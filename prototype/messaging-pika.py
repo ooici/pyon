@@ -95,7 +95,7 @@ class Publisher(object):
 def message_process(proc_id, msg_limit=20000, msgs_per_sec=None, send_first=True):
     print 'Starting process %d' % (proc_id)
     
-    cfg = {'host':'amoeba', 'virtual_host':'/', 'port':5672}
+    cfg = {'host':'localhost', 'virtual_host':'/', 'port':5672}
     params = ConnectionParameters(**cfg)
     connection = Connection(params)
 
@@ -132,6 +132,7 @@ def message_process(proc_id, msg_limit=20000, msgs_per_sec=None, send_first=True
     return mps
 
 def main():
+    print 'Here'
     setproctitle('messaging-pika')
 
     total_messages = 100000

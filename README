@@ -1,0 +1,17 @@
+Prototypes for ioncore-python in R2.
+
+You need the following installed before you can use ioncore R2:
+  - python 2.7
+  - virtualenv and virtualenvwrapper modules for your python 2.7 installation
+  - libevent 2.0
+    - This can easily be installed with Homebrew on a Mac or a package manager on linux.
+  - libyaml 3.0
+    - You need the -dev or -devel version on linux. If you don't have such a package, use extern/setup-libyaml.sh.
+    - The Homebrew version on a mac is sufficient.
+
+Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
+    mkvirtualenv --no-site-packages --python=python2.7 ion27
+    workon ion27
+
+Next install the python package dependencies with:
+    python setup.py install

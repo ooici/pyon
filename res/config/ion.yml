@@ -1,0 +1,14 @@
+# Central configuration file for ION services and modules.
+# The contents are transformed into a dict that supports dot notation:
+# CONF.broker.amqp.host
+# Do not modify this file! Set overrides in ion.local.yml
+
+server:
+  amqp:
+    host: amoeba.ucsd.edu
+    port: 5672
+    username: ems
+    password: ems
+    vhost: /
+    heartbeat: 30
+    
