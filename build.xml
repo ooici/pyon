@@ -1,0 +1,39 @@
+<!-- Ant build file for LCAarch -->
+<project name="ioncore-python" default="info" basedir=".">
+	<description>
+		This is the ANT build file for the OOI CI Python capability
+		container and service platform.
+	</description>
+
+	<!-- set global properties for this build -->
+	<property name="src" location="ion"/>
+	<property name="build" location="build"/>
+	<property name="dist"  location="dist"/>
+
+	<target name="info">
+		<echo message="ioncore-python ant build file. Specify a target to build."/>
+		<echo message="Run 'ant -p' to retrieve a list of targets."/>
+	</target>
+
+	<target name="init">
+		<!-- Create the time stamp -->
+		<tstamp/>
+	</target>
+
+	<target name="compile" depends="init" description="compile the source">
+		<!-- Precompiles all Python code without executing. Finds compile errors -->
+		<py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
+	</target>
+
+	<target name="clean" description="clean up">
+		<delete>
+			<fileset dir="${src}" includes="**/*.pyc"/>
+		</delete>
+		<delete dir="${build}"/>
+		<delete dir="${dist}"/>
+		<delete dir="ioncore.egg-info"/>
+		<delete dir="_trial_temp"/>
+		<!--<antcall target="remeggs"/>-->
+	</target>
+
+</project>

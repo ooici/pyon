@@ -4,6 +4,8 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import yaml
+
+from ion.core.util.ionlog import log
 from ion.util.containers import DotDict, dict_merge
 
 class Config(object):
