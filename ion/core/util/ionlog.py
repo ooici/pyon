@@ -50,7 +50,7 @@ class LogImportHook(ihooks.ModuleImporter):
     def import_module(self, name, globals=None, locals=None, fromlist=None):
         module = ihooks.ModuleImporter.import_module(self, name, globals, locals, fromlist)
 
-        if name in import_paths and 'log' in fromlist:
+        if name in import_paths and ('log' in fromlist or '*' in fromlist):
             log = get_scoped_log(2)
             setattr(module, 'log', log)
 
