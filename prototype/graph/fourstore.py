@@ -20,7 +20,7 @@ class Concurrent4Store(HTTP4Store, threading.local):
 def chunks(l, n):
     return [l[i:i+n] for i in range(0, len(l), n)]
 
-store = Concurrent4Store('http://localhost:8080')
+store = Concurrent4Store('http://localhost:8000')
 status = store.status()
 print status
 
@@ -40,34 +40,40 @@ triples = ['<%s> <%s> <%s> .' % (words[i], 'connects', words[i - 1])
 triple_count = len(triples)
 graph = '\n'.join(triples)
 
-# First just send the full graph
-time_start = time.time()
-store.append_graph(uri, graph, content_type='turtle')
-time_diff = time.time() - time_start
-print 'Took %.2f seconds to batch import %d triples' % (time_diff, len(triples))
+def send_batch():
+    # First just send the full graph
+    time_start = time.time()
+    store.append_graph(uri, graph, content_type='turtle')
+    time_diff = time.time() - time_start
+    print 'Took %.2f seconds to batch import %d triples' % (time_diff, len(triples))
 
-''' This next block makes a new connection for every triple, brutally slow.
-# Now send each triple individually, in batches of 10 requests at a time
-time_start = time.time()
-concurrency = 10
-for i in xrange(0, triple_count, concurrency):
-    some_triples = triples[i:i + concurrency]
-    wait([spawn(store.append_graph, uri, triple) for triple in some_triples])
+def send_concurrent():
+    # Now send each triple individually, in batches of 10 requests at a time
+    time_start = time.time()
+    concurrency = 10
+    for i in xrange(0, triple_count, concurrency):
+        some_triples = triples[i:i + concurrency]
+        wait([spawn(store.append_graph, uri, triple) for triple in some_triples])
 
-time_diff = time.time() - time_start
-print 'Took %.2f seconds to concurrent import %d triples' % (time_diff, len(triples))
-'''
+    time_diff = time.time() - time_start
+    print 'Took %.2f seconds to concurrent import %d triples' % (time_diff, len(triples))
 
-# Send each triple individually, but reuse HTTP connections
-@spawnf
-def append_all(triples):
-    for triple in triples:
-        store.append_graph(uri, triple)
-        
-time_start = time.time()
-concurrency = 10
-wait([append_all(some_triples) for some_triples in chunks(triples, triple_count/concurrency)])
-time_diff = time.time() - time_start
-print 'Took %.2f seconds to concurrent import %d triples' % (time_diff, len(triples))
+def send_concurrent_reuse():
+    # Send each triple individually, but reuse HTTP connections
+    @spawnf
+    def append_all(triples):
+        for triple in triples:
+            store.append_graph(uri, triple)
+    
+    time_start = time.time()
+    concurrency = 10
+    wait([append_all(some_triples) for some_triples in chunks(triples, triple_count/concurrency)])
+    time_diff = time.time() - time_start
+    print 'Took %.2f seconds to concurrent import %d triples' % (time_diff, len(triples))
 
-print store.sparql('SELECT * WHERE { ?s ?p ?o } LIMIT 10')
+import cProfile, pstats
+filename = 'fourstore.pstats'
+cProfile.run('send_concurrent_reuse()', filename)
+pstats.Stats(filename).sort_stats('time').print_stats(60)
+#print store.sparql('SELECT * WHERE { ?s ?p ?o } LIMIT 10')
+
