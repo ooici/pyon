@@ -33,7 +33,7 @@ def get_scoped_log(framestoskip=1):
     frame = sys._getframe(framestoskip)
     name = frame.f_locals.get('__name__', None)
 
-    while name in import_paths:
+    while name in import_paths and frame.f_back:
         frame = frame.f_back
         name = frame.f_locals.get('__name__', None)
 

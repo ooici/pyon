@@ -1,0 +1,3 @@
+[submodule "extern/compass"]
+	path = extern/compass
+	url = https://github.com/sunetos/Compass.git

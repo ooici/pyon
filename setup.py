@@ -35,5 +35,6 @@ setup(  name = 'ioncore_r2',
             'setproctitle==1.1.2',
             'pyyaml==3.10',
             'pika==0.9.5',
+            'httplib2==0.7.1',
         ],
      )
