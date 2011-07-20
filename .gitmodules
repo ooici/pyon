@@ -1,0 +1,3 @@
+[submodule "extern/ion-objects"]
+	path = extern/ion-objects
+	url = git@github.com:sunetos/ion-objects.git

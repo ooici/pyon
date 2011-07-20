@@ -69,11 +69,14 @@ def send_concurrent_reuse():
     concurrency = 10
     wait([append_all(some_triples) for some_triples in chunks(triples, triple_count/concurrency)])
     time_diff = time.time() - time_start
-    print 'Took %.2f seconds to concurrent import %d triples' % (time_diff, len(triples))
+    print 'Took %.2f seconds to concurrent import %d triples, reusing connections' % (time_diff, len(triples))
 
-import cProfile, pstats
-filename = 'fourstore.pstats'
-cProfile.run('send_concurrent_reuse()', filename)
-pstats.Stats(filename).sort_stats('time').print_stats(60)
+#import cProfile, pstats
+#filename = 'fourstore.pstats'
+#cProfile.run('send_concurrent_reuse()', filename)
+#pstats.Stats(filename).sort_stats('time').print_stats(60)
+
+send_concurrent_reuse()
+
 #print store.sparql('SELECT * WHERE { ?s ?p ?o } LIMIT 10')
 
