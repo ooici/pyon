@@ -67,6 +67,7 @@ class PythonProcess(IonProcess):
 
     def _spawn(self):
         proc = mp.Process(target=self.target, args=self.spawn_args, kwargs=self.spawn_kwargs)
+        proc.daemon = True
         proc.start()
         return proc
 
