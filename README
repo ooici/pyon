@@ -8,6 +8,8 @@ You need the following installed before you can use ioncore R2:
   - libyaml 3.0
     - You need the -dev or -devel version on linux. If you don't have such a package, use extern/setup-libyaml.sh.
     - The Homebrew version on a mac is sufficient.
+  - zeromq 2.1.x
+    - The Homebrew version on a mac is sufficient.
 
 Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
     mkvirtualenv --no-site-packages --python=python2.7 ion27
