@@ -3,7 +3,6 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from gevent import monkey; monkey.patch_all()
 import multiprocessing as mp
 
 from ion.util.async import *
