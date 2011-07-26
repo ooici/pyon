@@ -150,22 +150,3 @@ class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
     """ A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses. """
     pass
 
-if __name__ == '__main__':
-    import time
-    
-    def foo():
-        for i in xrange(10):
-            print 'i: %d' % i
-            time.sleep(0.1)
-
-    sup = GreenProcessSupervisor()
-    sup.start()
-    proc = sup.spawn(type='green', target=foo)
-    print sup.children
-    sup.join_children()
-    print sup.children
-
-    proc = sup.spawn(type='python', target=foo)
-    print sup.children
-    sup.join_children()
-    print sup.children
