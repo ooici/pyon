@@ -13,23 +13,51 @@ import yaml
 class IonObjectError(Exception):
     pass
 
-class IonObject(object):
-    def __init__(self, _def, _dict=None, **kwargs):
-        """
-        _def should be an instance of IonObjectDefinition.
-        Instead of instantiating these directly, you should go through an IonObjectRegistry.
+class IonObjectMetaType(type):
+    """
+    Metaclass that automatically generates subclasses of IonObject with the appropriate defaults for each field.
+    """
 
-        TODO: Use metaclasses to cache __dict__ defaults and generate custom types.
-        """
+    _type_cache = {}
 
-        self._def = _def
-        if _dict is not None:
-            self.__dict__ = _dict
+    def __call__(cls, _def, *args, **kwargs):
+        if _def in IonObjectMetaType._type_cache:
+            clsType = IonObjectMetaType._type_cache[_def]
         else:
-            # TODO: Probably needs to be a deepcopy
-            self.__dict__ = _def.default.copy()
-        
+            # Check that the object we are wrapping is an IonObjectDefinition
+            if not isinstance(_def, IonObjectDefinition):
+                raise IonObjectError('IonObject init first argument must be an IonObjectDefinition')
+
+            # Get the class name
+            clsName = '%s_%s_%s' % (cls.__name__, _def.type.name, _def.hash[:8])
+            clsDict = {'_def': _def}
+            clsDict.update(_def.default)
+            #clsDict['__slots__'] = clsDict.keys() + ['__weakref__']
+
+            clsType = IonObjectMetaType.__new__(IonObjectMetaType, clsName, (cls,), clsDict)
+            IonObjectMetaType._type_cache[_def] = clsType
+
+        # Finally allow the instantiation to occur, but slip in our new class type
+        obj = super(IonObjectMetaType, clsType).__call__(*args, **kwargs)
+        return obj
+
+class IonObject(object):
+    __metaclass__ = IonObjectMetaType
+    
+    def __init__(self, _dict=None, **kwargs):
+        """
+        Instead of instantiating these directly, you should go through an IonObjectRegistry.
+        If you need to instantiate directly, _def should be an instance of IonObjectDefinition.
+        """
+
+        if _dict is not None:
+            # TODO: Not doing a copy for performance reasons, verify this is safe with messaging
+            self.__dict__ = _dict
         self.__dict__.update(kwargs)
+
+    def __str__(self):
+        return '%s(%r)' % (self.__class__, self.__dict__)
+
 
 def hashfunc(text):
     return hashlib.sha1(text).hexdigest()
@@ -40,6 +68,8 @@ def is_hash(val):
 
 class IonObjectDefinition(object):
     """ An ION object definition, with a single parent type and a specific version. """
+
+    __slots__ = ('type', 'hash', 'default', 'def_text')
 
     def __init__(self, _type, hash, default, def_text):
         self.type = _type
@@ -52,6 +82,8 @@ class IonObjectType(object):
     An ION object type, with a single name and one or more defined versions.
     Versions are ordered by registration time, so the last version added is considered the latest.
     """
+
+    __slots__ = ('name', 'versions', 'latest_def')
 
     def __init__(self, name='<default>'):
         self.name = name
