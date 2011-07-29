@@ -31,7 +31,17 @@ class ObjectTest(unittest.TestCase):
         self.assertEqual(obj.time, datetime.datetime(2011, 7, 27, 2, 59, 43, 100000))
 
     def test_validate(self):
-        pass
+        obj = self.registry.new('SampleObject')
+        self.name = 'monkey'
+        self.int = 1
+        obj._validate()
+
+        obj.name = 3
+        self.assertRaises(AttributeError, obj._validate)
+
+        obj.name = 'monkey'
+        obj.extra_field = 5
+        self.assertRaises(AttributeError, obj._validate)
 
 if __name__ == '__main__':
     unittest.main()

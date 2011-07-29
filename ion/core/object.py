@@ -55,9 +55,27 @@ class IonObject(object):
         self.__dict__.update(kwargs)
 
     def __str__(self):
-        _dict = {key: getattr(self, key) for key in self._def.default.iterkeys()}
-        return '%s(%r)' % (self.__class__, _dict)
+        """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
+        _dict = self._def.default.copy()
+        _dict.update(self.__dict__)
+        #return '%s(%r)' % (self.__class__, _dict)
+        # If the yaml is too slow revert to the line above
+        name = '%s <%s>' % (self.__class__.__name__, id(self))
+        return yaml.dump({name: _dict}, default_flow_style=False)
 
+    def _validate(self):
+        """
+        Compare fields to the schema and raise AttributeError if mismatched.
+        Named _validate instead of validate because the data may have a field named "validate".
+        """
+        fields, schema = self.__dict__, self._def.default
+        extra_fields = fields.viewkeys() - schema.viewkeys()
+        if len(extra_fields) > 0:
+            raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
+        for key in fields.iterkeys():
+            if type(fields[key]) is not type(schema[key]):
+                raise AttributeError('Invalid %s for field "%s", should be %s' %
+                                     (type(fields[key]), key, type(schema[key])))
 
 def hashfunc(text):
     return hashlib.sha1(text).hexdigest()
