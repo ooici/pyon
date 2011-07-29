@@ -20,7 +20,7 @@ class IonObjectMetaType(type):
 
     _type_cache = {}
 
-    def __call__(cls, _def, *args, **kwargs):
+    def __call__(cls, _def, _dict=None, *args, **kwargs):
         if _def in IonObjectMetaType._type_cache:
             clsType = IonObjectMetaType._type_cache[_def]
         else:
@@ -28,7 +28,7 @@ class IonObjectMetaType(type):
             if not isinstance(_def, IonObjectDefinition):
                 raise IonObjectError('IonObject init first argument must be an IonObjectDefinition')
 
-            # Get the class name
+            # Generate a unique class name
             clsName = '%s_%s_%s' % (cls.__name__, _def.type.name, _def.hash[:8])
             clsDict = {'_def': _def}
             clsDict.update(_def.default)
@@ -38,7 +38,7 @@ class IonObjectMetaType(type):
             IonObjectMetaType._type_cache[_def] = clsType
 
         # Finally allow the instantiation to occur, but slip in our new class type
-        obj = super(IonObjectMetaType, clsType).__call__(*args, **kwargs)
+        obj = super(IonObjectMetaType, clsType).__call__(_dict, *args, **kwargs)
         return obj
 
 class IonObject(object):
@@ -47,16 +47,16 @@ class IonObject(object):
     def __init__(self, _dict=None, **kwargs):
         """
         Instead of instantiating these directly, you should go through an IonObjectRegistry.
-        If you need to instantiate directly, _def should be an instance of IonObjectDefinition.
+        If you need to instantiate directly, set _def to an instance of IonObjectDefinition.
         """
-
+        
         if _dict is not None:
-            # TODO: Not doing a copy for performance reasons, verify this is safe with messaging
-            self.__dict__ = _dict
+            self.__dict__.update(_dict)
         self.__dict__.update(kwargs)
 
     def __str__(self):
-        return '%s(%r)' % (self.__class__, self.__dict__)
+        _dict = {key: getattr(self, key) for key in self._def.default.iterkeys()}
+        return '%s(%r)' % (self.__class__, _dict)
 
 
 def hashfunc(text):

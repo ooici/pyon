@@ -26,8 +26,6 @@ class ObjectTest(unittest.TestCase):
         obj = self.registry.new(sample_def)
         obj = self.registry.new(sample_def.hash)
         obj = self.registry.new(sample_def.type.name)
-
-        print obj
         
         self.assertEqual(obj.name, '')
         self.assertEqual(obj.time, datetime.datetime(2011, 7, 27, 2, 59, 43, 100000))
