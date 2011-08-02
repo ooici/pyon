@@ -39,3 +39,24 @@ def wait(green_stuff):
         gevent.joinall(green_stuff)
         return [g.get() for g in green_stuff]
     return green_stuff.get()
+
+def blocking_cb(func, *args, **kwargs):
+    """
+    Wrap a function that takes a callback as its first parameter, to block and return its arguments as the result.
+    Really handy for working with callback-based APIs. Do not use in really frequently-called code.
+    If keyword args are supplied, they come through in a single dictionary to avoid out-of-order issues.
+    """
+    ev = Event()
+    ret_vals = []
+    def cb(*args, **kwargs):
+        ret_vals.extend(args)
+        if len(kwargs): ret_vals.append(kwargs)
+        ev.set()
+    kwargs[cb_arg] = cb
+    func(*args, **kwargs)
+    ev.wait()
+    if len(ret_vals) == 0:
+        return None
+    elif len(ret_vals) == 1:
+        return ret_vals[0]
+    return tuple(ret_vals)

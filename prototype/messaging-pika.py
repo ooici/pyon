@@ -1,14 +1,18 @@
 from gevent import monkey; monkey.patch_all()
 import gevent
+from gevent.event import Event
 
 import multiprocessing as mp
 import time
 from functools import wraps
 from setproctitle import setproctitle
 
-from pika.adapters import BlockingConnection as Connection
-#from pika.adapters import SelectConnection as Connection
+#from pika.adapters import BlockingConnection as Connection
+from pika.adapters import SelectConnection as Connection
 from pika import ConnectionParameters, BasicProperties
+
+import pika
+#setattr(pika.adapters.select_connection, 'SELECT_TYPE', 'select')
 
 loremIpsum = '''
 Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
@@ -25,6 +29,27 @@ def spawn(f):
 
 def gevent_switch():
     gevent.getcurrent().switch()
+
+def blocking_cb(func, cb_arg, *args, **kwargs):
+    """
+    Wrap a function that takes a callback as a named parameter, to block and return its arguments as the result.
+    Really handy for working with callback-based APIs. Do not use in really frequently-called code.
+    If keyword args are supplied, they come through in a single dictionary to avoid out-of-order issues.
+    """
+    ev = Event()
+    ret_vals = []
+    def cb(*args, **kwargs):
+        ret_vals.extend(args)
+        if len(kwargs): ret_vals.append(kwargs)
+        ev.set()
+    kwargs[cb_arg] = cb
+    func(*args, **kwargs)
+    ev.wait()
+    if len(ret_vals) == 0:
+        return None
+    elif len(ret_vals) == 1:
+        return ret_vals[0]
+    return tuple(ret_vals)
 
 class ReceiverTracker(object):
     def __init__(self, proc_id):
@@ -51,13 +76,17 @@ class ReceiverTracker(object):
         return msgs_sec
 
 class Receiver(object):
-    def __init__(self, proc_id, params, tracker, routing_key):
+    def __init__(self, proc_id, params, tracker, routing_key, connection=None):
         self.proc_id = proc_id
         self.tracker = tracker
         self.routing_key = routing_key
         
-        self.connection = Connection(params)
-        self.consume_channel = self.connection.channel()
+        if connection is not None:
+            self.connection = connection
+        else:
+            self.connection = Connection(params)
+        self.consume_channel = blocking_cb(self.connection.channel, 'on_open_callback')
+        print self.consume_channel
         #print '%d> Connected and ready to consume' % (self.proc_id)
 
     @spawn
@@ -72,10 +101,14 @@ class Receiver(object):
             gevent_switch()
 
 class Publisher(object):
-    def __init__(self, proc_id, params, routing_key, properties):
+    def __init__(self, proc_id, params, routing_key, properties, connection=None):
         self.proc_id = proc_id
-        self.connection = Connection(params)
-        self.publish_channel = self.connection.channel()
+        if connection is not None:
+            self.connection = connection
+        else:
+            self.connection = Connection(params)
+        self.publish_channel = blocking_cb(self.connection.channel, 'on_open_callback')
+        print self.publish_channel
         self.routing_key = routing_key
         self.properties = properties
 
@@ -98,14 +131,17 @@ def message_process(proc_id, msg_limit=20000, msgs_per_sec=None, send_first=True
     cfg = {'host':'localhost', 'virtual_host':'/', 'port':5672}
     params = ConnectionParameters(**cfg)
     connection = Connection(params)
+    gevent.spawn(connection.ioloop.start)
 
     exchange_name = 'simple-test-1'
     cfg = {'auto_delete':True, 'durable':False, 'exclusive':False}
-    channel = connection.channel()
+    channel = blocking_cb(connection.channel, 'on_open_callback')
+    print channel
     #exchange = channel.exchange_declare(exchange=exchange_name, **cfg)
 
     routing_key = 'simple-test-1-route-%d' % proc_id
-    queue = channel.queue_declare(queue=routing_key, **cfg)
+    queue = blocking_cb(channel.queue_declare, 'callback', queue=routing_key, **cfg)
+    print queue
 
     properties = BasicProperties(content_type='text/plain', delivery_mode=1)
 
@@ -121,7 +157,7 @@ def message_process(proc_id, msg_limit=20000, msgs_per_sec=None, send_first=True
     rtracker = ReceiverTracker(proc_id)
     receivers = [Receiver(proc_id, params, rtracker, routing_key) for i in xrange(worker_count)]
     rtracker.start()
-    finished = gevent.event.Event()
+    finished = Event()
     receivers = [rec.start_receiving(msg_limit, finished) for rec in receivers]
     finished.wait()
     gevent.killall(receivers)
@@ -135,9 +171,9 @@ def main():
     print 'Here'
     setproctitle('messaging-pika')
 
-    total_messages = 100000
+    total_messages = 10000
 
-    spawn_procs = True
+    spawn_procs = False
     if spawn_procs:
         process_count = mp.cpu_count()
         msgs_per_proc = total_messages/process_count

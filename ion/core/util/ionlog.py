@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-import ihooks
+import __builtin__
 import logging
 import sys
 
@@ -39,23 +39,23 @@ def get_scoped_log(framestoskip=1):
 
     log = get_logger(name) if name else None
     return log
-    
-class LogImportHook(ihooks.ModuleImporter):
+
+_orig___import__ = __import__
+def _import(name, globals=None, locals=None, fromlist=None, level=-1):
     """
     Magic import mechanism  to get a logger that's auto-scoped to the importing module. Example:
     from ion.base import scoped_log as log
 
     Inspects the stack; should be harmless since this is just syntactic sugar for module declarations.
     """
-    def import_module(self, name, globals=None, locals=None, fromlist=None):
-        module = ihooks.ModuleImporter.import_module(self, name, globals, locals, fromlist)
+    module = _orig___import__(name, globals, locals, fromlist)
 
-        if name in import_paths and ('log' in fromlist or '*' in fromlist):
-            log = get_scoped_log(2)
-            setattr(module, 'log', log)
+    if name in import_paths and ('log' in fromlist or '*' in fromlist):
+        log = get_scoped_log(2)
+        setattr(module, 'log', log)
 
-        return module
+    return module
+__builtin__.__import__ = _import
 
-LogImportHook().install()
 log = get_scoped_log()
 
