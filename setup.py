@@ -37,8 +37,8 @@ setup(  name = 'ioncore_r2',
             'pyyaml==3.10',
             'pika==0.9.5',
             'httplib2==0.7.1',
-            #'pyzmq==2.1.7',
-            #'gevent_zeromq==0.2.0',
+            'pyzmq==2.1.7',
+            'gevent_zeromq==0.2.0',
             'HTTP4Store==0.3.1'
         ],
      )

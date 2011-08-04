@@ -64,10 +64,12 @@ class NodeB(amqp.Node):
         if not self.running:
             raise #?
         result = event.AsyncResult()
-        def cb(ch):
+        def on_channel_open_ok(amq_chan):
+            ch = channel.SocketInterface(amq_chan, ch_type)
             result.set(ch)
-        self.client.channel(cb)
+        self.client.channel(on_channel_open_ok)
         ch = result.get()
+        #ch = channel.SocketInterface(client)
         return ch
 
 def ioloop(connection):
@@ -101,8 +103,20 @@ def testb():
     node, reactor = makeNode()
     ch = node.channel(channel.BaseChannel)
     print ch
+    ch.bind(('amq.direct', 'foo'))
+    print 'bound'
+    ch.listen(1)
+    print 'listening'
+    msg = ch.recv()
+    print 'message: ', msg
     reactor.join()
 
+def testbclient():
+    node, reactor = makeNode()
+    ch = node.channel(channel.BaseChannel)
+    print ch
+    ch.connect(('amq.direct', 'foo'))
+    ch.send('hey, whats up?')
 
 class NodeNB(amqp.Node):
     """
@@ -133,7 +147,7 @@ class NodeNB(amqp.Node):
         """
         """
 
-    def channel(self, name, ch_type):
+    def channel(self, ch_type):
         """
         ch_type is one of PointToPoint, etc.
         return Channel instance that will be activated with amqp_channel
@@ -142,7 +156,7 @@ class NodeNB(amqp.Node):
         name (exchange, key)
         name shouldn't need to be specified here, but it is for now
         """
-        ch = ch_type(name)
+        ch = ch_type()
         ch_id = self.id_pool.get_id()
         self.channels[ch_id] = ch
         if self.running:
@@ -157,10 +171,25 @@ class NodeNB(amqp.Node):
         """
         """
 
+class TestServer(channel.BaseChannel):
+
+    def do_config(self):
+        self.endpoint_name = ('amq.direct', 'foo')
+        self.queue = 'foo'
+        self.do_queue()
+
+class TestClient(channel.BaseChannel):
+
+    def do_config(self):
+        self.endpoint_name = ('amq.direct', 'foo')
+        self.send('test message')
+
+
 def testnb():
     node = NodeNB()
-    #ch = node.channel(('amq.direct', 'foo'), channel.PointToPointServer)
-    ch = node.channel(('amq.direct', 'foo'), channel.PointToPointClient)
+    #ch = node.channel(('amq.direct', 'foo'), TestServer)
+    #ch = node.channel(TestServer)
+    ch = node.channel(TestClient)
     conn_parameters = ConnectionParameters()
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     # Loop until CTRL-C
@@ -178,5 +207,6 @@ def testnb():
 
 
 if __name__ == '__main__':
-    testnb()
+    #testnb()
     #testb()
+    testbclient()

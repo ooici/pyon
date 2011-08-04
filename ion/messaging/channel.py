@@ -3,6 +3,9 @@
 
 from pika import BasicProperties
 
+from gevent import queue as gqueue
+from gevent import event
+
 class BaseChannel(object):
     """
     TODO: for synchronous method callbacks, the frame abstraction should
@@ -31,13 +34,12 @@ class BaseChannel(object):
     queue = None
     exchange = None
 
-    def __init__(self, name):
+    def __init__(self):
         """
-        name of channel (exchange, key)
-        needs work
         """
-        self.endpoint_name = name
-        #self.handler = handler
+        self._channel_bind_cb = None
+
+        self._consuming = 0
 
     def on_channel_open(self, amq_chan):
         """
@@ -45,7 +47,7 @@ class BaseChannel(object):
         print 'channel open'
         amq_chan.add_on_close_callback(self.on_channel_close)
         self.amq_chan = amq_chan
-        self.do_config()
+        self.do_config() # doesn't jive with blocking interface
 
     def on_channel_close(self, *a):
         """
@@ -60,7 +62,9 @@ class BaseChannel(object):
         XXX only use existing exchange now
         """
 
-    def do_queue(self):
+    def do_queue(self, callback=None):
+        if callback:
+            self._channel_bind_cb = callback
         self.amq_chan.queue_declare(callback=self._on_queue_declare_ok,
                                     queue=self.queue,
                                     auto_delete=self.queue_auto_delete,
@@ -87,11 +91,19 @@ class BaseChannel(object):
 
         nowait with consumer raises channel exception on error
         """
+        if self._channel_bind_cb:
+            self._channel_bind_cb()
+        else:
+            self._start_consumer()
+
+    def _start_consumer(self):
+        if self._consuming:
+            raise #?
         self.amq_chan.basic_consume(self._on_basic_deliver,
                                     queue=self.queue,
                                     no_ack=self.consumer_no_ack,
                                     exclusive=self.consumer_exclusive)
-        self.consuming = True # XXX ?
+        self._consuming = True # XXX ?
 
     def _on_exchange_declare_ok(self, frame):
         """
@@ -102,7 +114,13 @@ class BaseChannel(object):
         delivery comes with the channel context, so this can easily be
         intercepted before it gets here
         """
-        print 'basic deliver'
+        self.message_received(body)
+
+    def message_received(self, body):
+        """
+        implement
+        """
+        print 'message received'
         print body
 
     def send(self, data):
@@ -148,9 +166,6 @@ class PointToPointClient(BaseChannel):
     """
     """
 
-    def do_config(self):
-        self.send('dddddddddd')
-
 class PointToPointServer(BaseChannel):
     """
     """
@@ -174,12 +189,28 @@ class SocketInterface(object):
     Adds a blocking layer using gevent Async Events to achieve a socket/0mq like behavior.
     """
 
-    def __init__(self, chan):
-        self.chan = chan
+    def __init__(self, amq_chan, ch_type):
+        #amq_chan.add_on_close_callback(self.on_channel_close)
+        self.amq_chan = amq_chan
+        ch_proto = ch_type()
+        ch_proto.message_received = self.message_received
+        ch_proto.on_channel_open(amq_chan)
+        self.ch_proto = ch_proto
 
         self.exchange = None
         self.routing_key = None
         self.queue = None
+
+        self._bound = 0
+        self._receive_queue = gqueue.Queue()
+
+        self._connected = 0
+
+    def on_channel_close(self, *a):
+        print 'channel close'
+
+    def message_received(self, msg):
+        self._receive_queue.put(msg)
 
     def accept(self):
         """
@@ -188,6 +219,26 @@ class SocketInterface(object):
     def bind(self, name):
         """
         """
+        if self._bound:
+            raise #?
+        self._bound = 1
+        self._bind_name = name
+        self.ch_proto.endpoint_name = name
+        self.ch_proto.queue = name[1]
+
+        # not sure if we need this here?
+        self.exchange = name[0]
+        self.routing_key = name[1]
+        self.queue = name[1] # XXX for prototype, assume p2p
+
+        result = event.AsyncResult()
+        def channel_bound_ok():
+            result.set()
+
+        self.ch_proto.do_queue(channel_bound_ok) # XXX 
+        result.wait()
+        return
+
 
     def close(self):
         """
@@ -196,10 +247,24 @@ class SocketInterface(object):
     def connect(self, name):
         """
         """
+        self._connect_name = name
+        self.ch_proto.endpoint_name = name
+        self.ch_proto.queue = name[1]
+        self._connected = 1 #?
+
 
     def listen(self, n):
         """
         """
+        if self._bound:
+            self.ch_proto._start_consumer()
+        else:
+            raise #?
+
+    def recv(self, *args):
+        """
+        """
+        return self._receive_queue.get()
 
     def recv_into(self, callback):
         """
@@ -208,6 +273,7 @@ class SocketInterface(object):
     def send(self, data):
         """
         """
+        self.ch_proto.send(data)
 
     def sendto(self, data, name):
         """
