@@ -1,5 +1,7 @@
 """
 Tentatively named prototype
+
+
 """
 import ion
 
@@ -65,7 +67,7 @@ class NodeB(amqp.Node):
             raise #?
         result = event.AsyncResult()
         def on_channel_open_ok(amq_chan):
-            ch = channel.SocketInterface(amq_chan, ch_type)
+            ch = channel.SocketInterface.Socket(amq_chan, ch_type)
             result.set(ch)
         self.client.channel(on_channel_open_ok)
         ch = result.get()
@@ -100,7 +102,7 @@ def makeNode():
     return node, ioloop_process
 
 def testb():
-    node, reactor = makeNode()
+    node, ioloop_process = makeNode()
     ch = node.channel(channel.BaseChannel)
     print ch
     ch.bind(('amq.direct', 'foo'))
@@ -109,14 +111,34 @@ def testb():
     print 'listening'
     msg = ch.recv()
     print 'message: ', msg
-    reactor.join()
+    ioloop_process.join()
 
 def testbclient():
-    node, reactor = makeNode()
-    ch = node.channel(channel.BaseChannel)
+    node, ioloop_process = makeNode()
+    ch = node.channel(channel.BidirectionalClient)
     print ch
     ch.connect(('amq.direct', 'foo'))
+    print 'sending'
     ch.send('hey, whats up?')
+    print 'sent'
+    print 'receiving'
+    msg = ch.recv()
+    print 'message: ', msg
+
+def test_accept():
+    node, ioloop_process = makeNode()
+    ch = node.channel(channel.Bidirectional)
+    print ch
+    ch.bind(('amq.direct', 'foo'))
+    print 'bound'
+    ch.listen(1)
+    ch_serv = ch.accept() # do we need the name of the connected peer?
+    print 'accepted'
+    msg = ch_serv.recv()
+    print 'message: ', msg
+    ch_serv.send('not much, dude')
+
+    ioloop_process.join()
 
 class NodeNB(amqp.Node):
     """
@@ -174,22 +196,22 @@ class NodeNB(amqp.Node):
 class TestServer(channel.BaseChannel):
 
     def do_config(self):
-        self.endpoint_name = ('amq.direct', 'foo')
+        self._chan_name = ('amq.direct', 'foo')
         self.queue = 'foo'
         self.do_queue()
 
 class TestClient(channel.BaseChannel):
 
     def do_config(self):
-        self.endpoint_name = ('amq.direct', 'foo')
+        self._peer_name = ('amq.direct', 'foo')
         self.send('test message')
 
 
 def testnb():
     node = NodeNB()
     #ch = node.channel(('amq.direct', 'foo'), TestServer)
-    #ch = node.channel(TestServer)
-    ch = node.channel(TestClient)
+    ch = node.channel(TestServer)
+    #ch = node.channel(TestClient)
     conn_parameters = ConnectionParameters()
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     # Loop until CTRL-C
@@ -210,3 +232,4 @@ if __name__ == '__main__':
     #testnb()
     #testb()
     testbclient()
+    #test_accept()
