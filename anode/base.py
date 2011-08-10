@@ -10,10 +10,10 @@ __license__ = 'Apache 2.0'
 __all__ = []
 
 # Tell the magic import log setup to pass through this file
-from anode.core.util.log import import_paths
+from anode.util.log import import_paths
 import_paths.append(__name__)
 
-from anode.core.util.log import log
+from anode.util.log import log
 __all__ += ['log']
 
 from anode.core.bootstrap import CONF

@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.core.util.config import Config
+from anode.util.config import Config
 from anode.core.object import AnodeObjectRegistry
 
 # Note: do we really want to do the res folder like this again?
