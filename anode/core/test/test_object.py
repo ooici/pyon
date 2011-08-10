@@ -7,14 +7,14 @@ import os
 import unittest
 import datetime
 
-import ion
-from ion.core.object import IonObjectRegistry
+import anode
+from anode.core.object import IonObjectRegistry
 
 class ObjectTest(unittest.TestCase):
     def setUp(self):
         # TODO: Change the hacky hardcoded path once we have path management
         self.registry = IonObjectRegistry()
-        path = os.path.join(ion.__path__[0], '..', 'obj', 'prototype', 'sample.yml')
+        path = os.path.join(anode.__path__[0], '..', 'obj', 'prototype', 'sample.yml')
         defs_yaml = open(path, 'r').read()
         self.registry.register_yaml(defs_yaml)
 

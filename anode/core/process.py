@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 import multiprocessing as mp
 
-from ion.util.async import *
+from anode.util.async import *
 
 class IonProcessError(Exception):
     pass

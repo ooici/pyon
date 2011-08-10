@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 import unittest
 
-from ion.util.async import blocking_cb
+from anode.util.async import blocking_cb
 
 class AsyncTest(unittest.TestCase):
     def i_call_callbacks(self, cb):

@@ -44,7 +44,7 @@ _orig___import__ = __import__
 def _import(name, globals=None, locals=None, fromlist=None, level=-1):
     """
     Magic import mechanism  to get a logger that's auto-scoped to the importing module. Example:
-    from ion.base import scoped_log as log
+    from anode.base import scoped_log as log
 
     Inspects the stack; should be harmless since this is just syntactic sugar for module declarations.
     """

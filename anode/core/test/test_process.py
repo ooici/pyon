@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 import unittest
 
-from ion.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
+from anode.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
 
 class ProcessTest(unittest.TestCase):
     def setUp(self):

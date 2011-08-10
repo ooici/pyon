@@ -3,7 +3,7 @@ Tentatively named prototype
 
 
 """
-import ion
+import anode
 
 import gevent
 from gevent import event
@@ -12,8 +12,8 @@ from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
 from pika import BasicProperties
 
-from ion.messaging import channel
-from ion.messaging import amqp
+from anode.net import channel
+from anode.net import amqp
 
 class IDPool(object):
     """

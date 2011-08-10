@@ -5,8 +5,8 @@ __license__ = 'Apache 2.0'
 
 import yaml
 
-from ion.core.util.ionlog import *
-from ion.util.containers import DotDict, dict_merge
+from anode.core.util.ionlog import *
+from anode.util.containers import DotDict, dict_merge
 
 class Config(object):
     """
