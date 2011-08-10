@@ -2,6 +2,6 @@
 
 ARGS=$@
 if [ -z "$ARGS" ]; then
-    ARGS="ion"
+    ARGS="anode"
 fi
 python -m unittest discover -v $ARGS

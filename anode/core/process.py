@@ -16,7 +16,7 @@ class BaseProcess(object):
     """
 
     def __init__(self, target=None, *args, **kwargs):
-        super(AnodeProcess, self).__init__()
+        super(BaseProcess, self).__init__()
 
         if target is not None or not hasattr(self, 'target'):   # Allow setting target at class level
             self.target = target
@@ -72,8 +72,8 @@ class BaseProcess(object):
             self.stop()
 
 
-class GreenProcess(AnodeProcess):
-    """ An AnodeProcess that uses a greenlet to do its work. """
+class GreenProcess(BaseProcess):
+    """ An BaseProcess that uses a greenlet to do its work. """
 
     def _pid(self):
         return id(self.proc)
@@ -90,8 +90,8 @@ class GreenProcess(AnodeProcess):
     def _running(self):
         return self.proc.started
 
-class PythonProcess(AnodeProcess):
-    """ An AnodeProcess that uses a full OS process to do its work. """
+class PythonProcess(BaseProcess):
+    """ An BaseProcess that uses a full OS process to do its work. """
 
     def _pid(self):
         return self.proc.pid
