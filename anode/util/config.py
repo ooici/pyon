@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 import yaml
 
-from anode.core.util.ionlog import *
+from anode.util.log import *
 from anode.util.containers import DotDict, dict_merge
 
 class Config(object):

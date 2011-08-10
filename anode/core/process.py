@@ -7,16 +7,16 @@ import multiprocessing as mp
 
 from anode.util.async import *
 
-class IonProcessError(Exception):
+class AnodeProcessError(Exception):
     pass
 
-class IonProcess(object):
+class BaseProcess(object):
     """
     Base process class for doing work. There will be subclasses for various process kinds like greenlets.
     """
 
     def __init__(self, target=None, *args, **kwargs):
-        super(IonProcess, self).__init__()
+        super(AnodeProcess, self).__init__()
 
         if target is not None or not hasattr(self, 'target'):   # Allow setting target at class level
             self.target = target
@@ -72,8 +72,8 @@ class IonProcess(object):
             self.stop()
 
 
-class GreenProcess(IonProcess):
-    """ An IonProcess that uses a greenlet to do its work. """
+class GreenProcess(AnodeProcess):
+    """ An AnodeProcess that uses a greenlet to do its work. """
 
     def _pid(self):
         return id(self.proc)
@@ -90,8 +90,8 @@ class GreenProcess(IonProcess):
     def _running(self):
         return self.proc.started
 
-class PythonProcess(IonProcess):
-    """ An IonProcess that uses a full OS process to do its work. """
+class PythonProcess(AnodeProcess):
+    """ An AnodeProcess that uses a full OS process to do its work. """
 
     def _pid(self):
         return self.proc.pid
