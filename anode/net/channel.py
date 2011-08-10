@@ -80,6 +80,12 @@ class ChannelProtocol(object):
     """
     """
 
+    def message_received(self, msg):
+        """
+        msg is a unit of data, some kind of object depending on what kind
+        of Channel it is
+        """
+
 class BaseChannel(object):
     """
     Channel Protocol
@@ -146,7 +152,6 @@ class BaseChannel(object):
     def on_channel_open(self, amq_chan):
         """
         """
-        print 'channel open'
         amq_chan.add_on_close_callback(self.on_channel_close)
         self.amq_chan = amq_chan
         self.do_config() # doesn't jive with blocking interface
@@ -257,7 +262,6 @@ class BaseChannel(object):
         self.queue = frame.method.queue #XXX who really defines queue!!
         if not self._chan_name[1]:
             self._chan_name = (self._chan_name[0], self.queue) # XXX total HACK!!!
-        print 'queue ', self.queue
         self.amq_chan.queue_bind(callback=self._on_queue_bind_ok,
                                 queue=self.queue,
                                 exchange=self._chan_name[0],
@@ -296,10 +300,6 @@ class BaseChannel(object):
                                     exclusive=self.consumer_exclusive)
         self._consuming = True # XXX ?
 
-    def _on_exchange_declare_ok(self, frame):
-        """
-        """
-
     def _on_basic_deliver(self, chan, method_frame, header_frame, body):
         """
         delivery comes with the channel context, so this can easily be
@@ -317,13 +317,6 @@ class BaseChannel(object):
         # and functional
 
         self.message_received(body)
-
-    def message_received(self, body):
-        """
-        implement
-        """
-        print 'message received'
-        print body
 
     def send(self, data):
         """
@@ -355,9 +348,6 @@ class BaseChannel(object):
                             correlation_id=correlation_id,
                             message_id=message_id)
         # data is assumed to be properly encoded 
-        print 'sending'
-        print exchange, routing_key
-        print props
         self.amq_chan.basic_publish(exchange=exchange, #todo  
                                 routing_key=routing_key, #todo 
                                 body=data,
@@ -442,7 +432,6 @@ class Bidirectional(BaseChannel):
         message_type = header_frame.type
         # ensure proper type
         #self.message_received(body)
-        print header_frame
         reply_to = tuple(header_frame.reply_to.split(','))
         self._build_accepted_channel(reply_to, body)
 
@@ -486,7 +475,6 @@ class Bidirectional(BaseChannel):
         a listening Channel can establish a temp queue for interactions
         specific to this Node/Channel
         """
-        print 'chan_name ', self._chan_name
         message_type = "rr-data" # request-response data
         reply_to = "%s,%s" % self._chan_name # encode the tuple 
         #correlation_id = uuid.uuid4().hex # move to lower level
@@ -527,7 +515,6 @@ class BidirectionalClient(BaseChannel):
         a listening Channel can establish a temp queue for interactions
         specific to this Node/Channel
         """
-        print 'chan_name ', self._chan_name
         message_type = "rr-data" # request-response data
         reply_to = "%s,%s" % self._chan_name # encode the tuple 
         #correlation_id = uuid.uuid4().hex # move to lower level
@@ -652,9 +639,11 @@ class SocketInterface(object):
         return
 
 
-    def listen(self, n):
+    def listen(self, n=1):
         """
         Channel must be bound to a name to start listening
+
+        The n parameter will map to a qos setting where appropriate
 
         If the channel is in a good state, then a consumer is started.
         Depending on the interaction protocol, different things can happen
