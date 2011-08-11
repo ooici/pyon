@@ -11,6 +11,7 @@ from collections import OrderedDict, defaultdict
 from weakref import WeakSet, WeakValueDictionary
 
 import yaml
+from anode.util import yaml_ordered_dict
 
 class AnodeObjectError(Exception):
     pass

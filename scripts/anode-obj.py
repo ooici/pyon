@@ -19,7 +19,6 @@ templates = {
 '''#!/usr/bin/env python
 
 from zope.interface import Interface
-import datetime
 
 {classes}
 '''
@@ -79,7 +78,8 @@ if args.action == 'generate':
                     if isinstance(val, basestring):
                         val = "'%s'" % (val)
                     elif isinstance(val, datetime.datetime):
-                        val = "datetime.datetime('%s')" % (val)
+                        # TODO: generate the datetime code
+                        val = "'%s'" % (val)
                     args.append(templates['arg'].format(name=key, val=val))
                 args_str = ', '.join(args)
 
@@ -87,7 +87,6 @@ if args.action == 'generate':
 
         methods_str = '\n\n'.join(methods)
         _class = templates['class'].format(name=name, methods=methods_str)
-        print _class
         
         interface_contents = templates['file'].format(classes=_class)
         open(interface_file, 'w').write(interface_contents)
