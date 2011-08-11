@@ -19,6 +19,7 @@ templates = {
 '''#!/usr/bin/env python
 
 from zope.interface import Interface
+from collections import OrderedDict
 
 {classes}
 '''
