@@ -44,7 +44,7 @@ if os.getcwd().endswith('scripts'):
     sys.exit('This script needs to be run from the anode root.')
 
 if args.action == 'generate':
-    interface_dir = 'interface'
+    service_dir, interface_dir = 'obj/services', 'interface'
     if not os.path.exists(interface_dir):
         os.makedirs(interface_dir)
 
@@ -57,39 +57,43 @@ if args.action == 'generate':
 
     # Generate the new definitions, for now giving each yaml file its own python service
     file_re = re.compile('(obj)/(.*)[.](yml)')
-    files = obj_types.source_files
-    files.remove('obj/ion.yml')
-    for yaml_file in files:
-        interface_file, count = file_re.subn(r'interface/\2.py', yaml_file)
-        if not count: continue
+    for root, dirs, files in os.walk(service_dir):
+        for filename in fnmatch.filter(files, '*.yml'):
+            yaml_file = os.path.join(root, filename)
+            file_match = file_re.match(yaml_file)
+            if file_match is None: continue
 
-        parent_dir = os.path.dirname(interface_file)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
+            interface_name = file_match.group(2).rsplit(os.sep)[-1]
+            interface_file = file_re.sub(r'interface/\2.py', yaml_file)
 
-        methods = []
-        yaml_text = open(yaml_file, 'r').read()
-        defs = yaml.load_all(yaml_text)
-        for def_set in defs:
-            for name,_def in def_set.iteritems():
-                # TODO: Handle more than one definition version for the same object type
-                
-                args = []
-                for key,val in _def.iteritems():
-                    if isinstance(val, basestring):
-                        val = "'%s'" % (val)
-                    elif isinstance(val, datetime.datetime):
-                        # TODO: generate the datetime code
-                        val = "'%s'" % (val)
-                    args.append(templates['arg'].format(name=key, val=val))
-                args_str = ', '.join(args)
+            parent_dir = os.path.dirname(interface_file)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
 
-                methods.append(templates['method'].format(name=name, args=args_str))
+            methods = []
+            yaml_text = open(yaml_file, 'r').read()
+            defs = yaml.load_all(yaml_text)
+            for def_set in defs:
+                for name,_def in def_set.iteritems():
+                    # TODO: Handle more than one definition version for the same object type
 
-        methods_str = '\n\n'.join(methods)
-        _class = templates['class'].format(name=name, methods=methods_str)
-        
-        interface_contents = templates['file'].format(classes=_class)
-        open(interface_file, 'w').write(interface_contents)
+                    args = []
+                    for key,val in _def.iteritems():
+                        if isinstance(val, basestring):
+                            val = "'%s'" % (val)
+                        elif isinstance(val, datetime.datetime):
+                            # TODO: generate the datetime code
+                            val = "'%s'" % (val)
+                        args.append(templates['arg'].format(name=key, val=val))
+                    args_str = ', '.join(args)
+
+                    methods.append(templates['method'].format(name=name, args=args_str))
+
+            methods_str = '\n\n'.join(methods)
+            class_name = interface_name.title().replace('_', '').replace('-', '')
+            _class = templates['class'].format(name=class_name, methods=methods_str)
+
+            interface_contents = templates['file'].format(classes=_class)
+            open(interface_file, 'w').write(interface_contents)
 
 
