@@ -41,7 +41,8 @@ class Config(object):
                 self.paths_loaded.add(path)
             except IOError:
                 # TODO: Log this correctly once logging is implemented
-                print 'CONFIG NOT FOUND: %s' % (path)
+                if not path.endswith('.local.yml'):
+                    print 'CONFIG NOT FOUND: %s' % (path)
 
         self.data = data
 

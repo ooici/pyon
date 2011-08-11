@@ -14,10 +14,10 @@ if sys.platform == 'darwin':
 
 version = '0.1'
 
-setup(  name = 'ioncore_r2',
+setup(  name = 'anode',
         version = version,
         description = 'OOI ION Python Capability Container and Core Modules',
-        url = 'https://github.com/ooici/ioncore-python-r2',
+        url = 'https://github.com/ooici/anode',
         download_url = 'http://ooici.net/releases',
         license = 'Apache 2.0',
         author = 'Adam R. Smith',

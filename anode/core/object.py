@@ -4,6 +4,8 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import re
+import os
+import fnmatch
 import hashlib
 from collections import OrderedDict, defaultdict
 from weakref import WeakSet, WeakValueDictionary
@@ -138,6 +140,7 @@ class AnodeObjectRegistry(object):
         self.type_by_name = defaultdict(AnodeObjectType)
         self.instances = WeakSet()
         self.instances_by_name = WeakValueDictionary()
+        self.source_files = []
 
     def get_def(self, _def):
         """
@@ -195,4 +198,23 @@ class AnodeObjectRegistry(object):
                 # TODO: Hook into pyyaml's event emitting stuff to try to get the canonical form without re-dumping
                 def_text = yaml.dump(_def, canonical=True, allow_unicode=True)
                 self.register_def(name, _def, def_text)
+
+    def register_yaml_dir(self, yaml_dir, do_first=[]):
+        """
+        Recursively find all *.yml files under yaml_dir, concatenate into a big blob, and merge the yaml
+        contents into the registry. Files in do_first will be prepended to the blob if found.
+        """
+
+        yaml_files = [os.path.join(yaml_dir, file) for file in do_first]
+        skip_me = set(yaml_files)
+
+        for root, dirs, files in os.walk(yaml_dir):
+            for file in fnmatch.filter(files, '*.yml'):
+                path = os.path.join(root, file)
+                if not path in skip_me:
+                    yaml_files.append(path)
+
+        yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files)))
+        self.register_yaml(yaml_text)
+        self.source_files += yaml_files
 

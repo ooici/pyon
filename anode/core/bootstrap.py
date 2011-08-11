@@ -11,3 +11,4 @@ conf_paths = ['res/config/anode.yml', 'res/config/anode.local.yml']
 CONF = Config(conf_paths).data
 
 obj_types = AnodeObjectRegistry()
+obj_types.register_yaml_dir('obj', ['ion.yml'])
