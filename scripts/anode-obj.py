@@ -5,6 +5,7 @@ __license__ = 'Apache 2.0'
 
 from anode.base import obj_types
 
+from collections import OrderedDict
 import datetime
 import fnmatch
 import os
@@ -19,17 +20,16 @@ templates = {
 '''#!/usr/bin/env python
 
 from zope.interface import Interface
-from collections import OrderedDict
 
 {classes}
 '''
     , 'class':
-'''class {name}(Interface):
+'''class I{name}(Interface):
 {methods}
 '''
     , 'method':
 '''
-    def {name}(self, {args}):
+    def {name}({args}):
         pass
 '''
     , 'arg': '{name}={val}'
@@ -84,12 +84,14 @@ if args.action == 'generate':
                         elif isinstance(val, datetime.datetime):
                             # TODO: generate the datetime code
                             val = "'%s'" % (val)
+                        elif isinstance(val, OrderedDict):
+                            val = dict(val)
                         args.append(templates['arg'].format(name=key, val=val))
                     args_str = ', '.join(args)
 
                     methods.append(templates['method'].format(name=name, args=args_str))
 
-            methods_str = '\n\n'.join(methods)
+            methods_str = ''.join(methods)
             class_name = interface_name.title().replace('_', '').replace('-', '')
             _class = templates['class'].format(name=class_name, methods=methods_str)
 

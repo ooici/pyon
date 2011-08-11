@@ -1,10 +1,15 @@
 sample_ping:
   name: ''
   time: 2011-07-27T02:59:43.1Z
-  _int: 0
-  _float: 0.0
-  _str: ''
+  an_int: 0
+  a_float: 0.0
+  a_str: ''
   none:
-  _dict: {}
-  _list: []
+  a_dict: {}
+  a_list: []
+
+sample_other_op:
+  foo: bar
+  num: 84
+  
   
