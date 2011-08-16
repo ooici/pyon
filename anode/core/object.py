@@ -42,13 +42,12 @@ class AnodeObjectMetaType(type):
             AnodeObjectMetaType._type_cache[_def] = clsType
 
         # Auto-copy the defaults so we can use __dict__ authoritatively and simplify the code
-        if _dict is None:
-            _dict = _def.default.copy()
-            if type(_dict) is not dict:     # Must be dict and not a subclass
-                _dict = dict(_dict)
+        __dict__ = dict(_def.default)
+        if _dict is not None:
+            __dict__.update(_dict)
             
         # Finally allow the instantiation to occur, but slip in our new class type
-        obj = super(AnodeObjectMetaType, clsType).__call__(_dict, *args, **kwargs)
+        obj = super(AnodeObjectMetaType, clsType).__call__(__dict__, *args, **kwargs)
         return obj
 
 class AnodeObjectBase(object):
@@ -61,7 +60,6 @@ class AnodeObjectBase(object):
         """
         
         if _dict is not None:
-            #self.__dict__.update(_dict)
             self.__dict__ = _dict       # Don't copy here, assume this came through the metaclass
         self.__dict__.update(kwargs)
 
