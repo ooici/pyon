@@ -42,11 +42,25 @@ class DataStore:
 
     def list_objects(self, dataStoreName=None):
         """
-        List all data types existing in the data store instance.
+        List all object types existing in the data store instance.
         """
         pass
 
-    def read_object(self, objectId, rev_id=None, dataStoreName=None):
+    def list_object_revisions(self, objectId, dataStoreName=None):
+        """
+        Method for itemizing all the versions of a particular object
+        known to the data store.
+        """
+        pass
+
+    def create(self, object, dataStoreName=None):
+        """"
+        Persist a new object in the data store. An '_id' and initial
+        '_rev' value will be added to the doc.
+        """
+        pass
+
+    def read(self, objectId, rev_id=None, dataStoreName=None):
         """"
         Fetch an object instance.  If rev_id is specified, an attempt
         will be made to return that specific object version.  Otherwise,
@@ -54,34 +68,24 @@ class DataStore:
         """
         pass
 
-    def list_object_revisions(self, objectId, dataStoreName=None):
+    def update(self, object, dataStoreName=None):
         """
-        Method for itemizing all the versions of a particular object
-        known to the data source.
-        """
-        pass
-
-    def write_object(self, object, dataStoreName=None):
-        """
-        Persist an object to the data store.  If this is a new object,
-        an initial '_rev' value will be added to the doc.  If this is
-        an object update, the '_rev' value must exist in the object.
-        This method will check the '_rev' value to ensure that the object
-        being written is based on the most recent known object version.
-        If not, a VersionConflictError is thrown.
+        Update an existing object in the data store.  The '_rev' value
+        must exist in the object and must be the most recent known object
+        version. If not, a VersionConflictError is thrown.
         """
         pass
 
-    def delete_object(self, object, dataStoreName=None):
+    def delete(self, object, dataStoreName=None):
         """
-        Remove all versions of specified type from the data store.
+        Remove all versions of specified object from the data store.
         This method will check the '_rev' value to ensure that the object
         provided is the most recent known object version.  If not, a
         VersionConflictError is thrown.
         """
         pass
 
-    def find_objects(self, type, key=None, keyValue=None, dataStoreName=None):
+    def find(self, type, key=None, keyValue=None, dataStoreName=None):
         """
         Generic query function that allows searching on:
         object type -- or -- object type and key value

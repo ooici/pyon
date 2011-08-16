@@ -23,10 +23,14 @@ class Directory_Service:
             self.dataStore = CouchDB_DataStore(dataStoreName=dataStoreName)
         else:
             self.dataStore = MockDB_DataStore(dataStoreName=dataStoreName)
+
+    def delete(self):
         try:
             self.dataStore.delete_datastore()
         except NotFoundError:
             pass
+
+    def create(self):
         self.dataStore.create_datastore()
 
         directory_obj = {}

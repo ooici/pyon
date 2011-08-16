@@ -5,6 +5,9 @@ import unittest
 class Test_Directory_Service(unittest.TestCase):
 
     def doTest(self,directory_service):
+        directory_service.delete()
+        directory_service.create()
+
         root = directory_service.read("/")
         print "Directory root content: " + str(root)
 

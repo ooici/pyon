@@ -1,0 +1,18 @@
+DataSet:
+  type_: DataSet
+  owner_:
+  lastmodified_:
+  Description:
+  ContactInstitution:
+  ContactName:
+  ContactEmail:
+  MinLatitude:
+  MaxLatitude:
+  MinLongitude:
+  MaxLongitude:
+  UpperBound:
+  LowerBound:
+  VerticalPositive:
+  MinDatetime:
+  MaxDatetime:
+  Variables:

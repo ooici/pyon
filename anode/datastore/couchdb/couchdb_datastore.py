@@ -1,10 +1,10 @@
 import couchdb
-import json
-import simplejson
 
 from anode.datastore.datastore import DataStore, NotFoundError
 
 from couchdb.http import ResourceNotFound
+
+from anode.core.bootstrap import AnodeObject
 
 class CouchDB_DataStore(DataStore):
 
@@ -56,18 +56,6 @@ class CouchDB_DataStore(DataStore):
             objs.append(obj)
         return objs
 
-    def read_object(self, objectId, rev_id=None, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        db = self.server[dataStoreName]
-        if rev_id == None:
-            print 'Reading head version of object ' + dataStoreName + '/' + str(objectId)
-            obj = db.get(objectId)
-        else:
-            print 'Reading version ' + str(rev_id) + ' of object ' + dataStoreName + '/' + str(objectId)
-            obj = db.get(objectId,rev=rev_id)
-        return obj
-
     def list_object_revisions(self, objectId, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
@@ -79,22 +67,45 @@ class CouchDB_DataStore(DataStore):
             res.append(ent["_rev"])
         return res
 
-    def write_object(self, object, dataStoreName=None):
+    def create(self, object, dataStoreName=None):
+        print "XXXXXXXXXX Object in create: " + str(object.__dict__)
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
-        print 'Saving new version of object ' + dataStoreName + '/' + object["_id"]
-        res = self.server[dataStoreName].save(object)
+        print 'Creating new object ' + dataStoreName + '/' + object.type_
+        res = self.server[dataStoreName].save(object.__dict__)
         return res
 
-    def delete_object(self, object, dataStoreName=None):
+    def read(self, objectId, rev_id=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         db = self.server[dataStoreName]
-        print 'Deleting object ' + dataStoreName + '/' + object["_id"]
-        res = db.delete(object)
+        if rev_id == None:
+            print 'Reading head version of object ' + dataStoreName + '/' + str(objectId)
+            doc = db.get(objectId)
+        else:
+            print 'Reading version ' + str(rev_id) + ' of object ' + dataStoreName + '/' + str(objectId)
+            doc = db.get(objectId, rev=rev_id)
+        print "XXXXXXXXX doc from read: " + str(doc)
+        retObj = AnodeObject(doc.type_, doc)
+        return obj
+
+    def update(self, object, dataStoreName=None):
+        print "XXXXXXXXXX Object in update: " + str(object.__dict__)
+        if dataStoreName == None:
+            dataStoreName = self.dataStoreName
+        print 'Saving new version of object ' + dataStoreName + '/' + object.type_ + '/' + object._id
+        res = self.server[dataStoreName].save(object.__dict__)
+        return res
+
+    def delete(self, object, dataStoreName=None):
+        if dataStoreName == None:
+            dataStoreName = self.dataStoreName
+        db = self.server[dataStoreName]
+        print 'Deleting object ' + dataStoreName + '/' + object._id
+        res = db.delete(object.__dict__)
         return True
 
-    def find_objects(self, type, key=None, keyValue=None, dataStoreName=None):
+    def find(self, type, key=None, keyValue=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         db = self.server[dataStoreName]
@@ -104,13 +115,15 @@ class CouchDB_DataStore(DataStore):
         }'''
         query = db.query(map_fun)
         results = []
-        for obj in list(query[[type]]):
+        for doc in list(query[[type]]):
             try:
                 if keyValue == None:
-                    results.append(obj.value)
+                    obj = AnodeObject(doctype_, doc)
+                    results.append(obj)
                 else:
-                    if obj.value[key] == keyValue:
-                        results.append(obj.value)
+                    if doc.value[key] == keyValue:
+                        obj = AnodeObject(doc.type_, doc)
+                        results.append(obj)
             except KeyError:
                 pass
 
