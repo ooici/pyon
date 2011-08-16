@@ -16,8 +16,8 @@ import_paths.append(__name__)
 from anode.util.log import log
 __all__ += ['log']
 
-from anode.core.bootstrap import CONF, obj_types
-__all__ += ['CONF', 'obj_types']
+from anode.core.bootstrap import CONF, obj_registry
+__all__ += ['CONF', 'obj_registry']
 
 from anode.util.async import spawn, switch
 __all__ += ['spawn', 'switch']

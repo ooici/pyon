@@ -32,7 +32,8 @@ class AnodeObjectMetaType(type):
                 raise AnodeObjectError('AnodeObject init first argument must be an AnodeObjectDefinition')
 
             # Generate a unique class name
-            clsName = '%s_%s_%s' % (cls.__name__, _def.type.name, _def.hash[:8])
+            base_name = 'AnodeObject'
+            clsName = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
             clsDict = {'_def': _def}
             clsDict.update(_def.default)
             #clsDict['__slots__'] = clsDict.keys() + ['__weakref__']
@@ -44,7 +45,7 @@ class AnodeObjectMetaType(type):
         obj = super(AnodeObjectMetaType, clsType).__call__(_dict, *args, **kwargs)
         return obj
 
-class AnodeObject(object):
+class AnodeObjectBase(object):
     __metaclass__ = AnodeObjectMetaType
     
     def __init__(self, _dict=None, **kwargs):
@@ -172,7 +173,7 @@ class AnodeObjectRegistry(object):
         """ See get_def() for definition lookup options. """
 
         _def = self.get_def(_def)
-        obj = AnodeObject(_def, _dict, **kwargs)
+        obj = AnodeObjectBase(_def, _dict, **kwargs)
         self.instances.add(obj)
         self.instances_by_name[_def.type.name] = obj
         return obj
@@ -200,7 +201,7 @@ class AnodeObjectRegistry(object):
                 def_text = yaml.dump(_def, canonical=True, allow_unicode=True)
                 self.register_def(name, _def, def_text)
 
-    def register_yaml_dir(self, yaml_dir, do_first=[]):
+    def register_yaml_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         """
         Recursively find all *.yml files under yaml_dir, concatenate into a big blob, and merge the yaml
         contents into the registry. Files in do_first will be prepended to the blob if found.
@@ -208,8 +209,10 @@ class AnodeObjectRegistry(object):
 
         yaml_files = [os.path.join(yaml_dir, file) for file in do_first]
         skip_me = set(yaml_files)
+        exclude_dirs = set([os.path.join(yaml_dir, path) for path in exclude_dirs])
 
         for root, dirs, files in os.walk(yaml_dir):
+            if root in exclude_dirs: continue
             for file in fnmatch.filter(files, '*.yml'):
                 path = os.path.join(root, file)
                 if not path in skip_me:

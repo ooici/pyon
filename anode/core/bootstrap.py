@@ -10,5 +10,11 @@ from anode.core.object import AnodeObjectRegistry
 conf_paths = ['res/config/anode.yml', 'res/config/anode.local.yml']
 CONF = Config(conf_paths).data
 
-obj_types = AnodeObjectRegistry()
-obj_types.register_yaml_dir('obj', ['ion.yml'])
+obj_registry = AnodeObjectRegistry()
+obj_registry.register_yaml_dir('obj', ['ion.yml'], ['services'])
+
+# Make a default factory for AnodeObjects
+AnodeObject = obj_registry.new
+
+svc_registry = AnodeObjectRegistry()
+svc_registry.register_yaml_dir('obj/services')

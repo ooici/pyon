@@ -3,12 +3,13 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
+import anode
+from anode.core.object import AnodeObjectRegistry
+from anode.core.bootstrap import AnodeObject
+
 import os
 import unittest
 import datetime
-
-import anode
-from anode.core.object import AnodeObjectRegistry
 
 class ObjectTest(unittest.TestCase):
     def setUp(self):
@@ -42,6 +43,11 @@ class ObjectTest(unittest.TestCase):
         obj.name = 'monkey'
         obj.extra_field = 5
         self.assertRaises(AttributeError, obj._validate)
+
+    def test_bootstrap(self):
+        """ Use the factory and singleton from bootstrap.py/base.py """
+        obj = AnodeObject('SampleObject')
+        self.assertEqual(obj.name, '')
 
 if __name__ == '__main__':
     unittest.main()

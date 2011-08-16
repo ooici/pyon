@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.base import obj_types
+from anode.base import obj_registry
 
 from collections import OrderedDict
 import datetime
