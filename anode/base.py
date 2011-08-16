@@ -22,3 +22,8 @@ __all__ += ['CONF', 'obj_types']
 from anode.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
+from anode.core.process import AnodeProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
+__all__ += ['AnodeProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
+
+from anode.net import messaging, channel
+__all__ += ['messaging', 'channel']
