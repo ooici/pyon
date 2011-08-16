@@ -41,6 +41,10 @@ class AnodeObjectMetaType(type):
             clsType = AnodeObjectMetaType.__new__(AnodeObjectMetaType, clsName, (cls,), clsDict)
             AnodeObjectMetaType._type_cache[_def] = clsType
 
+        # Auto-copy the defaults so we can use __dict__ authoritatively and simplify the code
+        if _dict is None:
+            _dict = dict(_def.default.copy())
+            
         # Finally allow the instantiation to occur, but slip in our new class type
         obj = super(AnodeObjectMetaType, clsType).__call__(_dict, *args, **kwargs)
         return obj
@@ -55,13 +59,13 @@ class AnodeObjectBase(object):
         """
         
         if _dict is not None:
-            self.__dict__.update(_dict)
+            #self.__dict__.update(_dict)
+            self.__dict__ = _dict       # Don't copy here, assume this came through the metaclass
         self.__dict__.update(kwargs)
 
     def __str__(self):
         """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
-        _dict = self._def.default.copy()
-        _dict.update(self.__dict__)
+        _dict = self.__dict__
         #return '%s(%r)' % (self.__class__, _dict)
         # If the yaml is too slow revert to the line above
         name = '%s <%s>' % (self.__class__.__name__, id(self))

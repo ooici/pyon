@@ -42,6 +42,7 @@ class ObjectTest(unittest.TestCase):
 
         obj.name = 'monkey'
         obj.extra_field = 5
+        
         self.assertRaises(AttributeError, obj._validate)
 
     def test_bootstrap(self):
