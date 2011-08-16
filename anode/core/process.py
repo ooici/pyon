@@ -3,9 +3,11 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-import multiprocessing as mp
-
 from anode.util.async import *
+from anode.util.log import log
+
+import time
+import multiprocessing as mp
 
 class AnodeProcessError(Exception):
     pass
@@ -33,7 +35,7 @@ class BaseProcess(object):
     def _spawn(self):
         pass
 
-    def _join(self):
+    def _join(self, timeout=None):
         pass
 
     def _stop(self):
@@ -66,9 +68,9 @@ class BaseProcess(object):
         if self.supervisor is not None:
                 self.supervisor.child_stopped(self)
 
-    def join(self):
+    def join(self, timeout=None):
         if self.proc is not None:
-            self._join()
+            self._join(timeout)
             self.stop()
 
 
@@ -81,8 +83,8 @@ class GreenProcess(BaseProcess):
     def _spawn(self):
         return spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
 
-    def _join(self):
-        return self.proc.join()
+    def _join(self, timeout=None):
+        return self.proc.join(timeout)
 
     def _stop(self):
         return self.proc.kill()
@@ -102,8 +104,8 @@ class PythonProcess(BaseProcess):
         proc.start()
         return proc
 
-    def _join(self):
-        return self.proc.join()
+    def _join(self, timeout=None):
+        return self.proc.join(timeout)
 
     def _stop(self):
         return self.proc.terminate()
@@ -138,13 +140,42 @@ class ProcessSupervisor(object):
     def child_stopped(self, proc):
         if proc in self.children: self.children.remove(proc)
 
-    def join_children(self):
+    def join_children(self, timeout=None):
+        """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
+
+        time_start = time.time()
+        child_count = len(self.children)
+
         while len(self.children):
-            self.children.pop().join()
+            proc = self.children.pop()
+            
+            time_elapsed = time.time() - time_start
+            if timeout is not None:
+                time_remaining = timeout - time_elapsed
+                if time_remaining > 0:
+                    proc.join(time_remaining)
+                else:
+                    proc.stop()
+            else:
+                proc.join()
+
+        time_elapsed = time.time() - time_start
+        log.debug('Took %.2fs to shutdown %d child processes' % (time_elapsed, child_count))
+
+        return time_elapsed
 
     def target(self):
         # TODO: Implement monitoring and such
         pass
+
+    def shutdown(self, timeout=30.0):
+        """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
+
+        # TODO: use signals to absolutely guarantee shutdown even if there are busy loops in greenlets
+        elapsed = self.join_children(timeout)
+        self.stop()
+
+        return elapsed
 
 class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
     """ A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses. """

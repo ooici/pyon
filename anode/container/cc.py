@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.base import messaging, channel, GreenProcessSupervisor
+from anode.base import CFG, messaging, channel, GreenProcessSupervisor
 
 class Container(object):
     """
@@ -12,5 +12,9 @@ class Container(object):
     """
     def __init__(self):
         self.proc_sup = GreenProcessSupervisor()
-        
+        self.proc_sup.start()
+
+    def stop(self):
+        # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
+        self.proc_sup.shutdown(CFG.container.timeout.shutdown)
 

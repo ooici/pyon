@@ -1,6 +1,6 @@
 # Central configuration file for Anode services and modules.
 # The contents are transformed into a dict that supports dot notation:
-# CONF.broker.amqp.host
+# CFG.broker.amqp.host
 # Do not modify this file! Set overrides in anode.local.yml
 
 server:
@@ -11,4 +11,8 @@ server:
     password: ems
     vhost: /
     heartbeat: 30
+
+container:
+  timeout:
+    shutdown: 30.0
     
