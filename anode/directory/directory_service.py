@@ -66,11 +66,8 @@ class Directory_Service:
 
         # Now at end of parent path, add key and value, throwing
         # exception if key already exists
-        try:
-            if key in parentDict:
-                raise KeyAlreadyExistsError
-        except KeyError:
-            pass
+        if key in parentDict:
+            raise KeyAlreadyExistsError
 
         parentDict[key] = value
         self.dataStore.update(directory)
