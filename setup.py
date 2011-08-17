@@ -41,5 +41,6 @@ setup(  name = 'anode',
             'gevent_zeromq==0.2.0',
             'HTTP4Store==0.3.1',
             'zope.interface==3.6.4',
+            'couchdb==0.8',
         ],
      )

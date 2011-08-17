@@ -10,8 +10,11 @@ You need the following installed before you can use ioncore R2:
     - The Homebrew version on a mac is sufficient.
   - zeromq 2.1.x
     - The Homebrew version on a mac is sufficient.
+  - couchdb 0.8
+    - The Homebrew version on a mac is sufficient.
+
 Short version to setup a mac (assumes python 2.7 is already setup):
-  brew install libevent libyaml zeromq
+  brew install libevent libyaml zeromq couchdb
 
 Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
     mkvirtualenv --no-site-packages --python=python2.7 ion27
