@@ -3,6 +3,10 @@ import simplejson
 
 from anode.datastore.datastore import DataStore, DataStoreError, VersionConflictError
 
+from anode.core.bootstrap import AnodeObject
+
+from uuid import uuid4
+
 class MockDB_DataStore(DataStore):
 
     def __init__(self, dataStoreName='prototype'):
@@ -49,7 +53,43 @@ class MockDB_DataStore(DataStore):
                 objs.append(key)
         return objs
 
-    def read_object(self, objectId, rev_id=None, dataStoreName=None):
+    def list_object_revisions(self, objectId, dataStoreName=None):
+        if dataStoreName == None:
+            dataStoreName = self.dataStoreName
+        print 'Listing all versions of object ' + dataStoreName + '/' + str(objectId)
+        objs = []
+        for key, value in self.root[dataStoreName].items():
+            if key.find('_version_counter') == -1 and (key == objectId or key.find(objectId + '_version_') == 0):
+                objs.append(key)
+        return objs
+
+    def create(self, object, dataStoreName=None):
+        if dataStoreName == None:
+            dataStoreName = self.dataStoreName
+        try:
+            dataStoreDict = self.root[dataStoreName]
+        except KeyError:
+            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+
+        print 'Creating new object ' + dataStoreName + '/' + object.type_
+
+        # Assign an id
+        object._id = uuid4().hex
+        objectId = object._id
+
+        # Also add specific version element
+        versionCounterKey = '__' + objectId + '_version_counter'
+        versionCounter = 1
+
+        object._rev = versionCounter
+
+        # Overwrite HEAD
+        dataStoreDict[objectId] = object.__dict__
+        dataStoreDict[versionCounterKey] = versionCounter
+        dataStoreDict[objectId + '_version_' + str(versionCounter)] = object.__dict__
+        return (objectId, str(versionCounter))
+
+    def read(self, objectId, rev_id=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         try:
@@ -64,22 +104,14 @@ class MockDB_DataStore(DataStore):
             else:
                 print 'Reading version ' + str(rev_id) + ' of object ' + dataStoreName + '/' + str(objectId)
                 key += '_version_' + str(rev_id)
-            obj = dataStoreDict[key]
+            doc = dataStoreDict[key]
+
+            obj = AnodeObject(doc["type_"], doc)
         except KeyError:
             raise DataStoreError('Object does not exist.')
         return obj
 
-    def list_object_revisions(self, objectId, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        print 'Listing all versions of object ' + dataStoreName + '/' + str(objectId)
-        objs = []
-        for key, value in self.root[dataStoreName].items():
-            if key.find('_version_counter') == -1 and (key == objectId or key.find(objectId + '_version_') == 0):
-                objs.append(key)
-        return objs
-
-    def write_object(self, object, dataStoreName=None):
+    def update(self, object, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         try:
@@ -87,40 +119,34 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
 
-        objectId = object["_id"]
-        # Also add specific version element
-        versionCounterKey = '__' + objectId + '_version_counter'
-        versionCounter = 0
-        try :
-            versionCounter = dataStoreDict[versionCounterKey] + 1
-        except KeyError:
-            pass
-
         try:
-            baseVersion = object["_rev"]
+            objectId = object._id
+            versionCounterKey = '__' + objectId + '_version_counter'
+            baseVersion = object._rev
+            versionCounter = dataStoreDict[versionCounterKey] + 1
             if baseVersion != versionCounter - 1:
                 raise VersionConflictError('Object not based on most current version')
         except KeyError:
-            pass
+            raise DataStoreError("Object missing required _id and/or _rev values")
 
-        print 'Saving new version of object ' + dataStoreName + '/' + object["_id"]
-        object["_rev"] = versionCounter
+        print 'Saving new version of object ' + dataStoreName + '/' + object.type_ + '/' + object._id
+        object._rev = versionCounter
 
         # Overwrite HEAD
-        dataStoreDict[objectId] = object
+        dataStoreDict[objectId] = object.__dict__
         dataStoreDict[versionCounterKey] = versionCounter
-        dataStoreDict[objectId + '_version_' + str(versionCounter)] = object
+        dataStoreDict[objectId + '_version_' + str(versionCounter)] = object.__dict__
         return (objectId, str(versionCounter))
 
-    def delete_object(self, object, dataStoreName=None):
+    def delete(self, object, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         try:
             dataStoreDict = self.root[dataStoreName]
         except KeyError:
             raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
-        print 'Deleting object ' + dataStoreName + '/' + object["_id"]
-        objectId = object["_id"]
+        print 'Deleting object ' + dataStoreName + '/' + object.type_ + '/' + object._id
+        objectId = object._id
         try:
             if objectId in dataStoreDict.keys():
                 for key in dataStoreDict.keys():
@@ -132,7 +158,7 @@ class MockDB_DataStore(DataStore):
             raise DataStoreError('Object ' + objectId + ' does not exist.')
         return True
 
-    def find_objects(self, type, key=None, keyValue=None, dataStoreName=None):
+    def find(self, type, key=None, keyValue=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         try:
@@ -146,12 +172,12 @@ class MockDB_DataStore(DataStore):
             print "where key: " + key + " has value: " + str(keyValue)
         for objId in self.list_objects(dataStoreName):
             try:
-                obj = self.read_object(objId, rev_id=None, dataStoreName=dataStoreName)
-                if obj["_type"] == type:
+                obj = self.read(objId, rev_id=None, dataStoreName=dataStoreName)
+                if obj.type_ == type:
                     if keyValue == None:
                         results.append(obj)
                     else:
-                        if obj[key] == keyValue:
+                        if getattr(obj, key) == keyValue:
                             results.append(obj)
             except KeyError:
                 pass

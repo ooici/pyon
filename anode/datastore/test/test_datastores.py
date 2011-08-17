@@ -90,14 +90,17 @@ class Test_DataStores(unittest.TestCase):
         print "\nFind all UserInfo objects"
         res = data_source.find("UserInfo")
         print 'Query results: ' + str(res)
+        self.assertTrue(len(res) == 3)
 
         print "\nFind UserInfo object specifically for user 'Heitor Villa-Lobos'"
         res = data_source.find("UserInfo", "Name", "Heitor Villa-Lobos")
         print 'Query results: ' + str(res)
+        self.assertTrue(len(res) == 1)
+        userInfoObj = res[0]
+        self.assertTrue(userInfoObj.Name == "Heitor Villa-Lobos")
 
         print "\nCreate a sample data set object"
         dataSet = AnodeObject('DataSet')
-        print "XXXXXXXXXX DataSet object before value set: " + str(dataSet)
 
         dataSet.Description = "Real-time water data for Choptank River near Greensboro, MD"
         dataSet.ContactInstitution = "USGS NWIS"
@@ -119,41 +122,38 @@ class Test_DataStores(unittest.TestCase):
         }
         dataSet.owner_ = HeitorVillaLobos_OOI_ID
         dataSet.lastmodified_ = HeitorVillaLobos_OOI_ID
-        print "XXXXXXXXXX DataSet object after value set: " + str(dataSet)
 
         print "Writing DataSet object"
-        writeTuple = data_source.create(dataSet)
-        print "XXXXXXXXXX write object ret: " + str(writeTuple)
+        writeTuple1 = data_source.create(dataSet)
 
-        DataSet_UUID = writeTuple[0]
+        DataSet_UUID = writeTuple1[0]
 
         dataSetReadObj = data_source.read(DataSet_UUID)
-        print "XXXXXXXXXXX Read DataSet Object: " + str(dataSetReadObj)
+        self.assertTrue(dataSetReadObj._id == DataSet_UUID)
+        self.assertTrue(dataSetReadObj.type_ == "DataSet")
+        self.assertTrue(dataSetReadObj.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
         dataSetReadObj.Description = "Updated Description"
 
-        print "\Update DataSet"
-        tuple1 = data_source.update(dataSetReadObj)
-        print 'Write returned tuple: ' + str(tuple1)
+        print "\nUpdate DataSet"
+        writeTuple2 = data_source.update(dataSetReadObj)
 
         print "\nList all objects in data store"
         print data_source.list_objects()
 
         print "\nRetrieve updated DataSet"
         dataSetReadObj2 = data_source.read(DataSet_UUID)
-        print 'Returned object: ' + str(dataSetReadObj2)
+        self.assertTrue(dataSetReadObj2._id == DataSet_UUID)
+        self.assertTrue(dataSetReadObj2.Description == "Updated Description")
 
         print "\nList revisions of DataSet in data store"
         res = data_source.list_object_revisions(DataSet_UUID)
-        print 'Versions: ' + str(res)
 
          # Another update to the object
         dataSetReadObj2.Description = "USGS instantaneous value data for station 01491000"
 
-        print "Doc before update 2: " + str(dataSetReadObj2)
-        print "\nUpdate DataSet in data store"
-        tuple3 = data_source.update(dataSetReadObj2)
-        print 'Write returned tuple: ' + str(tuple3)
+        print "\nUpdate DataSet again"
+        writeTuple3 = data_source.update(dataSetReadObj2)
 
         print "\nList all object types in data store"
         print data_source.list_objects()
@@ -162,48 +162,47 @@ class Test_DataStores(unittest.TestCase):
         res = data_source.list_object_revisions(DataSet_UUID)
         print 'Versions: ' + str(res)
 
-        print "\nRetrieve version " + str(tuple1[1]) + " of object 'USGS Choptank' in data store"
-        obj1 = data_source.read(DataSet_UUID, rev_id=tuple1[1])
-        print 'Returned object: ' + str(obj1)
-        print 'Returned object rev: ' + str(obj1["_rev"])
+        print "\nRetrieve version " + str(writeTuple1[1]) + " of DataSet"
+        obj1 = data_source.read(DataSet_UUID, rev_id=writeTuple1[1])
+        self.assertTrue(obj1._id == DataSet_UUID)
+        self.assertTrue(obj1.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
-        print "\nRetrieve version " + str(tuple2[1]) + " of object 'USGS Choptank' in data store"
-        obj2 = data_source.read(DataSet_UUID, rev_id=tuple2[1])
-        print 'Returned object: ' + str(obj2)
-        print 'Returned object rev: ' + str(obj2["_rev"])
+        print "\nRetrieve version " + str(writeTuple2[1]) + " of DataSet"
+        obj2 = data_source.read(DataSet_UUID, rev_id=writeTuple2[1])
+        self.assertTrue(obj2._id == DataSet_UUID)
+        self.assertTrue(obj2.Description == "Updated Description")
 
-        print "\nRetrieve version " + str(tuple3[1]) + " of object 'USGS Choptank' in data store"
-        obj3 = data_source.read(DataSet_UUID, rev_id=tuple3[1])
-        print 'Returned object: ' + str(obj3)
-        print 'Returned object rev: ' + str(obj3["_rev"])
+        print "\nRetrieve version " + str(writeTuple3[1]) + " of DataSet"
+        obj3 = data_source.read(DataSet_UUID, rev_id=writeTuple3[1])
+        self.assertTrue(obj3._id == DataSet_UUID)
+        self.assertTrue(obj3.Description == "USGS instantaneous value data for station 01491000")
 
-        print "\nRetrieve HEAD version of object 'USGS Choptank' in data store"
+        print "\nRetrieve HEAD version of DataSet"
         head = data_source.read(DataSet_UUID)
-        print 'Returned object: ' + str(head)
-        print 'Returned object rev: ' + str(head["_rev"])
+        self.assertTrue(head._id == DataSet_UUID)
+        self.assertTrue(head.Description == "USGS instantaneous value data for station 01491000")
 
-        print "\n2 Delete object 'USGS Choptank' in data store"
+        print "\nDelete DataSet"
         ret = data_source.delete(head)
-        print 'Delete returned: ' + str(ret)
 
         print "\nList all objects in data store"
         print data_source.list_objects()
 
-        print "\nList revisions of object 'USGS Choptank' in data store"
-        res = data_source.list_object_revisions('USGS Choptank')
-        print 'Versions: ' + str(res)
+        print "\nList revisions of now deleted DataSet"
+        res = data_source.list_object_revisions(DataSet_UUID)
+        self.assertTrue(len(res) == 0)
 
         print "\nList info about data store"
         print data_source.info_datastore()
 
         print "\nDelete data store"
-        print data_source.delete_datastore()
+        self.assertTrue(data_source.delete_datastore())
 
         print "\nList data store on server:"
         print data_source.list_datastores()
 
-#    def test_non_persistent(self):
-#        self.doTestdata_source(MockDB_DataStore(dataStoreName='my_ds'))
+    def test_non_persistent(self):
+        self.doTestdata_source(MockDB_DataStore(dataStoreName='my_ds'))
 
     def test_persistent(self):
         self.doTestdata_source(CouchDB_DataStore(dataStoreName='my_ds'))

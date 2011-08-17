@@ -4,7 +4,7 @@ import unittest
 
 class Test_Directory_Service(unittest.TestCase):
 
-    def doTest(self,directory_service):
+    def doTest(self, directory_service):
         directory_service.delete()
         directory_service.create()
 
@@ -36,10 +36,10 @@ class Test_Directory_Service(unittest.TestCase):
         print "Directory root content: " + str(root)
 
     def test_non_persistent(self):
-        self.doTest(Directory_Service(dataStoreName='my_ds',persistent=False))
+        self.doTest(Directory_Service(dataStoreName='my_directory_ds',persistent=False))
 
     def test_persistent(self):
-        self.doTest(Directory_Service(dataStoreName='my_ds',persistent=True))
+        self.doTest(Directory_Service(dataStoreName='my_directory_ds',persistent=True))
 
 if __name__ == "__main__":
     unittest.main()

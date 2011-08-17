@@ -6,6 +6,8 @@ from couchdb.http import ResourceNotFound
 
 from anode.core.bootstrap import AnodeObject
 
+from uuid import uuid4
+
 class CouchDB_DataStore(DataStore):
 
     def __init__(self, host='localhost', port=5984, dataStoreName='prototype', options=None):
@@ -68,10 +70,10 @@ class CouchDB_DataStore(DataStore):
         return res
 
     def create(self, object, dataStoreName=None):
-        print "XXXXXXXXXX Object in create: " + str(object.__dict__)
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         print 'Creating new object ' + dataStoreName + '/' + object.type_
+        object._id = uuid4().hex
         res = self.server[dataStoreName].save(object.__dict__)
         return res
 
@@ -85,12 +87,10 @@ class CouchDB_DataStore(DataStore):
         else:
             print 'Reading version ' + str(rev_id) + ' of object ' + dataStoreName + '/' + str(objectId)
             doc = db.get(objectId, rev=rev_id)
-        print "XXXXXXXXX doc from read: " + str(doc)
-        retObj = AnodeObject(doc.type_, doc)
+        obj = AnodeObject(doc["type_"], doc)
         return obj
 
     def update(self, object, dataStoreName=None):
-        print "XXXXXXXXXX Object in update: " + str(object.__dict__)
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         print 'Saving new version of object ' + dataStoreName + '/' + object.type_ + '/' + object._id
@@ -115,14 +115,18 @@ class CouchDB_DataStore(DataStore):
         }'''
         query = db.query(map_fun)
         results = []
-        for doc in list(query[[type]]):
+        print "Searching for objects of type: " + str(type) + " in data store: " + dataStoreName
+        if key != None:
+            print "where key: " + key + " has value: " + str(keyValue)
+        for row in list(query[[type]]):
+            doc = row.value
             try:
                 if keyValue == None:
-                    obj = AnodeObject(doctype_, doc)
+                    obj = AnodeObject(doc["type_"], doc)
                     results.append(obj)
                 else:
-                    if doc.value[key] == keyValue:
-                        obj = AnodeObject(doc.type_, doc)
+                    if doc[key] == keyValue:
+                        obj = AnodeObject(doc["type_"], doc)
                         results.append(obj)
             except KeyError:
                 pass

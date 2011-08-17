@@ -13,9 +13,11 @@ class KeyAlreadyExistsError(DirectoryServiceError):
 class KeyNotFoundError(DirectoryServiceError):
     pass
 
+from anode.core.bootstrap import AnodeObject
+
 class Directory_Service:
 
-    objName = "DirectoryObj_"
+    objId = ""
     objType = "DirectoryObjType_"
 
     def __init__(self, dataStoreName, persistent=False):
@@ -33,16 +35,15 @@ class Directory_Service:
     def create(self):
         self.dataStore.create_datastore()
 
-        directory_obj = {}
-        directory_obj["_id"] = self.objName
-        directory_obj["type_"] = self.objType
-        directory_obj["content"] = {}
+        directory_obj = AnodeObject('Directory')
+        print "Directory obj: " + str(directory_obj)
 
-        self.dataStore.write_object(directory_obj)
+        createTuple = self.dataStore.create(directory_obj)
+        self.objId = createTuple[0]
 
     def findDict(self, parent):
-        directoryDoc = self.dataStore.read_object(self.objName)
-        parentDict = directoryDoc["content"]
+        directory = self.dataStore.read(self.objId)
+        parentDict = directory.Content
 
         if parent == '/':
             # We're already at the root
@@ -58,10 +59,10 @@ class Directory_Service:
                     except KeyError:
                         parentDict[pathElement] = {}
                         parentDict = parentDict[pathElement]
-        return directoryDoc, parentDict
+        return directory, parentDict
 
     def add(self, parent, key, value):
-        directoryDoc, parentDict = self.findDict(parent)
+        directory, parentDict = self.findDict(parent)
 
         # Now at end of parent path, add key and value, throwing
         # exception if key already exists
@@ -72,11 +73,11 @@ class Directory_Service:
             pass
 
         parentDict[key] = value
-        self.dataStore.write_object(directoryDoc)
+        self.dataStore.update(directory)
         return value
 
     def update(self, parent, key, value):
-        directoryDoc, parentDict = self.findDict(parent)
+        directory, parentDict = self.findDict(parent)
 
         # Now at end of parent path, add key and value, throwing
         # exception if key not found
@@ -86,11 +87,11 @@ class Directory_Service:
             raise KeyNotFoundError
 
         parentDict[key] = value
-        self.dataStore.write_object(directoryDoc)
+        self.dataStore.update(directory)
         return value
 
     def read(self, parent, key=None):
-        directoryDoc, parentDict = self.findDict(parent)
+        directory, parentDict = self.findDict(parent)
         if key == None:
             return parentDict
 
@@ -101,10 +102,10 @@ class Directory_Service:
         return val
 
     def remove(self, parent, key):
-        directoryDoc, parentDict = self.findDict(parent)
+        directory, parentDict = self.findDict(parent)
         try:
             val = parentDict.pop(key)
-            self.dataStore.write_object(directoryDoc)
+            self.dataStore.update(directory)
         except KeyError:
             raise KeyNotFoundError
         return val
