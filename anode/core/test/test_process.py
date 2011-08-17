@@ -37,22 +37,25 @@ class ProcessTest(unittest.TestCase):
         sup = GreenProcessSupervisor()
         sup.start()
 
+        import gevent
+        self.assertIs(time.sleep, gevent.hub.sleep)
+
         # Test that it takes at least the given timeout to join_children, but not much more
-        proc_sleep_secs = 0.001
-        [sup.spawn('green', time.sleep, proc_sleep_secs)]
+        proc_sleep_secs, proc_count = 0.01, 5
+        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(proc_sleep_secs)
         self.assertGreaterEqual(elapsed, proc_sleep_secs)
-        self.assertLess(elapsed, proc_sleep_secs*1.5)
+        self.assertLess(elapsed, proc_sleep_secs*3)
 
         # Test that a small timeout forcibly shuts down without waiting
-        wait_secs = 0.000001
-        [sup.spawn('green', time.sleep, proc_sleep_secs)]
+        wait_secs = 0.0001
+        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(wait_secs)
         self.assertGreaterEqual(elapsed, wait_secs)
         self.assertLess(elapsed, proc_sleep_secs)
 
         # Test that no timeout waits until all finished
-        [sup.spawn('green', time.sleep, proc_sleep_secs)]
+        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown()
         self.assertGreaterEqual(elapsed, proc_sleep_secs)
 
