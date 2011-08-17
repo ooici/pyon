@@ -3,6 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
+import copy
 import re
 import os
 import fnmatch
@@ -35,14 +36,14 @@ class AnodeObjectMetaType(type):
             base_name = 'AnodeObject'
             clsName = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
             clsDict = {'_def': _def}
-            clsDict.update(_def.default)
+            clsDict.update(copy.deepcopy(_def.default))
             #clsDict['__slots__'] = clsDict.keys() + ['__weakref__']
 
             clsType = AnodeObjectMetaType.__new__(AnodeObjectMetaType, clsName, (cls,), clsDict)
             AnodeObjectMetaType._type_cache[_def] = clsType
 
         # Auto-copy the defaults so we can use __dict__ authoritatively and simplify the code
-        __dict__ = dict(_def.default)
+        __dict__ = copy.deepcopy(dict(_def.default))
         if _dict is not None:
             __dict__.update(_dict)
             
