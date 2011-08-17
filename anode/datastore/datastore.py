@@ -7,7 +7,7 @@ class NotFoundError(DataStoreError):
 class VersionConflictError(DataStoreError):
     pass
 
-class DataStore:
+class DataStore(object):
     """
     Think of this class as a database server.
     """

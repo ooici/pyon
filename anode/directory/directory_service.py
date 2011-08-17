@@ -15,7 +15,7 @@ class KeyNotFoundError(DirectoryServiceError):
 
 from anode.core.bootstrap import AnodeObject
 
-class Directory_Service:
+class Directory_Service(object):
 
     objId = ""
     objType = "DirectoryObjType_"
