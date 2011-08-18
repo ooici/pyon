@@ -1,30 +1,29 @@
-from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-
-from anode.datastore.datastore import NotFoundError
-
 import unittest
 
+from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
+from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from anode.datastore.datastore import NotFoundError
 from anode.core.bootstrap import AnodeObject
 
 class Test_DataStores(unittest.TestCase):
 
-    def doTestdata_source(self, data_source):
+    def do_test(self, data_store):
 
-        print "\nDelete data store:"
+        # Just in case previous run failed without cleaning up,
+        # delete data store
         try:
-            data_source.delete_datastore()
+            data_store.delete_datastore()
         except NotFoundError:
             pass
 
-        print "\nCreate data store"
-        data_source.create_datastore()
+        # Create should succeed and report True
+        self.assertTrue(data_store.create_datastore())
 
-        print "\nList data stores on server"
-        print data_source.list_datastores()
+        # Should see new data
+        self.assertIn('my_ds', data_store.list_datastores())
 
-        print "\nList info about data store"
-        print data_source.info_datastore()
+        # Something should be returned
+        self.assertTrue(data_store.info_datastore() != None)
 
         # Construct user role objects
         admin_role = {
@@ -32,26 +31,26 @@ class Test_DataStores(unittest.TestCase):
             "Description":"Super user"
         }
         adminRoleObj = AnodeObject('UserRole', admin_role)
-        print "Creating Admin role object"
-        adminRoleTuple = data_source.create(adminRoleObj)
+        adminRoleTuple = data_store.create(adminRoleObj)
+        self.assertTrue(len(adminRoleTuple) == 2)
 
         data_provider_role = {
             "Name":"Data Provider",
             "Description":"User allowed to ingest data sets"
         }
         dataProviderRoleObj = AnodeObject('UserRole', data_provider_role)
-        print "Creating Data Provider role object"
-        dataProviderRoleTuple = data_source.create(dataProviderRoleObj)
+        dataProviderRoleTuple = data_store.create(dataProviderRoleObj)
+        self.assertTrue(len(dataProviderRoleTuple) == 2)
 
         marine_operator_role = {
             "Name":"Marine Operator",
             "Description":"User allowed to administer instruments"
         }
         marineOperatorRoleObj = AnodeObject('UserRole', marine_operator_role)
-        print "Creating Marine Operator role object"
-        marineOperatorRoleTuple = data_source.create(marineOperatorRoleObj)
+        marineOperatorRoleTuple = data_store.create(marineOperatorRoleObj)
+        self.assertTrue(len(marineOperatorRoleTuple) == 2)
 
-        # Construct a couple user info objects and assign them roles
+        # Construct three user info objects and assign them roles
         hvl_user_info = {
             "Name": "Heitor Villa-Lobos",
             "Variables": {
@@ -60,8 +59,8 @@ class Test_DataStores(unittest.TestCase):
         }
         hvl_user_info["roles"] = [adminRoleTuple[0]]
         hvlUserInfoObj = AnodeObject('UserInfo', hvl_user_info)
-        print "Creating Heitor Villa-Lobos UserInfo object"
-        hvlUserInfoTuple = data_source.create(hvlUserInfoObj)
+        hvlUserInfoTuple = data_store.create(hvlUserInfoObj)
+        self.assertTrue(len(hvlUserInfoTuple) == 2)
 
         HeitorVillaLobos_OOI_ID = hvlUserInfoTuple[0]
 
@@ -73,8 +72,8 @@ class Test_DataStores(unittest.TestCase):
         }
         ats_user_info["roles"] = [dataProviderRoleTuple[0]]
         atsUserInfoObj = AnodeObject('UserInfo', ats_user_info)
-        print "Creating Andres Torres Segovia UserInfo object"
-        atsUserInfoTuple = data_source.create(atsUserInfoObj)
+        atsUserInfoTuple = data_store.create(atsUserInfoObj)
+        self.assertTrue(len(atsUserInfoTuple) == 2)
 
         pok_user_info = {
             "Name": "Per-Olov Kindgren",
@@ -84,24 +83,28 @@ class Test_DataStores(unittest.TestCase):
         }
         pok_user_info["roles"] = [marineOperatorRoleTuple[0]]
         pokUserInfoObj = AnodeObject('UserInfo', pok_user_info)
-        print "Creating Per-Olov Kindgren UserInfo object"
-        pokUserInfoTuple = data_source.create(pokUserInfoObj)
+        pokUserInfoTuple = data_store.create(pokUserInfoObj)
+        self.assertTrue(len(pokUserInfoTuple) == 2)
 
-        print "\nFind all UserInfo objects"
-        res = data_source.find("UserInfo")
-        print 'Query results: ' + str(res)
+        # List all objects in data store and confirm there are six docs
+        res = data_store.list_objects()
+        self.assertTrue(len(res) == 6)
+
+        # Find all the UserInfo records
+        res = data_store.find("UserInfo")
         self.assertTrue(len(res) == 3)
 
-        print "\nFind UserInfo object specifically for user 'Heitor Villa-Lobos'"
-        res = data_source.find("UserInfo", "Name", "Heitor Villa-Lobos")
-        print 'Query results: ' + str(res)
+        # Find only the UserInfo record for user Heitor Villa-Lobos
+        res = data_store.find("UserInfo", "Name", "Heitor Villa-Lobos")
         self.assertTrue(len(res) == 1)
         userInfoObj = res[0]
         self.assertTrue(userInfoObj.Name == "Heitor Villa-Lobos")
 
-        print "\nCreate a sample data set object"
+        # Create an Anode object with default values set (if any)
         dataSet = AnodeObject('DataSet')
+        self.assertTrue(dataSet.type_ == 'DataSet')
 
+        # Assign values to object fields
         dataSet.Description = "Real-time water data for Choptank River near Greensboro, MD"
         dataSet.ContactInstitution = "USGS NWIS"
         dataSet.ContactName = "Heitor Villa-Lobos"
@@ -123,89 +126,83 @@ class Test_DataStores(unittest.TestCase):
         dataSet.owner_ = HeitorVillaLobos_OOI_ID
         dataSet.lastmodified_ = HeitorVillaLobos_OOI_ID
 
-        print "Writing DataSet object"
-        writeTuple1 = data_source.create(dataSet)
+        # Write DataSet object"
+        writeTuple1 = data_store.create(dataSet)
+        self.assertTrue(len(writeTuple1) == 2)
 
+        # Save off the object UUID
         DataSet_UUID = writeTuple1[0]
 
-        dataSetReadObj = data_source.read(DataSet_UUID)
+        # Read back the HEAD version of the object and validate fields
+        dataSetReadObj = data_store.read(DataSet_UUID)
         self.assertTrue(dataSetReadObj._id == DataSet_UUID)
         self.assertTrue(dataSetReadObj.type_ == "DataSet")
         self.assertTrue(dataSetReadObj.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
+        # Update DataSet's Description field and write
         dataSetReadObj.Description = "Updated Description"
+        writeTuple2 = data_store.update(dataSetReadObj)
+        self.assertTrue(len(writeTuple2) == 2)
 
-        print "\nUpdate DataSet"
-        writeTuple2 = data_source.update(dataSetReadObj)
-
-        print "\nList all objects in data store"
-        print data_source.list_objects()
-
-        print "\nRetrieve updated DataSet"
-        dataSetReadObj2 = data_source.read(DataSet_UUID)
+        # Retrieve the updated DataSet
+        dataSetReadObj2 = data_store.read(DataSet_UUID)
         self.assertTrue(dataSetReadObj2._id == DataSet_UUID)
         self.assertTrue(dataSetReadObj2.Description == "Updated Description")
 
-        print "\nList revisions of DataSet in data store"
-        res = data_source.list_object_revisions(DataSet_UUID)
+        # List all the revisions of DataSet in data store, should be two
+        res = data_store.list_object_revisions(DataSet_UUID)
+        self.assertTrue(len(res) == 2)
 
-         # Another update to the object
+        # Do another update to the object
         dataSetReadObj2.Description = "USGS instantaneous value data for station 01491000"
+        writeTuple3 = data_store.update(dataSetReadObj2)
 
-        print "\nUpdate DataSet again"
-        writeTuple3 = data_source.update(dataSetReadObj2)
+        # List revisions of DataSet in data store, should now be three
+        res = data_store.list_object_revisions(DataSet_UUID)
+        self.assertTrue(len(res) == 3)
 
-        print "\nList all object types in data store"
-        print data_source.list_objects()
-
-        print "\nList revisions of DataSet in data store"
-        res = data_source.list_object_revisions(DataSet_UUID)
-        print 'Versions: ' + str(res)
-
-        print "\nRetrieve version " + str(writeTuple1[1]) + " of DataSet"
-        obj1 = data_source.read(DataSet_UUID, rev_id=writeTuple1[1])
+        # Retrieve original version of DataSet
+        obj1 = data_store.read(DataSet_UUID, rev_id=writeTuple1[1])
         self.assertTrue(obj1._id == DataSet_UUID)
         self.assertTrue(obj1.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
-        print "\nRetrieve version " + str(writeTuple2[1]) + " of DataSet"
-        obj2 = data_source.read(DataSet_UUID, rev_id=writeTuple2[1])
+        # Retrieve second version of DataSet
+        obj2 = data_store.read(DataSet_UUID, rev_id=writeTuple2[1])
         self.assertTrue(obj2._id == DataSet_UUID)
         self.assertTrue(obj2.Description == "Updated Description")
 
-        print "\nRetrieve version " + str(writeTuple3[1]) + " of DataSet"
-        obj3 = data_source.read(DataSet_UUID, rev_id=writeTuple3[1])
+        # Retrieve third version of DataSet
+        obj3 = data_store.read(DataSet_UUID, rev_id=writeTuple3[1])
         self.assertTrue(obj3._id == DataSet_UUID)
         self.assertTrue(obj3.Description == "USGS instantaneous value data for station 01491000")
 
-        print "\nRetrieve HEAD version of DataSet"
-        head = data_source.read(DataSet_UUID)
+        # Retrieve HEAD version of DataSet
+        head = data_store.read(DataSet_UUID)
         self.assertTrue(head._id == DataSet_UUID)
         self.assertTrue(head.Description == "USGS instantaneous value data for station 01491000")
 
-        print "\nDelete DataSet"
-        ret = data_source.delete(head)
+        # Delete DataSet
+        self.assertTrue(data_store.delete(head))
 
-        print "\nList all objects in data store"
-        print data_source.list_objects()
+        # List all objects in data store, should be back to six
+        res = data_store.list_objects()
+        self.assertTrue(len(res) == 6)
 
-        print "\nList revisions of now deleted DataSet"
-        res = data_source.list_object_revisions(DataSet_UUID)
+        # List revisions of now deleted DataSet, should be empty list
+        res = data_store.list_object_revisions(DataSet_UUID)
         self.assertTrue(len(res) == 0)
 
-        print "\nList info about data store"
-        print data_source.info_datastore()
+        # Delete data store to clean up
+        self.assertTrue(data_store.delete_datastore())
 
-        print "\nDelete data store"
-        self.assertTrue(data_source.delete_datastore())
-
-        print "\nList data store on server:"
-        print data_source.list_datastores()
+        # Assert data store is now gone
+        self.assertNotIn('my_ds', data_store.list_datastores())
 
     def test_non_persistent(self):
-        self.doTestdata_source(MockDB_DataStore(dataStoreName='my_ds'))
+        self.do_test(MockDB_DataStore(dataStoreName='my_ds'))
 
     def test_persistent(self):
-        self.doTestdata_source(CouchDB_DataStore(dataStoreName='my_ds'))
+        self.do_test(CouchDB_DataStore(dataStoreName='my_ds'))
 
 if __name__ == "__main__":
     unittest.main()
