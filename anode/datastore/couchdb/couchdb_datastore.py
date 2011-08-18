@@ -155,29 +155,24 @@ class CouchDB_DataStore(DataStore):
             dataStoreName = self.dataStoreName
         db = self.server[dataStoreName]
 
-        map_fun = '''function(doc) {
-            emit([doc.type_],doc);
-        }'''
-        query = db.query(map_fun)
+        if key != None and keyValue != None:
+            map_fun = '''function(doc) {
+                if (doc.type_ === "''' + type + '''" && doc.''' + key + ''' === "''' + keyValue + '''") {
+                    emit(doc._id,doc);
+                }
+            }'''
+        else:
+            map_fun = '''function(doc) {
+                if (doc.type_ == "''' + type + '''") {
+                    emit(doc._id,doc);
+                }
+            }'''
+        log.debug("map_fun: %s" % str(map_fun))
+        queryList = list(db.query(map_fun))
         results = []
-        logString = "Searching for objects of type: " + type + " in data store " + dataStoreName
-        if key != None:
-            logString += "where key: " + key + " has value: " + str(keyValue)
-        log.debug(logString)
-        for row in list(query[[type]]):
+        for row in queryList:
             doc = row.value
-            log.debug("Doc returned from view: %s" % str(doc))
-            try:
-                if keyValue == None:
-                    log.debug("No key, appending doc to results")
-                    results.append(doc)
-                else:
-                    log.debug("Checking key value")
-                    if doc[key] == keyValue:
-                        log.debug("Key value matches, appending doc to results")
-                        results.append(doc)
-            except KeyError:
-                pass
+            results.append(doc)
 
         log.debug('Find results: %s' % str(results))
         return results
