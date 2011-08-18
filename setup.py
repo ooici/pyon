@@ -42,5 +42,7 @@ setup(  name = 'anode',
             'HTTP4Store==0.3.1',
             'zope.interface==3.6.4',
             'couchdb==0.8',
+            'lockfile==0.9.1',
+            'python-daemon==1.6',
         ],
      )
