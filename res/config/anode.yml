@@ -12,7 +12,7 @@ server:
     vhost: /
     heartbeat: 30
 
-container:
+cc:
   timeout:
     shutdown: 30.0
     
