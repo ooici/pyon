@@ -51,7 +51,7 @@ class NodeB(amqp.Node):
     """
 
     def __init__(self):
-        self.ready = event.AsyncResult()
+        self.ready = event.Event()
 
     def start_node(self):
         """
@@ -60,10 +60,13 @@ class NodeB(amqp.Node):
         """
         amqp.Node.start_node(self)
         self.running = 1
+        print 'start_node'
         self.ready.set()
+        print 'ready set'
 
     def channel(self, ch_type):
         if not self.running:
+            print 'not running'
             raise #?
         result = event.AsyncResult()
         def on_channel_open_ok(amq_chan):
@@ -96,10 +99,12 @@ def makeNode():
     conn_parameters = ConnectionParameters()
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection)
+    #ioloop_process = gevent.spawn(connection.ioloop.start)
     print 'waiting for node'
     node.ready.wait()
     print 'node ready'
     return node, ioloop_process
+    #return node, ioloop, connection
 
 def testb():
     node, ioloop_process = makeNode()

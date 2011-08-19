@@ -129,7 +129,7 @@ class ProcessSupervisor(object):
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
 
-    def spawn(self, type='green', target=None, *args, **kwargs):
+    def spawn(self, type, target, *args, **kwargs):
         proc_callable = self.type_callables[type]
         proc = proc_callable(target, *args, **kwargs)
         proc.supervisor = self

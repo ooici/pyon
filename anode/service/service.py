@@ -7,20 +7,11 @@ from anode.base import messaging, channel, log
 
 class BaseService(object):
     """
-    Services do work. This work usually comes from a message queue. This work always has a service namespace.
-    Service implementation classes will derive from both this class and a generated interface class.
+    Something that provides a 'service'.
+    Not dependent on messaging.
+    Probably will have a simple start/stop interface.
     """
 
-    def __init__(self, name):
-        self.node, ioloop_process = messaging.makeNode()
-        self.name = name
+    name = None
+    running = 0
 
-    def serve_forever(self):
-        self.ch = node.channel(channel.Bidirectional)
-        self.ch.bind(('amq.direct', self.name))
-        self.ch.listen()
-        while True:
-            connected_ch = ch.accept()
-            data = connected_ch.recv()
-            print 'Message recvd: ', data
-            connected_ch.send('hola')

@@ -28,6 +28,9 @@ if 'pydevd' in sys.modules or 'unittest' in sys.modules:
         mod = __import__(modname)
         for name,impl in feats_backup.iteritems():
             setattr(mod, name, impl)
+else:
+    from gevent import monkey; monkey.patch_all()
+
 
 # If we're running from a subdirectory of the code (in source mode, not egg),
 # change dir to the root directory for easier debugging and unit test launching.
