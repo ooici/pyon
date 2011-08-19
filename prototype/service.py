@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 from anode.base import log
 from anode.service.service import BaseService
-from interface.services.sample_service import ISampleService
+from interface.services.isample_service import ISampleService
 
 from zope.interface import implements
 
