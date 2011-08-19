@@ -7,6 +7,9 @@ from anode.util.config import Config
 from anode.core.object import AnodeObjectRegistry
 
 # Note: do we really want to do the res folder like this again?
+logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
+LOGGING_CFG = Config(logging_conf_paths).data
+
 conf_paths = ['res/config/anode.yml', 'res/config/anode.local.yml']
 CFG = Config(conf_paths).data
 

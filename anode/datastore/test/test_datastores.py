@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+__author__ = 'Thomas R. Lennan'
+__license__ = 'Apache 2.0'
+
 import unittest
 
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore

@@ -1,8 +1,13 @@
+#!/usr/bin/env python
+
+__author__ = 'Thomas R. Lennan'
+__license__ = 'Apache 2.0'
+
 import unittest
 
-from anode.directory.directory_service import Directory_Service
+from anode.directory.directory import Directory
 
-class Test_Directory_Service(unittest.TestCase):
+class Test_Directory(unittest.TestCase):
 
     def do_test(self, directory_service):
         directory_service.delete()
@@ -36,10 +41,10 @@ class Test_Directory_Service(unittest.TestCase):
         self.assertEquals(root, {"Services":{}} )
 
     def test_non_persistent(self):
-        self.do_test(Directory_Service(dataStoreName='my_directory_ds', persistent=False))
+        self.do_test(Directory(dataStoreName='my_directory_ds', persistent=False))
 
     def test_persistent(self):
-        self.do_test(Directory_Service(dataStoreName='my_directory_ds', persistent=True))
+        self.do_test(Directory(dataStoreName='my_directory_ds', persistent=True))
 
 if __name__ == "__main__":
     unittest.main()

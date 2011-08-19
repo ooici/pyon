@@ -1,0 +1,20 @@
+# Service interface definition to front end the
+# directory lookup library APIs
+
+add:
+  parent: '/'
+  key: 'foo'
+  value: {}
+
+update:
+  parent: '/'
+  key: 'foo'
+  value: {}
+
+read:
+  parent: '/'
+  key: 'foo'
+
+remove:
+  parent: '/'
+  key: 'foo'

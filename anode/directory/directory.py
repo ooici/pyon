@@ -1,11 +1,11 @@
 
-class DirectoryServiceError(Exception):
+class DirectoryError(Exception):
     pass
 
-class KeyAlreadyExistsError(DirectoryServiceError):
+class KeyAlreadyExistsError(DirectoryError):
     pass
 
-class KeyNotFoundError(DirectoryServiceError):
+class KeyNotFoundError(DirectoryError):
     pass
 
 from anode.core.bootstrap import AnodeObject
@@ -14,7 +14,7 @@ from anode.datastore.datastore import NotFoundError
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from anode.util.log import log
 
-class Directory_Service(object):
+class Directory(object):
     """
     Sample class that uses a data store and Anode object to
     provide a directory lookup mechanism
