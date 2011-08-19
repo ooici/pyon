@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+__author__ = 'Thomas R. Lennan'
+__license__ = 'Apache 2.0'
+
 class DataStoreError(Exception):
     pass
 
