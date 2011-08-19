@@ -63,12 +63,16 @@ if args.action == 'generate':
             file_match = file_re.match(yaml_file)
             if file_match is None: continue
 
-            interface_name = file_match.group(2).rsplit(os.sep)[-1]
-            interface_file = file_re.sub(r'interface/\2.py', yaml_file)
+            file_path = file_match.group(2)
+            interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
+            interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
 
             parent_dir = os.path.dirname(interface_file)
             if not os.path.exists(parent_dir):
                 os.makedirs(parent_dir)
+            pkg_file = os.path.join(parent_dir, '__init__.py')
+            if not os.path.exists(pkg_file):
+                open(pkg_file, 'w').close()
 
             methods = []
             yaml_text = open(yaml_file, 'r').read()
