@@ -92,8 +92,19 @@ def test_client():
 
     container.start_client('ooibank', client)
 
+    client.new_account('kurt')
+    client.deposit('kurt', 99999999)
+    client.withdraw('kurt', 1000)
+
     #container.serve_forever()
     return client
 
 if __name__ == '__main__':
-    test_server()
+    import sys
+    assert len(sys.argv) > 1, 'please specify server or client'
+
+    if sys.argv[1] == 'client':
+        test_client()
+    else:
+        test_server()
+
