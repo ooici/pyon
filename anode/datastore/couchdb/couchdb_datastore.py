@@ -144,7 +144,10 @@ class CouchDB_DataStore(DataStore):
         return True
 
     def find(self, type, key=None, keyValue=None, dataStoreName=None):
-        docList = self.find_doc(type, key, keyValue, dataStoreName)
+        try:
+            docList = self.find_doc(type, key, keyValue, dataStoreName)
+        except ResourceNotFound:
+            raise NotFoundError()
 
         results = []
         # Convert each returned doc to its associated Anode object
