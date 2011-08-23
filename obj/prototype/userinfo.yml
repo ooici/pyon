@@ -1,7 +1,6 @@
 UserInfo:
   type_: UserInfo
   Name:
-  Identities:
   Roles:
   Email:
   Phone:
