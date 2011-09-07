@@ -44,5 +44,6 @@ setup(  name = 'anode',
             'couchdb==0.8',
             'lockfile==0.9.1',
             'python-daemon==1.6',
+            'bottle==0.9.6',
         ],
      )

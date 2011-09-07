@@ -17,7 +17,7 @@ class MockDB_DataStore(DataStore):
 
     def __init__(self, dataStoreName='prototype'):
         self.dataStoreName = dataStoreName
-        print 'Creating in-memory dict of dicts that will simulate data stores'
+        log.debug('Creating in-memory dict of dicts that will simulate data stores')
         self.root = {dataStoreName:{}}
 
     def create_datastore(self, dataStoreName=None):

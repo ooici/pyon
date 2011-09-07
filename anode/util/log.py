@@ -9,7 +9,6 @@ import sys
 
 # List of module names that will pass-through for the magic import scoping. This can be modified.
 import_paths = [__name__]
-handlers = []
 
 def get_logger(loggername=__name__):
     """
@@ -21,9 +20,7 @@ def get_logger(loggername=__name__):
     have that handler.
     """
     logger = logging.getLogger(loggername)
-    for handler in handlers:
-        logger.addHandler(handler)
-    
+
     return logger
 
 # Special placeholder object, to be swapped out for each module that imports this one

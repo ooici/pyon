@@ -1,0 +1,5 @@
+BankAccount:
+  type_: BankAccount
+  Owner:
+  AccountType: Checking
+  Balance: 0.0

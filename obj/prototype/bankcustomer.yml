@@ -1,0 +1,5 @@
+BankCustomer:
+  type_: BankCustomer
+  Name:
+  Email:
+  Phone:
