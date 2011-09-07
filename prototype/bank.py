@@ -1,5 +1,4 @@
 """
-Sample Echo Service
 """
 
 from zope.interface import Interface, implements
@@ -93,7 +92,7 @@ def test_client():
     container.start_client('ooibank', client)
 
     #container.serve_forever()
-    return client
+    return client, container
 
 if __name__ == '__main__':
     test_server()

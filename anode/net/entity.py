@@ -16,8 +16,11 @@ class Entity(object):
     def attach_channel(self, channel):
         self.channel = channel
 
-    #def message_received(self, msg): #hack. Fix!
-    def message_received(self, chan, msg):
+    def channel_attached(self):
+        """
+        """
+
+    def message_received(self, msg):
         """
         """
 
@@ -47,15 +50,8 @@ class RPCEntityFromService(Entity):
         return meth(*args, **kwargs)
 
 
-
 class RPCClientEntityFromInterface(Entity):
     """
-    Provides IRabbitMQControlService interface.
-
-    In this version of the client, the methods are automatically generated
-    from the interface. It's harder to see how the client works (you have
-    to refer to the interface), but you gain robustness by directly using
-    the interface.
     """
     response_queue = None #clean up
 

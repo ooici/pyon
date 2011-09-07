@@ -31,6 +31,10 @@ listen mode
 
 TODO:
 [ ] Use nowait on amqp config methods and handle channel exceptions with pika
+[ ] PointToPoint Channel (from Bidirectional)
+[ ] Channel needs to support reliable delivery (consumer ack; point to
+point will ack when the contet of a delivery naturally concludes (channel
+is closed)
 """
 
 import uuid
@@ -135,7 +139,7 @@ class BaseChannel(object):
                             # be expected to already exist
 
     consumer_no_ack = True
-    consumer_exclusive = True
+    consumer_exclusive = False
     prefetch_size = 1
     prefetch_count = 1
 
@@ -428,6 +432,8 @@ class Bidirectional(BaseChannel):
     to the peer
     """
 
+    consumer_exclusive = True
+
     def _on_basic_deliver(self, chan, method_frame, header_frame, body):
         message_type = header_frame.type
         # ensure proper type
@@ -483,6 +489,7 @@ class Bidirectional(BaseChannel):
                                 reply_to=reply_to)
 
 class BidirectionalClient(BaseChannel):
+    consumer_exclusive = True
     def connect(self, name, callback):
         """
         connect to a channel such that this protocol can send a message to
@@ -531,12 +538,14 @@ class PointToPoint(BaseChannel):
     """
 
 
-class PubSubChannel(BaseChannel):
+class PubSub(BaseChannel):
     """
     Endpoints do not directly interact.
 
     use a topic amqp exchange
     """
+
+    #exchange_type = 'topic'
 
 
 class SocketInterface(object):

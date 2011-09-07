@@ -59,9 +59,20 @@ class Container(object):
                 entity.message_received(data)
         self.proc_sup.spawn('green', client_recv, ch, entity)
 
+    def start_subscriber(self, name, entity):
+        def generic_consumer(ch, entity):
+            ch.bind(('amq.direct', name))
+            ch.listen()
+            while True:
+                msg = ch.recv()
+                entity.message_received(msg)
+            # could use recv_from semantic 
+        ch = self.node.channel(channel.PubSub)
+        self.proc_sup.spawn('green', generic_consumer, ch, entity)
 
     def serve_forever(self):
         if not self.proc_sup.running:
-            self.start()
+            #self.start()
+            pass
         self.proc_sup.join_children()
 
