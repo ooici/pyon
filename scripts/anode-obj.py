@@ -79,6 +79,10 @@ if args.action == 'generate':
                 for name,_def in def_set.iteritems():
                     # TODO: Handle more than one definition version for the same object type
 
+                    # If the service specifies "in" and "out" blocks
+                    if isinstance(_def, dict) and 'in' in _def:
+                        _def = _def['in']
+
                     # Handle case where method has no parameters
                     if _def == None:
                         args_str = ''

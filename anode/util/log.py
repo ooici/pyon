@@ -45,6 +45,7 @@ def _import(name, globals=None, locals=None, fromlist=None, level=-1):
 
     Inspects the stack; should be harmless since this is just syntactic sugar for module declarations.
     """
+    
     module = _orig___import__(name, globals, locals, fromlist)
 
     if name in import_paths and ('log' in fromlist or '*' in fromlist):
@@ -53,6 +54,10 @@ def _import(name, globals=None, locals=None, fromlist=None, level=-1):
 
     return module
 __builtin__.__import__ = _import
+
+# Workaround a quirk in python 2.7 with custom imports
+from logging.config import BaseConfigurator
+BaseConfigurator.importer = staticmethod(_import)
 
 log = get_scoped_log()
 

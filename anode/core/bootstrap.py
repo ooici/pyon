@@ -3,15 +3,24 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-import logging.config
-
 from anode.util.config import Config
 from anode.core.object import AnodeObjectRegistry
 
+import logging.config
+import os
+
 # Note: do we really want to do the res folder like this again?
-#logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
-#LOGGING_CFG = Config(logging_conf_paths).data
-#logging.config.dictConfig(LOGGING_CFG)
+logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
+LOGGING_CFG = Config(logging_conf_paths).data
+
+# Ensure the logging directories exist
+for handler in LOGGING_CFG.get('handlers', {}).itervalues():
+    if 'filename' in handler:
+        log_dir = os.path.dirname(handler['filename'])
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+logging.config.dictConfig(LOGGING_CFG)
 
 conf_paths = ['res/config/anode.yml', 'res/config/anode.local.yml']
 CFG = Config(conf_paths).data
