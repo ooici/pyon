@@ -8,12 +8,15 @@ import anode
 import gevent
 from gevent import event
 
+from pika.credentials import PlainCredentials
 from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
 from pika import BasicProperties
 
 from anode.net import channel
 from anode.net import amqp
+
+from anode.core.bootstrap import CFG
 
 class IDPool(object):
     """
@@ -96,7 +99,10 @@ def makeNode():
     blocking construction and connection of node
     """
     node = NodeB()
-    conn_parameters = ConnectionParameters()
+    messagingParams = CFG.server.amqp
+    print "XXXXX messagingParams: " + str(messagingParams)
+    credentials = PlainCredentials(messagingParams["username"], messagingParams["password"])
+    conn_parameters = ConnectionParameters(host=messagingParams["host"], virtual_host=messagingParams["vhost"], port=messagingParams["port"], credentials=credentials)
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
