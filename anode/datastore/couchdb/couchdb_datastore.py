@@ -99,24 +99,24 @@ class CouchDB_DataStore(DataStore):
         log.debug('Create result: %s' % str(res))
         return res
 
-    def read(self, objectId, rev_id=None, dataStoreName=None):
-        doc = self.read_doc(objectId, rev_id, dataStoreName)
+    def read(self, objectId, revId=None, dataStoreName=None):
+        doc = self.read_doc(objectId, revId, dataStoreName)
 
         # Convert doc into Anode object
         obj = AnodeObject(doc["type_"], doc)
         log.debug('Anode object: %s' % str(obj))
         return obj
 
-    def read_doc(self, objectId, rev_id=None, dataStoreName=None):
+    def read_doc(self, objectId, revId=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         db = self.server[dataStoreName]
-        if rev_id == None:
+        if revId == None:
             log.debug('Reading head version of object %s/%s' % (dataStoreName, str(objectId)))
             doc = db.get(objectId)
         else:
-            log.debug('Reading version %s of object %s/%s' % (str(rev_id), dataStoreName, str(objectId)))
-            doc = db.get(objectId, rev=rev_id)
+            log.debug('Reading version %s of object %s/%s' % (str(revId), dataStoreName, str(objectId)))
+            doc = db.get(objectId, rev=revId)
         log.debug('Read result: %s' % str(doc))
         return doc
 
