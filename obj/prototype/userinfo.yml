@@ -1,7 +1,7 @@
 UserInfo:
   type_: UserInfo
-  Name:
-  Roles:
-  Email:
-  Phone:
-  Variables:
+  Name: ""
+  Roles: ""
+  Email: ""
+  Phone: ""
+  Variables: []
