@@ -1,0 +1,6 @@
+DatasourceUnavailableEventMessage:
+  datasource_id: ""
+  dataset_id: ""
+  title: ""
+  url: ""
+  error_explanation: ""

@@ -1,0 +1,7 @@
+CreateInstrumentRequest:
+  name: ""
+  description: ""
+  manufacturer: ""
+  model: ""
+  serial_num: ""
+  fw_version: ""

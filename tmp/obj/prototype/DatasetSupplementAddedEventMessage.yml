@@ -1,0 +1,8 @@
+DatasetSupplementAddedEventMessage:
+  datasource_id: ""
+  dataset_id: ""
+  title: ""
+  url: ""
+  start_datetime_millis: -1
+  end_datetime_millis: -1
+  number_of_timesteps: -1

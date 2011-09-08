@@ -1,0 +1,3 @@
+RegisterIonUserRequest:
+  certificate: ""
+  rsa_private_key: ""

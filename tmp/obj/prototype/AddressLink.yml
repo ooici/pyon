@@ -1,0 +1,14 @@
+AddressLink:
+  person: [
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true]
+  owner: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  title: ""

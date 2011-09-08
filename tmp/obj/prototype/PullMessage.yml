@@ -1,0 +1,6 @@
+PullMessage:
+  repository_key: ""
+  get_head_content: true
+  excluded_types: [
+    object_id: -1
+    version: -1]

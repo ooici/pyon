@@ -1,0 +1,12 @@
+ResourceDescription:
+  object_type: 
+    object_id: -1
+    version: -1
+  name: ""
+  description: ""
+  resource_type: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true

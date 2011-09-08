@@ -1,0 +1,16 @@
+create_object:
+
+get_object:
+
+create_exchangespace:
+
+create_exchangename:
+
+create_queue:
+
+create_binding:
+
+update_exchangename:
+
+set_exchangename_life_cycle:
+

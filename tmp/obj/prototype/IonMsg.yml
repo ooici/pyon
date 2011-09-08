@@ -1,0 +1,11 @@
+IonMsg:
+  name: ""
+  identity: ""
+  message_object: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  response_code: CONTINUE
+  response_body: ""

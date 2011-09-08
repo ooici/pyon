@@ -1,0 +1,7 @@
+DataRequestMessage:
+  structure_array_ref: ""
+  request_bounds: [
+    origin: -1
+    size: 18446744073709551615
+    stride: 18446744073709551615]
+  data_routing_key: ""

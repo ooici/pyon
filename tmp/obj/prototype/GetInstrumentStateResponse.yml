@@ -1,0 +1,17 @@
+GetInstrumentStateResponse:
+  properties: 
+    navg: -1
+    interval: -1
+    outputsv: true
+    outputsal: true
+    txrealtime: true
+    storetime: true
+    gpgga: ""
+    gpgll: ""
+    gprmc: ""
+    pgrmf: ""
+    pgrmc: ""
+    fix_mode: ""
+    alt_msl: -1.0
+    earth_datum: -1
+    diffmode: ""

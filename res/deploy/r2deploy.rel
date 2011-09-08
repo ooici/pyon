@@ -1,0 +1,41 @@
+{
+    "type":"release",
+    "name":"Release2Configuration",
+    "version": "0.1",
+    "description": "Release 2 deployment configuration.",
+    "anode" : "0.0.1",
+    "apps":[
+        # CC Agent
+#        {'name':'ccagent',              'version':'0.1',
+#        },
+
+        # Bootlevels less than 4 are not represented in this rel file...
+
+#-------------#
+# Bootlevel 4 #
+#-------------#
+        {'name':'datastore_service',    'version':'0.1',
+                                        'processapp':('datastore_service','prototype.datastore_service','DataStoreService'),
+                                        'config':{
+                                            'transient': True
+                                        }
+        },
+
+#-------------#
+# Bootlevel 9 #
+#-------------#
+
+#        {'name':'app_integration',    'version':'0.1',
+#                                      'processapp':('app_integration','ion.integration.ais.app_integration_service','AppIntegrationService'),
+#        },
+
+#--------------#
+# Bootlevel 11 #
+#--------------#
+
+#        {'name':'bank',       'version':'0.1',
+#                                      'processapp':('instrument_web_monitor','ion.services.dm.distribution.instrument_web_monitor','InstrumentWebMonitorService')
+#        },
+
+    ]
+}

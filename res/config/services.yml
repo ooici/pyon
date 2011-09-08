@@ -1,0 +1,11 @@
+# Central configuration file for defining the list of services
+# to start in the capability container.
+# The contents are transformed into a dict that supports dot notation:
+
+datastore:
+  name: DataStoreService
+  class: prototype.datastore_service.DataStoreService
+
+bank:
+  name: BankService
+  class: prototype.bank.BankService

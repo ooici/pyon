@@ -1,0 +1,14 @@
+NotificationMessage:
+  data_resource_id: ""
+  name: ""
+  status: IN_PROGRESS
+  description: ""
+  datetime: -1.1
+  origin: ""
+  body: ""
+  additional_data: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true

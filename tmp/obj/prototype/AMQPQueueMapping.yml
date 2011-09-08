@@ -1,0 +1,6 @@
+AMQPQueueMapping:
+  queuename: ""
+  passive: true
+  durable: true
+  exclusive: true
+  autodelete: true

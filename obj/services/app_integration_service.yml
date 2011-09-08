@@ -1,0 +1,230 @@
+findDataResources:
+  in:
+    user_ooi_id: ""
+    minLatitude: -1.1
+    maxLatitude: -1.1
+    minLongitude: -1.1
+    maxLongitude: -1.1
+    minVertical: -1.1
+    maxVertical: -1.1
+    posVertical: ""
+    minTime: ""
+    maxTime: ""
+    identity: ""
+
+  out:
+    dataResourceSummary:
+    - datasetMetadata:
+        user_ooi_id: ""
+        data_resource_id: ""
+        title: ""
+        institution: ""
+        source: ""
+        references: ""
+        conventions: ""
+        summary: ""
+        comment: ""
+        ion_time_coverage_start: ""
+        ion_time_coverage_end: ""
+        ion_geospatial_lat_min: -1.1
+        ion_geospatial_lat_max: -1.1
+        ion_geospatial_lon_min: -1.1
+        ion_geospatial_lon_max: -1.1
+        ion_geospatial_vertical_min: -1.1
+        ion_geospatial_vertical_max: -1.1
+        ion_geospatial_vertical_positive: ""
+        download_url: ""
+        visualization_url: ""
+      date_registered: 18446744073709551615
+      notificationSet: true
+
+findDataResourcesByUser:
+  in:
+    user_ooi_id: ""
+    minLatitude: -1.1
+    maxLatitude: -1.1
+    minLongitude: -1.1
+    maxLongitude: -1.1
+    minVertical: -1.1
+    maxVertical: -1.1
+    posVertical: ""
+    minTime: ""
+    maxTime: ""
+    identity: ""
+
+  out:
+    dataResourceSummary:
+    - datasetMetadata:
+        user_ooi_id: ""
+        data_resource_id: ""
+        title: ""
+        institution: ""
+        source: ""
+        references: ""
+        conventions: ""
+        summary: ""
+        comment: ""
+        ion_time_coverage_start: ""
+        ion_time_coverage_end: ""
+        ion_geospatial_lat_min: -1.1
+        ion_geospatial_lat_max: -1.1
+        ion_geospatial_lon_min: -1.1
+        ion_geospatial_lon_max: -1.1
+        ion_geospatial_vertical_min: -1.1
+        ion_geospatial_vertical_max: -1.1
+        ion_geospatial_vertical_positive: ""
+        download_url: ""
+        visualization_url: ""
+      date_registered: 18446744073709551615
+      notificationSet: true
+
+getDataResourceDetail:
+  in:
+    data_resource_id: ""
+  out:
+    data_resource_id: ""
+    dataResourceSummary:
+      user_ooi_id: ""
+      data_resource_id: ""
+      title: ""
+      institution: ""
+      source: ""
+      references: ""
+      conventions: ""
+      summary: ""
+      comment: ""
+      ion_time_coverage_start: ""
+      ion_time_coverage_end: ""
+      ion_geospatial_lat_min: -1.1
+      ion_geospatial_lat_max: -1.1
+      ion_geospatial_lon_min: -1.1
+      ion_geospatial_lon_max: -1.1
+      ion_geospatial_vertical_min: -1.1
+      ion_geospatial_vertical_max: -1.1
+      ion_geospatial_vertical_positive: ""
+      download_url: ""
+      visualization_url: ""
+    source:
+      source_type: SOS
+      request_type: NONE
+      top: -1.1
+      bottom: -1.1
+      left: -1.1
+      right: -1.1
+      base_url: ""
+      dataset_url: ""
+      ncml_mask: ""
+      max_ingest_millis: 18446744073709551615
+      start_time: ""
+      end_time: ""
+      institution_id: ""
+      ion_title: ""
+      ion_description: ""
+      ion_name: ""
+      ion_email: ""
+      ion_institution: ""
+      visualization_url: ""
+      is_public: true
+    variable:
+    - units: ""
+      standard_name: ""
+      long_name: ""
+      name: ""
+      other_attributes:
+      - name: ""
+        value: ""
+      dimensions:
+      - name: ""
+        length: -1.1
+    dimensions:
+    - name: ""
+      length: -1.1
+    other_attributes:
+    - name: ""
+      value: ""
+
+createDownloadURL:
+  in:
+    user_ooi_id: ""
+    data_resource_id: ""
+  out:
+    download_url: ""
+
+registerUser:
+  in:
+    certificate: ""
+    rsa_private_key: ""
+  out:
+    ooi_id: ""
+    user_is_admin: true
+    user_already_registered: true
+    user_is_early_adopter: true
+    user_is_data_provider: true
+    user_is_marine_operator: true
+
+updateUserProfile:
+  in:
+    user_ooi_id: ""
+    name: ""
+    institution: ""
+    email_address: ""
+    profile:
+    - name: ""
+      value: ""
+  out:
+    status: true
+
+getUser:
+  in:
+    user_ooi_id: ""
+  out:
+    name: ""
+    institution: ""
+    email_address: ""
+    authenticating_organization: ""
+    profile:
+    - name: ""
+      value: ""
+
+setUserRole:
+  in:
+    user_ooi_id: ""
+    role: ""
+  out:
+    status: true
+
+getResourceTypes:
+  in:
+  out:
+    types: []
+
+getResourcesOfType:
+  in:
+    resource_type: ""
+  out:
+      resources: []
+
+getResource:
+  in:
+    ooi_id: ""
+  out:
+    resource:
+    - name: ""
+      value: ""
+
+createDataResource:
+
+updateDataResource:
+
+deleteDataResource:
+
+validateDataResource:
+
+createDataResourceSubscription:
+
+findDataResourceSubscriptions:
+
+deleteDataResourceSubscription:
+
+updateDataResourceSubscription:
+

@@ -1,0 +1,7 @@
+ScalarDataPoint:
+  location: 
+    lat: -1.1
+    lon: -1.1
+    depth: -1.1
+    time: -1.1
+  val: -1.1

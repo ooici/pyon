@@ -1,0 +1,5 @@
+RequestCommitBlobsMessage:
+  commit_root_object: ""
+  excluded_types: [
+    object_id: -1
+    version: -1]
