@@ -167,17 +167,17 @@ class Test_DataStores(unittest.TestCase):
         self.assertTrue(len(res) == 3)
 
         # Retrieve original version of DataSet
-        obj1 = data_store.read(DataSet_UUID, rev_id=writeTuple1[1])
+        obj1 = data_store.read(DataSet_UUID, revId=writeTuple1[1])
         self.assertTrue(obj1._id == DataSet_UUID)
         self.assertTrue(obj1.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
         # Retrieve second version of DataSet
-        obj2 = data_store.read(DataSet_UUID, rev_id=writeTuple2[1])
+        obj2 = data_store.read(DataSet_UUID, revId=writeTuple2[1])
         self.assertTrue(obj2._id == DataSet_UUID)
         self.assertTrue(obj2.Description == "Updated Description")
 
         # Retrieve third version of DataSet
-        obj3 = data_store.read(DataSet_UUID, rev_id=writeTuple3[1])
+        obj3 = data_store.read(DataSet_UUID, revId=writeTuple3[1])
         self.assertTrue(obj3._id == DataSet_UUID)
         self.assertTrue(obj3.Description == "USGS instantaneous value data for station 01491000")
 
