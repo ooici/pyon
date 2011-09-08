@@ -3,8 +3,6 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.base import obj_registry
-
 from collections import OrderedDict
 import datetime
 import fnmatch
@@ -81,17 +79,21 @@ if args.action == 'generate':
                 for name,_def in def_set.iteritems():
                     # TODO: Handle more than one definition version for the same object type
 
-                    args = []
-                    for key,val in _def.iteritems():
-                        if isinstance(val, basestring):
-                            val = "'%s'" % (val)
-                        elif isinstance(val, datetime.datetime):
-                            # TODO: generate the datetime code
-                            val = "'%s'" % (val)
-                        elif isinstance(val, OrderedDict):
-                            val = dict(val)
-                        args.append(templates['arg'].format(name=key, val=val))
-                    args_str = ', '.join(args)
+                    # Handle case where method has no parameters
+                    if _def == None:
+                        args_str = ''
+                    else:
+                        args = []
+                        for key,val in _def.iteritems():
+                            if isinstance(val, basestring):
+                                val = "'%s'" % (val)
+                            elif isinstance(val, datetime.datetime):
+                                # TODO: generate the datetime code
+                                val = "'%s'" % (val)
+                            elif isinstance(val, OrderedDict):
+                                val = dict(val)
+                            args.append(templates['arg'].format(name=key, val=val))
+                        args_str = ', '.join(args)
 
                     methods.append(templates['method'].format(name=name, args=args_str))
 
