@@ -1,0 +1,10 @@
+Attribute:
+  name: ""
+  source_name: ""
+  data_type: BYTE
+  array: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true

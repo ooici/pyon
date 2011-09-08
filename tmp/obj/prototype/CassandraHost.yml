@@ -1,0 +1,3 @@
+CassandraHost:
+  host: ""
+  port: -1

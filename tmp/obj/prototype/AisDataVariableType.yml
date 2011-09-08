@@ -1,0 +1,11 @@
+AisDataVariableType:
+  units: ""
+  standard_name: ""
+  long_name: ""
+  name: ""
+  other_attributes: [
+    name: ""
+    value: ""]
+  dimensions: [
+    name: ""
+    length: -1.1]

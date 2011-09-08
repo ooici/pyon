@@ -7,12 +7,14 @@ server:
   amqp:
     host: amoeba.ucsd.edu
     port: 5672
-    username: ems
-    password: ems
+    username: guest
+    password: guest
     vhost: /
     heartbeat: 30
 
 cc:
   timeout:
     shutdown: 30.0
-    
+
+datastore:
+  type: persistent

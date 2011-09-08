@@ -1,0 +1,8 @@
+AMQPExchangeMapping:
+  exchangename: ""
+  type: DIRECT
+  passive: true
+  durable: true
+  autodelete: true
+  internal: true
+  nowait: true

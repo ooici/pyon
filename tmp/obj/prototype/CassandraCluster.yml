@@ -1,0 +1,19 @@
+CassandraCluster:
+  name: ""
+  hosts: [
+    host: ""
+    port: -1]
+  version: ""
+  key_ring: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  credentials: [
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""]

@@ -1,0 +1,7 @@
+RegisterIonUserReponse:
+  ooi_id: ""
+  user_is_admin: true
+  user_already_registered: true
+  user_is_early_adopter: true
+  user_is_data_provider: true
+  user_is_marine_operator: true

@@ -1,0 +1,16 @@
+AddressBook:
+  person: [
+    name: ""
+    id: -1
+    email: ""
+    phone: [
+      number: ""
+      type: MOBILE]]
+  owner: 
+    name: ""
+    id: -1
+    email: ""
+    phone: [
+      number: ""
+      type: MOBILE]
+  title: ""

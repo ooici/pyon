@@ -2,19 +2,24 @@
 # directory lookup library APIs
 
 add:
-  parent: '/'
-  key: 'foo'
-  value: {}
+  in:
+    parent: '/'
+    key: 'foo'
+    value: {}
 
 update:
-  parent: '/'
-  key: 'foo'
-  value: {}
+  in:
+    parent: '/'
+    key: 'foo'
+    value: {}
 
 read:
-  parent: '/'
-  key: 'foo'
+  in:
+    parent: '/'
+    key: 'foo'
 
 remove:
-  parent: '/'
-  key: 'foo'
+  in:
+    parent: '/'
+    key: 'foo'
+    

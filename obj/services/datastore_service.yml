@@ -1,0 +1,66 @@
+# Service interface definition to front end the
+# datastore library APIs
+
+create_datastore:
+  dataStoreName:
+
+delete_datastore:
+  dataStoreName:
+
+list_datastores:
+
+info_datastore:
+  dataStoreName:
+
+list_objects:
+  dataStoreName:
+
+list_object_revisions:
+  objectId:
+  dataStoreName:
+
+create:
+  object:
+  dataStoreName:
+
+create_doc:
+  object:
+  dataStoreName:
+
+read:
+  objectId:
+  revId:
+  dataStoreName:
+
+read_doc:
+  objectId:
+  revId:
+  dataStoreName:
+
+update:
+  object:
+  dataStoreName:
+
+update_doc:
+  object:
+  dataStoreName:
+
+delete:
+  object:
+  dataStoreName:
+
+delete_doc:
+  object:
+  dataStoreName:
+
+find:
+  type:
+  key:
+  keyValue:
+  dataStoreName:
+
+find_doc:
+  type:
+  key:
+  keyValue:
+  dataStoreName:

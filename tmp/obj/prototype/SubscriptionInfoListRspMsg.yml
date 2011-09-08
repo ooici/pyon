@@ -1,0 +1,31 @@
+SubscriptionInfoListRspMsg:
+  subscriptionListResults: [
+    subscriptionInfo: 
+      user_ooi_id: ""
+      data_src_id: ""
+      subscription_type: EMAIL
+      email_alerts_filter: UPDATES
+      dispatcher_alerts_filter: UPDATES
+      dispatcher_script_path: ""
+      date_registered: 18446744073709551615
+    datasetMetadata: 
+      user_ooi_id: ""
+      data_resource_id: ""
+      title: ""
+      institution: ""
+      source: ""
+      references: ""
+      conventions: ""
+      summary: ""
+      comment: ""
+      ion_time_coverage_start: ""
+      ion_time_coverage_end: ""
+      ion_geospatial_lat_min: -1.1
+      ion_geospatial_lat_max: -1.1
+      ion_geospatial_lon_min: -1.1
+      ion_geospatial_lon_max: -1.1
+      ion_geospatial_vertical_min: -1.1
+      ion_geospatial_vertical_max: -1.1
+      ion_geospatial_vertical_positive: ""
+      download_url: ""
+      visualization_url: ""]

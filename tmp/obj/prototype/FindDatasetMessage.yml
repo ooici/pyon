@@ -1,0 +1,3 @@
+FindDatasetMessage:
+  only_mine: true
+  by_life_cycle_state: NEW

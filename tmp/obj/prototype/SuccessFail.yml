@@ -1,0 +1,13 @@
+SuccessFail:
+  result: OK
+  item: [
+    type: STR
+    str: ""
+    pair: 
+      first: ""
+      second: ""
+    pair_and_result: 
+      pair: 
+        first: ""
+        second: ""
+      result: OK]

@@ -1,0 +1,16 @@
+create_new_instrument:
+
+create_new_data_product:
+
+execute_command:
+
+get_instrument_state:
+
+start_instrument_agent:
+
+stop_instrument_agent:
+
+start_direct_access:
+
+stop_direct_access:
+

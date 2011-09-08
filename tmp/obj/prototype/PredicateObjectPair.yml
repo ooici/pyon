@@ -1,0 +1,13 @@
+PredicateObjectPair:
+  predicate: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  object: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true

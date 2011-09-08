@@ -1,0 +1,13 @@
+GetObjectRequestMessage:
+  object_id: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  excluded_object_types: [
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true]

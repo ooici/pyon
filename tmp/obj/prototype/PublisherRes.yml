@@ -1,0 +1,21 @@
+PublisherRes:
+  exchange_space_id: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  exchange_point_id: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  topic_id: 
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+  publisher_name: ""
+  credentials: ""

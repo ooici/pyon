@@ -1,25 +1,28 @@
 doc_fields_:
-  name: text_
-  time: datetime_
-  an_int: int_
-  a_float: float_
-  a_string: text_
-  none: ???
-  a_dict: dict_
-  a_list: list_
+  in:
+    name: text_
+    time: datetime_
+    an_int: int_
+    a_float: float_
+    a_string: text_
+    none: ???
+    a_dict: dict_
+    a_list: list_
 
 sample_ping:
-  name: ''
-  time: 2011-07-27T02:59:43.1Z
-  an_int: 0
-  a_float: 0.0
-  a_str: ''
-  none:
-  a_dict: {}
-  a_list: []
+  in:
+    name: ''
+    time: 2011-07-27T02:59:43.1Z
+    an_int: 0
+    a_float: 0.0
+    a_str: ''
+    none:
+    a_dict: {}
+    a_list: []
 
 sample_other_op:
-  foo: bar
-  num: 84
-  
+  in:
+    foo: bar
+    num: 84
+    
   

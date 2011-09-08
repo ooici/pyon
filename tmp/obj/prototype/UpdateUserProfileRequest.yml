@@ -1,0 +1,8 @@
+UpdateUserProfileRequest:
+  user_ooi_id: ""
+  name: ""
+  institution: ""
+  email_address: ""
+  profile: [
+    name: ""
+    value: ""]

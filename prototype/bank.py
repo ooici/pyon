@@ -3,50 +3,19 @@
 
 from zope.interface import Interface, implements
 
-from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from anode.service import service
 from anode.net import entity
 from anode.container import cc
 from anode.core.bootstrap import AnodeObject
 from anode.datastore.datastore import NotFoundError
+from interface.services.ibank_service import IBankService
 
 from anode.net import messaging
 
-class IBankService(Interface):
-
-    def new_account(name):
-        """
-        """
-        pass
-
-    def deposit(name, amount):
-        """
-        """
-        pass
-
-    def withdraw(name, amount):
-        """
-        """
-        pass
-
-    def get_balance(name):
-        """
-        """
-        pass
-
 class BankService(service.BaseService):
-
     implements(IBankService)
 
-    def __init__(self, dataStoreName='bank', persistent=False):
-        print "dataStoreName = %s, persistent = %s" % (dataStoreName, str(persistent))
-        if persistent:
-            self.dataStore = CouchDB_DataStore(dataStoreName=dataStoreName)
-        else:
-            self.dataStore = MockDB_DataStore(dataStoreName=dataStoreName)
-
-    def new_account(self, name, accountType='Checking'):
+    def new_account(self, name='', accountType='Checking'):
         res = []
         try:
             res = self.dataStore.find("BankCustomer", "Name", name)
@@ -72,7 +41,7 @@ class BankService(service.BaseService):
 
         return accountId
 
-    def deposit(self, accountId, amount):
+    def deposit(self, accountId=-1, amount=0.0):
         accountObj = self.dataStore.read(accountId)
         if accountObj == None:
             return "Account does not exist"
@@ -80,7 +49,7 @@ class BankService(service.BaseService):
         self.dataStore.update(accountObj)
         return "Balance after deposit: %s" % (str(accountObj.Balance))
 
-    def withdraw(self, accountId, amount):
+    def withdraw(self, accountId=-1, amount=0.0):
         accountObj = self.dataStore.read(accountId)
         if accountObj == None:
             return "Account does not exist"
@@ -88,13 +57,13 @@ class BankService(service.BaseService):
         self.dataStore.update(accountObj)
         return "Balance after withdrawl: %s" % (str(accountObj.Balance))
 
-    def get_balance(self, accountId):
+    def get_balance(self, accountId=-1):
         accountObj = self.dataStore.read(accountId)
         if accountObj == None:
             return "Account does not exist"
         return "Balance: %s" % (str(accountObj.Balance))
 
-    def list_accounts(self, name):
+    def list_accounts(self, name=''):
         """
         Find all accounts (optionally of type) owned by user
         """

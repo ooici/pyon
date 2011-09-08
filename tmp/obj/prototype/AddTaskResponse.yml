@@ -1,0 +1,4 @@
+AddTaskResponse:
+  task_id: ""
+  origin: ""
+  duplicate: true

@@ -1,0 +1,4 @@
+FindProtectedResourcesRspMsg:
+  resources: [
+    name: ""
+    description: ""]

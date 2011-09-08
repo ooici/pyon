@@ -1,0 +1,13 @@
+Broker:
+  name: ""
+  description: ""
+  brokercredentials: 
+    brokername: ""
+    host: ""
+    port: -1
+    channelmax: -1
+    framemax: -1
+    heartbeat: -1
+    username: ""
+    password: ""
+    sslprotocol: true

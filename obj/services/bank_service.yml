@@ -1,0 +1,19 @@
+# Bank Service interface definition
+
+new_account:
+  name: ""
+  accountType: Checking
+
+deposit:
+  accountId: -1
+  amount: 0.0
+
+withdraw:
+  accountId: -1
+  amount: 0.0
+
+get_balance:
+  accountId: -1
+
+list_accounts:
+  name: ""
