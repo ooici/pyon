@@ -111,15 +111,15 @@ class MockDB_DataStore(DataStore):
         log.debug('Create result: %s' % str(res))
         return res
 
-    def read(self, objectId, rev_id=None, dataStoreName=None):
-        doc = self.read_doc(objectId, rev_id, dataStoreName)
+    def read(self, objectId, revId=None, dataStoreName=None):
+        doc = self.read_doc(objectId, revId, dataStoreName)
 
         # Convert doc into Anode object
         obj = AnodeObject(doc["type_"], doc)
         log.debug('Anode object: %s' % str(obj))
         return obj
 
-    def read_doc(self, objectId, rev_id=None, dataStoreName=None):
+    def read_doc(self, objectId, revId=None, dataStoreName=None):
         if dataStoreName == None:
             dataStoreName = self.dataStoreName
         try:
@@ -129,11 +129,11 @@ class MockDB_DataStore(DataStore):
 
         try:
             key = objectId
-            if rev_id == None:
+            if revId == None:
                 log.debug('Reading head version of object %s/%s' % (dataStoreName, str(objectId)))
             else:
-                log.debug('Reading version %s of object %s/%s' % (str(rev_id), dataStoreName, str(objectId)))
-                key += '_version_' + str(rev_id)
+                log.debug('Reading version %s of object %s/%s' % (str(revId), dataStoreName, str(objectId)))
+                key += '_version_' + str(revId)
             doc = dataStoreDict[key]
         except KeyError:
             raise DataStoreError('Object does not exist.')
@@ -233,7 +233,7 @@ class MockDB_DataStore(DataStore):
         #  - optionally, key/value match
         for objId in self.list_objects(dataStoreName):
             try:
-                doc = self.read_doc(objId, rev_id=None, dataStoreName=dataStoreName)
+                doc = self.read_doc(objId, revId=None, dataStoreName=dataStoreName)
                 log.debug("Doc: %s" % str(doc))
                 if doc["type_"] == type:
                     if keyValue == None:
