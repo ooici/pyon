@@ -72,17 +72,17 @@ class DataStore(object):
         """
         pass
 
-    def read(self, objectId, rev_id=None, dataStoreName=None):
+    def read(self, objectId, revId=None, dataStoreName=None):
         """"
-        Fetch an Anode object instance.  If rev_id is specified, an attempt
+        Fetch an Anode object instance.  If revId is specified, an attempt
         will be made to return that specific object version.  Otherwise,
         the HEAD version is returned.
         """
         pass
 
-    def read_doc(self, objectId, rev_id=None, dataStoreName=None):
+    def read_doc(self, objectId, revId=None, dataStoreName=None):
         """"
-        Fetch a raw doc instance.  If rev_id is specified, an attempt
+        Fetch a raw doc instance.  If revId is specified, an attempt
         will be made to return that specific doc version.  Otherwise,
         the HEAD version is returned.
         """
