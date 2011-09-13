@@ -12,7 +12,9 @@ actual handlers functional.
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.base import CFG, SERVICE_CFG, messaging, channel, GreenProcessSupervisor
+from anode.core.bootstrap import CFG, SERVICE_CFG
+from anode.net import messaging, channel
+from anode.core.process import GreenProcessSupervisor
 from anode.net import entity
 
 service_cls_by_name = {}
