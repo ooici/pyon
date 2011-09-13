@@ -44,10 +44,9 @@ class RPCEntityFromService(Entity):
         chan.send(response_msg)
 
     def _call_cmd(self, cmd_dict):
-        meth = getattr(self.service, cmd_dict['name'])
-        args = cmd_dict['required']
-        kwargs = dict([(str(k), v) for k, v in cmd_dict['optional'].items()])
-        return meth(*args, **kwargs)
+        meth = getattr(self.service, cmd_dict['method'])
+        kwargs = cmd_dict['params']
+        return meth(**kwargs)
 
 
 class RPCClientEntityFromInterface(Entity):
@@ -88,7 +87,11 @@ class _Command(object):
     """
     RPC Message Format
     Command method generated from interface.
-    Serialize using json
+    
+    Note: the required siginfo could be used by the client to catch bad
+    calls before it makes them. 
+    If calls are only made using named arguments, then the optional siginfo
+    can validate that the correct named arguments are used.
     """
 
     def __init__(self, client, name, siginfo, doc):
@@ -99,23 +102,16 @@ class _Command(object):
         self.optional = siginfo['optional']
         self.__doc__ = doc
 
-    def __call__(self, *args, **kwargs):
-        command_dict = self._commad_dict_from_call(*args, **kwargs)
+    def __call__(self, **kwargs):
+        command_dict = self._command_dict_from_call(**kwargs)
         return self.client.call_remote(command_dict)
 
-    def _commad_dict_from_call(self, *args, **kwargs):
-        if not len(args) == len(self.required):
-            raise TypeError('%s() takes at least %d arguments (%d given)' %
-                    (self.name, len(self.required), len(args)))
+    def _command_dict_from_call(self, **kwargs):
+        """parameters specified by name
+        """
         cmd_dict = {}
-        cmd_dict['name'] = self.name
-        cmd_dict['required'] = args
-        cmd_dict['optional'] = {}
-        for k, v in self.optional.iteritems():
-            cmd_dict['optional'][k] = kwargs.get(k, v)
-        if not (len(cmd_dict['required']) + len(cmd_dict['optional'])) == len(self.positional):
-            raise TypeError('%s() takes %d arguments (%d given)' %
-                    (self.name, len(self.positional), len(cmd_dict)))
+        cmd_dict['method'] = self.name
+        cmd_dict['params'] = kwargs
         return cmd_dict
 
 
