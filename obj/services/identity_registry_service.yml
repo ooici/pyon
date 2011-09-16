@@ -1,0 +1,109 @@
+# Bank Service interface definition
+
+_name:
+  identity_registry
+
+_dependencies:
+  [datastore]
+
+create_user:
+  in:
+    name: ""
+    subjects: ""
+    email: ""
+    phone: ""
+    variables:
+    - name: ""
+      value: ""
+  out:
+    id: ""
+
+update_user:
+  in:
+    name: ""
+    subjects: ""
+    email: ""
+    phone: ""
+    variables:
+    - name: ""
+      value: ""
+  out:
+
+remove_user:
+  in:
+    name: ""
+    email: ""
+  out:
+
+find_user_by_id:
+  in:
+    id: ""
+  out:
+    name: ""
+    subjects: ""
+    email: ""
+    phone: ""
+    variables:
+    - name: ""
+      value: ""
+
+find_user_by_name:
+  in:
+    name: ""
+  out:
+    name: ""
+    subjects: ""
+    email: ""
+    phone: ""
+    variables:
+    - name: ""
+      value: ""
+
+find_user_by_subject:
+  in:
+    subject: ""
+  out:
+    name: ""
+    subjects: ""
+    email: ""
+    phone: ""
+    variables:
+    - name: ""
+      value: ""
+
+add_cilogon_subject_to_user:
+  in:
+    name: ""
+    subject: ""
+  out:
+
+update_cilogon_subject_for_user:
+  in:
+    name: ""
+    old_subject: ""
+    new_subject: ""
+  out:
+
+remove_cilogon_subject_from_user:
+  in:
+    name: ""
+    subject: ""
+  out:
+
+get_user_roles:
+  in:
+    name: ""
+  out:
+    roles: ""
+
+set_user_role:
+  in:
+    name: ""
+    role: ""
+  out:
+
+unset_user_role:
+  in:
+    name: ""
+    role: ""
+  out:
