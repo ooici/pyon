@@ -41,10 +41,10 @@ class Test_Directory(unittest.TestCase):
         self.assertEquals(root, {"Services":{}} )
 
     def test_non_persistent(self):
-        self.do_test(Directory(dataStoreName='my_directory_ds', persistent=False))
+        self.do_test(Directory(datastore_name='my_directory_ds', persistent=False))
 
     def test_persistent(self):
-        self.do_test(Directory(dataStoreName='my_directory_ds', persistent=True))
+        self.do_test(Directory(datastore_name='my_directory_ds', persistent=True))
 
 if __name__ == "__main__":
     unittest.main()

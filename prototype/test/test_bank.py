@@ -22,7 +22,7 @@ class Test_Bank(unittest.TestCase):
             print "Account: " + str(acctObj)
 
     def test_non_persistent(self):
-        self.do_test(BankService(persistent=False))
+        self.do_test(BankService({}))
 
 #    def test_persistent(self):
 #        self.do_test(BankService(persistent=True))

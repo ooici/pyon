@@ -20,15 +20,15 @@ class Directory(object):
     provide a directory lookup mechanism
     """
 
-    objId = ""
+    obj_id = ""
     objType = "DirectoryObjType_"
 
-    def __init__(self, dataStoreName, persistent=False):
-        log.debug("Data store name: %s, persistent = %s" % (dataStoreName, str(persistent)))
+    def __init__(self, datastore_name, persistent=False):
+        log.debug("Data store name: %s, persistent = %s" % (datastore_name, str(persistent)))
         if persistent:
-            self.dataStore = CouchDB_DataStore(dataStoreName=dataStoreName)
+            self.datastore = CouchDB_DataStore(datastore_name=datastore_name)
         else:
-            self.dataStore = MockDB_DataStore(dataStoreName=dataStoreName)
+            self.datastore = MockDB_DataStore(datastore_name=datastore_name)
 
     def delete(self):
         """
@@ -38,7 +38,7 @@ class Directory(object):
         """
         log.debug("Deleting data store and Directory")
         try:
-            self.dataStore.delete_datastore()
+            self.datastore.delete_datastore()
         except NotFoundError:
             pass
 
@@ -48,28 +48,28 @@ class Directory(object):
         persist an empty Directory object.
         """
         log.debug("Creating data store and Directory")
-        self.dataStore.create_datastore()
+        self.datastore.create_datastore()
 
         # Persist empty Directory object
         directory_obj = AnodeObject('Directory')
-        createTuple = self.dataStore.create(directory_obj)
+        createTuple = self.datastore.create(directory_obj)
 
         # Save document id for later use
         log.debug("Saving Directory object id %s" % str(createTuple[0]))
-        self.objId = createTuple[0]
+        self.obj_id = createTuple[0]
 
-    def findDict(self, parent):
+    def find_dict(self, parent):
         """
         Helper method that reads the Directory object from the data store
         and then traverses the dict of dicts to find the desired parent
         dict within the directory hierarchy.
         """
         log.debug("Looking for parent dict %s" % str(parent))
-        directory = self.dataStore.read(self.objId)
+        directory = self.datastore.read(self.obj_id)
 
         # Get the actual dict of dicts from the object.
-        parentDict = directory.Content
-        log.debug("Root Directory dict content %s" % str(parentDict))
+        parent_dict = directory.content
+        log.debug("Root Directory dict content %s" % str(parent_dict))
 
         # Traverse as necessary.
         if parent == '/':
@@ -84,13 +84,13 @@ class Directory(object):
                 else:
                     log.debug("Intermediate Directory path element %s" % str(pathElement))
                     try:
-                        parentDict = parentDict[pathElement]
-                        log.debug("Intermediate Directory dict content %s" % str(parentDict))
+                        parent_dict = parent_dict[pathElement]
+                        log.debug("Intermediate Directory dict content %s" % str(parent_dict))
                     except KeyError:
                         log.debug("Intermediate Directory dict doesn't exist, creating.")
-                        parentDict[pathElement] = {}
-                        parentDict = parentDict[pathElement]
-        return directory, parentDict
+                        parent_dict[pathElement] = {}
+                        parent_dict = parent_dict[pathElement]
+        return directory, parent_dict
 
     def add(self, parent, key, value):
         """
@@ -98,14 +98,14 @@ class Directory(object):
         node level.
         """
         log.debug("Adding key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parentDict = self.findDict(parent)
+        directory, parent_dict = self.find_dict(parent)
 
         # Add key and value, throwing exception if key already exists.
-        if key in parentDict:
+        if key in parent_dict:
             raise KeyAlreadyExistsError
 
-        parentDict[key] = value
-        self.dataStore.update(directory)
+        parent_dict[key] = value
+        self.datastore.update(directory)
         return value
 
     def update(self, parent, key, value):
@@ -114,16 +114,16 @@ class Directory(object):
         node level.
         """
         log.debug("Updating key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parentDict = self.findDict(parent)
+        directory, parent_dict = self.find_dict(parent)
 
         # Replace value, throwing exception if key not found.
         try:
-            val = parentDict[key]
+            val = parent_dict[key]
         except KeyError:
             raise KeyNotFoundError
 
-        parentDict[key] = value
-        self.dataStore.update(directory)
+        parent_dict[key] = value
+        self.datastore.update(directory)
         return value
 
     def read(self, parent, key=None):
@@ -132,12 +132,12 @@ class Directory(object):
         node level.
         """
         log.debug("Reading content at path %s" % str(parent))
-        directory, parentDict = self.findDict(parent)
-        if key == None:
-            return parentDict
+        directory, parent_dict = self.find_dict(parent)
+        if key is None:
+            return parent_dict
 
         try:
-            val = parentDict[key]
+            val = parent_dict[key]
         except KeyError:
             raise KeyNotFoundError
         return val
@@ -148,10 +148,10 @@ class Directory(object):
         node level.
         """
         log.debug("Removing content at path %s" % str(parent))
-        directory, parentDict = self.findDict(parent)
+        directory, parent_dict = self.find_dict(parent)
         try:
-            val = parentDict.pop(key)
-            self.dataStore.update(directory)
+            val = parent_dict.pop(key)
+            self.datastore.update(directory)
         except KeyError:
             raise KeyNotFoundError
         return val

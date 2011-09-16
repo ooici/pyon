@@ -12,7 +12,8 @@ from collections import OrderedDict, defaultdict
 from weakref import WeakSet, WeakValueDictionary
 
 import yaml
-from anode.util import yaml_ordered_dict
+
+from anode.util.log import log
 
 class AnodeObjectError(Exception):
     pass
@@ -26,7 +27,7 @@ class AnodeObjectMetaType(type):
 
     def __call__(cls, _def, _dict=None, *args, **kwargs):
         if _def in AnodeObjectMetaType._type_cache:
-            clsType = AnodeObjectMetaType._type_cache[_def]
+            cls_type = AnodeObjectMetaType._type_cache[_def]
         else:
             # Check that the object we are wrapping is an AnodeObjectDefinition
             if not isinstance(_def, AnodeObjectDefinition):
@@ -34,13 +35,13 @@ class AnodeObjectMetaType(type):
 
             # Generate a unique class name
             base_name = 'AnodeObject'
-            clsName = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
-            clsDict = {'_def': _def}
-            clsDict.update(copy.deepcopy(_def.default))
-            #clsDict['__slots__'] = clsDict.keys() + ['__weakref__']
+            cls_name = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
+            cls_dict = {'_def': _def}
+            cls_dict.update(copy.deepcopy(_def.default))
+            #cls_dict['__slots__'] = cls_dict.keys() + ['__weakref__']
 
-            clsType = AnodeObjectMetaType.__new__(AnodeObjectMetaType, clsName, (cls,), clsDict)
-            AnodeObjectMetaType._type_cache[_def] = clsType
+            cls_type = AnodeObjectMetaType.__new__(AnodeObjectMetaType, cls_name, (cls,), cls_dict)
+            AnodeObjectMetaType._type_cache[_def] = cls_type
 
         # Auto-copy the defaults so we can use __dict__ authoritatively and simplify the code
         __dict__ = copy.deepcopy(dict(_def.default))
@@ -48,7 +49,7 @@ class AnodeObjectMetaType(type):
             __dict__.update(_dict)
             
         # Finally allow the instantiation to occur, but slip in our new class type
-        obj = super(AnodeObjectMetaType, clsType).__call__(__dict__, *args, **kwargs)
+        obj = super(AnodeObjectMetaType, cls_type).__call__(__dict__, *args, **kwargs)
         return obj
 
 class AnodeObjectBase(object):
@@ -176,7 +177,9 @@ class AnodeObjectRegistry(object):
 
     def new(self, _def, _dict=None, **kwargs):
         """ See get_def() for definition lookup options. """
-
+        log.debug("In AnodeObjectRegistry.new")
+        log.debug("_def: %s" % _def)
+        log.debug("_dict: %s" % str(_dict))
         _def = self.get_def(_def)
         obj = AnodeObjectBase(_def, _dict, **kwargs)
         self.instances.add(obj)

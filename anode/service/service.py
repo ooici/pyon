@@ -24,7 +24,6 @@ def build_service_map():
         if cls.name is None:
             raise AssertionError('Service class must define name value. Service class in error: %s' % (str(cls)))
         services_by_name[cls.name] = cls
-    print "XXXXX services_by_name: " + str(services_by_name)
 
 def add_service_by_name(name, service):
     services_by_name[name] = service

@@ -3,9 +3,9 @@
 # The contents are transformed into a dict that supports dot notation:
 
 datastore:
-  name: DataStoreService
+  name: datastore
   class: prototype.datastore_service.DataStoreService
 
 bank:
-  name: BankService
+  name: bank
   class: prototype.bank.BankService

@@ -60,7 +60,7 @@ class RPCEntityFromService(Entity):
     def _call_cmd(self, cmd_dict):
         log.debug("In RPCEntityFromService._call_cmd")
         log.debug("cmd_dict: %s" % str(cmd_dict))
-        meth = getattr(self.service, cmd_dict['name'])
+        meth = getattr(self.service, cmd_dict['method'])
         log.debug("meth: %s" % str(meth))
         args = cmd_dict['args']
         log.debug("args: %s" % str(args))
@@ -122,7 +122,11 @@ class _Command(object):
     """
     RPC Message Format
     Command method generated from interface.
-    Serialize using json
+    
+    Note: the required siginfo could be used by the client to catch bad
+    calls before it makes them. 
+    If calls are only made using named arguments, then the optional siginfo
+    can validate that the correct named arguments are used.
     """
 
     def __init__(self, client, name, siginfo, doc):
@@ -138,18 +142,18 @@ class _Command(object):
         self.optional = siginfo['optional']
         self.__doc__ = doc
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args):
         log.debug("In _Command.__call__")
-        command_dict = self._command_dict_from_call(*args, **kwargs)
+        command_dict = self._command_dict_from_call(*args)
         return self.client.call_remote(command_dict)
 
-    def _command_dict_from_call(self, *args, **kwargs):
+    def _command_dict_from_call(self, *args):
+        """
+        parameters specified by name
+        """
         log.debug("In _Command._command_dict_from_call")
-        if not len(args) >= len(self.required):
-            raise TypeError('%s() takes at least %d arguments (%d given)' %
-                    (self.name, len(self.required), len(args)))
         cmd_dict = {}
-        cmd_dict['name'] = self.name
+        cmd_dict['method'] = self.name
         cmd_dict['args'] = args
         log.debug("cmd_dict: %s" % str(cmd_dict))
         return cmd_dict

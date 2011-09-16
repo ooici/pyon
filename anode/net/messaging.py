@@ -13,10 +13,10 @@ from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
 from pika import BasicProperties
 
-from anode.net import channel
-from anode.net import amqp
-
 from anode.core.bootstrap import CFG
+from anode.net import amqp
+from anode.net import channel
+from anode.util.log import log
 
 class IDPool(object):
     """
@@ -25,7 +25,9 @@ class IDPool(object):
     """
 
     def __init__(self, new_id=None):
+        log.debug("In IDPool.__init__")
         if new_id is None: new_id = lambda x: x + 1
+        log.debug("new_id: %s" % str(new_id))
 
         self.ids_in_use = set()
         self.ids_free = set()
@@ -33,14 +35,21 @@ class IDPool(object):
         self.last_id = 0
 
     def get_id(self):
+        log.debug("In IDPool.get_id")
         if len(self.ids_free) > 0:
-            return self.ids_free.pop()
+            log.debug("new_id: %s" % str(new_id))
+            id = self.ids_free.pop()
+            log.debug("id: %s" % str(id))
+            return id
 
         self.last_id = id_ = self.new_id(self.last_id)
         self.ids_in_use.add(id_)
+        log.debug("id: %s" % str(id_))
         return id_
 
     def release_id(self, the_id):
+        log.debug("In IDPool.release_id")
+        log.debug("the_id: %s" % str(the_id))
         if the_id in self.ids_in_use:
             self.ids_in_use.remove(the_id)
             self.ids_free.add(the_id)
@@ -54,6 +63,7 @@ class NodeB(amqp.Node):
     """
 
     def __init__(self):
+        log.debug("In NodeB.__init__")
         self.ready = event.Event()
 
     def start_node(self):
@@ -61,15 +71,15 @@ class NodeB(amqp.Node):
         This should only be called by on_connection_opened..
         so, maybe we don't need a start_node/stop_node interface
         """
+        log.debug("In start_node")
         amqp.Node.start_node(self)
         self.running = 1
-        print 'start_node'
         self.ready.set()
-        print 'ready set'
 
     def channel(self, ch_type):
+        log.debug("In NodeB.channel")
         if not self.running:
-            print 'not running'
+            log.error("Attempt to open channel on node that is not running")
             raise #?
         result = event.AsyncResult()
         def on_channel_open_ok(amq_chan):
@@ -77,16 +87,22 @@ class NodeB(amqp.Node):
             result.set(ch)
         self.client.channel(on_channel_open_ok)
         ch = result.get()
+        log.debug("channel: %s" % str(ch))
         #ch = channel.SocketInterface(client)
         return ch
 
 def ioloop(connection):
     # Loop until CTRL-C
+    log.debug("In ioLoop")
     try:
         # Start our blocking loop
+        log.debug("Before start")
         connection.ioloop.start()
+        log.debug("After start")
 
     except KeyboardInterrupt:
+
+        log.debug("Got keyboard interrupt")
 
         # Close the connection
         connection.close()
@@ -98,21 +114,21 @@ def makeNode():
     """
     blocking construction and connection of node
     """
+    log.debug("In makeNode")
     node = NodeB()
     messagingParams = CFG.server.amqp
-    print "XXXXX messagingParams: " + str(messagingParams)
+    log.debug("messagingParams: %s" % str(messagingParams))
     credentials = PlainCredentials(messagingParams["username"], messagingParams["password"])
     conn_parameters = ConnectionParameters(host=messagingParams["host"], virtual_host=messagingParams["vhost"], port=messagingParams["port"], credentials=credentials)
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
-    print 'waiting for node'
     node.ready.wait()
-    print 'node ready'
     return node, ioloop_process
     #return node, ioloop, connection
 
 def testb():
+    log.debug("In testb")
     node, ioloop_process = makeNode()
     ch = node.channel(channel.BaseChannel)
     print ch
@@ -125,6 +141,7 @@ def testb():
     ioloop_process.join()
 
 def testbclient():
+    log.debug("In testbclient")
     node, ioloop_process = makeNode()
     ch = node.channel(channel.BidirectionalClient)
     print ch
@@ -137,6 +154,7 @@ def testbclient():
     print 'message: ', msg
 
 def test_accept():
+    log.debug("In test_accept")
     node, ioloop_process = makeNode()
     ch = node.channel(channel.Bidirectional)
     print ch
@@ -164,6 +182,7 @@ class NodeNB(amqp.Node):
     """
 
     def __init__(self):
+        log.debug("In NodeNB.__init__")
         self.channels = {}
         self.id_pool = IDPool()
 
@@ -172,6 +191,7 @@ class NodeNB(amqp.Node):
         This should only be called by on_connection_opened..
         so, maybe we don't need a start_node/stop_node interface
         """
+        log.debug("In NodeNB.start_node")
         amqp.Node.start_node(self)
         for ch_id in self.channels:
             self.start_channel(ch_id)
@@ -179,6 +199,7 @@ class NodeNB(amqp.Node):
     def stop_node(self):
         """
         """
+        log.debug("In NodeNB.stop_node")
 
     def channel(self, ch_type):
         """
@@ -189,24 +210,32 @@ class NodeNB(amqp.Node):
         name (exchange, key)
         name shouldn't need to be specified here, but it is for now
         """
+        log.debug("In NodeNB.channel")
         ch = ch_type()
         ch_id = self.id_pool.get_id()
+        log.debug("channel id: %s" % str(ch_id))
         self.channels[ch_id] = ch
         if self.running:
             self.start_channel(ch_id)
+        log.debug("channel: %s" % str(ch))
         return ch
 
     def start_channel(self, ch_id):
+        log.debug("In NodeNB.start_channel")
+        log.debug("ch_id: %s" % str(ch_id))
         ch = self.channels[ch_id]
+        log.debug("ch: %s" % str(ch))
         self.client.channel(ch.on_channel_open)
 
     def spawnServer(self, f):
         """
         """
+        log.debug("In spawnServer")
 
 class TestServer(channel.BaseChannel):
 
     def do_config(self):
+        log.debug("In TestServer.do_config")
         self._chan_name = ('amq.direct', 'foo')
         self.queue = 'foo'
         self.do_queue()
@@ -214,11 +243,13 @@ class TestServer(channel.BaseChannel):
 class TestClient(channel.BaseChannel):
 
     def do_config(self):
+        log.debug("In TestClient.do_config")
         self._peer_name = ('amq.direct', 'foo')
         self.send('test message')
 
 
 def testnb():
+    log.debug("In testnb")
     node = NodeNB()
     #ch = node.channel(('amq.direct', 'foo'), TestServer)
     ch = node.channel(TestServer)

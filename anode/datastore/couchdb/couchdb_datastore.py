@@ -18,31 +18,31 @@ class CouchDB_DataStore(DataStore):
     For API info, see: http://packages.python.org/CouchDB/client.html#
     """
 
-    def __init__(self, host='localhost', port=5984, dataStoreName='prototype', options=None):
-        log.debug('host %s port %d data store name %s options %s' % (host, port, str(dataStoreName), str(options)))
+    def __init__(self, host='localhost', port=5984, datastore_name='prototype', options=""):
+        log.debug('host %s port %d data store name %s options %s' % (host, port, str(datastore_name), str(options)))
         self.host = host
         self.port = port
-        self.dataStoreName = dataStoreName
-        connectionStr = "http://" + host + ":" + str(port)
-        log.info('Connecting to couchDB server: %s' % connectionStr)
-        self.server = couchdb.Server(connectionStr)
+        self.datastore_name = datastore_name
+        connection_str = "http://" + host + ":" + str(port)
+        log.info('Connecting to couchDB server: %s' % connection_str)
+        self.server = couchdb.Server(connection_str)
 
-    def create_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Creating data store %s' % dataStoreName)
-        self.server.create(dataStoreName)
+    def create_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Creating data store %s' % datastore_name)
+        self.server.create(datastore_name)
         return True
 
-    def delete_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Deleting data store %s' % dataStoreName)
+    def delete_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Deleting data store %s' % datastore_name)
         try:
-            self.server.delete(dataStoreName)
+            self.server.delete(datastore_name)
             return True
         except ResourceNotFound:
-            log.info('Data store delete failed.  Data store %s not found' % dataStoreName)
+            log.info('Data store delete failed.  Data store %s not found' % datastore_name)
             raise NotFoundError
 
     def list_datastores(self):
@@ -53,99 +53,99 @@ class CouchDB_DataStore(DataStore):
         log.debug('Data stores: %s' % str(dbs))
         return dbs
 
-    def info_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Listing information about data store %s' % dataStoreName)
-        info = self.server[dataStoreName].info()
+    def info_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Listing information about data store %s' % datastore_name)
+        info = self.server[datastore_name].info()
         log.debug('Data store info: %s' % str(info))
         return info
 
-    def list_objects(self, dataStoreName=None):
-        if not dataStoreName:
-            dataStoreName = self.dataStoreName
-        log.debug('Listing all objects in data store %s' % dataStoreName)
+    def list_objects(self, datastore_name=""):
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        log.debug('Listing all objects in data store %s' % datastore_name)
         objs = []
-        for obj in self.server[dataStoreName]:
+        for obj in self.server[datastore_name]:
             objs.append(obj)
         log.debug('Objects: %s' % str(objs))
         return objs
 
-    def list_object_revisions(self, objectId, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        db = self.server[dataStoreName]
-        log.debug('Listing all versions of object %s/%s' % (dataStoreName, str(objectId)))
-        gen = db.revisions(objectId)
+    def list_object_revisions(self, object_id, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        log.debug('Listing all versions of object %s/%s' % (datastore_name, str(object_id)))
+        gen = db.revisions(object_id)
         res = []
         for ent in gen:
             res.append(ent["_rev"])
         log.debug('Versions: %s' % str(res))
         return res
 
-    def create(self, object, dataStoreName=None):
+    def create(self, object, datastore_name=""):
         return self.create_doc(object.__dict__)
 
-    def create_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Creating new object %s/%s' % (dataStoreName, object["type_"]))
+    def create_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Creating new object %s/%s' % (datastore_name, object["type_"]))
 
         # Assign an id to doc (recommended in CouchDB documentation)
         object["_id"] = uuid4().hex
 
         # Save doc.  CouchDB will assign version to doc.
-        res = self.server[dataStoreName].save(object)
+        res = self.server[datastore_name].save(object)
         log.debug('Create result: %s' % str(res))
         return res
 
-    def read(self, objectId, revId=None, dataStoreName=None):
-        doc = self.read_doc(objectId, revId, dataStoreName)
+    def read(self, object_id, rev_id="", datastore_name=""):
+        doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Anode object
         obj = AnodeObject(doc["type_"], doc)
         log.debug('Anode object: %s' % str(obj))
         return obj
 
-    def read_doc(self, objectId, revId=None, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        db = self.server[dataStoreName]
-        if revId == None:
-            log.debug('Reading head version of object %s/%s' % (dataStoreName, str(objectId)))
-            doc = db.get(objectId)
+    def read_doc(self, object_id, rev_id="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        if rev_id == "":
+            log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
+            doc = db.get(object_id)
         else:
-            log.debug('Reading version %s of object %s/%s' % (str(revId), dataStoreName, str(objectId)))
-            doc = db.get(objectId, rev=revId)
+            log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(object_id)))
+            doc = db.get(object_id, rev=rev_id)
         log.debug('Read result: %s' % str(doc))
         return doc
 
-    def update(self, object, dataStoreName=None):
+    def update(self, object, datastore_name=""):
         return self.update_doc(object.__dict__)
 
-    def update_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Saving new version of object %s/%s/%s' % (dataStoreName, object["type_"], object["_id"]))
-        res = self.server[dataStoreName].save(object)
+    def update_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Saving new version of object %s/%s/%s' % (datastore_name, object["type_"], object["_id"]))
+        res = self.server[datastore_name].save(object)
         log.debug('Update result: %s' % str(res))
         return res
 
-    def delete(self, object, dataStoreName=None):
+    def delete(self, object, datastore_name=""):
         return self.delete_doc(object.__dict__)
 
-    def delete_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        db = self.server[dataStoreName]
-        log.debug('Deleting object %s/%s' % (dataStoreName, object["_id"]))
+    def delete_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        log.debug('Deleting object %s/%s' % (datastore_name, object["_id"]))
         res = db.delete(object)
         log.debug('Delete result: %s' % str(res))
         return True
 
-    def find(self, type, key=None, keyValue=None, dataStoreName=None):
+    def find(self, type, key="", key_value="", datastore_name=""):
         try:
-            docList = self.find_doc(type, key, keyValue, dataStoreName)
+            docList = self.find_doc(type, key, key_value, datastore_name)
         except ResourceNotFound:
             raise NotFoundError()
 
@@ -158,14 +158,14 @@ class CouchDB_DataStore(DataStore):
 
         return results
 
-    def find_doc(self, type, key=None, keyValue=None, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        db = self.server[dataStoreName]
+    def find_doc(self, type, key="", key_value="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
 
-        if key != None and keyValue != None:
+        if key != "" and key_value != "":
             map_fun = '''function(doc) {
-                if (doc.type_ === "''' + type + '''" && doc.''' + key + ''' === "''' + keyValue + '''") {
+                if (doc.type_ === "''' + type + '''" && doc.''' + key + ''' === "''' + key_value + '''") {
                     emit(doc._id,doc);
                 }
             }'''

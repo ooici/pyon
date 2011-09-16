@@ -45,5 +45,6 @@ setup(  name = 'anode',
             'lockfile==0.9.1',
             'python-daemon==1.6',
             'bottle==0.9.6',
+            'M2Crypto==0.21.1',
         ],
      )

@@ -3,67 +3,74 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from zope.interface import implements
-
-from anode.core.bootstrap import CFG
 from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from anode.datastore.datastore import NotFoundError
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-from anode.service.service import BaseService
-from interface.services.idatastore_service import IDatastoreService
+from interface.services.idatastore_service import BaseDatastoreService
 
-class DataStoreService(BaseService):
-    implements(IDatastoreService)
+from anode.util.log import log
 
-    def __init__(self):
-        if CFG.datastore.type == 'persistent':
-            self.dataStore = CouchDB_DataStore()
+class DataStoreService(BaseDatastoreService):
+
+    def __init__(self, config_params={}):
+        if config_params.has_key('type'):
+            if config_params["type"] == 'CouchDB':
+                self.datastore = CouchDB_DataStore()
+                if config_params.has_key('forceClean'):
+                    try:
+                        self.datastore.delete_datastore()
+                    except NotFoundError:
+                        pass
+                    self.datastore.create_datastore()
+            else:
+                self.datastore = MockDB_DataStore()
         else:
-            self.dataStore = MockDB_DataStore()
+            self.datastore = MockDB_DataStore()
 
-    def list_objects(dataStoreName=None):
-        return self.dataStore.list_objects(dataStoreName)
+    def create_datastore(self, datastore_name=''):
+        return self.datastore.create_datastore(datastore_name)
 
-    def delete_datastore(dataStoreName=None):
-        return self.dataStore.delete_datastore(dataStoreName)
+    def delete_datastore(self, datastore_name=''):
+        return self.datastore.delete(object, datastore_name)
 
-    def list_object_revisions(dataStoreName=None, objectId=None):
-        return self.dataStore.list_object_revisions(dataStoreName, objectId)
+    def list_datastores(self):
+        return self.datastore.list_datastores()
 
-    def update(object=None, dataStoreName=None):
-        return self.dataStore.update(object, dataStoreName)
+    def info_datastore(self, datastore_name=''):
+        return self.datastore.info_datastore(datastore_name)
 
-    def info_datastore(dataStoreName=None):
-        return self.dataStore.info_datastore(dataStoreName)
+    def list_objects(self, datastore_name=''):
+        return self.datastore.list_objects(datastore_name)
 
-    def read_doc(dataStoreName=None, revId=None, objectId=None):
-        return self.dataStore.read_doc(dataStoreName, revId, objectId)
+    def list_object_revisions(self, object_id='', datastore_name=''):
+        return self.datastore.list_object_revisions(object_id, datastore_name)
 
-    def find(type=None, dataStoreName=None, keyValue=None, key=None):
-        return self.dataStore.find(type, dataStoreName, keyValue, key)
+    def create(self, object={}, datastore_name=''):
+        return self.datastore.create(object, datastore_name)
 
-    def find_doc(type=None, dataStoreName=None, keyValue=None, key=None):
-        return self.dataStore.find_doc(type, dataStoreName, keyValue, key)
+    def create_doc(self, object={}, datastore_name=''):
+        return self.datastore.create_doc(object, datastore_name)
 
-    def list_datastores():
-        return self.dataStore.list_datastores()
+    def read(self, object_id='', rev_id='', datastore_name=''):
+        return self.datastore.read(object_id, rev_id, datastore_name)
 
-    def create(object=None, dataStoreName=None):
-        return self.dataStore.create(object, dataStoreName)
+    def read_doc(self, object_id='', rev_id='', datastore_name=''):
+        return self.datastore.read_doc(object_id, rev_id, datastore_name)
 
-    def create_datastore(dataStoreName=None):
-        return self.dataStore.create_datastore(dataStoreName)
+    def update(self, object={}, datastore_name=''):
+        return self.datastore.update(object, datastore_name)
 
-    def read(dataStoreName=None, revId=None, objectId=None):
-        return self.dataStore.read(dataStoreName, revId, objectId)
+    def update_doc(self, object={}, datastore_name=''):
+        return self.datastore.update_doc(object, datastore_name)
 
-    def update_doc(object=None, dataStoreName=None):
-        return self.dataStore.update_doc(object, dataStoreName)
+    def delete(self, object={}, datastore_name=''):
+        return self.datastore.delete_doc(object, datastore_name)
 
-    def create_doc(object=None, dataStoreName=None):
-        return self.dataStore.create_doc(object, dataStoreName)
+    def delete_doc(self, object={}, datastore_name=''):
+        return self.datastore.delete_doc(object, datastore_name)
 
-    def delete_doc(object=None, dataStoreName=None):
-        return self.dataStore.delete_doc(object, dataStoreName)
+    def find(self, type='', key='', key_value='', datastore_name=''):
+        return self.datastore.find(type, key, key_value, datastore_name)
 
-    def delete(object=None, dataStoreName=None):
-        return self.dataStore.delete(object, dataStoreName)
+    def find_doc(self, type='', key='', key_value='', datastore_name=''):
+        return self.datastore.find_doc(type, key, key_value, datastore_name)

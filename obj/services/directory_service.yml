@@ -1,6 +1,12 @@
 # Service interface definition to front end the
 # directory lookup library APIs
 
+_name:
+  directory
+
+_dependencies:
+  [datastore]
+
 add:
   in:
     parent: '/'

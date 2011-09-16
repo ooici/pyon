@@ -8,6 +8,7 @@ from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
 from pika import BasicProperties
 
+from anode.util.log import log
 
 class Node(object):
     """
@@ -29,7 +30,8 @@ class Node(object):
         AMQP Connection event handler.
         Should this be in another class?
         """
-        print 'connection open'
+        log.debug("In Node.on_connection_open")
+        log.debug("client: %s" % str(client))
         client.add_on_close_callback(self.on_connection_close)
         self.client = client
         self.start_node()
@@ -39,18 +41,20 @@ class Node(object):
         AMQP Connection event handler.
         Should this be in another class?
         """
-        print 'connection close'
+        log.debug("In Node.on_connection_close")
 
     def start_node(self):
         """
         This should only be called by on_connection_opened..
         so, maybe we don't need a start_node/stop_node interface
         """
+        log.debug("In Node.start_node")
         self.running = 1
 
     def stop_node(self):
         """
         """
+        log.debug("In Node.stop_node")
 
     def channel(self, name, ch_type):
         """
@@ -58,10 +62,7 @@ class Node(object):
 
         name shouldn't be a parameter here
         """
-
-
-
-
+        log.debug("In Node.channel")
 
 if __name__ == '__main__':
     test()

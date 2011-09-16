@@ -1,4 +1,12 @@
-findDataResources:
+# Application Integration Service interface definition
+
+_name:
+  app_integration
+
+_dependencies:
+  [datastore, identity_registry]
+
+find_data_resources:
   in:
     user_ooi_id: ""
     minLatitude: -1.1
@@ -38,7 +46,7 @@ findDataResources:
       date_registered: 18446744073709551615
       notificationSet: true
 
-findDataResourcesByUser:
+find_data_resources_by_user:
   in:
     user_ooi_id: ""
     minLatitude: -1.1
@@ -78,7 +86,7 @@ findDataResourcesByUser:
       date_registered: 18446744073709551615
       notificationSet: true
 
-getDataResourceDetail:
+get_data_resource_detail:
   in:
     data_resource_id: ""
   out:
@@ -143,14 +151,14 @@ getDataResourceDetail:
     - name: ""
       value: ""
 
-createDownloadURL:
+create_download_url:
   in:
     user_ooi_id: ""
     data_resource_id: ""
   out:
     download_url: ""
 
-registerUser:
+register_user:
   in:
     certificate: ""
     rsa_private_key: ""
@@ -162,7 +170,7 @@ registerUser:
     user_is_data_provider: true
     user_is_marine_operator: true
 
-updateUserProfile:
+update_user_profile:
   in:
     user_ooi_id: ""
     name: ""
@@ -174,7 +182,7 @@ updateUserProfile:
   out:
     status: true
 
-getUser:
+get_user:
   in:
     user_ooi_id: ""
   out:
@@ -186,25 +194,25 @@ getUser:
     - name: ""
       value: ""
 
-setUserRole:
+set_user_role:
   in:
     user_ooi_id: ""
     role: ""
   out:
     status: true
 
-getResourceTypes:
+get_resource_types:
   in:
   out:
     types: []
 
-getResourcesOfType:
+get_resources_of_type:
   in:
     resource_type: ""
   out:
       resources: []
 
-getResource:
+get_resource:
   in:
     ooi_id: ""
   out:
@@ -212,19 +220,19 @@ getResource:
     - name: ""
       value: ""
 
-createDataResource:
+create_data_resource:
 
-updateDataResource:
+update_data_resource:
 
-deleteDataResource:
+delete_data_resource:
 
-validateDataResource:
+validate_data_resource:
 
-createDataResourceSubscription:
+create_data_resource_subscription:
 
-findDataResourceSubscriptions:
+find_data_resource_subscriptions:
 
-deleteDataResourceSubscription:
+delete_data_resource_subscription:
 
-updateDataResourceSubscription:
+update_data_resource_subscription:
 

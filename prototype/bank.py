@@ -1,115 +1,167 @@
 """
 """
 
-from zope.interface import Interface, implements
-
-from anode.service import service
 from anode.net import entity
 from anode.container import cc
 from anode.core.bootstrap import AnodeObject
-from anode.datastore.datastore import NotFoundError
-from interface.services.ibank_service import IBankService
+from anode.util.log import log
 
-from anode.net import messaging
+from interface.services.ibank_service import IBankService, BaseBankService
 
-class BankService(service.BaseService):
-    implements(IBankService)
+class BankService(BaseBankService):
 
-    def new_account(self, name='', accountType='Checking'):
+    def __init__(self, config_params={}):
+        log.debug("In __init__")
+        pass
+
+    def new_account(self, name='', account_type='Checking'):
+        log.debug("In new_account")
+        log.debug("name: %s" % str(name))
+        log.debug("account_type: %s" % str(account_type))
         res = []
-        try:
-            res = self.dataStore.find("BankCustomer", "Name", name)
-        except NotFoundError:
-            print "Customer already exists.  Customer id: " + str(res)
+# TODO uncomment when exception handling is implemented in message stack
+#        try:
+#            res = self.clients.datastore.find("BankCustomer", "name", name)
+#            print "Existing customer.  Customer id: " + str(res)
+#        except NotFoundError:
+#            print "New customer"
         if len(res) == 0:
             # Create customer info entry
-            customerInfo = {}
-            customerInfo["Name"] = name
-            customerObj = AnodeObject("BankCustomer", customerInfo)
-            customerCreateTuple = self.dataStore.create(customerObj)
-            customerId = customerCreateTuple[0]
+            customer_info = {}
+            customer_info["name"] = name
+            customer_obj = AnodeObject("BankCustomer", customer_info)
+            customer_create_tuple = self.clients.datastore.create(customer_obj)
+            customer_id = customer_create_tuple[0]
 
-            # Create account entry
-            accountInfo = {}
-            accountInfo["AccountType"] = accountType
-            accountInfo["Owner"] = customerId
-            accountObj = AnodeObject("BankAccount", accountInfo)
-            accountCreateTuple = self.dataStore.create(accountObj)
-            accountId = accountCreateTuple[0]
+        # Create account entry
+        account_info = {}
+        account_info["account_type"] = account_type
+        account_info["owner"] = customer_id
+        account_obj = AnodeObject("BankAccount", account_info)
+        account_create_tuple = self.clients.datastore.create(account_obj)
+        account_id = account_create_tuple[0]
 
-            print "Created %s account for user %s.  Account id is %s" % (accountType, name, accountId)
+        print "Created %s account for user %s.  Account id is %s" % (account_type, name, account_id)
 
-        return accountId
+        return account_id
 
-    def deposit(self, accountId=-1, amount=0.0):
-        accountObj = self.dataStore.read(accountId)
-        if accountObj == None:
+    def deposit(self, account_id=-1, amount=0.0):
+        account_obj = self.clients.datastore.read(account_id)
+        if account_obj is None:
+            # TODO throw not found exception
             return "Account does not exist"
-        accountObj.Balance += amount
-        self.dataStore.update(accountObj)
-        return "Balance after deposit: %s" % (str(accountObj.Balance))
+        account_obj.balance += amount
+        self.clients.datastore.update(account_obj)
+        return "Balance after deposit: %s" % (str(account_obj.balance))
 
-    def withdraw(self, accountId=-1, amount=0.0):
-        accountObj = self.dataStore.read(accountId)
-        if accountObj == None:
+    def withdraw(self, account_id=-1, amount=0.0):
+        account_obj = self.clients.datastore.read(account_id)
+        if account_obj is None:
+            # TODO throw not found exception
             return "Account does not exist"
-        accountObj.Balance -= amount
-        self.dataStore.update(accountObj)
-        return "Balance after withdrawl: %s" % (str(accountObj.Balance))
+        account_obj.balance -= amount
+        self.clients.datastore.update(account_obj)
+        return "Balance after withdrawl: %s" % (str(account_obj.balance))
 
-    def get_balance(self, accountId=-1):
-        accountObj = self.dataStore.read(accountId)
-        if accountObj == None:
+    def get_balance(self, account_id=-1):
+        account_obj = self.clients.datastore.read(account_id)
+        if account_obj is None:
+            # TODO throw not found exception
             return "Account does not exist"
-        return "Balance: %s" % (str(accountObj.Balance))
+        return "Balance: %s" % (str(account_obj.balance))
 
     def list_accounts(self, name=''):
         """
         Find all accounts (optionally of type) owned by user
         """
-        customerList = self.dataStore.find("BankCustomer", "Name", name)
-        customerObj = customerList[0]
-        return self.dataStore.find("BankAccount", "Owner", customerObj._id)
+        customer_list = self.clients.datastore.find("BankCustomer", "name", name)
+        customer_obj = customer_list[0]
+        accounts = self.clients.datastore.find("BankAccount", "owner", customer_obj._id)
+        account_list = []
+        for account in accounts:
+            account_info = {}
+            account_info["account_type"] = account.account_type
+            account_info["balance"] = account.balance
+            account_list.append(account_info)
+        return account_list
 
 def test_service():
     bank = BankService()
-    acctNum = bank.new_account('kurt', 'Savings')
-    bank.balance(acctNum)
-    bank.deposit(acctNum, 99999999)
-    bank.balance(acctNum)
-    bank.withdraw(acctNum, 1000)
+    acct_num = bank.new_account('kurt', 'Savings')
+    bank.balance(acct_num)
+    bank.deposit(acct_num, 99999999)
+    bank.balance(acct_num)
+    bank.withdraw(acct_num, 1000)
     bank.list_accounts('kurt')
 
-def test_server():
+def start_server():
+    """
+    This method will start the container which will
+    in turn start the bank server and it's dependent
+    datastore service
+    """
     container = cc.Container()
     container.start() # :(
     print 'container started'
 
-    bank_service = BankService()
-
-    bank_entity = entity.RPCEntityFromService(bank_service)
-
-    print 'start_server'
-    container.start_server('ooibank', bank_entity)
-    print 'server started'
-
     container.serve_forever()
 
+def start_client():
+    """
+    This method will start the container which will
+    in turn start the bank server and it's dependent
+    datastore service
+    """
+    container = cc.Container()
+    container.start(server=False) # :(
+    print 'container started'
 
-def test_client():
+    client = entity.RPCClientEntityFromInterface(IBankService)
+
+    print "Before start client"
+    container.start_client('bank', client)
+
+    print "Before new account"
+    acctNum = client.new_account('kurt', 'Savings')
+    print "New account number: " + str(acctNum)
+    print "Starting balance %s" % str(client.get_balance(acctNum))
+    client.deposit(acctNum, 99999999)
+    print "Confirming balance after deposit %s" % str(client.get_balance(acctNum))
+    client.withdraw(acctNum, 1000)
+    print "Confirming balance after withdrawl %s" % str(client.get_balance(acctNum))
+    acctList = client.list_accounts('kurt')
+    for acct_obj in acctList:
+        print "Account: " + str(acct_obj)
+
+    container.stop()
+
+def test_single_container():
+    """
+    This is an all inclusive test in which the
+    client and server are all running within the
+    same container
+    """
     container = cc.Container()
     container.start() # :(
 
     client = entity.RPCClientEntityFromInterface(IBankService)
 
-    container.start_client('ooibank', client)
+    print "Before start client"
+    container.start_client('bank', client)
 
-    client.new_account('kurt')
-    client.deposit('kurt', 99999999)
-    client.withdraw('kurt', 1000)
+    print "Before new account"
+    acctNum = client.new_account('kurt', 'Savings')
+    print "New account number: " + str(acctNum)
+    print "Starting balance %s" % str(client.get_balance(acctNum))
+    client.deposit(acctNum, 99999999)
+    print "Confirming balance after deposit %s" % str(client.get_balance(acctNum))
+    client.withdraw(acctNum, 1000)
+    print "Confirming balance after withdrawl %s" % str(client.get_balance(acctNum))
+    acctList = client.list_accounts('kurt')
+    for acct_obj in acctList:
+        print "Account: " + str(acct_obj)
 
-    #container.serve_forever()
-    return client, container
+    container.stop()
 
 if __name__ == '__main__':
     import sys
@@ -119,4 +171,6 @@ if __name__ == '__main__':
         test_client()
     else:
         test_server()
+
+    test_single_container()
 

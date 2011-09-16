@@ -15,25 +15,25 @@ class MockDB_DataStore(DataStore):
     to persist documents.
     """
 
-    def __init__(self, dataStoreName='prototype'):
-        self.dataStoreName = dataStoreName
+    def __init__(self, datastore_name='prototype'):
+        self.datastore_name = datastore_name
         log.debug('Creating in-memory dict of dicts that will simulate data stores')
-        self.root = {dataStoreName:{}}
+        self.root = {datastore_name:{}}
 
-    def create_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Creating data store %s' % dataStoreName)
-        if dataStoreName not in self.root:
-            self.root[dataStoreName] = {}
+    def create_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Creating data store %s' % datastore_name)
+        if datastore_name not in self.root:
+            self.root[datastore_name] = {}
         return True
 
-    def delete_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Deleting data store %s' % dataStoreName)
-        if dataStoreName in self.root:
-            del self.root[dataStoreName]
+    def delete_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Deleting data store %s' % datastore_name)
+        if datastore_name in self.root:
+            del self.root[datastore_name]
         return True
 
     def list_datastores(self):
@@ -42,168 +42,168 @@ class MockDB_DataStore(DataStore):
         log.debug('Data stores: %s' % str(dsList))
         return dsList
 
-    def info_datastore(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Listing information about data store %s' % dataStoreName)
-        if dataStoreName in self.root:
+    def info_datastore(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Listing information about data store %s' % datastore_name)
+        if datastore_name in self.root:
             info = 'Data store exists'
         else:
             info = 'Data store does not exist'
         log.debug('Data store info: %s' % str(info))
         return info
 
-    def list_objects(self, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Listing all objects in data store %s' % dataStoreName)
+    def list_objects(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Listing all objects in data store %s' % datastore_name)
         objs = []
-        for key, value in self.root[dataStoreName].items():
+        for key, value in self.root[datastore_name].items():
             if key.find('_version_counter') == -1 and key.find('_version_') == -1:
                 objs.append(key)
         log.debug('Objects: %s' % str(objs))
         return objs
 
-    def list_object_revisions(self, objectId, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
-        log.debug('Listing all versions of object %s/%s' % (dataStoreName, str(objectId)))
+    def list_object_revisions(self, object_id, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        log.debug('Listing all versions of object %s/%s' % (datastore_name, str(object_id)))
         res = []
-        for key, value in self.root[dataStoreName].items():
+        for key, value in self.root[datastore_name].items():
             if (key.find('_version_counter') == -1
-                and (key.find(objectId + '_version_') == 0)):
+                and (key.find(object_id + '_version_') == 0)):
                 res.append(key)
         log.debug('Versions: %s' % str(res))
         return res
 
-    def create(self, object, dataStoreName=None):
+    def create(self, object, datastore_name=""):
         return self.create_doc(object.__dict__)
 
-    def create_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
+    def create_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
         try:
-            dataStoreDict = self.root[dataStoreName]
+            datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
 
-        log.debug('Creating new object %s/%s' % (dataStoreName, object["type_"]))
+        log.debug('Creating new object %s/%s' % (datastore_name, object["type_"]))
 
         # Assign an id to doc
         object["_id"] = uuid4().hex
-        objectId = object["_id"]
+        object_id = object["_id"]
 
         # Create key for version counter entry.  Will be used
         # on update to increment version number easily.
-        versionCounterKey = '__' + objectId + '_version_counter'
+        versionCounterKey = '__' + object_id + '_version_counter'
         versionCounter = 1
 
         # Assign initial version to doc
         object["_rev"] = versionCounter
 
         # Write HEAD, version and version counter dicts
-        dataStoreDict[objectId] = object
-        dataStoreDict[versionCounterKey] = versionCounter
-        dataStoreDict[objectId + '_version_' + str(versionCounter)] = object
+        datastore_dict[object_id] = object
+        datastore_dict[versionCounterKey] = versionCounter
+        datastore_dict[object_id + '_version_' + str(versionCounter)] = object
 
         # Return tuple that identifies the id of the new doc and its version
-        res = (objectId, str(versionCounter))
+        res = (object_id, str(versionCounter))
         log.debug('Create result: %s' % str(res))
         return res
 
-    def read(self, objectId, revId=None, dataStoreName=None):
-        doc = self.read_doc(objectId, revId, dataStoreName)
+    def read(self, object_id, rev_id="", datastore_name=""):
+        doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Anode object
         obj = AnodeObject(doc["type_"], doc)
         log.debug('Anode object: %s' % str(obj))
         return obj
 
-    def read_doc(self, objectId, revId=None, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
+    def read_doc(self, object_id, rev_id="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
         try:
-            dataStoreDict = self.root[dataStoreName]
+            datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
 
         try:
-            key = objectId
-            if revId == None:
-                log.debug('Reading head version of object %s/%s' % (dataStoreName, str(objectId)))
+            key = object_id
+            if rev_id == "":
+                log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
             else:
-                log.debug('Reading version %s of object %s/%s' % (str(revId), dataStoreName, str(objectId)))
-                key += '_version_' + str(revId)
-            doc = dataStoreDict[key]
+                log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(object_id)))
+                key += '_version_' + str(rev_id)
+            doc = datastore_dict[key]
         except KeyError:
             raise DataStoreError('Object does not exist.')
         log.debug('Read result: %s' % str(doc))
         return doc
 
-    def update(self, object, dataStoreName=None):
+    def update(self, object, datastore_name=""):
         return self.update_doc(object.__dict__)
 
-    def update_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
+    def update_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
         try:
-            dataStoreDict = self.root[dataStoreName]
+            datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
 
         try:
-            objectId = object["_id"]
+            object_id = object["_id"]
 
             # Find the next doc version
-            versionCounterKey = '__' + objectId + '_version_counter'
+            versionCounterKey = '__' + object_id + '_version_counter'
             baseVersion = object["_rev"]
-            versionCounter = dataStoreDict[versionCounterKey] + 1
+            versionCounter = datastore_dict[versionCounterKey] + 1
             if baseVersion != versionCounter - 1:
                 raise VersionConflictError('Object not based on most current version')
         except KeyError:
             raise DataStoreError("Object missing required _id and/or _rev values")
 
-        log.debug('Saving new version of object %s/%s/%s' % (dataStoreName, object["type_"], object["_id"]))
+        log.debug('Saving new version of object %s/%s/%s' % (datastore_name, object["type_"], object["_id"]))
         object["_rev"] = versionCounter
 
         # Overwrite HEAD and version counter dicts, add new version dict
-        dataStoreDict[objectId] = object
-        dataStoreDict[versionCounterKey] = versionCounter
-        dataStoreDict[objectId + '_version_' + str(versionCounter)] = object
-        res = (objectId, str(versionCounter))
+        datastore_dict[object_id] = object
+        datastore_dict[versionCounterKey] = versionCounter
+        datastore_dict[object_id + '_version_' + str(versionCounter)] = object
+        res = (object_id, str(versionCounter))
         log.debug('Update result: %s' % str(res))
         return res
 
-    def delete(self, object, dataStoreName=None):
+    def delete(self, object, datastore_name=""):
         return self.delete_doc(object.__dict__)
 
-    def delete_doc(self, object, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
+    def delete_doc(self, object, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
         try:
-            dataStoreDict = self.root[dataStoreName]
+            datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
 
-        objectId = object["_id"]
-        log.debug('Deleting object %s/%s' % (dataStoreName, object["_id"]))
+        object_id = object["_id"]
+        log.debug('Deleting object %s/%s' % (datastore_name, object["_id"]))
         try:
-            if objectId in dataStoreDict.keys():
+            if object_id in datastore_dict.keys():
                 # Find all version dicts and delete them
-                for key in dataStoreDict.keys():
-                    if key.find(objectId + '_version_') == 0:
-                        del dataStoreDict[key]
+                for key in datastore_dict.keys():
+                    if key.find(object_id + '_version_') == 0:
+                        del datastore_dict[key]
                 # Delete the HEAD dict
-                del dataStoreDict[objectId]
+                del datastore_dict[object_id]
                 # Delete the version counter dict
-                del dataStoreDict['__' + objectId + '_version_counter']
+                del datastore_dict['__' + object_id + '_version_counter']
         except KeyError:
-            raise DataStoreError('Object ' + objectId + ' does not exist.')
+            raise DataStoreError('Object ' + object_id + ' does not exist.')
         log.debug('Delete result: True')
         return True
 
-    def find(self, type, key=None, keyValue=None, dataStoreName=None):
-        docList = self.find_doc(type, key, keyValue, dataStoreName)
+    def find(self, type, key="", key_value="", datastore_name=""):
+        docList = self.find_doc(type, key, key_value, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Anode object
@@ -214,34 +214,34 @@ class MockDB_DataStore(DataStore):
 
         return results
 
-    def find_doc(self, type, key=None, keyValue=None, dataStoreName=None):
-        if dataStoreName == None:
-            dataStoreName = self.dataStoreName
+    def find_doc(self, type, key="", key_value="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
         try:
-            dataStoreDict = self.root[dataStoreName]
+            datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + dataStoreName + ' does not exist.')
+            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
 
         results = []
-        logString = "Searching for objects of type: " + type + " in data store " + dataStoreName
-        if key != None:
-            logString += "where key: " + key + " has value: " + str(keyValue)
-        log.debug(logString)
+        log_string = "Searching for objects of type: " + type + " in data store " + datastore_name
+        if key != "":
+            log_string += "where key: " + key + " has value: " + str(key_value)
+        log.debug(log_string)
 
         # Traverse entire data store, checking each HEAD version for equality on:
         #  - type
         #  - optionally, key/value match
-        for objId in self.list_objects(dataStoreName):
+        for obj_id in self.list_objects(datastore_name):
             try:
-                doc = self.read_doc(objId, revId=None, dataStoreName=dataStoreName)
+                doc = self.read_doc(obj_id, rev_id="", datastore_name=datastore_name)
                 log.debug("Doc: %s" % str(doc))
                 if doc["type_"] == type:
-                    if keyValue == None:
+                    if key_value == "":
                         log.debug("No key, appending doc to results")
                         results.append(doc)
                     else:
                         log.debug("Checking key value")
-                        if doc[key] == keyValue:
+                        if doc[key] == key_value:
                             log.debug("Key value matches, appending doc to results")
                             results.append(doc)
             except KeyError:

@@ -1,19 +1,25 @@
 # Bank Service interface definition
 
+_name:
+  bank
+
+_dependencies:
+  [datastore]
+
 new_account:
   name: ""
-  accountType: Checking
+  account_type: Checking
 
 deposit:
-  accountId: -1
+  account_id: -1
   amount: 0.0
 
 withdraw:
-  accountId: -1
+  account_id: -1
   amount: 0.0
 
 get_balance:
-  accountId: -1
+  account_id: -1
 
 list_accounts:
   name: ""

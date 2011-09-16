@@ -1,4 +1,4 @@
 UserRole:
   type_: UserRole
-  Name: ""
-  Description: ""
+  name: ""
+  description: ""

@@ -1,66 +1,115 @@
 # Service interface definition to front end the
 # datastore library APIs
 
+_name:
+  datastore
+
+_dependencies:
+  []
+
 create_datastore:
-  dataStoreName:
+  in:
+    datastore_name: ""
+  out:
 
 delete_datastore:
-  dataStoreName:
+  in:
+    datastore_name: ""
+  out:
 
 list_datastores:
+  in:
+  out:
+    list: []
 
 info_datastore:
-  dataStoreName:
+  in:
+    datastore_name: ""
+  out:
+    info: []
 
 list_objects:
-  dataStoreName:
+  in:
+    datastore_name: ""
+  out:
+    info: []
 
 list_object_revisions:
-  objectId:
-  dataStoreName:
+  in:
+    object_id: ""
+    datastore_name: ""
+  out:
+    list: []
 
 create:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
 
 create_doc:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
+    tuple: ()
 
 read:
-  objectId:
-  revId:
-  dataStoreName:
+  in:
+    object_id: ""
+    rev_id: ""
+    datastore_name: ""
+  out:
+    object: {}
 
 read_doc:
-  objectId:
-  revId:
-  dataStoreName:
+  in:
+    object_id: ""
+    rev_id: ""
+    datastore_name: ""
+  out:
+    object: {}
 
 update:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
+    tuple: ()
 
 update_doc:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
+    tuple: ()
 
 delete:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
 
 delete_doc:
-  object:
-  dataStoreName:
+  in:
+    object: {}
+    datastore_name: ""
+  out:
 
 find:
-  type:
-  key:
-  keyValue:
-  dataStoreName:
+  in:
+    type: ""
+    key: ""
+    key_value: ""
+    datastore_name: ""
+  out:
+    list: []
 
 find_doc:
-  type:
-  key:
-  keyValue:
-  dataStoreName:
+  in:
+    type: ""
+    key: ""
+    key_value: ""
+    datastore_name: ""
+  out:
+    list: []

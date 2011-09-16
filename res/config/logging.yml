@@ -52,4 +52,4 @@ handlers:
 loggers:
   anode:
     handlers: [console, file]
-    level: INFO
+    level: WARN

@@ -28,5 +28,5 @@ __all__ += ['AnodeProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'Pyth
 from anode.net import messaging, channel
 __all__ += ['messaging', 'channel']
 
-from anode.container.cc import Container
-__all__ += ['Container']
+#from anode.container.cc import Container
+#__all__ += ['Container']

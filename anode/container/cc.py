@@ -40,11 +40,11 @@ class Container(object):
         if server == True:
             # Read the config file and start services defined there
             # TODO likely should be done elsewhere
-            serviceNames = self.readConfig()
-            log.debug("serviceNames: %s" % str(serviceNames))
+            service_names = self.readConfig()
+            log.debug("service_names: %s" % str(service_names))
 
             # Iterate over service name list, starting services
-            for serviceName in serviceNames:
+            for serviceName in service_names:
                 log.debug("serviceName: %s" % str(serviceName))
                 self.start_service(serviceName)
 
@@ -54,50 +54,50 @@ class Container(object):
         services = SERVICE_CFG['apps']
         # Return value.  Will contain list of
         # service names from the config file
-        serviceNames = []
-        for serviceDef in services:
-            log.debug("serviceDef: %s" % str(serviceDef))
-            name = serviceDef["name"]
+        service_names = []
+        for service_def in services:
+            log.debug("service_def: %s" % str(service_def))
+            name = service_def["name"]
 
-            configParams = {}
-            if serviceDef.has_key("config"):
-                configParams = serviceDef["config"]
+            config_params = {}
+            if service_def.has_key("config"):
+                config_params = service_def["config"]
 
             # Service is described in processapp tuple
             # Field 1 is the module name
             # Field 2 is the class name
-            module = serviceDef["processapp"][1]
-            cls = serviceDef["processapp"][2]
+            module = service_def["processapp"][1]
+            cls = service_def["processapp"][2]
 
-            serviceInstance = self.forname(module, cls, configParams)
+            service_instance = self.forname(module, cls, config_params)
 
             # Inject dependencies
-            serviceInstance.clients = DotDict()
-            for dependency in serviceInstance.dependencies:
-                dependencyService = get_service_by_name(dependency)
-                dependencyInterface = list(providedBy(dependencyService))[0]
+            service_instance.clients = DotDict()
+            for dependency in service_instance.dependencies:
+                dependency_service = get_service_by_name(dependency)
+                dependency_interface = list(providedBy(dependency_service))[0]
 
-                client = entity.RPCClientEntityFromInterface(dependencyInterface)
+                client = entity.RPCClientEntityFromInterface(dependency_interface)
                 self.start_client(dependency, client)
-                serviceInstance.clients[dependency] = client
+                service_instance.clients[dependency] = client
 
             # Add to global dict
-            add_service_by_name(name, serviceInstance)
+            add_service_by_name(name, service_instance)
 
-            serviceNames.append(name)
+            service_names.append(name)
 
-        return serviceNames
+        return service_names
 
-    def forname(self, modpath, classname, configParams={}):
+    def forname(self, modpath, classname, config_params={}):
         ''' Returns a class of "classname" from module "modname". '''
         log.debug("In Container.forname")
         log.debug("modpath: %s" % modpath)
         log.debug("classname: %s" % classname)
-        log.debug("configParams: %s" % str(configParams))
+        log.debug("config_params: %s" % str(config_params))
         firstTime = True
         module = __import__(modpath, fromlist=[classname])
         classobj = getattr(module, classname)
-        return classobj(configParams)
+        return classobj(config_params)
 
 
     def stop(self):
