@@ -13,9 +13,9 @@ import argparse
 
 import yaml
 # Do not remove the
-import anode.util.yaml_ordered_dict
+import ion.util.yaml_ordered_dict
 
-class AnodeServiceDefinitionError(Exception):
+class IonServiceDefinitionError(Exception):
     pass
 
 templates = {
@@ -26,7 +26,7 @@ from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
-from anode.service.service import BaseService
+from ion.service.service import BaseService
 
 {classes}
 '''
@@ -52,13 +52,13 @@ from anode.service.service import BaseService
     , 'arg': '{name}={val}'
 }
 
-description = 'Anode utility for generating interfaces from object definitions (and vice versa).'
+description = 'Ion utility for generating interfaces from object definitions (and vice versa).'
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('action', type=str, default='generate', choices=['generate'], help='Which action to perform.')
 args = parser.parse_args()
 
 if os.getcwd().endswith('scripts'):
-    sys.exit('This script needs to be run from the anode root.')
+    sys.exit('This script needs to be run from the ion root.')
 
 if args.action == 'generate':
     service_dir, interface_dir = 'obj/services', 'interface'
@@ -133,7 +133,7 @@ if args.action == 'generate':
                         methods.append(templates['method'].format(name=name, args=args_str))
 
             if service_name is None:
-                raise AnodeServiceDefinitionError("Service definition file %s does not define _name attribute" % yaml_file)
+                raise IonServiceDefinitionError("Service definition file %s does not define _name attribute" % yaml_file)
             service_name_str = templates['svcname'].format(name=service_name)
             dependencies_str = templates['depends'].format(namelist=dependencies)
             methods_str = ''.join(methods)

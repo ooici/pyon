@@ -3,12 +3,12 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from anode.core.exception import NotFound
-from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
+from ion.core.exception import NotFound
+from ion.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from ion.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from interface.services.idatastore_service import BaseDatastoreService
 
-from anode.util.log import log
+from ion.util.log import log
 
 class DataStoreService(BaseDatastoreService):
 

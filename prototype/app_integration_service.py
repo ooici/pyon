@@ -8,11 +8,11 @@ from M2Crypto import X509
 from collections import OrderedDict, defaultdict
 
 # TODO temp imports
-from anode.net import entity
-from anode.container import cc
-from anode.core.exception import NotFound
+from ion.net import entity
+from ion.container import cc
+from ion.core.exception import NotFound
 
-from anode.util.log import log
+from ion.util.log import log
 
 from interface.services.iapp_integration_service import IAppIntegrationService, BaseAppIntegrationService
 
