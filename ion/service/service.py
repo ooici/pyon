@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-#from ion.base import log
+#from ion.public import log
 
 class BaseService(object):
     """

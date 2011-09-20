@@ -14,7 +14,7 @@ __license__ = 'Apache 2.0'
 
 from zope.interface import providedBy
 
-from ion.base import CFG, SERVICE_CFG, messaging, channel, GreenProcessSupervisor
+from ion.public import CFG, SERVICE_CFG, messaging, channel, GreenProcessSupervisor
 from ion.net import entity
 from ion.service.service import add_service_by_name, get_service_by_name
 

@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from ion.base import Container, GreenProcessSupervisor
+from ion.public import Container, GreenProcessSupervisor
 
 import argparse
 import yaml

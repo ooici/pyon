@@ -46,7 +46,7 @@ class ObjectTest(unittest.TestCase):
         self.assertRaises(AttributeError, obj._validate)
 
     def test_bootstrap(self):
-        """ Use the factory and singleton from bootstrap.py/base.py """
+        """ Use the factory and singleton from bootstrap.py/public.py """
         obj = IonObject('SampleObject')
         self.assertEqual(obj.name, '')
 
