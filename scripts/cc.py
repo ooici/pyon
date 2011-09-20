@@ -3,14 +3,14 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from ion.public import Container, GreenProcessSupervisor
+from pyon.public import Container, GreenProcessSupervisor
 
 import argparse
 import yaml
 
 version = "2.0"     # TODO: extract this from the code once versioning is automated again
 description = '''
-ion (ION capability container) v%s
+pyon (ION capability container) v%s
 ''' % (version)
 
 def main(opts, *args, **kwargs):
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('--notresident', action='store_false')
-    parser.add_argument('--version', action='version', version='ion v%s' % (version))
+    parser.add_argument('--version', action='version', version='pyon v%s' % (version))
     parser.add_argument('--count', type=int, default=1, choices=xrange(1, 1<<10), help='How many containers to spawn (1 to 1024).')
     parser.add_argument('--proctype', type=str, default='green', choices=proc_types, help='What type of process to spawn each container in.')
     opts, extra = parser.parse_known_args()

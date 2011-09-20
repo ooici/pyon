@@ -1,7 +1,7 @@
 # Central configuration file for Ion services and modules.
 # The contents are transformed into a dict that supports dot notation:
 # CFG.broker.amqp.host
-# Do not modify this file! Set overrides in ion.local.yml
+# Do not modify this file! Set overrides in pyon.local.yml
 
 server:
   amqp:

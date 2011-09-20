@@ -3,8 +3,8 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from ion.directory.directory import Directory
-from ion.util.log import log
+from pyon.directory.directory import Directory
+from pyon.util.log import log
 
 from interface.services.idirectory_service import BaseDirectoryService
 

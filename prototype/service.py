@@ -3,8 +3,8 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from ion.public import log
-from ion.service.service import BaseService
+from pyon.public import log
+from pyon.service.service import BaseService
 from interface.services.isample_service import ISampleService
 
 from zope.interface import implements
