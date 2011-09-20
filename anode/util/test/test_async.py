@@ -12,5 +12,5 @@ class AsyncTest(unittest.TestCase):
         cb(1, 2, 3, foo='bar')
 
     def test_blocking(self):
-        a, b, c, misc = blocking_cb(self.i_call_callbacks)
+        a, b, c, misc = blocking_cb(self.i_call_callbacks, cb_arg='cb')
         self.assertEqual((a, b, c, misc), (1, 2, 3, {'foo': 'bar'}))

@@ -9,7 +9,7 @@ from prototype.bank import BankService
 
 class Test_Bank(unittest.TestCase):
 
-    def do_test(self, bank):
+    def _do_test(self, bank):
         acctNum = bank.new_account('kurt', 'Savings')
         print "New account number: " + str(acctNum)
         print "Starting balance %s" % str(bank.get_balance(acctNum))
@@ -22,7 +22,7 @@ class Test_Bank(unittest.TestCase):
             print "Account: " + str(acctObj)
 
     def test_non_persistent(self):
-        self.do_test(BankService({}))
+        self._do_test(BankService({}))
 
 #    def test_persistent(self):
 #        self.do_test(BankService(persistent=True))

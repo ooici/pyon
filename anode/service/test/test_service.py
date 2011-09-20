@@ -8,10 +8,14 @@ from anode.service.service import BaseService
 
 import unittest
 
+class TestService(BaseService):
+    name = 'test-service'
+
 class ServiceTest(unittest.TestCase):
     def test_serve(self):
-        srv = BaseService('test-service')
-        srv.serve_forever()
+        # TODO: Make an equivalent of R1's ServiceProcess
+        srv = TestService()
+        #srv.serve_forever()
 
 if __name__ == '__main__':
     unittest.main()

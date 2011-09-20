@@ -4,7 +4,7 @@
 # TODO: Move this into a module that third parties can use
 # TODO: Confirm that monkey-patched thread-local storage still works
 import sys
-if 'pydevd' in sys.modules or 'unittest' in sys.modules:
+if 'pydevd' in sys.modules or 'unittest' in sys.modules or 'nose' in sys.modules:
     # The order matters
     monkey_list = ['os', 'time', 'thread', 'socket', 'select', 'ssl', 'httplib']
     for monkey in monkey_list:

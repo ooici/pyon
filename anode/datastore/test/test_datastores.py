@@ -3,17 +3,16 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-import unittest
-
 from anode.core.bootstrap import AnodeObject
 from anode.core.exception import NotFound
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 
+import unittest
+
 class Test_DataStores(unittest.TestCase):
 
-    def do_test(self, data_store):
-
+    def _do_test(self, data_store):
         # Just in case previous run failed without cleaning up,
         # delete data store
         try:
@@ -204,10 +203,10 @@ class Test_DataStores(unittest.TestCase):
         self.assertNotIn('my_ds', data_store.list_datastores())
 
     def test_non_persistent(self):
-        self.do_test(MockDB_DataStore(datastore_name='my_ds'))
+        self._do_test(MockDB_DataStore(datastore_name='my_ds'))
 
     def test_persistent(self):
-        self.do_test(CouchDB_DataStore(datastore_name='my_ds'))
+        self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
 
 if __name__ == "__main__":
     unittest.main()
