@@ -46,5 +46,7 @@ setup(  name = 'anode',
             'python-daemon==1.6',
             'bottle==0.9.6',
             'M2Crypto==0.21.1',
+            'coverage==3.5',
+            'nose==1.1.2',
         ],
      )
