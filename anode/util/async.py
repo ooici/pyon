@@ -3,6 +3,7 @@
 __author__ = 'Adam R. Smith'
 
 import gevent
+from gevent.event import Event
 from collections import Iterable
 from functools import wraps
 
@@ -40,9 +41,9 @@ def wait(green_stuff):
         return [g.get() for g in green_stuff]
     return green_stuff.get()
 
-def blocking_cb(func, *args, **kwargs):
+def blocking_cb(func, cb_arg, *args, **kwargs):
     """
-    Wrap a function that takes a callback as its first parameter, to block and return its arguments as the result.
+    Wrap a function that takes a callback as a named parameter, to block and return its arguments as the result.
     Really handy for working with callback-based APIs. Do not use in really frequently-called code.
     If keyword args are supplied, they come through in a single dictionary to avoid out-of-order issues.
     """
@@ -60,3 +61,4 @@ def blocking_cb(func, *args, **kwargs):
     elif len(ret_vals) == 1:
         return ret_vals[0]
     return tuple(ret_vals)
+
