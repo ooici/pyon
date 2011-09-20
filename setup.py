@@ -14,15 +14,15 @@ if sys.platform == 'darwin':
 
 version = '0.1'
 
-setup(  name = 'anode',
+setup(  name = 'pyon',
         version = version,
         description = 'OOI ION Python Capability Container and Core Modules',
-        url = 'https://github.com/ooici/anode',
+        url = 'https://github.com/ooici/pyon',
         download_url = 'http://ooici.net/releases',
         license = 'Apache 2.0',
         author = 'Adam R. Smith',
         author_email = 'a2smith@ucsd.edu',
-        keywords = ['ooici','ioncore'],
+        keywords = ['ooici','ioncore', 'pyon'],
         dependency_links = [
             'http://ooici.net/releases'
         ],

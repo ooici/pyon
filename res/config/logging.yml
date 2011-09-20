@@ -36,20 +36,20 @@ handlers:
 # are defined using dot notation.
 #
 # Examples:
-#   Enable DEBUG level for the anode.datastore package
+#   Enable DEBUG level for the ion.datastore package
 #   and all classes subordinate to that package.
 #
-#   anode.datastore:
+#   ion.datastore:
 #     handlers: [console, file]
 #     level: DEBUG
 #
 #   Enable INFO level for the module
-#   anode.datastore.couchchdb.couchdb_datastore
+#   ion.datastore.couchchdb.couchdb_datastore
 #
-#   anode.datastore.couchdb.couchdb_datastore:
+#   ion.datastore.couchdb.couchdb_datastore:
 #     handlers: [console, file]
 #     level: INFO
 loggers:
-  anode:
+  ion:
     handlers: [console, file]
     level: WARN
