@@ -26,7 +26,7 @@ setup(  name = 'pyon',
         dependency_links = [
             'http://ooici.net/releases'
         ],
-        test_suite = 'ion',
+        test_suite = 'pyon',
         install_requires = [
             'cython==0.14.1',
             'greenlet==0.3.1',

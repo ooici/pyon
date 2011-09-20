@@ -13,7 +13,7 @@ import argparse
 
 import yaml
 # Do not remove the
-import ion.util.yaml_ordered_dict
+import pyon.util.yaml_ordered_dict
 
 class IonServiceDefinitionError(Exception):
     pass
@@ -26,7 +26,7 @@ from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
-from ion.service.service import BaseService
+from pyon.service.service import BaseService
 
 {classes}
 '''
@@ -58,7 +58,7 @@ parser.add_argument('action', type=str, default='generate', choices=['generate']
 args = parser.parse_args()
 
 if os.getcwd().endswith('scripts'):
-    sys.exit('This script needs to be run from the ion root.')
+    sys.exit('This script needs to be run from the pyon root.')
 
 if args.action == 'generate':
     service_dir, interface_dir = 'obj/services', 'interface'

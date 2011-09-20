@@ -5,9 +5,9 @@ __license__ = 'Apache 2.0'
 
 from collections import OrderedDict, defaultdict
 
-from ion.core.bootstrap import IonObject
-from ion.core.exception import NotFound
-from ion.util.log import log
+from pyon.core.bootstrap import IonObject
+from pyon.core.exception import NotFound
+from pyon.util.log import log
 
 from interface.services.iidentity_registry_service import BaseIdentityRegistryService
 

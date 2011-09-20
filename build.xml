@@ -6,7 +6,7 @@
 	</description>
 
 	<!-- set global properties for this build -->
-	<property name="src" location="ion"/>
+	<property name="src" location="pyon"/>
 	<property name="build" location="build"/>
 	<property name="dist"  location="dist"/>
 
