@@ -12,6 +12,8 @@ import sys
 import argparse
 
 import yaml
+# Do not remove the
+import anode.util.yaml_ordered_dict
 
 class AnodeServiceDefinitionError(Exception):
     pass
@@ -21,6 +23,8 @@ templates = {
 '''#!/usr/bin/env python
 
 from zope.interface import Interface, implements
+
+from collections import OrderedDict, defaultdict
 
 from anode.service.service import BaseService
 

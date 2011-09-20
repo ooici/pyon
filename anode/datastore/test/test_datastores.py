@@ -5,10 +5,10 @@ __license__ = 'Apache 2.0'
 
 import unittest
 
+from anode.core.bootstrap import AnodeObject
+from anode.core.exception import NotFound
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from anode.datastore.datastore import NotFoundError
-from anode.core.bootstrap import AnodeObject
 
 class Test_DataStores(unittest.TestCase):
 
@@ -18,7 +18,7 @@ class Test_DataStores(unittest.TestCase):
         # delete data store
         try:
             data_store.delete_datastore()
-        except NotFoundError:
+        except NotFound:
             pass
 
         # Create should succeed and report True

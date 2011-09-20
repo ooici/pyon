@@ -6,7 +6,8 @@ __license__ = 'Apache 2.0'
 from uuid import uuid4
 
 from anode.core.bootstrap import AnodeObject
-from anode.datastore.datastore import DataStore, DataStoreError, VersionConflictError
+from anode.core.exception import BadRequest, Conflict, NotFound
+from anode.datastore.datastore import DataStore
 from anode.util.log import log
 
 class MockDB_DataStore(DataStore):
@@ -85,7 +86,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         log.debug('Creating new object %s/%s' % (datastore_name, object["type_"]))
 
@@ -125,7 +126,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         try:
             key = object_id
@@ -136,7 +137,7 @@ class MockDB_DataStore(DataStore):
                 key += '_version_' + str(rev_id)
             doc = datastore_dict[key]
         except KeyError:
-            raise DataStoreError('Object does not exist.')
+            raise NotFound('Object with id %s does not exist.' % str(object_id))
         log.debug('Read result: %s' % str(doc))
         return doc
 
@@ -149,7 +150,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         try:
             object_id = object["_id"]
@@ -159,9 +160,9 @@ class MockDB_DataStore(DataStore):
             baseVersion = object["_rev"]
             versionCounter = datastore_dict[versionCounterKey] + 1
             if baseVersion != versionCounter - 1:
-                raise VersionConflictError('Object not based on most current version')
+                raise Conflict('Object not based on most current version')
         except KeyError:
-            raise DataStoreError("Object missing required _id and/or _rev values")
+            raise BadRequest("Object missing required _id and/or _rev values")
 
         log.debug('Saving new version of object %s/%s/%s' % (datastore_name, object["type_"], object["_id"]))
         object["_rev"] = versionCounter
@@ -183,7 +184,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         object_id = object["_id"]
         log.debug('Deleting object %s/%s' % (datastore_name, object["_id"]))
@@ -198,7 +199,7 @@ class MockDB_DataStore(DataStore):
                 # Delete the version counter dict
                 del datastore_dict['__' + object_id + '_version_counter']
         except KeyError:
-            raise DataStoreError('Object ' + object_id + ' does not exist.')
+            raise NotFound('Object ' + object_id + ' does not exist.')
         log.debug('Delete result: True')
         return True
 
@@ -220,7 +221,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
-            raise DataStoreException('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         results = []
         log_string = "Searching for objects of type: " + type + " in data store " + datastore_name

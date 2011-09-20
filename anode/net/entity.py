@@ -11,6 +11,7 @@ import json # generalize
 
 from anode.core.bootstrap import AnodeObject
 from anode.core.object import AnodeObjectBase
+from anode.core import exception
 from anode.util.log import log
 
 class Entity(object):
@@ -46,16 +47,27 @@ class RPCEntityFromService(Entity):
         log.debug("chan: %s" % str(chan))
         log.debug("msg: %s" % str(msg))
 
-        cmd_dict = json.loads(msg, object_hook=as_anodeObject)
+        wrapped_req = json.loads(msg, object_hook=as_anodeObject)
+        cmd_dict = wrapped_req["payload"]
 
         # Need error handling
         #try:
-        result = self._call_cmd(cmd_dict)
-        response_msg = AnodeEncoder().encode(result)
-        log.debug("response_msg: %s" % str(response_msg))
+        try:
+            result = self._call_cmd(cmd_dict)
+            # Wrap message with response header
+            wrapped_result = {"header": {"status_code": 200, "error_message": ""}, "payload": result}
+        except exception.IonException as ex:
+            log.debug("Got error response")
+            wrapped_result = self.create_error_response(ex)
 
         #self.channel.send(response_msg)
-        chan.send(response_msg)
+        encoded_response = AnodeEncoder().encode(wrapped_result)
+        log.debug("response_msg: %s" % str(encoded_response))
+        chan.send(encoded_response)
+
+    def create_error_response(self, ex):
+        error_msg = {"header": {"status_code": ex.get_status_code(), "error_message": ex.get_error_message()}}
+        return error_msg
 
     def _call_cmd(self, cmd_dict):
         log.debug("In RPCEntityFromService._call_cmd")
@@ -94,19 +106,53 @@ class RPCClientEntityFromInterface(Entity):
         """
         log.debug("In RPCClientEntityFromInterface.call_remote")
         log.debug("cmd_dict: %s" % str(cmd_dict))
-        send_data = AnodeEncoder().encode(cmd_dict)
-        log.debug("send_data: %s" % str(send_data))
+        wrapped_cmd_dict = {"header": {}, "payload": cmd_dict}
+        send_data = AnodeEncoder().encode(wrapped_cmd_dict)
+        log.debug("wrapped send_data: %s" % str(send_data))
         #result_data = self.channel.send(self.service_name, send_data)
         log.debug("channel: " + str(self.channel))
+#        self.channel.send(send_data)
+        # Wrap message with request header
         self.channel.send(send_data)
         log.debug("After send")
         self.response_queue = event.AsyncResult()
         log.debug("Before get")
         result_data = self.response_queue.get()
-        log.debug("Before loads")
+        log.debug("Before loads. result_data: %s" % str(result_data))
         res = json.loads(result_data, object_hook=as_anodeObject)
         log.debug("res: %s" % str(res))
-        return res
+        # Check response header
+        header = res["header"]
+        if header["status_code"] == 200:
+            log.debug("OK status")
+            return res["payload"]
+        else:
+            log.debug("Bad status: %d" % header["status_code"])
+            log.debug("Error message: %s" % header["error_message"])
+            self.raise_exception(header["status_code"], header["error_message"])
+
+    def raise_exception(self, code, message):
+        if code == exception.BAD_REQUEST:
+            log.debug("Raising BadRequest");
+            raise exception.BadRequest(message)
+        elif code == exception.UNAUTHORIZED:
+            log.debug("Raising Unauthorized");
+            raise exception.Unauthorized(message)
+        if code == exception.NOT_FOUND:
+            log.debug("Raising NotFound");
+            raise exception.NotFound(message)
+        if code == exception.TIMEOUT:
+            log.debug("Raising Timeout");
+            raise exception.Timeout(message)
+        if code == exception.CONFLICT:
+            log.debug("Raising Conflict");
+            raise exception.Conflict(message)
+        if code == exception.SERVICE_UNAVAILABLE:
+            log.debug("Raising ServiceUnavailable");
+            raise exception.ServiceUnavailable(message)
+        else:
+            log.debug("Raising ServerError");
+            raise exception.ServerError(message)
 
     def _rpc(self, data):
         log.debug("In RPCClientEntityFromInterface._rpc")

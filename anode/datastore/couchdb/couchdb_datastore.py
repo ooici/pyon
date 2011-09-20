@@ -8,8 +8,9 @@ from uuid import uuid4
 import couchdb
 from couchdb.http import ResourceNotFound
 
-from anode.datastore.datastore import DataStore, NotFoundError
 from anode.core.bootstrap import AnodeObject
+from anode.core.exception import NotFound
+from anode.datastore.datastore import DataStore
 from anode.util.log import log
 
 class CouchDB_DataStore(DataStore):
@@ -43,7 +44,7 @@ class CouchDB_DataStore(DataStore):
             return True
         except ResourceNotFound:
             log.info('Data store delete failed.  Data store %s not found' % datastore_name)
-            raise NotFoundError
+            raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
 
     def list_datastores(self):
         log.debug('Listing all data stores')
@@ -144,10 +145,7 @@ class CouchDB_DataStore(DataStore):
         return True
 
     def find(self, type, key="", key_value="", datastore_name=""):
-        try:
-            docList = self.find_doc(type, key, key_value, datastore_name)
-        except ResourceNotFound:
-            raise NotFoundError()
+        docList = self.find_doc(type, key, key_value, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Anode object
@@ -176,7 +174,12 @@ class CouchDB_DataStore(DataStore):
                 }
             }'''
         log.debug("map_fun: %s" % str(map_fun))
-        queryList = list(db.query(map_fun))
+        try:
+            queryList = list(db.query(map_fun))
+        except ResourceNotFound:
+            raise NotFound("Data store query for type %s with key %s and key_value %s failed" % (type, key, str(key_value)))
+        if len(queryList) == 0:
+            raise NotFound("Data store query for type %s with key %s and key_value %s returned no objects" % (type, key, str(key_value)))
         results = []
         for row in queryList:
             doc = row.value

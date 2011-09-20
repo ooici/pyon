@@ -5,9 +5,12 @@ __license__ = 'Apache 2.0'
 
 from M2Crypto import X509
 
+from collections import OrderedDict, defaultdict
+
 # TODO temp imports
 from anode.net import entity
 from anode.container import cc
+from anode.core.exception import NotFound
 
 from anode.util.log import log
 
@@ -51,19 +54,19 @@ class AppIntegrationService(BaseAppIntegrationService):
                log.debug("User found")
                is_existing_user = True
             # TODO figure out right exception to catch
-            except:
+            except NotFound as ex:
                 # TODO for now just going to use CN portion of subject
                 # as new user name
-                name = subject.split("/CN=")[-1]
+                subj_name = subject.split("/CN=")[-1]
                 try:
-                    userinfo = self.clients.identity_registry.create_user(name = name)
+                    userinfo = self.clients.identity_registry.create_user(subj_name)
                     log.debug("User create succeeded")
-                except:
-                    # TODO throw not found exception
-                    log.error("Find failed")
+                except Exception as ex:
+                    # TODO throw exception
+                    log.error("Create failed")
 
-            ret["user_already_registered"] = is_existing_user
             ret = {"ooi_id": userinfo._id}
+            ret["user_already_registered"] = is_existing_user
             ret["user_is_admin"] = userinfo.roles.find("ADMIN") != -1
             ret["user_is_early_adopter"] = userinfo.roles.find("EARLY_ADOPTER") != -1
             ret["user_is_data_provider"] = userinfo.roles.find("DATA_PROVIDER") != -1
@@ -80,7 +83,7 @@ class AppIntegrationService(BaseAppIntegrationService):
             # TODO throw not found exception
             log.error("Find failed")
 
-    def update_user_profile(profile=[{'name': '', 'value': ''}], email_address='', name='', user_ooi_id='', institution=''):
+    def update_user_profile(self, user_ooi_id='', name='', institution='', email_address='', profile=[OrderedDict([('name', ''), ('value', '')])]):
         try:
             user_info = self.clients.identity_registry.update_user(name = name, email = email_address, variables = profile)
             log.debug("User updated")

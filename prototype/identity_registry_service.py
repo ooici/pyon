@@ -3,8 +3,10 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
+from collections import OrderedDict, defaultdict
+
 from anode.core.bootstrap import AnodeObject
-from anode.datastore.datastore import NotFoundError
+from anode.core.exception import NotFound
 from anode.util.log import log
 
 from interface.services.iidentity_registry_service import BaseIdentityRegistryService
@@ -15,7 +17,7 @@ class IdentityRegistryService(BaseIdentityRegistryService):
         log.debug("In __init__")
         pass
 
-    def create_user(self, phone='', variables=[{'name': '', 'value': ''}], subjects='', name='', email=''):
+    def create_user(self, name='', subjects='', email='', phone='', variables=[OrderedDict([('name', ''), ('value', '')])]):
         log.debug("In create_user")
         log.debug("name: %s" % name)
         log.debug("email: %s" % email)
@@ -26,25 +28,27 @@ class IdentityRegistryService(BaseIdentityRegistryService):
             res = self.clients.datastore.find("UserInfo", "name", name)
             log.info("User already exists. Raising exception")
             # TODO
-        except NotFoundError:
+        except NotFound:
             log.debug("New user")
 
         # Create user info entry
         userinfo = {}
-        userinfo["Name"] = name
+        userinfo["name"] = name
+        userinfo["roles"] = ""
+        userinfo["subjects"] = subjects
         userinfo["email"] = email
         userinfo["phone"] = phone
-        userinfo["subjects"] = subjects
         userinfo["variables"] = variables
-        userinfoObj = AnodeObject("UserInfo", userinfo)
-        userinfoCreateTuple = self.clients.datastore.create(userinfoObj)
-        userId = userinfoCreateTuple[0]
+        userinfo_obj = AnodeObject("UserInfo", userinfo)
+        userinfo_create_tuple = self.clients.datastore.create(userinfo_obj)
+        user_id = userinfo_create_tuple[0]
+        userinfo_obj._id = user_id
 
-        log.debug("Created user %s.  User id is %s" % (name, userId))
+        log.debug("Created user. User info: %s" % str(userinfo))
 
-        return userinfoObj
+        return userinfo_obj
 
-    def update_user(self, phone='', variables=[{'name': '', 'value': ''}], subjects='', name='', email=''):
+    def update_user(self, name='', subjects='', email='', phone='', variables=[OrderedDict([('name', ''), ('value', '')])]):
         log.debug("In update_user")
         log.debug("name: %s" % name)
         log.debug("email: %s" % email)
@@ -52,7 +56,7 @@ class IdentityRegistryService(BaseIdentityRegistryService):
         log.debug("subjects: %s" % subjects)
         log.debug("variables: %s" % str(variables))
         try:
-            userinfo = self.clients.datastore.find("UserInfo", "name", name)
+            userinfo = self.clients.datastore.find("UserInfo", "name", name)[0]
             log.debug("User found")
 
             # Update user info entry
@@ -61,13 +65,13 @@ class IdentityRegistryService(BaseIdentityRegistryService):
             userinfo["phone"] = phone
             userinfo["subjects"] = subjects
             userinfo["variables"] = variables
-            userinfoObj = AnodeObject("UserInfo", userinfo)
-            userinfoUpdateTuple = self.clients.datastore.update(userinfoObj)
+            userinfo_obj = AnodeObject("UserInfo", userinfo)
+            userinfo_update_tuple = self.clients.datastore.update(userinfo_obj)
 
             log.debug("Updated user %s." % name)
 
             return userinfoObj
-        except NotFoundError:
+        except NotFound:
             log.info("User not found. Raising exception")
             # TODO
 
@@ -76,10 +80,10 @@ class IdentityRegistryService(BaseIdentityRegistryService):
         log.debug("name: %s" % name)
         log.debug("email: %s" % email)
         try:
-            obj = self.clients.datastore.find("UserInfo", "name", name)
+            obj = self.clients.datastore.find("UserInfo", "name", name)[0]
             log.debug("User found")
             self.clients.datastore.delete(obj)
-        except NotFoundError:
+        except NotFound:
             log.info("User not found. Raising exception")
             # TODO
 
@@ -87,39 +91,39 @@ class IdentityRegistryService(BaseIdentityRegistryService):
         log.debug("In find_user_by_id")
         log.debug("id: %s" % id)
         try:
-            userinfo = self.clients.datastore.read(id)
+            userinfo = self.clients.datastore.read(id)[0]
             log.debug("User found: %s" % str(userinfo))
             return userinfo
-        except NotFoundError:
-            log.info("User not found. Raising exception")
-            # TODO
+        except NotFound as ex:
+            log.info("User not found. Re-raising exception")
+            raise ex
 
     def find_user_by_name(self, name=''):
         log.debug("In find_user_by_name")
         log.debug("name: %s" % name)
         try:
-            userinfo = self.clients.datastore.find("UserInfo", "name", name)
+            userinfo = self.clients.datastore.find("UserInfo", "name", name)[0]
             log.debug("User found: %s" % str(userinfo))
             return userinfo
-        except NotFoundError:
-            log.info("User not found. Raising exception")
-            # TODO
+        except NotFound as ex:
+            log.info("User not found. Re-raising exception")
+            raise ex
 
     def find_user_by_subject(self, subject=''):
         log.debug("In find_user_by_subject")
         log.debug("subject: %s" % subject)
         try:
-            userinfo = self.clients.datastore.find("UserInfo", "subjects", subject)
+            userinfo = self.clients.datastore.find("UserInfo", "subjects", subject)[0]
             log.debug("User found: %s" % str(userinfo))
             return userinfo
-        except NotFoundError:
-            log.info("User not found. Raising exception")
-            # TODO
+        except NotFound as ex:
+            log.info("User not found. Re-raising exception")
+            raise ex
 
     def add_cilogon_subject_to_user(self, name='', subject=''):
         pass
 
-    def update_cilogon_subject_for_user(self, name='', oldSubject='', newSubject=''):
+    def update_cilogon_subject_for_user(self, name='', old_subject='', new_subject=''):
         pass
 
     def remove_cilogon_subject_from_user(self, name='', subject=''):

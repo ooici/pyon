@@ -3,8 +3,8 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
+from anode.core.exception import NotFound
 from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from anode.datastore.datastore import NotFoundError
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from interface.services.idatastore_service import BaseDatastoreService
 
@@ -19,7 +19,7 @@ class DataStoreService(BaseDatastoreService):
                 if config_params.has_key('forceClean'):
                     try:
                         self.datastore.delete_datastore()
-                    except NotFoundError:
+                    except NotFound:
                         pass
                     self.datastore.create_datastore()
             else:

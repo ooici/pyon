@@ -3,15 +3,6 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-class DataStoreError(Exception):
-    pass
-
-class NotFoundError(DataStoreError):
-    pass
-
-class VersionConflictError(DataStoreError):
-    pass
-
 class DataStore(object):
     """
     Think of this class as a database server.
@@ -92,7 +83,7 @@ class DataStore(object):
         """
         Update an existing Anode object in the data store.  The '_rev' value
         must exist in the object and must be the most recent known object
-        version. If not, a VersionConflictError is thrown.
+        version. If not, a Conflict exception is thrown.
         """
         pass
 
@@ -100,7 +91,7 @@ class DataStore(object):
         """
         Update an existing raw doc in the data store.  The '_rev' value
         must exist in the doc and must be the most recent known doc
-        version. If not, a VersionConflictError is thrown.
+        version. If not, a Conflict exception is thrown.
         """
         pass
 
@@ -109,7 +100,7 @@ class DataStore(object):
         Remove all versions of specified Anode object from the data store.
         This method will check the '_rev' value to ensure that the object
         provided is the most recent known object version.  If not, a
-        VersionConflictError is thrown.
+        Conflict exception is thrown.
         """
         pass
 
@@ -118,7 +109,7 @@ class DataStore(object):
         Remove all versions of specified raw doc from the data store.
         This method will check the '_rev' value to ensure that the doc
         provided is the most recent known doc version.  If not, a
-        VersionConflictError is thrown.
+        Conflict exception is thrown.
         """
         pass
 
