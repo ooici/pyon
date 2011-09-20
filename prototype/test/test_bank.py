@@ -5,24 +5,35 @@ __license__ = 'Apache 2.0'
 
 import unittest
 
-from prototype.bank import BankService
+from anode.net import entity
+from anode.container import cc
 
-class Test_Bank(unittest.TestCase):
+from interface.services.ibank_service import IBankService, BaseBankService
 
-    def do_test(self, bank):
-        acctNum = bank.new_account('kurt', 'Savings')
-        print "New account number: " + str(acctNum)
-        print "Starting balance %s" % str(bank.get_balance(acctNum))
-        bank.deposit(acctNum, 99999999)
-        print "Confirming balance after deposit %s" % str(bank.get_balance(acctNum))
-        bank.withdraw(acctNum, 1000)
-        print "Confirming balance after withdrawl %s" % str(bank.get_balance(acctNum))
-        acctList = bank.list_accounts('kurt')
-        for acctObj in acctList:
-            print "Account: " + str(acctObj)
-
-    def test_non_persistent(self):
-        self.do_test(BankService({}))
+#class Test_Bank(unittest.TestCase):
+#
+#    def test_bank(self):
+#        container = cc.Container()
+#        container.start() # :(
+#
+#        client = entity.RPCClientEntityFromInterface(IBankService)
+#
+#        print "Before start client"
+#        container.start_client('bank', client)
+#
+#        print "Before new account"
+#        acctNum = client.new_account('kurt', 'Savings')
+#        print "New account number: " + str(acctNum)
+#        print "Starting balance %s" % str(client.get_balance(acctNum))
+#        client.deposit(acctNum, 99999999)
+#        print "Confirming balance after deposit %s" % str(client.get_balance(acctNum))
+#        client.withdraw(acctNum, 1000)
+#        print "Confirming balance after withdrawl %s" % str(client.get_balance(acctNum))
+#        acctList = client.list_accounts('kurt')
+#        for acct_obj in acctList:
+#            print "Account: " + str(acct_obj)
+#
+#        container.stop()
 
 #    def test_persistent(self):
 #        self.do_test(BankService(persistent=True))
