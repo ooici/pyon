@@ -1,16 +1,7 @@
 
-class DirectoryError(Exception):
-    pass
-
-class KeyAlreadyExistsError(DirectoryError):
-    pass
-
-class KeyNotFoundError(DirectoryError):
-    pass
-
 from anode.core.bootstrap import AnodeObject
 from anode.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from anode.datastore.datastore import NotFoundError
+from anode.core.exception import NotFound
 from anode.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from anode.util.log import log
 
@@ -39,7 +30,7 @@ class Directory(object):
         log.debug("Deleting data store and Directory")
         try:
             self.datastore.delete_datastore()
-        except NotFoundError:
+        except NotFound:
             pass
 
     def create(self):
