@@ -3,11 +3,11 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from anode.base import log
-from anode.service import service
-from anode.net import entity
-from anode.container import cc
-from anode.service.service import BaseService
+from pyon.public import log
+from pyon.service import service
+from pyon.net import entity
+from pyon.container import cc
+from pyon.service.service import BaseService
 from interface.services.iping_service import IPingService
 
 from zope.interface import implements

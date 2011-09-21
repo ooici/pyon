@@ -5,9 +5,9 @@ __license__ = 'Apache 2.0'
 
 from collections import OrderedDict, defaultdict
 
-from anode.core.bootstrap import AnodeObject
-from anode.core.exception import NotFound
-from anode.util.log import log
+from pyon.core.bootstrap import IonObject
+from pyon.core.exception import NotFound
+from pyon.util.log import log
 
 from interface.services.iidentity_registry_service import BaseIdentityRegistryService
 
@@ -39,7 +39,7 @@ class IdentityRegistryService(BaseIdentityRegistryService):
         userinfo["email"] = email
         userinfo["phone"] = phone
         userinfo["variables"] = variables
-        userinfo_obj = AnodeObject("UserInfo", userinfo)
+        userinfo_obj = IonObject("UserInfo", userinfo)
         userinfo_create_tuple = self.clients.datastore.create(userinfo_obj)
         user_id = userinfo_create_tuple[0]
         userinfo_obj._id = user_id
@@ -65,7 +65,7 @@ class IdentityRegistryService(BaseIdentityRegistryService):
             userinfo["phone"] = phone
             userinfo["subjects"] = subjects
             userinfo["variables"] = variables
-            userinfo_obj = AnodeObject("UserInfo", userinfo)
+            userinfo_obj = IonObject("UserInfo", userinfo)
             userinfo_update_tuple = self.clients.datastore.update(userinfo_obj)
 
             log.debug("Updated user %s." % name)

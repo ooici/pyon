@@ -1,18 +1,25 @@
-#!/usr/bin/env python
 
-__author__ = 'Thomas R. Lennan'
-__license__ = 'Apache 2.0'
-
-from pyon.directory.directory import Directory
+from pyon.core.bootstrap import IonObject
+from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.core.exception import NotFound
+from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.util.log import log
 
-from interface.services.idirectory_service import BaseDirectoryService
+class Directory(object):
+    """
+    Sample class that uses a data store and Ion object to
+    provide a directory lookup mechanism
+    """
 
-class DirectoryService(BaseDirectoryService):
+    obj_id = ""
+    objType = "DirectoryObjType_"
 
-    def __init__(self, config_params={}):
-        log.debug("In __init__")
-        pass
+    def __init__(self, datastore_name, persistent=False):
+        log.debug("Data store name: %s, persistent = %s" % (datastore_name, str(persistent)))
+        if persistent:
+            self.datastore = CouchDB_DataStore(datastore_name=datastore_name)
+        else:
+            self.datastore = MockDB_DataStore(datastore_name=datastore_name)
 
     def delete(self):
         """
@@ -22,8 +29,8 @@ class DirectoryService(BaseDirectoryService):
         """
         log.debug("Deleting data store and Directory")
         try:
-            self.clients.datastore.delete_datastore()
-        except NotFoundError:
+            self.datastore.delete_datastore()
+        except NotFound:
             pass
 
     def create(self):
@@ -32,11 +39,11 @@ class DirectoryService(BaseDirectoryService):
         persist an empty Directory object.
         """
         log.debug("Creating data store and Directory")
-        self.clients.datastore.create_datastore()
+        self.datastore.create_datastore()
 
         # Persist empty Directory object
         directory_obj = IonObject('Directory')
-        createTuple = self.clients.datastore.create(directory_obj)
+        createTuple = self.datastore.create(directory_obj)
 
         # Save document id for later use
         log.debug("Saving Directory object id %s" % str(createTuple[0]))
@@ -49,7 +56,7 @@ class DirectoryService(BaseDirectoryService):
         dict within the directory hierarchy.
         """
         log.debug("Looking for parent dict %s" % str(parent))
-        directory = self.clients.datastore.read(self.obj_id)
+        directory = self.datastore.read(self.obj_id)
 
         # Get the actual dict of dicts from the object.
         parent_dict = directory.content
@@ -76,7 +83,41 @@ class DirectoryService(BaseDirectoryService):
                         parent_dict = parent_dict[pathElement]
         return directory, parent_dict
 
-    def read(self, parent='/', key='foo'):
+    def add(self, parent, key, value):
+        """
+        Add a key/value pair to directory below parent
+        node level.
+        """
+        log.debug("Adding key %s and value %s at path %s" % (key, str(value), parent))
+        directory, parent_dict = self.find_dict(parent)
+
+        # Add key and value, throwing exception if key already exists.
+        if key in parent_dict:
+            raise KeyAlreadyExistsError
+
+        parent_dict[key] = value
+        self.datastore.update(directory)
+        return value
+
+    def update(self, parent, key, value):
+        """
+        Update key/value pair in directory at parent
+        node level.
+        """
+        log.debug("Updating key %s and value %s at path %s" % (key, str(value), parent))
+        directory, parent_dict = self.find_dict(parent)
+
+        # Replace value, throwing exception if key not found.
+        try:
+            val = parent_dict[key]
+        except KeyError:
+            raise KeyNotFoundError
+
+        parent_dict[key] = value
+        self.datastore.update(directory)
+        return value
+
+    def read(self, parent, key=None):
         """
         Read key/value pair(s) residing in directory at parent
         node level.
@@ -89,48 +130,10 @@ class DirectoryService(BaseDirectoryService):
         try:
             val = parent_dict[key]
         except KeyError:
-            # TODO raise some exception
-            pass
-
+            raise KeyNotFoundError
         return val
 
-    def add(self, parent='/', key='foo', value={}):
-        """
-        Add a key/value pair to directory below parent
-        node level.
-        """
-        log.debug("Adding key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parent_dict = self.find_dict(parent)
-
-        # Add key and value, throwing exception if key already exists.
-        if key in parent_dict:
-            # TODO raise some exception
-            pass
-
-        parent_dict[key] = value
-        self.clients.datastore.update(directory)
-        return value
-
-    def update(self, parent='/', key='foo', value={}):
-        """
-        Update key/value pair in directory at parent
-        node level.
-        """
-        log.debug("Updating key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parent_dict = self.find_dict(parent)
-
-        # Replace value, throwing exception if key not found.
-        try:
-            val = parent_dict[key]
-        except KeyError:
-            # TODO raise some exception
-            pass
-
-        parent_dict[key] = value
-        self.clients.datastore.update(directory)
-        return value
-
-    def remove(self, parent='/', key='foo'):
+    def remove(self, parent, key):
         """
         Remove key/value residing in directory at parent
         node level.
@@ -139,7 +142,8 @@ class DirectoryService(BaseDirectoryService):
         directory, parent_dict = self.find_dict(parent)
         try:
             val = parent_dict.pop(key)
-            self.clients.datastore.update(directory)
+            self.datastore.update(directory)
         except KeyError:
             raise KeyNotFoundError
         return val
+

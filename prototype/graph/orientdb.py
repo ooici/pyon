@@ -8,7 +8,7 @@ from compass.client import CompassException, Server, ADMIN
 import simplejson as json
 import time
 
-from ion.util.async import *
+from pyon.util.async import *
 
 #import compass
 #compass.request.DEBUG = True

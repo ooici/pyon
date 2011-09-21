@@ -1,8 +1,8 @@
 """
 Run the request_server example first.
 """
-from anode.net import messaging
-from anode.net import channel
+from pyon.net import messaging
+from pyon.net import channel
 
 if __name__ == '__main__':
     node, ioloop_process = messaging.makeNode()

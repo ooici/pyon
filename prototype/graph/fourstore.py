@@ -12,7 +12,7 @@ from itertools import permutations
 
 from HTTP4Store import HTTP4Store
 
-from ion.util.async import *
+from pyon.util.async import *
 
 class Concurrent4Store(HTTP4Store, threading.local):
     pass

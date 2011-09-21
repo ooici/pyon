@@ -1,10 +1,10 @@
 """
 """
 
-from anode.net import entity
-from anode.container import cc
-from anode.core.bootstrap import AnodeObject
-from anode.util.log import log
+from pyon.net import entity
+from pyon.container import cc
+from pyon.core.bootstrap import IonObject
+from pyon.util.log import log
 
 from interface.services.ibank_service import IBankService, BaseBankService
 
@@ -29,7 +29,7 @@ class BankService(BaseBankService):
             # Create customer info entry
             customer_info = {}
             customer_info["name"] = name
-            customer_obj = AnodeObject("BankCustomer", customer_info)
+            customer_obj = IonObject("BankCustomer", customer_info)
             customer_create_tuple = self.clients.datastore.create(customer_obj)
             customer_id = customer_create_tuple[0]
 
@@ -37,7 +37,7 @@ class BankService(BaseBankService):
         account_info = {}
         account_info["account_type"] = account_type
         account_info["owner"] = customer_id
-        account_obj = AnodeObject("BankAccount", account_info)
+        account_obj = IonObject("BankAccount", account_info)
         account_create_tuple = self.clients.datastore.create(account_obj)
         account_id = account_create_tuple[0]
 

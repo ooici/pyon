@@ -1,0 +1,20 @@
+# Central configuration file for Ion services and modules.
+# The contents are transformed into a dict that supports dot notation:
+# CFG.broker.amqp.host
+# Do not modify this file! Set overrides in pyon.local.yml
+
+server:
+  amqp:
+    host: amoeba.ucsd.edu
+    port: 5672
+    username: guest
+    password: guest
+    vhost: /
+    heartbeat: 30
+
+cc:
+  timeout:
+    shutdown: 30.0
+
+datastore:
+  type: persistent

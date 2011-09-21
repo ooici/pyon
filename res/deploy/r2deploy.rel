@@ -3,7 +3,7 @@
     "name":"Release2Configuration",
     "version": "0.1",
     "description": "Release 2 deployment configuration.",
-    "anode" : "0.0.1",
+    "ion" : "0.0.1",
     "apps":[
         # CC Agent
 #        {'name':'ccagent',              'version':'0.1',

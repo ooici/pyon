@@ -3,9 +3,9 @@ import gevent
 
 from zope.interface import Interface, implements
 
-from anode.service import service
-from anode.net import entity
-from anode.container import cc
+from pyon.service import service
+from pyon.net import entity
+from pyon.container import cc
 
 import time
 
