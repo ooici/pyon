@@ -25,5 +25,5 @@ bin/
 buildout.cfg
 .idea
 msc.*
-res/config/ion.local.yml
+res/config/pyon.local.yml
 
