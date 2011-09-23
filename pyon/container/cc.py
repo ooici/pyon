@@ -9,6 +9,8 @@ per request. This will also facilitate the Entity holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional. 
 """
+from pyon.net.entity import RPCServer, RPCClient
+
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
@@ -77,8 +79,8 @@ class Container(object):
                 dependency_service = get_service_by_name(dependency)
                 dependency_interface = list(providedBy(dependency_service))[0]
 
-                client = entity.RPCClientEntityFromInterface(dependency_interface)
-                self.start_client(dependency, client)
+                # @TODO: start_client call instead?
+                client = RPCClient(node=self.node, name=dependency, iface=dependency_interface)
                 service_instance.clients[dependency] = client
 
             # Add to global dict
@@ -108,56 +110,10 @@ class Container(object):
     def start_service(self, name):
         log.debug("In Container.start_service")
         log.debug("name: %s" % name)
-        self.start_server(name, entity.RPCEntityFromService(get_service_by_name(name)))
 
-    def start_server(self, name, entity):
-        """
-        Start a new request/response server using the given entity as the
-        handler/service
-        """
-        log.debug("In Container.start_server")
-        log.debug("name: %s" % str(name))
-        def generic_server(ch, entity):
-            log.debug("In generic_server. Binding name: %s" % str(name))
-            ch.bind(('amq.direct', name))
-            ch.listen()
-            while True:
-                log.debug("service: %s blocking waiting for message" % str(name))
-                req_chan = ch.accept()
-                msg = req_chan.recv()
-                log.debug("service %s received message: %s" % (str(name),str(msg)))
-                entity.message_received(req_chan, msg)
-
-        ch = self.node.channel(channel.Bidirectional)
-        self.proc_sup.spawn('green', generic_server, ch, entity)
-
-    def start_client(self, name, entity):
-        log.debug("In Container.start_client")
-        log.debug("name: %s" % str(name))
-        log.debug("entity: %s" % str(entity))
-        ch = self.node.channel(channel.BidirectionalClient)
-        ch.connect(('amq.direct', name))
-        entity.attach_channel(ch)
-        def client_recv(ch, entity):
-            while True:
-                data = ch.recv()
-                entity.message_received(data)
-        self.proc_sup.spawn('green', client_recv, ch, entity)
-
-    def start_subscriber(self, name, entity):
-        log.debug("In Container.start_subscriber")
-        log.debug("name: %s" % str(name))
-        log.debug("entity: %s" % str(entity))
-        def generic_consumer(ch, entity):
-            log.debug("In generic_consumer. Binding name: %s" % str(name))
-            ch.bind(('amq.direct', name))
-            ch.listen()
-            while True:
-                msg = ch.recv()
-                entity.message_received(msg)
-            # could use recv_from semantic 
-        ch = self.node.channel(channel.PubSub)
-        self.proc_sup.spawn('green', generic_consumer, ch, entity)
+        svc = get_service_by_name(name)
+        rsvc = RPCServer(node=self.node, name=name, service=svc)
+        self.proc_sup.spawn('green', rsvc.listen)
 
     def serve_forever(self):
         log.debug("In Container.serve_forever")

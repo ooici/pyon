@@ -6,7 +6,7 @@ Tentatively named prototype
 import pyon
 
 import gevent
-from gevent import event
+from gevent import event, coros
 
 from pika.credentials import PlainCredentials
 from pika.connection import ConnectionParameters
@@ -65,6 +65,9 @@ class NodeB(amqp.Node):
     def __init__(self):
         log.debug("In NodeB.__init__")
         self.ready = event.Event()
+        self._sem = coros.Semaphore()
+
+        amqp.Node.__init__(self)
 
     def start_node(self):
         """
@@ -81,6 +84,11 @@ class NodeB(amqp.Node):
         if not self.running:
             log.error("Attempt to open channel on node that is not running")
             raise #?
+
+        log.debug("acquire semaphore")
+        self._sem.acquire()
+        log.debug("acquired semaphore")
+
         result = event.AsyncResult()
         def on_channel_open_ok(amq_chan):
             ch = channel.SocketInterface.Socket(amq_chan, ch_type)
@@ -89,6 +97,9 @@ class NodeB(amqp.Node):
         ch = result.get()
         log.debug("channel: %s" % str(ch))
         #ch = channel.SocketInterface(client)
+        log.debug("release semaphore")
+        self._sem.release()
+
         return ch
 
 def ioloop(connection):

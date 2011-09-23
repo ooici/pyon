@@ -247,7 +247,7 @@ class BaseChannel(object):
         may actually require interaction with the broker.
         """
         log.debug("In BaseChannel.connect")
-        log.debug("name: %s" % name)
+        log.debug("name: %s" % str(name))
         if self._peer_name:
             raise ChannelError('Channel already connected') # this is more "Client" than "Protocol"
         self._peer_name = name
@@ -695,6 +695,26 @@ class PubSub(BaseChannel):
 #        res += "None" if self.exchange is None else self.exchange
 #        return res
 
+    def _on_basic_deliver(self, chan, method_frame, header_frame, body):
+        message_type = header_frame.type
+        # ensure proper type
+        #self.message_received(body)
+        log.debug("In PubSub._on_basic_deliver")
+        log.debug("\nhf: %s\nbody: %s" % (str(header_frame), str(body)))
+        #reply_to = tuple(header_frame.reply_to.split(','))
+        self._build_accepted_channel("", body)
+
+    def _build_accepted_channel(self, peer_name, body):
+        """
+        only set send context (can't receive yet)
+        """
+        log.debug("In PubSub._build_accepted_channel")
+        log.debug("peer_name: %s" % str(peer_name))
+        new_chan = BaseChannel()
+        new_chan.amq_chan = self.amq_chan #hack
+        new_chan._peer_name = peer_name
+        self.message_received((new_chan, body)) # XXX hack
+
 
 class SocketInterface(object):
     """
@@ -757,7 +777,11 @@ class SocketInterface(object):
 
         if not self._listening:
             raise ChannelError('Channel not listening')#?
-        new_serv_ch_proto, body = self._receive_queue.get()
+        #new_serv_ch_proto, body = self._receive_queue.get()
+        fullon = self._receive_queue.get()
+        log.debug("we got %d items: %s" % (len(fullon), str(fullon)))
+
+        new_serv_ch_proto, body = fullon[0:2]
 
         new_chan = SocketInterface(self.amq_chan, new_serv_ch_proto)
         #new_chan.ch_proto.connect() # need
