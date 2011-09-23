@@ -48,5 +48,11 @@ setup(  name = 'pyon',
             'M2Crypto==0.21.1',
             'coverage==3.5',
             'nose==1.1.2',
+            'numpy==1.6.1',
+            'numexpr==1.4.2',
+# Uncomment only after manually installing HDF5 package
+# see: http://www.hdfgroup.org/HDF5/release/obtain5.html
+#            'h5py==2.0.1',
+#            'tables==2.3',
         ],
      )
