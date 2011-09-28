@@ -24,7 +24,7 @@ class IonException(Exception):
         return self.message
 
     def __str__(self):
-        return str(status_code) + " - " + str(self.message)
+        return str(self.get_status_code()) + " - " + str(self.get_error_message())
 
 class BadRequest(IonException):
     '''
