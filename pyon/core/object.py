@@ -84,7 +84,7 @@ class IonObjectBase(object):
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
             if type(fields[key]) is not type(schema[key]):
-                raise AttributeError('Invalid %s for field "%s", should be %s' %
+                raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, type(schema[key])))
 
 def hashfunc(text):
@@ -193,6 +193,7 @@ class IonObjectRegistry(object):
         typically be in YAML canonical form (for consistent hashing).
         """
 
+        log.debug('Registering object definition "%s"', name)
         _type = self.type_by_name[name]
         _type.name = name
         _def = _type.register_def_raw(default, def_text)
@@ -221,6 +222,7 @@ class IonObjectRegistry(object):
 
         for root, dirs, files in os.walk(yaml_dir):
             if root in exclude_dirs: continue
+            log.debug('Registering yaml files in dir: %s', root)
             for file in fnmatch.filter(files, '*.yml'):
                 path = os.path.join(root, file)
                 if not path in skip_me:
