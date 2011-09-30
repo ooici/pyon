@@ -172,6 +172,14 @@ class BaseChannel(object):
         res += "None" if self.exchange is None else self.exchange
         return res
 
+    def close(self):
+        """
+        Closes the AMQP connection.  @TODO: belongs here?
+        """
+        log.debug("BaseChannel.close")
+        if self.amq_chan:
+            self.amq_chan.close()
+
     def on_channel_open(self, amq_chan):
         """
         """
@@ -814,6 +822,7 @@ class SocketInterface(object):
         close underlying amqp channel
         """
         log.debug("In SocketInterface.close")
+        self.ch_proto.close()
 
     def connect(self, name):
         """

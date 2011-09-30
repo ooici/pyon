@@ -9,7 +9,7 @@ per request. This will also facilitate the Entity holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional. 
 """
-from pyon.net.entity import RPCServer, RPCClient
+from pyon.net.entity import RPCServer, RPCClient, BinderListener
 
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
@@ -113,7 +113,11 @@ class Container(object):
 
         svc = get_service_by_name(name)
         rsvc = RPCServer(node=self.node, name=name, service=svc)
-        self.proc_sup.spawn('green', rsvc.listen)
+
+        # @TODO: this commented out line makes each request handler spawn in a proc_sup managed greenlet
+        #listener = BinderListener(self.node, name, rsvc, None, lambda cb, *args: self.proc_sup.spawn('green', cb, *args))
+        listener = BinderListener(self.node, name, rsvc, None, None)
+        self.proc_sup.spawn('green', listener.listen)
 
     def serve_forever(self):
         log.debug("In Container.serve_forever")

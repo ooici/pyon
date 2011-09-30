@@ -26,6 +26,7 @@ class Entity(object):
         log.debug("channel %s" % str(channel))
         self.channel = channel
 
+    # @TODO: is this used?
     def channel_attached(self):
         """
         """
@@ -42,10 +43,21 @@ class Entity(object):
         log.debug("In Entity.send")
         self.channel.send(msg)
 
+    def spawn_listener(self):
+        def client_recv():
+            while True:
+                log.debug("client_recv waiting for a message")
+                data = self.channel.recv()
+                log.debug("client_recv got a message")
+                self.message_received(data)
+
+        # @TODO: spawn should be configurable to maybe the proc_sup in the container?
+        self._recv_greenlet = spawn(client_recv)
+
     def close(self):
-        # @TODO: need a channel close probably!
-        #self.channel.close()
-        if self._recv_greenlet:
+        if self.channel is not None:
+            self.channel.close()
+        if self._recv_greenlet is not None:
             self._recv_greenlet.kill()
 
 class EntityFactory(object):
@@ -61,16 +73,14 @@ class EntityFactory(object):
     name = None
     node = None     # connection to the broker, basically
 
-    def __init__(self, node=None, name=None):  #, entity_type=None, channel_type=None):   # took this out, didn't like it - set it class level instead
+    def __init__(self, node=None, name=None):
         """
         name can be a to address or a from address in the derived ListeningEntityFactory.
         """
         self.node = node
         self.name = name
-        ##self.entity_type = entity_type or Entity
-        ###self.channel_type = channel_type or self.__class__.channel_type or BidirectionalClient
 
-    def create_entity(self, to_name=None, existing_channel=None):
+    def create_entity(self, to_name=None, existing_channel=None, **kwargs):
         name = to_name or self.name
         assert name
 
@@ -80,58 +90,50 @@ class EntityFactory(object):
             ch = self.node.channel(self.channel_type)
             ch.connect(('amq.direct', name))
 
-        e = self.entity_type()
+        e = self.entity_type(**kwargs)
         e.attach_channel(ch)
-
-        # @TODO: move this to the entity itself perhaps? or should the Entity know what channel type instead of the factory?
-        if self.channel_type in [Bidirectional, BidirectionalClient]:
-            log.debug("Setting up bidir listener")
-            def client_recv(chan, entity):
-                while True:
-                    data = chan.recv()
-                    log.debug("client_recv got a message")
-                    entity.message_received(data)
-            e._recv_greenlet = spawn(client_recv, ch, e)
 
         return e
 
-class ListeningEntityFactory(EntityFactory):
-    """
-    Rename this.
+    def close(self):
+        """
+        To be defined by derived classes. Cleanup any resources here, such as channels being open.
+        """
+        pass
 
-    Listens for incoming messages, on receipt, forks off a new channel, creates an entity and lets the
-    entity do its job.
-    """
-    channel_type = Bidirectional
+class BinderListener(object):
+    def __init__(self, node, name, entity_factory, listening_channel_type, spawn_callable):
+        """
+        @param spawn_callable   A callable to spawn a new received message worker thread. Calls with
+                                the callable to be spawned and args. If None specified, does not create
+                                a new thread: all processing is done synchronously.
+        """
+        self._node = node
+        self._name = name
+        self._ent_fact = entity_factory or ListeningEntityFactory(node, name)
+        self._ch_type = listening_channel_type or Bidirectional
+        self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
 
     def listen(self):
-        """
-        Creates a channel to listen on, endlessly loops on message receipts.
+        log.debug("BinderListener.listen")
+        chan = self._node.channel(self._ch_type)
+        chan.bind(('amq.direct', self._name))
+        chan.listen()
+        while True:
+            log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
+            req_chan = chan.accept()
+            msg = req_chan.recv()
+            log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
+            e = self._ent_fact.create_entity(existing_channel=req_chan)   # @TODO: reply-to here?
 
-        Greenlet?
-        """
-        def generic_server(chan):
-            log.debug("In generic_server. Binding name: %s" % str(self.name))
-            chan.bind(('amq.direct', self.name))
-            chan.listen()
-            while True:
-                log.debug("service: %s blocking waiting for message" % str(self.name))
-                req_chan = chan.accept()
-                msg = req_chan.recv()
-                log.debug("service %s received message: %s" % (str(self.name),str(msg)))
-                entity = self.create_entity(existing_channel=req_chan)   # @TODO: reply-to here?
-                entity.message_received(msg)
+            self._spawn(e.message_received, msg)
 
-        log.debug("bout to call channelelelel %s" % str(self.name))
-        ch = self.node.channel(self.channel_type)
-        generic_server(ch)
-        #return spawn(generic_server, ch)
-
-    def msg_received(self, msg):
-        self.dispatch_msg(msg)
-
-    def dispatch_msg(self, msg):
-        log.warn("Dispatch message, needs to be overridden")
+class ListeningEntityFactory(EntityFactory):
+    """
+    Establishes channel type for a host of derived, listen/react entity factories.
+    Designed to be used inside of a BinderListener.
+    """
+    channel_type = Bidirectional
 
 #
 # PUB/SUB
@@ -148,18 +150,41 @@ class Publisher(EntityFactory):
     entity_type = PublisherEntity
     channel_type = PubSub
 
+    def __init__(self, **kwargs):
+        self._pub_ent = None
+        EntityFactory.__init__(self, **kwargs)
+
     def publish(self, msg):
-        e = self.create_entity(self.name)
-        e.send(msg)
-        e.close()
+        # @TODO: needs thread safety
+        if not self._pub_ent:
+            self._pub_ent = self.create_entity(self.name)
+
+        self._pub_ent.send(msg)
+
+    def close(self):
+        """
+        Closes the opened publishing channel, if we've opened it previously.
+        """
+        if self._pub_ent:
+            self._pub_ent.close()
 
 class SubscriberEntity(Entity):
     """
     @TODO: Should have routing mechanics, possibly shared with other listener entity types
     """
+    def __init__(self, callback):
+        Entity.__init__(self)
+        self.set_callback(callback)
+
+    def set_callback(self, callback):
+        """
+        Sets the callback to be used by this SubscriberEntity when a message is received.
+        """
+        self._callback = callback
+
     def message_received(self, msg):
         Entity.message_received(self, msg)
-        assert self._callback, "Should have been patched on in Subscriber.create_entity, how did i get created?"  # @TODO: remove obv
+        assert self._callback, "No callback provided, cannot route subscribed message"
 
         self._callback(msg)
         
@@ -179,19 +204,27 @@ class Subscriber(ListeningEntityFactory):
 
     def create_entity(self, **kwargs):
         log.debug("Subscriber.create_entity override")
-        e = ListeningEntityFactory.create_entity(self, **kwargs)
-
-        # @TODO would prefer this to be part of initializer for entity, perhaps kwarg you can pass into create_entity?
-        e._callback = self._callback
-        return e
-
+        return ListeningEntityFactory.create_entity(self, callback=self._callback, **kwargs)
 
 #
 #  REQ / RESP (and RPC)
 #
 
 class RequestEntity(Entity):
-    pass
+    def send(self, msg):
+        log.debug("RequestEntity.send")
+
+        if not self._recv_greenlet:
+            self.spawn_listener()
+
+        self.response_queue = event.AsyncResult()
+        self.message_received = lambda m: self.response_queue.set(m)
+
+        Entity.send(self, msg)
+
+        result_data = self.response_queue.get()
+        log.debug("got response to our request: %s" % str(result_data))
+        return result_data
 
 class RequestResponseClient(EntityFactory):
     """
@@ -202,14 +235,9 @@ class RequestResponseClient(EntityFactory):
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
         e = self.create_entity(self.name)
-        self.response_queue = event.AsyncResult()
-        e.message_received = lambda m: self.response_queue.set(m)
-
-        e.send(msg)
-
-        result_data = self.response_queue.get()
-        log.debug("got response to our request: %s" % str(result_data))
-        return result_data
+        retval = e.send(msg)
+        e.close()
+        return retval
 
 class ResponseEntity(Entity):
     """
@@ -224,41 +252,17 @@ class RequestResponseServer(ListeningEntityFactory):
 
 
 class RPCRequestEntity(RequestEntity):
-    pass
 
-class RPCClient(RequestResponseClient):
-    entity_type = RPCRequestEntity
+    def send(self, msg):
+        log.debug("RPCRequestEntity.send (call_remote): %s" % str(msg))
 
-    def __init__(self, iface=None, **kwargs):
-        self._define_interface(iface)
-        RequestResponseClient.__init__(self, **kwargs)
-
-    def _define_interface(self, iface):
-        """
-        from dorian's RPCClientEntityFromInterface: sets attrs on this client instance from an interface definition.
-        """
-        namesAndDesc = iface.namesAndDescriptions()
-        for name, command in namesAndDesc:
-            #log.debug("name: %s" % str(name))
-            #log.debug("command: %s" % str(command))
-            info = command.getSignatureInfo()
-            #log.debug("info: %s" % str(info))
-            doc = command.getDoc()
-            #log.debug("doc: %s" % str(doc))
-            setattr(self, name, _Command(self, name, info, doc))        # @TODO: _Command is a callable is non-obvious, make callback to call_remote here explicit
-
-    def call_remote(self, cmd_dict):
-        log.debug("RPCClient call_remote: %s" % str(cmd_dict))
-
-        wrapped_cmd_dict = {"header": {}, "payload": cmd_dict}
+        wrapped_cmd_dict = {"header": {}, "payload": msg}
         send_data = IonEncoder().encode(wrapped_cmd_dict)
 
-        result_data = self.request(send_data)
+        result_data = RequestEntity.send(self, send_data)
         res = json.loads(result_data, object_hook=as_ionObject)
 
-        log.debug("Call_remote got this response: %s" % str(res))
-
-        # @TODO: handle exceptions here? or in entity?
+        log.debug("RPCRequestEntity got this response: %s" % str(res))
 
         # Check response header
         header = res["header"]
@@ -295,9 +299,30 @@ class RPCClient(RequestResponseClient):
             log.debug("Raising ServerError")
             raise exception.ServerError(message)
 
+class RPCClient(RequestResponseClient):
+    entity_type = RPCRequestEntity
+
+    def __init__(self, iface=None, **kwargs):
+        self._define_interface(iface)
+        RequestResponseClient.__init__(self, **kwargs)
+
+    def _define_interface(self, iface):
+        """
+        from dorian's RPCClientEntityFromInterface: sets attrs on this client instance from an interface definition.
+        """
+        namesAndDesc = iface.namesAndDescriptions()
+        for name, command in namesAndDesc:
+            #log.debug("name: %s" % str(name))
+            #log.debug("command: %s" % str(command))
+            info = command.getSignatureInfo()
+            #log.debug("info: %s" % str(info))
+            doc = command.getDoc()
+            #log.debug("doc: %s" % str(doc))
+            setattr(self, name, _Command(self.request, name, info, doc))        # @TODO: _Command is a callable is non-obvious, make callback to call_remote here explicit
+
 class RPCResponseEntity(ResponseEntity):
-    def __init__(self, **kwargs):
-        self._routing_obj = None
+    def __init__(self, routing_obj=None, **kwargs):
+        self._routing_obj = routing_obj
 
     def message_received(self, msg):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -349,11 +374,7 @@ class RPCServer(RequestResponseServer):
         @TODO: push this into RequestResponseServer
         """
         log.debug("RPCServer.create_entity override")
-        e = RequestResponseServer.create_entity(self, **kwargs)
-
-        # @TODO would prefer this to be part of initializer for entity, perhaps kwarg you can pass into create_entity?
-        e._routing_obj = self._service
-        return e
+        return RequestResponseServer.create_entity(self, routing_obj=self._service, **kwargs)
 
 
 class _Command(object):
@@ -367,13 +388,13 @@ class _Command(object):
     can validate that the correct named arguments are used.
     """
 
-    def __init__(self, client, name, siginfo, doc):
+    def __init__(self, callback, name, siginfo, doc):
         #log.debug("In _Command.__init__")
         #log.debug("client: %s" % str(client))
         #log.debug("name: %s" % str(name))
         #log.debug("siginfo: %s" % str(siginfo))
         #log.debug("doc: %s" % str(doc))
-        self.client = client
+        self.callback = callback
         self.name = name
         self.positional = siginfo['positional']
         self.required = siginfo['required']
@@ -383,7 +404,7 @@ class _Command(object):
     def __call__(self, *args):
         log.debug("In _Command.__call__")
         command_dict = self._command_dict_from_call(*args)
-        return self.client.call_remote(command_dict)
+        return self.callback(command_dict)
 
     def _command_dict_from_call(self, *args):
         """
