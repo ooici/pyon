@@ -5,6 +5,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
+from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 
@@ -95,14 +96,20 @@ class Test_DataStores(unittest.TestCase):
         self.assertTrue(len(res) == 6)
 
         # Find all the UserInfo records
-        res = data_store.find("UserInfo")
+        res = data_store.find([("type_", "==", "UserInfo")])
         self.assertTrue(len(res) == 3)
 
         # Find only the UserInfo record for user Heitor Villa-Lobos
-        res = data_store.find("UserInfo", "name", "Heitor Villa-Lobos")
+        res = data_store.find([("type_", DataStore.EQUAL, "UserInfo"), DataStore.AND, ("name", DataStore.EQUAL, "Heitor Villa-Lobos")])
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
+
+        # Find role(s) for user Heitor Villa-Lobos
+        res = data_store.find_by_association([("type_", DataStore.EQUAL, "UserInfo"), DataStore.AND, ("name", DataStore.EQUAL, "Heitor Villa-Lobos")], "roles")
+        self.assertTrue(len(res) == 1)
+        user_role_obj = res[0]
+        self.assertTrue(user_role_obj.name == "Admin")
 
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')

@@ -8,6 +8,16 @@ class DataStore(object):
     Think of this class as a database server.
     """
 
+    EQUAL = '=='
+    NOT_EQUAL = '!='
+    GREATER_THAN = '>'
+    GREATER_THAN_OR_EQUAL = '>='
+    LESS_THAN = '<'
+    LESS_THAN_OR_EQUAL = '<='
+
+    AND = 0
+    OR = 1
+
     def create_datastore(self, datastore_name=""):
         """
         Create a data store with the given name.  This is
@@ -113,16 +123,83 @@ class DataStore(object):
         """
         pass
 
-    def find(self, type, key="", key_value="", datastore_name=""):
+    def find(self, criteria=[], datastore_name=""):
         """
-        Generic query function that allows searching on:
-        Ion object type -- or -- Ion object type and key value
+        Generic query function that allows searching on zero
+        or more criteria represented in the following format:
+            [(<field>, <logical constant>, <value>), <and>|<or>, ...]
+
+        For example, to find all objects of type 'foo':
+            [('type_', DataStore.EQUAL, 'foo')]
+
+        Think of this as equivalent to:
+            select * from datastore_name where type = 'foo'
+
+        Possible logical values to apply are:
+            EQUAL
+            NOT_EQUAL
+            GREATER_THAN
+            GREATER_THAN_OR_EQUAL
+            LESS_THAN
+            LESS_THAN_OR_EQUAL
+
+        If you specify two or more criterion, each criterion can
+        be ANDed or ORed with the other criterion.  For example, to find
+        objects of type 'foo' with name value 'bar', pass the
+        following:
+            [('type_', DataStore.EQUAL, 'foo'), DataStore.AND, ('name', DataStore.EQUAL, 'bar')]
+
+        In SQL, this is equivalent to:
+            select * from datastore_name where type = 'foo' and name = 'bar'
+
+        This function returns AnodeObjects
         """
         pass
 
-    def find_doc(self, type, key="", key_value="", datastore_name=""):
+    def find_doc(self, criteria=[], datastore_name=""):
         """
-        Generic query function that allows searching on:
-        doc type -- or -- doc type and key value
+        Same as the find method except that this function returns raw doc dicts
+        """
+        pass
+
+    def find_by_association(self, criteria=[], association="", datastore_name=""):
+        """
+        Generic query function that allows searching on zero
+        or more criteria represented in the following format:
+            [(<field>, <logical constant>, <value>), ...]
+        to derive a list of associated objects.  The association
+        of interest is passed in the association attribute
+        and should be the name of an object field.
+
+        For example to find the roles of user 'foo' specify the following
+        criteria and association:
+            [('type_', DataStore.EQUAL, 'UserInfo'), DataStore.AND, ('name', DataStore.EQUAL, 'foo')], 'roles'
+
+        Think of this as equivalent to:
+            select * from datastore_name where id_ in (
+                select roles from datastore_name where type = 'UserInfo' and name = 'foo'
+            )
+
+        Possible logical values to apply are:
+            EQUAL
+            NOT_EQUAL
+            GREATER_THAN
+            GREATER_THAN_OR_EQUAL
+            LESS_THAN
+            LESS_THAN_OR_EQUAL
+
+        If you specify two or more criterion, each criterion can
+        be ANDed or ORed with the other criterion.  For example, to find
+        objects of type 'foo' with name value 'bar', pass the
+        following:
+            [('type_', DataStore.EQUAL, 'foo'), DataStore.AND, ('name', DataStore.EQUAL, 'bar')]
+
+        This function returns AnodeObjects
+        """
+        pass
+
+    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+        """
+        Same as the find_by_association method except that this function returns raw doc dicts
         """
         pass

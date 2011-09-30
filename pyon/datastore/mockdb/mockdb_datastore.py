@@ -203,8 +203,8 @@ class MockDB_DataStore(DataStore):
         log.debug('Delete result: True')
         return True
 
-    def find(self, type, key="", key_value="", datastore_name=""):
-        docList = self.find_doc(type, key, key_value, datastore_name)
+    def find(self, criteria=[], datastore_name=""):
+        docList = self.find_doc(criteria, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -215,7 +215,7 @@ class MockDB_DataStore(DataStore):
 
         return results
 
-    def find_doc(self, type, key="", key_value="", datastore_name=""):
+    def find_doc(self, criteria=[], datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -224,29 +224,162 @@ class MockDB_DataStore(DataStore):
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         results = []
-        log_string = "Searching for objects of type: " + type + " in data store " + datastore_name
-        if key != "":
-            log_string += "where key: " + key + " has value: " + str(key_value)
+        log_string = "Searching for objects matching criteria list: " + str(criteria)
         log.debug(log_string)
 
-        # Traverse entire data store, checking each HEAD version for equality on:
-        #  - type
-        #  - optionally, key/value match
+        # Traverse entire data store, checking each HEAD version for equality
+        # with specified criterion
         for obj_id in self.list_objects(datastore_name):
             try:
                 doc = self.read_doc(obj_id, rev_id="", datastore_name=datastore_name)
                 log.debug("Doc: %s" % str(doc))
-                if doc["type_"] == type:
-                    if key_value == "":
-                        log.debug("No key, appending doc to results")
+                if len(criteria) == 0:
+                    results.append(doc)
+                else:
+                    criteria_satisfied = False
+                    for criterion in criteria:
+                        if isinstance(criterion, tuple):
+                            key = criterion[0]
+                            logical_operation = criterion[1]
+                            value = criterion[2]
+                            if doc.has_key(key):
+                                if logical_operation == DataStore.EQUAL:
+                                    if doc[key] == value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.NOT_EQUAL:
+                                    if doc[key] != value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.GREATER_THAN:
+                                    if doc[key] > value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.GREATER_THAN_OR_EQUAL:
+                                    if doc[key] >= value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.LESS_THAN:
+                                    if doc[key] < value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.LESS_THAN_OR_EQUAL:
+                                    if doc[key] <= value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                        else:
+                            if criterion == DataStore.AND:
+                                # Can shortcut the query at this point if the
+                                # previous criterion failed
+                                if criteria_satisfied == False:
+                                    break
+
+                    if criteria_satisfied:
                         results.append(doc)
-                    else:
-                        log.debug("Checking key value")
-                        if doc[key] == key_value:
-                            log.debug("Key value matches, appending doc to results")
-                            results.append(doc)
+                
             except KeyError:
                 pass
+
+        log.debug('Find results: %s' % str(results))
+        return results
+
+    def find_by_association(self, criteria=[], association="", datastore_name=""):
+        docList = self.find_by_association_doc(criteria, association, datastore_name)
+
+        results = []
+        # Convert each returned doc to its associated Ion object
+        for doc in docList:
+            obj = IonObject(doc["type_"], doc)
+            log.debug('Ion object: %s' % str(obj))
+            results.append(obj)
+
+        return results
+
+    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        try:
+            datastore_dict = self.root[datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        ids = []
+        log_string = "Searching for objects matching criteria list: " + str(criteria)
+        log.debug(log_string)
+
+        # Traverse entire data store, checking each HEAD version for equality
+        # with specified criterion
+        for obj_id in self.list_objects(datastore_name):
+            try:
+                doc = self.read_doc(obj_id, rev_id="", datastore_name=datastore_name)
+                log.debug("Doc: %s" % str(doc))
+                if len(criteria) == 0:
+                    if doc.has_key(association):
+                        for id in doc[association]:
+                            ids.append(id)
+                else:
+                    criteria_satisfied = False
+                    for criterion in criteria:
+                        if isinstance(criterion, tuple):
+                            key = criterion[0]
+                            logical_operation = criterion[1]
+                            value = criterion[2]
+                            if doc.has_key(key):
+                                if logical_operation == DataStore.EQUAL:
+                                    if doc[key] == value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.NOT_EQUAL:
+                                    if doc[key] != value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.GREATER_THAN:
+                                    if doc[key] > value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.GREATER_THAN_OR_EQUAL:
+                                    if doc[key] >= value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.LESS_THAN:
+                                    if doc[key] < value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                                elif logical_operation == DataStore.LESS_THAN_OR_EQUAL:
+                                    if doc[key] <= value:
+                                        criteria_satisfied = True
+                                    else:
+                                        criteria_satisfied = False
+                        else:
+                            if criterion == DataStore.AND:
+                                # Can shortcut the query at this point if the
+                                # previous criterion failed
+                                if criteria_satisfied == False:
+                                    break
+
+                    if criteria_satisfied:
+                        if doc.has_key(association):
+                            for id in doc[association]:
+                                ids.append(id)
+
+            except KeyError:
+                pass
+
+        results = []
+        for id in ids:
+            doc = self.read_doc(id, "", datastore_name)
+            results.append(doc)
 
         log.debug('Find results: %s' % str(results))
         return results

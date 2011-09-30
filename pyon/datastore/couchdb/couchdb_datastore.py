@@ -144,35 +144,50 @@ class CouchDB_DataStore(DataStore):
         log.debug('Delete result: %s' % str(res))
         return True
 
-    def find(self, type, key="", key_value="", datastore_name=""):
-        docList = self.find_doc(type, key, key_value, datastore_name)
+    def find(self, criteria=[], datastore_name=""):
+        doc_list = self.find_docs(criteria, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
-        for doc in docList:
+        for doc in doc_list:
             obj = IonObject(doc["type_"], doc)
             log.debug('Ion object: %s' % str(obj))
             results.append(obj)
 
         return results
 
-    def find_doc(self, type, key="", key_value="", datastore_name=""):
+    def find_docs(self, criteria=[], datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
-        if key != "" and key_value != "":
-            map_fun = '''function(doc) {
-                if (doc.type_ === "''' + type + '''" && doc.''' + key + ''' === "''' + key_value + '''") {
-                    emit(doc._id,doc);
-                }
-            }'''
+        if len(criteria) == 0:
+            # Return set of all objects indexed by doc id
+            map_fun =\
+'''function(doc) {
+    emit(doc._id,doc);
+}'''
         else:
-            map_fun = '''function(doc) {
-                if (doc.type_ == "''' + type + '''") {
-                    emit(doc._id,doc);
-                }
-            }'''
+            map_fun =\
+'''function(doc) {
+    if ('''
+            for criterion in criteria:
+                if isinstance(criterion, tuple):
+                    map_fun += "doc." + criterion[0]
+                    map_fun += " " + criterion[1] + " "
+                    map_fun += "\"" + criterion[2] + "\""
+                else:
+                    if criterion == DataStore.AND:
+                        map_fun += ' && '
+                    else:
+                        map_fun += ' || '
+
+            map_fun +=\
+''') {
+        emit(doc._id, doc);
+    }
+}'''
+
         log.debug("map_fun: %s" % str(map_fun))
         try:
             queryList = list(db.query(map_fun))
@@ -183,6 +198,94 @@ class CouchDB_DataStore(DataStore):
         results = []
         for row in queryList:
             doc = row.value
+            results.append(doc)
+
+        log.debug('Find results: %s' % str(results))
+        return results
+
+    def find_by_association(self, criteria=[], association="", datastore_name=""):
+        doc_list = self.find_by_association_doc(criteria, association, datastore_name)
+
+        results = []
+        # Convert each returned doc to its associated Ion object
+        for doc in doc_list:
+            obj = IonObject(doc["type_"], doc)
+            log.debug('Ion object: %s' % str(obj))
+            results.append(obj)
+
+        return results
+
+    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+
+        if len(criteria) == 0:
+            # Return set of all objects indexed by doc id
+            map_fun =\
+'''function(doc) {
+    if (doc.'''
+            map_fun += association
+            map_fun +=\
+''') {
+        for (var i in doc.'''
+            map_fun += association
+            map_fun +=\
+''') {
+            emit(i, {_id: doc.'''
+            map_fun += association
+            map_fun +=\
+'''[i]});
+        }
+    }
+}'''
+        else:
+            map_fun =\
+'''function(doc) {
+    if ('''
+            for criterion in criteria:
+                if isinstance(criterion, tuple):
+                    map_fun += "doc." + criterion[0]
+                    map_fun += " " + criterion[1] + " "
+                    map_fun += "\"" + criterion[2] + "\""
+                else:
+                    if criterion == DataStore.AND:
+                        map_fun += ' && '
+                    else:
+                        map_fun += ' || '
+
+            map_fun +=\
+''') {
+        if (doc.'''
+            map_fun += association
+            map_fun +=\
+''') {
+            for (var i in doc.'''
+            map_fun += association
+            map_fun +=\
+''') {
+                emit([doc.'''
+            map_fun += association
+            map_fun +=\
+''', i], {_id: doc.'''
+            map_fun += association
+            map_fun +=\
+'''[i]});
+            }
+        }
+    }
+}'''
+
+        log.debug("map_fun: %s" % str(map_fun))
+        try:
+            queryList = list(db.query(map_fun, include_docs=True))
+        except ResourceNotFound:
+            raise NotFound("Data store query for type %s with key %s and key_value %s failed" % (type, key, str(key_value)))
+        if len(queryList) == 0:
+            raise NotFound("Data store query for type %s with key %s and key_value %s returned no objects" % (type, key, str(key_value)))
+        results = []
+        for row in queryList:
+            doc = row.doc
             results.append(doc)
 
         log.debug('Find results: %s' % str(results))
