@@ -37,14 +37,14 @@ class IonObjectMetaType(type):
             base_name = 'IonObject'
             cls_name = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
             cls_dict = {'_def': _def}
-            cls_dict.update(copy.deepcopy(_def.default))
+            cls_dict.update(copy.deepcopy(_def.schema))
             #cls_dict['__slots__'] = cls_dict.keys() + ['__weakref__']
 
             cls_type = IonObjectMetaType.__new__(IonObjectMetaType, cls_name, (cls,), cls_dict)
             IonObjectMetaType._type_cache[_def] = cls_type
 
-        # Auto-copy the defaults so we can use __dict__ authoritatively and simplify the code
-        __dict__ = copy.deepcopy(dict(_def.default))
+        # Auto-copy the schema so we can use __dict__ authoritatively and simplify the code
+        __dict__ = copy.deepcopy(dict(_def.schema))
         if _dict is not None:
             __dict__.update(_dict)
             
@@ -78,13 +78,13 @@ class IonObjectBase(object):
         Compare fields to the schema and raise AttributeError if mismatched.
         Named _validate instead of validate because the data may have a field named "validate".
         """
-        fields, schema = self.__dict__, self._def.default
+        fields, schema = self.__dict__, self._def.schema
         extra_fields = fields.viewkeys() - schema.viewkeys()
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
             if type(fields[key]) is not type(schema[key]):
-                raise AttributeError('Invalid %s for field "%s", should be %s' %
+                raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, type(schema[key])))
 
 def hashfunc(text):
@@ -97,12 +97,12 @@ def is_hash(val):
 class IonObjectDefinition(object):
     """ An ION object definition, with a single parent type and a specific version. """
 
-    __slots__ = ('type', 'hash', 'default', 'def_text')
+    __slots__ = ('type', 'hash', 'schema', 'def_text')
 
-    def __init__(self, _type, hash, default, def_text):
+    def __init__(self, _type, hash, schema, def_text):
         self.type = _type
         self.hash = hash
-        self.default = default
+        self.schema = schema
         self.def_text = def_text
 
 class IonObjectType(object):
@@ -121,10 +121,10 @@ class IonObjectType(object):
         # Cache pointer to the latest version definition
         self.latest_def = None
 
-    def register_def_raw(self, default, def_text):
+    def register_def_raw(self, schema, def_text):
         """ The definition should be in something like YAML canonical form, see IonObjectRegistry for more. """
         hash = hashfunc(def_text)
-        definition = IonObjectDefinition(self, hash, default, def_text)
+        definition = IonObjectDefinition(self, hash, schema, def_text)
         self.register_def(hash, definition)
         return definition
 
@@ -186,16 +186,17 @@ class IonObjectRegistry(object):
         self.instances_by_name[_def.type.name] = obj
         return obj
 
-    def register_def(self, name, default, def_text):
+    def register_def(self, name, schema, def_text):
         """
         Register a type in the registry. It will index by both name and version,
         where version is the SHA1 hash of the definition. The definition should
         typically be in YAML canonical form (for consistent hashing).
         """
 
+        log.debug('Registering objetdefinition')
         _type = self.type_by_name[name]
         _type.name = name
-        _def = _type.register_def_raw(default, def_text)
+        _def = _type.register_def_raw(schema, def_text)
         self.def_by_hash[_def.hash] = _def
         return _def
 
@@ -203,11 +204,15 @@ class IonObjectRegistry(object):
         """ Parse the contents of a YAML file that contains one or more object definitions. """
 
         defs = yaml.load_all(yaml_text)
+        obj_defs = []
         for def_set in defs:
             for name,_def in def_set.iteritems():
                 # TODO: Hook into pyyaml's event emitting stuff to try to get the canonical form without re-dumping
                 def_text = yaml.dump(_def, canonical=True, allow_unicode=True)
-                self.register_def(name, _def, def_text)
+                _def = self.register_def(name, _def, def_text)
+                obj_defs.append(_def)
+
+        return obj_defs
 
     def register_yaml_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         """
@@ -221,12 +226,14 @@ class IonObjectRegistry(object):
 
         for root, dirs, files in os.walk(yaml_dir):
             if root in exclude_dirs: continue
+            log.debug('Registering yaml files in dir: %s', root)
             for file in fnmatch.filter(files, '*.yml'):
                 path = os.path.join(root, file)
                 if not path in skip_me:
                     yaml_files.append(path)
 
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files)))
-        self.register_yaml(yaml_text)
+        obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
+        return obj_defs
 
