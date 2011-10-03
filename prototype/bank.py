@@ -74,7 +74,11 @@ class BankService(BaseBankService):
         """
         Find all accounts (optionally of type) owned by user
         """
-        customer_list = self.clients.datastore.find("BankCustomer", "name", name)
+        try:
+            customer_list = self.clients.datastore.find("BankCustomer", "name", name)
+        except:
+            log.error("No customers found!")
+            return []
         customer_obj = customer_list[0]
         accounts = self.clients.datastore.find("BankAccount", "owner", customer_obj._id)
         account_list = []
