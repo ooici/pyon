@@ -39,6 +39,8 @@ class Test_DataStores(unittest.TestCase):
         admin_role_tuple = data_store.create(admin_role_obj)
         self.assertTrue(len(admin_role_tuple) == 2)
 
+        admin_role_ooi_id = admin_role_tuple[0]
+
         data_provider_role = {
             "name":"Data Provider",
             "description":"User allowed to ingest data sets"
@@ -46,6 +48,8 @@ class Test_DataStores(unittest.TestCase):
         data_provider_role_obj = IonObject('UserRole', data_provider_role)
         data_provider_role_tuple = data_store.create(data_provider_role_obj)
         self.assertTrue(len(data_provider_role_tuple) == 2)
+
+        data_provider_role_ooi_id = data_provider_role_tuple[0]
 
         marine_operator_role = {
             "name":"Marine Operator",
@@ -55,6 +59,8 @@ class Test_DataStores(unittest.TestCase):
         marine_operator_role_tuple = data_store.create(marine_operator_role_obj)
         self.assertTrue(len(marine_operator_role_tuple) == 2)
 
+        marine_operator_role_ooi_id = marine_operator_role_tuple[0]
+
         # Construct three user info objects and assign them roles
         hvl_user_info = {
             "name": "Heitor Villa-Lobos",
@@ -62,7 +68,7 @@ class Test_DataStores(unittest.TestCase):
                 "name": "Claim To Fame", "value": "Legendary Brazilian composer"
             }
         }
-        hvl_user_info["roles"] = [admin_role_tuple[0]]
+        hvl_user_info["roles"] = [admin_role_ooi_id]
         hvl_user_info_obj = IonObject('UserInfo', hvl_user_info)
         hvl_user_info_tuple = data_store.create(hvl_user_info_obj)
         self.assertTrue(len(hvl_user_info_tuple) == 2)
@@ -75,7 +81,7 @@ class Test_DataStores(unittest.TestCase):
                 "name": "Claim To Fame", "value": "Legendary Concert Guitarist"
             }
         }
-        ats_user_info["roles"] = [data_provider_role_tuple[0]]
+        ats_user_info["roles"] = [data_provider_role_ooi_id]
         ats_user_info_obj = IonObject('UserInfo', ats_user_info)
         ats_user_info_tuple = data_store.create(ats_user_info_obj)
         self.assertTrue(len(ats_user_info_tuple) == 2)
@@ -86,7 +92,7 @@ class Test_DataStores(unittest.TestCase):
                 "name": "Claim To Fame", "value": "Composer and YouTube star"
             }
         }
-        pok_user_info["roles"] = [marine_operator_role_tuple[0]]
+        pok_user_info["roles"] = [marine_operator_role_ooi_id]
         pok_user_info_obj = IonObject('UserInfo', pok_user_info)
         pok_user_info_tuple = data_store.create(pok_user_info_obj)
         self.assertTrue(len(pok_user_info_tuple) == 2)
@@ -110,6 +116,38 @@ class Test_DataStores(unittest.TestCase):
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0]
         self.assertTrue(user_role_obj.name == "Admin")
+
+        # Find role association(s) for user Heitor Villa-Lobos
+        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, 'roles', None))
+        self.assertTrue(len(res) == 1)
+        user_role_obj = res[0][2]
+        self.assertTrue(user_role_obj.name == "Admin")
+
+        # Assert Admin role association exists for user Heitor Villa-Lobos
+        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id))
+        self.assertTrue(len(res) == 1)
+        user_role_obj = res[0][2]
+        self.assertTrue(user_role_obj.name == "Admin")
+
+        # Find every subject with an association to the Admin role
+        res = data_store.resolve_association_tuple((None, 'roles', admin_role_ooi_id))
+        self.assertTrue(len(res) == 1)
+        user_info_obj = res[0][0]
+        self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
+
+        # Find every association involving object
+        res = data_store.resolve_association_tuple((None, None, admin_role_ooi_id))
+        self.assertTrue(len(res) == 1)
+        user_info_obj = res[0][0]
+        self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
+        predicate = res[0][1]
+        self.assertTrue(predicate == "roles")
+
+        # Find every association between the subject and object
+        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, None, admin_role_ooi_id))
+        self.assertTrue(len(res) == 1)
+        predicate = res[0][1]
+        self.assertTrue(predicate == "roles")
 
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')

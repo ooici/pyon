@@ -203,3 +203,31 @@ class DataStore(object):
         Same as the find_by_association method except that this function returns raw doc dicts
         """
         pass
+
+    def resolve_association_tuple(self, tuple=(), datastore_name=""):
+        """
+        Generic association query function that allows queries for associations
+        by subject, predicate or object.  Examples:
+
+        (<subject>, <predicate>, None) - returns all objects associated with
+            the subject via the specified predicate
+        (<subject>, None, <object>) - returns all associations between subject
+            and object
+        (None, <predicate>, <object>) - returns all subjects that have association
+            with object via predicate
+        (<subject>, <predicate>, <object>) - returns true if association exists
+        (None, <predicate>, None) - returns all subjects and objects associated
+            via predicate
+
+        This function returns a set of tuples in the form
+            [(AnodeObject, <predicate>, AnodeObject), ...]
+        """
+        pass
+
+    def resolve_association_tuple_doc(self, tuple=(), datastore_name=""):
+        """
+        Same as the resolve_association_tuple method except that this function returns
+        a set of tuples in the form
+            [({}, <predicate>, {}), ...]
+        """
+        pass
