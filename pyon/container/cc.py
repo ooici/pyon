@@ -4,12 +4,12 @@ TODO:
 [ ] server and client name argument is a short cut
 [ ] generic server and client delivery loop
 [ ] decide on how Channel Type is passed/associated with gen server/client
-[ ] Entity might be better as a 'factory' that can make handler instances
-per request. This will also facilitate the Entity holding 'business'
+[ ] Endpoint might be better as a 'factory' that can make handler instances
+per request. This will also facilitate the Endpoint holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional. 
 """
-from pyon.net.entity import RPCServer, RPCClient, BinderListener
+from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
@@ -17,7 +17,6 @@ __license__ = 'Apache 2.0'
 from zope.interface import providedBy
 
 from pyon.public import CFG, SERVICE_CFG, messaging, channel, GreenProcessSupervisor
-from pyon.net import entity
 from pyon.service.service import add_service_by_name, get_service_by_name
 
 from pyon.util.log import log

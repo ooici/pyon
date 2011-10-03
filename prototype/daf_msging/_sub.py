@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pyon.net.entity import Subscriber
+from pyon.net.endpoint import Subscriber
 from pyon.net.messaging import makeNode
 import gevent
 

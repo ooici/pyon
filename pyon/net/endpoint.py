@@ -1,10 +1,3 @@
-"""
-TODO:
-[ ] Plug-able RPC message encoders. Can the Channel try to encode and
-decode for the Entity?
-[ ] Consuming Entity for subscription/event handler endpoints
-[ ] Simple Producing Entity
-"""
 from gevent import event
 
 import json # generalize
@@ -16,13 +9,13 @@ from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
 from pyon.util.async import spawn
 from pyon.util.log import log
 
-class Entity(object):
+class Endpoint(object):
 
     channel = None
     _recv_greenlet = None
 
     def attach_channel(self, channel):
-        log.debug("In Entity.attach_channel")
+        log.debug("In Endpoint.attach_channel")
         log.debug("channel %s" % str(channel))
         self.channel = channel
 
@@ -30,17 +23,17 @@ class Entity(object):
     def channel_attached(self):
         """
         """
-        log.debug("In Entity.channel_attached")
+        log.debug("In Endpoint.channel_attached")
 
     def message_received(self, msg):
         """
         """
-        log.debug("In Entity.message_received")
+        log.debug("In Endpoint.message_received")
 
     def send(self, msg):
         """
         """
-        log.debug("In Entity.send")
+        log.debug("In Endpoint.send")
         self.channel.send(msg)
 
     def spawn_listener(self):
@@ -60,27 +53,27 @@ class Entity(object):
         if self._recv_greenlet is not None:
             self._recv_greenlet.kill()
 
-class EntityFactory(object):
+class EndpointFactory(object):
     """
     Rename this.
 
-    Creates new channel/entity pairs for communication. This base class only deals with communication
+    Creates new channel/endpoint pairs for communication. This base class only deals with communication
     patterns that send first (and possibly get a response). The derived ListeningEventFactory listens
     first.
     """
-    entity_type = Entity
+    endpoint_type = Endpoint
     channel_type = BidirectionalClient
     name = None
     node = None     # connection to the broker, basically
 
     def __init__(self, node=None, name=None):
         """
-        name can be a to address or a from address in the derived ListeningEntityFactory.
+        name can be a to address or a from address in the derived ListeningEndpointFactory.
         """
         self.node = node
         self.name = name
 
-    def create_entity(self, to_name=None, existing_channel=None, **kwargs):
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         name = to_name or self.name
         assert name
 
@@ -90,7 +83,7 @@ class EntityFactory(object):
             ch = self.node.channel(self.channel_type)
             ch.connect(('amq.direct', name))
 
-        e = self.entity_type(**kwargs)
+        e = self.endpoint_type(**kwargs)
         e.attach_channel(ch)
 
         return e
@@ -102,7 +95,7 @@ class EntityFactory(object):
         pass
 
 class BinderListener(object):
-    def __init__(self, node, name, entity_factory, listening_channel_type, spawn_callable):
+    def __init__(self, node, name, endpoint_factory, listening_channel_type, spawn_callable):
         """
         @param spawn_callable   A callable to spawn a new received message worker thread. Calls with
                                 the callable to be spawned and args. If None specified, does not create
@@ -110,7 +103,7 @@ class BinderListener(object):
         """
         self._node = node
         self._name = name
-        self._ent_fact = entity_factory or ListeningEntityFactory(node, name)
+        self._ent_fact = endpoint_factory or ListeningEndpointFactory(node, name)
         self._ch_type = listening_channel_type or Bidirectional
         self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
 
@@ -124,13 +117,13 @@ class BinderListener(object):
             req_chan = chan.accept()
             msg = req_chan.recv()
             log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
-            e = self._ent_fact.create_entity(existing_channel=req_chan)   # @TODO: reply-to here?
+            e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
             self._spawn(e.message_received, msg)
 
-class ListeningEntityFactory(EntityFactory):
+class ListeningEndpointFactory(EndpointFactory):
     """
-    Establishes channel type for a host of derived, listen/react entity factories.
+    Establishes channel type for a host of derived, listen/react endpoint factories.
     Designed to be used inside of a BinderListener.
     """
     channel_type = Bidirectional
@@ -139,59 +132,59 @@ class ListeningEntityFactory(EntityFactory):
 # PUB/SUB
 #
 
-class PublisherEntity(Entity):
+class PublisherEndpoint(Endpoint):
     pass
 
-class Publisher(EntityFactory):
+class Publisher(EndpointFactory):
     """
     Simple publisher sends out broadcast messages.
     """
 
-    entity_type = PublisherEntity
+    endpoint_type = PublisherEndpoint
     channel_type = PubSub
 
     def __init__(self, **kwargs):
-        self._pub_ent = None
-        EntityFactory.__init__(self, **kwargs)
+        self._pub_ep = None
+        EndpointFactory.__init__(self, **kwargs)
 
     def publish(self, msg):
         # @TODO: needs thread safety
-        if not self._pub_ent:
-            self._pub_ent = self.create_entity(self.name)
+        if not self._pub_ep:
+            self._pub_ep = self.create_endpoint(self.name)
 
-        self._pub_ent.send(msg)
+        self._pub_ep.send(msg)
 
     def close(self):
         """
         Closes the opened publishing channel, if we've opened it previously.
         """
-        if self._pub_ent:
-            self._pub_ent.close()
+        if self._pub_ep:
+            self._pub_ep.close()
 
-class SubscriberEntity(Entity):
+class SubscriberEndpoint(Endpoint):
     """
-    @TODO: Should have routing mechanics, possibly shared with other listener entity types
+    @TODO: Should have routing mechanics, possibly shared with other listener endpoint types
     """
     def __init__(self, callback):
-        Entity.__init__(self)
+        Endpoint.__init__(self)
         self.set_callback(callback)
 
     def set_callback(self, callback):
         """
-        Sets the callback to be used by this SubscriberEntity when a message is received.
+        Sets the callback to be used by this SubscriberEndpoint when a message is received.
         """
         self._callback = callback
 
     def message_received(self, msg):
-        Entity.message_received(self, msg)
+        Endpoint.message_received(self, msg)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
         self._callback(msg)
         
 
-class Subscriber(ListeningEntityFactory):
+class Subscriber(ListeningEndpointFactory):
 
-    entity_type = SubscriberEntity
+    endpoint_type = SubscriberEndpoint
     channel_type = PubSub
 
     def __init__(self, callback=None, **kwargs):
@@ -200,19 +193,19 @@ class Subscriber(ListeningEntityFactory):
         """
         assert callback
         self._callback = callback
-        ListeningEntityFactory.__init__(self, **kwargs)
+        ListeningEndpointFactory.__init__(self, **kwargs)
 
-    def create_entity(self, **kwargs):
-        log.debug("Subscriber.create_entity override")
-        return ListeningEntityFactory.create_entity(self, callback=self._callback, **kwargs)
+    def create_endpoint(self, **kwargs):
+        log.debug("Subscriber.create_endpoint override")
+        return ListeningEndpointFactory.create_endpoint(self, callback=self._callback, **kwargs)
 
 #
 #  REQ / RESP (and RPC)
 #
 
-class RequestEntity(Entity):
+class RequestEndpoint(Endpoint):
     def send(self, msg):
-        log.debug("RequestEntity.send")
+        log.debug("RequestEndpoint.send")
 
         if not self._recv_greenlet:
             self.spawn_listener()
@@ -220,49 +213,49 @@ class RequestEntity(Entity):
         self.response_queue = event.AsyncResult()
         self.message_received = lambda m: self.response_queue.set(m)
 
-        Entity.send(self, msg)
+        Endpoint.send(self, msg)
 
         result_data = self.response_queue.get()
         log.debug("got response to our request: %s" % str(result_data))
         return result_data
 
-class RequestResponseClient(EntityFactory):
+class RequestResponseClient(EndpointFactory):
     """
     Sends a request, waits for a response.
     """
-    entity_type = RequestEntity
+    endpoint_type = RequestEndpoint
 
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
-        e = self.create_entity(self.name)
+        e = self.create_endpoint(self.name)
         retval = e.send(msg)
         e.close()
         return retval
 
-class ResponseEntity(Entity):
+class ResponseEndpoint(Endpoint):
     """
     The listener side makes one of these.
     """
     pass
 
-class RequestResponseServer(ListeningEntityFactory):
-    entity_type = ResponseEntity
+class RequestResponseServer(ListeningEndpointFactory):
+    endpoint_type = ResponseEndpoint
 
     pass
 
 
-class RPCRequestEntity(RequestEntity):
+class RPCRequestEndpoint(RequestEndpoint):
 
     def send(self, msg):
-        log.debug("RPCRequestEntity.send (call_remote): %s" % str(msg))
+        log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
         wrapped_cmd_dict = {"header": {}, "payload": msg}
         send_data = IonEncoder().encode(wrapped_cmd_dict)
 
-        result_data = RequestEntity.send(self, send_data)
+        result_data = RequestEndpoint.send(self, send_data)
         res = json.loads(result_data, object_hook=as_ionObject)
 
-        log.debug("RPCRequestEntity got this response: %s" % str(res))
+        log.debug("RPCRequestEndpoint got this response: %s" % str(res))
 
         # Check response header
         header = res["header"]
@@ -300,7 +293,7 @@ class RPCRequestEntity(RequestEntity):
             raise exception.ServerError(message)
 
 class RPCClient(RequestResponseClient):
-    entity_type = RPCRequestEntity
+    endpoint_type = RPCRequestEndpoint
 
     def __init__(self, iface=None, **kwargs):
         self._define_interface(iface)
@@ -320,14 +313,14 @@ class RPCClient(RequestResponseClient):
             #log.debug("doc: %s" % str(doc))
             setattr(self, name, _Command(self.request, name, info, doc))        # @TODO: _Command is a callable is non-obvious, make callback to call_remote here explicit
 
-class RPCResponseEntity(ResponseEntity):
+class RPCResponseEndpoint(ResponseEndpoint):
     def __init__(self, routing_obj=None, **kwargs):
         self._routing_obj = routing_obj
 
     def message_received(self, msg):
         assert self._routing_obj, "How did I get created without a routing object?"
 
-        log.debug("In RPCResponseEntity.message_received")
+        log.debug("In RPCResponseEndpoint.message_received")
         log.debug("chan: %s" % str(self.channel))
         log.debug("msg: %s" % str(msg))
 
@@ -348,7 +341,7 @@ class RPCResponseEntity(ResponseEntity):
         self.send(encoded_response)
 
     def _call_cmd(self, cmd_dict):
-        log.debug("In RPCResponseEntity._call_cmd")
+        log.debug("In RPCResponseEndpoint._call_cmd")
         log.debug("cmd_dict: %s" % str(cmd_dict))
         meth = getattr(self._routing_obj, cmd_dict['method'])
         log.debug("meth: %s" % str(meth))
@@ -362,19 +355,19 @@ class RPCResponseEntity(ResponseEntity):
 
 
 class RPCServer(RequestResponseServer):
-    entity_type = RPCResponseEntity
+    endpoint_type = RPCResponseEndpoint
 
     def __init__(self, service=None, **kwargs):
         log.debug("In RPCServer.__init__")
         self._service = service
         RequestResponseServer.__init__(self, **kwargs)
 
-    def create_entity(self, **kwargs):
+    def create_endpoint(self, **kwargs):
         """
         @TODO: push this into RequestResponseServer
         """
-        log.debug("RPCServer.create_entity override")
-        return RequestResponseServer.create_entity(self, routing_obj=self._service, **kwargs)
+        log.debug("RPCServer.create_endpoint override")
+        return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
 
 class _Command(object):

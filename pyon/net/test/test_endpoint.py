@@ -4,7 +4,7 @@ from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net.channel import PubSub
-from pyon.net.entity import Entity, EntityFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEntity, RPCRequestEntity, IonEncoder, RPCClient, _Command, RPCResponseEntity
+from pyon.net.endpoint import Endpoint, EndpointFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, IonEncoder, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event, GreenletExit
 from pyon.service.service import BaseService
 from pyon.util.async import wait, spawn
@@ -78,51 +78,51 @@ class FakeNode(object):
         self._chan = self._chan_type(**self._chan_kwargs)
         return self._chan
 
-class TestEntity(unittest.TestCase):
+class TestEndpoint(unittest.TestCase):
 
 
     def setUp(self):
-        self._entity = Entity()
+        self._endpoint = Endpoint()
 
     def test_attach_channel(self):
         ch = FakeChannel()
-        self._entity.attach_channel(ch)
+        self._endpoint.attach_channel(ch)
 
-        self.assertTrue(self._entity.channel is not None)
+        self.assertTrue(self._endpoint.channel is not None)
 
     def test_send(self):
 
         # need a channel to send on
-        self.assertRaises(AttributeError, self._entity.send, "fake")
+        self.assertRaises(AttributeError, self._endpoint.send, "fake")
 
         ch = FakeChannel()
-        self._entity.attach_channel(ch)
+        self._endpoint.attach_channel(ch)
 
-        self._entity.send("hi")
+        self._endpoint.send("hi")
         self.assertEquals(ch._sendcount, 1)
 
     def test_close(self):
         ch = FakeChannel()
-        self._entity.attach_channel(ch)
-        self._entity.close()
+        self._endpoint.attach_channel(ch)
+        self._endpoint.close()
         self.assertEquals(ch._closecount, 1)
 
     def test_spawn_listener(self):
         ch = FakeChannel()
-        self._entity.attach_channel(ch)
+        self._endpoint.attach_channel(ch)
 
-        self._entity.spawn_listener()
+        self._endpoint.spawn_listener()
 
-        self._entity.close()
-        self.assertTrue(self._entity._recv_greenlet.ready())
+        self._endpoint.close()
+        self.assertTrue(self._endpoint._recv_greenlet.ready())
 
-class TestEntityFactory(unittest.TestCase):
+class TestEndpointFactory(unittest.TestCase):
     def setUp(self):
         self._node = FakeNode()
-        self._ef = EntityFactory(node=self._node, name="EFTest")
+        self._ef = EndpointFactory(node=self._node, name="EFTest")
 
-    def test_create_entity(self):
-        e = self._ef.create_entity()
+    def test_create_endpoint(self):
+        e = self._ef.create_endpoint()
 
         # check attrs
         self.assertTrue(hasattr(e, 'channel'))
@@ -131,14 +131,14 @@ class TestEntityFactory(unittest.TestCase):
         # make sure we can shut it down
         e.close()
 
-    def test_create_entity_new_name(self):
-        e = self._ef.create_entity(to_name="reroute")
+    def test_create_endpoint_new_name(self):
+        e = self._ef.create_endpoint(to_name="reroute")
         self.assertTrue("reroute" in e.channel._name)
         e.close()
 
-    def test_create_entity_existing_channel(self):
+    def test_create_endpoint_existing_channel(self):
         ch = FakeChannel()
-        e = self._ef.create_entity(existing_channel=ch)
+        e = self._ef.create_endpoint(existing_channel=ch)
         self.assertEquals(e.channel, ch)
         self.assertTrue(e.channel._name is None)
 
@@ -147,19 +147,19 @@ class TestEntityFactory(unittest.TestCase):
         
         e.close()
 
-    def test_create_entity_kwarg(self):
+    def test_create_endpoint_kwarg(self):
         """
         Make sure our kwarg gets set.
         """
 
-        class OptEntity(Entity):
+        class OptEndpoint(Endpoint):
             def __init__(self, opt=None, **kwargs):
                 self._opt = opt
-                Entity.__init__(self, **kwargs)
+                Endpoint.__init__(self, **kwargs)
 
-        self._ef.entity_type = OptEntity
+        self._ef.endpoint_type = OptEndpoint
 
-        e = self._ef.create_entity(opt="stringer")
+        e = self._ef.create_endpoint(opt="stringer")
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
@@ -209,12 +209,12 @@ class TestSubscriber(unittest.TestCase):
     def test_create_sub_without_callback(self):
         self.assertRaises(AssertionError, Subscriber, node=self._node, name="testsub")
 
-    def test_create_entity(self):
+    def test_create_endpoint(self):
         def mycb(msg):
             return "test"
 
         sub = Subscriber(node=self._node, name="testsub", callback=mycb)
-        e = sub.create_entity()
+        e = sub.create_endpoint()
 
         self.assertEquals(e._callback, mycb)
 
@@ -223,7 +223,7 @@ class TestSubscriber(unittest.TestCase):
             raise GreenletExit(msg)
 
         sub = Subscriber(node=self._node, name="testsub", callback=mycb)
-        bl = BinderListener(node=self._node, name="testsub", entity_factory=sub, listening_channel_type=FakeChannel, spawn_callable=None)
+        bl = BinderListener(node=self._node, name="testsub", endpoint_factory=sub, listening_channel_type=FakeChannel, spawn_callable=None)
 
         listen_g = spawn(bl.listen)
         wait(listen_g)
@@ -235,8 +235,8 @@ class TestRequestResponse(unittest.TestCase):
     def setUp(self):
         self._node = FakeNode()
 
-    def test_entity_send(self):
-        e = RequestEntity()
+    def test_endpoint_send(self):
+        e = RequestEndpoint()
         ch = FakeChannel()
         e.attach_channel(ch)
 
@@ -293,10 +293,10 @@ class FakeRPCServerChannel(FakeChannel):
             res = event.AsyncResult()
             res.get()
 
-class TestRPCRequestEntity(unittest.TestCase):
+class TestRPCRequestEndpoint(unittest.TestCase):
 
-    def test_entity_send(self):
-        e = RPCRequestEntity()
+    def test_endpoint_send(self):
+        e = RPCRequestEndpoint()
         ch = FakeRPCChannel()
         e.attach_channel(ch)
 
@@ -305,11 +305,11 @@ class TestRPCRequestEntity(unittest.TestCase):
 
         e.close()
 
-    def test_entity_send_errors(self):
+    def test_endpoint_send_errors(self):
         errlist = [exception.BadRequest, exception.Unauthorized, exception.NotFound, exception.Timeout, exception.Conflict, exception.ServerError, exception.ServiceUnavailable]
 
         for err in errlist:
-            e = RPCRequestEntity()
+            e = RPCRequestEndpoint()
             ch = FakeRPCChannel(err.status_code, str(err.status_code))
             e.attach_channel(ch)
 
@@ -326,18 +326,18 @@ class TestRPCClient(unittest.TestCase):
         ret = rpcc.simple("zap", "zip")
         self.assertEquals(ret, "some payload")
 
-class TestRPCResponseEntity(unittest.TestCase):
+class TestRPCResponseEndpoint(unittest.TestCase):
 
     def simple(self, *args):
         """
-        The entity will fire its received message into here.
+        The endpoint will fire its received message into here.
         """
         self._ar.set(args)
 
-    def test_entity_receive(self):
+    def test_endpoint_receive(self):
         self._ar = event.AsyncResult()
 
-        e = RPCResponseEntity(routing_obj=self)
+        e = RPCResponseEndpoint(routing_obj=self)
         ch = FakeRPCServerChannel()
         e.attach_channel(ch)
 
@@ -354,7 +354,7 @@ class TestRPCServer(unittest.TestCase):
         rpcs = RPCServer(node=node, name="testrpc", service=svc)
 
         # uses the chan_type specified in FakeNode constructor for the listener
-        bl = BinderListener(node=node, name="testrpc", entity_factory=rpcs, listening_channel_type=None, spawn_callable=None)
+        bl = BinderListener(node=node, name="testrpc", endpoint_factory=rpcs, listening_channel_type=None, spawn_callable=None)
         listen_g = spawn(bl.listen)
 
         # wait for first message to get passed in

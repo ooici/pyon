@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pyon.net.entity import Publisher
+from pyon.net.endpoint import Publisher
 from pyon.net.messaging import makeNode
 import gevent
 

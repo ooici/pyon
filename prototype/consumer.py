@@ -4,7 +4,7 @@ import gevent
 from zope.interface import Interface, implements
 
 from pyon.service import service
-from pyon.net import entity
+from pyon.net import endpoint
 from pyon.container import cc
 
 import time
@@ -30,7 +30,7 @@ class MessageCountSampler(object):
         print "count: %s msgs - rate: %s msg/sec " % (str(self.total_count), str(inst_rate),)
 
 
-class Counter(entity.Entity):
+class Counter(endpoint.Endpoint):
 
     def __init__(self):
         self.count = 0

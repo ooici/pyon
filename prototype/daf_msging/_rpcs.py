@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 
-from pyon.net.entity import RPCServer
+from pyon.net.endpoint import RPCServer
 from pyon.net.messaging import makeNode
 import gevent
 
@@ -22,5 +22,5 @@ from pyon.container.cc import Container
 cc=Container()
 cc.start()
 
-#cc.serve_forever()
+cc.serve_forever()
 

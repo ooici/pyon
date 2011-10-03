@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pyon.net.entity import RPCClient
+from pyon.net.endpoint import RPCClient
 from pyon.net.messaging import makeNode
 import gevent
 
