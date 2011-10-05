@@ -13,10 +13,6 @@ from interface.services.iidentity_registry_service import BaseIdentityRegistrySe
 
 class IdentityRegistryService(BaseIdentityRegistryService):
 
-    def __init__(self, configParams={}):
-        log.debug("In __init__")
-        pass
-
     def create_user(self, name='', subjects='', email='', phone='', variables=[OrderedDict([('name', ''), ('value', '')])]):
         log.debug("In create_user")
         log.debug("name: %s" % name)

@@ -10,10 +10,6 @@ from interface.services.idirectory_service import BaseDirectoryService
 
 class DirectoryService(BaseDirectoryService):
 
-    def __init__(self, config_params={}):
-        log.debug("In __init__")
-        pass
-
     def delete(self):
         """
         Method to delete directory.  Delete occurs as side effect
