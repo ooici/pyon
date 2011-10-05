@@ -116,6 +116,25 @@ class TestEndpoint(unittest.TestCase):
         self._endpoint.close()
         self.assertTrue(self._endpoint._recv_greenlet.ready())
 
+    def test_build_header(self):
+        head = self._endpoint._build_header({'fake': 'content'})
+        self.assertTrue(isinstance(head, dict))
+
+    def test_build_payload(self):
+        fakemsg = {'fake':'content'}
+        msg = self._endpoint._build_payload(fakemsg)
+        self.assertEquals(msg, fakemsg)
+
+    def test_build_header(self):
+        fakemsg = {'fake':'content'}
+        msg = self._endpoint._build_msg(fakemsg)
+        self.assertTrue(isinstance(msg, dict))
+        self.assertTrue(msg.has_key('header'))
+        self.assertTrue(msg.has_key('payload'))
+        self.assertTrue(isinstance(msg['header'], dict))
+        self.assertEquals(fakemsg, msg['payload'])
+
+
 class TestEndpointFactory(unittest.TestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -294,6 +313,14 @@ class FakeRPCServerChannel(FakeChannel):
             res.get()
 
 class TestRPCRequestEndpoint(unittest.TestCase):
+
+    def test_build_msg(self):
+        e = RPCRequestEndpoint()
+        fakemsg = {'fake':'content'}
+        msg = e._build_msg(fakemsg)
+
+        # er in json now, how to really check
+        self.assertNotEquals(str(msg), str(fakemsg))
 
     def test_endpoint_send(self):
         e = RPCRequestEndpoint()
