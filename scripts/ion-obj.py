@@ -12,7 +12,8 @@ import sys
 import argparse
 
 import yaml
-# Do not remove the
+# Do not remove this
+from pyon.core.object import service_name_from_file_name
 import pyon.util.yaml_ordered_dict
 
 class IonServiceDefinitionError(Exception):
@@ -39,6 +40,7 @@ from pyon.service.service import BaseService
 
 {servicename}
 {dependencies}
+{classmethods}
 '''
     , 'svcname':
 '    name = \'{name}\''
@@ -47,10 +49,34 @@ from pyon.service.service import BaseService
     , 'method':
 '''
     def {name}({args}):
+        # Return Value
+        # ------------
+        # {outargs}
         pass
 '''
     , 'arg': '{name}={val}'
 }
+
+def build_args_str(_def, include_self=True):
+    # Handle case where method has no parameters
+    args = []
+    if include_self: args.append('self')
+        
+    for key,val in (_def or {}).iteritems():
+        if isinstance(val, basestring):
+            val = "'%s'" % (val)
+        elif isinstance(val, datetime.datetime):
+            # TODO: generate the datetime code
+            val = "'%s'" % (val)
+        # For collections, default to an empty collection of the same base type
+        elif isinstance(val, list):
+            val = []
+        elif isinstance(val, dict):
+            val = {}
+        args.append(templates['arg'].format(name=key, val=val))
+        
+    args_str = ', '.join(args)
+    return args_str
 
 description = 'Ion utility for generating interfaces from object definitions (and vice versa).'
 parser = argparse.ArgumentParser(description=description)
@@ -82,6 +108,7 @@ if args.action == 'generate':
 
             file_path = file_match.group(2)
             interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
+            print 'Generating "%s"...' % (interface_name)
             interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
 
             parent_dir = os.path.dirname(interface_file)
@@ -91,56 +118,34 @@ if args.action == 'generate':
             if not os.path.exists(pkg_file):
                 open(pkg_file, 'w').close()
 
-            service_name = None
-            dependencies = []
-            methods = []
             yaml_text = open(yaml_file, 'r').read()
             defs = yaml.load_all(yaml_text)
             for def_set in defs:
-                for name,_def in def_set.iteritems():
-                    # Handle name declaration
-                    if name == '_name':
-                        service_name = _def
+                service_name = def_set.get('name', None)
+                dependencies = def_set.get('dependencies', None)
+                methods, class_methods = [], []
 
-                    # Jandle dependency declaration
-                    elif name == '_dependencies':
-                        dependencies = _def
+                for op_name,op_def in def_set.get('methods', {}).iteritems():
+                    if not op_def: continue
+                    def_in, def_out = op_def.get('in', None), op_def.get('out', None)
 
-                    # Handle service operations
-                    else:
-                        # TODO: Handle more than one definition version for the same object type
+                    args_str, class_args_str = build_args_str(def_in, False), build_args_str(def_in, True)
+                    outargs_str = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
-                        # If the service specifies "in" and "out" blocks
-                        if isinstance(_def, dict) and 'in' in _def:
-                            _def = _def['in']
+                    methods.append(templates['method'].format(name=op_name, args=args_str, outargs=outargs_str))
+                    class_methods.append(templates['method'].format(name=op_name, args=class_args_str, outargs=outargs_str))
 
-                        # Handle case where method has no parameters
-                        if _def is None:
-                            args_str = ''
-                        else:
-                            args = []
-                            for key,val in _def.iteritems():
-                                if isinstance(val, basestring):
-                                    val = "'%s'" % (val)
-                                elif isinstance(val, datetime.datetime):
-                                    # TODO: generate the datetime code
-                                    val = "'%s'" % (val)
-                                elif isinstance(val, OrderedDict):
-                                    val = dict(val)
-                                args.append(templates['arg'].format(name=key, val=val))
-                            args_str = ', '.join(args)
+                if service_name is None:
+                    raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
+                service_name_str = templates['svcname'].format(name=service_name)
+                dependencies_str = templates['depends'].format(namelist=dependencies)
+                methods_str = ''.join(methods) or '    pass\n'
+                classmethods_str = ''.join(class_methods)
+                class_name = service_name_from_file_name(interface_name)
+                _class = templates['class'].format(name=class_name, servicename=service_name_str, dependencies=dependencies_str,
+                                                   methods=methods_str, classmethods=classmethods_str)
 
-                        methods.append(templates['method'].format(name=name, args=args_str))
-
-            if service_name is None:
-                raise IonServiceDefinitionError("Service definition file %s does not define _name attribute" % yaml_file)
-            service_name_str = templates['svcname'].format(name=service_name)
-            dependencies_str = templates['depends'].format(namelist=dependencies)
-            methods_str = ''.join(methods)
-            class_name = interface_name.title().replace('_', '').replace('-', '')
-            _class = templates['class'].format(name=class_name, servicename=service_name_str, dependencies=dependencies_str, methods=methods_str)
-
-            interface_contents = templates['file'].format(classes=_class)
-            open(interface_file, 'w').write(interface_contents)
+                interface_contents = templates['file'].format(classes=_class)
+                open(interface_file, 'w').write(interface_contents)
 
 

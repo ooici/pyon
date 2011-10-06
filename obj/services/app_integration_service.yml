@@ -1,238 +1,239 @@
 # Application Integration Service interface definition
 
-_name:
-  app_integration
-
-_dependencies:
-  [datastore, identity_registry]
-
-find_data_resources:
-  in:
+obj:
+  DatasetMetadata:
     user_ooi_id: ""
-    minLatitude: -1.1
-    maxLatitude: -1.1
-    minLongitude: -1.1
-    maxLongitude: -1.1
-    minVertical: -1.1
-    maxVertical: -1.1
-    posVertical: ""
-    minTime: ""
-    maxTime: ""
-    identity: ""
-
-  out:
-    dataResourceSummary:
-    - datasetMetadata:
-        user_ooi_id: ""
-        data_resource_id: ""
-        title: ""
-        institution: ""
-        source: ""
-        references: ""
-        conventions: ""
-        summary: ""
-        comment: ""
-        ion_time_coverage_start: ""
-        ion_time_coverage_end: ""
-        ion_geospatial_lat_min: -1.1
-        ion_geospatial_lat_max: -1.1
-        ion_geospatial_lon_min: -1.1
-        ion_geospatial_lon_max: -1.1
-        ion_geospatial_vertical_min: -1.1
-        ion_geospatial_vertical_max: -1.1
-        ion_geospatial_vertical_positive: ""
-        download_url: ""
-        visualization_url: ""
-      date_registered: 18446744073709551615
-      notificationSet: true
-
-find_data_resources_by_user:
-  in:
-    user_ooi_id: ""
-    minLatitude: -1.1
-    maxLatitude: -1.1
-    minLongitude: -1.1
-    maxLongitude: -1.1
-    minVertical: -1.1
-    maxVertical: -1.1
-    posVertical: ""
-    minTime: ""
-    maxTime: ""
-    identity: ""
-
-  out:
-    dataResourceSummary:
-    - datasetMetadata:
-        user_ooi_id: ""
-        data_resource_id: ""
-        title: ""
-        institution: ""
-        source: ""
-        references: ""
-        conventions: ""
-        summary: ""
-        comment: ""
-        ion_time_coverage_start: ""
-        ion_time_coverage_end: ""
-        ion_geospatial_lat_min: -1.1
-        ion_geospatial_lat_max: -1.1
-        ion_geospatial_lon_min: -1.1
-        ion_geospatial_lon_max: -1.1
-        ion_geospatial_vertical_min: -1.1
-        ion_geospatial_vertical_max: -1.1
-        ion_geospatial_vertical_positive: ""
-        download_url: ""
-        visualization_url: ""
-      date_registered: 18446744073709551615
-      notificationSet: true
-
-get_data_resource_detail:
-  in:
     data_resource_id: ""
-  out:
-    data_resource_id: ""
-    dataResourceSummary:
+    title: ""
+    institution: ""
+    source: ""
+    references: ""
+    conventions: ""
+    summary: ""
+    comment: ""
+    ion_time_coverage_start: ""
+    ion_time_coverage_end: ""
+    ion_geospatial_lat_min: -1.1
+    ion_geospatial_lat_max: -1.1
+    ion_geospatial_lon_min: -1.1
+    ion_geospatial_lon_max: -1.1
+    ion_geospatial_vertical_min: -1.1
+    ion_geospatial_vertical_max: -1.1
+    ion_geospatial_vertical_positive: ""
+    download_url: ""
+    visualization_url: ""
+--- # Document separator required after obj block
+
+name: app_integration
+dependencies: [datastore, identity_registry]
+methods:
+  find_data_resources:
+    in:
       user_ooi_id: ""
+      minLatitude: -1.1
+      maxLatitude: -1.1
+      minLongitude: -1.1
+      maxLongitude: -1.1
+      minVertical: -1.1
+      maxVertical: -1.1
+      posVertical: ""
+      minTime: ""
+      maxTime: ""
+      identity: ""
+
+    out:
+      dataResourceSummary:
+      - datasetMetadata: !DatasetMetadata
+        date_registered: 18446744073709551615
+        notificationSet: true
+
+  find_data_resources_by_user:
+    in:
+      user_ooi_id: ""
+      minLatitude: -1.1
+      maxLatitude: -1.1
+      minLongitude: -1.1
+      maxLongitude: -1.1
+      minVertical: -1.1
+      maxVertical: -1.1
+      posVertical: ""
+      minTime: ""
+      maxTime: ""
+      identity: ""
+
+    out:
+      dataResourceSummary:
+      - datasetMetadata:
+          user_ooi_id: ""
+          data_resource_id: ""
+          title: ""
+          institution: ""
+          source: ""
+          references: ""
+          conventions: ""
+          summary: ""
+          comment: ""
+          ion_time_coverage_start: ""
+          ion_time_coverage_end: ""
+          ion_geospatial_lat_min: -1.1
+          ion_geospatial_lat_max: -1.1
+          ion_geospatial_lon_min: -1.1
+          ion_geospatial_lon_max: -1.1
+          ion_geospatial_vertical_min: -1.1
+          ion_geospatial_vertical_max: -1.1
+          ion_geospatial_vertical_positive: ""
+          download_url: ""
+          visualization_url: ""
+        date_registered: 18446744073709551615
+        notificationSet: true
+
+  get_data_resource_detail:
+    in:
       data_resource_id: ""
-      title: ""
-      institution: ""
-      source: ""
-      references: ""
-      conventions: ""
-      summary: ""
-      comment: ""
-      ion_time_coverage_start: ""
-      ion_time_coverage_end: ""
-      ion_geospatial_lat_min: -1.1
-      ion_geospatial_lat_max: -1.1
-      ion_geospatial_lon_min: -1.1
-      ion_geospatial_lon_max: -1.1
-      ion_geospatial_vertical_min: -1.1
-      ion_geospatial_vertical_max: -1.1
-      ion_geospatial_vertical_positive: ""
-      download_url: ""
-      visualization_url: ""
-    source:
-      source_type: SOS
-      request_type: NONE
-      top: -1.1
-      bottom: -1.1
-      left: -1.1
-      right: -1.1
-      base_url: ""
-      dataset_url: ""
-      ncml_mask: ""
-      max_ingest_millis: 18446744073709551615
-      start_time: ""
-      end_time: ""
-      institution_id: ""
-      ion_title: ""
-      ion_description: ""
-      ion_name: ""
-      ion_email: ""
-      ion_institution: ""
-      visualization_url: ""
-      is_public: true
-    variable:
-    - units: ""
-      standard_name: ""
-      long_name: ""
-      name: ""
-      other_attributes:
-      - name: ""
-        value: ""
+    out:
+      data_resource_id: ""
+      dataResourceSummary:
+        user_ooi_id: ""
+        data_resource_id: ""
+        title: ""
+        institution: ""
+        source: ""
+        references: ""
+        conventions: ""
+        summary: ""
+        comment: ""
+        ion_time_coverage_start: ""
+        ion_time_coverage_end: ""
+        ion_geospatial_lat_min: -1.1
+        ion_geospatial_lat_max: -1.1
+        ion_geospatial_lon_min: -1.1
+        ion_geospatial_lon_max: -1.1
+        ion_geospatial_vertical_min: -1.1
+        ion_geospatial_vertical_max: -1.1
+        ion_geospatial_vertical_positive: ""
+        download_url: ""
+        visualization_url: ""
+      source:
+        source_type: SOS
+        request_type: NONE
+        top: -1.1
+        bottom: -1.1
+        left: -1.1
+        right: -1.1
+        base_url: ""
+        dataset_url: ""
+        ncml_mask: ""
+        max_ingest_millis: 18446744073709551615
+        start_time: ""
+        end_time: ""
+        institution_id: ""
+        ion_title: ""
+        ion_description: ""
+        ion_name: ""
+        ion_email: ""
+        ion_institution: ""
+        visualization_url: ""
+        is_public: true
+      variable:
+      - units: ""
+        standard_name: ""
+        long_name: ""
+        name: ""
+        other_attributes:
+        - name: ""
+          value: ""
+        dimensions:
+        - name: ""
+          length: -1.1
       dimensions:
       - name: ""
         length: -1.1
-    dimensions:
-    - name: ""
-      length: -1.1
-    other_attributes:
-    - name: ""
-      value: ""
+      other_attributes:
+      - name: ""
+        value: ""
 
-create_download_url:
-  in:
-    user_ooi_id: ""
-    data_resource_id: ""
-  out:
-    download_url: ""
+  create_download_url:
+    in:
+      user_ooi_id: ""
+      data_resource_id: ""
+    out:
+      download_url: ""
 
-register_user:
-  in:
-    certificate: ""
-    rsa_private_key: ""
-  out:
-    ooi_id: ""
-    user_is_admin: true
-    user_already_registered: true
-    user_is_early_adopter: true
-    user_is_data_provider: true
-    user_is_marine_operator: true
+  register_user:
+    in:
+      certificate: ""
+      rsa_private_key: ""
+    out:
+      ooi_id: ""
+      user_is_admin: true
+      user_already_registered: true
+      user_is_early_adopter: true
+      user_is_data_provider: true
+      user_is_marine_operator: true
 
-update_user_profile:
-  in:
-    user_ooi_id: ""
-    name: ""
-    institution: ""
-    email_address: ""
-    profile:
-    - name: ""
-      value: ""
-  out:
-    status: true
+  update_user_profile:
+    in:
+      user_ooi_id: ""
+      name: ""
+      institution: ""
+      email_address: ""
+      profile:
+      - name: ""
+        value: ""
+    out:
+      status: true
 
-get_user:
-  in:
-    user_ooi_id: ""
-  out:
-    name: ""
-    institution: ""
-    email_address: ""
-    authenticating_organization: ""
-    profile:
-    - name: ""
-      value: ""
+  get_user:
+    in:
+      user_ooi_id: ""
+    out:
+      name: ""
+      institution: ""
+      email_address: ""
+      authenticating_organization: ""
+      profile:
+      - name: ""
+        value: ""
 
-set_user_role:
-  in:
-    user_ooi_id: ""
-    role: ""
-  out:
-    status: true
+  set_user_role:
+    in:
+      user_ooi_id: ""
+      role: ""
+    out:
+      status: true
 
-get_resource_types:
-  in:
-  out:
-    types: []
+  get_resource_types:
+    in:
+    out:
+      types: []
 
-get_resources_of_type:
-  in:
-    resource_type: ""
-  out:
-      resources: []
+  get_resources_of_type:
+    in:
+      resource_type: ""
+    out:
+        resources: []
 
-get_resource:
-  in:
-    ooi_id: ""
-  out:
-    resource:
-    - name: ""
-      value: ""
+  get_resource:
+    in:
+      ooi_id: ""
+    out:
+      resource:
+      - name: ""
+        value: ""
 
-create_data_resource:
+  create_data_resource:
 
-update_data_resource:
+  update_data_resource:
 
-delete_data_resource:
+  delete_data_resource:
 
-validate_data_resource:
+  validate_data_resource:
 
-create_data_resource_subscription:
+  create_data_resource_subscription:
 
-find_data_resource_subscriptions:
+  find_data_resource_subscriptions:
 
-delete_data_resource_subscription:
+  delete_data_resource_subscription:
 
-update_data_resource_subscription:
+  update_data_resource_subscription:
 
