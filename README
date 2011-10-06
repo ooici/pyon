@@ -1,8 +1,29 @@
-Prototypes for ioncore-python in R2.
+===========================================================
+Ocean Observatories Initiative Cyberinfrastructure (OOI CI)
+Integrated Observatory Network (ION)
 
-You need the following installed before you can use ioncore R2:
+pyon - Python COI Capability Container and Core Modules R2
+
+(C) UC Regents, 2010-2011
+===========================================================
+
+Prototypes for Python COI Capability Container R2.
+
+INSTALL
+=======
+
+You need the following installed before you can use pyon:
   - python 2.7
+    - Download and use installer on a Mac
+  - distutils 2.7.2
+    - Download egg and execute with sh
+  - pip
+    - Use easy_install to install
+  - homebrew (Mac, optional)
+    - Install with: /usr/bin/ruby -e "$(curl -fsSL https://raw.github.com/gist/323731)"
   - virtualenv and virtualenvwrapper modules for your python 2.7 installation
+    - Use easy_install to install (pip may not work)
+    - May require XCode
   - libevent 2.0
     - This can easily be installed with Homebrew on a Mac or a package manager on linux.
   - libyaml 3.0
@@ -13,7 +34,7 @@ You need the following installed before you can use ioncore R2:
   - couchdb 0.8
     - The Homebrew version on a mac is sufficient.
 
-Short version to setup a mac (assumes python 2.7 is already setup):
+Short version to setup a Mac (assumes python 2.7 is already setup):
   brew install libevent libyaml zeromq couchdb
 
 Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
@@ -22,3 +43,19 @@ Now setup a virtualenv with a command like the following (substitute your own na
 
 Next install the python package dependencies with:
     python setup.py install
+
+  - The installation of numpy may fail.
+  - Use pip to install numpy (easy_install may fail) and rerun
+
+
+USE
+===
+
+Run couchdb in second terminal before starting the container or tests:
+    couchdb
+
+Run the unittests:
+    ./unittest
+
+Start the capability container in interactive mode:
+    ./cc
