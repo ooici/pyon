@@ -8,10 +8,9 @@ from M2Crypto import X509
 from collections import OrderedDict, defaultdict
 
 # TODO temp imports
-from pyon.net import entity
 from pyon.container import cc
 from pyon.core.exception import NotFound
-
+from pyon.net.endpoint import RPCClient
 from pyon.util.log import log
 
 from interface.services.iapp_integration_service import IAppIntegrationService, BaseAppIntegrationService
@@ -145,7 +144,7 @@ c2bPOQRAYZyD2o+/MHBDsz7RWZJoZiI+SJJuE4wphGUsEbI2Ger1QW9135jKp6BsY2qZ
     container = cc.Container()
     container.start() # :(
 
-    client = entity.RPCClientEntityFromInterface(IAppIntegrationService)
+    client = RPCClient(node=container.node, name="app_integration", iface=IAppIntegrationService)
 
     print "Before start client"
     container.start_client('app_integration', client)
