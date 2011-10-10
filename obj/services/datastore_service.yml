@@ -98,18 +98,44 @@ delete_doc:
 
 find:
   in:
-    type: ""
-    key: ""
-    key_value: ""
+    criteria: []
     datastore_name: ""
   out:
     list: []
 
 find_doc:
   in:
-    type: ""
-    key: ""
-    key_value: ""
+    criteria: []
+    datastore_name: ""
+  out:
+    list: []
+
+find_by_association:
+  in:
+    criteria: []
+    association: ""
+    datastore_name: ""
+  out:
+    list: []
+
+find_by_association_doc:
+  in:
+    criteria: []
+    association: ""
+    datastore_name: ""
+  out:
+    list: []
+
+resolve_association:
+  in:
+    tuple: ()
+    datastore_name: ""
+  out:
+    list: []
+
+resolve_association_doc:
+  in:
+    tuple: ()
     datastore_name: ""
   out:
     list: []
