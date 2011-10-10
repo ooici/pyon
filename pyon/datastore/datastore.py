@@ -127,10 +127,10 @@ class DataStore(object):
         """
         Generic query function that allows searching on zero
         or more criteria represented in the following format:
-            [(<field>, <logical constant>, <value>), <and>|<or>, ...]
+            [[<field>, <logical constant>, <value>], <and>|<or>, ...]
 
         For example, to find all objects of type 'foo':
-            [('type_', DataStore.EQUAL, 'foo')]
+            [['type_', DataStore.EQUAL, 'foo']]
 
         Think of this as equivalent to:
             select * from datastore_name where type = 'foo'
@@ -147,7 +147,7 @@ class DataStore(object):
         be ANDed or ORed with the other criterion.  For example, to find
         objects of type 'foo' with name value 'bar', pass the
         following:
-            [('type_', DataStore.EQUAL, 'foo'), DataStore.AND, ('name', DataStore.EQUAL, 'bar')]
+            [['type_', DataStore.EQUAL, 'foo'], DataStore.AND, ['name', DataStore.EQUAL, 'bar']]
 
         In SQL, this is equivalent to:
             select * from datastore_name where type = 'foo' and name = 'bar'
@@ -173,7 +173,7 @@ class DataStore(object):
 
         For example to find the roles of user 'foo' specify the following
         criteria and association:
-            [('type_', DataStore.EQUAL, 'UserInfo'), DataStore.AND, ('name', DataStore.EQUAL, 'foo')], 'roles'
+            [['type_', DataStore.EQUAL, 'UserInfo'], DataStore.AND, ['name', DataStore.EQUAL, 'foo']], 'roles'
 
         Think of this as equivalent to:
             select * from datastore_name where id_ in (
@@ -192,7 +192,7 @@ class DataStore(object):
         be ANDed or ORed with the other criterion.  For example, to find
         objects of type 'foo' with name value 'bar', pass the
         following:
-            [('type_', DataStore.EQUAL, 'foo'), DataStore.AND, ('name', DataStore.EQUAL, 'bar')]
+            [['type_', DataStore.EQUAL, 'foo'], DataStore.AND, ['name', DataStore.EQUAL, 'bar']]
 
         This function returns AnodeObjects
         """
@@ -204,10 +204,10 @@ class DataStore(object):
         """
         pass
 
-    def resolve_association_tuple(self, tuple=(), datastore_name=""):
+    def resolve_association(self, subject="", predicate="", object="", datastore_name=""):
         """
         Generic association query function that allows queries for associations
-        by subject, predicate or object.  Examples:
+        by subject, predicate and/or object.  Examples:
 
         (<subject>, <predicate>, None) - returns all objects associated with
             the subject via the specified predicate
@@ -224,7 +224,7 @@ class DataStore(object):
         """
         pass
 
-    def resolve_association_tuple_doc(self, tuple=(), datastore_name=""):
+    def resolve_association_doc(self, subject="", predicate="", object="", datastore_name=""):
         """
         Same as the resolve_association_tuple method except that this function returns
         a set of tuples in the form
