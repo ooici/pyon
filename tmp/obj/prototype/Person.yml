@@ -1,7 +1,0 @@
-Person:
-  name: ""
-  id: -1
-  email: ""
-  phone: [
-    number: ""
-    type: MOBILE]

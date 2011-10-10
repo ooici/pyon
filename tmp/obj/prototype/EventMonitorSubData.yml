@@ -1,9 +1,0 @@
-EventMonitorSubData:
-  subscription_id: ""
-  subscription_desc: ""
-  events: [
-    key: ""
-    type: 
-      object_id: -1
-      version: -1
-    isleaf: true]

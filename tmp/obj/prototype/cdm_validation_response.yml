@@ -1,8 +1,0 @@
-cdm_validation_response:
-  response_type: NONE
-  cf_output: ""
-  cdm_output: ""
-  cf_error_count: 4294967295
-  cf_warning_count: 4294967295
-  cf_info_count: 4294967295
-  err_msg: ""

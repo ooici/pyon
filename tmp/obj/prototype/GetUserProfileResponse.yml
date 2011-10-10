@@ -1,8 +1,0 @@
-GetUserProfileResponse:
-  name: ""
-  institution: ""
-  email_address: ""
-  authenticating_organization: ""
-  profile: [
-    name: ""
-    value: ""]

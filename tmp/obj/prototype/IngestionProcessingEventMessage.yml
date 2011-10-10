@@ -1,5 +1,0 @@
-IngestionProcessingEventMessage:
-  dataset_id: ""
-  ingestion_process_id: ""
-  conv_id: ""
-  processing_step: ""

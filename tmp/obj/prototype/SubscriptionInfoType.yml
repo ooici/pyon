@@ -1,8 +1,0 @@
-SubscriptionInfoType:
-  user_ooi_id: ""
-  data_src_id: ""
-  subscription_type: EMAIL
-  email_alerts_filter: UPDATES
-  dispatcher_alerts_filter: UPDATES
-  dispatcher_script_path: ""
-  date_registered: 18446744073709551615

@@ -1,5 +1,0 @@
-PerformIngestMessage:
-  dataset_id: ""
-  reply_to: ""
-  ingest_service_timeout: -1.1
-  datasource_id: ""

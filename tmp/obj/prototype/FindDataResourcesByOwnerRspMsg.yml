@@ -1,8 +1,0 @@
-FindDataResourcesByOwnerRspMsg:
-  datasetByOwnerMetadata: [
-    data_resource_id: ""
-    title: ""
-    date_registered: 18446744073709551615
-    ion_title: ""
-    activation_state: ""
-    update_interval_seconds: 18446744073709551615]
