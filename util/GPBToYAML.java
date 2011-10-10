@@ -111,11 +111,15 @@ public class GPBToYAML {
     /**
      * Routine that takes JSON and converts it to YAML format
      */
-    public String convertJSONToYAML(String jsonString, String className) {
-    	String yamlString = className + ":";
+    public String convertJSONToYAML(int msgId, int msgVersion, String jsonString, String className) {
+    	String yamlString = "# _ID = " + msgId + "\n";
+    	yamlString += "# _VERSION = " + msgVersion + "\n";
+    	yamlString += "obj:\n";
+    	
+    	yamlString += "  " + className + ":";
     	
     	// Walk the string character by character
-    	int indent = 0;
+    	int indent = 1;
     	for (int i = 0; i < jsonString.length(); i++) {
     		char c = jsonString.charAt(i);
     		
@@ -153,6 +157,8 @@ public class GPBToYAML {
     		}
     	}
     	
+    	yamlString += "\n--- # _ID = " + msgId;
+    	
     	return yamlString;
     }
 
@@ -169,11 +175,17 @@ public class GPBToYAML {
 			for (Class clazz : gpbClasses) {
 				Builder builder = gpbToYAML.getMessageBuilder(clazz);
 				gpbToYAML.convertGPB(builder);
+				int msgId = IonBootstrap.getKeyValueForMappedClass(clazz);
+				int msgVersion = IonBootstrap.getMappedClassVersion(msgId);
 				String jsonString = JsonFormat.printToString(builder.build());
-				String yamlString = gpbToYAML.convertJSONToYAML(jsonString, clazz.getSimpleName());
+				String yamlString = gpbToYAML.convertJSONToYAML(msgId, msgVersion, jsonString, clazz.getSimpleName());
 
-				FileOutputStream out = new FileOutputStream("tmp/" + clazz.getSimpleName() + ".yml");
+				FileOutputStream out = new FileOutputStream("../protodefs/by_name/" + clazz.getSimpleName() + ".yml");
 				PrintStream p = new PrintStream(out);
+				p.print(yamlString);
+				p.close();
+				out = new FileOutputStream("../protodefs/by_id/" + msgId + ".yml");
+				p = new PrintStream(out);
 				p.print(yamlString);
 				p.close();
 			}
