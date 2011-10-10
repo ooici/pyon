@@ -238,7 +238,7 @@ class MockDB_DataStore(DataStore):
                 else:
                     criteria_satisfied = False
                     for criterion in criteria:
-                        if isinstance(criterion, tuple):
+                        if isinstance(criterion, list):
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
@@ -326,7 +326,7 @@ class MockDB_DataStore(DataStore):
                 else:
                     criteria_satisfied = False
                     for criterion in criteria:
-                        if isinstance(criterion, tuple):
+                        if isinstance(criterion, list):
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
@@ -384,23 +384,23 @@ class MockDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def resolve_association_tuple(self, tuple=(), datastore_name=""):
-        tuple_list = self.resolve_association_tuple_doc(tuple, datastore_name)
+    def resolve_association(self, subject="", predicate="", object="", datastore_name=""):
+        res_list = self.resolve_association_doc(subject, predicate, object, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
-        for a_tuple in tuple_list:
-            subject_dict = a_tuple[0]
-            object_dict = a_tuple[2]
+        for item in res_list:
+            subject_dict = item[0]
+            object_dict = item[2]
             subject = IonObject(subject_dict["type_"], subject_dict)
             log.debug('Subject Ion object: %s' % str(subject))
             object = IonObject(object_dict["type_"], object_dict)
             log.debug('Object Ion object: %s' % str(object))
-            results.append((subject, a_tuple[1], object))
+            results.append([subject, item[1], object])
 
         return results
 
-    def resolve_association_tuple_doc(self, tuple=(), datastore_name=""):
+    def resolve_association_doc(self, subject="", predicate="", object="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -408,15 +408,11 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        subject = tuple[0]
-        predicate = tuple[1]
-        object = tuple[2]
-
-        if subject is None:
-            if predicate is None:
-                if object is None:
+        if subject == "":
+            if predicate == "":
+                if object == "":
                     # throw exception
-                    raise BadRequest("Data store query does not specify tuple")
+                    raise BadRequest("Data store query does not specify subject, predicate or object")
                 else:
                     # Find all subjects with any association to object
                     object_doc = self.read_doc(object, "", datastore_name)
@@ -429,13 +425,13 @@ class MockDB_DataStore(DataStore):
                         for key in subject_doc:
                             if isinstance(subject_doc[key], list):
                                 if object in subject_doc[key]:
-                                    res.append((subject_doc, key, object_doc))
+                                    res.append([subject_doc, key, object_doc])
                             else:
                                 if object == subject_doc[key]:
-                                    res.append((subject_doc, key, object_doc))
+                                    res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
-                        raise NotFound("Data store query for association %s failed" % str(tuple))
+                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
                     else:
                         return res
             else:
@@ -449,15 +445,15 @@ class MockDB_DataStore(DataStore):
                     subject_doc = self.read_doc(subject_doc_id, "", datastore_name)
                     if subject_doc.has_key(predicate):
                         if object in subject_doc[predicate]:
-                            res.append((subject_doc, predicate, object_doc))
+                            res.append([subject_doc, predicate, object_doc])
 
                 if len(res) == 0:
-                    raise NotFound("Data store query for association %s failed" % str(tuple))
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
                 else:
                     return res
         else:
-            if predicate is None:
-                if object is None:
+            if predicate == "":
+                if object == "":
                     # Find all objects with any association to subject
                     # TODO would need some way to indicate a key is an association predicate
                     pass
@@ -469,31 +465,31 @@ class MockDB_DataStore(DataStore):
                     for key in subject_doc:
                         if isinstance(subject_doc[key], list):
                             if object in subject_doc[key]:
-                                res.append((subject_doc, key, object_doc))
+                                res.append([subject_doc, key, object_doc])
                         else:
                             if object == subject_doc[key]:
-                                res.append((subject_doc, key, object_doc))
+                                res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
-                        raise NotFound("Data store query for association %s failed" % str(tuple))
+                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
                     else:
                         return res
             else:
-                if object is None:
+                if object == "":
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
                     if subject_doc.has_key(predicate):
                         for id in subject_doc[predicate]:
                             object_doc = self.read_doc(id, "", datastore_name)
-                            res.append((subject_doc, predicate, object_doc))
+                            res.append([subject_doc, predicate, object_doc])
                         return res
-                    raise NotFound("Data store query for association %s failed" % str(tuple))
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
                 else:
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     object_doc = self.read_doc(object, "", datastore_name)
                     if subject_doc.has_key(predicate):
                         if object in subject_doc[predicate]:
-                            return [(subject_doc, predicate, object_doc)]
-                    raise NotFound("Data store query for association %s failed" % str(tuple))
+                            return [[subject_doc, predicate, object_doc]]
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))

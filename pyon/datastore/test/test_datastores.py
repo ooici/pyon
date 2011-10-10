@@ -102,41 +102,41 @@ class Test_DataStores(unittest.TestCase):
         self.assertTrue(len(res) == 6)
 
         # Find all the UserInfo records
-        res = data_store.find([("type_", "==", "UserInfo")])
+        res = data_store.find([["type_", "==", "UserInfo"]])
         self.assertTrue(len(res) == 3)
 
         # Find only the UserInfo record for user Heitor Villa-Lobos
-        res = data_store.find([("type_", DataStore.EQUAL, "UserInfo"), DataStore.AND, ("name", DataStore.EQUAL, "Heitor Villa-Lobos")])
+        res = data_store.find([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]])
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
 
         # Find role(s) for user Heitor Villa-Lobos
-        res = data_store.find_by_association([("type_", DataStore.EQUAL, "UserInfo"), DataStore.AND, ("name", DataStore.EQUAL, "Heitor Villa-Lobos")], "roles")
+        res = data_store.find_by_association([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]], "roles")
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Find role association(s) for user Heitor Villa-Lobos
-        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, 'roles', None))
+        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, 'roles', "")
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0][2]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Assert Admin role association exists for user Heitor Villa-Lobos
-        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id))
+        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0][2]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Find every subject with an association to the Admin role
-        res = data_store.resolve_association_tuple((None, 'roles', admin_role_ooi_id))
+        res = data_store.resolve_association("", 'roles', admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0][0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
 
         # Find every association involving object
-        res = data_store.resolve_association_tuple((None, None, admin_role_ooi_id))
+        res = data_store.resolve_association("", "", admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0][0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
@@ -144,7 +144,7 @@ class Test_DataStores(unittest.TestCase):
         self.assertTrue(predicate == "roles")
 
         # Find every association between the subject and object
-        res = data_store.resolve_association_tuple((heitor_villa_lobos_ooi_id, None, admin_role_ooi_id))
+        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, "", admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         predicate = res[0][1]
         self.assertTrue(predicate == "roles")
