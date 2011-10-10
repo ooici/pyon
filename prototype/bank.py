@@ -1,30 +1,27 @@
 """
 """
 
-from pyon.net import entity
 from pyon.container import cc
 from pyon.core.bootstrap import IonObject
+from pyon.core.exception import NotFound
+from pyon.datastore.datastore import DataStore
+from pyon.net.endpoint import RPCClient
 from pyon.util.log import log
 
 from interface.services.ibank_service import IBankService, BaseBankService
 
 class BankService(BaseBankService):
 
-    def __init__(self, config_params={}):
-        log.debug("In __init__")
-        pass
-
     def new_account(self, name='', account_type='Checking'):
         log.debug("In new_account")
         log.debug("name: %s" % str(name))
         log.debug("account_type: %s" % str(account_type))
         res = []
-# TODO uncomment when exception handling is implemented in message stack
-#        try:
-#            res = self.clients.datastore.find("BankCustomer", "name", name)
-#            print "Existing customer.  Customer id: " + str(res)
-#        except NotFoundError:
-#            print "New customer"
+        try:
+            res = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), ("name", DataStore.EQUAL, name)])
+            print "Existing customer.  Customer id: " + str(res)
+        except NotFound:
+            print "New customer"
         if len(res) == 0:
             # Create customer info entry
             customer_info = {}
@@ -48,8 +45,7 @@ class BankService(BaseBankService):
     def deposit(self, account_id=-1, amount=0.0):
         account_obj = self.clients.datastore.read(account_id)
         if account_obj is None:
-            # TODO throw not found exception
-            return "Account does not exist"
+            raise NotFound("Account %d does not exist" % account_id)
         account_obj.balance += amount
         self.clients.datastore.update(account_obj)
         return "Balance after deposit: %s" % (str(account_obj.balance))
@@ -57,8 +53,7 @@ class BankService(BaseBankService):
     def withdraw(self, account_id=-1, amount=0.0):
         account_obj = self.clients.datastore.read(account_id)
         if account_obj is None:
-            # TODO throw not found exception
-            return "Account does not exist"
+            raise NotFound("Account %d does not exist" % account_id)
         account_obj.balance -= amount
         self.clients.datastore.update(account_obj)
         return "Balance after withdrawl: %s" % (str(account_obj.balance))
@@ -66,8 +61,7 @@ class BankService(BaseBankService):
     def get_balance(self, account_id=-1):
         account_obj = self.clients.datastore.read(account_id)
         if account_obj is None:
-            # TODO throw not found exception
-            return "Account does not exist"
+            raise NotFound("Account %d does not exist" % account_id)
         return "Balance: %s" % (str(account_obj.balance))
 
     def list_accounts(self, name=''):
@@ -75,12 +69,12 @@ class BankService(BaseBankService):
         Find all accounts (optionally of type) owned by user
         """
         try:
-            customer_list = self.clients.datastore.find("BankCustomer", "name", name)
+            customer_list = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), ("name", DataStore.EQUAL, name)])
         except:
             log.error("No customers found!")
             return []
         customer_obj = customer_list[0]
-        accounts = self.clients.datastore.find("BankAccount", "owner", customer_obj._id)
+        accounts = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankAccount"), ("owner", DataStore.EQUAL, customer_obj._id)])
         account_list = []
         for account in accounts:
             account_info = {}
@@ -120,10 +114,10 @@ def start_client():
     container.start(server=False) # :(
     print 'container started'
 
-    client = entity.RPCClientEntityFromInterface(IBankService)
+    client = RPCClient(node=container.node, name="bank", iface=IBankService)
 
     print "Before start client"
-    container.start_client('bank', client)
+    container.start(False)
 
     print "Before new account"
     acctNum = client.new_account('kurt', 'Savings')
@@ -148,10 +142,10 @@ def test_single_container():
     container = cc.Container()
     container.start() # :(
 
-    client = entity.RPCClientEntityFromInterface(IBankService)
+    client = RPCClient(node=container.node, name="bank", iface=IBankService)
 
     print "Before start client"
-    container.start_client('bank', client)
+    container.start(False)
 
     print "Before new account"
     acctNum = client.new_account('kurt', 'Savings')
@@ -171,10 +165,10 @@ if __name__ == '__main__':
     import sys
     assert len(sys.argv) > 1, 'please specify server or client'
 
-    if sys.argv[1] == 'client':
-        test_client()
-    else:
-        test_server()
+#    if sys.argv[1] == 'client':
+#        test_client()
+#    else:
+#        test_server()
 
     test_single_container()
 
