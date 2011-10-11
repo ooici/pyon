@@ -78,6 +78,8 @@ class IonObjectBase(object):
 
     def __str__(self):
         """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
+        # TODO: Add a yaml representer for IonObjects to match their tag constructors
+
         _dict = self.__dict__
         #return '%s(%r)' % (self.__class__, _dict)
         # If the yaml is too slow revert to the line above
