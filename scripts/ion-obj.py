@@ -121,6 +121,13 @@ if args.action == 'generate':
             yaml_text = open(yaml_file, 'r').read()
             defs = yaml.load_all(yaml_text)
             for def_set in defs:
+                # Handle object definitions first; make dummy constructors so tags will parse
+                if 'obj' in def_set:
+                    for obj_name in def_set['obj']:
+                        tag = u'!%s' % (obj_name)
+                        yaml.add_constructor(tag, lambda loader, node: {})
+                    continue
+
                 service_name = def_set.get('name', None)
                 dependencies = def_set.get('dependencies', None)
                 methods, class_methods = [], []
