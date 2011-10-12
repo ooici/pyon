@@ -127,3 +127,16 @@ class SampleInterceptor(EnvelopeInterceptor):
         return invocation
 
 
+class SampleProcessOnlyInterceptor(EnvelopeInterceptor):
+    def int_in(self, invocation):
+        log.warn("SampleProcessOnlyInterceptor.int_in: %s", invocation)
+        invocation.message['header']['process_only'] = 'process_only_inteceptor'
+        return invocation
+
+    def int_out(self, invocation):
+        log.warn("SampleProcessOnlyInterceptor.int_out: %s", invocation)
+        if invocation.message['header'].has_key('process_only'):
+            log.warn("This message has been PROCESS ONLY SAMPLE INTERCEPTED!")
+        else:
+            log.warn("This message was NOT process only sample intercepted!")
+        return invocation
