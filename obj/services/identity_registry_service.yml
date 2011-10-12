@@ -1,109 +1,106 @@
 # Bank Service interface definition
 
-_name:
-  identity_registry
+name: identity_registry
+dependencies: [datastore]
+methods:
+  create_user:
+    in:
+      name: ""
+      subjects: ""
+      email: ""
+      phone: ""
+      variables:
+      - name: ""
+        value: ""
+    out:
+      id: ""
 
-_dependencies:
-  [datastore]
+  update_user:
+    in:
+      name: ""
+      subjects: ""
+      email: ""
+      phone: ""
+      variables:
+      - name: ""
+        value: ""
+    out:
 
-create_user:
-  in:
-    name: ""
-    subjects: ""
-    email: ""
-    phone: ""
-    variables:
-    - name: ""
-      value: ""
-  out:
-    id: ""
+  remove_user:
+    in:
+      name: ""
+      email: ""
+    out:
 
-update_user:
-  in:
-    name: ""
-    subjects: ""
-    email: ""
-    phone: ""
-    variables:
-    - name: ""
-      value: ""
-  out:
+  find_user_by_id:
+    in:
+      id: ""
+    out:
+      name: ""
+      subjects: ""
+      email: ""
+      phone: ""
+      variables:
+      - name: ""
+        value: ""
 
-remove_user:
-  in:
-    name: ""
-    email: ""
-  out:
+  find_user_by_name:
+    in:
+      name: ""
+    out:
+      name: ""
+      subjects: ""
+      email: ""
+      phone: ""
+      variables:
+      - name: ""
+        value: ""
 
-find_user_by_id:
-  in:
-    id: ""
-  out:
-    name: ""
-    subjects: ""
-    email: ""
-    phone: ""
-    variables:
-    - name: ""
-      value: ""
+  find_user_by_subject:
+    in:
+      subject: ""
+    out:
+      name: ""
+      subjects: ""
+      email: ""
+      phone: ""
+      variables:
+      - name: ""
+        value: ""
 
-find_user_by_name:
-  in:
-    name: ""
-  out:
-    name: ""
-    subjects: ""
-    email: ""
-    phone: ""
-    variables:
-    - name: ""
-      value: ""
+  add_cilogon_subject_to_user:
+    in:
+      name: ""
+      subject: ""
+    out:
 
-find_user_by_subject:
-  in:
-    subject: ""
-  out:
-    name: ""
-    subjects: ""
-    email: ""
-    phone: ""
-    variables:
-    - name: ""
-      value: ""
+  update_cilogon_subject_for_user:
+    in:
+      name: ""
+      old_subject: ""
+      new_subject: ""
+    out:
 
-add_cilogon_subject_to_user:
-  in:
-    name: ""
-    subject: ""
-  out:
+  remove_cilogon_subject_from_user:
+    in:
+      name: ""
+      subject: ""
+    out:
 
-update_cilogon_subject_for_user:
-  in:
-    name: ""
-    old_subject: ""
-    new_subject: ""
-  out:
+  get_user_roles:
+    in:
+      name: ""
+    out:
+      roles: ""
 
-remove_cilogon_subject_from_user:
-  in:
-    name: ""
-    subject: ""
-  out:
+  set_user_role:
+    in:
+      name: ""
+      role: ""
+    out:
 
-get_user_roles:
-  in:
-    name: ""
-  out:
-    roles: ""
-
-set_user_role:
-  in:
-    name: ""
-    role: ""
-  out:
-
-unset_user_role:
-  in:
-    name: ""
-    role: ""
-  out:
+  unset_user_role:
+    in:
+      name: ""
+      role: ""
+    out:

@@ -6,8 +6,23 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
+from pyon.net.interceptor import SampleInterceptor, Invocation
 from pyon.util.async import spawn
 from pyon.util.log import log
+
+# @TODO: a proper interceptor management system, for now, this works
+
+# interceptors is an array of instances of Interceptor derived instances
+interceptors = [SampleInterceptor()]
+
+def process_interceptors(invocation):
+    for int in interceptors:
+        try:
+            invocation = int.process(invocation)
+        except Exception, ex:
+            log.exception("Error in interceptor path")
+            raise ex
+    return invocation
 
 class Endpoint(object):
 
@@ -25,16 +40,50 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.channel_attached")
 
+    def _message_received(self, msg):
+        """
+        Entry point for received messages in below channel layer. This method puts the message through
+        the interceptor stack, then funnels the message into the message_received method.
+
+        This method should not be overridden unless you are familiar with how the interceptor stack and
+        friends work!
+        """
+        # interceptor point
+        if isinstance(msg, dict):
+            inv = Invocation(path=Invocation.PATH_IN,
+                                 message=msg,
+                                 content=msg['payload']
+                                 )
+            inv_prime = process_interceptors(inv)
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        self.message_received(new_msg)
+
     def message_received(self, msg):
         """
         """
         log.debug("In Endpoint.message_received")
 
-    def send(self, msg):
+    def send(self, raw_msg):
         """
         """
         log.debug("In Endpoint.send")
-        self.channel.send(msg)
+        msg = self._build_msg(raw_msg)
+
+        # interceptor point
+        if isinstance(msg, dict):
+            inv = Invocation(path=Invocation.PATH_OUT,
+                                     message=msg,
+                                     content=msg['payload'],
+                                     )
+            inv_prime = process_interceptors(inv)
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        self.channel.send(new_msg)
 
     def spawn_listener(self):
         def client_recv():
@@ -42,7 +91,7 @@ class Endpoint(object):
                 log.debug("client_recv waiting for a message")
                 data = self.channel.recv()
                 log.debug("client_recv got a message")
-                self.message_received(data)
+                self._message_received(data)
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
@@ -52,6 +101,35 @@ class Endpoint(object):
             self.channel.close()
         if self._recv_greenlet is not None:
             self._recv_greenlet.kill()
+
+    def _build_header(self, raw_msg):
+        """
+        Assembles the headers of a message from the raw message's content.
+        """
+        log.debug("Endpoint _build_header")
+        return {}
+
+    def _build_payload(self, raw_msg):
+        """
+        Assembles the payload of a message from the raw message's content.
+        """
+        log.debug("Endpoint _build_payload")
+        return raw_msg
+
+    def _build_msg(self, raw_msg):
+        """
+        Builds a message (headers/payload) from the raw message's content.
+        You typically do not need to override this method, but override the _build_header
+        and _build_payload methods.
+
+        @returns A dict containing two keys: header and payload.
+        """
+        log.debug("Endpoint _build_msg")
+        header = self._build_header(raw_msg)
+        payload = self._build_payload(raw_msg)
+
+        msg = {"header": header, "payload": payload}
+        return msg
 
 class EndpointFactory(object):
     """
@@ -119,7 +197,7 @@ class BinderListener(object):
             log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
             e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
-            self._spawn(e.message_received, msg)
+            self._spawn(e._message_received, msg)
 
 class ListeningEndpointFactory(EndpointFactory):
     """
@@ -200,10 +278,19 @@ class Subscriber(ListeningEndpointFactory):
         return ListeningEndpointFactory.create_endpoint(self, callback=self._callback, **kwargs)
 
 #
+# BIDIRECTIONAL ENDPOINTS
+#
+class BidirectionalEndpoint(Endpoint):
+    pass
+
+class BidirectionalListeningEndpoint(Endpoint):
+    pass
+
+#
 #  REQ / RESP (and RPC)
 #
 
-class RequestEndpoint(Endpoint):
+class RequestEndpoint(BidirectionalEndpoint):
     def send(self, msg):
         log.debug("RequestEndpoint.send")
 
@@ -232,7 +319,7 @@ class RequestResponseClient(EndpointFactory):
         e.close()
         return retval
 
-class ResponseEndpoint(Endpoint):
+class ResponseEndpoint(BidirectionalListeningEndpoint):
     """
     The listener side makes one of these.
     """
@@ -246,13 +333,21 @@ class RequestResponseServer(ListeningEndpointFactory):
 
 class RPCRequestEndpoint(RequestEndpoint):
 
+    def _build_msg(self, raw_msg):
+        """
+        This override encodes the message for RPC communication using an IonEncoder.
+        It is called automatically by the base class send.
+        """
+        msg = RequestEndpoint._build_msg(self, raw_msg)
+        encoded_msg = IonEncoder().encode(msg)
+
+        return encoded_msg
+
     def send(self, msg):
         log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
-        wrapped_cmd_dict = {"header": {}, "payload": msg}
-        send_data = IonEncoder().encode(wrapped_cmd_dict)
-
-        result_data = RequestEndpoint.send(self, send_data)
+        # Endpoint.send will call our _build_msg override automatically.
+        result_data = RequestEndpoint.send(self, msg)
         res = json.loads(result_data, object_hook=as_ionObject)
 
         log.debug("RPCRequestEndpoint got this response: %s" % str(res))
@@ -369,6 +464,50 @@ class RPCServer(RequestResponseServer):
         log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
+
+class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
+    def __init__(self, process):
+        self._process = process
+
+    def _build_header(self, raw_msg):
+        """
+        See: https://confluence.oceanobservatories.org/display/CIDev/Process+Model
+
+        From R1 Conversations:
+            headers: (many get copied to message instance via R1 interceptor)
+                sender              - set by envelope interceptor (headers.get('sender', message.get('sender'))
+                sender-name         - set in Process.send
+                conv-id             - set by envelope interceptor (passed in or ''), set by Process.send (from conv.conv_id, or created new if no conv)
+                conv-seq            - set by envelope interceptor (passed in or '1'), or set by Process.reply
+                performative        - set by envelope interceptor (passed in or ''), set by Process.send supercalls, possible values: request, inform_result, failure, [agree, refuse]
+                protocol            - set by envelope interceptor (passed in or ''), set by Process.send (from conv.protocol or CONV_TYPE_NONE), possible values: rpc...
+                reply-to            - set by envelope interceptor (reply-to, sender)
+                user-id             - set by envelope interceptor (passed in or "ANONYMOUS")
+                expiry              - set by envelope interceptor (passed in or "0")
+                quiet               - (unused)
+                encoding            - set by envelope interceptor (passed in or "json"), set by codec interceptor (ION_R1_GPB)
+                language            - set by envelope interceptor (passed in or "ion1")
+                format              - set by envelope interceptor (passed in or "raw")
+                ontology            - set by envelope interceptor (passed in or '')
+                status              - set by envelope interceptor (passed in or 'OK')
+                ts                  - set by envelope interceptor (always current time in ms)
+                op                  - set by envelope interceptor (copies 'operation' passed in)
+            conversation?
+            process
+            content
+
+        """
+
+        # must set here: sender-name, conv-id, conv-seq, performative
+        header = RPCRequestEndpoint._build_header(self, raw_msg)
+
+        header.update({'sender-name'  : self._process.name,     # @TODO
+                       'sender'       : self.channel._chan_name,
+                       'conv-id'      : None,                   # @TODO
+                       'conv-seq'     : 1,
+                       'performative' : 'request'})
+
+        return header
 
 class _Command(object):
     """

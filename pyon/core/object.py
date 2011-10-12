@@ -8,7 +8,7 @@ import re
 import os
 import fnmatch
 import hashlib
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, Mapping, Iterable
 from weakref import WeakSet, WeakValueDictionary
 
 import yaml
@@ -17,6 +17,17 @@ from pyon.util.log import log
 
 class IonObjectError(Exception):
     pass
+
+class IonYamlLoader(yaml.Loader):
+    """ For ION-specific overrides of YAML loading behavior. """
+    pass
+class IonYamlDumper(yaml.Dumper):
+    """ For ION-specific overrides of YAML dumping behavior. """
+    pass
+
+def service_name_from_file_name(file_name):
+    file_name = os.path.basename(file_name).split('.', 1)[0]
+    return file_name.title().replace('_', '').replace('-', '')
 
 class IonObjectMetaType(type):
     """
@@ -67,11 +78,13 @@ class IonObjectBase(object):
 
     def __str__(self):
         """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
+        # TODO: Add a yaml representer for IonObjects to match their tag constructors
+
         _dict = self.__dict__
         #return '%s(%r)' % (self.__class__, _dict)
         # If the yaml is too slow revert to the line above
         name = '%s <%s>' % (self.__class__.__name__, id(self))
-        return yaml.dump({name: _dict}, default_flow_style=False)
+        return yaml.dump({name: _dict}, default_flow_style=False, Dumper=IonYamlDumper)
 
     def _validate(self):
         """
@@ -83,9 +96,23 @@ class IonObjectBase(object):
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
-            if type(fields[key]) is not type(schema[key]):
+            field_val, schema_val = fields[key], schema[key]
+            if type(field_val) is not type(schema_val):
                 raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, type(schema[key])))
+            if isinstance(field_val, IonObjectBase):
+                field_val._validate()
+            # Next validate only IonObjects found in child collections. Other than that, don't validate collections.
+            # Note that this is non-recursive; only for first-level collections.
+            elif isinstance(field_val, Mapping):
+                for subkey in field_val:
+                    subval = field_val[subkey]
+                    if isinstance(subval, IonObjectBase):
+                        subval._validate()
+            elif isinstance(field_val, Iterable):
+                for subval in field_val:
+                    if isinstance(subval, IonObjectBase):
+                        subval._validate()
 
 def hashfunc(text):
     return hashlib.sha1(text).hexdigest()
@@ -186,54 +213,111 @@ class IonObjectRegistry(object):
         self.instances_by_name[_def.type.name] = obj
         return obj
 
-    def register_def(self, name, schema, def_text):
+    def register_def(self, name, schema, def_text=None):
         """
         Register a type in the registry. It will index by both name and version,
         where version is the SHA1 hash of the definition. The definition should
         typically be in YAML canonical form (for consistent hashing).
         """
 
-        log.debug('Registering objetdefinition')
+        log.debug('Registering object definition')
+        if def_text is None:
+            # TODO: Hook into pyyaml's event emitting stuff to try to get the canonical form without re-dumping
+            def_text = yaml.dump(schema, canonical=True, allow_unicode=True, Dumper=IonYamlDumper)
+
         _type = self.type_by_name[name]
         _type.name = name
         _def = _type.register_def_raw(schema, def_text)
         self.def_by_hash[_def.hash] = _def
+
+        # Support for composite objects in definitions via YAML tags
+        tag = u'!%s' % (name)
+        def constructor(loader, node):
+            if isinstance(node, yaml.MappingNode):
+                value = loader.construct_mapping(node)
+            else:
+                value = {}
+            return self.new(_def, value)
+        log.debug('Added YAML constructor for tag: %s' % tag)
+        yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
         return _def
 
     def register_yaml(self, yaml_text):
         """ Parse the contents of a YAML file that contains one or more object definitions. """
 
-        defs = yaml.load_all(yaml_text)
+        defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
         obj_defs = []
         for def_set in defs:
             for name,_def in def_set.iteritems():
-                # TODO: Hook into pyyaml's event emitting stuff to try to get the canonical form without re-dumping
-                def_text = yaml.dump(_def, canonical=True, allow_unicode=True)
-                _def = self.register_def(name, _def, def_text)
-                obj_defs.append(_def)
+                reg_def = self.register_def(name, _def)
+                obj_defs.append(reg_def)
 
         return obj_defs
 
-    def register_yaml_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
+    def _list_files_recursive(self, file_dir, pattern, do_first=[], exclude_dirs=[]):
+        """
+        Recursively find all files matching pattern under file_dir and return a list.
+        """
+
+        all_files = [os.path.join(file_dir, file) for file in do_first]
+        skip_me = set(all_files)
+        exclude_dirs = set([os.path.join(file_dir, path) for path in exclude_dirs])
+
+        for root, dirs, files in os.walk(file_dir):
+            if root in exclude_dirs: continue
+            log.debug('Registering yaml files in dir: %s', root)
+            for file in fnmatch.filter(files, pattern):
+                path = os.path.join(root, file)
+                if not path in skip_me:
+                    all_files.append(path)
+
+        return all_files
+
+    def register_obj_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         """
         Recursively find all *.yml files under yaml_dir, concatenate into a big blob, and merge the yaml
         contents into the registry. Files in do_first will be prepended to the blob if found.
         """
 
-        yaml_files = [os.path.join(yaml_dir, file) for file in do_first]
-        skip_me = set(yaml_files)
-        exclude_dirs = set([os.path.join(yaml_dir, path) for path in exclude_dirs])
-
-        for root, dirs, files in os.walk(yaml_dir):
-            if root in exclude_dirs: continue
-            log.debug('Registering yaml files in dir: %s', root)
-            for file in fnmatch.filter(files, '*.yml'):
-                path = os.path.join(root, file)
-                if not path in skip_me:
-                    yaml_files.append(path)
+        yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
 
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files)))
         obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
         return obj_defs
 
+class IonServiceRegistry(IonObjectRegistry):
+    """
+    Adds a layer of service-specific syntax to the object definitions.
+    """
+
+    def register_svc_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
+        yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
+        for yaml_file in yaml_files:
+            svc_name = service_name_from_file_name(yaml_file)
+            yaml_text = open(yaml_file, 'r').read()
+
+            defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
+            obj_defs = []
+            for def_set in defs:
+                # Register all supporting objects first
+                for obj_name,obj_def in def_set.get('obj', {}).iteritems():
+                    if not obj_def: continue
+
+                    #obj_name = '%s_%s' % (svc_name, obj_name)   # Prefix the service name
+                    reg_def = self.register_def(obj_name, obj_def)
+                    obj_defs.append(reg_def)
+
+                # Register the service ops in/out objects
+                for op_name,op_def in def_set.get('methods', {}).iteritems():
+                    if not op_def: continue
+                    for direction in ('in', 'out'):
+                        if not direction in op_def: continue
+
+                        def_name = '%s_%s_%s' % (svc_name, op_name, direction)   # Prefix the service name
+                        reg_def = self.register_def(def_name, op_def[direction])
+                        obj_defs.append(reg_def)
+
+        return obj_defs
+    

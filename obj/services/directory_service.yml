@@ -1,31 +1,27 @@
 # Service interface definition to front end the
 # directory lookup library APIs
 
-_name:
-  directory
+name: directory
+dependencies: [datastore]
+methods:
+  add:
+    in:
+      parent: '/'
+      key: 'foo'
+      value: {}
 
-_dependencies:
-  [datastore]
+  update:
+    in:
+      parent: '/'
+      key: 'foo'
+      value: {}
 
-add:
-  in:
-    parent: '/'
-    key: 'foo'
-    value: {}
+  read:
+    in:
+      parent: '/'
+      key: 'foo'
 
-update:
-  in:
-    parent: '/'
-    key: 'foo'
-    value: {}
-
-read:
-  in:
-    parent: '/'
-    key: 'foo'
-
-remove:
-  in:
-    parent: '/'
-    key: 'foo'
-    
+  remove:
+    in:
+      parent: '/'
+      key: 'foo'

@@ -15,6 +15,8 @@ things:
   foo: !Foo
     name: bob
     age: 22
+
+  foo2: !Foo
 '''
 
 obj_reg = IonObjectRegistry()
@@ -27,10 +29,14 @@ class PyonYamlLoader(yaml.Loader):
     pass
 
 def foo_constructor(loader, node):
-    value = loader.construct_mapping(node)
+    if isinstance(node, yaml.MappingNode):
+        value = loader.construct_mapping(node)
+    else:
+        value = {}
     return obj_reg.new(obj_def, value)
 
 tag = u'!%s' % (obj_def.type.name)
+yaml.add_constructor(tag, foo_constructor, Loader=PyonYamlLoader)
 yaml.add_constructor(tag, foo_constructor, Loader=PyonYamlLoader)
 obj = yaml.load_all(yaml_raw, Loader=PyonYamlLoader)
 print list(obj)

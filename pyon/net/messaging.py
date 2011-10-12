@@ -65,7 +65,7 @@ class NodeB(amqp.Node):
     def __init__(self):
         log.debug("In NodeB.__init__")
         self.ready = event.Event()
-        self._sem = coros.Semaphore()
+        self._lock = coros.RLock()
 
         amqp.Node.__init__(self)
 
@@ -86,19 +86,19 @@ class NodeB(amqp.Node):
             raise #?
 
         log.debug("acquire semaphore")
-        self._sem.acquire()
-        log.debug("acquired semaphore")
+        with self._lock:
+            log.debug("acquired semaphore")
 
-        result = event.AsyncResult()
-        def on_channel_open_ok(amq_chan):
-            ch = channel.SocketInterface.Socket(amq_chan, ch_type)
-            result.set(ch)
-        self.client.channel(on_channel_open_ok)
-        ch = result.get()
-        log.debug("channel: %s" % str(ch))
-        #ch = channel.SocketInterface(client)
+            result = event.AsyncResult()
+            def on_channel_open_ok(amq_chan):
+                ch = channel.SocketInterface.Socket(amq_chan, ch_type)
+                result.set(ch)
+            self.client.channel(on_channel_open_ok)
+            ch = result.get()
+            log.debug("channel: %s" % str(ch))
+            #ch = channel.SocketInterface(client)
+
         log.debug("release semaphore")
-        self._sem.release()
 
         return ch
 

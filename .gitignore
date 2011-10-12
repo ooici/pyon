@@ -26,4 +26,6 @@ buildout.cfg
 .idea
 msc.*
 res/config/pyon.local.yml
-
+logs
+res/config/*~*
+scripts/*~*

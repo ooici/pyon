@@ -1,141 +1,146 @@
 # Service interface definition to front end the
 # datastore library APIs
 
-_name:
-  datastore
+name: datastore
+dependencies: []
+methods:
+  create_datastore:
+    in:
+      datastore_name: ""
+    out:
 
-_dependencies:
-  []
+  delete_datastore:
+    in:
+      datastore_name: ""
+    out:
 
-create_datastore:
-  in:
-    datastore_name: ""
-  out:
+  list_datastores:
+    in:
+    out:
+      list: []
 
-delete_datastore:
-  in:
-    datastore_name: ""
-  out:
+  info_datastore:
+    in:
+      datastore_name: ""
+    out:
+      info: []
 
-list_datastores:
-  in:
-  out:
-    list: []
+  list_objects:
+    in:
+      datastore_name: ""
+    out:
+      info: []
 
-info_datastore:
-  in:
-    datastore_name: ""
-  out:
-    info: []
+  list_object_revisions:
+    in:
+      object_id: ""
+      datastore_name: ""
+    out:
+      list: []
 
-list_objects:
-  in:
-    datastore_name: ""
-  out:
-    info: []
+  create:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
 
-list_object_revisions:
-  in:
-    object_id: ""
-    datastore_name: ""
-  out:
-    list: []
+  create_doc:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
+      tuple: ()
 
-create:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
+  read:
+    in:
+      object_id: ""
+      rev_id: ""
+      datastore_name: ""
+    out:
+      object: {}
 
-create_doc:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
-    tuple: ()
+  read_doc:
+    in:
+      object_id: ""
+      rev_id: ""
+      datastore_name: ""
+    out:
+      object: {}
 
-read:
-  in:
-    object_id: ""
-    rev_id: ""
-    datastore_name: ""
-  out:
-    object: {}
+  update:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
+      tuple: ()
 
-read_doc:
-  in:
-    object_id: ""
-    rev_id: ""
-    datastore_name: ""
-  out:
-    object: {}
+  update_doc:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
+      tuple: ()
 
-update:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
-    tuple: ()
+  delete:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
 
-update_doc:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
-    tuple: ()
+  delete_doc:
+    in:
+      object: {}
+      datastore_name: ""
+    out:
 
-delete:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
+  find:
+    in:
+      type: ""
+      key: ""
+      key_value: ""
+      datastore_name: ""
+    out:
+      list: []
 
-delete_doc:
-  in:
-    object: {}
-    datastore_name: ""
-  out:
+  find_doc:
+    in:
+      type: ""
+      key: ""
+      key_value: ""
+      datastore_name: ""
+    out:
+      list: []
 
-find:
-  in:
-    criteria: []
-    datastore_name: ""
-  out:
-    list: []
+  find_by_association:
+    in:
+      criteria: []
+      association: ""
+      datastore_name: ""
+    out:
+      list: []
 
-find_doc:
-  in:
-    criteria: []
-    datastore_name: ""
-  out:
-    list: []
+  find_by_association_doc:
+    in:
+      criteria: []
+      association: ""
+      datastore_name: ""
+    out:
+      list: []
 
-find_by_association:
-  in:
-    criteria: []
-    association: ""
-    datastore_name: ""
-  out:
-    list: []
+  resolve_association:
+    in:
+      subject: ""
+      predicate: ""
+      object: ""
+      datastore_name: ""
+    out:
+      list: []
 
-find_by_association_doc:
-  in:
-    criteria: []
-    association: ""
-    datastore_name: ""
-  out:
-    list: []
-
-resolve_association:
-  in:
-    tuple: ()
-    datastore_name: ""
-  out:
-    list: []
-
-resolve_association_doc:
-  in:
-    tuple: ()
-    datastore_name: ""
-  out:
-    list: []
+  resolve_association_doc:
+    in:
+      subject: ""
+      predicate: ""
+      object: ""
+      datastore_name: ""
+    out:
+      list: []

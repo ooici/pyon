@@ -3,8 +3,8 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.core.object import IonObjectRegistry
 from pyon.util.config import Config
+from pyon.core.object import IonServiceRegistry
 
 import logging.config
 import os
@@ -26,11 +26,9 @@ logging.config.dictConfig(LOGGING_CFG)
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml', 'res/deploy/r2deploy.rel']
 CFG = Config(conf_paths).data
 
-obj_registry = IonObjectRegistry()
-obj_registry.register_yaml_dir('obj', ['ion.yml'], ['services'])
+obj_registry = IonServiceRegistry()
+obj_registry.register_obj_dir('obj', ['ion.yml'], ['services'])
+obj_registry.register_svc_dir('obj/services')
 
 # Make a default factory for IonObjects
 IonObject = obj_registry.new
-
-svc_registry = IonObjectRegistry()
-svc_registry.register_yaml_dir('obj/services')
