@@ -242,7 +242,7 @@ class MockDB_DataStore(DataStore):
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
-                            if doc.has_key(key):
+                            if key in doc:
                                 if logical_operation == DataStore.EQUAL:
                                     if doc[key] == value:
                                         criteria_satisfied = True
@@ -320,7 +320,7 @@ class MockDB_DataStore(DataStore):
                 doc = self.read_doc(obj_id, rev_id="", datastore_name=datastore_name)
                 log.debug("Doc: %s" % str(doc))
                 if len(criteria) == 0:
-                    if doc.has_key(association):
+                    if association in doc:
                         for id in doc[association]:
                             ids.append(id)
                 else:
@@ -330,7 +330,7 @@ class MockDB_DataStore(DataStore):
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
-                            if doc.has_key(key):
+                            if key in doc:
                                 if logical_operation == DataStore.EQUAL:
                                     if doc[key] == value:
                                         criteria_satisfied = True
@@ -369,7 +369,7 @@ class MockDB_DataStore(DataStore):
                                     break
 
                     if criteria_satisfied:
-                        if doc.has_key(association):
+                        if association in doc:
                             for id in doc[association]:
                                 ids.append(id)
 
@@ -443,7 +443,7 @@ class MockDB_DataStore(DataStore):
                     if subject_doc_id == object:
                         continue
                     subject_doc = self.read_doc(subject_doc_id, "", datastore_name)
-                    if subject_doc.has_key(predicate):
+                    if predicate in subject_doc:
                         if object in subject_doc[predicate]:
                             res.append([subject_doc, predicate, object_doc])
 
@@ -479,7 +479,7 @@ class MockDB_DataStore(DataStore):
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
-                    if subject_doc.has_key(predicate):
+                    if predictate in subject_doc:
                         for id in subject_doc[predicate]:
                             object_doc = self.read_doc(id, "", datastore_name)
                             res.append([subject_doc, predicate, object_doc])
@@ -489,7 +489,7 @@ class MockDB_DataStore(DataStore):
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     object_doc = self.read_doc(object, "", datastore_name)
-                    if subject_doc.has_key(predicate):
+                    if predicate in subject_doc:
                         if object in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))

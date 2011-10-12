@@ -408,7 +408,7 @@ class CouchDB_DataStore(DataStore):
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
-                    if subject_doc.has_key(predicate):
+                    if predicate in subject_doc:
                         for id in subject_doc[predicate]:
                             object_doc = self.read_doc(id, "", datastore_name)
                             res.append([subject_doc, predicate, object_doc])
@@ -418,7 +418,7 @@ class CouchDB_DataStore(DataStore):
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     object_doc = self.read_doc(object, "", datastore_name)
-                    if subject_doc.has_key(predicate):
+                    if predicate in subject_doc:
                         if object in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
