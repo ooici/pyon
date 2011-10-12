@@ -3,8 +3,8 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.util.config import Config
 from pyon.core.object import IonObjectRegistry
+from pyon.util.config import Config
 
 import logging.config
 import os
@@ -22,11 +22,9 @@ for handler in LOGGING_CFG.get('handlers', {}).itervalues():
 
 logging.config.dictConfig(LOGGING_CFG)
 
-conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
+# Read global configuration
+conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml', 'res/deploy/r2deploy.rel']
 CFG = Config(conf_paths).data
-
-service_conf_path = 'res/deploy/r2deploy.rel'
-SERVICE_CFG = eval(open(service_conf_path).read())
 
 obj_registry = IonObjectRegistry()
 obj_registry.register_yaml_dir('obj', ['ion.yml'], ['services'])
