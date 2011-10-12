@@ -15,6 +15,3 @@ server:
 cc:
   timeout:
     shutdown: 30.0
-
-datastore:
-  type: persistent
