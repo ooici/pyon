@@ -16,11 +16,12 @@ __license__ = 'Apache 2.0'
 
 from zope.interface import providedBy
 
-from pyon.public import CFG, SERVICE_CFG, messaging, channel, GreenProcessSupervisor
+from pyon.public import CFG, messaging, channel, GreenProcessSupervisor
 from pyon.service.service import add_service_by_name, get_service_by_name
 
+from pyon.util.config import Config
 from pyon.util.log import log
-from pyon.util.containers import DotDict
+from pyon.util.containers import DictModifier, DotDict
 
 class Container(object):
     """
@@ -52,25 +53,21 @@ class Container(object):
     def readConfig(self):
         log.debug("In Container.readConfig")
         # Loop through configured services and start them
-        services = SERVICE_CFG['apps']
+        services = CFG['deploy']["apps"]
         # Return value.  Will contain list of
         # service names from the config file
         service_names = []
         for service_def in services:
-            log.debug("service_def: %s" % str(service_def))
             name = service_def["name"]
 
-            config_params = {}
-            if service_def.has_key("config"):
-                config_params = service_def["config"]
-
-            # Service is described in processapp tuple
+            # TODO fix this
+            # For now service is described in processapp tuple in rel file
             # Field 1 is the module name
             # Field 2 is the class name
-            module = service_def["processapp"][1]
-            cls = service_def["processapp"][2]
+            module = service_def["processapp"][0]
+            cls = service_def["processapp"][1]
 
-            service_instance = self.forname(module, cls, config_params)
+            service_instance = self.forname(module, cls)
 
             # Inject dependencies
             service_instance.clients = DotDict()
@@ -82,6 +79,13 @@ class Container(object):
                 client = RPCClient(node=self.node, name=dependency, iface=dependency_interface)
                 service_instance.clients[dependency] = client
 
+            # Call method to blend config values
+            service_config = self.get_service_config(name, {})
+            service_instance.CFG = service_config
+
+            # Call method to allow service to self-init
+            service_instance.service_init()
+
             # Add to global dict
             add_service_by_name(name, service_instance)
 
@@ -89,17 +93,42 @@ class Container(object):
 
         return service_names
 
-    def forname(self, modpath, classname, config_params={}):
+    def forname(self, modpath, classname):
         ''' Returns a class of "classname" from module "modname". '''
         log.debug("In Container.forname")
         log.debug("modpath: %s" % modpath)
         log.debug("classname: %s" % classname)
-        log.debug("config_params: %s" % str(config_params))
-        firstTime = True
         module = __import__(modpath, fromlist=[classname])
         classobj = getattr(module, classname)
-        return classobj(config_params)
+        return classobj()
 
+    def get_service_config(self, appname, spawnargs={}):
+        # Base is global config
+        cfg_dict = DictModifier(CFG)
+
+        app_path = ['res/apps/' + appname + '.app']
+        app_cfg = Config(app_path).data
+        if "config" in app_cfg:
+            app_cfg_dict = DotDict(app_cfg["config"])
+            cfg_dict.update(app_cfg_dict)
+
+        # Find service definition in rel file
+        for app_def in CFG['deploy']["apps"]:
+            if app_def["name"] == appname:
+                rel_def = app_def
+                break
+        if "config" in rel_def:
+            rel_cfg_dict = DotDict(rel_def["config"])
+            cfg_dict.update(rel_cfg_dict)
+
+        if not isinstance(spawnargs, dict):
+            # TODO throw some exception
+            pass
+        elif len(spawnargs) != 0:
+            spawnargs_cfg_dict = DotDict(spawnargs)
+            cfg_dict.update(spawnargs_cfg_dict)
+
+        return cfg_dict
 
     def stop(self):
         log.debug("In Container.stop")
