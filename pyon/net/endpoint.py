@@ -6,8 +6,23 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
+from pyon.net.interceptor import SampleInterceptor, Invocation
 from pyon.util.async import spawn
 from pyon.util.log import log
+
+# @TODO: a proper interceptor management system, for now, this works
+
+# interceptors is an array of instances of Interceptor derived instances
+interceptors = [SampleInterceptor()]
+
+def process_interceptors(invocation):
+    for int in interceptors:
+        try:
+            invocation = int.process(invocation)
+        except Exception, ex:
+            log.exception("Error in interceptor path")
+            raise ex
+    return invocation
 
 class Endpoint(object):
 
@@ -25,6 +40,27 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.channel_attached")
 
+    def _message_received(self, msg):
+        """
+        Entry point for received messages in below channel layer. This method puts the message through
+        the interceptor stack, then funnels the message into the message_received method.
+
+        This method should not be overridden unless you are familiar with how the interceptor stack and
+        friends work!
+        """
+        # interceptor point
+        if isinstance(msg, dict):
+            inv = Invocation(path=Invocation.PATH_IN,
+                                 message=msg,
+                                 content=msg['payload']
+                                 )
+            inv_prime = process_interceptors(inv)
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        self.message_received(new_msg)
+
     def message_received(self, msg):
         """
         """
@@ -35,7 +71,19 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.send")
         msg = self._build_msg(raw_msg)
-        self.channel.send(msg)
+
+        # interceptor point
+        if isinstance(msg, dict):
+            inv = Invocation(path=Invocation.PATH_OUT,
+                                     message=msg,
+                                     content=msg['payload'],
+                                     )
+            inv_prime = process_interceptors(inv)
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        self.channel.send(new_msg)
 
     def spawn_listener(self):
         def client_recv():
@@ -43,7 +91,7 @@ class Endpoint(object):
                 log.debug("client_recv waiting for a message")
                 data = self.channel.recv()
                 log.debug("client_recv got a message")
-                self.message_received(data)
+                self._message_received(data)
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
@@ -149,7 +197,7 @@ class BinderListener(object):
             log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
             e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
-            self._spawn(e.message_received, msg)
+            self._spawn(e._message_received, msg)
 
 class ListeningEndpointFactory(EndpointFactory):
     """
