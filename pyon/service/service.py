@@ -3,8 +3,6 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-#from pyon.public import log
-
 class BaseService(object):
     """
     Something that provides a 'service'.
@@ -14,6 +12,22 @@ class BaseService(object):
 
     name = None
     running = 0
+
+    def service_init(self):
+        """
+        Method to be overridden as neccessary by
+        implementing service classes to perform
+        initialization actions prior to service
+        start.  Configuration parameters are
+        accessible via the self.CFG dict.
+        """
+        pass
+
+    def service_start(self):
+        """
+        Method called at service startup.
+        """
+        pass
 
 services_by_name = {}
 
@@ -29,7 +43,7 @@ def add_service_by_name(name, service):
     services_by_name[name] = service
 
 def get_service_by_name(name):
-    if services_by_name.has_key(name):
+    if name in services_by_name:
         return services_by_name[name]
     else:
         return None
