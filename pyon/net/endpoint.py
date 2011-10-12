@@ -13,9 +13,9 @@ from pyon.util.log import log
 # @TODO: a proper interceptor management system, for now, this works
 
 # interceptors is an array of instances of Interceptor derived instances
-interceptors = [SampleInterceptor()]
+base_interceptors = [SampleInterceptor()]
 
-def process_interceptors(invocation):
+def process_interceptors(interceptors, invocation):
     for int in interceptors:
         try:
             invocation = int.process(invocation)
@@ -28,6 +28,7 @@ class Endpoint(object):
 
     channel = None
     _recv_greenlet = None
+    interceptors = base_interceptors
 
     def attach_channel(self, channel):
         log.debug("In Endpoint.attach_channel")
@@ -54,7 +55,7 @@ class Endpoint(object):
                                  message=msg,
                                  content=msg['payload']
                                  )
-            inv_prime = process_interceptors(inv)
+            inv_prime = process_interceptors(self.interceptors, inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -78,7 +79,7 @@ class Endpoint(object):
                                      message=msg,
                                      content=msg['payload'],
                                      )
-            inv_prime = process_interceptors(inv)
+            inv_prime = process_interceptors(self.interceptors, inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -411,6 +412,26 @@ class RPCClient(RequestResponseClient):
 class RPCResponseEndpoint(ResponseEndpoint):
     def __init__(self, routing_obj=None, **kwargs):
         self._routing_obj = routing_obj
+        self._response_headers = None
+#        self._response_payload = None
+
+    def _build_header(self, raw_msg):
+        hdrs = ResponseEndpoint._build_header(self, raw_msg)
+        hdrs.update(self._response_headers)
+        return hdrs
+
+#    def _build_payload(self, raw_msg):
+#        return self._response_payload
+
+    def _build_msg(self, raw_msg):
+        """
+        This override encodes the message for RPC communication using an IonEncoder.
+        It is called automatically by the base class send.
+        """
+        msg = ResponseEndpoint._build_msg(self, raw_msg)
+        encoded_msg = IonEncoder().encode(msg)
+
+        return encoded_msg
 
     def message_received(self, msg):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -422,18 +443,16 @@ class RPCResponseEndpoint(ResponseEndpoint):
         wrapped_req = json.loads(msg, object_hook=as_ionObject)
         cmd_dict = wrapped_req["payload"]
 
+        result = None
         try:
             result = self._call_cmd(cmd_dict)
-            # Wrap message with response header
-            wrapped_result = {"header": {"status_code": 200, "error_message": ""}, "payload": result}
+            self._response_headers = { 'status_code': 200, 'error_message': '' }
         except exception.IonException as ex:
             log.debug("Got error response")
             wrapped_result = self._create_error_response(ex)
 
         #self.channel.send(response_msg)
-        encoded_response = IonEncoder().encode(wrapped_result)
-        log.debug("response_msg: %s" % str(encoded_response))
-        self.send(encoded_response)
+        self.send(result)
 
     def _call_cmd(self, cmd_dict):
         log.debug("In RPCResponseEndpoint._call_cmd")
@@ -445,9 +464,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         return meth(*args)
 
     def _create_error_response(self, ex):
-        error_msg = {"header": {"status_code": ex.get_status_code(), "error_message": ex.get_error_message()}}
-        return error_msg
-
+        self._response_headers = {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
 
 class RPCServer(RequestResponseServer):
     endpoint_type = RPCResponseEndpoint
