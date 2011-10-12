@@ -479,7 +479,7 @@ class MockDB_DataStore(DataStore):
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
-                    if predictate in subject_doc:
+                    if predicate in subject_doc:
                         for id in subject_doc[predicate]:
                             object_doc = self.read_doc(id, "", datastore_name)
                             res.append([subject_doc, predicate, object_doc])
