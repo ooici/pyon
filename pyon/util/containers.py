@@ -31,6 +31,29 @@ class DotDict(dict):
     def fromkeys(cls, seq, value=None):
         return DotDict(dict.fromkeys(seq, value))
 
+class DictModifier(DotDict):
+    """
+    Subclass of DotDict that allows the sparse overriding of dict values.
+    """
+    def __init__(self, base):
+        # base should be a DotDict, raise TypeError exception if not
+        if not isinstance(base, DotDict):
+            raise TypeError("Base must be of type DotDict")
+        self.base = base
+
+    def __getattr__(self, key):
+        try:
+            return DotDict.__getattr__(self, key)
+        except AttributeError, ae:
+            # Delegate to base
+            return getattr(self.base, key)
+
+    def __getitem__(self, key):
+        try:
+            return DotDict.__getitem__(self, key)
+        except KeyError, ke:
+            # Delegate to base
+            return getattr(self.base, key)
 
 # dict_merge from: http://appdelegateinc.com/blog/2011/01/12/merge-deeply-nested-dicts-in-python/
 
