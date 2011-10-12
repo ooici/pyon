@@ -1,0 +1,7 @@
+# _ID = 1009
+# _VERSION = 1
+obj:
+  BrokerFederation:
+    name: ""
+    description: ""
+--- # _ID = 1009

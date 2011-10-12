@@ -1,0 +1,8 @@
+name: hello_service.py
+dependencies: []
+methods:
+  hello:
+    in:
+
+    out:
+

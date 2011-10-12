@@ -1,0 +1,18 @@
+# _ID = 15
+# _VERSION = 1
+obj:
+  PredicateObjectQuery:
+    pairs: [
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      object: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 15

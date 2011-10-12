@@ -1,0 +1,87 @@
+# _ID = 20003
+# _VERSION = 1
+obj:
+  AddressLink:
+    person: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+    owner: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    title: ""
+--- # _ID = 20003
+
+# _ID = 20001
+# _VERSION = 1
+obj:
+  Person:
+    name: ""
+    id: -1
+    email: ""
+    phone: [
+      number: ""
+      type: MOBILE]
+--- # _ID = 20001
+
+# _ID = 10
+# _VERSION = 1
+obj:
+  ResourceConfigurationRequest:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    life_cycle_operation: ACTIVATE
+--- # _ID = 10
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+name: hello_data_update.py
+dependencies: []
+methods:
+  create_addressbook_resource:
+    in:
+
+    out:
+
+  clobber_addressbook_resource:
+    in:
+
+    out:
+
+  merge_addressbook_resource:
+    in:
+
+    out:
+

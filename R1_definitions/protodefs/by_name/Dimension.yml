@@ -1,0 +1,10 @@
+# _ID = 10018
+# _VERSION = 1
+obj:
+  Dimension:
+    name: ""
+    source_name: ""
+    length: 18446744073709551615
+    variable_length: true
+    min_offset: 18446744073709551615
+--- # _ID = 10018

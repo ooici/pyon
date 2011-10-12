@@ -1,0 +1,6 @@
+# _ID = 9124
+# _VERSION = 1
+obj:
+  GetResourceRequest:
+    ooi_id: ""
+--- # _ID = 9124

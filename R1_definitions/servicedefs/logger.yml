@@ -1,0 +1,13 @@
+name: logger.py
+dependencies: []
+methods:
+  config:
+    in:
+
+    out:
+
+  logmsg:
+    in:
+
+    out:
+

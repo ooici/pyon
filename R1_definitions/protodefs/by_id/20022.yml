@@ -1,0 +1,23 @@
+# _ID = 20022
+# _VERSION = 1
+obj:
+  CTDSensor:
+    id: ""
+    name: ""
+    temperature: [
+      location: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      val: -1.1]
+    salinity: [
+      location: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      val: -1.1]
+--- # _ID = 20022

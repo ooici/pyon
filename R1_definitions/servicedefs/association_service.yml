@@ -1,0 +1,192 @@
+# _ID = 4
+# _VERSION = 1
+obj:
+  IDRef:
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""
+--- # _ID = 4
+
+# _ID = 16
+# _VERSION = 1
+obj:
+  SubjectPredicateQuery:
+    pairs: [
+      subject: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 16
+
+# _ID = 15
+# _VERSION = 1
+obj:
+  PredicateObjectQuery:
+    pairs: [
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      object: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 15
+
+# _ID = 27
+# _VERSION = 1
+obj:
+  AssociationQueryMsg:
+    subject: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    predicate: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    object: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 27
+
+# _ID = 28
+# _VERSION = 1
+obj:
+  AssociationGetStarMsg:
+    subject_pairs: [
+      subject: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+    object_pairs: [
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      object: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 28
+
+# _ID = 30
+# _VERSION = 1
+obj:
+  BoolMsg:
+    result: true
+--- # _ID = 30
+
+# _ID = 22
+# _VERSION = 1
+obj:
+  QueryResult:
+    idrefs: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+--- # _ID = 22
+
+# _ID = 25
+# _VERSION = 1
+obj:
+  PredicateReference:
+    key: ""
+--- # _ID = 25
+
+# _ID = 26
+# _VERSION = 1
+obj:
+  LifeCycleStateObject:
+    lcs: NEW
+--- # _ID = 26
+
+name: association_service.py
+dependencies: []
+methods:
+  get_subjects:
+    in:
+
+    out:
+
+  get_objects:
+    in:
+
+    out:
+
+  get_star:
+    in:
+
+    out:
+
+  object_associations:
+    in:
+
+    out:
+
+  subject_associations:
+    in:
+
+    out:
+
+  get_association:
+    in:
+
+    out:
+
+  association_exists:
+    in:
+
+    out:
+
+  get_associations:
+    in:
+
+    out:
+
+  get_associations_map:
+    in:
+
+    out:
+
+  get_associations_list:
+    in:
+
+    out:
+

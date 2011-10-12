@@ -1,0 +1,11 @@
+# _ID = 1
+# _VERSION = 1
+obj:
+  StructureElement:
+    key: ""
+    type: 
+      object_id: -1
+      version: -1
+    isleaf: true
+    value: ""
+--- # _ID = 1

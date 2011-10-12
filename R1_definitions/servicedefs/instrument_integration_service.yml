@@ -1,0 +1,276 @@
+# _ID = 4301
+# _VERSION = 1
+obj:
+  Instrument:
+    name: ""
+    description: ""
+    manufacturer: ""
+    model: ""
+    serial_num: ""
+    fw_version: ""
+--- # _ID = 4301
+
+# _ID = 4302
+# _VERSION = 1
+obj:
+  InstrumentAgent:
+    name: ""
+    version: ""
+    description: ""
+    class_name: ""
+    module: ""
+    process_id: ""
+--- # _ID = 4302
+
+# _ID = 4
+# _VERSION = 1
+obj:
+  IDRef:
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""
+--- # _ID = 4
+
+# _ID = 9001
+# _VERSION = 1
+obj:
+  ApplicationIntegrationServiceRequestMsg:
+    message_parameters_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 9001
+
+# _ID = 9002
+# _VERSION = 1
+obj:
+  ApplicationIntegrationServiceResponseMsg:
+    message_parameters_reference: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+    result: -1
+--- # _ID = 9002
+
+# _ID = 9003
+# _VERSION = 1
+obj:
+  ApplicationIntegrationServiceError:
+    error_num: -1
+    error_str: ""
+--- # _ID = 9003
+
+# _ID = 9301
+# _VERSION = 1
+obj:
+  CreateInstrumentRequest:
+    name: ""
+    description: ""
+    manufacturer: ""
+    model: ""
+    serial_num: ""
+    fw_version: ""
+--- # _ID = 9301
+
+# _ID = 9302
+# _VERSION = 1
+obj:
+  CreateInstrumentResponse:
+    instrument_resource_id: ""
+--- # _ID = 9302
+
+# _ID = 9303
+# _VERSION = 1
+obj:
+  StartInstrumentAgentRequest:
+    name: ""
+    model: ""
+    instrument_resource_id: ""
+--- # _ID = 9303
+
+# _ID = 9304
+# _VERSION = 1
+obj:
+  StartInstrumentAgentResponse:
+    instrument_agent_resource_id: ""
+    instrument_agent_process_id: ""
+--- # _ID = 9304
+
+# _ID = 9305
+# _VERSION = 1
+obj:
+  StartInstrumentSamplingRequest:
+    instrument_resource_id: ""
+--- # _ID = 9305
+
+# _ID = 9306
+# _VERSION = 1
+obj:
+  StartInstrumentSamplingResponse:
+    status: ""
+--- # _ID = 9306
+
+# _ID = 9307
+# _VERSION = 1
+obj:
+  StopInstrumentSamplingRequest:
+    instrument_resource_id: ""
+--- # _ID = 9307
+
+# _ID = 9308
+# _VERSION = 1
+obj:
+  StopInstrumentSamplingResponse:
+    status: ""
+--- # _ID = 9308
+
+# _ID = 9309
+# _VERSION = 1
+obj:
+  GetInstrumentStateRequest:
+    instrument_resource_id: ""
+--- # _ID = 9309
+
+# _ID = 9310
+# _VERSION = 1
+obj:
+  GetInstrumentStateResponse:
+    properties: 
+      navg: -1
+      interval: -1
+      outputsv: true
+      outputsal: true
+      txrealtime: true
+      storetime: true
+      gpgga: ""
+      gpgll: ""
+      gprmc: ""
+      pgrmf: ""
+      pgrmc: ""
+      fix_mode: ""
+      alt_msl: -1.0
+      earth_datum: -1
+      diffmode: ""
+--- # _ID = 9310
+
+# _ID = 9311
+# _VERSION = 1
+obj:
+  SetInstrumentStateRequest:
+    instrument_resource_id: ""
+    properties: 
+      navg: -1
+      interval: -1
+      outputsv: true
+      outputsal: true
+      txrealtime: true
+      storetime: true
+      gpgga: ""
+      gpgll: ""
+      gprmc: ""
+      pgrmf: ""
+      pgrmc: ""
+      fix_mode: ""
+      alt_msl: -1.0
+      earth_datum: -1
+      diffmode: ""
+--- # _ID = 9311
+
+# _ID = 9312
+# _VERSION = 1
+obj:
+  SetInstrumentStateResponse:
+    status: ""
+--- # _ID = 9312
+
+# _ID = 9313
+# _VERSION = 1
+obj:
+  GetInstrumentListRequest:
+    
+--- # _ID = 9313
+
+# _ID = 9314
+# _VERSION = 1
+obj:
+  GetInstrumentListResponse:
+    instrument_metadata: [
+      instrument_resource_id: ""
+      name: ""
+      description: ""
+      manufacturer: ""
+      model: ""
+      serial_num: ""
+      fw_version: ""]
+--- # _ID = 9314
+
+name: instrument_integration_service.py
+dependencies: []
+methods:
+  prepInstrument:
+    in:
+
+    out:
+
+  cleanupInstrument:
+    in:
+
+    out:
+
+  getInstrumentList:
+    in:
+
+    out:
+
+  createNewInstrument:
+    in:
+
+    out:
+
+  startAutoSampling:
+    in:
+
+    out:
+
+  stopAutoSampling:
+    in:
+
+    out:
+
+  getInstrumentState:
+    in:
+
+    out:
+
+  setInstrumentState:
+    in:
+
+    out:
+
+  startInstrumentAgent:
+    in:
+
+    out:
+
+  stopInstrumentAgent:
+    in:
+
+    out:
+
+  startDirectAccess:
+    in:
+
+    out:
+
+  stopDirectAccess:
+    in:
+
+    out:
+

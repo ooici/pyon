@@ -1,0 +1,7 @@
+# _ID = 10005
+# _VERSION = 1
+obj:
+  Feature:
+    name: ""
+    feature_type: PointFeature
+--- # _ID = 10005

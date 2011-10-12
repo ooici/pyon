@@ -1,0 +1,168 @@
+# _ID = 10001
+# _VERSION = 1
+obj:
+  Dataset:
+    root_group: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 10001
+
+# _ID = 10009
+# _VERSION = 1
+obj:
+  int32Array:
+    
+--- # _ID = 10009
+
+# _ID = 10010
+# _VERSION = 1
+obj:
+  uint32Array:
+    
+--- # _ID = 10010
+
+# _ID = 10011
+# _VERSION = 1
+obj:
+  int64Array:
+    
+--- # _ID = 10011
+
+# _ID = 10012
+# _VERSION = 1
+obj:
+  uint64Array:
+    
+--- # _ID = 10012
+
+# _ID = 10013
+# _VERSION = 1
+obj:
+  f32Array:
+    
+--- # _ID = 10013
+
+# _ID = 10014
+# _VERSION = 1
+obj:
+  f64Array:
+    
+--- # _ID = 10014
+
+# _ID = 10015
+# _VERSION = 1
+obj:
+  stringArray:
+    
+--- # _ID = 10015
+
+# _ID = 10016
+# _VERSION = 1
+obj:
+  opaqueArray:
+    
+--- # _ID = 10016
+
+# _ID = 10021
+# _VERSION = 1
+obj:
+  BoundedArray:
+    bounds: [
+      origin: -1
+      size: 18446744073709551615
+      stride: 18446744073709551615]
+    ndarray: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 10021
+
+# _ID = 10025
+# _VERSION = 1
+obj:
+  ArrayStructure:
+    bounded_arrays: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+--- # _ID = 10025
+
+# _ID = 2001
+# _VERSION = 1
+obj:
+  SupplementMessage:
+    dataset_id: ""
+    variable_name: ""
+    bounded_array: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2001
+
+# _ID = 2002
+# _VERSION = 1
+obj:
+  PerformIngestMessage:
+    dataset_id: ""
+    reply_to: ""
+    ingest_service_timeout: -1.1
+    datasource_id: ""
+--- # _ID = 2002
+
+# _ID = 2003
+# _VERSION = 1
+obj:
+  CreateDatasetTopicsMessage:
+    dataset_id: ""
+--- # _ID = 2003
+
+# _ID = 2004
+# _VERSION = 1
+obj:
+  IngestionReadyMessage:
+    xp_name: ""
+    publish_topic: ""
+--- # _ID = 2004
+
+# _ID = 2005
+# _VERSION = 1
+obj:
+  DataAcquisitionCompleteMessage:
+    status: OK
+    status_body: ""
+--- # _ID = 2005
+
+# _ID = 52
+# _VERSION = 1
+obj:
+  BlobsMessage:
+    blob_elements: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+--- # _ID = 52
+
+name: ingestion.py
+dependencies: []
+methods:
+  create_dataset_topics:
+    in:
+
+    out:
+
+  ingest:
+    in:
+
+    out:
+

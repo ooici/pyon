@@ -1,0 +1,15 @@
+# _ID = 10007
+# _VERSION = 1
+obj:
+  CDMPointFeature:
+    long: -1.0
+    lat: -1.0
+    z: -1.0
+    time: -1.0
+    data: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+--- # _ID = 10007

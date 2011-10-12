@@ -1,0 +1,44 @@
+# _ID = 20003
+# _VERSION = 1
+obj:
+  AddressLink:
+    person: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+    owner: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    title: ""
+--- # _ID = 20003
+
+# _ID = 20001
+# _VERSION = 1
+obj:
+  Person:
+    name: ""
+    id: -1
+    email: ""
+    phone: [
+      number: ""
+      type: MOBILE]
+--- # _ID = 20001
+
+name: receiver_test_service.py
+dependencies: []
+methods:
+  a:
+    in:
+
+    out:
+
+  b:
+    in:
+
+    out:
+

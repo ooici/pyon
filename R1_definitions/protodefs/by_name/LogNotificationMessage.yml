@@ -1,0 +1,15 @@
+# _ID = 2305
+# _VERSION = 1
+obj:
+  LogNotificationMessage:
+    message: ""
+    levelname: ""
+    levelno: -1
+    asctime: ""
+    createdtime: ""
+    filename: ""
+    funcName: ""
+    lineno: -1
+    module: ""
+    pathname: ""
+--- # _ID = 2305

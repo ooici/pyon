@@ -1,0 +1,15 @@
+# _ID = 10021
+# _VERSION = 1
+obj:
+  BoundedArray:
+    bounds: [
+      origin: -1
+      size: 18446744073709551615
+      stride: 18446744073709551615]
+    ndarray: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 10021

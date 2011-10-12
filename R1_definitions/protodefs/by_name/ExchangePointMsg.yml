@@ -1,0 +1,12 @@
+# _ID = 2309
+# _VERSION = 1
+obj:
+  ExchangePointMsg:
+    exchange_point_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2309

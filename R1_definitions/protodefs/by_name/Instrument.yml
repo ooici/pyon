@@ -1,0 +1,11 @@
+# _ID = 4301
+# _VERSION = 1
+obj:
+  Instrument:
+    name: ""
+    description: ""
+    manufacturer: ""
+    model: ""
+    serial_num: ""
+    fw_version: ""
+--- # _ID = 4301

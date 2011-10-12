@@ -1,0 +1,13 @@
+name: hello_identity.py
+dependencies: []
+methods:
+  hello_anonymous_request:
+    in:
+
+    out:
+
+  hello_user_request:
+    in:
+
+    out:
+

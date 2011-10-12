@@ -1,0 +1,7 @@
+# _ID = 9035
+# _VERSION = 1
+obj:
+  CreateDownloadURLReqMsg:
+    user_ooi_id: ""
+    data_resource_id: ""
+--- # _ID = 9035

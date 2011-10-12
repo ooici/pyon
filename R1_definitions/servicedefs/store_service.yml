@@ -1,0 +1,73 @@
+# _ID = 17
+# _VERSION = 1
+obj:
+  QueryAttributes:
+    attrs: [
+      attribute_name: ""
+      attribute_value: ""
+      predicate_type: ""]
+--- # _ID = 17
+
+# _ID = 18
+# _VERSION = 1
+obj:
+  Row:
+    key: ""
+    value: ""
+    cols: [
+      column_name: ""
+      column_value: ""]
+--- # _ID = 18
+
+# _ID = 19
+# _VERSION = 1
+obj:
+  Rows:
+    rows: [
+      key: ""
+      value: ""
+      cols: [
+        column_name: ""
+        column_value: ""]]
+--- # _ID = 19
+
+# _ID = 20
+# _VERSION = 1
+obj:
+  IndexedAttributes:
+    
+--- # _ID = 20
+
+# _ID = 21
+# _VERSION = 1
+obj:
+  RowIndexUpdate:
+    key: ""
+    cols: [
+      column_name: ""
+      column_value: ""]
+--- # _ID = 21
+
+name: store_service.py
+dependencies: []
+methods:
+  put:
+    in:
+
+    out:
+
+  get:
+    in:
+
+    out:
+
+  remove:
+    in:
+
+    out:
+
+  has_key:
+    in:
+
+    out:
+

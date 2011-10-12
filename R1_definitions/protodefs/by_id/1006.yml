@@ -1,0 +1,12 @@
+# _ID = 1006
+# _VERSION = 1
+obj:
+  AMQPExchangeMapping:
+    exchangename: ""
+    type: DIRECT
+    passive: true
+    durable: true
+    autodelete: true
+    internal: true
+    nowait: true
+--- # _ID = 1006

@@ -1,0 +1,12 @@
+# _ID = 9002
+# _VERSION = 1
+obj:
+  ApplicationIntegrationServiceResponseMsg:
+    message_parameters_reference: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+    result: -1
+--- # _ID = 9002

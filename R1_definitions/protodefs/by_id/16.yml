@@ -1,0 +1,18 @@
+# _ID = 16
+# _VERSION = 1
+obj:
+  SubjectPredicateQuery:
+    pairs: [
+      subject: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 16

@@ -1,0 +1,7 @@
+# _ID = 1010
+# _VERSION = 1
+obj:
+  HardwareMapping:
+    name: ""
+    description: ""
+--- # _ID = 1010

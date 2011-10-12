@@ -1,0 +1,6 @@
+# _ID = 9307
+# _VERSION = 1
+obj:
+  StopInstrumentSamplingRequest:
+    instrument_resource_id: ""
+--- # _ID = 9307

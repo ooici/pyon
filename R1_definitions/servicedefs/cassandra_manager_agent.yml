@@ -1,0 +1,161 @@
+# _ID = 2501
+# _VERSION = 1
+obj:
+  CassandraHost:
+    host: ""
+    port: -1
+--- # _ID = 2501
+
+# _ID = 2502
+# _VERSION = 1
+obj:
+  SimplePassword:
+    username: ""
+    password: ""
+--- # _ID = 2502
+
+# _ID = 2503
+# _VERSION = 1
+obj:
+  CassandraCredential:
+    acl: ReadOnly
+    token: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2503
+
+# _ID = 2508
+# _VERSION = 1
+obj:
+  ColumnDef:
+    column_name: ""
+    validation_class: ""
+    index_type: -1
+    index_name: ""
+--- # _ID = 2508
+
+# _ID = 2504
+# _VERSION = 1
+obj:
+  CassandraCluster:
+    name: ""
+    hosts: [
+      host: ""
+      port: -1]
+    version: ""
+    key_ring: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    credentials: [
+      key: ""
+      branch: ""
+      commit: ""
+      carrot_parent: 4294967295
+      tilde_spec: 4294967295
+      treeish: ""]
+--- # _ID = 2504
+
+# _ID = 2506
+# _VERSION = 1
+obj:
+  CassandraKeySpace:
+    name: ""
+    strategy_class: ""
+    replication_factor: -1
+    column_family: [
+      key: ""
+      branch: ""
+      commit: ""
+      carrot_parent: 4294967295
+      tilde_spec: 4294967295
+      treeish: ""]
+--- # _ID = 2506
+
+# _ID = 2507
+# _VERSION = 1
+obj:
+  ColumnFamily:
+    name: ""
+    column_type: ""
+    comparator_type: ""
+    subcomparator_type: ""
+    comment: ""
+    row_cache_size: -1.1
+    key_cache_size: -1.1
+    read_repair_chance: -1.1
+    column_metadata: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+    gc_grace_seconds: -1.1
+    default_validation_class: ""
+    id: -1
+    min_compaction_threshold: -1
+    max_compaction_threshold: -1
+    row_cache_save_period_in_seconds: -1
+    key_cache_save_period_in_seconds: -1
+    memtable_flush_after_mins: -1
+    memtable_throughput_in_mb: -1
+    memtable_operations_in_millions: -1.1
+--- # _ID = 2507
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+name: cassandra_manager_agent.py
+dependencies: []
+methods:
+  create_persistent_archive:
+    in:
+
+    out:
+
+  update_persistent_archive:
+    in:
+
+    out:
+
+  delete_persistent_archive:
+    in:
+
+    out:
+
+  create_cache:
+    in:
+
+    out:
+
+  update_cache:
+    in:
+
+    out:
+
+  delete_cache:
+    in:
+
+    out:
+

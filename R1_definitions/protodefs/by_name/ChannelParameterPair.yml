@@ -1,0 +1,7 @@
+# _ID = 20035
+# _VERSION = 1
+obj:
+  ChannelParameterPair:
+    channel: ""
+    parameter: ""
+--- # _ID = 20035

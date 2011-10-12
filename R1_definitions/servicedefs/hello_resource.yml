@@ -1,0 +1,88 @@
+# _ID = 20029
+# _VERSION = 1
+obj:
+  InstrumentResource:
+    name: ""
+    make: ""
+    model: ""
+    serial_number: ""
+--- # _ID = 20029
+
+# _ID = 20030
+# _VERSION = 1
+obj:
+  InstrumentInfoObject:
+    name: ""
+    make: ""
+    model: ""
+    serial_number: ""
+--- # _ID = 20030
+
+# _ID = 10
+# _VERSION = 1
+obj:
+  ResourceConfigurationRequest:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    life_cycle_operation: ACTIVATE
+--- # _ID = 10
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+# _ID = 4
+# _VERSION = 1
+obj:
+  IDRef:
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""
+--- # _ID = 4
+
+name: hello_resource.py
+dependencies: []
+methods:
+  create_instrument_resource:
+    in:
+
+    out:
+
+  update_instrument_resource:
+    in:
+
+    out:
+
+  set_instrument_resource_life_cycle:
+    in:
+
+    out:
+

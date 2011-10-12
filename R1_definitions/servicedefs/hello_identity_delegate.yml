@@ -1,0 +1,18 @@
+name: hello_identity_delegate.py
+dependencies: []
+methods:
+  hello_anonymous_request_delegate:
+    in:
+
+    out:
+
+  hello_user_request_delegate:
+    in:
+
+    out:
+
+  hello_user_request_delegate_switch_user:
+    in:
+
+    out:
+

@@ -1,0 +1,18 @@
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12

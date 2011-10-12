@@ -1,0 +1,6 @@
+# _ID = 9207
+# _VERSION = 1
+obj:
+  SubscriptionInfoListReqMsg:
+    user_ooi_id: ""
+--- # _ID = 9207

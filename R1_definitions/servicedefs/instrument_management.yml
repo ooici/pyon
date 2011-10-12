@@ -1,0 +1,79 @@
+# _ID = 4301
+# _VERSION = 1
+obj:
+  Instrument:
+    name: ""
+    description: ""
+    manufacturer: ""
+    model: ""
+    serial_num: ""
+    fw_version: ""
+--- # _ID = 4301
+
+# _ID = 4302
+# _VERSION = 1
+obj:
+  InstrumentAgent:
+    name: ""
+    version: ""
+    description: ""
+    class_name: ""
+    module: ""
+    process_id: ""
+--- # _ID = 4302
+
+# _ID = 4
+# _VERSION = 1
+obj:
+  IDRef:
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""
+--- # _ID = 4
+
+name: instrument_management.py
+dependencies: []
+methods:
+  create_new_instrument:
+    in:
+
+    out:
+
+  create_new_data_product:
+    in:
+
+    out:
+
+  execute_command:
+    in:
+
+    out:
+
+  get_instrument_state:
+    in:
+
+    out:
+
+  start_instrument_agent:
+    in:
+
+    out:
+
+  stop_instrument_agent:
+    in:
+
+    out:
+
+  start_direct_access:
+    in:
+
+    out:
+
+  stop_direct_access:
+    in:
+
+    out:
+

@@ -1,0 +1,15 @@
+# _ID = 20021
+# _VERSION = 1
+obj:
+  VectorDataPoint:
+    location: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    vector: 
+      xi: -1.1
+      xj: -1.1
+      xk: -1.1
+--- # _ID = 20021

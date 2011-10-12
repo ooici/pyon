@@ -1,0 +1,10 @@
+# _ID = 1003
+# _VERSION = 1
+obj:
+  ExchangeName:
+    name: ""
+    description: ""
+    type: PROCESS
+    exchangespace: ""
+    mapping: ""
+--- # _ID = 1003

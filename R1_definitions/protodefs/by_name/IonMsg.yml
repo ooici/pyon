@@ -1,0 +1,15 @@
+# _ID = 11
+# _VERSION = 1
+obj:
+  IonMsg:
+    name: ""
+    identity: ""
+    message_object: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    response_code: CONTINUE
+    response_body: ""
+--- # _ID = 11

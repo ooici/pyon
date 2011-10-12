@@ -1,0 +1,24 @@
+# _ID = 2308
+# _VERSION = 1
+obj:
+  QueueMsg:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    queue_name: ""
+--- # _ID = 2308

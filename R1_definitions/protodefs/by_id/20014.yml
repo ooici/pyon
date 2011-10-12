@@ -1,0 +1,14 @@
+# _ID = 20014
+# _VERSION = 1
+obj:
+  VectorDataPoint:
+    location: 
+      lat: -1.1
+      lon: -1.1
+      depth: -1.1
+      time: -1.1
+    vector: 
+      xi: -1.1
+      xj: -1.1
+      xk: -1.1
+--- # _ID = 20014

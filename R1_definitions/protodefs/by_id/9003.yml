@@ -1,0 +1,7 @@
+# _ID = 9003
+# _VERSION = 1
+obj:
+  ApplicationIntegrationServiceError:
+    error_num: -1
+    error_str: ""
+--- # _ID = 9003

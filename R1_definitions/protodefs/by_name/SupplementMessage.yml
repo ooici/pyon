@@ -1,0 +1,13 @@
+# _ID = 2001
+# _VERSION = 1
+obj:
+  SupplementMessage:
+    dataset_id: ""
+    variable_name: ""
+    bounded_array: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2001

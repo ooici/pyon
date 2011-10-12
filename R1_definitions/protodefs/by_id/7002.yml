@@ -1,0 +1,6 @@
+# _ID = 7002
+# _VERSION = 1
+obj:
+  DispatcherResource:
+    dispatcher_name: ""
+--- # _ID = 7002

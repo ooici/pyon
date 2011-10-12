@@ -1,0 +1,11 @@
+# _ID = 2328
+# _VERSION = 1
+obj:
+  DelSubscriptionEventMessage:
+    dispatcher_workflow: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2328

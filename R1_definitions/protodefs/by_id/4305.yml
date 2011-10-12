@@ -1,0 +1,7 @@
+# _ID = 4305
+# _VERSION = 1
+obj:
+  InstrumentConfiguration:
+    parameters: ""
+    timeout: -1
+--- # _ID = 4305

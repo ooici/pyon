@@ -1,0 +1,6 @@
+# _ID = 9121
+# _VERSION = 1
+obj:
+  GetResourcesOfTypeRequest:
+    resource_type: ""
+--- # _ID = 9121

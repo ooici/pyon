@@ -1,0 +1,12 @@
+# _ID = 9102
+# _VERSION = 1
+obj:
+  UpdateUserProfileRequest:
+    user_ooi_id: ""
+    name: ""
+    institution: ""
+    email_address: ""
+    profile: [
+      name: ""
+      value: ""]
+--- # _ID = 9102

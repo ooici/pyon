@@ -1,0 +1,7 @@
+# _ID = 2004
+# _VERSION = 1
+obj:
+  IngestionReadyMessage:
+    xp_name: ""
+    publish_topic: ""
+--- # _ID = 2004

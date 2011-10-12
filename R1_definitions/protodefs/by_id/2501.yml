@@ -1,0 +1,7 @@
+# _ID = 2501
+# _VERSION = 1
+obj:
+  CassandraHost:
+    host: ""
+    port: -1
+--- # _ID = 2501

@@ -1,0 +1,13 @@
+# _ID = 2303
+# _VERSION = 1
+obj:
+  SubscriptionMessage:
+    data_resource_id: ""
+    name: ""
+    source: ""
+    datetime: -1.1
+    delivery_mode: INSTANT
+    delivery_interval: -1.1
+    delivery_channel: WEBUI
+    delivery_address: ""
+--- # _ID = 2303

@@ -1,0 +1,7 @@
+# _ID = 2336
+# _VERSION = 1
+obj:
+  EventMonitorSubscribeResponse:
+    session_id: ""
+    subscription_id: ""
+--- # _ID = 2336

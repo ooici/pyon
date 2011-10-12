@@ -1,0 +1,11 @@
+# _ID = 4302
+# _VERSION = 1
+obj:
+  InstrumentAgent:
+    name: ""
+    version: ""
+    description: ""
+    class_name: ""
+    module: ""
+    process_id: ""
+--- # _ID = 4302

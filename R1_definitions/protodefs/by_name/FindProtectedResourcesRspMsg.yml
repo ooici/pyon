@@ -1,0 +1,8 @@
+# _ID = 20039
+# _VERSION = 1
+obj:
+  FindProtectedResourcesRspMsg:
+    resources: [
+      name: ""
+      description: ""]
+--- # _ID = 20039

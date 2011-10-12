@@ -1,0 +1,12 @@
+# _ID = 9105
+# _VERSION = 1
+obj:
+  GetUserProfileResponse:
+    name: ""
+    institution: ""
+    email_address: ""
+    authenticating_organization: ""
+    profile: [
+      name: ""
+      value: ""]
+--- # _ID = 9105

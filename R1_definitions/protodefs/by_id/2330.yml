@@ -1,0 +1,10 @@
+# _ID = 2330
+# _VERSION = 1
+obj:
+  DatasourceUnavailableEventMessage:
+    datasource_id: ""
+    dataset_id: ""
+    title: ""
+    url: ""
+    error_explanation: ""
+--- # _ID = 2330

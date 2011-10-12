@@ -1,0 +1,9 @@
+# _ID = 20030
+# _VERSION = 1
+obj:
+  InstrumentInfoObject:
+    name: ""
+    make: ""
+    model: ""
+    serial_number: ""
+--- # _ID = 20030

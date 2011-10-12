@@ -1,0 +1,16 @@
+# _ID = 30001
+# _VERSION = 1
+obj:
+  LoadTestMessageSimple:
+    id: ""
+    body: ""
+--- # _ID = 30001
+
+name: ccbrokerload.py
+dependencies: []
+methods:
+  message_simple:
+    in:
+
+    out:
+

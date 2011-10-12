@@ -1,0 +1,83 @@
+# _ID = 1102
+# _VERSION = 1
+obj:
+  OOIResource:
+    name: ""
+    identity: ""
+    object_type: 
+      object_id: -1
+      version: -1
+    lcs: NEW
+    resource_object: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    description: ""
+    resource_type: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 1102
+
+# _ID = 1101
+# _VERSION = 1
+obj:
+  ResourceDescription:
+    object_type: 
+      object_id: -1
+      version: -1
+    name: ""
+    description: ""
+    resource_type: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 1101
+
+# _ID = 9
+# _VERSION = 1
+obj:
+  GPBType:
+    object_id: -1
+    version: -1
+--- # _ID = 9
+
+name: resource_registry.py
+dependencies: []
+methods:
+  register_resource_instance:
+    in:
+
+    out:
+
+  lookup_resource_instance:
+    in:
+
+    out:
+
+  register_RESOURCE_TYPE:
+    in:
+
+    out:
+
+  lookup_RESOURCE_TYPE:
+    in:
+
+    out:
+
+  find_registered_resource:
+    in:
+
+    out:
+
+  find_registered_resource_instance:
+    in:
+
+    out:
+

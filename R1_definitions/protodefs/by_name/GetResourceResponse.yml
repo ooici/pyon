@@ -1,0 +1,8 @@
+# _ID = 9126
+# _VERSION = 1
+obj:
+  GetResourceResponse:
+    resource: [
+      name: ""
+      value: ""]
+--- # _ID = 9126

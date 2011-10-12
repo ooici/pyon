@@ -1,0 +1,116 @@
+# _ID = 25
+# _VERSION = 1
+obj:
+  PredicateReference:
+    key: ""
+--- # _ID = 25
+
+# _ID = 1401
+# _VERSION = 1
+obj:
+  UserIdentity:
+    subject: ""
+    certificate: ""
+    rsa_private_key: ""
+    name: ""
+    institution: ""
+    email: ""
+    authenticating_organization: ""
+    profile: [
+      name: ""
+      value: ""]
+--- # _ID = 1401
+
+# _ID = 1403
+# _VERSION = 1
+obj:
+  UserOoiId:
+    ooi_id: ""
+--- # _ID = 1403
+
+# _ID = 10
+# _VERSION = 1
+obj:
+  ResourceConfigurationRequest:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    life_cycle_operation: ACTIVATE
+--- # _ID = 10
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+name: identity_registry.py
+dependencies: []
+methods:
+  register_user_credentials:
+    in:
+
+    out:
+
+  get_user:
+    in:
+
+    out:
+
+  authenticate_user_credentials:
+    in:
+
+    out:
+
+  get_ooiid_for_user:
+    in:
+
+    out:
+
+  update_user_profile:
+    in:
+
+    out:
+
+  set_role:
+    in:
+
+    out:
+
+  unset_role:
+    in:
+
+    out:
+
+  get_role:
+    in:
+
+    out:
+
+  broadcast:
+    in:
+
+    out:
+

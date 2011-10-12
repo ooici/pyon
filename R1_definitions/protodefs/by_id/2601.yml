@@ -1,0 +1,17 @@
+# _ID = 2601
+# _VERSION = 1
+obj:
+  AddTaskRequest:
+    task_id: ""
+    desired_origin: ""
+    interval_seconds: 18446744073709551615
+    start_time: -1
+    end_time: -1
+    user_id: ""
+    payload: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2601

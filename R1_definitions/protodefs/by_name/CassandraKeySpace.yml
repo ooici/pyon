@@ -1,0 +1,15 @@
+# _ID = 2506
+# _VERSION = 1
+obj:
+  CassandraKeySpace:
+    name: ""
+    strategy_class: ""
+    replication_factor: -1
+    column_family: [
+      key: ""
+      branch: ""
+      commit: ""
+      carrot_parent: 4294967295
+      tilde_spec: 4294967295
+      treeish: ""]
+--- # _ID = 2506

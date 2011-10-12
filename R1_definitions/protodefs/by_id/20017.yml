@@ -1,0 +1,46 @@
+# _ID = 20017
+# _VERSION = 1
+obj:
+  Mooring:
+    id: ""
+    name: ""
+    location: 
+      lat: -1.1
+      lon: -1.1
+      depth: -1.1
+      time: -1.1
+    ctds: [
+      id: ""
+      name: ""
+      temperature: [
+        location: 
+          lat: -1.1
+          lon: -1.1
+          depth: -1.1
+          time: -1.1
+        val: -1.1]
+      salinity: [
+        location: 
+          lat: -1.1
+          lon: -1.1
+          depth: -1.1
+          time: -1.1
+        val: -1.1]]
+    adcps: [
+      id: ""
+      name: ""
+      temperature: [
+        location: 
+          lat: -1.1
+          lon: -1.1
+          depth: -1.1
+          time: -1.1
+        val: -1.1]
+      salinity: [
+        location: 
+          lat: -1.1
+          lon: -1.1
+          depth: -1.1
+          time: -1.1
+        val: -1.1]]
+--- # _ID = 20017

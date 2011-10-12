@@ -1,0 +1,31 @@
+# _ID = 28
+# _VERSION = 1
+obj:
+  AssociationGetStarMsg:
+    subject_pairs: [
+      subject: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+    object_pairs: [
+      predicate: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true
+      object: 
+        key: ""
+        type: 
+          object_id: -1
+          version: -1
+        isleaf: true]
+--- # _ID = 28

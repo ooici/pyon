@@ -1,0 +1,7 @@
+# _ID = 20040
+# _VERSION = 1
+obj:
+  CreateProtectedResourceReqMsg:
+    name: ""
+    description: ""
+--- # _ID = 20040

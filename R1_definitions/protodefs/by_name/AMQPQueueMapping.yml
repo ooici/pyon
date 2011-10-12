@@ -1,0 +1,10 @@
+# _ID = 1007
+# _VERSION = 1
+obj:
+  AMQPQueueMapping:
+    queuename: ""
+    passive: true
+    durable: true
+    exclusive: true
+    autodelete: true
+--- # _ID = 1007

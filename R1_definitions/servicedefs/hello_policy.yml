@@ -1,0 +1,141 @@
+# _ID = 20037
+# _VERSION = 1
+obj:
+  ProtectedResource:
+    name: ""
+    description: ""
+--- # _ID = 20037
+
+# _ID = 20038
+# _VERSION = 1
+obj:
+  FindProtectedResourcesReqMsg:
+    resource_id: ""
+--- # _ID = 20038
+
+# _ID = 20039
+# _VERSION = 1
+obj:
+  FindProtectedResourcesRspMsg:
+    resources: [
+      name: ""
+      description: ""]
+--- # _ID = 20039
+
+# _ID = 20040
+# _VERSION = 1
+obj:
+  CreateProtectedResourceReqMsg:
+    name: ""
+    description: ""
+--- # _ID = 20040
+
+# _ID = 20041
+# _VERSION = 1
+obj:
+  CreateProtectedResourceRspMsg:
+    status: ""
+    resource_id: ""
+--- # _ID = 20041
+
+# _ID = 20042
+# _VERSION = 1
+obj:
+  UpdateProtectedResourceReqMsg:
+    resource_id: ""
+    name: ""
+    description: ""
+--- # _ID = 20042
+
+# _ID = 20043
+# _VERSION = 1
+obj:
+  UpdateProtectedResourceRspMsg:
+    status: ""
+--- # _ID = 20043
+
+# _ID = 20044
+# _VERSION = 1
+obj:
+  DeleteProtectedResourceReqMsg:
+    
+--- # _ID = 20044
+
+# _ID = 20045
+# _VERSION = 1
+obj:
+  DeleteProtectedResourceRspMsg:
+    status: ""
+--- # _ID = 20045
+
+# _ID = 10
+# _VERSION = 1
+obj:
+  ResourceConfigurationRequest:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    life_cycle_operation: ACTIVATE
+--- # _ID = 10
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+name: hello_policy.py
+dependencies: []
+methods:
+  hello_anonymous_request:
+    in:
+
+    out:
+
+  hello_authenticated_request:
+    in:
+
+    out:
+
+  hello_create_resource:
+    in:
+
+    out:
+
+  hello_find_resource:
+    in:
+
+    out:
+
+  hello_update_resource:
+    in:
+
+    out:
+
+  hello_delete_resource:
+    in:
+
+    out:
+

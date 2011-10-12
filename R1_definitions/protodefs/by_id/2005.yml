@@ -1,0 +1,7 @@
+# _ID = 2005
+# _VERSION = 1
+obj:
+  DataAcquisitionCompleteMessage:
+    status: OK
+    status_body: ""
+--- # _ID = 2005

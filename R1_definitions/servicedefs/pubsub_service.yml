@@ -1,0 +1,449 @@
+# _ID = 2313
+# _VERSION = 1
+obj:
+  ExchangeSpaceMsg:
+    exchange_space_name: ""
+--- # _ID = 2313
+
+# _ID = 2309
+# _VERSION = 1
+obj:
+  ExchangePointMsg:
+    exchange_point_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2309
+
+# _ID = 2307
+# _VERSION = 1
+obj:
+  TopicMsg:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_name: ""
+--- # _ID = 2307
+
+# _ID = 2310
+# _VERSION = 1
+obj:
+  PublisherMsg:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    publisher_name: ""
+    credentials: ""
+--- # _ID = 2310
+
+# _ID = 2311
+# _VERSION = 1
+obj:
+  SubscriberMsg:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    subscriber_name: ""
+    queue_name: ""
+--- # _ID = 2311
+
+# _ID = 2308
+# _VERSION = 1
+obj:
+  QueueMsg:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    queue_name: ""
+--- # _ID = 2308
+
+# _ID = 2314
+# _VERSION = 1
+obj:
+  BindingMsg:
+    queue_name: ""
+    binding: ""
+--- # _ID = 2314
+
+# _ID = 10
+# _VERSION = 1
+obj:
+  ResourceConfigurationRequest:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    life_cycle_operation: ACTIVATE
+--- # _ID = 10
+
+# _ID = 12
+# _VERSION = 1
+obj:
+  ResourceConfigurationResponse:
+    resource_reference: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    configuration: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    result: ""
+--- # _ID = 12
+
+# _ID = 4
+# _VERSION = 1
+obj:
+  IDRef:
+    key: ""
+    branch: ""
+    commit: ""
+    carrot_parent: 4294967295
+    tilde_spec: 4294967295
+    treeish: ""
+--- # _ID = 4
+
+# _ID = 2306
+# _VERSION = 1
+obj:
+  RegexQueryMsg:
+    regex: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2306
+
+# _ID = 2312
+# _VERSION = 1
+obj:
+  IDListMsg:
+    id_list: [
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true]
+--- # _ID = 2312
+
+# _ID = 2315
+# _VERSION = 1
+obj:
+  ExchangeSpaceRes:
+    exchange_space_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2315
+
+# _ID = 2316
+# _VERSION = 1
+obj:
+  ExchangePointRes:
+    exchange_space_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_name: ""
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2316
+
+# _ID = 2317
+# _VERSION = 1
+obj:
+  TopicRes:
+    exchange_space_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_name: ""
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_name: ""
+--- # _ID = 2317
+
+# _ID = 2318
+# _VERSION = 1
+obj:
+  PublisherRes:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    publisher_name: ""
+    credentials: ""
+--- # _ID = 2318
+
+# _ID = 2319
+# _VERSION = 1
+obj:
+  SubscriberRes:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    queue_name: ""
+--- # _ID = 2319
+
+# _ID = 2321
+# _VERSION = 1
+obj:
+  QueueRes:
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    queue_name: ""
+--- # _ID = 2321
+
+# _ID = 2320
+# _VERSION = 1
+obj:
+  BindingRes:
+    queue_name: ""
+    binding: ""
+    queue_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+--- # _ID = 2320
+
+# _ID = 25
+# _VERSION = 1
+obj:
+  PredicateReference:
+    key: ""
+--- # _ID = 25
+
+name: pubsub_service.py
+dependencies: []
+methods:
+  declare_exchange_space:
+    in:
+
+    out:
+
+  undeclare_exchange_space:
+    in:
+
+    out:
+
+  query_exchange_spaces:
+    in:
+
+    out:
+
+  declare_exchange_point:
+    in:
+
+    out:
+
+  undeclare_exchange_point:
+    in:
+
+    out:
+
+  query_exchange_points:
+    in:
+
+    out:
+
+  declare_topic:
+    in:
+
+    out:
+
+  undeclare_topic:
+    in:
+
+    out:
+
+  query_topics:
+    in:
+
+    out:
+
+  declare_publisher:
+    in:
+
+    out:
+
+  undeclare_publisher:
+    in:
+
+    out:
+
+  query_publishers:
+    in:
+
+    out:
+
+  subscribe:
+    in:
+
+    out:
+
+  unsubscribe:
+    in:
+
+    out:
+
+  query_subscribers:
+    in:
+
+    out:
+
+  declare_queue:
+    in:
+
+    out:
+
+  undeclare_queue:
+    in:
+
+    out:
+
+  add_binding:
+    in:
+
+    out:
+

@@ -1,0 +1,8 @@
+# _ID = 20020
+# _VERSION = 1
+obj:
+  VectorData:
+    xi: -1.1
+    xj: -1.1
+    xk: -1.1
+--- # _ID = 20020

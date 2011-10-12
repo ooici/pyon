@@ -1,0 +1,7 @@
+# _ID = 9101
+# _VERSION = 1
+obj:
+  RegisterIonUserRequest:
+    certificate: ""
+    rsa_private_key: ""
+--- # _ID = 9101

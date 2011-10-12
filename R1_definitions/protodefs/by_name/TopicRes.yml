@@ -1,0 +1,20 @@
+# _ID = 2317
+# _VERSION = 1
+obj:
+  TopicRes:
+    exchange_space_name: ""
+    exchange_space_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    exchange_point_name: ""
+    exchange_point_id: 
+      key: ""
+      type: 
+        object_id: -1
+        version: -1
+      isleaf: true
+    topic_name: ""
+--- # _ID = 2317

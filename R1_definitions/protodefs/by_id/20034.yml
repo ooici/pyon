@@ -1,0 +1,10 @@
+# _ID = 20034
+# _VERSION = 1
+obj:
+  Command:
+    command: ""
+    args: [
+      channel: ""
+      parameter: ""]
+    publish_stream: ""
+--- # _ID = 20034
