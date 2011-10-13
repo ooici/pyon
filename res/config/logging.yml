@@ -50,6 +50,6 @@ handlers:
 #     handlers: [console, file]
 #     level: INFO
 loggers:
-  ion:
+  pyon:
     handlers: [console, file]
     level: WARN
