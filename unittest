@@ -4,4 +4,4 @@ ARGS=$@
 if [ -z "$ARGS" ]; then
     ARGS="pyon"
 fi
-python -m unittest discover -v $ARGS
+python -m unittest discover -v $ARGS > unittest.out

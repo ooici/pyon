@@ -30,3 +30,4 @@ res/config/logging.local.yml
 logs
 res/config/*~*
 scripts/*~*
+unittest.out
