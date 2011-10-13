@@ -44,6 +44,8 @@ from pika import BasicProperties
 
 from gevent import queue as gqueue
 from gevent import event
+from pyon.core.bootstrap import CFG
+from pyon.util.async import blocking_cb
 
 from pyon.util.log import log
 
@@ -133,9 +135,10 @@ class BaseChannel(object):
     _chan_name = None # name recv uses (exchange, binding_key)
 
     # AMQP options
-    exchange_type = 'direct' # do channels get to create exchanges?
-    exchange_auto_delete = False
+    exchange_type = 'topic' # do channels get to create exchanges?
+    exchange_auto_delete = True
     exchange_durable = False
+
     queue_auto_delete = True
     queue_durable = False
     queue_exclusive = False
@@ -231,10 +234,19 @@ class BaseChannel(object):
             raise ChannelError('Channel already bound') #?
         self._chan_name = name
         if shared_queue:
+            self.exchange = name[0]
             self.queue = name[1]
         else:
             self.queue = ''
         #self._bind_callback = callback
+
+        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
+        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
+        blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
+                                                                type=self.exchange_type,
+                                                                durable=self.exchange_durable,
+                                                                auto_delete=self.exchange_auto_delete)
+
         self.do_queue(callback)
         
     def on_bind(self):
@@ -569,6 +581,16 @@ class Bidirectional(BaseChannel):
         self._peer_name = name
         self.queue = ''
         self._chan_name = (self._peer_name[0], '')
+        self.exchange = self._peer_name[0]
+
+        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
+        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
+        blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
+                                                                type=self.exchange_type,
+                                                                durable=self.exchange_durable,
+                                                                auto_delete=self.exchange_auto_delete)
+
+
         # bind to temp reply queue
         def set_reply_name():
             self._chan_name = (self._peer_name[0], self.queue)

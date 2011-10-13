@@ -2,7 +2,7 @@ from gevent import event
 
 import json # generalize
 
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import IonObject, CFG, sys_name
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
@@ -171,7 +171,7 @@ class EndpointFactory(object):
             ch = existing_channel
         else:
             ch = self.node.channel(self.channel_type)
-            ch.connect(('amq.direct', name))
+            ch.connect((sys_name, name))
 
         e = self.endpoint_type(**kwargs)
         e.attach_channel(ch)
@@ -200,7 +200,7 @@ class BinderListener(object):
     def listen(self):
         log.debug("BinderListener.listen")
         chan = self._node.channel(self._ch_type)
-        chan.bind(('amq.direct', self._name))
+        chan.bind((sys_name, self._name))
         chan.listen()
         while True:
             log.debug("BinderListener: %s blocking waiting for message" % str(self._name))

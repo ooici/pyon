@@ -37,7 +37,7 @@ class Container(object):
         log.debug("server: %s" % str(server))
         self.proc_sup.start() 
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
-        self.proc_sup.spawn('green', self.ioloop.join)
+        self.proc_sup.spawn(('green', self.ioloop.join))
 
         if server == True:
             # Read the config file and start services defined there
@@ -150,7 +150,7 @@ class Container(object):
         # @TODO: this commented out line makes each request handler spawn in a proc_sup managed greenlet
         #listener = BinderListener(self.node, name, rsvc, None, lambda cb, *args: self.proc_sup.spawn('green', cb, *args))
         listener = BinderListener(self.node, name, rsvc, None, None)
-        self.proc_sup.spawn('green', listener.listen)
+        self.proc_sup.spawn(('green', listener.listen))
 
     def serve_forever(self):
         log.debug("In Container.serve_forever")
