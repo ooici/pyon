@@ -27,7 +27,7 @@ class ProcessTest(unittest.TestCase):
         self.counter = 0
         sup = GreenProcessSupervisor()
         sup.start()
-        proc = sup.spawn(type='green', target=self.increment, amount=2)
+        proc = sup.spawn(('green', self.increment), amount=2)
         self.assertEqual(self.counter, 0)
         sup.join_children()
         self.assertEqual(self.counter, 2)
@@ -42,20 +42,20 @@ class ProcessTest(unittest.TestCase):
 
         # Test that it takes at least the given timeout to join_children, but not much more
         proc_sleep_secs, proc_count = 0.01, 5
-        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
+        [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(proc_sleep_secs)
         self.assertGreaterEqual(elapsed, proc_sleep_secs)
         self.assertLess(elapsed, proc_sleep_secs*3)
 
         # Test that a small timeout forcibly shuts down without waiting
         wait_secs = 0.0001
-        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
+        [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(wait_secs)
         self.assertGreaterEqual(elapsed, wait_secs)
         self.assertLess(elapsed, proc_sleep_secs)
 
         # Test that no timeout waits until all finished
-        [sup.spawn('green', time.sleep, proc_sleep_secs) for i in xrange(5)]
+        [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown()
         self.assertGreaterEqual(elapsed, proc_sleep_secs)
 

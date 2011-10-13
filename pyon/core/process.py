@@ -134,19 +134,20 @@ class ProcessSupervisor(object):
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
 
-    def spawn(self, proc_type, target, *args, **kwargs):
+    def spawn(self, type_and_target, *args, **kwargs):
         """
-        To instantiate a proc_type that is a class with a defined "target" method, pass None for target.
-        TODO: Change this interface to a tuple or something that does "the right thing" in all cases.
+        type_and_target should either be a tuple of (type, target) where type is a string in type_callables
+        and target is a callable, or a subclass of PyonProcess that defines its own "target" method.
         """
-        if isinstance(proc_type, str):
+        if isinstance(type_and_target, tuple):
+            proc_type, proc_target = type_and_target
             proc_callable = self.type_callables[proc_type]
-        elif callable(proc_type):
-            proc_callable = proc_type
+            proc = proc_callable(proc_target, *args, **kwargs)
+        elif isinstance(type_and_target, PyonProcess) and hasattr(type_and_target, 'target'):
+            proc = type_and_target(*args, **kwargs)
         else:
-            raise PyonProcessError('Invalid proc_type (must be string type or callable)')
-        
-        proc = proc_callable(target, *args, **kwargs)
+            raise PyonProcessError('Invalid proc_type (must be tuple or PyonProcess subclass with a target method)')
+
         proc.supervisor = self
 
         proc.start()
