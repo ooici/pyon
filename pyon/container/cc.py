@@ -109,6 +109,7 @@ class Container(object):
         app_path = ['res/apps/' + appname + '.app']
         app_cfg = Config(app_path).data
         if "config" in app_cfg:
+            # Apply config from app file
             app_cfg_dict = DotDict(app_cfg["config"])
             cfg_dict.update(app_cfg_dict)
 
@@ -118,6 +119,8 @@ class Container(object):
                 rel_def = app_def
                 break
         if "config" in rel_def:
+            # Nest dict modifier and apply config from rel file
+            cfg_dict = DictModifier(cfg_dict)
             rel_cfg_dict = DotDict(rel_def["config"])
             cfg_dict.update(rel_cfg_dict)
 
@@ -125,6 +128,8 @@ class Container(object):
             # TODO throw some exception
             pass
         elif len(spawnargs) != 0:
+            # Nest dict modifier and apply config from spawn args
+            cfg_dict = DictModifier(cfg_dict)
             spawnargs_cfg_dict = DotDict(spawnargs)
             cfg_dict.update(spawnargs_cfg_dict)
 
