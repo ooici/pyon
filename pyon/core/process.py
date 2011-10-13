@@ -9,16 +9,16 @@ from pyon.util.log import log
 import time
 import multiprocessing as mp
 
-class IonProcessError(Exception):
+class PyonProcessError(Exception):
     pass
 
-class BaseProcess(object):
+class PyonProcess(object):
     """
     Base process class for doing work. There will be subclasses for various process kinds like greenlets.
     """
 
     def __init__(self, target=None, *args, **kwargs):
-        super(BaseProcess, self).__init__()
+        super(PyonProcess, self).__init__()
 
         if target is not None or not hasattr(self, 'target'):   # Allow setting target at class level
             self.target = target
@@ -58,6 +58,7 @@ class BaseProcess(object):
 
     def start(self):
         self.proc = self._spawn()
+        return self
 
     def stop(self):
         if self.running:
@@ -68,13 +69,17 @@ class BaseProcess(object):
         if self.supervisor is not None:
                 self.supervisor.child_stopped(self)
 
+        return self
+
     def join(self, timeout=None):
         if self.proc is not None:
             self._join(timeout)
             self.stop()
+            
+        return self
 
 
-class GreenProcess(BaseProcess):
+class GreenProcess(PyonProcess):
     """ An BaseProcess that uses a greenlet to do its work. """
 
     def _pid(self):
@@ -92,7 +97,7 @@ class GreenProcess(BaseProcess):
     def _running(self):
         return self.proc.started
 
-class PythonProcess(BaseProcess):
+class PythonProcess(PyonProcess):
     """ An BaseProcess that uses a full OS process to do its work. """
 
     def _pid(self):
@@ -129,13 +134,24 @@ class ProcessSupervisor(object):
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
 
-    def spawn(self, type, target, *args, **kwargs):
-        proc_callable = self.type_callables[type]
+    def spawn(self, proc_type, target, *args, **kwargs):
+        """
+        To instantiate a proc_type that is a class with a defined "target" method, pass None for target.
+        TODO: Change this interface to a tuple or something that does "the right thing" in all cases.
+        """
+        if isinstance(proc_type, str):
+            proc_callable = self.type_callables[proc_type]
+        elif callable(proc_type):
+            proc_callable = proc_type
+        else:
+            raise PyonProcessError('Invalid proc_type (must be string type or callable)')
+        
         proc = proc_callable(target, *args, **kwargs)
         proc.supervisor = self
 
         proc.start()
         self.children.add(proc)
+        return proc
 
     def child_stopped(self, proc):
         if proc in self.children: self.children.remove(proc)
