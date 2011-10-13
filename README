@@ -57,5 +57,8 @@ Run couchdb in second terminal before starting the container or tests:
 Run the unittests:
     ./unittest
 
+Run code coverage:
+    nosetests -w pyon --with-coverage --cover-package=pyon
+
 Start the capability container in interactive mode:
     ./cc
