@@ -6,7 +6,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
-from pyon.net.interceptor import SampleInterceptor, Invocation
+from pyon.net.interceptor import SampleInterceptor, Invocation, SampleProcessOnlyInterceptor
 from pyon.util.async import spawn
 from pyon.util.log import log
 
@@ -41,6 +41,14 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.channel_attached")
 
+    def _build_invocation(self, **kwargs):
+        """
+        Builds an Invocation instance to be used by the interceptor stack.
+        This method exists so we can override it in derived classes (ex with a process).
+        """
+        inv = Invocation(**kwargs)
+        return inv
+
     def _message_received(self, msg):
         """
         Entry point for received messages in below channel layer. This method puts the message through
@@ -50,11 +58,13 @@ class Endpoint(object):
         friends work!
         """
         # interceptor point
+
+        # @TODO dict check is a hax
         if isinstance(msg, dict):
-            inv = Invocation(path=Invocation.PATH_IN,
-                                 message=msg,
-                                 content=msg['payload']
-                                 )
+
+            inv = self._build_invocation(path=Invocation.PATH_IN,
+                                         message=msg,
+                                         content=msg['payload'])
             inv_prime = process_interceptors(self.interceptors, inv)
             new_msg = inv_prime.message
         else:
@@ -74,11 +84,12 @@ class Endpoint(object):
         msg = self._build_msg(raw_msg)
 
         # interceptor point
+
+        # @TODO dict check is a hax
         if isinstance(msg, dict):
-            inv = Invocation(path=Invocation.PATH_OUT,
-                                     message=msg,
-                                     content=msg['payload'],
-                                     )
+            inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                         message=msg,
+                                         content=msg['payload'])
             inv_prime = process_interceptors(self.interceptors, inv)
             new_msg = inv_prime.message
         else:
@@ -411,6 +422,7 @@ class RPCClient(RequestResponseClient):
 
 class RPCResponseEndpoint(ResponseEndpoint):
     def __init__(self, routing_obj=None, **kwargs):
+        ResponseEndpoint.__init__(self)
         self._routing_obj = routing_obj
         self._response_headers = None
 #        self._response_payload = None
@@ -483,8 +495,20 @@ class RPCServer(RequestResponseServer):
 
 
 class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
+
+    # add process specific interceptors here
+    interceptors = RPCRequestEndpoint.interceptors + [SampleProcessOnlyInterceptor()]
+
     def __init__(self, process):
+        RPCRequestEndpoint.__init__(self)
         self._process = process
+
+    def _build_invocation(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs.update({'process':self._process})
+
+        inv = RPCRequestEndpoint._build_invocation(**newkwargs)
+        return inv
 
     def _build_header(self, raw_msg):
         """
@@ -525,6 +549,22 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
                        'performative' : 'request'})
 
         return header
+
+class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
+
+    # add process specific interceptors here
+    interceptors = RPCResponseEndpoint.interceptors + [SampleProcessOnlyInterceptor()]
+
+    def __init__(self, process):
+        RPCResponseEndpoint.__init__(self)
+        self._process = process
+
+    def _build_invocation(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs.update({'process':self._process})
+
+        inv = RPCRequestEndpoint._build_invocation(**newkwargs)
+        return inv
 
 class _Command(object):
     """

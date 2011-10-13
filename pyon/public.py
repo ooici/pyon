@@ -22,11 +22,11 @@ __all__ += ['CFG', 'obj_registry', 'IonObject']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
-from pyon.core.process import IonProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
-__all__ += ['IonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
+from pyon.core.process import PyonProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
+__all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
 
-from pyon.net import messaging, channel
-__all__ += ['messaging', 'channel']
+from pyon.net import messaging, channel, endpoint
+__all__ += ['messaging', 'channel', 'endpoint']
 
 #from pyon.container.cc import Container
 #__all__ += ['Container']
