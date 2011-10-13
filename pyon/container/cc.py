@@ -53,19 +53,18 @@ class Container(object):
     def readConfig(self):
         log.debug("In Container.readConfig")
         # Loop through configured services and start them
-        services = CFG['deploy']["apps"]
+        services = CFG.deploy.apps
         # Return value.  Will contain list of
         # service names from the config file
         service_names = []
         for service_def in services:
-            name = service_def["name"]
+            name = service_def.name
 
             # TODO fix this
             # For now service is described in processapp tuple in rel file
             # Field 1 is the module name
             # Field 2 is the class name
-            module = service_def["processapp"][0]
-            cls = service_def["processapp"][1]
+            module, cls = service_def.processapp
 
             service_instance = self.forname(module, cls)
 
@@ -114,14 +113,14 @@ class Container(object):
             cfg_dict.update(app_cfg_dict)
 
         # Find service definition in rel file
-        for app_def in CFG['deploy']["apps"]:
-            if app_def["name"] == appname:
+        for app_def in CFG.deploy.apps:
+            if app_def.name == appname:
                 rel_def = app_def
                 break
         if "config" in rel_def:
             # Nest dict modifier and apply config from rel file
             cfg_dict = DictModifier(cfg_dict)
-            rel_cfg_dict = DotDict(rel_def["config"])
+            rel_cfg_dict = DotDict(rel_def.config)
             cfg_dict.update(rel_cfg_dict)
 
         if not isinstance(spawnargs, dict):

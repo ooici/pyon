@@ -5,11 +5,45 @@ __license__ = 'Apache 2.0'
 
 import collections
 
-class DotDict(dict):
+class DotNotationGetItem(object):
+    """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
+
+    def _convert(self, val):
+        """ Convert the type if necessary and return if a conversion happened. """
+        if isinstance(val, dict) and not isinstance(val, DotDict):
+            return DotDict(val), True
+        elif isinstance(val, list) and not isinstance(val, DotList):
+            return DotList(val), True
+
+        return val, False
+
+    def __getitem__(self, key):
+        val = super(DotNotationGetItem, self).__getitem__(key)
+        val, converted = self._convert(val)
+        if converted: self[key] = val
+
+        return val
+
+class DotList(DotNotationGetItem, list):
+    """ Partner class for DotDict; see that for docs. Both are needed to fully support JSON/YAML blocks. """
+
+    #def DotListIterator(list.)
+
+    def __iter__(self):
+        """ Monkey-patch the "next" iterator method to return modified versions. This will be slow. """
+        #it = super(DotList, self).__iter__()
+        #it_next = getattr(it, 'next')
+        #setattr(it, 'next', lambda: it_next(it))
+        #return it
+        for val in super(DotList, self).__iter__():
+            val, converted = self._convert(val)
+            yield val
+
+class DotDict(DotNotationGetItem, dict):
     """
     Subclass of dict that will recursively look up attributes with dot notation.
     This is primarily for working with JSON-style data in a cleaner way like javascript.
-    Note that this will instantiate a number of child DotNotationDicts when you first access attributes;
+    Note that this will instantiate a number of child DotDicts when you first access attributes;
     do not use in performance-critical parts of your code.
     """
 
@@ -17,8 +51,6 @@ class DotDict(dict):
         """ Make attempts to lookup by nonexistent attributes also attempt key lookups. """
         try:
             val = self.__getitem__(key)
-            if isinstance(val, dict) and not isinstance(val, DotDict):
-                self[key] = val = DotDict(val)
         except KeyError:
             raise AttributeError(key)
 
@@ -96,3 +128,7 @@ if __name__ == '__main__':
 
     print dict.fromkeys(('a','b','c'), 'foo')
     print DotDict.fromkeys(('a','b','c'), 'foo').a
+
+    dl = DotList([1, {'a':{'b':{'c':1, 'd':2}}}])
+    print dl[1].a.b.c
+    
