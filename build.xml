@@ -5,6 +5,9 @@
 		container and service platform.
 	</description>
 
+    <!-- load python specific ant tasks from jar file -->
+    <taskdef resource="pyAntTasks.properties" classpath="pyAntTasks-1.3.3.jar"/>
+
 	<!-- set global properties for this build -->
 	<property name="src" location="pyon"/>
 	<property name="build" location="build"/>
@@ -20,19 +23,23 @@
 		<tstamp/>
 	</target>
 
-	<target name="compile" depends="init" description="compile the source">
-		<!-- Precompiles all Python code without executing. Finds compile errors -->
-		<py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
+    <!-- Precompiles all Python code without executing. Finds compile errors -->
+	<target name="compile" depends="init" description="Compile the source">
+        <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
+        <py-compile dir="scripts" pythonpath="${src}" optimize="0"/>
+        <py-compile dir="prototype" pythonpath="${src}" optimize="0"/>
 	</target>
 
 	<target name="clean" description="clean up">
 		<delete>
 			<fileset dir="${src}" includes="**/*.pyc"/>
-		</delete>
+			<fileset dir="scripts" includes="**/*.pyc"/>
+			<fileset dir="prototype" includes="**/*.pyc"/>
+        </delete>
+        <delete dir="interface"/>
 		<delete dir="${build}"/>
 		<delete dir="${dist}"/>
 		<delete dir="pyon.egg-info"/>
-		<delete dir="_trial_temp"/>
 		<!--<antcall target="remeggs"/>-->
 	</target>
 
