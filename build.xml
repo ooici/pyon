@@ -1,46 +1,46 @@
 <!-- Ant build file for pyon -->
 <project name="pyon" default="info" basedir=".">
-	<description>
-		This is the ANT build file for the OOI CI Python capability
-		container and service platform.
-	</description>
+    <description>
+        This is the ANT build file for the OOI CI Python capability
+        container and service platform.
+    </description>
 
     <!-- load python specific ant tasks from jar file -->
     <taskdef resource="pyAntTasks.properties" classpath="scripts/lib/pyAntTasks-1.3.3.jar"/>
 
-	<!-- set global properties for this build -->
-	<property name="src" location="pyon"/>
-	<property name="build" location="build"/>
-	<property name="dist"  location="dist"/>
+    <!-- set global properties for this build -->
+    <property name="src" location="pyon"/>
+    <property name="build" location="build"/>
+    <property name="dist"  location="dist"/>
 
-	<target name="info">
-		<echo message="pyon ant build file. Specify a target to build."/>
-		<echo message="Run 'ant -p' to retrieve a list of targets."/>
-	</target>
+    <target name="info">
+        <echo message="pyon ant build file. Specify a target to build."/>
+        <echo message="Run 'ant -p' to retrieve a list of targets."/>
+    </target>
 
-	<target name="init">
-		<!-- Create the time stamp -->
-		<tstamp/>
-	</target>
+    <target name="init">
+        <!-- Create the time stamp -->
+        <tstamp/>
+    </target>
 
     <!-- Precompiles all Python code without executing. Finds compile errors -->
-	<target name="compile" depends="init" description="Compile the source">
+    <target name="compile" depends="init" description="Compile the source">
         <py-compile dir="${src}" pythonpath="${src}" optimize="0"/>
         <py-compile dir="scripts" pythonpath="${src}" optimize="0"/>
         <py-compile dir="prototype" pythonpath="${src}" optimize="0"/>
-	</target>
+    </target>
 
-	<target name="clean" description="clean up">
-		<delete>
-			<fileset dir="${src}" includes="**/*.pyc"/>
-			<fileset dir="scripts" includes="**/*.pyc"/>
-			<fileset dir="prototype" includes="**/*.pyc"/>
+    <target name="clean" description="clean up">
+        <delete>
+            <fileset dir="${src}" includes="**/*.pyc"/>
+            <fileset dir="scripts" includes="**/*.pyc"/>
+            <fileset dir="prototype" includes="**/*.pyc"/>
         </delete>
         <delete dir="interface"/>
-		<delete dir="${build}"/>
-		<delete dir="${dist}"/>
-		<delete dir="pyon.egg-info"/>
-		<!--<antcall target="remeggs"/>-->
-	</target>
+        <delete dir="${build}"/>
+        <delete dir="${dist}"/>
+        <delete dir="pyon.egg-info"/>
+        <!--<antcall target="remeggs"/>-->
+    </target>
 
 </project>
