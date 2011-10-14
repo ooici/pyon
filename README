@@ -47,15 +47,19 @@ Next install the python package dependencies with:
   - The installation of numpy may fail.
   - Use pip to install numpy (easy_install may fail) and rerun
 
-
-USE
-===
-
-Run couchdb in second terminal before starting the container or tests:
+Run couchdb in second terminal before starting the container or running tests:
     couchdb
+
+
+TEST
+====
 
 Run the unittests:
     ./unittest
+
+
+USE
+===
 
 Start the capability container in interactive mode:
     ./cc
