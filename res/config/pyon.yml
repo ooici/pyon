@@ -12,11 +12,14 @@ server:
     vhost: /
     heartbeat: 30
 
-# sysname - by default it is generated from your system's uname.
-# uncomment and set here if you want to lock it to something.
-#system:
-#  name: r2demo
+system:
+  # sysname - by default it is generated from your system's uname.
+  # uncomment and set here if you want to lock it to something.
+  #name: r2demo
+  name:
 
 cc:
   timeout:
     shutdown: 30.0
+    heartbeat: 3.0
+  proctype: green   # Type of ION process to spawn for new services/processes (green or python)

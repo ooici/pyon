@@ -18,6 +18,10 @@ deploy:
         config:
             type: CouchDB
             forceClean: true
+            server:
+              amqp:
+                host:
+                  datastore_host
 
 #-------------#
 # Bootlevel 7 #

@@ -5,7 +5,9 @@ __license__ = 'Apache 2.0'
 
 from pyon.public import Container, GreenProcessSupervisor
 
+from collections import defaultdict
 import argparse
+
 import yaml
 
 version = "2.0"     # TODO: extract this from the code once versioning is automated again
@@ -13,25 +15,64 @@ description = '''
 pyon (ION capability container) v%s
 ''' % (version)
 
-def main(opts, *args, **kwargs):
-    # Run each container in a process (green or python subprocess)
-    sup = GreenProcessSupervisor()
-    for i in xrange(opts.count):
-        container = Container(*args, **kwargs)
-        sup.spawn(opts.proctype, container.serve_forever)
+def setup_ipython():
+    from IPython.config.loader import Config
+    cfg = Config()
+    shell_config = cfg.InteractiveShellEmbed
+    shell_config.prompt_in1 = '><> '
+    shell_config.prompt_in2 = '... '
+    shell_config.prompt_out = '--> '
+    shell_config.confirm_exit = False
 
-    # TODO: "notresident" should wait until the process is finished and then terminate, rather than just exiting now
-    if not opts.notresident:
-        sup.join_children()
+    # First import the embeddable shell class
+    from IPython.frontend.terminal.embed import InteractiveShellEmbed
+
+    # Now create an instance of the embeddable shell. The first argument is a
+    # string with options exactly as you would type them if you were starting
+    # IPython at the system command line. Any parameters you want to define for
+    # configuration can thus be specified here.
+    ipshell = InteractiveShellEmbed(config=cfg,
+                           banner1 = 'Dropping into IPython',
+                           exit_msg = 'Leaving Interpreter, back to program.')
+
+    ipshell('Pyon shell (ION R2)')
+
+# From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
+def unflatten(dictionary):
+    resultDict = dict()
+    for key, value in dictionary.iteritems():
+        parts = key.split(".")
+        d = resultDict
+        for part in parts[:-1]:
+            if part not in d:
+                d[part] = dict()
+            d = d[part]
+        d[parts[-1]] = value
+    return resultDict
+    
+def main(opts, *args, **kwargs):
+    print 'Starting ION CC with options: ', opts
+
+    container = Container(*args, **kwargs)
+    container.start()
+
+    if opts.rel:
+        container.start_rel(opts.rel)
+    
+    if not opts.noshell:
+        setup_ipython()
+    else:
+        container.serve_forever()
 
 def parse_args(tokens):
-    # Exploit yaml's spectacular type inference (and ensure consistency with config files)
+    """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """
     args, kwargs = [], {}
     for token in tokens:
         token = token.lstrip('-')
         if '=' in token:
             key,val = token.split('=', 1)
-            kwargs[key] = yaml.load(val)
+            cfg = unflatten({key: yaml.load(val)})
+            kwargs.update(cfg)
         else:
             args.append(yaml.load(token))
 
@@ -39,13 +80,15 @@ def parse_args(tokens):
 
 if __name__ == '__main__':
     proc_types = GreenProcessSupervisor.type_callables.keys()
+
+    # NOTE: Resist the temptation to add manual parameters here! Most container config options
+    # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
     
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-d', '--daemon', action='store_true')
-    parser.add_argument('--notresident', action='store_false')
+    parser.add_argument('-n', '--noshell', action='store_true')
+    parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
     parser.add_argument('--version', action='version', version='pyon v%s' % (version))
-    parser.add_argument('--count', type=int, default=1, choices=xrange(1, 1<<10), help='How many containers to spawn (1 to 1024).')
-    parser.add_argument('--proctype', type=str, default='green', choices=proc_types, help='What type of process to spawn each container in.')
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
@@ -56,7 +99,7 @@ if __name__ == '__main__':
 
         # TODO: May need to generate a pidfile based on some parameter or cc name
         with DaemonContext(pidfile=FileLock('cc.pid')):
-            main(opts, extra)
+            main(opts, *args, **kwargs)
     else:
-        main(opts, extra)
+        main(opts, *args, **kwargs)
     

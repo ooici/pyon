@@ -14,14 +14,17 @@ from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from zope.interface import providedBy
-
-from pyon.public import CFG, messaging, channel, GreenProcessSupervisor
+from pyon.net import messaging, channel
+from pyon.core.bootstrap import CFG
 from pyon.service.service import add_service_by_name, get_service_by_name
 
 from pyon.util.config import Config
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, DotDict
+
+from pyon.ion.process import IonProcessSupervisor
+
+from zope.interface import providedBy
 
 class Container(object):
     """
@@ -30,7 +33,10 @@ class Container(object):
     """
     node = None
     def __init__(self, *args, **kwargs):
-        self.proc_sup = GreenProcessSupervisor()
+        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
+
+        # Keep track of the overrides from the command-line, so they can trump app/rel file data
+        self.spawn_args = DictModifier(CFG, kwargs)
 
     def start(self, server=True):
         log.debug("In Container.start")
@@ -39,18 +45,22 @@ class Container(object):
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
         self.proc_sup.spawn(('green', self.ioloop.join))
 
-        if server == True:
-            # Read the config file and start services defined there
-            # TODO likely should be done elsewhere
-            service_names = self.readConfig()
-            log.debug("service_names: %s" % str(service_names))
+    def start_rel(self, rel_file):
+        # Read the config file and start services defined there.
+        # Saving the current rel block in CFG.deploy, not sure I like this. - Adam
 
-            # Iterate over service name list, starting services
-            for serviceName in service_names:
-                log.debug("serviceName: %s" % str(serviceName))
-                self.start_service(serviceName)
+        rel_data = Config([rel_file]).data
+        CFG.deploy = rel_data.deploy
 
-    def readConfig(self):
+        service_names = self.read_config()
+        log.debug("service_names: %s" % str(service_names))
+
+        # Iterate over service name list, starting services
+        for serviceName in service_names:
+            log.debug("serviceName: %s" % str(serviceName))
+            self.start_service(serviceName)
+
+    def read_config(self):
         log.debug("In Container.readConfig")
         # Loop through configured services and start them
         services = CFG.deploy.apps
@@ -79,7 +89,7 @@ class Container(object):
                 service_instance.clients[dependency] = client
 
             # Call method to blend config values
-            service_config = self.get_service_config(name, {})
+            service_config = self.get_service_config(name)
             service_instance.CFG = service_config
 
             # Call method to allow service to self-init
@@ -101,15 +111,15 @@ class Container(object):
         classobj = getattr(module, classname)
         return classobj()
 
-    def get_service_config(self, appname, spawnargs={}):
+    def get_service_config(self, appname):
         # Base is global config
         cfg_dict = DictModifier(CFG)
 
         app_path = ['res/apps/' + appname + '.app']
         app_cfg = Config(app_path).data
-        if "config" in app_cfg:
+        if 'config' in app_cfg:
             # Apply config from app file
-            app_cfg_dict = DotDict(app_cfg["config"])
+            app_cfg_dict = DotDict(app_cfg.config)
             cfg_dict.update(app_cfg_dict)
 
         # Find service definition in rel file
@@ -117,20 +127,13 @@ class Container(object):
             if app_def.name == appname:
                 rel_def = app_def
                 break
-        if "config" in rel_def:
+        if 'config' in rel_def:
             # Nest dict modifier and apply config from rel file
-            cfg_dict = DictModifier(cfg_dict)
-            rel_cfg_dict = DotDict(rel_def.config)
-            cfg_dict.update(rel_cfg_dict)
+            cfg_dict = DictModifier(cfg_dict, rel_def.config)
 
-        if not isinstance(spawnargs, dict):
-            # TODO throw some exception
-            pass
-        elif len(spawnargs) != 0:
+        if self.spawn_args:
             # Nest dict modifier and apply config from spawn args
-            cfg_dict = DictModifier(cfg_dict)
-            spawnargs_cfg_dict = DotDict(spawnargs)
-            cfg_dict.update(spawnargs_cfg_dict)
+            cfg_dict = DictModifier(cfg_dict, self.spawn_args)
 
         return cfg_dict
 
@@ -146,14 +149,21 @@ class Container(object):
         svc = get_service_by_name(name)
         rsvc = RPCServer(node=self.node, name=name, service=svc)
 
-        # @TODO: this commented out line makes each request handler spawn in a proc_sup managed greenlet
-        #listener = BinderListener(self.node, name, rsvc, None, lambda cb, *args: self.proc_sup.spawn('green', cb, *args))
+        # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, name, rsvc, None, None)
-        self.proc_sup.spawn(('green', listener.listen))
+        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
     def serve_forever(self):
+        """ Run the container until killed. """
+        
         log.debug("In Container.serve_forever")
+        
         if not self.proc_sup.running:
-            #self.start()
-            pass
-        self.proc_sup.join_children()
+            self.start()
+            
+        try:
+            self.proc_sup.join_children()
+        except (KeyboardInterrupt, SystemExit) as ex:
+            log.info("Received a kill signal, shutting down the container.")
+            self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+            

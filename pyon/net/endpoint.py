@@ -5,9 +5,9 @@ import json # generalize
 from pyon.core.bootstrap import IonObject, CFG, sys_name
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
-from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub
+from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
 from pyon.net.interceptor import SampleInterceptor, Invocation, SampleProcessOnlyInterceptor
-from pyon.util.async import spawn
+from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
 # @TODO: a proper interceptor management system, for now, this works
@@ -196,20 +196,31 @@ class BinderListener(object):
         self._ent_fact = endpoint_factory or ListeningEndpointFactory(node, name)
         self._ch_type = listening_channel_type or Bidirectional
         self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
+        self._chan = None
 
     def listen(self):
         log.debug("BinderListener.listen")
-        chan = self._node.channel(self._ch_type)
-        chan.bind((sys_name, self._name))
-        chan.listen()
+        self._chan = self._node.channel(self._ch_type)
+        self._chan.bind((sys_name, self._name))
+        self._chan.listen()
         while True:
             log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
-            req_chan = chan.accept()
-            msg = req_chan.recv()
-            log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
-            e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
+            try:
+                req_chan = self._chan.accept()
+                msg = req_chan.recv()
+                log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
+                e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
-            self._spawn(e._message_received, msg)
+                self._spawn(e._message_received, msg)
+            except ChannelError as ex:
+                log.exception('Channel error during BinderListener.listen')
+                switch()
+            except ChannelClosedError as ex:
+                log.debug('Channel was closed during BinderListener.listen')
+                break
+
+    def close(self):
+        if self._chan: self._chan.close()
 
 class ListeningEndpointFactory(EndpointFactory):
     """
@@ -270,7 +281,7 @@ class SubscriberEndpoint(Endpoint):
         assert self._callback, "No callback provided, cannot route subscribed message"
 
         self._callback(msg)
-        
+
 
 class Subscriber(ListeningEndpointFactory):
 

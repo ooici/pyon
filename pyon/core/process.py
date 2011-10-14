@@ -38,6 +38,9 @@ class PyonProcess(object):
     def _join(self, timeout=None):
         pass
 
+    def _notify_stop(self):
+        """ Get ready, you're about to get shutdown. """
+    
     def _stop(self):
         pass
 
@@ -59,6 +62,10 @@ class PyonProcess(object):
     def start(self):
         self.proc = self._spawn()
         return self
+
+    def notify_stop(self):
+        """ Get ready, you're about to get shutdown. """
+        self._notify_stop()
 
     def stop(self):
         if self.running:
@@ -128,11 +135,13 @@ class ProcessSupervisor(object):
           'green': GreenProcess
         , 'python': PythonProcess
     }
-    def __init__(self):
+    def __init__(self, heartbeat_secs=10.0):
         super(ProcessSupervisor, self).__init__()
 
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
+        self.heartbeat_secs = heartbeat_secs
+        self._shutting_down = False
 
     def spawn(self, type_and_target, *args, **kwargs):
         """
@@ -169,9 +178,13 @@ class ProcessSupervisor(object):
             time_elapsed = time.time() - time_start
             if timeout is not None:
                 time_remaining = timeout - time_elapsed
+
                 if time_remaining > 0:
+                    # The nice way; let it do cleanup
+                    proc.notify_stop()
                     proc.join(time_remaining)
                 else:
+                    # Out of time. Cya, sucker
                     proc.stop()
             else:
                 proc.join()
@@ -183,7 +196,9 @@ class ProcessSupervisor(object):
 
     def target(self):
         # TODO: Implement monitoring and such
-        pass
+        while True:
+            #self.send_heartbeats()
+            time.sleep(self.heartbeat_secs)
 
     def shutdown(self, timeout=30.0):
         """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
