@@ -12,6 +12,11 @@ server:
     vhost: /
     heartbeat: 30
 
+# sysname - by default it is generated from your system's uname.
+# uncomment and set here if you want to lock it to something.
+#system:
+#  name: r2demo
+
 cc:
   timeout:
     shutdown: 30.0
