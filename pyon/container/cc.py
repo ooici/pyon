@@ -164,6 +164,9 @@ class Container(object):
         try:
             self.proc_sup.join_children()
         except (KeyboardInterrupt, SystemExit) as ex:
-            log.info("Received a kill signal, shutting down the container.")
-            self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+            log.info('Received a kill signal, shutting down the container.')
+        except:
+            log.exception('Unhandled error! Forcing container shutdown')
+
+        self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
             

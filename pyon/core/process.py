@@ -8,6 +8,8 @@ from pyon.util.log import log
 
 import time
 import multiprocessing as mp
+import os
+import signal
 
 class PyonProcessError(Exception):
     pass
@@ -203,13 +205,46 @@ class ProcessSupervisor(object):
     def shutdown(self, timeout=30.0):
         """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
 
-        # TODO: use signals to absolutely guarantee shutdown even if there are busy loops in greenlets
+        unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
         elapsed = self.join_children(timeout)
         self.stop()
 
+        unset()
         return elapsed
 
 class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
     """ A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses. """
     pass
 
+def shutdown_or_die(delay_sec=0):
+    """ Wait the given number of seconds and forcibly kill this process if it's still running. """
+
+    def diediedie(sig=None, frame=None):
+        pid = os.getpid()
+        print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
+        os.kill(pid, signal.SIGKILL)
+
+    def dontdie():
+        signal.alarm(0)
+
+    if delay_sec > 0:
+        try:
+            old = signal.signal(signal.SIGALRM, diediedie)
+            signal.alarm(int(delay_sec))
+
+            if old:
+                print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
+        except ValueError, ex:
+            print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
+            pass
+    else:
+        diediedie()
+
+    return dontdie
+
+if __name__ == '__main__':
+    unset = shutdown_or_die(3)
+    unset()
+    while True:
+        pass
+    
