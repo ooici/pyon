@@ -109,10 +109,10 @@ class Endpoint(object):
         self._recv_greenlet = spawn(client_recv)
 
     def close(self):
-        if self.channel is not None:
-            self.channel.close()
         if self._recv_greenlet is not None:
             self._recv_greenlet.kill()
+        if self.channel is not None:
+            self.channel.close()
 
     def _build_header(self, raw_msg):
         """
