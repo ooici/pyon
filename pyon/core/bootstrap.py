@@ -23,9 +23,9 @@ for handler in LOGGING_CFG.get('handlers', {}).itervalues():
 logging.config.dictConfig(LOGGING_CFG)
 
 # Read global configuration
-conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml', 'res/deploy/r2deploy.rel']
+conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
 CFG = Config(conf_paths).data
-sys_name = CFG.get('system', {}).get('name', 'pyon.%s' % os.uname()[1].replace('.', '_'))
+sys_name = CFG.system.name or 'pyon.%s' % os.uname()[1].replace('.', '_')
 
 obj_registry = IonServiceRegistry()
 obj_registry.register_obj_dir('obj', ['ion.yml'], ['services'])

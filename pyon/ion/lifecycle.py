@@ -3,7 +3,7 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.public import log
+from pyon.util.log import log
 from pyon.util.state_object import StateObject, BasicFSMFactory, BasicStates
 
 class IonLifecycleMixin(StateObject):
@@ -13,8 +13,8 @@ class IonLifecycleMixin(StateObject):
     @todo Add precondition checker
     """
 
-    def __init__(self):
-        super(IonLifecycleMixin, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(IonLifecycleMixin, self).__init__(*args, **kwargs)
         factory = BasicFSMFactory()
         fsm = factory.create_fsm(self)
         self._so_set_fsm(fsm)

@@ -8,6 +8,8 @@ from pyon.util.log import log
 
 import time
 import multiprocessing as mp
+import os
+import signal
 
 class PyonProcessError(Exception):
     pass
@@ -38,6 +40,9 @@ class PyonProcess(object):
     def _join(self, timeout=None):
         pass
 
+    def _notify_stop(self):
+        """ Get ready, you're about to get shutdown. """
+    
     def _stop(self):
         pass
 
@@ -59,6 +64,10 @@ class PyonProcess(object):
     def start(self):
         self.proc = self._spawn()
         return self
+
+    def notify_stop(self):
+        """ Get ready, you're about to get shutdown. """
+        self._notify_stop()
 
     def stop(self):
         if self.running:
@@ -128,11 +137,13 @@ class ProcessSupervisor(object):
           'green': GreenProcess
         , 'python': PythonProcess
     }
-    def __init__(self):
+    def __init__(self, heartbeat_secs=10.0):
         super(ProcessSupervisor, self).__init__()
 
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
+        self.heartbeat_secs = heartbeat_secs
+        self._shutting_down = False
 
     def spawn(self, type_and_target, *args, **kwargs):
         """
@@ -169,9 +180,13 @@ class ProcessSupervisor(object):
             time_elapsed = time.time() - time_start
             if timeout is not None:
                 time_remaining = timeout - time_elapsed
+
                 if time_remaining > 0:
+                    # The nice way; let it do cleanup
+                    proc.notify_stop()
                     proc.join(time_remaining)
                 else:
+                    # Out of time. Cya, sucker
                     proc.stop()
             else:
                 proc.join()
@@ -183,18 +198,53 @@ class ProcessSupervisor(object):
 
     def target(self):
         # TODO: Implement monitoring and such
-        pass
+        while True:
+            #self.send_heartbeats()
+            time.sleep(self.heartbeat_secs)
 
     def shutdown(self, timeout=30.0):
         """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
 
-        # TODO: use signals to absolutely guarantee shutdown even if there are busy loops in greenlets
+        unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
         elapsed = self.join_children(timeout)
         self.stop()
 
+        unset()
         return elapsed
 
 class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
     """ A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses. """
     pass
 
+def shutdown_or_die(delay_sec=0):
+    """ Wait the given number of seconds and forcibly kill this process if it's still running. """
+
+    def diediedie(sig=None, frame=None):
+        pid = os.getpid()
+        print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
+        os.kill(pid, signal.SIGKILL)
+
+    def dontdie():
+        signal.alarm(0)
+
+    if delay_sec > 0:
+        try:
+            old = signal.signal(signal.SIGALRM, diediedie)
+            signal.alarm(int(delay_sec))
+
+            if old:
+                print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
+        except ValueError, ex:
+            print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
+            pass
+    else:
+        diediedie()
+
+    return dontdie
+
+if __name__ == '__main__':
+    unset = shutdown_or_die(3)
+    unset()
+    while True:
+        pass
+    

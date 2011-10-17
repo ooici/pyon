@@ -67,11 +67,14 @@ class DictModifier(DotDict):
     """
     Subclass of DotDict that allows the sparse overriding of dict values.
     """
-    def __init__(self, base):
+    def __init__(self, base, data=None):
         # base should be a DotDict, raise TypeError exception if not
         if not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
         self.base = base
+
+        if data is not None:
+            self.update(data)
 
     def __getattr__(self, key):
         try:

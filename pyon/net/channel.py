@@ -53,6 +53,10 @@ class ChannelError(Exception):
     """
     Exception raised for error using Channel Socket Interface.
     """
+class ChannelClosedError(Exception):
+    """
+    Denote activity on a closed channel (usually during shutdown).
+    """
 
 class Admin(object):
     """
@@ -745,6 +749,9 @@ class PubSub(BaseChannel):
         new_chan._peer_name = peer_name
         self.message_received((new_chan, body)) # XXX hack
 
+class ChannelShutdownMessage(object):
+    """ Dummy object to unblock queues. """
+    pass
 
 class SocketInterface(object):
     """
@@ -775,6 +782,11 @@ class SocketInterface(object):
         self._receive_queue = gqueue.Queue()
         ch_proto.message_received = self.message_received
 
+    def _next_in_queue(self):
+        msg = self._receive_queue.get()
+        if isinstance(msg, ChannelShutdownMessage):
+            raise ChannelClosedError('Attempt to recv on a channel that is being closed.')
+        return msg
 
     @classmethod
     def Socket(cls, amq_chan, ch_proto_type):
@@ -808,7 +820,7 @@ class SocketInterface(object):
         if not self._listening:
             raise ChannelError('Channel not listening')#?
         #new_serv_ch_proto, body = self._receive_queue.get()
-        fullon = self._receive_queue.get()
+        fullon = self._next_in_queue()
         log.debug("we got %d items: %s" % (len(fullon), str(fullon)))
 
         new_serv_ch_proto, body = fullon[0:2]
@@ -844,6 +856,7 @@ class SocketInterface(object):
         close underlying amqp channel
         """
         log.debug("In SocketInterface.close")
+        self._receive_queue.put(ChannelShutdownMessage())
         self.ch_proto.close()
 
     def connect(self, name):
@@ -887,7 +900,7 @@ class SocketInterface(object):
         log.debug("In SocketInterface.recv")
         if not self._connected:
             raise ChannelError('Channel not connected')#?
-        return self._receive_queue.get()
+        return self._next_in_queue()
 
     def recv_into(self, callback):
         """

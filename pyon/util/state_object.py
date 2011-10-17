@@ -34,11 +34,11 @@ class StateObject(Actionable):
         The underlying FSM can be set explicitly.
     """
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         # The FSM instance
         self.__fsm = None
 
-        super(StateObject, self).__init__()
+        super(StateObject, self).__init__(*args, **kwargs)
 
     # Function prefix _so is for StateObject control functions
 
