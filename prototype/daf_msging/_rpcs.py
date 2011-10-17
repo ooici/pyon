@@ -21,6 +21,7 @@ gevent.joinall([mooo])
 from pyon.container.cc import Container
 cc=Container()
 cc.start()
+cc.start_rel('res/deploy/r2deploy.rel')
 
 cc.serve_forever()
 
