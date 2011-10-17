@@ -28,8 +28,8 @@ __all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'Pytho
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessSupervisor
-__all__ += ['IonProcessSupervisor']
-
-from pyon.container.cc import Container
-__all__ += ['Container']
+#from pyon.ion.process import IonProcessSupervisor
+#__all__ += ['IonProcessSupervisor']
+#
+#from pyon.container.cc import Container
+#__all__ += ['Container']
