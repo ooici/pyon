@@ -15,6 +15,9 @@ INSTALL
 You need the following installed before you can use pyon:
   - python 2.7
     - Download and use installer on a Mac
+    - If you need to build from source (like on some linux distributions), enable the following in the build:
+      - SSL
+      - sqlite
   - distutils 2.7.2
     - Download egg and execute with sh
   - pip
