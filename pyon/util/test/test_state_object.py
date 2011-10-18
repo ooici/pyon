@@ -3,7 +3,7 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.public import log
+from pyon.util.log import log
 from pyon.util.state_object import StateObject, BasicFSMFactory, BasicStates
 
 import unittest
