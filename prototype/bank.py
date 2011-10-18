@@ -142,7 +142,9 @@ def test_single_container():
     same container
     """
     container = cc.Container()
-    server_listen_ready_list = container.start() # :(
+    container.start() # :(
+
+    server_listen_ready_list = container.start_rel('res/deploy/r2deploy.rel')
 
     # wait for them to spawn: this is horribad, figure out better practice
     for x in server_listen_ready_list:
@@ -151,9 +153,6 @@ def test_single_container():
         print ".. done"
 
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
-
-    #spawn(container.serve_forever)
-    sleep(4)
 
     print "\n\n=====================================\n\n"
 
