@@ -33,6 +33,7 @@ class Container(object):
     """
     node = None
     def __init__(self, *args, **kwargs):
+        log.debug("Container.__init__")
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
@@ -52,13 +53,18 @@ class Container(object):
         rel_data = Config([rel_file]).data
         CFG.deploy = rel_data.deploy
 
+        server_listen_ready_list = []
+
         service_names = self.read_config()
         log.debug("service_names: %s" % str(service_names))
 
         # Iterate over service name list, starting services
         for serviceName in service_names:
             log.debug("serviceName: %s" % str(serviceName))
-            self.start_service(serviceName)
+            listen_ready = self.start_service(serviceName)
+            server_listen_ready_list.append(listen_ready)
+
+        return server_listen_ready_list
 
     def read_config(self):
         log.debug("In Container.readConfig")
@@ -152,6 +158,8 @@ class Container(object):
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+
+        return listener.get_ready_event()
 
     def serve_forever(self):
         """ Run the container until killed. """

@@ -197,12 +197,25 @@ class BinderListener(object):
         self._ch_type = listening_channel_type or Bidirectional
         self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
         self._chan = None
+        self._ready_event = event.AsyncResult()
+
+    def get_ready_event(self):
+        """
+        Returns an AsyncResult you can use to wait on to determine if this BinderListener has been setup
+        and is ready to accept messages.
+
+        @TODO: this sounds a lot like lifecycle
+        """
+        return self._ready_event
 
     def listen(self):
         log.debug("BinderListener.listen")
         self._chan = self._node.channel(self._ch_type)
         self._chan.bind((sys_name, self._name))
         self._chan.listen()
+
+        self._ready_event.set(True)
+
         while True:
             log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
             try:
@@ -212,6 +225,7 @@ class BinderListener(object):
                 e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
                 self._spawn(e._message_received, msg)
+
             except ChannelError as ex:
                 log.exception('Channel error during BinderListener.listen')
                 switch()
@@ -338,8 +352,11 @@ class RequestResponseClient(EndpointFactory):
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
         e = self.create_endpoint(self.name)
-        retval = e.send(msg)
-        e.close()
+        try:
+            retval = e.send(msg)
+        finally:
+            # always close, even if endpoint raised a logical exception
+            e.close()
         return retval
 
 class ResponseEndpoint(BidirectionalListeningEndpoint):
