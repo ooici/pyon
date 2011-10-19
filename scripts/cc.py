@@ -59,16 +59,9 @@ def main(opts, *args, **kwargs):
     container.start()
 
     if opts.rel:
-        container.start_rel_from_url(opts.rel)
-#
-#        print "XXXXXXXXX node: " + str(container.node)
-#
-#        client = RPCClient(node=container.node, name="container_agent", iface=IContainerAgent)
-#        print "XXXXXXXXX In main.  client: " + str(client)
-#        client.start_rel_from_url(opts.rel)
-#
-#        container.start_rel_from_url(opts.rel)
-    
+        client = RPCClient(node=container.node, name="container_agent", iface=IContainerAgent)
+        client.start_rel_from_url(opts.rel)
+
     if not opts.noshell:
         setup_ipython()
     else:
