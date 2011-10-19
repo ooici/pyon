@@ -45,6 +45,7 @@ class Container(object):
     that do the bulk of the work in the ION system.
     """
     node = None
+    name = "container_agent"
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
@@ -56,7 +57,12 @@ class Container(object):
         log.debug("In Container.start")
         self.proc_sup.start()
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
-        self.proc_sup.spawn(('green', self.ioloop.join))
+
+        rsvc = RPCServer(node=self.node, name=self.name, service=self)
+
+        # Start an ION process with the right kind of endpoint factory
+        listener = BinderListener(self.node, self.name, rsvc, None, None)
+        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
     def start_app(self, processapp=[], config={}):
         log.debug("In Container.start_app processapp: %s config: %s"%(str(processapp),str(config)))
@@ -150,7 +156,7 @@ class Container(object):
             
     def _for_name(self, modpath, classname):
         ''' Returns a class of "classname" from module "modname". '''
-        log.debug("In Container.forname")
+        log.debug("In Container._forname")
         log.debug("modpath: %s" % modpath)
         log.debug("classname: %s" % classname)
         module = __import__(modpath, fromlist=[classname])
