@@ -21,9 +21,9 @@ class BankService(BaseBankService):
         res = []
         try:
             res = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), DataStore.AND, ("name", DataStore.EQUAL, name)])
-            print "Existing customer.  Customer id: " + str(res)
         except NotFound:
-            print "New customer"
+            # New customer
+            pass
         if len(res) == 0:
             # Create customer info entry
             customer_info = {}
@@ -39,8 +39,6 @@ class BankService(BaseBankService):
         account_obj = IonObject("BankAccount", account_info)
         account_create_tuple = self.clients.datastore.create(account_obj)
         account_id = account_create_tuple[0]
-
-        print "Created %s account for user %s.  Account id is %s" % (account_type, name, account_id)
 
         return account_id
 
@@ -118,9 +116,6 @@ def start_client():
     print 'container started'
 
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
-
-    print "Before container start"
-    container.start()
 
     print "Before new account"
     acctNum = client.new_account('kurt', 'Savings')
