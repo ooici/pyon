@@ -1,7 +1,7 @@
 """
 """
 
-from pyon.container import cc
+from pyon.public import Container
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
@@ -98,8 +98,9 @@ def start_server():
     in turn start the bank server and it's dependent
     datastore service
     """
-    container = cc.Container()
+    container = Container()
     container.start() # :(
+    container.start_rel_from_url("res/deploy/r2deploy.yml")
     print 'container started'
 
     container.serve_forever()
@@ -110,14 +111,14 @@ def start_client():
     in turn start the bank server and it's dependent
     datastore service
     """
-    container = cc.Container()
-    container.start(server=False) # :(
+    container = Container()
+    container.start() # :(
     print 'container started'
 
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
 
-    print "Before start client"
-    container.start(False)
+    print "Before container start"
+    container.start()
 
     print "Before new account"
     acctNum = client.new_account('kurt', 'Savings')
@@ -139,13 +140,11 @@ def test_single_container():
     client and server are all running within the
     same container
     """
-    container = cc.Container()
+    container = Container()
     container.start() # :(
+    container.start_rel_from_url("res/deploy/r2deploy.yml")
 
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
-
-    print "Before start client"
-    container.start(False)
 
     print "Before new account"
     acctNum = client.new_account('kurt', 'Savings')
