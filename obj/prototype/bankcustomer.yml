@@ -1,5 +1,4 @@
 BankCustomer:
-  type_: BankCustomer
   name: ""
   email: ""
   phone: ""
