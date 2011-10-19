@@ -21,6 +21,8 @@ class BankService(BaseBankService):
         res = []
         try:
             res = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), DataStore.AND, ("name", DataStore.EQUAL, name)])
+            customer_info = res[0]
+            customer_id = customer_info._id
         except NotFound:
             # New customer
             pass
@@ -75,13 +77,15 @@ class BankService(BaseBankService):
             return []
         customer_obj = customer_list[0]
         accounts = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankAccount"), DataStore.AND, ("owner", DataStore.EQUAL, customer_obj._id)])
-        account_list = []
-        for account in accounts:
-            account_info = {}
-            account_info["account_type"] = account.account_type
-            account_info["balance"] = account.balance
-            account_list.append(account_info)
-        return account_list
+        print "XXXXXXXXXXXXXXXXXXXXXXX accounts: " + str(accounts)
+        return accounts
+#        account_list = []
+#        for account in accounts:
+#            account_info = {}
+#            account_info["account_type"] = account.account_type
+#            account_info["balance"] = account.balance
+#            account_list.append(account_info)
+#        return account_list
 
 def test_service():
     bank = BankService()
@@ -118,13 +122,22 @@ def start_client():
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
 
     print "Before new account"
-    acctNum = client.new_account('kurt', 'Savings')
-    print "New account number: " + str(acctNum)
-    print "Starting balance %s" % str(client.get_balance(acctNum))
-    client.deposit(acctNum, 99999999)
-    print "Confirming balance after deposit %s" % str(client.get_balance(acctNum))
-    client.withdraw(acctNum, 1000)
-    print "Confirming balance after withdrawl %s" % str(client.get_balance(acctNum))
+    savingsAcctNum = client.new_account('kurt', 'Savings')
+    print "New savings account number: " + str(savingsAcctNum)
+    print "Starting savings balance %s" % str(client.get_balance(savingsAcctNum))
+    client.deposit(savingsAcctNum, 99999999)
+    print "Confirming savings balance after deposit %s" % str(client.get_balance(savingsAcctNum))
+    client.withdraw(savingsAcctNum, 1000)
+    print "Confirming savings balance after withdrawl %s" % str(client.get_balance(savingsAcctNum))
+
+    checkingAcctNum = client.new_account('kurt', 'Checking')
+    print "New checking account number: " + str(checkingAcctNum)
+    print "Starting checking balance %s" % str(client.get_balance(checkingAcctNum))
+    client.deposit(checkingAcctNum, 99999999)
+    print "Confirming checking balance after deposit %s" % str(client.get_balance(checkingAcctNum))
+    client.withdraw(checkingAcctNum, 1000)
+    print "Confirming checking balance after withdrawl %s" % str(client.get_balance(checkingAcctNum))
+
     acctList = client.list_accounts('kurt')
     for acct_obj in acctList:
         print "Account: " + str(acct_obj)
@@ -141,7 +154,7 @@ def test_single_container():
     container.start() # :(
     container.start_rel_from_url("res/deploy/r2deploy.yml")
 
-    server_listen_ready_list = container.start_rel('res/deploy/r2deploy.rel')
+    server_listen_ready_list = container.start_rel_from_url('res/deploy/r2deploy.yml')
 
     # wait for them to spawn: this is horribad, figure out better practice
     for x in server_listen_ready_list:
@@ -152,13 +165,22 @@ def test_single_container():
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
 
     print "Before new account"
-    acctNum = client.new_account('kurt', 'Savings')
-    print "New account number: " + str(acctNum)
-    print "Starting balance %s" % str(client.get_balance(acctNum))
-    client.deposit(acctNum, 99999999)
-    print "Confirming balance after deposit %s" % str(client.get_balance(acctNum))
-    client.withdraw(acctNum, 1000)
-    print "Confirming balance after withdrawl %s" % str(client.get_balance(acctNum))
+    savingsAcctNum = client.new_account('kurt', 'Savings')
+    print "New savings account number: " + str(savingsAcctNum)
+    print "Starting savings balance %s" % str(client.get_balance(savingsAcctNum))
+    client.deposit(savingsAcctNum, 99999999)
+    print "Confirming savings balance after deposit %s" % str(client.get_balance(savingsAcctNum))
+    client.withdraw(savingsAcctNum, 1000)
+    print "Confirming savings balance after withdrawl %s" % str(client.get_balance(savingsAcctNum))
+
+    checkingAcctNum = client.new_account('kurt', 'Checking')
+    print "New checking account number: " + str(checkingAcctNum)
+    print "Starting checking balance %s" % str(client.get_balance(checkingAcctNum))
+    client.deposit(checkingAcctNum, 99999999)
+    print "Confirming checking balance after deposit %s" % str(client.get_balance(checkingAcctNum))
+    client.withdraw(checkingAcctNum, 1000)
+    print "Confirming checking balance after withdrawl %s" % str(client.get_balance(checkingAcctNum))
+
     acctList = client.list_accounts('kurt')
     for acct_obj in acctList:
         print "Account: " + str(acct_obj)
