@@ -161,20 +161,25 @@ class EndpointFactory(object):
 
     def __init__(self, node=None, name=None):
         """
-        name can be a to address or a from address in the derived ListeningEndpointFactory.
+        name can be a to address or a from address in the derived ListeningEndpointFactory. Either a string
+        or a 2-tuple of (exchange, name).
         """
         self.node = node
         self.name = name
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
-        name = to_name or self.name
-        assert name
-
+        """
+        @param  to_name     Either a string or a 2-tuple of (exchange, name)
+        """
         if existing_channel:
             ch = existing_channel
         else:
+            name = to_name or self.name
+            assert name
+            if not isinstance(name, tuple):
+                name = (sys_name, name)
             ch = self.node.channel(self.channel_type)
-            ch.connect((sys_name, name))
+            ch.connect(name)
 
         e = self.endpoint_type(**kwargs)
         e.attach_channel(ch)
@@ -251,7 +256,13 @@ class ListeningEndpointFactory(EndpointFactory):
 #
 
 class PublisherEndpoint(Endpoint):
-    pass
+    def _build_msg(self, raw_msg):
+        """
+        """
+        msg = Endpoint._build_msg(self, raw_msg)
+        encoded_msg = IonEncoder().encode(msg)
+
+        return encoded_msg
 
 class Publisher(EndpointFactory):
     """

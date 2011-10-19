@@ -237,6 +237,19 @@ class BaseChannel(object):
         """
         log.debug("In BaseChannel.do_config")
 
+    def config_exchange(self):
+        """
+        @TODO: too amqp specific, name this something else?  or push it down somewhere else?
+        Performs an exchange_declare on the connection.
+        """
+        assert self.exchange
+        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
+        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
+        blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
+                                                                type=self.exchange_type,
+                                                                durable=self.exchange_durable,
+                                                                auto_delete=self.exchange_auto_delete)
+
     def bind(self, callback, name, shared_queue=False):
         """
         bind a channel to a name.
@@ -256,18 +269,13 @@ class BaseChannel(object):
         self._chan_name = name
         if shared_queue:
             self.exchange = name[0]
-            self.queue = name[1]
+            self.queue = ".".join(name)     # prefix sysname so we don't clobber others please
         else:
+            assert False        # @TODO is this used?
             self.queue = ''
         #self._bind_callback = callback
 
-        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
-        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
-        blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
-                                                                type=self.exchange_type,
-                                                                durable=self.exchange_durable,
-                                                                auto_delete=self.exchange_auto_delete)
-
+        self.config_exchange()
         self.do_queue(callback)
         
     def on_bind(self):
@@ -295,6 +303,8 @@ class BaseChannel(object):
         if callback:
             self._connect_callback = callback
             callback()
+
+        self.on_connect()
 
     def on_connect(self):
         """
@@ -604,13 +614,7 @@ class Bidirectional(BaseChannel):
         self._chan_name = (self._peer_name[0], '')
         self.exchange = self._peer_name[0]
 
-        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
-        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
-        blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
-                                                                type=self.exchange_type,
-                                                                durable=self.exchange_durable,
-                                                                auto_delete=self.exchange_auto_delete)
-
+        self.config_exchange()
 
         # bind to temp reply queue
         def set_reply_name():
@@ -765,6 +769,10 @@ class PubSub(BaseChannel):
         new_chan.amq_chan = self.amq_chan #hack
         new_chan._peer_name = peer_name
         self.message_received((new_chan, body)) # XXX hack
+
+    def on_connect(self):
+        self.exchange = self._peer_name[0]
+        self.config_exchange()
 
 class ChannelShutdownMessage(object):
     """ Dummy object to unblock queues. """
