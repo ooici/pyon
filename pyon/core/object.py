@@ -287,10 +287,42 @@ class IonObjectRegistry(object):
         self.source_files += yaml_files
         return obj_defs
 
+class IonServiceMethod(object):
+    """ Reference the object definitions for a service method. """
+
+    def __init__(self, def_in, def_out):
+        self.def_in = def_in
+        self.def_out = def_out
+
+class IonServiceDefinition(object):
+    """ Provides a walkable structure for ION service metadata and object definitions. """
+
+    def __init__(self, name, dependencies=[], version=''):
+        self.name = name
+        self.dependencies = list(dependencies)
+        self.version = version
+        self.methods = []
+
 class IonServiceRegistry(IonObjectRegistry):
     """
     Adds a layer of service-specific syntax to the object definitions.
     """
+
+    def __init__(self):
+        super(IonServiceRegistry, self).__init__()
+        self.services = set()
+        self.services_by_name = {}
+
+    def _reg_method_part(self, svc_name, op_name, op_def, direction, required=False):
+        if not direction in op_def:
+            if required:
+                raise IonObjectError('Method definition missing "%s" block in service "%s".' % (direction, svc_name))
+            else:
+                return
+
+        def_name = '%s_%s_%s' % (svc_name, op_name, direction)   # Prefix the service name
+        reg_def = self.register_def(def_name, op_def[direction])
+        return reg_def
 
     def register_svc_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
@@ -309,15 +341,21 @@ class IonServiceRegistry(IonObjectRegistry):
                     reg_def = self.register_def(obj_name, obj_def)
                     obj_defs.append(reg_def)
 
-                # Register the service ops in/out objects
-                for op_name,op_def in def_set.get('methods', {}).iteritems():
-                    if not op_def: continue
-                    for direction in ('in', 'out'):
-                        if not direction in op_def: continue
+                # Register the service and its ops in/out objects
+                if 'name' in def_set:
+                    name, deps, version = def_set['name'], def_set.get('dependencies', None), def_set.get('version', '')
+                    svc_def = IonServiceDefinition(name, deps, version)
+                    log.debug('Registering service "%s"' % (name))
 
-                        def_name = '%s_%s_%s' % (svc_name, op_name, direction)   # Prefix the service name
-                        reg_def = self.register_def(def_name, op_def[direction])
-                        obj_defs.append(reg_def)
+                    for op_name,op_def in def_set.get('methods', {}).iteritems():
+                        if not op_def: continue
+                        def_in, def_out = (self._reg_method_part(svc_name, op_name, op_def, d) for d in ('in', 'out'))
+                        [obj_defs.append(reg_def) for reg_def in (def_in, def_out)]
+                        method = IonServiceMethod(def_in, def_out)
+                        svc_def.methods.append(method)
+
+                    self.services.add(svc_def)
+                    self.services_by_name[svc_def.name] = svc_def
 
         return obj_defs
     

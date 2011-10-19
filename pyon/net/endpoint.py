@@ -1,20 +1,22 @@
+import pprint
 from gevent import event
 
 import json # generalize
+import msgpack
 
 from pyon.core.bootstrap import IonObject, CFG, sys_name
 from pyon.core.object import IonObjectBase
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
-from pyon.net.interceptor import SampleInterceptor, Invocation, SampleProcessOnlyInterceptor
+from pyon.net.interceptor import SampleInterceptor, Invocation, SampleProcessOnlyInterceptor, CodecInterceptor, EncoderInterceptor
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
 # @TODO: a proper interceptor management system, for now, this works
 # interceptor paths
 interceptors = {
-    'message-in':  [SampleInterceptor()],
-    'message-out': [SampleInterceptor()],
+    'message-in':  [EncoderInterceptor(), CodecInterceptor()],
+    'message-out': [CodecInterceptor(), EncoderInterceptor()],
     'process-in':  [SampleProcessOnlyInterceptor()],
     'process-out': [SampleProcessOnlyInterceptor()],
 }
@@ -23,9 +25,12 @@ def process_interceptors(interceptors, invocation):
     for int in interceptors:
         try:
             invocation = int.process(invocation)
-        except Exception, ex:
-            log.exception("Error in interceptor path")
-            raise ex
+        finally:
+            pass
+#        except Exception, ex:
+#            log.exception("Error in interceptor path")
+#            log.error(str(ex))
+#            raise ex
     return invocation
 
 class Endpoint(object):
@@ -61,17 +66,10 @@ class Endpoint(object):
         friends work!
         """
         # interceptor point
-
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-
-            inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['message-in'], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+        inv = self._build_invocation(path=Invocation.PATH_IN,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors['message-in'], inv)
+        new_msg = inv_prime.message
 
         self.message_received(new_msg)
 
@@ -256,13 +254,14 @@ class ListeningEndpointFactory(EndpointFactory):
 #
 
 class PublisherEndpoint(Endpoint):
-    def _build_msg(self, raw_msg):
-        """
-        """
-        msg = Endpoint._build_msg(self, raw_msg)
-        encoded_msg = IonEncoder().encode(msg)
-
-        return encoded_msg
+    pass
+#    def _build_msg(self, raw_msg):
+#        """
+#        """
+#        msg = Endpoint._build_msg(self, raw_msg)
+#        encoded_msg = IonEncoder().encode(msg)
+#
+#        return encoded_msg
 
 class Publisher(EndpointFactory):
     """
@@ -387,22 +386,25 @@ class RequestResponseServer(ListeningEndpointFactory):
 
 class RPCRequestEndpoint(RequestEndpoint):
 
-    def _build_msg(self, raw_msg):
-        """
-        This override encodes the message for RPC communication using an IonEncoder.
-        It is called automatically by the base class send.
-        """
-        msg = RequestEndpoint._build_msg(self, raw_msg)
-        encoded_msg = IonEncoder().encode(msg)
-
-        return encoded_msg
+#    def _build_msg(self, raw_msg):
+#        """
+#        This override encodes the message for RPC communication using an IonEncoder.
+#        It is called automatically by the base class send.
+#        """
+#        msg = RequestEndpoint._build_msg(self, raw_msg)
+#        log.error(pprint.pformat(msg))
+#        encoded_msg = IonEncoder().encode(msg)
+#
+#        return encoded_msg
 
     def send(self, msg):
         log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
         # Endpoint.send will call our _build_msg override automatically.
-        result_data = RequestEndpoint.send(self, msg)
-        res = json.loads(result_data, object_hook=as_ionObject)
+        res = RequestEndpoint.send(self, msg)
+        #res = json.loads(result_data, object_hook=as_ionObject)
+        #res = msgpack.loads(result_data)
+        #res = as_ionObject(res)
 
         log.debug("RPCRequestEndpoint got this response: %s" % str(res))
 
@@ -477,15 +479,15 @@ class RPCResponseEndpoint(ResponseEndpoint):
 #    def _build_payload(self, raw_msg):
 #        return self._response_payload
 
-    def _build_msg(self, raw_msg):
-        """
-        This override encodes the message for RPC communication using an IonEncoder.
-        It is called automatically by the base class send.
-        """
-        msg = ResponseEndpoint._build_msg(self, raw_msg)
-        encoded_msg = IonEncoder().encode(msg)
-
-        return encoded_msg
+#    def _build_msg(self, raw_msg):
+#        """
+#        This override encodes the message for RPC communication using an IonEncoder.
+#        It is called automatically by the base class send.
+#        """
+#        msg = ResponseEndpoint._build_msg(self, raw_msg)
+#        encoded_msg = IonEncoder().encode(msg)
+#
+#        return encoded_msg
 
     def message_received(self, msg):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -494,8 +496,11 @@ class RPCResponseEndpoint(ResponseEndpoint):
         log.debug("chan: %s" % str(self.channel))
         log.debug("msg: %s" % str(msg))
 
-        wrapped_req = json.loads(msg, object_hook=as_ionObject)
-        cmd_dict = wrapped_req["payload"]
+        #wrapped_req = json.loads(msg, object_hook=as_ionObject)
+        #wrapped_req = msgpack.loads(msg)
+        #wrapped_req = as_ionObject(wrapped_req)
+        #cmd_dict = wrapped_req["payload"]
+        cmd_dict = msg["payload"]
 
         result = None
         try:
@@ -716,7 +721,23 @@ class _Command(object):
         log.debug("cmd_dict: %s" % str(cmd_dict))
         return cmd_dict
 
-class IonEncoder(json.JSONEncoder):
+class IonEncoder(object):
+    def encode(self, obj):
+        if isinstance(obj, IonObjectBase):
+            res = obj.__dict__
+            res["__isAnIonObject"] = obj._def.type.name
+            return res
+        return msgpack.dumps(obj)
+
+def as_ionObject(dct):
+    if "__isAnIonObject" in dct:
+        type = dct.pop("__isAnIonObject")
+        ionObj = IonObject(type.encode('ascii'), dct)
+        return ionObj
+    return dct
+
+
+class jsonIonEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, IonObjectBase):
             res = obj.__dict__
@@ -724,7 +745,7 @@ class IonEncoder(json.JSONEncoder):
             return res
         return json.JSONEncoder.default(self, obj)
 
-def as_ionObject(dct):
+def jsonas_ionObject(dct):
     if "__isAnIonObject" in dct:
         type = dct.pop("__isAnIonObject")
         ionObj = IonObject(type.encode('ascii'), dct)
