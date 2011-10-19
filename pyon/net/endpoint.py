@@ -720,13 +720,13 @@ class IonEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, IonObjectBase):
             res = obj.__dict__
-            res["__isAnIonObject"] = True
+            res["__isAnIonObject"] = obj._def.type.name
             return res
         return json.JSONEncoder.default(self, obj)
 
 def as_ionObject(dct):
     if "__isAnIonObject" in dct:
-        del dct["__isAnIonObject"]
-        ionObj = IonObject(dct["type_"].encode('ascii'), dct)
+        type = dct.pop("__isAnIonObject")
+        ionObj = IonObject(type.encode('ascii'), dct)
         return ionObj
     return dct
