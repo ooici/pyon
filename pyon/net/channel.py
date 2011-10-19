@@ -223,10 +223,13 @@ class BaseChannel(object):
         use instance state (current sync handler) to decide how to report
         channel exceptions 
         """
-        log.debug("In BaseChannel.on_channel_close")
-        log.debug("channel number: %d", self.amq_chan.channel_number)
-        log.debug("code: %d" % code)
-        log.debug("text: %s" % str(text))
+        logmeth = log.debug
+        if code != 0:
+            logmeth = log.error
+        logmeth("In BaseChannel.on_channel_close")
+        logmeth("channel number: %d", self.amq_chan.channel_number)
+        logmeth("code: %d" % code)
+        logmeth("text: %s" % str(text))
 
     def do_config(self):
         """
