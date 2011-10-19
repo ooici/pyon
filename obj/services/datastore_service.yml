@@ -7,27 +7,34 @@ methods:
   create_datastore:
     in:
       datastore_name: ""
+
     out:
+      status: True
 
   delete_datastore:
     in:
       datastore_name: ""
+
     out:
+      status: True
 
   list_datastores:
     in:
+
     out:
       list: []
 
   info_datastore:
     in:
       datastore_name: ""
+
     out:
       info: []
 
   list_objects:
     in:
       datastore_name: ""
+
     out:
       info: []
 
@@ -35,6 +42,7 @@ methods:
     in:
       object_id: ""
       datastore_name: ""
+
     out:
       list: []
 
@@ -42,20 +50,24 @@ methods:
     in:
       object: {}
       datastore_name: ""
+
     out:
+      tuple: []
 
   create_doc:
     in:
       object: {}
       datastore_name: ""
+
     out:
-      tuple: ()
+      tuple: []
 
   read:
     in:
       object_id: ""
       rev_id: ""
       datastore_name: ""
+
     out:
       object: {}
 
@@ -64,6 +76,7 @@ methods:
       object_id: ""
       rev_id: ""
       datastore_name: ""
+
     out:
       object: {}
 
@@ -71,27 +84,33 @@ methods:
     in:
       object: {}
       datastore_name: ""
+
     out:
-      tuple: ()
+      tuple: []
 
   update_doc:
     in:
       object: {}
       datastore_name: ""
+
     out:
-      tuple: ()
+      tuple: []
 
   delete:
     in:
       object: {}
       datastore_name: ""
+
     out:
+      status: True
 
   delete_doc:
     in:
       object: {}
       datastore_name: ""
+
     out:
+      status: True
 
   find:
     in:
@@ -99,6 +118,7 @@ methods:
       key: ""
       key_value: ""
       datastore_name: ""
+
     out:
       list: []
 
@@ -108,6 +128,7 @@ methods:
       key: ""
       key_value: ""
       datastore_name: ""
+
     out:
       list: []
 
@@ -116,6 +137,7 @@ methods:
       criteria: []
       association: ""
       datastore_name: ""
+
     out:
       list: []
 
@@ -133,6 +155,7 @@ methods:
       predicate: ""
       object: ""
       datastore_name: ""
+
     out:
       list: []
 
@@ -142,5 +165,6 @@ methods:
       predicate: ""
       object: ""
       datastore_name: ""
+
     out:
       list: []

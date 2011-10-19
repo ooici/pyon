@@ -4,10 +4,14 @@
 name: directory
 dependencies: [datastore]
 methods:
+  delete:
   add:
     in:
       parent: '/'
       key: 'foo'
+      value: {}
+
+    out:
       value: {}
 
   update:
@@ -16,12 +20,22 @@ methods:
       key: 'foo'
       value: {}
 
+    out:
+      value: {}
+
   read:
     in:
       parent: '/'
       key: 'foo'
 
+    out:
+      value: {}
+
   remove:
     in:
       parent: '/'
       key: 'foo'
+
+    out:
+      value: {}
+

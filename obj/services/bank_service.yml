@@ -4,19 +4,39 @@ name: bank
 dependencies: [datastore]
 methods:
   new_account:
-    name: ""
-    account_type: Checking
+    in:
+      name: ""
+      account_type: Checking
+
+    out:
+      acct_num: ""
 
   deposit:
-    account_id: -1
-    amount: 0.0
+    in:
+      account_id: -1
+      amount: 0.0
+
+    out:
+      status: ""
 
   withdraw:
-    account_id: -1
-    amount: 0.0
+    in:
+      account_id: -1
+      amount: 0.0
+
+    out:
+      status: ""
 
   get_balance:
-    account_id: -1
+    in:
+      account_id: -1
+
+    out:
+      status: ""
 
   list_accounts:
-    name: ""
+    in:
+      name: ""
+
+    out:
+      account_list: []

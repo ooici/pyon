@@ -11,9 +11,13 @@ from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
 # @TODO: a proper interceptor management system, for now, this works
-
-# interceptors is an array of instances of Interceptor derived instances
-base_interceptors = [SampleInterceptor()]
+# interceptor paths
+interceptors = {
+    'message-in':  [SampleInterceptor()],
+    'message-out': [SampleInterceptor()],
+    'process-in':  [SampleProcessOnlyInterceptor()],
+    'process-out': [SampleProcessOnlyInterceptor()],
+}
 
 def process_interceptors(interceptors, invocation):
     for int in interceptors:
@@ -28,7 +32,6 @@ class Endpoint(object):
 
     channel = None
     _recv_greenlet = None
-    interceptors = base_interceptors
 
     def attach_channel(self, channel):
         log.debug("In Endpoint.attach_channel")
@@ -65,7 +68,7 @@ class Endpoint(object):
             inv = self._build_invocation(path=Invocation.PATH_IN,
                                          message=msg,
                                          content=msg['payload'])
-            inv_prime = process_interceptors(self.interceptors, inv)
+            inv_prime = process_interceptors(interceptors['message-in'], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -90,7 +93,7 @@ class Endpoint(object):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
                                          message=msg,
                                          content=msg['payload'])
-            inv_prime = process_interceptors(self.interceptors, inv)
+            inv_prime = process_interceptors(interceptors['message-out'], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -109,10 +112,10 @@ class Endpoint(object):
         self._recv_greenlet = spawn(client_recv)
 
     def close(self):
-        if self.channel is not None:
-            self.channel.close()
         if self._recv_greenlet is not None:
             self._recv_greenlet.kill()
+        if self.channel is not None:
+            self.channel.close()
 
     def _build_header(self, raw_msg):
         """
@@ -197,12 +200,25 @@ class BinderListener(object):
         self._ch_type = listening_channel_type or Bidirectional
         self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
         self._chan = None
+        self._ready_event = event.AsyncResult()
+
+    def get_ready_event(self):
+        """
+        Returns an AsyncResult you can use to wait on to determine if this BinderListener has been setup
+        and is ready to accept messages.
+
+        @TODO: this sounds a lot like lifecycle
+        """
+        return self._ready_event
 
     def listen(self):
         log.debug("BinderListener.listen")
         self._chan = self._node.channel(self._ch_type)
         self._chan.bind((sys_name, self._name))
         self._chan.listen()
+
+        self._ready_event.set(True)
+
         while True:
             log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
             try:
@@ -212,6 +228,7 @@ class BinderListener(object):
                 e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
                 self._spawn(e._message_received, msg)
+
             except ChannelError as ex:
                 log.exception('Channel error during BinderListener.listen')
                 switch()
@@ -338,8 +355,11 @@ class RequestResponseClient(EndpointFactory):
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
         e = self.create_endpoint(self.name)
-        retval = e.send(msg)
-        e.close()
+        try:
+            retval = e.send(msg)
+        finally:
+            # always close, even if endpoint raised a logical exception
+            e.close()
         return retval
 
 class ResponseEndpoint(BidirectionalListeningEndpoint):
@@ -507,9 +527,6 @@ class RPCServer(RequestResponseServer):
 
 class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
-    # add process specific interceptors here
-    interceptors = RPCRequestEndpoint.interceptors + [SampleProcessOnlyInterceptor()]
-
     def __init__(self, process):
         RPCRequestEndpoint.__init__(self)
         self._process = process
@@ -520,6 +537,43 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         inv = RPCRequestEndpoint._build_invocation(**newkwargs)
         return inv
+
+    def _message_received(self, msg):
+        """
+        Override to send incoming messages through the process-in interceptor stack
+        """
+        # @TODO dict check is a hax
+        if isinstance(msg, dict):
+
+            inv = self._build_invocation(path=Invocation.PATH_IN,
+                                         message=msg,
+                                         content=msg['payload'])
+            inv_prime = process_interceptors(interceptors['process-in'], inv)
+
+            # @TODO check dropped etc
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        RPCRequestEndpoint._message_received(self, new_msg)
+
+    def send(self, msg):
+        """
+        Override to send outgoing messages through the process-out interceptor stack
+        """
+        # @TODO dict check is a hax
+        if isinstance(msg, dict):
+            inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                         message=msg,
+                                         content=msg['payload'])
+            inv_prime = process_interceptors(interceptors['process-out'], inv)
+
+            # @TODO check for dropped etc
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        RPCRequestEndpoint.send(self, new_msg)
 
     def _build_header(self, raw_msg):
         """
@@ -563,9 +617,6 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
 class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
-    # add process specific interceptors here
-    interceptors = RPCResponseEndpoint.interceptors + [SampleProcessOnlyInterceptor()]
-
     def __init__(self, process):
         RPCResponseEndpoint.__init__(self)
         self._process = process
@@ -576,6 +627,43 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
         inv = RPCRequestEndpoint._build_invocation(**newkwargs)
         return inv
+
+    def _message_received(self, msg):
+        """
+        Override to send incoming messages through the process-in interceptor stack
+        """
+        # @TODO dict check is a hax
+        if isinstance(msg, dict):
+
+            inv = self._build_invocation(path=Invocation.PATH_IN,
+                                         message=msg,
+                                         content=msg['payload'])
+            inv_prime = process_interceptors(interceptors['process-in'], inv)
+
+            # @TODO check dropped etc
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        RPCResponseEndpoint._message_received(self, new_msg)
+
+    def send(self, msg):
+        """
+        Override to send outgoing messages through the process-out interceptor stack
+        """
+        # @TODO dict check is a hax
+        if isinstance(msg, dict):
+            inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                         message=msg,
+                                         content=msg['payload'])
+            inv_prime = process_interceptors(interceptors['process-out'], inv)
+
+            # @TODO check for dropped etc
+            new_msg = inv_prime.message
+        else:
+            new_msg = msg
+
+        RPCResponseEndpoint.send(self, new_msg)
 
 class _Command(object):
     """

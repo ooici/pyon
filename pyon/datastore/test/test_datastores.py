@@ -151,7 +151,7 @@ class Test_DataStores(unittest.TestCase):
 
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')
-        self.assertTrue(data_set.type_ == 'DataSet')
+        self.assertTrue(data_set._def.type.name == 'DataSet')
 
         # Assign values to object fields
         data_set.Description = "Real-time water data for Choptank River near Greensboro, MD"
@@ -185,7 +185,7 @@ class Test_DataStores(unittest.TestCase):
         # Read back the HEAD version of the object and validate fields
         data_set_read_obj = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
-        self.assertTrue(data_set_read_obj.type_ == "DataSet")
+        self.assertTrue(data_set_read_obj._def.type.name == "DataSet")
         self.assertTrue(data_set_read_obj.Description == "Real-time water data for Choptank River near Greensboro, MD")
 
         # Update DataSet's Description field and write

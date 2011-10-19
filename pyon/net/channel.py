@@ -48,6 +48,7 @@ from pyon.core.bootstrap import CFG
 from pyon.util.async import blocking_cb
 
 from pyon.util.log import log
+#import pprint
 
 class ChannelError(Exception):
     """
@@ -88,6 +89,7 @@ class _AMQPHandlerMixin(object):
         channel exceptions 
         """
         log.debug("In _AMQPHandlerMixin.on_channel_close")
+        log.debug("channel: %d", self.amq_chan.channel_number)
         log.debug("code: %d" % code)
         log.debug("text: %s" % str(text))
 
@@ -157,6 +159,7 @@ class BaseChannel(object):
     prefetch_count = 1
 
     _consuming = False
+    _consumer_tag = None
     _channel_bind_cb = None
 
     immediate = False # don't use
@@ -187,12 +190,25 @@ class BaseChannel(object):
         if self.amq_chan:
             self.amq_chan.close()
 
+        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
+        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
+        # up for Pika here so we don't goof up when reusing a channel number.
+        self.amq_chan.callbacks.remove(self.amq_chan.channel_number, 'Basic.GetEmpty')
+        self.amq_chan.callbacks.remove(self.amq_chan.channel_number, 'Channel.Close')
+        self.amq_chan.callbacks.remove(self.amq_chan.channel_number, '_on_basic_deliver')
+        self.amq_chan.callbacks.remove(self.amq_chan.channel_number, '_on_basic_get')
+
+        # uncomment these lines to see the full callback list that Pika maintains
+        #stro = pprint.pformat(self.amq_chan.callbacks._callbacks)
+        #log.error(str(stro))
+
     def on_channel_open(self, amq_chan):
         """
         """
         log.debug("In BaseChannel.on_channel_open")
-        log.debug("amq_chan: %s" % str(amq_chan))
+        log.debug("channel_number: %d", amq_chan.channel_number)
         amq_chan.add_on_close_callback(self.on_channel_close)
+
         self.amq_chan = amq_chan
         self.do_config() # doesn't jive with blocking interface
 
@@ -208,6 +224,7 @@ class BaseChannel(object):
         channel exceptions 
         """
         log.debug("In BaseChannel.on_channel_close")
+        log.debug("channel number: %d", self.amq_chan.channel_number)
         log.debug("code: %d" % code)
         log.debug("text: %s" % str(text))
 
@@ -362,7 +379,7 @@ class BaseChannel(object):
         log.debug("In BaseChannel._start_consumer")
         if self._consuming:
             raise #?
-        consumer_tag = self.amq_chan.basic_consume(self._on_basic_deliver,
+        self._consumer_tag = self.amq_chan.basic_consume(self._on_basic_deliver,
                                     queue=self.queue,
                                     no_ack=self.consumer_no_ack,
                                     exclusive=self.consumer_exclusive)
@@ -379,7 +396,7 @@ class BaseChannel(object):
         redelivered = method_frame.redelivered
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
-        
+
         # amqp specifics are handled here, and a mid-level event can be
         # raised here before the simple message_received. It's all about
         # funneling/organizing context to keep the endpoint handlers simple

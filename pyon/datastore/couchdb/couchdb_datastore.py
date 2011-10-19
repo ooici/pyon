@@ -85,62 +85,64 @@ class CouchDB_DataStore(DataStore):
         return res
 
     def create(self, object, datastore_name=""):
-        return self.create_doc(object.__dict__)
+        return self.create_doc(self._ion_object_to_persistence_dict(object))
 
-    def create_doc(self, object, datastore_name=""):
+    def create_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
-        log.debug('Creating new object %s/%s' % (datastore_name, object["type_"]))
 
         # Assign an id to doc (recommended in CouchDB documentation)
-        object["_id"] = uuid4().hex
+        doc["_id"] = uuid4().hex
+        log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
 
         # Save doc.  CouchDB will assign version to doc.
-        res = self.server[datastore_name].save(object)
+        res = self.server[datastore_name].save(doc)
         log.debug('Create result: %s' % str(res))
-        return res
+        id, version = res
+        return [id, version]
 
     def read(self, object_id, rev_id="", datastore_name=""):
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Ion object
-        obj = IonObject(doc["type_"], doc)
+        obj = self._persistence_dict_to_ion_object(doc)
         log.debug('Ion object: %s' % str(obj))
         return obj
 
-    def read_doc(self, object_id, rev_id="", datastore_name=""):
+    def read_doc(self, doc_id, rev_id="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         if rev_id == "":
-            log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
-            doc = db.get(object_id)
+            log.debug('Reading head version of object %s/%s' % (datastore_name, str(doc_id)))
+            doc = db.get(doc_id)
         else:
-            log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(object_id)))
-            doc = db.get(object_id, rev=rev_id)
+            log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(doc_id)))
+            doc = db.get(doc_id, rev=rev_id)
         log.debug('Read result: %s' % str(doc))
         return doc
 
     def update(self, object, datastore_name=""):
-        return self.update_doc(object.__dict__)
+        return self.update_doc(self._ion_object_to_persistence_dict(object))
 
-    def update_doc(self, object, datastore_name=""):
+    def update_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
-        log.debug('Saving new version of object %s/%s/%s' % (datastore_name, object["type_"], object["_id"]))
-        res = self.server[datastore_name].save(object)
+        log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
+        res = self.server[datastore_name].save(doc)
         log.debug('Update result: %s' % str(res))
-        return res
+        id, version = res
+        return [id, version]
 
     def delete(self, object, datastore_name=""):
-        return self.delete_doc(object.__dict__)
+        return self.delete_doc(self._ion_object_to_persistence_dict(object))
 
-    def delete_doc(self, object, datastore_name=""):
+    def delete_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        log.debug('Deleting object %s/%s' % (datastore_name, object["_id"]))
-        res = db.delete(object)
+        log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+        res = db.delete(doc)
         log.debug('Delete result: %s' % str(res))
         return True
 
@@ -150,7 +152,7 @@ class CouchDB_DataStore(DataStore):
         results = []
         # Convert each returned doc to its associated Ion object
         for doc in doc_list:
-            obj = IonObject(doc["type_"], doc)
+            obj = self._persistence_dict_to_ion_object(doc)
             log.debug('Ion object: %s' % str(obj))
             results.append(obj)
 
@@ -209,7 +211,7 @@ class CouchDB_DataStore(DataStore):
         results = []
         # Convert each returned doc to its associated Ion object
         for doc in doc_list:
-            obj = IonObject(doc["type_"], doc)
+            obj = self._persistence_dict_to_ion_object(doc)
             log.debug('Ion object: %s' % str(obj))
             results.append(obj)
 
@@ -299,9 +301,9 @@ class CouchDB_DataStore(DataStore):
         for item in res_list:
             subject_dict = item[0]
             object_dict = item[2]
-            subject = IonObject(subject_dict["type_"], subject_dict)
+            subject = self._persistence_dict_to_ion_object(subject_dict)
             log.debug('Subject Ion object: %s' % str(subject))
-            object = IonObject(object_dict["type_"], object_dict)
+            object = self._persistence_dict_to_ion_object(object_dict)
             log.debug('Object Ion object: %s' % str(object))
             results.append([subject, item[1], object])
 
@@ -422,3 +424,14 @@ class CouchDB_DataStore(DataStore):
                         if object in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
+
+    def _ion_object_to_persistence_dict(self, ion_object):
+        obj_dict = ion_object.__dict__.copy()
+        obj_dict["type_"] = ion_object._def.type.name
+        return obj_dict
+
+    def _persistence_dict_to_ion_object(self, obj_dict):
+        init_dict = obj_dict.copy()
+        type = init_dict.pop("type_")
+        ion_object = IonObject(type, init_dict)
+        return ion_object

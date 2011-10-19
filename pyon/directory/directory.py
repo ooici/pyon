@@ -35,7 +35,7 @@ class Directory(object):
 
     def create(self):
         """
-        Method which will creat the underlying data store and
+        Method which will create the underlying data store and
         persist an empty Directory object.
         """
         log.debug("Creating data store and Directory")
@@ -49,7 +49,71 @@ class Directory(object):
         log.debug("Saving Directory object id %s" % str(createTuple[0]))
         self.obj_id = createTuple[0]
 
-    def find_dict(self, parent):
+    def add(self, parent, key, value):
+        """
+        Add a key/value pair to directory below parent
+        node level.
+        """
+        log.debug("Adding key %s and value %s at path %s" % (key, str(value), parent))
+        directory, parent_dict = self._find_dict(parent)
+
+        # Add key and value, throwing exception if key already exists.
+        if key in parent_dict:
+            raise KeyAlreadyExistsError
+
+        parent_dict[key] = value
+        self.datastore.update(directory)
+        return value
+
+    def update(self, parent, key, value):
+        """
+        Update key/value pair in directory at parent
+        node level.
+        """
+        log.debug("Updating key %s and value %s at path %s" % (key, str(value), parent))
+        directory, parent_dict = self._find_dict(parent)
+
+        # Replace value, throwing exception if key not found.
+        try:
+            val = parent_dict[key]
+        except KeyError:
+            raise KeyNotFoundError
+
+        parent_dict[key] = value
+        self.datastore.update(directory)
+        return value
+
+    def read(self, parent, key=None):
+        """
+        Read key/value pair(s) residing in directory at parent
+        node level.
+        """
+        log.debug("Reading content at path %s" % str(parent))
+        directory, parent_dict = self._find_dict(parent)
+        if key is None:
+            return parent_dict
+
+        try:
+            val = parent_dict[key]
+        except KeyError:
+            raise KeyNotFoundError
+        return val
+
+    def remove(self, parent, key):
+        """
+        Remove key/value residing in directory at parent
+        node level.
+        """
+        log.debug("Removing content at path %s" % str(parent))
+        directory, parent_dict = self._find_dict(parent)
+        try:
+            val = parent_dict.pop(key)
+            self.datastore.update(directory)
+        except KeyError:
+            raise KeyNotFoundError
+        return val
+
+    def _find_dict(self, parent):
         """
         Helper method that reads the Directory object from the data store
         and then traverses the dict of dicts to find the desired parent
@@ -82,68 +146,4 @@ class Directory(object):
                         parent_dict[pathElement] = {}
                         parent_dict = parent_dict[pathElement]
         return directory, parent_dict
-
-    def add(self, parent, key, value):
-        """
-        Add a key/value pair to directory below parent
-        node level.
-        """
-        log.debug("Adding key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parent_dict = self.find_dict(parent)
-
-        # Add key and value, throwing exception if key already exists.
-        if key in parent_dict:
-            raise KeyAlreadyExistsError
-
-        parent_dict[key] = value
-        self.datastore.update(directory)
-        return value
-
-    def update(self, parent, key, value):
-        """
-        Update key/value pair in directory at parent
-        node level.
-        """
-        log.debug("Updating key %s and value %s at path %s" % (key, str(value), parent))
-        directory, parent_dict = self.find_dict(parent)
-
-        # Replace value, throwing exception if key not found.
-        try:
-            val = parent_dict[key]
-        except KeyError:
-            raise KeyNotFoundError
-
-        parent_dict[key] = value
-        self.datastore.update(directory)
-        return value
-
-    def read(self, parent, key=None):
-        """
-        Read key/value pair(s) residing in directory at parent
-        node level.
-        """
-        log.debug("Reading content at path %s" % str(parent))
-        directory, parent_dict = self.find_dict(parent)
-        if key is None:
-            return parent_dict
-
-        try:
-            val = parent_dict[key]
-        except KeyError:
-            raise KeyNotFoundError
-        return val
-
-    def remove(self, parent, key):
-        """
-        Remove key/value residing in directory at parent
-        node level.
-        """
-        log.debug("Removing content at path %s" % str(parent))
-        directory, parent_dict = self.find_dict(parent)
-        try:
-            val = parent_dict.pop(key)
-            self.datastore.update(directory)
-        except KeyError:
-            raise KeyNotFoundError
-        return val
 

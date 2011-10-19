@@ -3,12 +3,14 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.public import Container, GreenProcessSupervisor
-
-from collections import defaultdict
 import argparse
 
 import yaml
+
+from pyon.public import Container, GreenProcessSupervisor
+
+from pyon.container.cc import IContainerAgent
+from pyon.net.endpoint import RPCClient
 
 version = "2.0"     # TODO: extract this from the code once versioning is automated again
 description = '''
@@ -57,7 +59,15 @@ def main(opts, *args, **kwargs):
     container.start()
 
     if opts.rel:
-        container.start_rel(opts.rel)
+        container.start_rel_from_url(opts.rel)
+#
+#        print "XXXXXXXXX node: " + str(container.node)
+#
+#        client = RPCClient(node=container.node, name="container_agent", iface=IContainerAgent)
+#        print "XXXXXXXXX In main.  client: " + str(client)
+#        client.start_rel_from_url(opts.rel)
+#
+#        container.start_rel_from_url(opts.rel)
     
     if not opts.noshell:
         setup_ipython()

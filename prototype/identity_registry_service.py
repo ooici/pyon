@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound

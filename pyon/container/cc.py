@@ -46,6 +46,7 @@ class Container(object):
     """
     node = None
     def __init__(self, *args, **kwargs):
+        log.debug("Container.__init__")
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data

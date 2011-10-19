@@ -52,4 +52,4 @@ handlers:
 loggers:
   pyon:
     handlers: [console, file]
-    level: WARN
+    level: DEBUG

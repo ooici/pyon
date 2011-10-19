@@ -78,9 +78,9 @@ class MockDB_DataStore(DataStore):
         return res
 
     def create(self, object, datastore_name=""):
-        return self.create_doc(object.__dict__)
+        return self.create_doc(self._ion_object_to_persistence_dict(object))
 
-    def create_doc(self, object, datastore_name=""):
+    def create_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -88,11 +88,10 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        log.debug('Creating new object %s/%s' % (datastore_name, object["type_"]))
-
         # Assign an id to doc
-        object["_id"] = uuid4().hex
-        object_id = object["_id"]
+        doc["_id"] = uuid4().hex
+        object_id = doc["_id"]
+        log.debug('Creating new object %s/%s' % (datastore_name, object_id))
 
         # Create key for version counter entry.  Will be used
         # on update to increment version number easily.
@@ -100,15 +99,15 @@ class MockDB_DataStore(DataStore):
         versionCounter = 1
 
         # Assign initial version to doc
-        object["_rev"] = versionCounter
+        doc["_rev"] = versionCounter
 
         # Write HEAD, version and version counter dicts
-        datastore_dict[object_id] = object
+        datastore_dict[object_id] = doc
         datastore_dict[versionCounterKey] = versionCounter
-        datastore_dict[object_id + '_version_' + str(versionCounter)] = object
+        datastore_dict[object_id + '_version_' + str(versionCounter)] = doc
 
-        # Return tuple that identifies the id of the new doc and its version
-        res = (object_id, str(versionCounter))
+        # Return list that identifies the id of the new doc and its version
+        res = [object_id, str(versionCounter)]
         log.debug('Create result: %s' % str(res))
         return res
 
@@ -116,7 +115,7 @@ class MockDB_DataStore(DataStore):
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Ion object
-        obj = IonObject(doc["type_"], doc)
+        obj = self._persistence_dict_to_ion_object(doc)
         log.debug('Ion object: %s' % str(obj))
         return obj
 
@@ -142,9 +141,9 @@ class MockDB_DataStore(DataStore):
         return doc
 
     def update(self, object, datastore_name=""):
-        return self.update_doc(object.__dict__)
+        return self.update_doc(self._ion_object_to_persistence_dict(object))
 
-    def update_doc(self, object, datastore_name=""):
+    def update_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -153,32 +152,32 @@ class MockDB_DataStore(DataStore):
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         try:
-            object_id = object["_id"]
+            object_id = doc["_id"]
 
             # Find the next doc version
             versionCounterKey = '__' + object_id + '_version_counter'
-            baseVersion = object["_rev"]
+            baseVersion = doc["_rev"]
             versionCounter = datastore_dict[versionCounterKey] + 1
             if baseVersion != versionCounter - 1:
                 raise Conflict('Object not based on most current version')
         except KeyError:
             raise BadRequest("Object missing required _id and/or _rev values")
 
-        log.debug('Saving new version of object %s/%s/%s' % (datastore_name, object["type_"], object["_id"]))
-        object["_rev"] = versionCounter
+        log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
+        doc["_rev"] = versionCounter
 
         # Overwrite HEAD and version counter dicts, add new version dict
-        datastore_dict[object_id] = object
+        datastore_dict[object_id] = doc
         datastore_dict[versionCounterKey] = versionCounter
-        datastore_dict[object_id + '_version_' + str(versionCounter)] = object
-        res = (object_id, str(versionCounter))
+        datastore_dict[object_id + '_version_' + str(versionCounter)] = doc
+        res = [object_id, str(versionCounter)]
         log.debug('Update result: %s' % str(res))
         return res
 
     def delete(self, object, datastore_name=""):
-        return self.delete_doc(object.__dict__)
+        return self.delete_doc(self._ion_object_to_persistence_dict(object))
 
-    def delete_doc(self, object, datastore_name=""):
+    def delete_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -186,8 +185,8 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = object["_id"]
-        log.debug('Deleting object %s/%s' % (datastore_name, object["_id"]))
+        object_id = doc["_id"]
+        log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
         try:
             if object_id in datastore_dict.keys():
                 # Find all version dicts and delete them
@@ -209,7 +208,7 @@ class MockDB_DataStore(DataStore):
         results = []
         # Convert each returned doc to its associated Ion object
         for doc in docList:
-            obj = IonObject(doc["type_"], doc)
+            obj = self._persistence_dict_to_ion_object(doc)
             log.debug('Ion object: %s' % str(obj))
             results.append(obj)
 
@@ -295,7 +294,7 @@ class MockDB_DataStore(DataStore):
         results = []
         # Convert each returned doc to its associated Ion object
         for doc in doc_list:
-            obj = IonObject(doc["type_"], doc)
+            obj = self._persistence_dict_to_ion_object(doc)
             log.debug('Ion object: %s' % str(obj))
             results.append(obj)
 
@@ -392,9 +391,9 @@ class MockDB_DataStore(DataStore):
         for item in res_list:
             subject_dict = item[0]
             object_dict = item[2]
-            subject = IonObject(subject_dict["type_"], subject_dict)
+            subject = self._persistence_dict_to_ion_object(subject_dict)
             log.debug('Subject Ion object: %s' % str(subject))
-            object = IonObject(object_dict["type_"], object_dict)
+            object = self._persistence_dict_to_ion_object(object_dict)
             log.debug('Object Ion object: %s' % str(object))
             results.append([subject, item[1], object])
 
@@ -493,3 +492,14 @@ class MockDB_DataStore(DataStore):
                         if object in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+
+    def _ion_object_to_persistence_dict(self, ion_object):
+        obj_dict = ion_object.__dict__.copy()
+        obj_dict["type_"] = ion_object._def.type.name
+        return obj_dict
+
+    def _persistence_dict_to_ion_object(self, obj_dict):
+        init_dict = obj_dict.copy()
+        type = init_dict.pop("type_")
+        ion_object = IonObject(type, init_dict)
+        return ion_object

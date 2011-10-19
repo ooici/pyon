@@ -1,11 +1,13 @@
 """
 """
+from time import sleep
 
 from pyon.public import Container
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import RPCClient
+from pyon.util.async import spawn
 from pyon.util.log import log
 
 from interface.services.ibank_service import IBankService, BaseBankService
@@ -18,7 +20,7 @@ class BankService(BaseBankService):
         log.debug("account_type: %s" % str(account_type))
         res = []
         try:
-            res = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), ("name", DataStore.EQUAL, name)])
+            res = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), DataStore.AND, ("name", DataStore.EQUAL, name)])
             print "Existing customer.  Customer id: " + str(res)
         except NotFound:
             print "New customer"
@@ -69,12 +71,12 @@ class BankService(BaseBankService):
         Find all accounts (optionally of type) owned by user
         """
         try:
-            customer_list = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), ("name", DataStore.EQUAL, name)])
+            customer_list = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankCustomer"), DataStore.AND, ("name", DataStore.EQUAL, name)])
         except:
             log.error("No customers found!")
             return []
         customer_obj = customer_list[0]
-        accounts = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankAccount"), ("owner", DataStore.EQUAL, customer_obj._id)])
+        accounts = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankAccount"), DataStore.AND, ("owner", DataStore.EQUAL, customer_obj._id)])
         account_list = []
         for account in accounts:
             account_info = {}
@@ -143,6 +145,14 @@ def test_single_container():
     container = Container()
     container.start() # :(
     container.start_rel_from_url("res/deploy/r2deploy.yml")
+
+    server_listen_ready_list = container.start_rel('res/deploy/r2deploy.rel')
+
+    # wait for them to spawn: this is horribad, figure out better practice
+    for x in server_listen_ready_list:
+        print "Waiting for server listen ready"
+        x.get()
+        print ".. done"
 
     client = RPCClient(node=container.node, name="bank", iface=IBankService)
 

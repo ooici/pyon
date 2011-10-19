@@ -53,6 +53,10 @@ Next install the python package dependencies with:
 Run couchdb in second terminal before starting the container or running tests:
     couchdb
 
+Finally, you should add the current directory to your pythonpath for an easier time running scripts. Add the following
+line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
+export PYTHONPATH=.
+
 
 TEST
 ====
