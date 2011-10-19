@@ -101,6 +101,7 @@ class Container(object):
         # Recurse over the rel and start apps defined there.
         log.debug("In Container.start_rel  rel: %s" % str(rel))
 
+        server_listen_ready_list = []
         for rel_app_cfg in rel.apps:
             name = rel_app_cfg.name
             log.debug("rel definition: %s" % str(rel_app_cfg))
@@ -125,13 +126,14 @@ class Container(object):
             else:
                 processapp = app_file_cfg.processapp
 
-            self.start_app(processapp, config)
+            server_listen_ready_list.append(self.start_app(processapp, config))
+        return server_listen_ready_list
 
     def start_rel_from_url(self, rel_url=""):
         # Read the rel file and call start_rel
         log.debug("In Container.start_rel_from_url  rel_url: %s" % str(rel_url))
         rel = Config([rel_url]).data
-        self.start_rel(rel)
+        return self.start_rel(rel)
 
     def stop(self):
         log.debug("In Container.stop")
