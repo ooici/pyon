@@ -65,6 +65,8 @@ class Container(object):
         listener = BinderListener(self.node, self.name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
+        return listener.get_ready_event()
+
     def start_app(self, processapp=[], config={}):
         log.debug("In Container.start_app processapp: %s config: %s"%(str(processapp),str(config)))
         # Start process defined by processapp with specified config

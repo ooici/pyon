@@ -56,10 +56,13 @@ def main(opts, *args, **kwargs):
     print 'Starting ION CC with options: ', opts
 
     container = Container(*args, **kwargs)
-    container.start()
+
+    # start and wait for container to signal ready
+    ready = container.start()
+    ready.get()
 
     if opts.rel:
-        client = RPCClient(node=container.node, name="container_agent", iface=IContainerAgent)
+        client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
         client.start_rel_from_url(opts.rel)
 
     if not opts.noshell:
