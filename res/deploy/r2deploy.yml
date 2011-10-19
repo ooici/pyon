@@ -1,0 +1,40 @@
+type: release
+name: Release2Configuration
+version: 0.1
+description: Release 2 deployment configuration
+ion: 0.0.1
+apps:
+
+    # Bootlevels less than 4 are not represented in this rel file...
+
+#-------------#
+# Bootlevel 4 #
+#-------------#
+  - name: datastore
+    description: Data store service
+    version: 0.1
+    processapp: [datastore, prototype.datastore_service, DataStoreService]
+    config:
+        type: CouchDB
+        forceClean: true
+
+#-------------#
+# Bootlevel 7 #
+#-------------#
+  - name: identity_registry
+    version: 0.1
+    processapp: [identity_registry, prototype.identity_registry_service, IdentityRegistryService]
+
+#-------------#
+# Bootlevel 9 #
+#-------------#
+  - name: app_integration
+    version: 0.1
+    processapp: [app_integration, prototype.app_integration_service, AppIntegrationService]
+
+#--------------#
+# Bootlevel 11 #
+#--------------#
+  - name: bank
+    version: 0.1
+    processapp: [bank, prototype.bank, BankService]
