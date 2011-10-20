@@ -255,13 +255,6 @@ class ListeningEndpointFactory(EndpointFactory):
 
 class PublisherEndpoint(Endpoint):
     pass
-#    def _build_msg(self, raw_msg):
-#        """
-#        """
-#        msg = Endpoint._build_msg(self, raw_msg)
-#        encoded_msg = IonEncoder().encode(msg)
-#
-#        return encoded_msg
 
 class Publisher(EndpointFactory):
     """
@@ -386,26 +379,10 @@ class RequestResponseServer(ListeningEndpointFactory):
 
 class RPCRequestEndpoint(RequestEndpoint):
 
-#    def _build_msg(self, raw_msg):
-#        """
-#        This override encodes the message for RPC communication using an IonEncoder.
-#        It is called automatically by the base class send.
-#        """
-#        msg = RequestEndpoint._build_msg(self, raw_msg)
-#        log.error(pprint.pformat(msg))
-#        encoded_msg = IonEncoder().encode(msg)
-#
-#        return encoded_msg
-
     def send(self, msg):
         log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
-        # Endpoint.send will call our _build_msg override automatically.
         res = RequestEndpoint.send(self, msg)
-        #res = json.loads(result_data, object_hook=as_ionObject)
-        #res = msgpack.loads(result_data)
-        #res = as_ionObject(res)
-
         log.debug("RPCRequestEndpoint got this response: %s" % str(res))
 
         # Check response header
@@ -475,19 +452,6 @@ class RPCResponseEndpoint(ResponseEndpoint):
         hdrs = ResponseEndpoint._build_header(self, raw_msg)
         hdrs.update(self._response_headers)
         return hdrs
-
-#    def _build_payload(self, raw_msg):
-#        return self._response_payload
-
-#    def _build_msg(self, raw_msg):
-#        """
-#        This override encodes the message for RPC communication using an IonEncoder.
-#        It is called automatically by the base class send.
-#        """
-#        msg = ResponseEndpoint._build_msg(self, raw_msg)
-#        encoded_msg = IonEncoder().encode(msg)
-#
-#        return encoded_msg
 
     def message_received(self, msg):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -720,34 +684,3 @@ class _Command(object):
         cmd_dict['args'] = args
         log.debug("cmd_dict: %s" % str(cmd_dict))
         return cmd_dict
-
-class IonEncoder(object):
-    def encode(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = obj.__dict__
-            res["__isAnIonObject"] = obj._def.type.name
-            return res
-        return msgpack.dumps(obj)
-
-def as_ionObject(dct):
-    if "__isAnIonObject" in dct:
-        type = dct.pop("__isAnIonObject")
-        ionObj = IonObject(type.encode('ascii'), dct)
-        return ionObj
-    return dct
-
-
-class jsonIonEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = obj.__dict__
-            res["__isAnIonObject"] = obj._def.type.name
-            return res
-        return json.JSONEncoder.default(self, obj)
-
-def jsonas_ionObject(dct):
-    if "__isAnIonObject" in dct:
-        type = dct.pop("__isAnIonObject")
-        ionObj = IonObject(type.encode('ascii'), dct)
-        return ionObj
-    return dct
