@@ -23,3 +23,23 @@ cc:
     shutdown: 30.0
     heartbeat: 3.0
   proctype: green   # Type of ION process to spawn for new services/processes (green or python)
+
+interceptor:
+  interceptors:
+    sample:
+      class: pyon.core.interceptor.sample.SampleInterceptor
+    sampleprocessonly:
+      class: pyon.core.interceptor.sample.SampleProcessOnlyInterceptor
+    codec:
+      class: pyon.core.interceptor.codec.CodecInterceptor
+    validate:
+      class: pyon.core.interceptor.validate.ValidateInterceptor
+    encode:
+      class: pyon.core.interceptor.encode.EncodeInterceptor
+      config:
+        foo: bar
+  stack:
+    message_outgoing: [validate, codec, encode]
+    message_incoming: [encode, codec, validate]
+    process_outgoing: [sampleprocessonly]
+    process_incoming: [sampleprocessonly]
