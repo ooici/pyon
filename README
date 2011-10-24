@@ -60,6 +60,9 @@ Finally, you should add the current directory to your pythonpath for an easier t
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
     export PYTHONPATH=.
 
+Generate service definition interfaces and abstract base classes files:
+    python scripts/ion-obj.py generate
+
 
 TEST
 ====
@@ -81,7 +84,7 @@ List supported arguments:
     ./cc --help
 
 Start the CC with a deploy (*.rel) file:
-    ./cc
+    ./cc --rel res/deploy/r2deploy.rel
 
 
 EXAMPLES

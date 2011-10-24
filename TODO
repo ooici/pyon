@@ -1,5 +1,24 @@
 pyon TODO list:
+===============
+
+PACKAGING:
 
 - Remove all unnecessary imports from setup.py
-- Enable other packages to import pyon and run it from their directory
+- Automate versioning
+
+CODE:
+
 - Enforce naming conventions for interface dirs
+
+STARTUP
+
+- Enable to start more than one CC out of the same directory
+- Enable other packages to import pyon and run it from their directory
+
+OBJECTS:
+
+- Place ION objects and service definitions in separate git submodule
+
+DEPLOY:
+
+-
