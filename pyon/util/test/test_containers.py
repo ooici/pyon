@@ -11,9 +11,8 @@ class Test_Containers(unittest.TestCase):
 
     def test_dot_dict(self):
         dotDict = DotDict({"foo": {"bar": {"bah": "fah"}}})
-        dotDict.foo.bar.bah
-        getattr(dotDict, "foo.bar.bah")
-        self.assertEqual(dotDict["foo.bar.bah"], "fah")
+        val = dotDict.foo.bar.bah
+        self.assertEqual(val, "fah")
 
     def test_dict_modifier(self):
         base = DotDict({"foo": "bar", "bah": "fah"})
