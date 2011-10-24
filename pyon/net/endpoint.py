@@ -96,7 +96,6 @@ class Endpoint(object):
         """
         """
         log.debug("In Endpoint.send")
-        print "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX raw_msg:\n", raw_msg
         for line in traceback.format_stack():
             print line.strip()
         msg = self._build_msg(raw_msg)
@@ -105,7 +104,6 @@ class Endpoint(object):
 
         # @TODO dict check is a hax
         if isinstance(msg, dict):
-            print "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX msg:\n", msg
             inv = self._build_invocation(path=Invocation.PATH_OUT,
                                          message=msg)
             inv_prime = process_interceptors(interceptors["message_outgoing"], inv)
