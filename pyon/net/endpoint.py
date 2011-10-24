@@ -351,7 +351,7 @@ class RequestEndpoint(BidirectionalEndpoint):
 
         Endpoint.send(self, msg)
 
-        result_data = self.response_queue.get()
+        result_data = self.response_queue.get(timeout=10)
         log.debug("got response to our request: %s" % str(result_data))
         return result_data
 

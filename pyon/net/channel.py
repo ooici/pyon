@@ -429,7 +429,7 @@ class BaseChannel(object):
         """
         log.debug("In BaseChannel.sendto")
 
-    def _send(self, name, data, headers={},
+    def _send(self, name, data, headers=None,
                                 content_type=None,
                                 content_encoding=None,
                                 message_type=None,
@@ -444,6 +444,7 @@ class BaseChannel(object):
         log.debug("name: %s" % str(name))
         log.debug("data: %s" % str(data))
         exchange, routing_key = name
+        headers = headers or {}
         props = BasicProperties(headers=headers,
                             content_type=content_type,
                             content_encoding=content_encoding,
