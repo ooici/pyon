@@ -9,6 +9,12 @@ from pyon.util.containers import DictModifier, DotDict
 
 class Test_Containers(unittest.TestCase):
 
+    def test_dot_dict(self):
+        dotDict = DotDict({"foo": {"bar": {"bah": "fah"}}})
+        dotDict.foo.bar.bah
+        getattr(dotDict, "foo.bar.bah")
+        self.assertEqual(dotDict["foo.bar.bah"], "fah")
+
     def test_dict_modifier(self):
         base = DotDict({"foo": "bar", "bah": "fah"})
         dict_modifier = DictModifier(base)
