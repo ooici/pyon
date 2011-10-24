@@ -1,37 +1,51 @@
 import pprint
 from gevent import event
 
-import json # generalize
-import msgpack
+#import json # generalize
+#import msgpack
 
-from pyon.core.bootstrap import IonObject, CFG, sys_name
-from pyon.core.object import IonObjectBase
+import traceback
+
+from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
-from pyon.net.interceptor import SampleInterceptor, Invocation, SampleProcessOnlyInterceptor, CodecInterceptor, EncoderInterceptor
+from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
-# @TODO: a proper interceptor management system, for now, this works
-# interceptor paths
-interceptors = {
-    'message-in':  [EncoderInterceptor(), CodecInterceptor()],
-    'message-out': [CodecInterceptor(), EncoderInterceptor()],
-    'process-in':  [SampleProcessOnlyInterceptor()],
-    'process-out': [SampleProcessOnlyInterceptor()],
-}
+def instantiate_interceptors(interceptor_cfg):
+    stack = interceptor_cfg["stack"]
+    defs = interceptor_cfg["interceptors"]
 
-def process_interceptors(interceptors, invocation):
-    for int in interceptors:
-        try:
-            invocation = int.process(invocation)
-        finally:
-            pass
-#        except Exception, ex:
-#            log.exception("Error in interceptor path")
-#            log.error(str(ex))
-#            raise ex
-    return invocation
+    by_name_dict = {}
+    resdict = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
+    for type_and_direction in stack:
+        interceptor_names = stack[type_and_direction]
+        for name in interceptor_names:
+            if name in by_name_dict:
+                classinst = by_name_dict[name]
+            else:
+                interceptor_def = defs[name]
+
+                # Instantiate and put in by_name array
+                parts = interceptor_def["class"].split('.')
+                modpath = ".".join(parts[:-1])
+                classname = parts[-1]
+                module = __import__(modpath, fromlist=[classname])
+                classobj = getattr(module, classname)
+                classinst = classobj()
+
+                # Call configure
+                classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
+
+                # Put in by_name_dict for possible re-use
+                by_name_dict[name] = classinst
+
+            resdict[type_and_direction].append(classinst)
+
+    return resdict
+
+interceptors = instantiate_interceptors(CFG.interceptor)
 
 class Endpoint(object):
 
@@ -68,7 +82,7 @@ class Endpoint(object):
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_IN,
                                      message=msg)
-        inv_prime = process_interceptors(interceptors['message-in'], inv)
+        inv_prime = process_interceptors(interceptors["message_incoming"], inv)
         new_msg = inv_prime.message
 
         self.message_received(new_msg)
@@ -82,16 +96,19 @@ class Endpoint(object):
         """
         """
         log.debug("In Endpoint.send")
+        print "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX raw_msg:\n", raw_msg
+        for line in traceback.format_stack():
+            print line.strip()
         msg = self._build_msg(raw_msg)
 
         # interceptor point
 
         # @TODO dict check is a hax
         if isinstance(msg, dict):
+            print "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX msg:\n", msg
             inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['message-out'], inv)
+                                         message=msg)
+            inv_prime = process_interceptors(interceptors["message_outgoing"], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -556,17 +573,13 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
     def _message_received(self, msg):
         """
-        Override to send incoming messages through the process-in interceptor stack
+        Override to send incoming messages through the process_incoming interceptor stack
         """
         # @TODO dict check is a hax
         if isinstance(msg, dict):
-
             inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['process-in'], inv)
-
-            # @TODO check dropped etc
+                                         message=msg)
+            inv_prime = process_interceptors(interceptors["process_incoming"], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -575,16 +588,13 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
     def send(self, msg):
         """
-        Override to send outgoing messages through the process-out interceptor stack
+        Override to send outgoing messages through the process_outgoing interceptor stack
         """
         # @TODO dict check is a hax
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['process-out'], inv)
-
-            # @TODO check for dropped etc
+                                         message=msg)
+            inv_prime = process_interceptors(interceptors["process_outgoing"], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -646,17 +656,13 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
     def _message_received(self, msg):
         """
-        Override to send incoming messages through the process-in interceptor stack
+        Override to send incoming messages through the process_incoming interceptor stack
         """
         # @TODO dict check is a hax
         if isinstance(msg, dict):
-
             inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['process-in'], inv)
-
-            # @TODO check dropped etc
+                                         message=msg)
+            inv_prime = process_interceptors(interceptors["process_incoming"], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -665,16 +671,13 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
     def send(self, msg):
         """
-        Override to send outgoing messages through the process-out interceptor stack
+        Override to send outgoing messages through the process_outgoing interceptor stack
         """
         # @TODO dict check is a hax
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg,
-                                         content=msg['payload'])
-            inv_prime = process_interceptors(interceptors['process-out'], inv)
-
-            # @TODO check for dropped etc
+                                         message=msg)
+            inv_prime = process_interceptors(interceptors["process_outgoing"], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -720,34 +723,3 @@ class _Command(object):
         cmd_dict['args'] = args
         log.debug("cmd_dict: %s" % str(cmd_dict))
         return cmd_dict
-
-class IonEncoder(object):
-    def encode(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = obj.__dict__
-            res["__isAnIonObject"] = obj._def.type.name
-            return res
-        return msgpack.dumps(obj)
-
-def as_ionObject(dct):
-    if "__isAnIonObject" in dct:
-        type = dct.pop("__isAnIonObject")
-        ionObj = IonObject(type.encode('ascii'), dct)
-        return ionObj
-    return dct
-
-
-class jsonIonEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = obj.__dict__
-            res["__isAnIonObject"] = obj._def.type.name
-            return res
-        return json.JSONEncoder.default(self, obj)
-
-def jsonas_ionObject(dct):
-    if "__isAnIonObject" in dct:
-        type = dct.pop("__isAnIonObject")
-        ionObj = IonObject(type.encode('ascii'), dct)
-        return ionObj
-    return dct
