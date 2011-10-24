@@ -1,4 +1,5 @@
 # Configuration file for setting log levels.
+# To define local overrides, add a file "logging.local.yml"
 
 # Required.  Do not touch or alter.
 version: 1
@@ -29,7 +30,7 @@ handlers:
     formatter: default
     level: DEBUG
     filename: logs/logfile.txt
-    maxBytes: 1024
+    maxBytes: 1024000
     backupCount: 3
 
 # Section for defining logger log levels.  Loggers
