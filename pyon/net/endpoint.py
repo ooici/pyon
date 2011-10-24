@@ -1,10 +1,4 @@
-import pprint
 from gevent import event
-
-#import json # generalize
-#import msgpack
-
-import traceback
 
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
@@ -96,8 +90,6 @@ class Endpoint(object):
         """
         """
         log.debug("In Endpoint.send")
-        for line in traceback.format_stack():
-            print line.strip()
         msg = self._build_msg(raw_msg)
 
         # interceptor point
