@@ -4,7 +4,8 @@ from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net.channel import PubSub
-from pyon.net.endpoint import Endpoint, EndpointFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, IonEncoder, RPCClient, _Command, RPCResponseEndpoint
+from pyon.net import endpoint
+from pyon.net.endpoint import Endpoint, EndpointFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event, GreenletExit
 from pyon.service.service import BaseService
 from pyon.util.async import wait, spawn
@@ -13,6 +14,12 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 import unittest
+
+# NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
+endpoint.interceptors = {'message-in': [],
+                         'message-out': [],
+                         'process-in': [],
+                         'process-out': []}
 
 class FakeChannel(object):
     """
@@ -59,9 +66,9 @@ class FakeRPCChannel(FakeChannel):
     def recv(self):
         if not self._sentone:
             self._sentone = True
-            return IonEncoder().encode({ 'header' : { 'status_code': self._code,
-                                                      'error_message': self._msg },
-                                         'payload' : 'some payload' })
+            return { 'header' : { 'status_code': self._code,
+                                  'error_message': self._msg },
+                     'payload' : 'some payload' }
         else:
             res = event.AsyncResult()
             res.get()
@@ -307,7 +314,7 @@ class FakeRPCServerChannel(FakeChannel):
             cmd = _Command(None, info[0], info[1].getSignatureInfo(), "")
             pl = cmd._command_dict_from_call('ein', 'zwei')
             print "\n\n\nMY PAYLOAD IS", str(pl), "\n\n\n"
-            return IonEncoder().encode({'header':{}, 'payload':pl})
+            return {'header':{}, 'payload':pl}
         else:
             res = event.AsyncResult()
             res.get()
