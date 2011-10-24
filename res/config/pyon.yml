@@ -34,10 +34,10 @@ interceptor:
       class: pyon.core.interceptor.codec.CodecInterceptor
     validate:
       class: pyon.core.interceptor.validate.ValidateInterceptor
+      config:
+        enabled: true
     encode:
       class: pyon.core.interceptor.encode.EncodeInterceptor
-      config:
-        foo: bar
   stack:
     message_outgoing: [validate, codec, encode]
     message_incoming: [encode, codec, validate]
