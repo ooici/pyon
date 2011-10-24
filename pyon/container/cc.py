@@ -9,13 +9,15 @@ per request. This will also facilitate the Endpoint holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional. 
 """
-import os
-from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.net import messaging, channel
+import os
+
+from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
+
+from pyon.net import messaging
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.service.service import add_service_by_name, get_service_by_name
 
