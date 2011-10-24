@@ -7,12 +7,13 @@ from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
+interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
+
 def instantiate_interceptors(interceptor_cfg):
     stack = interceptor_cfg["stack"]
     defs = interceptor_cfg["interceptors"]
 
     by_name_dict = {}
-    resdict = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
     for type_and_direction in stack:
         interceptor_names = stack[type_and_direction]
         for name in interceptor_names:
@@ -35,11 +36,9 @@ def instantiate_interceptors(interceptor_cfg):
                 # Put in by_name_dict for possible re-use
                 by_name_dict[name] = classinst
 
-            resdict[type_and_direction].append(classinst)
+            interceptors[type_and_direction].append(classinst)
 
-    return resdict
-
-interceptors = instantiate_interceptors(CFG.interceptor)
+instantiate_interceptors(CFG.interceptor)
 
 class Endpoint(object):
 
@@ -76,7 +75,7 @@ class Endpoint(object):
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_IN,
                                      message=msg)
-        inv_prime = process_interceptors(interceptors["message_incoming"], inv)
+        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
         new_msg = inv_prime.message
 
         self.message_received(new_msg)
@@ -98,7 +97,7 @@ class Endpoint(object):
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
                                          message=msg)
-            inv_prime = process_interceptors(interceptors["message_outgoing"], inv)
+            inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -533,7 +532,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_IN,
                                          message=msg)
-            inv_prime = process_interceptors(interceptors["process_incoming"], inv)
+            inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -548,7 +547,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
                                          message=msg)
-            inv_prime = process_interceptors(interceptors["process_outgoing"], inv)
+            inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -616,7 +615,7 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_IN,
                                          message=msg)
-            inv_prime = process_interceptors(interceptors["process_incoming"], inv)
+            inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
@@ -631,7 +630,7 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         if isinstance(msg, dict):
             inv = self._build_invocation(path=Invocation.PATH_OUT,
                                          message=msg)
-            inv_prime = process_interceptors(interceptors["process_outgoing"], inv)
+            inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
             new_msg = inv_prime.message
         else:
             new_msg = msg
