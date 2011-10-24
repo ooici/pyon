@@ -7,7 +7,6 @@ pyon - Python COI Capability Container and Core Modules R2
 (C) UC Regents, 2010-2011
 ===========================================================
 
-Prototypes for Python COI Capability Container R2.
 
 INSTALL
 =======
@@ -38,13 +37,17 @@ You need the following installed before you can use pyon:
     - The Homebrew version on a mac is sufficient.
 
 Short version to setup a Mac (assumes python 2.7 is already setup):
-  brew install libevent libyaml zeromq couchdb
+    brew install libevent libyaml zeromq couchdb
 
 Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
     mkvirtualenv --no-site-packages --python=python2.7 ion27
     workon ion27
 
-Next install the python package dependencies with:
+
+DEPENDENCIES
+============
+
+Install the python package dependencies with:
     python setup.py install
 
   - The installation of numpy may fail.
@@ -55,7 +58,7 @@ Run couchdb in second terminal before starting the container or running tests:
 
 Finally, you should add the current directory to your pythonpath for an easier time running scripts. Add the following
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
-export PYTHONPATH=.
+    export PYTHONPATH=.
 
 
 TEST
@@ -67,8 +70,21 @@ Run the unittests:
 Run code coverage:
     nosetests -w pyon --with-coverage --cover-package=pyon
 
+
 USE
 ===
 
 Start the capability container in interactive mode:
     ./cc
+
+List supported arguments:
+    ./cc --help
+
+Start the CC with a deploy (*.rel) file:
+    ./cc
+
+
+EXAMPLES
+========
+
+Make sure to look in the examples directory for a README and examples.

@@ -1,0 +1,5 @@
+pyon TODO list:
+
+- Remove all unnecessary imports from setup.py
+- Enable other packages to import pyon and run it from their directory
+- Enforce naming conventions for interface dirs

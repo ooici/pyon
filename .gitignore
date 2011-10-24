@@ -31,3 +31,4 @@ logs
 res/config/*~*
 scripts/*~*
 unittest.out
+interface/*
