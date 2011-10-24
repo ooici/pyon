@@ -100,13 +100,15 @@ class Container(object):
         listener = BinderListener(self.node, name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
-        return listener.get_ready_event()
+        # Wait for app to spawn
+        log.debug("Waiting for server %s listener ready", name)
+        listener.get_ready_event().get()
+        log.debug("Server %s listener ready", name)
 
     def start_rel(self, rel={}):
         # Recurse over the rel and start apps defined there.
         log.debug("In Container.start_rel  rel: %s" % str(rel))
 
-        server_listen_ready_list = []
         for rel_app_cfg in rel.apps:
             name = rel_app_cfg.name
             log.debug("rel definition: %s" % str(rel_app_cfg))
@@ -131,14 +133,13 @@ class Container(object):
             else:
                 processapp = app_file_cfg.processapp
 
-            server_listen_ready_list.append(self.start_app(processapp, config))
-        return server_listen_ready_list
+            self.start_app(processapp, config)
 
     def start_rel_from_url(self, rel_url=""):
         # Read the rel file and call start_rel
         log.debug("In Container.start_rel_from_url  rel_url: %s" % str(rel_url))
         rel = Config([rel_url]).data
-        return self.start_rel(rel)
+        self.start_rel(rel)
 
     def stop(self):
         log.debug("In Container.stop")
