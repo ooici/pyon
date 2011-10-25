@@ -251,12 +251,12 @@ class Test_DataStores(unittest.TestCase):
         self._do_test(MockDB_DataStore(datastore_name='my_ds'))
 
     def test_persistent(self):
+        import socket
         try:
-            ds = CouchDB_DataStore(datastore_name='my_ds')
-        except:
+            self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
+        except socket.error:
             raise unittest.SkipTest('Failed to connect to CouchDB')
 
-        self._do_test(ds)
 
 if __name__ == "__main__":
     unittest.main()

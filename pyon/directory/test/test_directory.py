@@ -44,12 +44,12 @@ class Test_Directory(unittest.TestCase):
         self._do_test(Directory(datastore_name='my_directory_ds', persistent=False))
 
     def test_persistent(self):
+        import socket
         try:
-            directory = Directory(datastore_name='my_directory_ds', persistent=True)
+            self._do_test(Directory(datastore_name='my_directory_ds',
+                persistent=True))
         except:
             raise unittest.SkipTest('Failed to connect to CouchDB')
-
-        self._do_test(directory)
 
 if __name__ == "__main__":
     unittest.main()
