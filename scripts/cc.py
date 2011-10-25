@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 import argparse
 
 import yaml
+from uuid import uuid4
 
 from pyon.public import Container, GreenProcessSupervisor
 
@@ -94,6 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
+    parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
@@ -104,7 +106,8 @@ if __name__ == '__main__':
         from lockfile import FileLock
 
         # TODO: May need to generate a pidfile based on some parameter or cc name
-        with DaemonContext(pidfile=FileLock('cc.pid')):
+        pidfile = opts.pidfile or 'cc-%s.pid' % str(uuid4())[0:4]
+        with DaemonContext(pidfile=FileLock(pidfile)):
             main(opts, *args, **kwargs)
     else:
         main(opts, *args, **kwargs)
