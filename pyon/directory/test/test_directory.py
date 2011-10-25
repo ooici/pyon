@@ -48,7 +48,7 @@ class Test_Directory(unittest.TestCase):
         try:
             self._do_test(Directory(datastore_name='my_directory_ds',
                 persistent=True))
-        except:
+        except socket.error:
             raise unittest.SkipTest('Failed to connect to CouchDB')
 
 if __name__ == "__main__":
