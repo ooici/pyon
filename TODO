@@ -1,23 +1,31 @@
-pyon TODO list:
-===============
+Current pyon TODO list:
+=======================
 
 PACKAGING:
 
 - Remove all unnecessary imports from setup.py
-- Automate versioning
+- Automate versioning and packaging of pyon egg
 
 CODE:
 
-- Enforce naming conventions for interface dirs
+- Rename pyon.container.cc into something else (conflicts with cc start script)
+- Enforce naming conventions for generated interface dirs
 
 STARTUP
 
-- Enable to start more than one CC out of the same directory
+- Enable to start more than one CC out of the same directory (logging, pid file)
 - Enable other packages to import pyon and run it from their directory
+- Process spawnargs
+- Starter one-off script accessing a container via messaging
 
 OBJECTS:
 
 - Place ION objects and service definitions in separate git submodule
+- Rename obj into objects (obj looks like build files)
+
+CONTAINER:
+
+
 
 DEPLOY:
 
