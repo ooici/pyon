@@ -1,8 +1,0 @@
-name: transformation_service.py
-dependencies: []
-methods:
-  transform:
-    in:
-
-    out:
-

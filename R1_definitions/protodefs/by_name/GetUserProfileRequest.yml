@@ -1,6 +1,0 @@
-# _ID = 9104
-# _VERSION = 1
-obj:
-  GetUserProfileRequest:
-    user_ooi_id: ""
---- # _ID = 9104

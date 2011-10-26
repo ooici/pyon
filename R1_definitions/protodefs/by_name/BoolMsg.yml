@@ -1,6 +1,0 @@
-# _ID = 30
-# _VERSION = 1
-obj:
-  BoolMsg:
-    result: true
---- # _ID = 30

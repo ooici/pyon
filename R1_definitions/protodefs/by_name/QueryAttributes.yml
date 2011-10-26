@@ -1,9 +1,0 @@
-# _ID = 17
-# _VERSION = 1
-obj:
-  QueryAttributes:
-    attrs: [
-      attribute_name: ""
-      attribute_value: ""
-      predicate_type: ""]
---- # _ID = 17

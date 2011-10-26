@@ -1,9 +1,0 @@
-# _ID = 48
-# _VERSION = 1
-obj:
-  RequestCommitBlobsMessage:
-    commit_root_object: ""
-    excluded_types: [
-      object_id: -1
-      version: -1]
---- # _ID = 48

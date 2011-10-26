@@ -1,6 +1,0 @@
-# _ID = 9206
-# _VERSION = 1
-obj:
-  SubscriptionDeleteRspMsg:
-    success: true
---- # _ID = 9206

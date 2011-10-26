@@ -1,7 +1,0 @@
-# _ID = 2338
-# _VERSION = 1
-obj:
-  EventMonitorGetDataMessage:
-    session_id: ""
-    timestamp: ""
---- # _ID = 2338

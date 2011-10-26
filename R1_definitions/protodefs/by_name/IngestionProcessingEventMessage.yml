@@ -1,9 +1,0 @@
-# _ID = 2343
-# _VERSION = 1
-obj:
-  IngestionProcessingEventMessage:
-    dataset_id: ""
-    ingestion_process_id: ""
-    conv_id: ""
-    processing_step: ""
---- # _ID = 2343

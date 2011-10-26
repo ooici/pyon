@@ -1,8 +1,0 @@
-name: presentation_service.py
-dependencies: []
-methods:
-  present_catalog:
-    in:
-
-    out:
-

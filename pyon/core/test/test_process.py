@@ -4,11 +4,12 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
+from pyon.test.pyontest import PyonTestCase
+from unittest import SkipTest
 
-import unittest
 import time
 
-class ProcessTest(unittest.TestCase):
+class ProcessTest(PyonTestCase):
     def setUp(self):
         self.counter = 0
 
@@ -60,13 +61,10 @@ class ProcessTest(unittest.TestCase):
         self.assertGreaterEqual(elapsed, proc_sleep_secs)
 
     def test_python(self):
-        raise unittest.SkipTest('Need a better test here')
+        raise SkipTest('Need a better test here')
         self.counter = 0
         proc = PythonProcess(self.increment, 2)
         proc.start()
         self.assertEqual(self.counter, 0)
         proc.join()
         self.assertEqual(self.counter, 2)
-
-if __name__ == '__main__':
-    unittest.main()

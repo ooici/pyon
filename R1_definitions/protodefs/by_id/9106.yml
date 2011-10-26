@@ -1,7 +1,0 @@
-# _ID = 9106
-# _VERSION = 1
-obj:
-  ManageUserRoleRequest:
-    user_ooi_id: ""
-    role: ""
---- # _ID = 9106

@@ -1,6 +1,0 @@
-# _ID = 2323
-# _VERSION = 1
-obj:
-  ResourceLifecycleEventMessage:
-    state: NEW
---- # _ID = 2323

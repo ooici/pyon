@@ -1,8 +1,0 @@
-# _ID = 59
-# _VERSION = 1
-obj:
-  GetLCSResponseMessage:
-    key_lcs_pairs: [
-      key: ""
-      lcs: NEW]
---- # _ID = 59

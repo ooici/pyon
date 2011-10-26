@@ -3,19 +3,18 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-import pyon
 from pyon.core.object import IonObjectRegistry
 from pyon.core.bootstrap import IonObject
+from pyon.test.pyontest import PyonTestCase
 
 import os
-import unittest
 import datetime
 
-class ObjectTest(unittest.TestCase):
+class ObjectTest(PyonTestCase):
     def setUp(self):
         # TODO: Change the hacky hardcoded path once we have path management
         self.registry = IonObjectRegistry()
-        path = os.path.join(pyon.__path__[0], '..', 'obj', 'prototype', 'sample.yml')
+        path = os.path.join('obj', 'data', 'sample.yml')
         defs_yaml = open(path, 'r').read()
         self.registry.register_yaml(defs_yaml)
 
@@ -49,6 +48,3 @@ class ObjectTest(unittest.TestCase):
         """ Use the factory and singleton from bootstrap.py/public.py """
         obj = IonObject('SampleObject')
         self.assertEqual(obj.name, '')
-
-if __name__ == '__main__':
-    unittest.main()

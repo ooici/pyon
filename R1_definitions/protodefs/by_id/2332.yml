@@ -1,7 +1,0 @@
-# _ID = 2332
-# _VERSION = 1
-obj:
-  AppLoaderEventMessage:
-    app_name: ""
-    state: STARTED
---- # _ID = 2332

@@ -1,9 +1,0 @@
-# _ID = 20029
-# _VERSION = 1
-obj:
-  InstrumentResource:
-    name: ""
-    make: ""
-    model: ""
-    serial_number: ""
---- # _ID = 20029

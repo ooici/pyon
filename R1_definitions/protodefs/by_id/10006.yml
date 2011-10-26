@@ -1,8 +1,0 @@
-# _ID = 10006
-# _VERSION = 1
-obj:
-  FeatureCollection:
-    feature: [
-      name: ""
-      feature_type: PointFeature]
---- # _ID = 10006

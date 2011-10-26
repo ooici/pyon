@@ -22,7 +22,8 @@ from pyon.net.endpoint import RPCServer, BinderListener
 
 from pyon.net import messaging
 from pyon.container.apps import AppManager
-from pyon.core.bootstrap import CFG, sys_name
+from pyon.core.bootstrap import CFG, sys_name, populate_registry
+
 
 from pyon.util.log import log
 from pyon.util.containers import DictModifier
@@ -79,6 +80,10 @@ class Container(object):
 
     def start(self):
         log.debug("In Container.start")
+
+        # Bootstrap object registry
+        populate_registry()
+
         self.pidfile = "cc-pid-%d" % os.getpid()
         if os.path.exists(self.pidfile):
             raise Exception("Existing pid file already found: %s" % self.pidfile)

@@ -1,8 +1,0 @@
-# _ID = 20010
-# _VERSION = 1
-obj:
-  TestObj:
-    string: ""
-    integer: -1
-    float: -1.0
---- # _ID = 20010

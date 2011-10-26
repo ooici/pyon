@@ -1,7 +1,0 @@
-# _ID = 2302
-# _VERSION = 1
-obj:
-  DataResourceDetailMessage:
-    type: SUMMARY
-    body: ""
---- # _ID = 2302

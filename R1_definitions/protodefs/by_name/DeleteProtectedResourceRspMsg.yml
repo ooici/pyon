@@ -1,6 +1,0 @@
-# _ID = 20045
-# _VERSION = 1
-obj:
-  DeleteProtectedResourceRspMsg:
-    status: ""
---- # _ID = 20045

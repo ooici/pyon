@@ -5,10 +5,9 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.state_object import StateObject, BasicFSMFactory, BasicStates
+from pyon.test.pyontest import PyonTestCase
 
-import unittest
-
-class StateObjectTest(unittest.TestCase):
+class StateObjectTest(PyonTestCase):
     """
     Tests state object stuff
     """

@@ -1,7 +1,0 @@
-# _ID = 20041
-# _VERSION = 1
-obj:
-  CreateProtectedResourceRspMsg:
-    status: ""
-    resource_id: ""
---- # _ID = 20041

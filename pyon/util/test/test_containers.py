@@ -3,11 +3,10 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-import unittest
-
 from pyon.util.containers import DictModifier, DotDict
+from pyon.test.pyontest import PyonTestCase
 
-class Test_Containers(unittest.TestCase):
+class Test_Containers(PyonTestCase):
 
     def test_dot_dict(self):
         dotDict = DotDict({"foo": {"bar": {"bah": "fah"}}})
