@@ -74,7 +74,7 @@ See more about submodules:
 GENERATE SERVICE STUBS:
 
 Generate service definition interfaces and abstract base classes files:
-    python scripts/ion-obj.py generate
+    python scripts/generate_interfaces.py
     Note: These will be placed in the interfaces/ subdirectory.
 
 
