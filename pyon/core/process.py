@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Classes to build and manage pyon container worker processes."""
+
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
@@ -16,10 +18,16 @@ class PyonProcessError(Exception):
 
 class PyonProcess(object):
     """
-    Base process class for doing work. There will be subclasses for various process kinds like greenlets.
+    @brief Process abstract base class for doing work in the container.
+    There will be subclasses for various process kinds like greenlets and OS processes.
     """
 
     def __init__(self, target=None, *args, **kwargs):
+        """
+        @param target The Callable to start as independent process
+        @param args  Provided as spawn args to process
+        @param kwargs  Provided as spawn kwargs to process
+        """
         super(PyonProcess, self).__init__()
 
         if target is not None or not hasattr(self, 'target'):   # Allow setting target at class level
@@ -89,7 +97,9 @@ class PyonProcess(object):
 
 
 class GreenProcess(PyonProcess):
-    """ An BaseProcess that uses a greenlet to do its work. """
+    """
+    @brief A BaseProcess that uses a greenlet to do its work.
+    """
 
     def _pid(self):
         return id(self.proc)
@@ -107,7 +117,9 @@ class GreenProcess(PyonProcess):
         return self.proc.started
 
 class PythonProcess(PyonProcess):
-    """ An BaseProcess that uses a full OS process to do its work. """
+    """
+    @brief A BaseProcess that uses a full OS process to do its work.
+    """
 
     def _pid(self):
         return self.proc.pid
@@ -129,7 +141,7 @@ class PythonProcess(PyonProcess):
 
 class ProcessSupervisor(object):
     """
-    Manage spawning processes of multiple kinds and ensure they're alive.
+    @brief Manage spawning processes of multiple kinds and ensure they're alive.
     TODO: Add heartbeats with zeromq for monitoring and restarting.
     """
 
@@ -137,6 +149,7 @@ class ProcessSupervisor(object):
           'green': GreenProcess
         , 'python': PythonProcess
     }
+
     def __init__(self, heartbeat_secs=10.0):
         super(ProcessSupervisor, self).__init__()
 
@@ -147,7 +160,8 @@ class ProcessSupervisor(object):
 
     def spawn(self, type_and_target, *args, **kwargs):
         """
-        type_and_target should either be a tuple of (type, target) where type is a string in type_callables
+        @brief Spawn a pyon process
+        @param type_and_target should either be a tuple of (type, target) where type is a string in type_callables
         and target is a callable, or a subclass of PyonProcess that defines its own "target" method.
         """
         if isinstance(type_and_target, tuple):
@@ -203,7 +217,9 @@ class ProcessSupervisor(object):
             time.sleep(self.heartbeat_secs)
 
     def shutdown(self, timeout=30.0):
-        """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
+        """
+        @brief Give child processes "timeout" seconds to shutdown, then forcibly terminate.
+        """
 
         unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
         elapsed = self.join_children(timeout)
@@ -213,11 +229,15 @@ class ProcessSupervisor(object):
         return elapsed
 
 class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
-    """ A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses. """
+    """
+    A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses.
+    """
     pass
 
 def shutdown_or_die(delay_sec=0):
-    """ Wait the given number of seconds and forcibly kill this process if it's still running. """
+    """
+    Wait the given number of seconds and forcibly kill this process if it's still running.
+    """
 
     def diediedie(sig=None, frame=None):
         pid = os.getpid()

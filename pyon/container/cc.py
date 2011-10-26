@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+Capability Container base class
 TODO:
 [ ] server and client name argument is a short cut
 [ ] generic server and client delivery loop
@@ -31,12 +32,14 @@ from pyon.ion.process import IonProcessSupervisor
 
 from zope.interface import providedBy
 from zope.interface import Interface, implements
+
+import string
 import os
 import msgpack
 
 class IContainerAgent(Interface):
 
-    def start_process():
+    def spawn_process(name=None, module=None, cls=None, config=None):
         pass
 
     def start_app(appdef=None, processapp=None, config=None):
@@ -58,7 +61,8 @@ class Container(object):
     that do the bulk of the work in the ION system.
     """
     node = None
-    name = "container_agent-%s-%d" % (sys_name, os.getpid())
+    id = string.replace('%s.%d' % (os.uname()[1], os.getpid()), ".", "_")
+    name = "container_agent-%s" % (id)
     pidfile = None
 
     def __init__(self, *args, **kwargs):
