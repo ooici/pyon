@@ -31,8 +31,7 @@ sys_name = CFG.system.name or 'pyon.%s' % os.uname()[1].replace('.', '_')
 obj_registry = IonServiceRegistry()
 IonObject = obj_registry.new
 
-# DAFTODO
 def populate_registry():
-    obj_registry.register_obj_dir('../ion-definitions/objects', ['ion.yml'], ['services'])
-    obj_registry.register_svc_dir('../ion-definitions/objects/services')
+    obj_registry.register_obj_dir('obj', ['ion.yml'], ['services'])
+    obj_registry.register_svc_dir('obj/services')
 

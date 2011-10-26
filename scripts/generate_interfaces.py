@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Ion utility for generating interfaces from object definitions (and vice versa).
+
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
@@ -75,15 +77,10 @@ def build_args_str(_def, include_self=True):
     args_str = ', '.join(args)
     return args_str
 
-'''
-Ion utility for generating interfaces from object definitions (and vice versa).
-'''
-
 if os.getcwd().endswith('scripts'):
     sys.exit('This script needs to be run from the pyon root.')
 
-# DAFTODO
-service_dir, interface_dir = '../ion-definitions/objects/services', 'interface'
+service_dir, interface_dir = 'obj/services', 'interface'
 if not os.path.exists(interface_dir):
     os.makedirs(interface_dir)
 
@@ -96,9 +93,8 @@ open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
 # Load data yaml files in case services define interfaces
 # in terms of common data objects
-# DAFTODO
-file_re = re.compile('(../ion-definitions/objects)/(.*)[.](yml)')
-data_dir = '../ion-definitions/objects/data'
+file_re = re.compile('(obj)/(.*)[.](yml)')
+data_dir = 'obj/data'
 for root, dirs, files in os.walk(data_dir):
     for filename in fnmatch.filter(files, '*.yml'):
         yaml_file = os.path.join(root, filename)
@@ -114,7 +110,6 @@ for root, dirs, files in os.walk(data_dir):
 
 # Generate the new definitions, for now giving each
 # yaml file its own python service
-# DAFTODO
 for root, dirs, files in os.walk(service_dir):
     for filename in fnmatch.filter(files, '*.yml'):
         yaml_file = os.path.join(root, filename)
