@@ -3,15 +3,15 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import obj_registry, IonObject
 from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.test.pyontest import PyonTestCase
+from unittest import SkipTest
 
-import unittest
-
-class Test_DataStores(unittest.TestCase):
+class Test_DataStores(PyonTestCase):
 
     def _do_test(self, data_store):
         # Just in case previous run failed without cleaning up,
@@ -255,7 +255,7 @@ class Test_DataStores(unittest.TestCase):
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
         except socket.error:
-            raise unittest.SkipTest('Failed to connect to CouchDB')
+            raise SkipTest('Failed to connect to CouchDB')
 
 
 if __name__ == "__main__":

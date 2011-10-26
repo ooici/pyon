@@ -3,11 +3,10 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-import unittest
-
 from pyon.util.async import blocking_cb
+from pyon.test.pyontest import PyonTestCase
 
-class AsyncTest(unittest.TestCase):
+class AsyncTest(PyonTestCase):
     def i_call_callbacks(self, cb):
         cb(1, 2, 3, foo='bar')
 

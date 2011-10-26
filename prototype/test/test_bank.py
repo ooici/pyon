@@ -3,14 +3,13 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-import unittest
-
 from pyon.container import cc
 from pyon.net.endpoint import RPCClient
+from pyon.test.pyontest import PyonTestCase
 
 from interface.services.ibank_service import IBankService, BaseBankService
 
-class Test_Bank(unittest.TestCase):
+class Test_Bank(PyonTestCase):
 
     def test_bank(self):
         """
@@ -40,6 +39,3 @@ class Test_Bank(unittest.TestCase):
 
         container.stop()
 
-if __name__ == "__main__":
-    unittest.main()
-    

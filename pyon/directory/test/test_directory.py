@@ -3,11 +3,11 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-import unittest
-
 from pyon.directory.directory import Directory
+from pyon.test.pyontest import PyonTestCase
+from unittest import SkipTest
 
-class Test_Directory(unittest.TestCase):
+class Test_Directory(PyonTestCase):
 
     def _do_test(self, directory_service):
         directory_service.delete()
@@ -49,7 +49,7 @@ class Test_Directory(unittest.TestCase):
             self._do_test(Directory(datastore_name='my_directory_ds',
                 persistent=True))
         except socket.error:
-            raise unittest.SkipTest('Failed to connect to CouchDB')
+            raise SkipTest('Failed to connect to CouchDB')
 
 if __name__ == "__main__":
     unittest.main()
