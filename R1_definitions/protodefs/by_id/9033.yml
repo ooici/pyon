@@ -1,6 +1,0 @@
-# _ID = 9033
-# _VERSION = 1
-obj:
-  GetDataResourceDetailReqMsg:
-    data_resource_id: ""
---- # _ID = 9033

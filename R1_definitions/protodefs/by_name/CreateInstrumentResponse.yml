@@ -1,6 +1,0 @@
-# _ID = 9302
-# _VERSION = 1
-obj:
-  CreateInstrumentResponse:
-    instrument_resource_id: ""
---- # _ID = 9302

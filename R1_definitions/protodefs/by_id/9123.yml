@@ -1,7 +1,0 @@
-# _ID = 9123
-# _VERSION = 1
-obj:
-  GetResourcesOfTypeResponse:
-    resources: [
-      ]
---- # _ID = 9123

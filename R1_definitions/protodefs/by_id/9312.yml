@@ -1,6 +1,0 @@
-# _ID = 9312
-# _VERSION = 1
-obj:
-  SetInstrumentStateResponse:
-    status: ""
---- # _ID = 9312

@@ -1,6 +1,0 @@
-# _ID = 9216
-# _VERSION = 1
-obj:
-  DataResourceUpdateResponse:
-    success: true
---- # _ID = 9216

@@ -1,6 +1,0 @@
-# _ID = 9306
-# _VERSION = 1
-obj:
-  StartInstrumentSamplingResponse:
-    status: ""
---- # _ID = 9306

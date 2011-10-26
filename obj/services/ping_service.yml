@@ -1,6 +1,0 @@
-name: ping
-dependencies: []
-methods:
-  ping:
-    pong: pong
-  

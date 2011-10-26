@@ -1,8 +1,0 @@
-# _ID = 20042
-# _VERSION = 1
-obj:
-  UpdateProtectedResourceReqMsg:
-    resource_id: ""
-    name: ""
-    description: ""
---- # _ID = 20042

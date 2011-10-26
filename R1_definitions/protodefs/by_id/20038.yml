@@ -1,6 +1,0 @@
-# _ID = 20038
-# _VERSION = 1
-obj:
-  FindProtectedResourcesReqMsg:
-    resource_id: ""
---- # _ID = 20038

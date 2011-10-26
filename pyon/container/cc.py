@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 """
 TODO:
 [ ] server and client name argument is a short cut
@@ -7,13 +8,14 @@ TODO:
 [ ] Endpoint might be better as a 'factory' that can make handler instances
 per request. This will also facilitate the Endpoint holding 'business'
 objects/resources that each request has access to. This will keep the
-actual handlers functional. 
+actual handlers functional.
+[ ] Determine a container ID
+[ ] Use the unique container ID in the name
 """
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-import os
 
 from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 
@@ -29,13 +31,21 @@ from pyon.ion.process import IonProcessSupervisor
 
 from zope.interface import providedBy
 from zope.interface import Interface, implements
+import os
+import msgpack
 
 class IContainerAgent(Interface):
 
-    def start_app(processapp=[], config={}):
+    def start_process():
         pass
 
-    def start_rel(rel={}):
+    def start_app(appdef=None, processapp=None, config=None):
+        pass
+
+    def start_app_from_url(app_url=""):
+        pass
+
+    def start_rel(rel=None):
         pass
 
     def start_rel_from_url(rel_url=""):
@@ -49,6 +59,8 @@ class Container(object):
     """
     node = None
     name = "container_agent-%s-%d" % (sys_name, os.getpid())
+    pidfile = None
+
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
@@ -62,6 +74,10 @@ class Container(object):
         # Bootstrap object registry
         populate_registry()
 
+        self.pidfile = "cc-pid-%d" % os.getpid()
+        if os.path.exists(self.pidfile):
+            raise Exception("Existing pid file already found: %s" % self.pidfile)
+
         self.proc_sup.start()
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
 
@@ -71,34 +87,58 @@ class Container(object):
         listener = BinderListener(self.node, self.name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
+        # write out a PID file containing our agent messaging name
+        with open(self.pidfile, 'w') as f:
+            pid_contents = {'messaging': dict(CFG.server.amqp),
+                            'container-agent': self.name,
+                            'container-xp': sys_name }
+            f.write(msgpack.dumps(pid_contents))
+
         return listener.get_ready_event()
 
-    def start_app(self, processapp=[], config={}):
-        log.debug("In Container.start_app processapp: %s config: %s"%(str(processapp),str(config)))
-        # Start process defined by processapp with specified config
-        name, module, cls = processapp
 
-        service_instance = self._for_name(module, cls)
+    def start_app(self, appdef=None, processapp=None, config=None):
+        if processapp:
+
+            # Start process defined by processapp with specified config
+            name, module, cls = processapp
+            self.spawn_process(name, module, cls, config)
+
+        else:
+            # TODO
+            pass
+
+    def spawn_process(self, name=None, module=None, cls=None, config=None):
+        """
+        Spawn a process locally.
+        """
+        log.debug("In Container.spawn_process: name=%s, module=%s, config=%s" % (name, module, config))
+
+        # TODO: Process should get its own immutable copy of config, no matter what
+        if config is None: config = {}
+
+        process_instance = self._for_name(module, cls)
+        # TODO: Check that this is a proper instance (interface)
 
         # Inject dependencies
-        service_instance.clients = DotDict()
-        log.debug("In Container.start_app dependencies: %s"%str(service_instance.dependencies))
-        for dependency in service_instance.dependencies:
+        process_instance.clients = DotDict()
+        log.debug("In Container.spawn_process dependencies: %s"%str(process_instance.dependencies))
+        for dependency in process_instance.dependencies:
             dependency_service = get_service_by_name(dependency)
             dependency_interface = list(providedBy(dependency_service))[0]
 
             # @TODO: start_client call instead?
             client = RPCClient(node=self.node, name=dependency, iface=dependency_interface)
-            service_instance.clients[dependency] = client
+            process_instance.clients[dependency] = client
 
-        # Init service
-        service_instance.CFG = config
-        service_instance.service_init()
+        # Init process
+        process_instance.CFG = config
+        process_instance.service_init()
 
         # Add to global dict
-        add_service_by_name(name, service_instance)
+        add_service_by_name(name, process_instance)
 
-        rsvc = RPCServer(node=self.node, name=name, service=service_instance)
+        rsvc = RPCServer(node=self.node, name=name, service=process_instance)
 
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, name, rsvc, None, None)
@@ -109,9 +149,23 @@ class Container(object):
         listener.get_ready_event().get()
         log.debug("Server %s listener ready", name)
 
-    def start_rel(self, rel={}):
-        # Recurse over the rel and start apps defined there.
+
+    def start_app_from_url(self, app_url=""):
+        """
+        @brief Read the app file and call start_app
+        """
+        log.debug("In Container.start_app_from_url  app_url: %s" % str(app_url))
+        app = Config([app_url]).data
+        self.start_app(appdef=app)
+
+
+    def start_rel(self, rel=None):
+        """
+        @brief Recurse over the rel and start apps defined there.
+        """
         log.debug("In Container.start_rel  rel: %s" % str(rel))
+
+        if rel is None: rel = {}
 
         for rel_app_cfg in rel.apps:
             name = rel_app_cfg.name
@@ -137,10 +191,12 @@ class Container(object):
             else:
                 processapp = app_file_cfg.processapp
 
-            self.start_app(processapp, config)
+            self.start_app(processapp=processapp, config=config)
 
     def start_rel_from_url(self, rel_url=""):
-        # Read the rel file and call start_rel
+        """
+        @brief Read the rel file and call start_rel
+        """
         log.debug("In Container.start_rel_from_url  rel_url: %s" % str(rel_url))
         rel = Config([rel_url]).data
         self.start_rel(rel)
@@ -149,6 +205,10 @@ class Container(object):
         log.debug("In Container.stop")
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+        try:
+            os.unlink(self.pidfile)
+        except Exception, e:
+            log.warn("Pidfile did not unlink: %s" % str(e))
 
     def serve_forever(self):
         """ Run the container until killed. """

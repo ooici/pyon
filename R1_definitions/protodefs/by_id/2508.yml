@@ -1,9 +1,0 @@
-# _ID = 2508
-# _VERSION = 1
-obj:
-  ColumnDef:
-    column_name: ""
-    validation_class: ""
-    index_type: -1
-    index_name: ""
---- # _ID = 2508

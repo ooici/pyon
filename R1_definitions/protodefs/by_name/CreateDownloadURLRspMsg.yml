@@ -1,6 +1,0 @@
-# _ID = 9036
-# _VERSION = 1
-obj:
-  CreateDownloadURLRspMsg:
-    download_url: ""
---- # _ID = 9036

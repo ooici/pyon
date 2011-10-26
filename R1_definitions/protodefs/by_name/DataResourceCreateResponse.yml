@@ -1,8 +1,0 @@
-# _ID = 9212
-# _VERSION = 1
-obj:
-  DataResourceCreateResponse:
-    data_source_id: ""
-    data_set_id: ""
-    association_id: ""
---- # _ID = 9212

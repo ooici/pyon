@@ -1,7 +1,0 @@
-# _ID = 2314
-# _VERSION = 1
-obj:
-  BindingMsg:
-    queue_name: ""
-    binding: ""
---- # _ID = 2314

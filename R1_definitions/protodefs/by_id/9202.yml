@@ -1,6 +1,0 @@
-# _ID = 9202
-# _VERSION = 1
-obj:
-  SubscriptionInfoRspMsg:
-    success: true
---- # _ID = 9202

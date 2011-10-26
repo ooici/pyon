@@ -1,7 +1,0 @@
-# _ID = 2607
-# _VERSION = 1
-obj:
-  SchedulerPerformIngestionUpdateMessage:
-    dataset_id: ""
-    datasource_id: ""
---- # _ID = 2607

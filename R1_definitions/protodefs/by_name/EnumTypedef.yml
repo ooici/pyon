@@ -1,8 +1,0 @@
-# _ID = 10019
-# _VERSION = 1
-obj:
-  EnumTypedef:
-    pairs: [
-      key: 4294967295
-      value: ""]
---- # _ID = 10019

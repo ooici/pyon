@@ -3,7 +3,6 @@ Tentatively named prototype
 
 
 """
-import pyon
 
 import gevent
 from gevent import event, coros
@@ -121,16 +120,17 @@ def ioloop(connection):
         # Loop until the connection is closed
         connection.ioloop.start()
 
-def makeNode():
+def makeNode(connection_params=None):
     """
     blocking construction and connection of node
+
+    @param  connection_params   AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
     """
     log.debug("In makeNode")
     node = NodeB()
-    messagingParams = CFG.server.amqp
-    log.debug("messagingParams: %s" % str(messagingParams))
-    credentials = PlainCredentials(messagingParams["username"], messagingParams["password"])
-    conn_parameters = ConnectionParameters(host=messagingParams["host"], virtual_host=messagingParams["vhost"], port=messagingParams["port"], credentials=credentials)
+    connection_params = connection_params or CFG.server.amqp
+    credentials = PlainCredentials(connection_params["username"], connection_params["password"])
+    conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
     connection = SelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
