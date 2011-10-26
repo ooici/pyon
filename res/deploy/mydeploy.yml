@@ -1,0 +1,12 @@
+type: release
+name: MyConfig
+version: 0.1
+description: Demo deployment configuration
+ion: 0.0.1
+apps:
+  - name: hello
+    description: Hello service
+    version: 0.1
+    processapp: [hello, examples.service.hello_service, HelloService]
+    config:
+        some: "Hi"

@@ -1,0 +1,11 @@
+# Hello Service interface definition
+
+name: hello
+dependencies: []
+methods:
+  hello:
+    in:
+      text: ""
+
+    out:
+      text: ""
