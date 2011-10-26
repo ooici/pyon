@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+"""Python Capability Container start script"""
+
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import argparse
-
 import yaml
 from uuid import uuid4
 

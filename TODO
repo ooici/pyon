@@ -17,6 +17,7 @@ STARTUP
 - Enable other packages to import pyon and run it from their directory
 - Process spawnargs
 - Starter one-off script accessing a container via messaging
+- Rename cc to pycc
 
 OBJECTS:
 
