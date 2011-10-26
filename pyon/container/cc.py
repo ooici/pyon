@@ -16,7 +16,6 @@ actual handlers functional.
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-import os
 
 from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 
@@ -32,6 +31,8 @@ from pyon.ion.process import IonProcessSupervisor
 
 from zope.interface import providedBy
 from zope.interface import Interface, implements
+import os
+import msgpack
 
 class IContainerAgent(Interface):
 
@@ -58,6 +59,7 @@ class Container(object):
     """
     node = None
     name = "container_agent-%s-%d" % (sys_name, os.getpid())
+    pidfile = None
 
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
@@ -68,6 +70,10 @@ class Container(object):
 
     def start(self):
         log.debug("In Container.start")
+        self.pidfile = "cc-pid-%d" % os.getpid()
+        if os.path.exists(self.pidfile):
+            raise Exception("Existing pid file already found: %s" % self.pidfile)
+
         self.proc_sup.start()
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
 
@@ -76,6 +82,13 @@ class Container(object):
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, self.name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+
+        # write out a PID file containing our agent messaging name
+        with open(self.pidfile, 'w') as f:
+            pid_contents = {'messaging': dict(CFG.server.amqp),
+                            'container-agent': self.name,
+                            'container-xp': sys_name }
+            f.write(msgpack.dumps(pid_contents))
 
         return listener.get_ready_event()
 
@@ -188,6 +201,10 @@ class Container(object):
         log.debug("In Container.stop")
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+        try:
+            os.unlink(self.pidfile)
+        except Exception, e:
+            log.warn("Pidfile did not unlink: %s" % str(e))
 
     def serve_forever(self):
         """ Run the container until killed. """
