@@ -1,0 +1,3 @@
+[submodule "extern/ion-definitions"]
+	path = extern/ion-definitions
+	url = https://github.com/ooici/ion-definitions

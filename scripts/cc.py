@@ -8,10 +8,12 @@ import argparse
 import yaml
 from uuid import uuid4
 
-from pyon.public import Container, GreenProcessSupervisor
-
-from pyon.container.cc import IContainerAgent
-from pyon.net.endpoint import RPCClient
+#
+# WARNING - DO NOT IMPORT GEVENT OR PYON HERE. IMPORTS **MUST** BE DONE IN THE MAIN()
+# DUE TO DAEMONIZATION.
+#
+# SEE: http://groups.google.com/group/gevent/browse_thread/thread/6223805ffcd5be22?pli=1
+#
 
 version = "2.0"     # TODO: extract this from the code once versioning is automated again
 description = '''
@@ -55,6 +57,9 @@ def unflatten(dictionary):
     
 def main(opts, *args, **kwargs):
     print 'Starting ION CC with options: ', opts
+    from pyon.public import Container
+    from pyon.container.cc import IContainerAgent
+    from pyon.net.endpoint import RPCClient
 
     container = Container(*args, **kwargs)
 
@@ -66,10 +71,12 @@ def main(opts, *args, **kwargs):
         client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
         client.start_rel_from_url(opts.rel)
 
-    if not opts.noshell:
+    if not opts.noshell and not opts.daemon:
         setup_ipython()
     else:
         container.serve_forever()
+
+    container.stop()
 
 def parse_args(tokens):
     """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """
@@ -86,7 +93,7 @@ def parse_args(tokens):
     return args, kwargs
 
 if __name__ == '__main__':
-    proc_types = GreenProcessSupervisor.type_callables.keys()
+    #proc_types = GreenProcessSupervisor.type_callables.keys()
 
     # NOTE: Resist the temptation to add manual parameters here! Most container config options
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
@@ -105,9 +112,12 @@ if __name__ == '__main__':
         from daemon import DaemonContext
         from lockfile import FileLock
 
+        #logg = open('hi.txt', 'w+')
+        #slogg = open('hi2.txt', 'w+')
+
         # TODO: May need to generate a pidfile based on some parameter or cc name
         pidfile = opts.pidfile or 'cc-%s.pid' % str(uuid4())[0:4]
-        with DaemonContext(pidfile=FileLock(pidfile)):
+        with DaemonContext(pidfile=FileLock(pidfile)):#, stdout=logg, stderr=slogg):
             main(opts, *args, **kwargs)
     else:
         main(opts, *args, **kwargs)
