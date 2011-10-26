@@ -27,9 +27,12 @@ conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
 CFG = Config(conf_paths).data
 sys_name = CFG.system.name or 'pyon.%s' % os.uname()[1].replace('.', '_')
 
-obj_registry = IonServiceRegistry()
-obj_registry.register_obj_dir('obj', ['ion.yml'], ['services'])
-obj_registry.register_svc_dir('obj/services')
-
 # Make a default factory for IonObjects
+obj_registry = IonServiceRegistry()
 IonObject = obj_registry.new
+
+# DAFTODO
+def populate_registry():
+    obj_registry.register_obj_dir('../ion-definitions/objects', ['ion.yml'], ['services'])
+    obj_registry.register_svc_dir('../ion-definitions/objects/services')
+

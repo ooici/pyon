@@ -18,7 +18,7 @@ import os
 from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 
 from pyon.net import messaging
-from pyon.core.bootstrap import CFG, sys_name
+from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.service.service import add_service_by_name, get_service_by_name
 
 from pyon.util.config import Config
@@ -58,6 +58,10 @@ class Container(object):
 
     def start(self):
         log.debug("In Container.start")
+
+        # Bootstrap object registry
+        populate_registry()
+
         self.proc_sup.start()
         self.node, self.ioloop = messaging.makeNode() # shortcut hack
 
