@@ -43,39 +43,51 @@ Now setup a virtualenv with a command like the following (substitute your own na
     mkvirtualenv --no-site-packages --python=python2.7 ion27
     workon ion27
 
-OBJECTS SUBMODULE
-=================
 
-There is a git-submodule which tracks the current commit of ion-definitions that this pyon repository
-depends on. When you clone this repository, you must follow that with `git submodule update --init` to
-pull and checkout that repository.
+DEVELOPMENT TIME DEPENDENCIES
+=============================
 
-On a regular `git-pull`, you should call `git submodule update` afterwards.
-
-The obj/ subdir is a symlink to the checkout's extern/ion-definitions.
-
-See more about submodules: 
-- http://book.git-scm.com/5_submodules.html
-- http://speirs.org/blog/2009/5/11/understanding-git-submodules.html
-
-DEPENDENCIES
-============
+PACKAGES:
 
 Install the python package dependencies with:
     python setup.py install
+    Note: If the installation of numpy fails, use pip to install numpy and rerun
 
-  - The installation of numpy may fail.
-  - Use pip to install numpy (easy_install may fail) and rerun
+
+ION-DEFINITIONS SUBMODULE:
+
+There is a git-submodule which tracks the current commit of ion-definitions that this pyon repository
+depends on for object and service definitions. Run the following to pull and checkout that repository:
+    git submodule update --init
+    cd extern/ion-definitions
+    git checkout master
+
+On a regular `git-pull`, you should call `git submodule update` afterwards.
+
+The obj/ subdir is a symlink to the checkout's extern/ion-definitions/objects.
+
+See more about submodules:
+- http://book.git-scm.com/5_submodules.html
+- http://speirs.org/blog/2009/5/11/understanding-git-submodules.html
+- http://blog.endpoint.com/2010/04/git-submodule-workflow.html
+
+GENERATE SERVICE STUBS:
+
+Generate service definition interfaces and abstract base classes files:
+    python scripts/ion-obj.py generate
+    Note: These will be placed in the interfaces/ subdirectory.
+
+
+RUN-TIME DEPENDENCIES
+=====================
 
 Run couchdb in second terminal before starting the container or running tests:
     couchdb
 
-Finally, you should add the current directory to your pythonpath for an easier time running scripts. Add the following
+Add the current directory to your PYTHONPATH for an easier time running scripts. Add the following
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
     export PYTHONPATH=.
 
-Generate service definition interfaces and abstract base classes files:
-    python scripts/ion-obj.py generate
 
 
 TEST
@@ -97,8 +109,8 @@ Start the capability container in interactive mode:
 List supported arguments:
     ./cc --help
 
-Start the CC with a deploy (*.rel) file:
-    ./cc --rel res/deploy/r2deploy.rel
+Start the CC with a deploy file:
+    ./cc --rel res/deploy/r2deploy.yml
 
 
 EXAMPLES
