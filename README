@@ -43,6 +43,20 @@ Now setup a virtualenv with a command like the following (substitute your own na
     mkvirtualenv --no-site-packages --python=python2.7 ion27
     workon ion27
 
+OBJECTS SUBMODULE
+=================
+
+There is a git-submodule which tracks the current commit of ion-definitions that this pyon repository
+depends on. When you clone this repository, you must follow that with `git submodule update --init` to
+pull and checkout that repository.
+
+On a regular `git-pull`, you should call `git submodule update` afterwards.
+
+The obj/ subdir is a symlink to the checkout's extern/ion-definitions.
+
+See more about submodules: 
+- http://book.git-scm.com/5_submodules.html
+- http://speirs.org/blog/2009/5/11/understanding-git-submodules.html
 
 DEPENDENCIES
 ============

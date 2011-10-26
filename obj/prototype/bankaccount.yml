@@ -1,4 +1,0 @@
-BankAccount:
-  owner: ""
-  account_type: Checking
-  balance: 0.0
