@@ -123,6 +123,12 @@ def dict_merge(a, b):
                     current_dst[key] = current_src[key]
     return dst
 
+def for_name(modpath, classname):
+    ''' Returns a class of "classname" from module "modname". '''
+    module = __import__(modpath, fromlist=[classname])
+    classobj = getattr(module, classname)
+    return classobj()
+
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})
     print dd.a.b.c, dd.a.b.d

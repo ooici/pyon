@@ -3,6 +3,7 @@ Ocean Observatories Initiative Cyberinfrastructure (OOI CI)
 Integrated Observatory Network (ION)
 
 pyon - Python COI Capability Container and Core Modules R2
+https://confluence.oceanobservatories.org/x/ehdTAQ
 
 (C) UC Regents, 2010-2011
 ===========================================================
@@ -62,7 +63,9 @@ depends on for object and service definitions. Run the following to pull and che
     cd extern/ion-definitions
     git checkout master
 
-On a regular `git-pull`, you should call `git submodule update` afterwards.
+On a regular `git-pull`, call `git submodule update` afterwards to pull the commit of the submodule
+specified with pyon. Note: this does NOT happen automatically and this is NOT the branch head of the
+submodule. To change the submodule commit within the parent, cd into the submodule and do a `git pull`.
 
 The obj/ subdir is a symlink to the checkout's extern/ion-definitions/objects.
 
@@ -71,10 +74,11 @@ See more about submodules:
 - http://speirs.org/blog/2009/5/11/understanding-git-submodules.html
 - http://blog.endpoint.com/2010/04/git-submodule-workflow.html
 
+
 GENERATE SERVICE STUBS:
 
 Generate service definition interfaces and abstract base classes files:
-    python scripts/ion-obj.py generate
+    python scripts/generate_interfaces.py
     Note: These will be placed in the interfaces/ subdirectory.
 
 
@@ -87,7 +91,6 @@ Run couchdb in second terminal before starting the container or running tests:
 Add the current directory to your PYTHONPATH for an easier time running scripts. Add the following
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
     export PYTHONPATH=.
-
 
 
 TEST
@@ -104,16 +107,22 @@ USE
 ===
 
 Start the capability container in interactive mode:
-    ./cc
+    ./pycc
 
 List supported arguments:
-    ./cc --help
+    ./pycc --help
 
 Start the CC with a deploy file:
-    ./cc --rel res/deploy/r2deploy.yml
+    ./pycc --rel res/deploy/r2deploy.yml
 
 
 EXAMPLES
 ========
 
 Make sure to look in the examples directory for a README and examples.
+
+
+SEE ALSO
+========
+
+https://confluence.oceanobservatories.org/x/ehdTAQ

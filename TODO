@@ -5,28 +5,27 @@ PACKAGING:
 
 - Remove all unnecessary imports from setup.py
 - Automate versioning and packaging of pyon egg
+- Use buildbot
 
 CODE:
 
-- Rename pyon.container.cc into something else (conflicts with cc start script)
 - Enforce naming conventions for generated interface dirs
+- More str() output
+- Clear distinction between ION process and pyon process
+- Clear confusion with service vs process
 
 STARTUP
 
 - Enable to start more than one CC out of the same directory (logging, pid file)
 - Enable other packages to import pyon and run it from their directory
 - Process spawnargs
-- Starter one-off script accessing a container via messaging
 
 OBJECTS:
 
-- Place ION objects and service definitions in separate git submodule
-- Rename obj into objects (obj looks like build files)
+- Revise service YML files (look at WSDL)
 
 CONTAINER:
 
-
-
-DEPLOY:
-
--
+- Remove PID file even in case of abnormal termination
+- Enhanced shell API
+- Enhanced messaging bookkeeping

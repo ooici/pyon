@@ -1,8 +1,6 @@
-"""
-Tentatively named prototype
+#!/usr/bin/env python
 
-
-"""
+"""AMQP messaging with Pika."""
 
 import gevent
 from gevent import event, coros
@@ -19,8 +17,9 @@ from pyon.util.log import log
 
 class IDPool(object):
     """
-    Create a pool of IDs to allow reuse. The "new_id" function generates the next
-    valid ID from the previous one. If not given, defaults to incrementing an integer.
+    Create a pool of IDs to allow reuse.
+    The "new_id" function generates the next valid ID from the previous one. If not given, defaults to
+    incrementing an integer.
     """
 
     def __init__(self, new_id=None):
@@ -55,10 +54,10 @@ class IDPool(object):
 
 class NodeB(amqp.Node):
     """
-    prototype blocking interface to messaging primitives 
+    Blocking interface to AMQP messaging primitives.
 
-    wrap around Node and create blocking interface for getting channel
-    objects
+    Wrap around Node and create blocking interface for getting channel
+    objects.
     """
 
     def __init__(self):
@@ -103,7 +102,7 @@ class NodeB(amqp.Node):
 
 def ioloop(connection):
     # Loop until CTRL-C
-    log.debug("In ioLoop")
+    log.debug("In ioloop")
     try:
         # Start our blocking loop
         log.debug("Before start")
@@ -122,7 +121,7 @@ def ioloop(connection):
 
 def makeNode(connection_params=None):
     """
-    blocking construction and connection of node
+    Blocking construction and connection of node.
 
     @param  connection_params   AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
     """
@@ -182,7 +181,7 @@ def test_accept():
 
 class NodeNB(amqp.Node):
     """
-    Main messaging interface that goes active when amqp client connects.
+    Main non blocking messaging interface that goes active when amqp client connects.
     Integrates messaging and processing
 
     The life cycle of this depends on the underlying amqp connection.
