@@ -4,7 +4,7 @@ from pyon.util.log import log
 class SampleInterceptor(Interceptor):
     def outgoing(self, invocation):
         log.warn("SampleInterceptor.outgoing: %s", invocation)
-        invocation.transformed_message['header']['sample_interceptor'] = 'intercepted'
+        invocation.message['header']['sample_interceptor'] = 'intercepted'
         return invocation
 
     def incoming(self, invocation):
@@ -18,7 +18,7 @@ class SampleInterceptor(Interceptor):
 class SampleProcessOnlyInterceptor(Interceptor):
     def outgoing(self, invocation):
         log.warn("SampleProcessOnlyInterceptor.outgoing: %s", invocation)
-        invocation.transformed_message['header']['process_only'] = 'process_only_inteceptor'
+        invocation.message['header']['process_only'] = 'process_only_inteceptor'
         return invocation
 
     def incoming(self, invocation):

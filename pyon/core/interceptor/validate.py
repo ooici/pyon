@@ -24,7 +24,7 @@ class ValidateInterceptor(Interceptor):
 
             def validate_ionobj(obj):
                 if isinstance(obj, IonObjectBase):
-                    invocation.transformed_message["header"]["validate"] = True
+                    invocation.message["header"]["validate"] = True
                 return obj
 
             walk(payload, validate_ionobj)
