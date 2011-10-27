@@ -1,6 +1,6 @@
 Pyon change log:
 
 2011-10-26:
-- Added shell API
 - Renamed cc to pycc to avoid name clash with gcc
+- Added shell API
 - Refactoring process classes

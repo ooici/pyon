@@ -82,12 +82,11 @@ def ps():
     print "----------------------"
     print "\n".join((str(p) for p in container.proc_sup.children))
 
-
 def ms():
     print "List of messaging endpoints"
     print "---------------------------"
     from pyon.net.endpoint import EndpointFactory
-    for name in EndpointFactory.endpoint_by_name:
+    for name in sorted(EndpointFactory.endpoint_by_name.keys()):
         print name
         print "\n".join(("  %s"%(ed) for ed in EndpointFactory.endpoint_by_name[name]))
 
