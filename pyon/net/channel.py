@@ -1,6 +1,7 @@
-"""
+#!/usr/bin/env python
 
-Channel Protocol
+"""
+Provides a messaging channel protocol.
 
 Defines the configuration parameter values and execution/command sequence.
 (The configuration may require in-band communication with the broker. This
@@ -33,7 +34,7 @@ TODO:
 [ ] Use nowait on amqp config methods and handle channel exceptions with pika
 [ ] PointToPoint Channel (from Bidirectional)
 [ ] Channel needs to support reliable delivery (consumer ack; point to
-point will ack when the contet of a delivery naturally concludes (channel
+point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
 

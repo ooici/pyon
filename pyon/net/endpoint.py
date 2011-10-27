@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+
+"""Provides the communication layer above channels."""
+
 from gevent import event
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
