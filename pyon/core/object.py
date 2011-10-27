@@ -91,13 +91,27 @@ class IonObjectBase(object):
         Compare fields to the schema and raise AttributeError if mismatched.
         Named _validate instead of validate because the data may have a field named "validate".
         """
+        id_and_rev_set = set(['_id','_rev'])
         fields, schema = self.__dict__, self._def.schema
-        extra_fields = fields.viewkeys() - schema.viewkeys()
+        extra_fields = fields.viewkeys() - schema.viewkeys() - id_and_rev_set
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
+            if key in id_and_rev_set:
+                continue
             field_val, schema_val = fields[key], schema[key]
             if type(field_val) is not type(schema_val):
+                # Special handle numeric types.  Allow int to be
+                # passed for long and float.  Auto convert to the
+                # right type.
+                if isinstance(field_val, int):
+                    if isinstance(schema_val, float):
+                        fields[key] = float(fields[key])
+                        continue
+                    elif isinstance(schema_val,long):
+                        fields[key] = long(fields[key])
+                        continue
+
                 raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, type(schema[key])))
             if isinstance(field_val, IonObjectBase):
