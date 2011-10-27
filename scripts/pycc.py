@@ -133,7 +133,7 @@ def parse_args(tokens):
 
     return args, kwargs
 
-if __name__ == '__main__':
+def entry():
     #proc_types = GreenProcessSupervisor.type_callables.keys()
 
     # NOTE: Resist the temptation to add manual parameters here! Most container config options
@@ -162,4 +162,6 @@ if __name__ == '__main__':
             main(opts, *args, **kwargs)
     else:
         main(opts, *args, **kwargs)
-    
+
+if __name__ == '__main__':
+    entry()

@@ -23,6 +23,14 @@ setup(  name = 'pyon',
         author = 'Adam R. Smith',
         author_email = 'a2smith@ucsd.edu',
         keywords = ['ooici','ioncore', 'pyon'],
+        packages = find_packages(),
+        entry_points = {
+            'console_scripts' : [
+                'pycc=scripts.pycc:entry',
+                'control_cc=scripts.control_cc:main',
+                'generate_interfaces=scripts.generate_interfaces:main'
+                ]
+            },
         dependency_links = [
             'http://ooici.net/releases'
         ],
@@ -36,10 +44,10 @@ setup(  name = 'pyon',
             'pyyaml==3.10',
             'pika==0.9.5',
             'httplib2==0.7.1',
-            # 'pyzmq==2.1.7',
+            'pyzmq==2.1.7',
             'gevent_zeromq==0.2.0',
             'HTTP4Store==0.3.1',
-            'zope.interface==3.6.4',
+            'zope.interface',
             'couchdb==0.8',
             # 'lockfile==0.9.1',
             'python-daemon==1.6',

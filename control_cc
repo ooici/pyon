@@ -4,4 +4,4 @@ ARGS=$@
 if [ -z "$ARGS" ]; then
     ARGS=""
 fi
-python scripts/control-cc.py $ARGS
+python scripts/control_cc.py $ARGS
