@@ -94,6 +94,7 @@ class CouchDB_DataStore(DataStore):
         # Assign an id to doc (recommended in CouchDB documentation)
         doc["_id"] = uuid4().hex
         log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
+        log.debug('create doc contents: %s', doc)
 
         # Save doc.  CouchDB will assign version to doc.
         res = self.server[datastore_name].save(doc)
@@ -119,7 +120,7 @@ class CouchDB_DataStore(DataStore):
         else:
             log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(doc_id)))
             doc = db.get(doc_id, rev=rev_id)
-        log.debug('Read result: %s' % str(doc))
+        log.debug('read doc contents: %s', doc)
         return doc
 
     def update(self, object, datastore_name=""):
@@ -129,6 +130,7 @@ class CouchDB_DataStore(DataStore):
         if datastore_name == "":
             datastore_name = self.datastore_name
         log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
+        log.debug('update doc contents: %s', doc)
         res = self.server[datastore_name].save(doc)
         log.debug('Update result: %s' % str(res))
         id, version = res
@@ -200,6 +202,7 @@ class CouchDB_DataStore(DataStore):
         results = []
         for row in queryList:
             doc = row.value
+            log.debug('find doc contents: %s', doc)
             results.append(doc)
 
         log.debug('Find results: %s' % str(results))
