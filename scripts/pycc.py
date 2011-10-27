@@ -52,7 +52,7 @@ def setup_ipython(shell_api=None):
       /____/""",
                            exit_msg = 'Leaving ION shell, shutting down container.')
 
-    ipshell('ION R2 Pyon shell - powered by IPython. Type help() for help')
+    ipshell('Pyon - ION R2 CC interactive IPython shell. Type help() for help')
 
 # From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
 def unflatten(dictionary):
@@ -68,6 +68,9 @@ def unflatten(dictionary):
     return resultDict
     
 def main(opts, *args, **kwargs):
+    import threading
+    threading.current_thread().name = "CC-Main"
+
     print 'Starting ION CC with options: ', opts
     from pyon.public import Container
     from pyon.container.cc import IContainerAgent
@@ -110,7 +113,7 @@ if __name__ == '__main__':
 
     # NOTE: Resist the temptation to add manual parameters here! Most container config options
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
-    
+
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')

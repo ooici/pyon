@@ -152,16 +152,21 @@ class Endpoint(object):
 
 class EndpointFactory(object):
     """
-    Rename this.
-
-    Creates new channel/endpoint pairs for communication. This base class only deals with communication
+    Creates new channel/endpoint pairs for communication.
+    This base class only deals with communication
     patterns that send first (and possibly get a response). The derived ListeningEventFactory listens
     first.
+
+    TODO Rename this.
     """
     endpoint_type = Endpoint
     channel_type = BidirectionalClient
     name = None
     node = None     # connection to the broker, basically
+
+    # Endpoints
+    # TODO: Make weakref or repace entirely
+    endpoint_by_name = {}
 
     def __init__(self, node=None, name=None):
         """
@@ -170,6 +175,11 @@ class EndpointFactory(object):
         """
         self.node = node
         self.name = name
+
+        if name in self.endpoint_by_name:
+            self.endpoint_by_name[name].append(self)
+        else:
+            self.endpoint_by_name[name] = [self]
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """

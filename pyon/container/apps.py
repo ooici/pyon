@@ -24,6 +24,8 @@ class AppManager(object):
                               self.start_app_from_url,
                               self.start_rel,
                               self.start_rel_from_url]
+        self.apps = {}
+
     def start(self):
         pass
 
@@ -41,6 +43,7 @@ class AppManager(object):
             # Start process defined by processapp with specified config
             name, module, cls = processapp
             self.spawn_process(name, module, cls, config)
+            self.apps[name] = processapp
 
         else:
             # TODO: App file case

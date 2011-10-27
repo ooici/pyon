@@ -4,6 +4,8 @@
 
 __author__ = 'Michael Meisinger'
 
+container = None
+
 def get_console_dimensions():
     """Returns (rowns, columns) of current terminal"""
     import os
@@ -71,17 +73,28 @@ def pprint_list(l, c, pad=1, indent=0):
 # -------------------------------------------------
 
 def ps():
-    print "List of processes"
-    print "-----------------"
+    print "List of ION processes"
+    print "---------------*-----"
+    from pyon.service.service import services_by_name
+    print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
+
+    print "\nList of pyon processes"
+    print "----------------------"
+    print "\n".join((str(p) for p in container.proc_sup.children))
+
 
 def ms():
     print "List of messaging endpoints"
     print "---------------------------"
+    from pyon.net.endpoint import EndpointFactory
+    for name in EndpointFactory.endpoint_by_name:
+        print name
+        print "\n".join(("  %s"%(ed) for ed in EndpointFactory.endpoint_by_name[name]))
 
 def apps():
     print "List of active pyon apps"
     print "------------------------"
-
+    print "\n".join(("%s: %s"%(an, ad) for (an,ad) in container.app_manager.apps.iteritems()))
 
 def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
@@ -157,7 +170,7 @@ def type_defs(ob=None):
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
 def help():
-    print "ION CC interactive shell"
+    print "ION R2 CC interactive shell"
     print
     print "Available functions: %s" % ", ".join([func.__name__ for func in public_api])
     print "Available variables: %s" % ", ".join(public_vars.keys())
@@ -166,22 +179,23 @@ def help():
 public_api = [help,ps,ms,apps,svc_defs,obj_defs,type_defs]
 
 def define_vars():
-
     from pyon.core.bootstrap import CFG, sys_name, obj_registry
 
     return locals()
 
 public_vars = define_vars()
 
-def get_shell_api(container):
+def get_shell_api(cc):
     """Returns an API to introspect and manipulate the container
     @retval dict that can be added to locals() namespace
     """
-    ns_dict = dict()
+    global container
+    container = cc
 
+    ns_dict = dict()
     for func in public_api:
         ns_dict[func.__name__] = func
-
     ns_dict.update(public_vars)
+    ns_dict['cc'] = cc
 
     return ns_dict

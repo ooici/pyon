@@ -5,9 +5,10 @@ __license__ = 'Apache 2.0'
 
 class BaseService(object):
     """
-    Something that provides a 'service'.
+    A process class that provides a 'service'.
     Not dependent on messaging.
     Probably will have a simple start/stop interface.
+    TODO: Rename to process. This is not a service in ION speak!
     """
 
     name = None
