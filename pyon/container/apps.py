@@ -5,14 +5,11 @@
 __author__ = 'Michael Meisinger'
 
 from pyon.core.bootstrap import CFG
-
 from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
-
 from pyon.service.service import add_service_by_name, get_service_by_name
-
 from pyon.util.config import Config
-from pyon.util.log import log
 from pyon.util.containers import DictModifier, DotDict, for_name
+from pyon.util.log import log
 
 from zope.interface import providedBy
 from zope.interface import Interface, implements

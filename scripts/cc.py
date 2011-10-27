@@ -21,7 +21,7 @@ description = '''
 pyon (ION capability container) v%s
 ''' % (version)
 
-def setup_ipython():
+def setup_ipython(shell_api=None):
     from IPython.config.loader import Config
     cfg = Config()
     shell_config = cfg.InteractiveShellEmbed
@@ -33,15 +33,26 @@ def setup_ipython():
     # First import the embeddable shell class
     from IPython.frontend.terminal.embed import InteractiveShellEmbed
 
+    # Update namespace of interactive shell
+    # TODO: Cleanup namespace even further
+    if shell_api is not None:
+        locals().update(shell_api)
+
     # Now create an instance of the embeddable shell. The first argument is a
     # string with options exactly as you would type them if you were starting
     # IPython at the system command line. Any parameters you want to define for
     # configuration can thus be specified here.
     ipshell = InteractiveShellEmbed(config=cfg,
-                           banner1 = 'Dropping into IPython',
-                           exit_msg = 'Leaving Interpreter, back to program.')
+                           banner1 = \
+"""    ____                                ________  _   __   ____________   ____  ___
+   / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
+  / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
+ / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
+/_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
+      /____/""",
+                           exit_msg = 'Leaving ION shell, shutting down container.')
 
-    ipshell('Pyon shell (ION R2)')
+    ipshell('ION R2 Pyon shell - powered by IPython. Type help() for help')
 
 # From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
 def unflatten(dictionary):
@@ -60,6 +71,7 @@ def main(opts, *args, **kwargs):
     print 'Starting ION CC with options: ', opts
     from pyon.public import Container
     from pyon.container.cc import IContainerAgent
+    from pyon.container.shell_api import get_shell_api
     from pyon.net.endpoint import RPCClient
 
     container = Container(*args, **kwargs)
@@ -73,7 +85,7 @@ def main(opts, *args, **kwargs):
         client.start_rel_from_url(opts.rel)
 
     if not opts.noshell and not opts.daemon:
-        setup_ipython()
+        setup_ipython(get_shell_api(container))
     else:
         container.serve_forever()
 

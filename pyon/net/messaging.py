@@ -1,8 +1,4 @@
-"""
-Tentatively named prototype
-
-
-"""
+#!/usr/bin/env python
 
 import gevent
 from gevent import event, coros
@@ -19,8 +15,9 @@ from pyon.util.log import log
 
 class IDPool(object):
     """
-    Create a pool of IDs to allow reuse. The "new_id" function generates the next
-    valid ID from the previous one. If not given, defaults to incrementing an integer.
+    @brief Create a pool of IDs to allow reuse.
+    The "new_id" function generates the next valid ID from the previous one. If not given, defaults to
+    incrementing an integer.
     """
 
     def __init__(self, new_id=None):
@@ -122,7 +119,7 @@ def ioloop(connection):
 
 def makeNode(connection_params=None):
     """
-    blocking construction and connection of node
+    @brief Blocking construction and connection of node
 
     @param  connection_params   AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
     """

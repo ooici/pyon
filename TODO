@@ -26,6 +26,7 @@ OBJECTS:
 
 CONTAINER:
 
+- Remove PID file even in case of abnormal termination
 
 
 DEPLOY:

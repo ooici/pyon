@@ -290,9 +290,14 @@ class IonObjectRegistry(object):
 class IonServiceMethod(object):
     """ Reference the object definitions for a service method. """
 
-    def __init__(self, def_in, def_out):
+    def __init__(self, def_in, def_out, op_name=None):
         self.def_in = def_in
         self.def_out = def_out
+        self.op_name = op_name
+
+    def __str__(self):
+        str = "op:%s\nin:%s\nout:%s" % (self.op_name, self.def_in, self.def_out)
+        return str
 
 class IonServiceDefinition(object):
     """ Provides a walkable structure for ION service metadata and object definitions. """
@@ -351,7 +356,7 @@ class IonServiceRegistry(IonObjectRegistry):
                         if not op_def: continue
                         def_in, def_out = (self._reg_method_part(svc_name, op_name, op_def, d) for d in ('in', 'out'))
                         [obj_defs.append(reg_def) for reg_def in (def_in, def_out)]
-                        method = IonServiceMethod(def_in, def_out)
+                        method = IonServiceMethod(def_in, def_out, op_name)
                         svc_def.methods.append(method)
 
                     self.services.add(svc_def)
