@@ -105,6 +105,7 @@ def svc_defs(svcs=None, op=None):
         svcdef = obj_registry.services_by_name[svcs]
         print "Service definition for: %s (version %s) operation %s" % (svcs, svcdef.version or 'ND', op)
         print "".join([str(m) for m in svcdef.methods if m.op_name == op])
+        return svcdef
 
     elif svcs is not None:
         if not getattr(svcs, '__iter__', False):
@@ -114,6 +115,7 @@ def svc_defs(svcs=None, op=None):
             svcops = "\n     ".join(sorted([smd.op_name for smd in svcdef.methods]))
             print "Service definition for: %s (version %s)" % (svcname, svcdef.version or 'ND')
             print "ops: %s" % (svcops)
+            return svcdef
 
     else:
         print "List of defined services"
@@ -125,6 +127,7 @@ def svc_defs(svcs=None, op=None):
             print "%s %s" % (svcname, svcdef.version)
 
         print "\nType svc_defs('name') or svc_defs(['name1','name2']) for definition"
+        return None
 
 def obj_defs(ob=None):
     """Returns object definitions for object name(s)

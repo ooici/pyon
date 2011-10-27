@@ -1,11 +1,12 @@
 from gevent import event
-
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
+from pyon.core.object import IonServiceDefinition
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
+from zope import interface
 
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
@@ -440,8 +441,25 @@ class RPCClient(RequestResponseClient):
     endpoint_type = RPCRequestEndpoint
 
     def __init__(self, iface=None, **kwargs):
-        self._define_interface(iface)
+        if isinstance(iface, interface.interface.InterfaceClass):
+            self._define_interface(iface)
+        elif isinstance(iface, IonServiceDefinition):
+            self._define_svcdef(iface)
+        else:
+            raise RuntimeError("interface is not a zope.interface or an IonServiceDefinition")
+
         RequestResponseClient.__init__(self, **kwargs)
+
+    def _define_svcdef(self, svc_def):
+        """
+        Defines an RPCClient's attributes from an IonServiceDefinition.
+        """
+        for meth in svc_def.methods:
+            name = meth.op_name
+            info = meth.def_in
+            doc = meth.__doc__
+
+            setattr(self, name, _Command(self.request, name, info, doc))
 
     def _define_interface(self, iface):
         """
@@ -651,7 +669,8 @@ class _Command(object):
     """
     RPC Message Format
     Command method generated from interface.
-    
+
+    @TODO: CURRENTLY UNUSED SIGINFO FOR VALIDATION
     Note: the required siginfo could be used by the client to catch bad
     calls before it makes them. 
     If calls are only made using named arguments, then the optional siginfo
@@ -666,9 +685,9 @@ class _Command(object):
         #log.debug("doc: %s" % str(doc))
         self.callback = callback
         self.name = name
-        self.positional = siginfo['positional']
-        self.required = siginfo['required']
-        self.optional = siginfo['optional']
+#        self.positional = siginfo['positional']
+#        self.required = siginfo['required']
+#        self.optional = siginfo['optional']
         self.__doc__ = doc
 
     def __call__(self, *args):
