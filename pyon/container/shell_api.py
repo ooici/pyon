@@ -171,14 +171,14 @@ def type_defs(ob=None):
         print pprint_list(tnames, -1, 1, 2)
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
-def help():
+def ionhelp():
     print "ION R2 CC interactive shell"
     print
     print "Available functions: %s" % ", ".join([func.__name__ for func in public_api])
     print "Available variables: %s" % ", ".join(public_vars.keys())
 
 # This defines the public API of functions
-public_api = [help,ps,ms,apps,svc_defs,obj_defs,type_defs]
+public_api = [ionhelp,ps,ms,apps,svc_defs,obj_defs,type_defs]
 
 def define_vars():
     from pyon.core.bootstrap import CFG, sys_name, obj_registry

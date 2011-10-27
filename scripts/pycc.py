@@ -77,7 +77,7 @@ def setup_ipython(shell_api=None):
       /____/""",
                            exit_msg = 'Leaving ION shell, shutting down container.')
 
-    ipshell('Pyon - ION R2 CC interactive IPython shell. Type help() for help')
+    ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
 
 # From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
 def unflatten(dictionary):
