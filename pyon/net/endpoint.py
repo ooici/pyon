@@ -3,14 +3,15 @@
 """Provides the communication layer above channels."""
 
 from gevent import event
+from zope import interface
+
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition
-from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
+from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError, BaseChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
-from zope import interface
 
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
@@ -210,6 +211,28 @@ class EndpointFactory(object):
         To be defined by derived classes. Cleanup any resources here, such as channels being open.
         """
         pass
+
+class ExchangeManagementEndpoint(Endpoint):
+    def create_xs(self, name):
+        pass
+
+class ExchangeManagement(EndpointFactory):
+    endpoint_type = ExchangeManagementEndpoint
+    channel_type = BaseChannel
+
+    def __init__(self, **kwargs):
+        self._pub_ep = None
+        EndpointFactory.__init__(self, **kwargs)
+
+    def create_xs(self, name):
+        if not self._exchange_ep:
+            self._exchange_ep = self.create_endpoint(self.name)
+
+        self._exchange_ep.create_xs(name)
+
+    def close(self):
+        if self._exchange_ep:
+            self._exchange_ep.close()
 
 class BinderListener(object):
     def __init__(self, node, name, endpoint_factory, listening_channel_type, spawn_callable):

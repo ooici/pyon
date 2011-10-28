@@ -2,7 +2,7 @@
 
 """
 AMQP messaging with Pika.
-Use Pika SelectConnection (using monkey patched select module).
+Uses Pika SelectConnection (using monkey patched select module).
 """
 
 from pika.adapters import SelectConnection
@@ -28,7 +28,7 @@ class Node(object):
     def on_connection_open(self, client):
         """
         AMQP Connection Open event handler.
-        Should this be in another class?
+        TODO: Should this be in another class?
         """
         log.debug("In Node.on_connection_open")
         log.debug("client: %s" % str(client))
@@ -39,7 +39,7 @@ class Node(object):
     def on_connection_close(self, *a):
         """
         AMQP Connection Close event handler.
-        Should this be in another class?
+        TODO: Should this be in another class?
         """
         log.debug("In Node.on_connection_close")
 
