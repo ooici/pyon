@@ -2,11 +2,11 @@
 
 from pyon.net.endpoint import RPCClient
 from interface.services.idatastore_service import IDatastoreService
-from pyon.net.messaging import makeNode
+from pyon.net.messaging import make_node
 import gevent
 import time
 
-node,iowat=makeNode()
+node,iowat=make_node()
 dsclient = RPCClient(node=node, name="datastore", iface=IDatastoreService)
 
 counter = 0
