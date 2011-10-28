@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-"""
-Base classes for objects that are controlled by an underlying state machine.
-"""
+"""Base classes for objects that are controlled by an underlying state machine."""
 
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.fsm import FSM
+
+from collections import Iterable
 
 class LifecycleException(Exception):
     pass
@@ -97,6 +97,7 @@ class LifecycleStateMixin(LifecycleMixin):
         if not hasattr(self,"_state"):
             self._state = self.S_NEW
 
+        res = None
         try:
             old_state = self._state
             new_state, action = self.TRANSITIONS.get((self._state, event), (None, None))
@@ -106,10 +107,10 @@ class LifecycleStateMixin(LifecycleMixin):
                 actionfunc = getattr(self, action)
                 if event == self.E_ERROR:
                     # This calls the error action function
-                    actionfunc(self.ERR_INDUCED, *args, **kwargs)
+                    res = actionfunc(self.ERR_INDUCED, *args, **kwargs)
                 else:
                     # This calls the action function
-                    actionfunc(*args, **kwargs)
+                    res = actionfunc(*args, **kwargs)
 
                 # Change the state
                 self._state = new_state
@@ -117,13 +118,13 @@ class LifecycleStateMixin(LifecycleMixin):
                 self._event = None
             else:
                 # Invalid event in this state. No transition found
-                self.on_error(self.ERR_INVALID_EVENT, *args, **kwargs)
+                res = self.on_error(self.ERR_INVALID_EVENT, *args, **kwargs)
 
         except StandardError, ex:
             # Process to NEXT state failed (no Deferred) -> forward to ERROR
             log.exception("ERROR in LifecycleMixin _smprocess(event=%s,state=%s)" % (event,self._state))
             try:
-                self.on_error(self.ERR_ACTION_FAILED, *args, **kwargs)
+                res = self.on_error(self.ERR_ACTION_FAILED, *args, **kwargs)
                 raise ex
             except Exception, ex1:
                 log.exception("ERROR in LifecycleMixin on_error()")
@@ -146,6 +147,12 @@ class LifecycleStateMixin(LifecycleMixin):
 
     def _smerror(self, reason, *args, **kwargs):
         return self.on_error(self.ERR_ACTION_FAILED, *args, **kwargs)
+
+    def _instate(self,states):
+        if isinstance(states, Iterable):
+            return self._state in states
+        else:
+            return self._state == str(states)
 
     # Public class lifecycle API:
 

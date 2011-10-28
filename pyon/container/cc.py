@@ -17,25 +17,23 @@ actual handlers functional.
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-
-from pyon.net.endpoint import RPCServer, BinderListener
-
-from pyon.net import messaging
-from pyon.container.apps import AppManager
-from pyon.core.bootstrap import CFG, sys_name, populate_registry
-
-
-from pyon.util.log import log
-from pyon.util.containers import DictModifier
-
-from pyon.ion.process import IonProcessSupervisor
-
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 import string
 import os
 import msgpack
+
+from pyon.container.apps import AppManager
+from pyon.core.bootstrap import CFG, sys_name, populate_registry
+from pyon.net.endpoint import RPCServer, BinderListener
+from pyon.net import messaging
+from pyon.util.log import log
+from pyon.util.containers import DictModifier
+
+from pyon.ion.exchange import ExchangeManager
+from pyon.ion.process import IonProcessSupervisor
+
 
 class IContainerAgent(Interface):
 
@@ -67,11 +65,12 @@ class Container(object):
 
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
+
+        # Create this Container's specific ExchangeManager instance
+        self.ex_manager = ExchangeManager(self)
+
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
-        # Add the public callables of AppManager to Container
-        for call in self.app_manager.container_api:
-            setattr(self, call.__name__, call)
 
         # The pyon worker process supervisor
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
@@ -91,8 +90,10 @@ class Container(object):
 
         self.proc_sup.start()
 
-        # Establish connection to broker
-        self.node, self.ioloop = messaging.makeNode() # TODO: shortcut hack
+        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
+
+        # Start ExchangeManager. In particular establish broker connection
+        self.ex_manager.start()
 
         # Start the CC-Agent API
         rsvc = RPCServer(node=self.node, name=self.name, service=self)
@@ -107,6 +108,7 @@ class Container(object):
                             'container-agent': self.name,
                             'container-xp': sys_name }
             f.write(msgpack.dumps(pid_contents))
+
 
         self.app_manager.start()
 
