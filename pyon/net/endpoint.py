@@ -170,7 +170,7 @@ class EndpointFactory(object):
     node = None     # connection to the broker, basically
 
     # Endpoints
-    # TODO: Make weakref or repace entirely
+    # TODO: Make weakref or replace entirely
     endpoint_by_name = {}
 
     def __init__(self, node=None, name=None):

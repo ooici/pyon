@@ -29,3 +29,20 @@ CONTAINER:
 - Remove PID file even in case of abnormal termination
 - Enhanced shell API
 - Enhanced messaging bookkeeping
+
+PROCESS:
+
+- Unique process IO
+- Process attachment (direct or via container)
+- Lifecycle
+
+
+
+TERMINOLOGY:
+
+- Node ~ AMQP connection
+  - Variants: blocking, non-blocking
+
+- Channel ~ AMQP channel
+
+- Endpoint ~ AMQP publisher/consumer + conversation

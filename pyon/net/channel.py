@@ -248,7 +248,8 @@ class BaseChannel(object):
         """
         assert self.exchange
         # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
-        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
+        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type,
+                                                                self.exchange_durable, self.exchange_auto_delete)
         blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
                                                                 type=self.exchange_type,
                                                                 durable=self.exchange_durable,

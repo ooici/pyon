@@ -62,7 +62,7 @@ class Container(object):
     """
     node = None
     id = string.replace('%s.%d' % (os.uname()[1], os.getpid()), ".", "_")
-    name = "container_agent-%s" % (id)
+    name = "cc_agent_%s" % (id)
     pidfile = None
 
     def __init__(self, *args, **kwargs):
@@ -73,6 +73,7 @@ class Container(object):
         for call in self.app_manager.container_api:
             setattr(self, call.__name__, call)
 
+        # The pyon worker process supervisor
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
@@ -89,8 +90,11 @@ class Container(object):
             raise Exception("Existing pid file already found: %s" % self.pidfile)
 
         self.proc_sup.start()
+
+        # Establish connection to broker
         self.node, self.ioloop = messaging.makeNode() # TODO: shortcut hack
 
+        # Start the CC-Agent API
         rsvc = RPCServer(node=self.node, name=self.name, service=self)
 
         # Start an ION process with the right kind of endpoint factory

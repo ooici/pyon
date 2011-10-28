@@ -35,6 +35,7 @@ class PyonProcess(object):
         self.spawn_args = args
         self.spawn_kwargs = kwargs
 
+        # The instance of Greenlet or subprocess or similar
         self.proc = None
         self.supervisor = None
 
@@ -105,6 +106,7 @@ class GreenProcess(PyonProcess):
         return id(self.proc)
 
     def _spawn(self):
+        # Gevent spawn
         return spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
 
     def _join(self, timeout=None):
@@ -125,6 +127,7 @@ class PythonProcess(PyonProcess):
         return self.proc.pid
 
     def _spawn(self):
+        # Multiprocessing spawn
         proc = mp.Process(target=self.target, args=self.spawn_args, kwargs=self.spawn_kwargs)
         proc.daemon = True
         proc.start()

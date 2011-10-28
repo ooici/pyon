@@ -174,8 +174,8 @@ def type_defs(ob=None):
 def ionhelp():
     print "ION R2 CC interactive shell"
     print
-    print "Available functions: %s" % ", ".join([func.__name__ for func in public_api])
-    print "Available variables: %s" % ", ".join(public_vars.keys())
+    print "Available functions: %s" % ", ".join(sorted([func.__name__ for func in public_api]))
+    print "Available variables: cc, %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
 public_api = [ionhelp,ps,ms,apps,svc_defs,obj_defs,type_defs]

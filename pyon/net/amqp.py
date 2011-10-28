@@ -1,10 +1,10 @@
-"""
-Prototype messaging interface on top of Pika SelectConnection (using monkey patched select module).
+#!/usr/bin/env python
 
-note: might not be an amqp module after all
+"""
+AMQP messaging with Pika.
+Use Pika SelectConnection (using monkey patched select module).
 """
 
-from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
 from pika import BasicProperties
 
@@ -12,10 +12,10 @@ from pyon.util.log import log
 
 class Node(object):
     """
-    Main messaging interface that goes active when amqp client connects.
+    Main messaging interface that goes active when AMQP client connects.
     Integrates messaging and processing
 
-    The life cycle of this depends on the underlying amqp connection.
+    The life cycle of this depends on the underlying AMQP connection.
 
     This thing (or a subordinate but coupled/controlled object) mediates
     Messaging Channels that are used to send messages or that dispatch
@@ -27,7 +27,7 @@ class Node(object):
 
     def on_connection_open(self, client):
         """
-        AMQP Connection event handler.
+        AMQP Connection Open event handler.
         Should this be in another class?
         """
         log.debug("In Node.on_connection_open")
@@ -38,15 +38,16 @@ class Node(object):
 
     def on_connection_close(self, *a):
         """
-        AMQP Connection event handler.
+        AMQP Connection Close event handler.
         Should this be in another class?
         """
         log.debug("In Node.on_connection_close")
 
     def start_node(self):
         """
-        This should only be called by on_connection_opened..
+        This should only be called by on_connection_opened.
         so, maybe we don't need a start_node/stop_node interface
+        TODO: Does this mean only one connection is supported?
         """
         log.debug("In Node.start_node")
         self.running = 1
@@ -58,8 +59,8 @@ class Node(object):
 
     def channel(self, name, ch_type):
         """
-        implement this in subclass
-
+        Create a channel on current node.
+        Implement this in subclass
         name shouldn't be a parameter here
         """
         log.debug("In Node.channel")

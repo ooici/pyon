@@ -19,7 +19,23 @@ class InvalidEventException(LifecycleException):
 class ActionFailedException(LifecycleException):
     pass
 
-class LifecycleMixin():
+class LifecycleMixin(object):
+    # Public class lifecycle API:
+
+    def init(self, *args, **kwargs):
+        pass
+
+    def start(self, *args, **kwargs):
+        pass
+
+    def stop(self, *args, **kwargs):
+        pass
+
+    def quit(self, *args, **kwargs):
+        pass
+
+
+class LifecycleStateMixin(LifecycleMixin):
     """
     Provides an efficent standard life-cycle management for internal pyon objects.
     States: NEW - READY - ACTIVE - QUIT - ERROR
