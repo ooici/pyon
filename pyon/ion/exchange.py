@@ -80,8 +80,8 @@ class ExchangeSpace(object):
     def ensure_exists(self, node):
         xname = self.build_xname()
         log.debug("ExchangeSpace.ensure_exists() xname=%" % xname)
-        ch = node.basic_channel()
-        log.debug("ExchangeSpace.ensure_exists. Got basic channel %s" % ch)
+        #ch = node.basic_channel()
+        #log.debug("ExchangeSpace.ensure_exists. Got basic channel %s" % ch)
 
 
     def __str__(self):

@@ -121,7 +121,7 @@ def ioloop(connection):
         # Loop until the connection is closed
         connection.ioloop.start()
 
-def makeNode(connection_params=None):
+def make_node(connection_params=None):
     """
     Blocking construction and connection of node.
 
