@@ -29,7 +29,7 @@ You need the following installed before you can use pyon:
     - May require XCode
   - libevent 2.0
     - This can easily be installed with Homebrew on a Mac or a package manager on linux.
-  - libyaml 3.0
+  - libyaml 0.1.4 
     - You need the -dev or -devel version on linux. If you don't have such a package, use extern/setup-libyaml.sh.
     - The Homebrew version on a mac is sufficient.
   - zeromq 2.1.x
