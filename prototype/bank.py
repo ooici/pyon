@@ -7,7 +7,6 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import RPCClient
-from pyon.util.async import spawn
 from pyon.util.log import log
 
 from interface.services.ibank_service import IBankService, BaseBankService
@@ -77,7 +76,6 @@ class BankService(BaseBankService):
             return []
         customer_obj = customer_list[0]
         accounts = self.clients.datastore.find([("type_", DataStore.EQUAL, "BankAccount"), DataStore.AND, ("owner", DataStore.EQUAL, customer_obj._id)])
-        print "XXXXXXXXXXXXXXXXXXXXXXX accounts: " + str(accounts)
         return accounts
 #        account_list = []
 #        for account in accounts:
