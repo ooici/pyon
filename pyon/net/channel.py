@@ -1,6 +1,7 @@
-"""
+#!/usr/bin/env python
 
-Channel Protocol
+"""
+Provides a messaging channel protocol.
 
 Defines the configuration parameter values and execution/command sequence.
 (The configuration may require in-band communication with the broker. This
@@ -33,27 +34,23 @@ TODO:
 [ ] Use nowait on amqp config methods and handle channel exceptions with pika
 [ ] PointToPoint Channel (from Bidirectional)
 [ ] Channel needs to support reliable delivery (consumer ack; point to
-point will ack when the contet of a delivery naturally concludes (channel
+point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
-
-import uuid
-import time
 
 from pika import BasicProperties
 
 from gevent import queue as gqueue
 from gevent import event
-from pyon.core.bootstrap import CFG
-from pyon.util.async import blocking_cb
 
+from pyon.util.async import blocking_cb
 from pyon.util.log import log
-#import pprint
 
 class ChannelError(Exception):
     """
     Exception raised for error using Channel Socket Interface.
     """
+
 class ChannelClosedError(Exception):
     """
     Denote activity on a closed channel (usually during shutdown).
@@ -61,15 +58,15 @@ class ChannelClosedError(Exception):
 
 class Admin(object):
     """
-    service thing to look up what exchanges should be available to the
-    Node.
-    thing could also be used to register exchanges (ex points).
+    Service thing to look up what exchanges should be available to the Node.
+    Thing could also be used to register exchanges (ex points).
     Defaults could be in local file (e.g. /etc/hosts)
 
-    an actual network service could give more accurate/dynamic info.
+    An actual network service could give more accurate/dynamic info.
     """
 
 class _AMQPHandlerMixin(object):
+    # UNUSED
 
     def on_channel_open(self, amq_chan):
         log.debug("In _AMQPHandlerMixin.on_channel_open")
@@ -96,7 +93,6 @@ class _AMQPHandlerMixin(object):
 class ChannelProtocol(object):
     """
     """
-
     def message_received(self, msg):
         """
         msg is a unit of data, some kind of object depending on what kind
@@ -106,29 +102,19 @@ class ChannelProtocol(object):
 
 class BaseChannel(object):
     """
-    Channel Protocol
-    Configuration and operation mechanics for an interaction pattern
+    Channel Protocol: Configuration and operation mechanics for an interaction pattern.
 
-    The channel protocol is a context in which to handle amqp events.
+    The channel protocol is a context in which to handle AMQP events.
     Synchronous configuration (Queue, Basic, and Channel class)
 
     Synchronous:
-        Queue.Declare
-        Queue.Bind
-        Basic.Consume
-        Basic.Cancel
+        Queue.Declare, Queue.Bind, Basic.Consume, Basic.Cancel
 
     Asynchronous Methods (client to broker):
-        Basic.Publish
-        Basic.Ack
-        Basic.Reject
-        Basic.Qos
+        Basic.Publish, Basic.Ack, Basic.Reject, Basic.Qos
 
     Asynchronous Events (broker to client):
-        Channel.Close
-        Basic.Deliver
-        Basic.Return
-
+        Channel.Close, Basic.Deliver, Basic.Return
 
     TODO: for synchronous method callbacks, the frame abstraction should
     not show up in this class. The layer below needs to unpack the frames
@@ -137,14 +123,15 @@ class BaseChannel(object):
 
     amq_chan = None # the amqp transport
 
-    _peer_name = None # name send uses (exchange, routing_key)
-    _chan_name = None # name recv uses (exchange, binding_key)
+    _peer_name = None  # name send uses (exchange, routing_key)
+    _chan_name = None  # name recv uses (exchange, binding_key)
 
-    # AMQP options
+    # AMQP Exchange options
     exchange_type = 'topic' # do channels get to create exchanges?
     exchange_auto_delete = True
     exchange_durable = False
 
+    # AMQP Queue options
     queue_auto_delete = True
     queue_durable = False
     queue_exclusive = False
@@ -153,6 +140,7 @@ class BaseChannel(object):
     queue_do_declare = True # toggle actually creating queue; a queue may
                             # be expected to already exist
 
+    # AMQP Consumer options
     consumer_no_ack = True
     consumer_exclusive = False
     prefetch_size = 1
@@ -184,7 +172,8 @@ class BaseChannel(object):
 
     def close(self):
         """
-        Closes the AMQP connection.  @TODO: belongs here?
+        Closes the AMQP connection.
+        @TODO: belongs here?
         """
         log.debug("BaseChannel.close")
         if self.amq_chan:
@@ -247,7 +236,8 @@ class BaseChannel(object):
         """
         assert self.exchange
         # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
-        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type, self.exchange_durable, self.exchange_auto_delete)
+        log.debug("Attempting exchange declare: %s, TYPE %s, DUR %s AD %s", self.exchange, self.exchange_type,
+                                                                self.exchange_durable, self.exchange_auto_delete)
         blocking_cb(self.amq_chan.exchange_declare, 'callback', exchange=self.exchange,
                                                                 type=self.exchange_type,
                                                                 durable=self.exchange_durable,
@@ -589,9 +579,7 @@ class Bidirectional(BaseChannel):
         self._build_accepted_channel(reply_to, body)
 
     def _build_accepted_channel(self, peer_name, body):
-        """
-        only set send context (can't receive yet)
-        """
+        """Only set send context (can't receive yet)"""
         log.debug("In Bidirectional._build_accepted_channel")
         log.debug("peer_name: %s" % str(peer_name))
         new_chan = _Bidirectional_accepted()
@@ -601,10 +589,9 @@ class Bidirectional(BaseChannel):
 
     def connect(self, name, callback):
         """
-        connect to a channel such that this protocol can send a message to
-        it.
+        Connect to a channel such that this protocol can send a message to it.
 
-        sets the sending context of the channel protocol
+        Sets the sending context of the channel protocol
 
         Some Channel Protocols just set the _peer_name statically; others
         may actually require interaction with the broker.
@@ -784,7 +771,7 @@ class ChannelShutdownMessage(object):
 
 class SocketInterface(object):
     """
-    Adapts an amqp channel.
+    Adapts an AMQP channel.
     Adds a blocking layer using gevent Async Events to achieve a socket/0mq like behavior.
     """
 
@@ -792,8 +779,8 @@ class SocketInterface(object):
 
     def __init__(self, amq_chan, ch_proto):
         """
-        amq_chan - instance of amqp channel from amqp client
-        ch_proto instance of a ChannelProtocol
+        @param amq_chan instance of amqp channel from amqp client
+        @param ch_proto instance of a ChannelProtocol
         """
         log.debug("In SocketInterface.__init__")
         log.debug("amq_chan: %s" % str(amq_chan))

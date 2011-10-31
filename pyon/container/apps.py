@@ -4,18 +4,19 @@
 
 __author__ = 'Michael Meisinger'
 
+from zope.interface import providedBy
+from zope.interface import Interface, implements
+
 from pyon.core.bootstrap import CFG
 from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
 from pyon.service.service import add_service_by_name, get_service_by_name
 from pyon.util.config import Config
 from pyon.util.containers import DictModifier, DotDict, for_name
 from pyon.util.log import log
+from pyon.util.state_object import  LifecycleStateMixin
 
-from zope.interface import providedBy
-from zope.interface import Interface, implements
-
-class AppManager(object):
-    def __init__(self, container):
+class AppManager(LifecycleStateMixin):
+    def on_init(self, container, *args, **kwargs):
         self.container = container
 
         # Define the callables that can be added to Container public API
@@ -24,10 +25,15 @@ class AppManager(object):
                               self.start_app_from_url,
                               self.start_rel,
                               self.start_rel_from_url]
+
+        # Add the public callables to Container
+        for call in self.container_api:
+            setattr(self.container, call.__name__, call)
+
         self.apps = {}
 
-    def start(self):
-        pass
+    def on_start(self, *args, **kwargs):
+        log.debug("AppManager: start")
 
     def start_app_from_url(self, app_url=""):
         """

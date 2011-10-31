@@ -43,4 +43,15 @@
         <!--<antcall target="remeggs"/>-->
     </target>
 
+    <target name="clean-buildout"
+        description="clean up buildout dirs" depends="clean" >
+        <echo message="Clean up buildout directories.  Please run `python bootstrap.py` to start buildout."/>
+        <delete dir="parts"/>
+        <delete dir="develop-eggs"/>
+        <delete dir="bin"/>
+        <delete dir="downloads"/>
+        <delete dir="eggs"/>
+        <delete dir="build"/>
+        <delete file=".installed.cfg"/>
+    </target>
 </project>

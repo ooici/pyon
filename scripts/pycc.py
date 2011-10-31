@@ -77,7 +77,7 @@ def setup_ipython(shell_api=None):
       /____/""",
                            exit_msg = 'Leaving ION shell, shutting down container.')
 
-    ipshell('Pyon - ION R2 CC interactive IPython shell. Type help() for help')
+    ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
 
 # From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
 def unflatten(dictionary):
@@ -133,10 +133,10 @@ def parse_args(tokens):
 
     return args, kwargs
 
-if __name__ == '__main__':
+def entry():
     #proc_types = GreenProcessSupervisor.type_callables.keys()
 
-    # NOTE: Resist the temptation to add manual parameters here! Most container config options
+    # NOTE: Resist the temptation to add other parameters here! Most container config options
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
 
     parser = argparse.ArgumentParser(description=description)
@@ -162,4 +162,6 @@ if __name__ == '__main__':
             main(opts, *args, **kwargs)
     else:
         main(opts, *args, **kwargs)
-    
+
+if __name__ == '__main__':
+    entry()

@@ -69,7 +69,7 @@ class NodeB(amqp.Node):
 
     def start_node(self):
         """
-        This should only be called by on_connection_opened..
+        This should only be called by on_connection_opened.
         so, maybe we don't need a start_node/stop_node interface
         """
         log.debug("In start_node")
@@ -103,6 +103,8 @@ class NodeB(amqp.Node):
 def ioloop(connection):
     # Loop until CTRL-C
     log.debug("In ioloop")
+    import threading
+    threading.current_thread().name = "NODE"
     try:
         # Start our blocking loop
         log.debug("Before start")
@@ -119,11 +121,11 @@ def ioloop(connection):
         # Loop until the connection is closed
         connection.ioloop.start()
 
-def makeNode(connection_params=None):
+def make_node(connection_params=None):
     """
     Blocking construction and connection of node.
 
-    @param  connection_params   AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
+    @param connection_params  AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
     """
     log.debug("In makeNode")
     node = NodeB()

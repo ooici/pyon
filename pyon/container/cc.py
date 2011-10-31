@@ -17,25 +17,23 @@ actual handlers functional.
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-
-from pyon.net.endpoint import RPCServer, BinderListener
-
-from pyon.net import messaging
-from pyon.container.apps import AppManager
-from pyon.core.bootstrap import CFG, sys_name, populate_registry
-
-
-from pyon.util.log import log
-from pyon.util.containers import DictModifier
-
-from pyon.ion.process import IonProcessSupervisor
-
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 import string
 import os
 import msgpack
+
+from pyon.container.apps import AppManager
+from pyon.core.bootstrap import CFG, sys_name, populate_registry
+from pyon.net.endpoint import RPCServer, BinderListener
+from pyon.net import messaging
+from pyon.util.log import log
+from pyon.util.containers import DictModifier
+
+from pyon.ion.exchange import ExchangeManager
+from pyon.ion.process import IonProcessSupervisor
+
 
 class IContainerAgent(Interface):
 
@@ -62,17 +60,19 @@ class Container(object):
     """
     node = None
     id = string.replace('%s.%d' % (os.uname()[1], os.getpid()), ".", "_")
-    name = "container_agent-%s" % (id)
+    name = "cc_agent_%s" % (id)
     pidfile = None
 
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
+
+        # Create this Container's specific ExchangeManager instance
+        self.ex_manager = ExchangeManager(self)
+
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
-        # Add the public callables of AppManager to Container
-        for call in self.app_manager.container_api:
-            setattr(self, call.__name__, call)
 
+        # The pyon worker process supervisor
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
@@ -89,8 +89,13 @@ class Container(object):
             raise Exception("Existing pid file already found: %s" % self.pidfile)
 
         self.proc_sup.start()
-        self.node, self.ioloop = messaging.makeNode() # TODO: shortcut hack
 
+        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
+
+        # Start ExchangeManager. In particular establish broker connection
+        self.ex_manager.start()
+
+        # Start the CC-Agent API
         rsvc = RPCServer(node=self.node, name=self.name, service=self)
 
         # Start an ION process with the right kind of endpoint factory
@@ -103,6 +108,7 @@ class Container(object):
                             'container-agent': self.name,
                             'container-xp': sys_name }
             f.write(msgpack.dumps(pid_contents))
+
 
         self.app_manager.start()
 

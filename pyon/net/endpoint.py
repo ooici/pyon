@@ -1,8 +1,14 @@
+#!/usr/bin/env python
+
+"""Provides the communication layer above channels."""
+
 from gevent import event
+from zope import interface
 
 from pyon.core.bootstrap import CFG, sys_name
 from pyon.core import exception
-from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError
+from pyon.core.object import IonServiceDefinition
+from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError, BaseChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
@@ -165,7 +171,7 @@ class EndpointFactory(object):
     node = None     # connection to the broker, basically
 
     # Endpoints
-    # TODO: Make weakref or repace entirely
+    # TODO: Make weakref or replace entirely
     endpoint_by_name = {}
 
     def __init__(self, node=None, name=None):
@@ -205,6 +211,28 @@ class EndpointFactory(object):
         To be defined by derived classes. Cleanup any resources here, such as channels being open.
         """
         pass
+
+class ExchangeManagementEndpoint(Endpoint):
+    def create_xs(self, name):
+        pass
+
+class ExchangeManagement(EndpointFactory):
+    endpoint_type = ExchangeManagementEndpoint
+    channel_type = BaseChannel
+
+    def __init__(self, **kwargs):
+        self._pub_ep = None
+        EndpointFactory.__init__(self, **kwargs)
+
+    def create_xs(self, name):
+        if not self._exchange_ep:
+            self._exchange_ep = self.create_endpoint(self.name)
+
+        self._exchange_ep.create_xs(name)
+
+    def close(self):
+        if self._exchange_ep:
+            self._exchange_ep.close()
 
 class BinderListener(object):
     def __init__(self, node, name, endpoint_factory, listening_channel_type, spawn_callable):
@@ -440,8 +468,25 @@ class RPCClient(RequestResponseClient):
     endpoint_type = RPCRequestEndpoint
 
     def __init__(self, iface=None, **kwargs):
-        self._define_interface(iface)
+        if isinstance(iface, interface.interface.InterfaceClass):
+            self._define_interface(iface)
+        elif isinstance(iface, IonServiceDefinition):
+            self._define_svcdef(iface)
+        else:
+            raise RuntimeError("interface is not a zope.interface or an IonServiceDefinition")
+
         RequestResponseClient.__init__(self, **kwargs)
+
+    def _define_svcdef(self, svc_def):
+        """
+        Defines an RPCClient's attributes from an IonServiceDefinition.
+        """
+        for meth in svc_def.methods:
+            name = meth.op_name
+            info = meth.def_in
+            doc = meth.__doc__
+
+            setattr(self, name, _Command(self.request, name, info, doc))
 
     def _define_interface(self, iface):
         """
@@ -651,7 +696,8 @@ class _Command(object):
     """
     RPC Message Format
     Command method generated from interface.
-    
+
+    @TODO: CURRENTLY UNUSED SIGINFO FOR VALIDATION
     Note: the required siginfo could be used by the client to catch bad
     calls before it makes them. 
     If calls are only made using named arguments, then the optional siginfo
@@ -666,9 +712,9 @@ class _Command(object):
         #log.debug("doc: %s" % str(doc))
         self.callback = callback
         self.name = name
-        self.positional = siginfo['positional']
-        self.required = siginfo['required']
-        self.optional = siginfo['optional']
+#        self.positional = siginfo['positional']
+#        self.required = siginfo['required']
+#        self.optional = siginfo['optional']
         self.__doc__ = doc
 
     def __call__(self, *args):
