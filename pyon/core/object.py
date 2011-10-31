@@ -296,7 +296,7 @@ class IonObjectRegistry(object):
 
         yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
 
-        yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files)))
+        yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
         obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
         return obj_defs
@@ -345,12 +345,12 @@ class IonServiceRegistry(IonObjectRegistry):
 
     def register_svc_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
+        obj_defs = []
         for yaml_file in yaml_files:
             svc_name = service_name_from_file_name(yaml_file)
             yaml_text = open(yaml_file, 'r').read()
 
             defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
-            obj_defs = []
             for def_set in defs:
                 # Register all supporting objects first
                 for obj_name,obj_def in def_set.get('obj', {}).iteritems():
