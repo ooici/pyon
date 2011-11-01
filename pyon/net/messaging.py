@@ -35,8 +35,9 @@ class IDPool(object):
     def get_id(self):
         log.debug("In IDPool.get_id")
         if len(self.ids_free) > 0:
-            log.debug("new_id: %s" % str(new_id))
+            #log.debug("new_id: %s" % str(new_id))
             id = self.ids_free.pop()
+            self.ids_in_use.add(id)
             log.debug("id: %s" % str(id))
             return id
 
@@ -64,6 +65,9 @@ class NodeB(amqp.Node):
         log.debug("In NodeB.__init__")
         self.ready = event.Event()
         self._lock = coros.RLock()
+        self._pool = IDPool()
+        self._bidir_pool = {}   # maps inactive/active our numbers (from self._pool) to channels
+        self._pool_map = {}     # maps active pika channel numbers to our numbers (from self._pool)
 
         amqp.Node.__init__(self)
 
@@ -78,7 +82,7 @@ class NodeB(amqp.Node):
         self.ready.set()
 
     def channel(self, ch_type):
-        log.debug("In NodeB.channel")
+        log.debug("In NodeB.channel, pool size is %d", len(self._bidir_pool))
         if not self.running:
             log.error("Attempt to open channel on node that is not running")
             raise #?
@@ -87,18 +91,47 @@ class NodeB(amqp.Node):
         with self._lock:
             log.debug("acquired semaphore")
 
-            result = event.AsyncResult()
-            def on_channel_open_ok(amq_chan):
-                ch = channel.SocketInterface.Socket(amq_chan, ch_type)
-                result.set(ch)
-            self.client.channel(on_channel_open_ok)
-            ch = result.get()
-            log.debug("channel: %s" % str(ch))
-            #ch = channel.SocketInterface(client)
+            def new_channel():
+                result = event.AsyncResult()
+                def on_channel_open_ok(amq_chan):
+                    sch = ch_type(close_callback=self.on_channel_request_close)
+                    sch.on_channel_open(amq_chan)
+                    ch = channel.SocketInterface.Socket(amq_chan, sch)
+                    result.set((ch, sch))
+                self.client.channel(on_channel_open_ok)
+                return result.get()
+
+            if ch_type == channel.BidirectionalClient:
+                chid = self._pool.get_id()
+                if chid in self._bidir_pool:
+                    assert not chid in self._pool_map
+                    self._pool_map[chid] = self._bidir_pool[chid].amq_chan.channel_number
+                    ch = self._bidir_pool[chid]
+                    socket = channel.SocketInterface.Socket(ch.amq_chan, ch)
+                else:
+                    socket, ch = new_channel()
+                    self._bidir_pool[chid] = ch
+                    self._pool_map[chid] = ch.amq_chan.channel_number
+            else:
+                socket, ch = new_channel()
+
+            assert socket and ch
+            log.debug("sock channel: %s" % str(socket))
 
         log.debug("release semaphore")
 
-        return ch
+        return socket
+
+    def on_channel_request_close(self, ch):
+        log.debug("NodeB: on_channel_request_close")
+        log.debug(str(ch))
+
+        if ch.amq_chan.channel_number in self._pool_map:
+            chid = self._pool_map.pop(ch.amq_chan.channel_number)
+            log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.amq_chan.channel_number, chid)
+            self._pool.release_id(chid)
+        else:
+            ch.close_impl()
 
 def ioloop(connection):
     # Loop until CTRL-C

@@ -126,6 +126,8 @@ class BaseChannel(object):
     _peer_name = None  # name send uses (exchange, routing_key)
     _chan_name = None  # name recv uses (exchange, binding_key)
 
+    _close_callback = None  # the callback to use when close() is called
+
     # AMQP Exchange options
     exchange_type = 'topic' # do channels get to create exchanges?
     exchange_auto_delete = True
@@ -156,26 +158,46 @@ class BaseChannel(object):
     queue = None
     exchange = None
 
+    def __init__(self, close_callback=None):
+        """
+        Initializes a BaseChannel instance.
+
+        @param  close_callback  The method to invoke when close() is called on this BaseChannel. May be left as None,
+                                in which case close_impl() will be called. This expects to be a callable taking one
+                                param, this channel instance.
+        """
+        self._close_callback = close_callback
+
     def __str__(self):
         res = "\n  _peer_name: "
         res += "None" if self._peer_name is None else str(self._peer_name)
         res += "\n"
         res += "  _chan_name: "
-        res += "None" if self._chan_name is None else self._chan_name
+        res += "None" if self._chan_name is None else str(self._chan_name)
         res += "\n"
         res += "  queue: "
-        res += "None" if self.queue is None else self.queue
+        res += "None" if self.queue is None else str(self.queue)
         res += "\n"
         res += "  exchange: "
-        res += "None" if self.exchange is None else self.exchange
+        res += "None" if self.exchange is None else str(self.exchange)
         return res
 
     def close(self):
         """
+        Default close method. If created via a Node (99% likely), the Node will take care of
+        calling close_impl for you at the proper time.
+        """
+        if self._close_callback:
+            self._close_callback(self)
+        else:
+            self.close_impl()
+
+    def close_impl(self):
+        """
         Closes the AMQP connection.
         @TODO: belongs here?
         """
-        log.debug("BaseChannel.close")
+        log.debug("BaseChannel.close_impl")
         if self.amq_chan:
             self.amq_chan.close()
 
@@ -330,7 +352,7 @@ class BaseChannel(object):
         if callback:
             self._channel_bind_cb = callback
         self.amq_chan.queue_declare(callback=self._on_queue_declare_ok,
-                                    queue=self.queue,
+                                    queue=self.queue or '',
                                     auto_delete=self.queue_auto_delete,
                                     durable=self.queue_durable)
 
@@ -666,15 +688,18 @@ class BidirectionalClient(BaseChannel):
         if self._peer_name:
             raise ChannelError('Channel already connected') # this is more "Client" than "Protocol"
         self._peer_name = name
-        self.queue = ''
-        self._chan_name = (self._peer_name[0], '')
-        # bind to temp reply queue
-        def set_reply_name():
-            self._chan_name = (self._peer_name[0], self.queue)
-            self._start_consumer()
+        self._chan_name = (self._peer_name[0], self.queue)
+
+        if self.queue_do_declare:
+            # bind to temp reply queue
+            def set_reply_name():
+                self._chan_name = (self._peer_name[0], self.queue)
+                self._start_consumer()
+                callback()
+            self.do_queue(set_reply_name)
+            self.queue_do_declare = False
+        else:
             callback()
-        self.do_queue(set_reply_name)
-        #self._connect_callback = callback
 
 
     def send(self, data):
@@ -694,6 +719,16 @@ class BidirectionalClient(BaseChannel):
         self._send(self._peer_name, data, 
                                 message_type=message_type,
                                 reply_to=reply_to)
+
+    def close(self):
+        """
+        Close override, cleans up changes made during connect so this can be
+        re-used again on the logical level.
+        """
+        log.debug("In BidirectionalClient.close")
+        self._peer_name = None
+
+        BaseChannel.close(self)
 
 
 
@@ -805,14 +840,12 @@ class SocketInterface(object):
         return msg
 
     @classmethod
-    def Socket(cls, amq_chan, ch_proto_type):
+    def Socket(cls, amq_chan, ch_proto):
         """Main way to instantiate a Channel wrapping SocketInterface
         """
         log.debug("In SocketInterface.Socket")
         log.debug("amq_chan: %s" % str(amq_chan))
-        ch_proto = ch_proto_type()
         log.debug("ch_proto: %s" % str(ch_proto))
-        ch_proto.on_channel_open(amq_chan)
         inst = cls(amq_chan, ch_proto)
         return inst
 
