@@ -2,11 +2,11 @@
 
 from pyon.net.endpoint import Subscriber, BinderListener
 from pyon.net.channel import PubSub
-from pyon.net.messaging import makeNode
+from pyon.net.messaging import make_node
 import gevent
 import time
 
-node,iowat=makeNode()
+node,iowat=make_node()
 
 def msg_recv(msg):
     global counter

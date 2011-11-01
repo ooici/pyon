@@ -10,7 +10,7 @@ import msgpack
 import os
 from pyon.net.endpoint import RPCClient
 from pyon.container.cc import IContainerAgent
-from pyon.net.messaging import makeNode
+from pyon.net.messaging import make_node
 
 def main():
     parser = argparse.ArgumentParser(description="CC Control script")
@@ -30,7 +30,7 @@ def main():
 
     assert parms, "No content in pidfile"
 
-    node, ioloop = makeNode(parms['messaging'])
+    node, ioloop = make_node(parms['messaging'])
     cc = RPCClient(node=node, name=(parms['container-xp'], parms['container-agent']), iface=IContainerAgent)
 
     meth = getattr(cc, opts.command)

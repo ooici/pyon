@@ -20,7 +20,9 @@ for handler in LOGGING_CFG.get('handlers', {}).itervalues():
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
-logging.config.dictConfig(LOGGING_CFG)
+# if there's no logging config, we can't configure it: the call requires version at a minimum
+if LOGGING_CFG:
+    logging.config.dictConfig(LOGGING_CFG)
 
 # Read global configuration
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']

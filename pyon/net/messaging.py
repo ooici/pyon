@@ -127,7 +127,7 @@ def make_node(connection_params=None):
 
     @param connection_params  AMQP connection parameters. By default, uses CFG.server.amqp (most common use).
     """
-    log.debug("In makeNode")
+    log.debug("In make_node")
     node = NodeB()
     connection_params = connection_params or CFG.server.amqp
     credentials = PlainCredentials(connection_params["username"], connection_params["password"])
@@ -141,7 +141,7 @@ def make_node(connection_params=None):
 
 def testb():
     log.debug("In testb")
-    node, ioloop_process = makeNode()
+    node, ioloop_process = make_node()
     ch = node.channel(channel.BaseChannel)
     print ch
     ch.bind(('amq.direct', 'foo'))
@@ -154,7 +154,7 @@ def testb():
 
 def testbclient():
     log.debug("In testbclient")
-    node, ioloop_process = makeNode()
+    node, ioloop_process = make_node()
     ch = node.channel(channel.BidirectionalClient)
     print ch
     ch.connect(('amq.direct', 'foo'))
@@ -167,7 +167,7 @@ def testbclient():
 
 def test_accept():
     log.debug("In test_accept")
-    node, ioloop_process = makeNode()
+    node, ioloop_process = make_node()
     ch = node.channel(channel.Bidirectional)
     print ch
     ch.bind(('amq.direct', 'foo'))

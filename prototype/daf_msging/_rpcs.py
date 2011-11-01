@@ -2,12 +2,12 @@
 """
 
 from pyon.net.endpoint import RPCServer
-from pyon.net.messaging import makeNode
+from pyon.net.messaging import make_node
 import gevent
 
 from prototype.bank import BankService
 
-node,iowat=makeNode()
+node,iowat=make_node()
 
 bs = BankService()
 

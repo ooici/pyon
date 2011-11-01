@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pyon.net.endpoint import Publisher, PublisherEndpoint
-from pyon.net.messaging import makeNode
+from pyon.net.messaging import make_node
 import gevent
 import time
 
@@ -12,7 +12,7 @@ class SpeedPublisherEndpoint(PublisherEndpoint):
 class SpeedPublisher(Publisher):
     endpoint_type = SpeedPublisherEndpoint
 
-node,iowat=makeNode()
+node,iowat=make_node()
 pub=Publisher(node=node, name="hassan")
 #pub=SpeedPublisher(node=node, name="hassan")
 
