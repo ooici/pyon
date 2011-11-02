@@ -32,3 +32,4 @@ res/config/*~*
 scripts/*~*
 unittest.out
 interface/*
+cc-pid*

@@ -21,21 +21,26 @@ You need the following installed before you can use pyon:
   - distutils 2.7.2
     - Download egg and execute with sh
   - pip
-    - Use easy_install to install
+      > easy_install pip
   - homebrew (Mac, optional)
-    - Install with: /usr/bin/ruby -e "$(curl -fsSL https://raw.github.com/gist/323731)"
+      > /usr/bin/ruby -e "$(curl -fsSL https://raw.github.com/gist/323731)"
   - virtualenv and virtualenvwrapper modules for your python 2.7 installation
-    - Use easy_install to install (pip may not work)
-    - May require XCode
+      > easy_install --upgrade virtualenv
+      > easy_install --upgrade virtualenvwrapper
+      Note: This may require XCode (use XCode 3.3 free version)
   - libevent 2.0
-    - This can easily be installed with Homebrew on a Mac or a package manager on linux.
+      Mac: Use Homebrew install (see below)
+      Linux: Install with package manager
   - libyaml 0.1.4 
-    - You need the -dev or -devel version on linux. If you don't have such a package, use extern/setup-libyaml.sh.
-    - The Homebrew version on a mac is sufficient.
+      Mac: Use Homebrew install (see below)
+      Linux: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh.
   - zeromq 2.1.x
-    - The Homebrew version on a mac is sufficient.
-  - couchdb 0.8
-    - The Homebrew version on a mac is sufficient.
+      Mac: Use Homebrew install (see below)
+  - couchdb 0.8 (optional if memory mockdb is used)
+      Mac: Use Homebrew install (see below)
+  - rabbitmq 2.6.1 (optional if amoeba is used)
+      Download generic Linix version and
+      Note: May need erl (Erlang) and some dependencies installed before
 
 Short version to setup a Mac (assumes python 2.7 is already setup):
     brew install libevent libyaml zeromq couchdb
@@ -50,24 +55,36 @@ DEVELOPMENT TIME DEPENDENCIES
 
 PACKAGES:
 
-Install the python package dependencies with:
+Use Buildout to install the python package dependencies with:
+    > python bootstrap.py
+    > bin/buildout
+
+Alternative: Install the python package dependencies with:
+    pip --upgrade numpy
+    Note: easy_install / setup.py do not like numpy.
     python setup.py install
-    Note: If the installation of numpy fails, use pip to install numpy and rerun
 
 
 ION-DEFINITIONS SUBMODULE:
 
-There is a git-submodule which tracks the current commit of ion-definitions that this pyon repository
-depends on for object and service definitions. Run the following to pull and checkout that repository:
+Link git submodule ion-definitions, containing object and service definitions and resource files:
     git submodule update --init
     cd extern/ion-definitions
     git checkout master
 
-On a regular `git-pull`, call `git submodule update` afterwards to pull the commit of the submodule
-specified with pyon. Note: this does NOT happen automatically and this is NOT the branch head of the
-submodule. To change the submodule commit within the parent, cd into the submodule and do a `git pull`.
+Note: This git-submodule always references a specific commit of ion-definitions used by pyon.
+
+To update the code in pyon and the specific commit in the submodule:
+    > git pull
+    > git submodule update
+
+Notes:
+- The submodule update does NOT happen automatically
+- The submodule update does NOT pull the branch head of the submodule.
+- To change the submodule commit within pyon, cd into the submodule and do a `git pull`, then commit pyon.
 
 The obj/ subdir is a symlink to the checkout's extern/ion-definitions/objects.
+The res/ subdir is a symlink to the checkout's extern/ion-definitions/res.
 
 See more about submodules:
 - http://book.git-scm.com/5_submodules.html
@@ -78,25 +95,32 @@ See more about submodules:
 GENERATE SERVICE STUBS:
 
 Generate service definition interfaces and abstract base classes files:
-    python scripts/generate_interfaces.py
+    > python scripts/generate_interfaces.py
     Note: These will be placed in the interfaces/ subdirectory.
 
 
 RUN-TIME DEPENDENCIES
 =====================
 
+COUCHDB (OBJECT DATA STORE):
+
 Run couchdb in second terminal before starting the container or running tests:
-    couchdb
+    > couchdb
+
+
+RABBITMQ (MESSAGE BROKER):
+    > sudo sbin/rabbitmq-server
 
 Add the current directory to your PYTHONPATH for an easier time running scripts. Add the following
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
-    export PYTHONPATH=.
+    > export PYTHONPATH=.
 
 
 TEST
 ====
 
 Run the unittests:
+    bin/unittest (if using buildout)
     ./unittest
 
 Run code coverage:
@@ -107,13 +131,23 @@ USE
 ===
 
 Start the capability container in interactive mode:
+    bin/pycc (if using buildout)
     ./pycc
 
 List supported arguments:
-    ./pycc --help
+    bin/pycc --help
 
 Start the CC with a deploy file:
-    ./pycc --rel res/deploy/r2deploy.yml
+    bin/pycc --rel res/deploy/r2deploy.yml
+
+
+DEBUG
+=====
+
+Real-time debugging is possible with Pycharm. Start pycc from Pycharm.
+
+Remote debugging is possible too (on the localhost by default):
+    ./pyccd -n --rel res/deploy/r2services.yml
 
 
 EXAMPLES
