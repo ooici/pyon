@@ -46,6 +46,12 @@ class DataStore(object):
         """
         pass
 
+    def datastore_exists(self, datastore_name=""):
+        """
+        Indicates whether named data store currently exists.
+        """
+        pass
+
     def list_objects(self, datastore_name=""):
         """
         List all object types existing in the data store instance.
