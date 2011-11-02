@@ -1,15 +1,35 @@
 #!/usr/bin/env python
 
 from pyon.net.endpoint import RPCClient
-from interface.services.idatastore_service import IDatastoreService
+#from interface.services.idatastore_service import IDatastoreService
+from interface.services.ihello_service import IHelloService
 from pyon.net.messaging import make_node
 import gevent
 import time
+import base64
+import os
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--datasize', type=int, help='Size of data in bytes')
+parser.add_argument('-p', '--parallel', type=int, help='Number of parallel requests to run')
+parser.set_defaults(datasize=1024, parallel=1)
+opts = parser.parse_args()
+
 
 node,iowat=make_node()
-dsclient = RPCClient(node=node, name="datastore", iface=IDatastoreService)
+#dsclient = RPCClient(node=node, name="datastore", iface=IDatastoreService)
+hsclient = RPCClient(node=node, name="hello", iface=IHelloService)
 
-counter = 0
+# make data (bytes)
+DATA_SIZE = opts.datasize
+data = base64.urlsafe_b64encode(os.urandom(DATA_SIZE))
+
+PARALLEL = opts.parallel
+
+print "Datasize:", DATA_SIZE, "Parallel:", PARALLEL
+
+counter = [0] * PARALLEL
 st = time.time()
 
 def tick():
@@ -18,19 +38,24 @@ def tick():
         time.sleep(2)
         ct = time.time()
         elapsed_s = ct - st
+        sc = sum(counter)
 
-        mps = counter / elapsed_s
+        mps = sc / elapsed_s
 
-        print counter, "messages, per sec:", mps
+        print counter, sc, "requests, per sec:", mps
 
-def work():
+def work(wid):
     global counter
     while True:
-        dsclient.list_datastores()
-        counter += 1
+        hsclient.noop(data)
+        #hsclient.hello(str(counter[wid]))
+        counter[wid] += 1
 
 _gt = gevent.spawn(tick)
-_gw = gevent.spawn(work)
 
-gevent.joinall([_gt, _gw])
+workers = []
+for x in range(PARALLEL):
+    workers.append(gevent.spawn(work, x))
+
+gevent.joinall([_gt] + workers)
 
