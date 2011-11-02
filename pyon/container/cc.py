@@ -26,6 +26,7 @@ import msgpack
 
 from pyon.container.apps import AppManager
 from pyon.core.bootstrap import CFG, sys_name, populate_registry
+from pyon.directory.directory import Directory
 from pyon.net.endpoint import RPCServer, BinderListener
 from pyon.net import messaging
 from pyon.util.log import log
@@ -110,6 +111,10 @@ class Container(object):
             f.write(msgpack.dumps(pid_contents))
 
 
+        # Instantiate Directory singleton and self-register
+        self.directory = Directory()
+        self.directory.add("/","Container",{"name": self.name, "sysname": sys_name})
+
         self.app_manager.start()
 
         return listener.get_ready_event()
@@ -117,6 +122,10 @@ class Container(object):
 
     def stop(self):
         log.debug("In Container.stop")
+
+        # Unregister from directory
+        self.directory.remove("/","Container")
+
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
         try:
