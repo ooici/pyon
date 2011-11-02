@@ -11,3 +11,7 @@ class HelloService(BaseHelloService):
     def hello(self, text=''):
         log.debug("In hello_service.hello. Text=%s" % text)
         return "BACK:%s" % text
+
+    def noop(self, text=''):
+        return "k"
+
