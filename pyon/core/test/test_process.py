@@ -45,20 +45,24 @@ class ProcessTest(PyonTestCase):
         proc_sleep_secs, proc_count = 0.01, 5
         [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(proc_sleep_secs)
-        self.assertGreaterEqual(elapsed, proc_sleep_secs)
+        self.assertAlmostEqual(elapsed, proc_sleep_secs, places=2)
+
+        # this could be trouble
         self.assertLess(elapsed, proc_sleep_secs*3)
 
         # Test that a small timeout forcibly shuts down without waiting
         wait_secs = 0.0001
         [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown(wait_secs)
-        self.assertGreaterEqual(elapsed, wait_secs)
+        self.assertAlmostEqual(elapsed, wait_secs, places=2)
+
+        # this could be trouble too
         self.assertLess(elapsed, proc_sleep_secs)
 
         # Test that no timeout waits until all finished
         [sup.spawn(('green', time.sleep), proc_sleep_secs) for i in xrange(5)]
         elapsed = sup.shutdown()
-        self.assertGreaterEqual(elapsed, proc_sleep_secs)
+        self.assertAlmostEqual(elapsed, proc_sleep_secs, places=2)
 
     def test_python(self):
         raise SkipTest('Need a better test here')
