@@ -9,9 +9,8 @@ from unittest import SkipTest
 
 class Test_Directory(PyonTestCase):
 
-    def _do_test(self, directory_service):
-        directory_service.delete()
-        directory_service.create()
+    def test_non_persistent(self):
+        directory_service = Directory()
 
         root = directory_service.read("/")
         self.assertEquals(root,{})
@@ -39,17 +38,6 @@ class Test_Directory(PyonTestCase):
 
         root = directory_service.read("/")
         self.assertEquals(root, {"Services":{}} )
-
-    def test_non_persistent(self):
-        self._do_test(Directory(datastore_name='my_directory_ds', persistent=False))
-
-    def test_persistent(self):
-        import socket
-        try:
-            self._do_test(Directory(datastore_name='my_directory_ds',
-                persistent=True))
-        except socket.error:
-            raise SkipTest('Failed to connect to CouchDB')
 
 if __name__ == "__main__":
     unittest.main()
