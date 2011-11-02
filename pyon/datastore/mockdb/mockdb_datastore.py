@@ -19,7 +19,7 @@ class MockDB_DataStore(DataStore):
     def __init__(self, datastore_name='prototype'):
         self.datastore_name = datastore_name
         log.debug('Creating in-memory dict of dicts that will simulate data stores')
-        self.root = {datastore_name:{}}
+        self.root = {}
 
     def create_datastore(self, datastore_name=""):
         if datastore_name == "":
@@ -53,6 +53,9 @@ class MockDB_DataStore(DataStore):
             info = 'Data store does not exist'
         log.debug('Data store info: %s' % str(info))
         return info
+
+    def datastore_exists(self, datastore_name=""):
+        return datastore_name in self.root
 
     def list_objects(self, datastore_name=""):
         if datastore_name == "":

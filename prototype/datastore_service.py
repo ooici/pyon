@@ -13,8 +13,8 @@ class DataStoreService(BaseDatastoreService):
     def service_init(self):
         if self.CFG["type"] == 'CouchDB':
             self.datastore = CouchDB_DataStore()
-            if 'forceClean' in self.CFG:
-                if self.CFG['forceClean'] == True:
+            if 'force_clean' in self.CFG:
+                if self.CFG['force_clean'] == True:
                     try:
                         self.datastore.delete_datastore()
                     except NotFound:

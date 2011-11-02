@@ -6,10 +6,10 @@ __license__ = 'Apache 2.0'
 from uuid import uuid4
 
 import couchdb
-from couchdb.http import ResourceNotFound
+from couchdb.http import ResourceConflict, ResourceNotFound
 
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import BadRequest, NotFound
+from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
 
@@ -25,7 +25,7 @@ class CouchDB_DataStore(DataStore):
         self.port = port
         self.datastore_name = datastore_name
         connection_str = "http://" + host + ":" + str(port)
-        log.info('Connecting to couchDB server: %s' % connection_str)
+        log.debug('Connecting to couchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
     def create_datastore(self, datastore_name=""):
@@ -61,6 +61,12 @@ class CouchDB_DataStore(DataStore):
         info = self.server[datastore_name].info()
         log.debug('Data store info: %s' % str(info))
         return info
+
+    def datastore_exists(self, datastore_name=""):
+        for db in self.server:
+            if db == datastore_name:
+                return True
+        return False
 
     def list_objects(self, datastore_name=""):
         if not datastore_name:
@@ -131,7 +137,10 @@ class CouchDB_DataStore(DataStore):
             datastore_name = self.datastore_name
         log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('update doc contents: %s', doc)
-        res = self.server[datastore_name].save(doc)
+        try:
+            res = self.server[datastore_name].save(doc)
+        except ResourceConflict:
+            raise Conflict('Object not based on most current version')
         log.debug('Update result: %s' % str(res))
         id, version = res
         return [id, version]
