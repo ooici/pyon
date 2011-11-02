@@ -93,10 +93,16 @@ class Endpoint(object):
 
     def send(self, raw_msg):
         """
+        Public send method.
+        Calls _build_msg, then _send. Override either one of these methods to inject your logic.
+        """
+        msg = self._build_msg(raw_msg)
+        return self._send(msg)
+
+    def _send(self, msg):
+        """
         """
         log.debug("In Endpoint.send")
-        msg = self._build_msg(raw_msg)
-
         # interceptor point
 
         # @TODO dict check is a hax
@@ -378,7 +384,7 @@ class BidirectionalListeningEndpoint(Endpoint):
 #
 
 class RequestEndpoint(BidirectionalEndpoint):
-    def send(self, msg):
+    def _send(self, msg):
         log.debug("RequestEndpoint.send")
 
         if not self._recv_greenlet:
@@ -387,7 +393,7 @@ class RequestEndpoint(BidirectionalEndpoint):
         self.response_queue = event.AsyncResult()
         self.message_received = lambda m: self.response_queue.set(m)
 
-        Endpoint.send(self, msg)
+        Endpoint._send(self, msg)
 
         result_data = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
         log.debug("got response to our request: %s" % str(result_data))
@@ -423,10 +429,10 @@ class RequestResponseServer(ListeningEndpointFactory):
 
 class RPCRequestEndpoint(RequestEndpoint):
 
-    def send(self, msg):
+    def _send(self, msg):
         log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
-        res = RequestEndpoint.send(self, msg)
+        res = RequestEndpoint._send(self, msg)
         log.debug("RPCRequestEndpoint got this response: %s" % str(res))
 
         # Check response header
@@ -568,15 +574,15 @@ class RPCServer(RequestResponseServer):
 
 class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
-    def __init__(self, process):
-        RPCRequestEndpoint.__init__(self)
+    def __init__(self, process=None, **kwargs):
+        RPCRequestEndpoint.__init__(self, **kwargs)
         self._process = process
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs.update({'process':self._process})
 
-        inv = RPCRequestEndpoint._build_invocation(**newkwargs)
+        inv = RPCRequestEndpoint._build_invocation(self, **newkwargs)
         return inv
 
     def _message_received(self, msg):
@@ -594,7 +600,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         RPCRequestEndpoint._message_received(self, new_msg)
 
-    def send(self, msg):
+    def _send(self, msg):
         """
         Override to send outgoing messages through the process_outgoing interceptor stack
         """
@@ -607,7 +613,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         else:
             new_msg = msg
 
-        RPCRequestEndpoint.send(self, new_msg)
+        return RPCRequestEndpoint._send(self, new_msg)
 
     def _build_header(self, raw_msg):
         """
@@ -642,24 +648,36 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         header = RPCRequestEndpoint._build_header(self, raw_msg)
 
         header.update({'sender-name'  : self._process.name,     # @TODO
-                       'sender'       : self.channel._chan_name,
+                       'sender'       : 'todo',#self.channel._chan_name,
                        'conv-id'      : None,                   # @TODO
                        'conv-seq'     : 1,
                        'performative' : 'request'})
 
         return header
+    
+class ProcessRPCClient(RPCClient):
+    endpoint_type = ProcessRPCRequestEndpoint
+
+    def __init__(self, process=None, **kwargs):
+        self._process = process
+        RPCClient.__init__(self, **kwargs)
+
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        return RPCClient.create_endpoint(self, to_name, existing_channel, **newkwargs)
 
 class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
-    def __init__(self, process):
-        RPCResponseEndpoint.__init__(self)
+    def __init__(self, process=None, **kwargs):
+        RPCResponseEndpoint.__init__(self, **kwargs)
         self._process = process
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs.update({'process':self._process})
 
-        inv = RPCRequestEndpoint._build_invocation(**newkwargs)
+        inv = RPCResponseEndpoint._build_invocation(self, **newkwargs)
         return inv
 
     def _message_received(self, msg):
@@ -677,7 +695,7 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
         RPCResponseEndpoint._message_received(self, new_msg)
 
-    def send(self, msg):
+    def _send(self, msg):
         """
         Override to send outgoing messages through the process_outgoing interceptor stack
         """
@@ -690,7 +708,19 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         else:
             new_msg = msg
 
-        RPCResponseEndpoint.send(self, new_msg)
+        return RPCResponseEndpoint._send(self, new_msg)
+
+class ProcessRPCServer(RPCServer):
+    endpoint_type = ProcessRPCResponseEndpoint
+
+    def __init__(self, process=None, **kwargs):
+        self._process = process
+        RPCServer.__init__(self, **kwargs)
+
+    def create_endpoint(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        return RPCServer.create_endpoint(self, **newkwargs)
 
 class _Command(object):
     """

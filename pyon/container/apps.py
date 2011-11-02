@@ -8,7 +8,7 @@ from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
-from pyon.net.endpoint import RPCServer, RPCClient, BinderListener
+from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient
 from pyon.service.service import add_service_by_name, get_service_by_name
 from pyon.util.config import Config
 from pyon.util.containers import DictModifier, DotDict, for_name
@@ -76,7 +76,7 @@ class AppManager(LifecycleStateMixin):
             dependency_interface = list(providedBy(dependency_service))[0]
 
             # @TODO: start_client call instead?
-            client = RPCClient(node=self.container.node, name=dependency, iface=dependency_interface)
+            client = ProcessRPCClient(node=self.container.node, name=dependency, iface=dependency_interface, process=process_instance)
             process_instance.clients[dependency] = client
 
         # Init process
@@ -86,7 +86,7 @@ class AppManager(LifecycleStateMixin):
         # Add to global dict
         add_service_by_name(name, process_instance)
 
-        rsvc = RPCServer(node=self.container.node, name=name, service=process_instance)
+        rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
 
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.container.node, name, rsvc, None, None)
