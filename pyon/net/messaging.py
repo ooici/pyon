@@ -34,6 +34,8 @@ class IDPool(object):
 
     def get_id(self):
         log.debug("In IDPool.get_id")
+        log.debug("idsfree: %s", self.ids_free)
+        log.debug("idsinuse: %s", self.ids_in_use)
         if len(self.ids_free) > 0:
             #log.debug("new_id: %s" % str(new_id))
             id = self.ids_free.pop()
@@ -49,6 +51,8 @@ class IDPool(object):
     def release_id(self, the_id):
         log.debug("In IDPool.release_id")
         log.debug("the_id: %s" % str(the_id))
+        log.debug("idsfree: %s", self.ids_free)
+        log.debug("idsinuse: %s", self.ids_in_use)
         if the_id in self.ids_in_use:
             self.ids_in_use.remove(the_id)
             self.ids_free.add(the_id)
@@ -105,13 +109,13 @@ class NodeB(amqp.Node):
                 chid = self._pool.get_id()
                 if chid in self._bidir_pool:
                     assert not chid in self._pool_map
-                    self._pool_map[chid] = self._bidir_pool[chid].amq_chan.channel_number
+                    self._pool_map[self._bidir_pool[chid].amq_chan.channel_number] = chid
                     ch = self._bidir_pool[chid]
                     socket = channel.SocketInterface.Socket(ch.amq_chan, ch)
                 else:
                     socket, ch = new_channel()
                     self._bidir_pool[chid] = ch
-                    self._pool_map[chid] = ch.amq_chan.channel_number
+                    self._pool_map[ch.amq_chan.channel_number] = chid
             else:
                 socket, ch = new_channel()
 
@@ -124,12 +128,14 @@ class NodeB(amqp.Node):
 
     def on_channel_request_close(self, ch):
         log.debug("NodeB: on_channel_request_close")
-        log.debug(str(ch))
+        log.debug("ChType %s, Ch#: %d", ch.__class__, ch.amq_chan.channel_number)
+        log.debug("MAP: %s", self._pool_map)
 
         if ch.amq_chan.channel_number in self._pool_map:
-            chid = self._pool_map.pop(ch.amq_chan.channel_number)
-            log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.amq_chan.channel_number, chid)
-            self._pool.release_id(chid)
+            with self._lock:
+                chid = self._pool_map.pop(ch.amq_chan.channel_number)
+                log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.amq_chan.channel_number, chid)
+                self._pool.release_id(chid)
         else:
             ch.close_impl()
 
