@@ -33,3 +33,4 @@ scripts/*~*
 unittest.out
 interface/*
 cc-pid*
+.coverage

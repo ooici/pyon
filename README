@@ -96,7 +96,7 @@ GENERATE SERVICE STUBS:
 
 Generate service definition interfaces and abstract base classes files:
     > python scripts/generate_interfaces.py
-    Note: These will be placed in the interfaces/ subdirectory.
+    Note: These will be placed in the interfaces/ subdirectory (and not in GIT nor in the egg).
 
 
 RUN-TIME DEPENDENCIES
@@ -110,6 +110,9 @@ Run couchdb in second terminal before starting the container or running tests:
 
 RABBITMQ (MESSAGE BROKER):
     > sudo sbin/rabbitmq-server
+
+
+SOURCE PATH:
 
 Add the current directory to your PYTHONPATH for an easier time running scripts. Add the following
 line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
