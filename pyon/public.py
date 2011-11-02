@@ -9,6 +9,18 @@ __license__ = 'Apache 2.0'
 
 __all__ = []
 
+def assert_environment():
+    """This asserts the mandatory (minimal) execution environment for pyon"""
+    import os.path
+    if not os.path.exists("res"):
+        raise StandardError("pyon environment assertion failed: res/ directory not found")
+    if not os.path.exists("res/config"):
+        raise StandardError("pyon environment assertion failed: res/config directory not found")
+    if not os.path.exists("res/config/pyon.yml"):
+        raise StandardError("pyon environment assertion failed: pyon.yml config missing")
+
+assert_environment()
+
 # Tell the magic import log setup to pass through this file
 from pyon.util.log import import_paths
 import_paths.append(__name__)

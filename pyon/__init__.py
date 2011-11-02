@@ -34,6 +34,7 @@ else:
 
 # If we're running from a subdirectory of the code (in source mode, not egg),
 # change dir to the root directory for easier debugging and unit test launching.
+### Note: commented out because this prevents start of pycc from a different repo.
 '''
 import os
 cwd, path = os.getcwd(), os.path.realpath(__file__)

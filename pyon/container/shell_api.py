@@ -74,7 +74,7 @@ def pprint_list(l, c, pad=1, indent=0):
 
 def ps():
     print "List of ION processes"
-    print "---------------*-----"
+    print "---------------------"
     from pyon.service.service import services_by_name
     print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
 
