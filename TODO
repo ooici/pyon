@@ -36,7 +36,9 @@ PROCESS:
 - Process attachment (direct or via container)
 - Lifecycle
 
+MESSAGING:
 
+- Use AMQP headers
 
 TERMINOLOGY:
 

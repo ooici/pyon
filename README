@@ -39,7 +39,7 @@ You need the following installed before you can use pyon:
   - couchdb 0.8 (optional if memory mockdb is used)
       Mac: Use Homebrew install (see below)
   - rabbitmq 2.6.1 (optional if amoeba is used)
-      Download generic Linix version and
+      Download generic Linux version and
       Note: May need erl (Erlang) and some dependencies installed before
 
 Short version to setup a Mac (assumes python 2.7 is already setup):
@@ -132,6 +132,10 @@ Run code coverage:
 
 USE
 ===
+
+Provide local configuration overrides in:
+    res/config/pyon.local.yml
+    res/config/logging.local.yml
 
 Start the capability container in interactive mode:
     bin/pycc (if using buildout)
