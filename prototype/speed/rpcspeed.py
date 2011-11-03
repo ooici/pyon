@@ -9,10 +9,12 @@ import time
 import base64
 import os
 import argparse
+import msgpack
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--datasize', type=int, help='Size of data in bytes')
 parser.add_argument('-p', '--parallel', type=int, help='Number of parallel requests to run')
+parser.add_argument('-m', '--msgpack', action='store_true', help='Encode data with msgpack')
 parser.set_defaults(datasize=1024, parallel=1)
 opts = parser.parse_args()
 
@@ -23,7 +25,10 @@ hsclient = RPCClient(node=node, name="hello", iface=IHelloService)
 
 # make data (bytes)
 DATA_SIZE = opts.datasize
-data = base64.urlsafe_b64encode(os.urandom(DATA_SIZE))
+# base64 encoding wastes a lot of space, truncate it at the exact data size we requested
+data = base64.urlsafe_b64encode(os.urandom(DATA_SIZE))[:DATA_SIZE]
+if opts.msgpack:
+    data = msgpack.dumps(data)
 
 PARALLEL = opts.parallel
 
