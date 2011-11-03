@@ -8,10 +8,13 @@ from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
+from pyon.core.exception import ContainerConfigError, ContainerStartupError, ContainerAppError
 from pyon.util.config import Config
-from pyon.util.containers import DictModifier, DotDict
+from pyon.util.containers import DictModifier, DotDict, named_any
 from pyon.util.log import log
 from pyon.util.state_object import  LifecycleStateMixin
+
+START_PERMANENT = "permanent"
 
 class AppManager(LifecycleStateMixin):
     def on_init(self, container, *args, **kwargs):
@@ -27,13 +30,16 @@ class AppManager(LifecycleStateMixin):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.apps = {}
+        self.apps = []
 
     def on_start(self, *args, **kwargs):
         log.debug("AppManager: start")
 
     def on_stop(self, *args, **kwargs):
         log.debug("AppManager: stop")
+        # Stop apps in reverse order of startup
+        for appdef in reversed(self.apps):
+            self.stop_app(appdef)
 
     def start_rel_from_url(self, rel_url=""):
         """
@@ -70,7 +76,7 @@ class AppManager(LifecycleStateMixin):
                     config = DictModifier(CFG)
 
                 self.container.spawn_process(name, module, cls, config)
-                self.apps[name] = rel_app_cfg.processapp
+                self.apps.append(DotDict(type="application", name=name, processapp=rel_app_cfg.processapp))
 
             else:
                 # Case 2: Rel contains reference to app file to start
@@ -93,8 +99,9 @@ class AppManager(LifecycleStateMixin):
         1 processapp: In-line defined process to be started
         2 regular app: Full app definition
         """
-        log.debug("app file definition: %s" % appdef)
+        log.debug("start_app: appdef=%s" % appdef)
 
+        appdef = DotDict(appdef)
         app_config = DictModifier(CFG)
 
         if 'config' in appdef:
@@ -109,10 +116,33 @@ class AppManager(LifecycleStateMixin):
         if 'processapp' in appdef:
             # Case 1: Appdef contains definition of process to start
             name, module, cls = appdef.processapp
-
-            self.container.spawn_process(name, module, cls, app_config)
-            self.apps[name] = appdef.processapp
+            try:
+                pid = self.container.spawn_process(name, module, cls, app_config)
+                appdef._pid = pid
+                self.apps.append(appdef)
+            except Exception, ex:
+                log.exception("Appl %s start from processapp failed" % appdef.name)
         else:
             # Case 2: Appdef contains full app start params
-            raise NotImplementedError("Cannot start app from appdef yet: %s" % (appdef))
+            modpath = appdef.mod
+            try:
+                mod = named_any(modpath)
+                appdef._mod_loaded = mod
 
+                # Start the app
+                supid, state = mod.start(self.container, START_PERMANENT, appdef, config)
+                appdef._supid = supid
+                appdef._state = state
+
+                log.debug("App '%s' started. Root sup-id=%s" % (appdef.name, supid))
+
+                self.apps.append(appdef)
+            except Exception, ex:
+                log.exception("Appl %s start from appdef failed" % appdef.name)
+
+    def stop_app(self, appdef):
+        log.debug("App '%s' stopping" % appdef.name)
+        try:
+            appdef._mod_loaded.stop(self.container, appdef._state)
+        except Exception, ex:
+            log.exception("Application %s stop failed" % appdef.name)

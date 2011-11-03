@@ -8,6 +8,7 @@ from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
+from pyon.service.service import BaseService
 from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient
 from pyon.service.service import add_service_by_name, get_service_by_name
 from pyon.util.containers import DictModifier, DotDict, for_name
@@ -35,20 +36,21 @@ class ProcManager(LifecycleStateMixin):
 
     def spawn_process(self, name=None, module=None, cls=None, config=None):
         """
-        Spawn a process locally.
+        Spawn a process within the container.
         """
-        log.debug("In AppManager.spawn_process(name=%s, module=%s, config=%s)" % (name, module, config))
+        log.debug("AppManager.spawn_process(name=%s, module=%s, config=%s)" % (name, module, config))
 
-        # TODO: Process should get its own immutable copy of config, no matter what
-        if config is None: config = DictModifier(CFG)
+        if config is None:
+            config = DictModifier(CFG)
 
-        log.debug("In AppManager.spawn_process: for_name(mod=%s, cls=%s)" % (module, cls))
+        log.debug("AppManager.spawn_process: for_name(mod=%s, cls=%s)" % (module, cls))
         process_instance = for_name(module, cls)
-        # TODO: Check that this is a proper instance (interface)
+        assert isinstance(process_instance, BaseService), "Instantiated process not a BaseService %r" % process_instance
 
         # Inject dependencies
         process_instance.clients = DotDict()
-        log.debug("In AppManager.spawn_process dependencies: %s" % process_instance.dependencies)
+        log.debug("AppManager.spawn_process dependencies: %s" % process_instance.dependencies)
+        # TODO: Service dependency != process dependency
         for dependency in process_instance.dependencies:
             dependency_service = get_service_by_name(dependency)
             dependency_interface = list(providedBy(dependency_service))[0]
@@ -64,6 +66,7 @@ class ProcManager(LifecycleStateMixin):
         # Add to global dict
         # TODO: This needs to go into the process list
         add_service_by_name(name, process_instance)
+        self.procs[name] = process_instance
 
         rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
 

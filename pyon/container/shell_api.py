@@ -93,7 +93,7 @@ def ms():
 def apps():
     print "List of active pyon apps"
     print "------------------------"
-    print "\n".join(("%s: %s"%(an, ad) for (an,ad) in container.app_manager.apps.iteritems()))
+    print "\n".join(("%s: %s"%(appdef.name, appdef) for appdef in container.app_manager.apps))
 
 def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)

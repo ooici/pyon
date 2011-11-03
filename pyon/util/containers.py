@@ -123,11 +123,48 @@ def dict_merge(a, b):
                     current_dst[key] = current_src[key]
     return dst
 
+def named_any(name):
+    """
+    Retrieve a Python object by its fully qualified name from the global Python
+    module namespace.  The first part of the name, that describes a module,
+    will be discovered and imported.  Each subsequent part of the name is
+    treated as the name of an attribute of the object specified by all of the
+    name which came before it.
+    @param name: The name of the object to return.
+    @return: the Python object identified by 'name'.
+    """
+    assert name, 'Empty module name'
+    names = name.split('.')
+
+    topLevelPackage = None
+    moduleNames = names[:]
+    while not topLevelPackage:
+        if moduleNames:
+            trialname = '.'.join(moduleNames)
+            try:
+                topLevelPackage = __import__(trialname)
+            except Exception, ex:
+                moduleNames.pop()
+        else:
+            if len(names) == 1:
+                raise Exception("No module named %r" % (name,))
+            else:
+                raise Exception('%r does not name an object' % (name,))
+
+    obj = topLevelPackage
+    for n in names[1:]:
+        obj = getattr(obj, n)
+
+    return obj
+
 def for_name(modpath, classname):
-    ''' Returns a class of "classname" from module "modname". '''
+    '''
+    Returns a class of "classname" from module "modname".
+    '''
     module = __import__(modpath, fromlist=[classname])
     classobj = getattr(module, classname)
     return classobj()
+
 
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})

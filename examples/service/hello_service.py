@@ -15,3 +15,10 @@ class HelloService(BaseHelloService):
     def noop(self, text=''):
         return "k"
 
+
+def start(container, starttype, app_definition, config):
+    log.debug("Hello app started")
+    return (None, None)
+
+def stop(container, state):
+    log.debug("Hello app stopped")

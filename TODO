@@ -30,10 +30,13 @@ CONTAINER:
 - Enhanced shell API
 - Enhanced messaging bookkeeping
 - Shutdown
+- Add event framework
+- Apply command line config to app/rel config
 
 TESTING:
 
 - Work with pypi mock (in particular specs)
+- Have an IonTest base class
 
 PROCESS:
 

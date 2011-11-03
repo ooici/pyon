@@ -67,3 +67,24 @@ class ServiceUnavailable(IonException):
     Requested service not started or otherwise unavailable
     '''
     status_code = 503
+
+
+class ContainerError(IonException):
+    '''
+    '''
+    status_code = 550
+
+class ContainerConfigError(ContainerError):
+    '''
+    '''
+    status_code = 551
+
+class ContainerStartupError(ContainerError):
+    '''
+    '''
+    status_code = 552
+
+class ContainerAppError(ContainerError):
+    '''
+    '''
+    status_code = 551
