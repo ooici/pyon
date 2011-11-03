@@ -42,7 +42,7 @@ class ExchangeManager(LifecycleStateMixin):
 
         # Declare root exchange
         #self.default_xs.ensure_exists(self.container.node)
-        pass
+        log.debug("ExchangeManager: start")
 
     def create_xs(self, name):
         pass
@@ -53,8 +53,8 @@ class ExchangeManager(LifecycleStateMixin):
     def create_xn(self, xs, name):
         pass
 
-    def on_start(self, *args, **kwargs):
-        log.debug("ExchangeManager: start")
+    def on_stop(self, *args, **kwargs):
+        log.debug("ExchangeManager: stop")
 
 
 class ExchangeSpace(object):
