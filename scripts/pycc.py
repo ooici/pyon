@@ -105,7 +105,6 @@ def main(opts, *args, **kwargs):
     container = Container(*args, **kwargs)
 
     # start and wait for container to signal ready
-    ready = container.init()
     ready = container.start()
     ready.get()
 

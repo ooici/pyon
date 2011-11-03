@@ -83,6 +83,8 @@ class Container(LifecycleStateMixin):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
+        self.init(*args, **kwargs)
+
     def on_start(self):
         log.debug("In Container.on_start")
 
