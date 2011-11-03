@@ -28,14 +28,13 @@ from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.directory.directory import Directory
-from pyon.net.endpoint import RPCServer, BinderListener
+from pyon.net.endpoint import ProcessRPCServer, BinderListener
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier
 from pyon.util.state_object import  LifecycleStateMixin
 
 from pyon.ion.exchange import ExchangeManager
-from pyon.ion.process import IonProcessSupervisor
 
 
 class IContainerAgent(Interface):
@@ -81,9 +80,6 @@ class Container(LifecycleStateMixin):
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
 
-        # The pyon worker process supervisor
-        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
-
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
@@ -97,19 +93,19 @@ class Container(LifecycleStateMixin):
         if os.path.exists(self.pidfile):
             raise Exception("Existing pid file already found: %s" % self.pidfile)
 
-        self.proc_sup.start()
-
-        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
 
+        # TODO: Move this in ExchangeManager - but there is an error
+        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
+
         # Start the CC-Agent API
-        rsvc = RPCServer(node=self.node, name=self.name, service=self)
+        rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
 
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, self.name, rsvc, None, None)
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:
@@ -142,26 +138,24 @@ class Container(LifecycleStateMixin):
         # Unregister from directory
         self.directory.remove("/","Container")
 
-        # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
-        self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
         try:
-            os.unlink(self.pidfile)
+            os.remove(self.pidfile)
         except Exception, e:
-            log.warn("Pidfile did not unlink: %s" % str(e))
+            log.warn("Pidfile could not be deleted: %s" % str(e))
 
     def serve_forever(self):
         """ Run the container until killed. """
         log.debug("In Container.serve_forever")
         
-        if not self.proc_sup.running:
+        if not self.proc_manager.proc_sup.running:
             self.start()
             
         try:
-            self.proc_sup.join_children()
+            self.proc_manager.proc_sup.join_children()
         except (KeyboardInterrupt, SystemExit) as ex:
             log.info('Received a kill signal, shutting down the container.')
         except:
             log.exception('Unhandled error! Forcing container shutdown')
 
-        self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+        self.proc_manager.proc_sup.shutdown(CFG.cc.timeout.shutdown)
             

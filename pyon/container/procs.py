@@ -4,6 +4,8 @@
 
 __author__ = 'Michael Meisinger'
 
+import os
+
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
@@ -14,6 +16,8 @@ from pyon.service.service import add_service_by_name, get_service_by_name
 from pyon.util.containers import DictModifier, DotDict, for_name
 from pyon.util.log import log
 from pyon.util.state_object import  LifecycleStateMixin
+
+from pyon.ion.process import IonProcessSupervisor
 
 class ProcManager(LifecycleStateMixin):
     def on_init(self, container, *args, **kwargs):
@@ -28,11 +32,19 @@ class ProcManager(LifecycleStateMixin):
 
         self.procs = {}
 
+        # The pyon worker process supervisor
+        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
+
     def on_start(self, *args, **kwargs):
         log.debug("ProcManager: start")
 
+        self.proc_sup.start()
+
     def on_quit(self, *args, **kwargs):
         log.debug("ProcManager: quit")
+
+        # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
+        self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
 
     def spawn_process(self, name=None, module=None, cls=None, config=None):
         """
@@ -72,7 +84,7 @@ class ProcManager(LifecycleStateMixin):
 
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.container.node, name, rsvc, None, None)
-        self.container.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
         # Wait for app to spawn
         log.debug("Waiting for server %s listener ready", name)
