@@ -32,6 +32,7 @@ from pyon.net.endpoint import RPCServer, BinderListener
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier
+from pyon.util.state_object import  LifecycleStateMixin
 
 from pyon.ion.exchange import ExchangeManager
 from pyon.ion.process import IonProcessSupervisor
@@ -57,7 +58,7 @@ class IContainerAgent(Interface):
     def stop():
         pass
 
-class Container(object):
+class Container(LifecycleStateMixin):
     implements(IContainerAgent)
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
@@ -86,8 +87,8 @@ class Container(object):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
-    def start(self):
-        log.debug("In Container.start")
+    def on_start(self):
+        log.debug("In Container.on_start")
 
         # Bootstrap object registry
         populate_registry()
@@ -129,14 +130,14 @@ class Container(object):
         return listener.get_ready_event()
 
 
-    def stop(self):
-        log.debug("In Container.stop")
+    def on_quit(self):
+        log.debug("In Container.on_quit")
 
-        self.app_manager.stop()
+        self.app_manager.quit()
 
-        self.proc_manager.stop()
+        self.proc_manager.quit()
 
-        self.ex_manager.stop()
+        self.ex_manager.quit()
 
         # Unregister from directory
         self.directory.remove("/","Container")

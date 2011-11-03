@@ -35,8 +35,8 @@ class AppManager(LifecycleStateMixin):
     def on_start(self, *args, **kwargs):
         log.debug("AppManager: start")
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("AppManager: stop")
+    def on_quit(self, *args, **kwargs):
+        log.debug("AppManager: quit")
         # Stop apps in reverse order of startup
         for appdef in reversed(self.apps):
             self.stop_app(appdef)

@@ -76,8 +76,10 @@ def ps():
     print "List of ION processes"
     print "---------------------"
     from pyon.service.service import services_by_name
-    print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
+    #print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
+    print "\n".join(("%s: %s"%(name, p) for (name,p) in container.proc_manager.procs.iteritems()))
 
+def procs():
     print "\nList of pyon processes"
     print "----------------------"
     print "\n".join((str(p) for p in container.proc_sup.children))
@@ -178,7 +180,7 @@ def ionhelp():
     print "Available variables: cc, %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp,ps,ms,apps,svc_defs,obj_defs,type_defs]
+public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs]
 
 def define_vars():
     from pyon.core.bootstrap import CFG, sys_name, obj_registry

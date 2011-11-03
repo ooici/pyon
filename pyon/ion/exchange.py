@@ -53,8 +53,8 @@ class ExchangeManager(LifecycleStateMixin):
     def create_xn(self, xs, name):
         pass
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("ExchangeManager: stop")
+    def on_quit(self, *args, **kwargs):
+        log.debug("ExchangeManager: quit")
 
 
 class ExchangeSpace(object):

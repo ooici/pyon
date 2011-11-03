@@ -31,8 +31,8 @@ class ProcManager(LifecycleStateMixin):
     def on_start(self, *args, **kwargs):
         log.debug("ProcManager: start")
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("ProcManager: stop")
+    def on_quit(self, *args, **kwargs):
+        log.debug("ProcManager: quit")
 
     def spawn_process(self, name=None, module=None, cls=None, config=None):
         """
