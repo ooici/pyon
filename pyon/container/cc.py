@@ -25,6 +25,7 @@ import os
 import msgpack
 
 from pyon.container.apps import AppManager
+from pyon.container.procs import ProcManager
 from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.directory.directory import Directory
 from pyon.net.endpoint import RPCServer, BinderListener
@@ -53,6 +54,9 @@ class IContainerAgent(Interface):
     def start_rel_from_url(rel_url=""):
         pass
 
+    def stop():
+        pass
+
 class Container(object):
     implements(IContainerAgent)
     """
@@ -69,6 +73,9 @@ class Container(object):
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
+
+        # Create this Container's specific ProcManager instance
+        self.proc_manager = ProcManager(self)
 
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
@@ -115,6 +122,8 @@ class Container(object):
         self.directory = Directory()
         self.directory.add("/","Container",{"name": self.name, "sysname": sys_name})
 
+        self.proc_manager.start()
+
         self.app_manager.start()
 
         return listener.get_ready_event()
@@ -122,6 +131,12 @@ class Container(object):
 
     def stop(self):
         log.debug("In Container.stop")
+
+        self.app_manager.stop()
+
+        self.proc_manager.stop()
+
+        self.ex_manager.stop()
 
         # Unregister from directory
         self.directory.remove("/","Container")

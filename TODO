@@ -19,6 +19,7 @@ STARTUP
 - Enable to start more than one CC out of the same directory (logging, pid file)
 - Enable other packages to import pyon and run it from their directory
 - Process spawnargs
+- Assertion of execution enviroment. Proper exit and message if false
 
 OBJECTS:
 
@@ -26,9 +27,13 @@ OBJECTS:
 
 CONTAINER:
 
-- Remove PID file even in case of abnormal termination
 - Enhanced shell API
 - Enhanced messaging bookkeeping
+- Shutdown
+
+TESTING:
+
+- Work with pypi mock (in particular specs)
 
 PROCESS:
 
@@ -44,7 +49,11 @@ TERMINOLOGY:
 
 - Node ~ AMQP connection
   - Variants: blocking, non-blocking
-
-- Channel ~ AMQP channel
-
+- Channel ~ AMQP channel + more
+- Socket: abstracts a Channel
 - Endpoint ~ AMQP publisher/consumer + conversation
+
+BUGS:
+
+- control_cc induced stop does not work
+- Remove PID file even in case of abnormal termination

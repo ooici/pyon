@@ -159,8 +159,10 @@ def entry():
         # TODO: May need to generate a pidfile based on some parameter or cc name
         pidfile = opts.pidfile or 'cc-%s.pid' % str(uuid4())[0:4]
         with DaemonContext(pidfile=FileLock(pidfile)):#, stdout=logg, stderr=slogg):
+            print "Starting ION CC in deamon context"
             main(opts, *args, **kwargs)
     else:
+        print "Starting ION CC in non deamon context"
         main(opts, *args, **kwargs)
 
 if __name__ == '__main__':
