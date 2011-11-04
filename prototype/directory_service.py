@@ -5,7 +5,6 @@ __license__ = 'Apache 2.0'
 
 from pyon.directory.directory import Directory
 from interface.services.idirectory_service import BaseDirectoryService
-from pyon.util.log import log
 
 class DirectoryService(BaseDirectoryService):
 
