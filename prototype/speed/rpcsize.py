@@ -12,16 +12,20 @@ import argparse
 import msgpack
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--datasize', type=int, help='Size of data in bytes')
-parser.add_argument('-p', '--parallel', type=int, help='Number of parallel requests to run')
+parser.add_argument('-d', '--datasize', type=int, help='Maximum size of data in bytes')
 parser.add_argument('-m', '--msgpack', action='store_true', help='Encode data with msgpack')
-parser.set_defaults(datasize=1024, parallel=1)
+parser.set_defaults(datasize=1024*1024, parallel=1)
 opts = parser.parse_args()
 
 
 node,iowat=make_node()
 #dsclient = RPCClient(node=node, name="datastore", iface=IDatastoreService)
 hsclient = RPCClient(node=node, name="hello", iface=IHelloService)
+
+def notif(*args, **kwargs):
+    print "GOT A BACKPRESSURE NOTICE", str(args), str(kwargs)
+
+#node.client.add_backpressure_callback(notif)
 
 # make data (bytes)
 DATA_SIZE = opts.datasize
@@ -30,12 +34,8 @@ data = base64.urlsafe_b64encode(os.urandom(DATA_SIZE))[:DATA_SIZE]
 if opts.msgpack:
     data = msgpack.dumps(data)
 
-PARALLEL = opts.parallel
-
-print "Datasize:", DATA_SIZE, "Parallel:", PARALLEL
-
-counter = [0] * PARALLEL
-st = time.time()
+counter = 0
+st = 0
 
 def tick():
     global counter, st
@@ -49,18 +49,35 @@ def tick():
 
         print counter, sc, "requests, per sec:", mps
 
-def work(wid):
+def work(ds):
+    curdata = data[:ds]
     global counter
-    while True:
-        hsclient.noop(data)
+    global st
+    counter = 0
+    st = time.time()
+
+    while counter < 1000:
+        hsclient.noop(curdata)
         #hsclient.hello(str(counter[wid]))
-        counter[wid] += 1
+        counter += 1
 
-_gt = gevent.spawn(tick)
+    et = time.time()
+    return et - st
 
-workers = []
-for x in range(PARALLEL):
-    workers.append(gevent.spawn(work, x))
+#_gt = gevent.spawn(tick)
 
-gevent.joinall([_gt] + workers)
+results = {}
+
+for size in [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]:
+    _gl = gevent.spawn(work, size)
+    try:
+        rs = _gl.get(timeout=10)
+    except gevent.Timeout:
+        print "10s elapsed, cutting it"
+        rs = time.time() - st
+    results[size] = { "elapsed": rs, "count": counter, "ps":counter/rs }
+    print "Size:", size, str(results[size]) 
+
+import pprint
+pprint.pprint(results)
 
