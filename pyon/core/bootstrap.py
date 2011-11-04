@@ -11,7 +11,7 @@ import os
 
 # Note: do we really want to do the res folder like this again?
 logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
-LOGGING_CFG = Config(logging_conf_paths).data
+LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
 
 # Ensure the logging directories exist
 for handler in LOGGING_CFG.get('handlers', {}).itervalues():
@@ -26,8 +26,8 @@ if LOGGING_CFG:
 
 # Read global configuration
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
-CFG = Config(conf_paths).data
-sys_name = CFG.system.name or 'pyon.%s' % os.uname()[1].replace('.', '_')
+CFG = Config(conf_paths, ignore_not_found=True).data
+sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
 # Make a default factory for IonObjects
 obj_registry = IonServiceRegistry()

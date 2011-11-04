@@ -12,8 +12,10 @@ import re
 import sys
 
 import yaml
-# Do not remove this
+
+# Do not remove any of the imports below this comment!!!!!!
 from pyon.core.object import IonYamlLoader, service_name_from_file_name
+from pyon.util import yaml_ordered_dict
 
 class IonServiceDefinitionError(Exception):
     pass

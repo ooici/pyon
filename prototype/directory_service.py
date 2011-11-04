@@ -8,7 +8,7 @@ from interface.services.idirectory_service import BaseDirectoryService
 
 class DirectoryService(BaseDirectoryService):
 
-    def service_init(self):
+    def on_init(self):
         self.directory = Directory()
 
     def add(self, parent='/', key='foo', value={}):

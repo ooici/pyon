@@ -83,29 +83,15 @@ class Container(LifecycleStateMixin):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
+        self.init(*args, **kwargs)
+
     def on_start(self):
         log.debug("In Container.on_start")
 
-        # Bootstrap object registry
-        populate_registry()
-
+        # Check if this UNIX process already runs a Container.
         self.pidfile = "cc-pid-%d" % os.getpid()
         if os.path.exists(self.pidfile):
             raise Exception("Existing pid file already found: %s" % self.pidfile)
-
-
-        # Start ExchangeManager. In particular establish broker connection
-        self.ex_manager.start()
-
-        # TODO: Move this in ExchangeManager - but there is an error
-        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
-
-        # Start the CC-Agent API
-        rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
-
-        # Start an ION process with the right kind of endpoint factory
-        listener = BinderListener(self.node, self.name, rsvc, None, None)
-        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:
@@ -113,6 +99,15 @@ class Container(LifecycleStateMixin):
                             'container-agent': self.name,
                             'container-xp': sys_name }
             f.write(msgpack.dumps(pid_contents))
+
+        # Bootstrap object registry
+        populate_registry()
+
+        # Start ExchangeManager. In particular establish broker connection
+        self.ex_manager.start()
+
+        # TODO: Move this in ExchangeManager - but there is an error
+        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
 
 
         # Instantiate Directory singleton and self-register
@@ -123,7 +118,15 @@ class Container(LifecycleStateMixin):
 
         self.app_manager.start()
 
-        return listener.get_ready_event()
+        # Start the CC-Agent API
+        rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
+
+        # Start an ION process with the right kind of endpoint factory
+        listener = BinderListener(self.node, self.name, rsvc, None, None)
+        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+        res = listener.get_ready_event()
+
+        return res
 
 
     def on_quit(self):

@@ -16,6 +16,7 @@ class HelloService(BaseHelloService):
         return "k"
 
 
+
 def start(container, starttype, app_definition, config):
     log.debug("Hello app started")
     return (None, None)

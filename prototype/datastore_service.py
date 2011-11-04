@@ -3,6 +3,7 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
+from pyon.core.bootstrap import sys_name
 from pyon.core.exception import NotFound
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
@@ -10,17 +11,18 @@ from interface.services.idatastore_service import BaseDatastoreService
 
 class DataStoreService(BaseDatastoreService):
 
-    def service_init(self):
-        datastore_name = "Resource"
+    def on_init(self):
+        datastore_name = sys_name + "_resources"
+        datastore_name = datastore_name.lower()
         persistent = False
         force_clean = False
         if 'datastore' in self.CFG:
             datastore_cfg = self.CFG['datastore']
             if 'persistent' in datastore_cfg:
-                if self.CFG['persistent'] == True:
+                if datastore_cfg['persistent'] == True:
                     persistent = True
             if 'force_clean' in datastore_cfg:
-                if self.CFG['force_clean'] == True:
+                if datastore_cfg['force_clean'] == True:
                     force_clean = True
         if persistent:
             self.datastore = CouchDB_DataStore(datastore_name=datastore_name)

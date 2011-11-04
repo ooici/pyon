@@ -73,7 +73,7 @@ class ProcManager(LifecycleStateMixin):
 
         # Init process
         process_instance.CFG = config
-        process_instance.service_init()
+        process_instance.init()
 
         # Add to global dict
         # TODO: This needs to go into the process list

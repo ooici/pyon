@@ -69,6 +69,12 @@ class ServiceUnavailable(IonException):
     status_code = 503
 
 
+class ConfigNotFound(IonException):
+    '''
+    '''
+    status_code = 540
+
+
 class ContainerError(IonException):
     '''
     '''
@@ -82,9 +88,9 @@ class ContainerConfigError(ContainerError):
 class ContainerStartupError(ContainerError):
     '''
     '''
-    status_code = 552
+    status_code = 553
 
 class ContainerAppError(ContainerError):
     '''
     '''
-    status_code = 551
+    status_code = 554

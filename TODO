@@ -13,13 +13,14 @@ CODE:
 - More str() output
 - Clear distinction between ION process and pyon process
 - Clear confusion with service vs process
+- Move all services out of pyon
 
 STARTUP
 
 - Enable to start more than one CC out of the same directory (logging, pid file)
 - Enable other packages to import pyon and run it from their directory
 - Process spawnargs
-- Assertion of execution enviroment. Proper exit and message if false
+- Assertion of execution environment. Proper exit and message if false
 
 OBJECTS:
 
