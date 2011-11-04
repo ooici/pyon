@@ -10,7 +10,7 @@ from interface.services.idatastore_service import BaseDatastoreService
 
 class DataStoreService(BaseDatastoreService):
 
-    def service_init(self):
+    def on_init(self):
         if self.CFG["type"] == 'CouchDB':
             self.datastore = CouchDB_DataStore()
             if 'force_clean' in self.CFG:

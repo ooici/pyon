@@ -9,7 +9,7 @@ from pyon.util.log import log
 
 class DirectoryService(BaseDirectoryService):
 
-    def service_init(self):
+    def on_init(self):
         self.directory = Directory()
 
     def add(self, parent='/', key='foo', value={}):
