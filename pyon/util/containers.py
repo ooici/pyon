@@ -24,6 +24,9 @@ class DotNotationGetItem(object):
 
         return val
 
+    def __contains__(self, item):
+        return hasattr(self, item)
+
 class DotList(DotNotationGetItem, list):
     """ Partner class for DotDict; see that for docs. Both are needed to fully support JSON/YAML blocks. """
 
@@ -55,6 +58,7 @@ class DotDict(DotNotationGetItem, dict):
             raise AttributeError(key)
 
         return val
+
 
     def copy(self):
         return DotDict(dict.copy(self))

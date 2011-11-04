@@ -12,6 +12,9 @@ class Test_Containers(PyonTestCase):
         dotDict = DotDict({"foo": {"bar": {"bah": "fah"}}})
         val = dotDict.foo.bar.bah
         self.assertEqual(val, "fah")
+        dotDict.a = "1"
+        self.assertEqual(dotDict.a, "1")
+        self.assertTrue('a' in dotDict)
 
     def test_dict_modifier(self):
         base = DotDict({"foo": "bar", "bah": "fah"})
