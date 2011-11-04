@@ -4,11 +4,13 @@
 
 __author__ = 'Michael Meisinger'
 
+import os.path
+
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerConfigError, ContainerStartupError, ContainerAppError
+from pyon.core.exception import ContainerConfigError, ContainerStartupError, ContainerAppError, ConfigNotFound
 from pyon.util.config import Config
 from pyon.util.containers import DictModifier, DotDict, named_any
 from pyon.util.log import log
@@ -46,9 +48,17 @@ class AppManager(LifecycleStateMixin):
         @brief Read the rel file and call start_rel
         """
         log.debug("In AppManager.start_rel_from_url  rel_url: %s" % str(rel_url))
-        # TODO: Catch URL not exist error
-        rel = Config([rel_url]).data
-        self.start_rel(rel)
+
+        try:
+            rel = Config([rel_url]).data
+            self.start_rel(rel)
+            return True
+        except ConfigNotFound as cnf:
+            log.warning("Could not find container deploy file '%s'" % rel_url)
+        except Exception as ex:
+            log.exception("Could not start container deploy file '%s'" % rel_url)
+
+        return False
 
     def start_rel(self, rel=None):
         """
@@ -88,9 +98,18 @@ class AppManager(LifecycleStateMixin):
         @brief Read the app file and call start_app
         """
         log.debug("In AppManager.start_app_from_url  app_url: %s" % app_url)
-        # TODO: Catch URL not exist error
-        app = Config([app_url]).data
-        self.start_app(appdef=app, config=config)
+
+        try:
+            app = Config([app_url]).data
+            self.start_app(appdef=app, config=config)
+            return True
+        except ConfigNotFound as cnf:
+            log.warning("Could not find container app file '%s'" % app_url)
+        except Exception as ex:
+            log.exception("Could not start app file %s" % app_url)
+
+        return False
+
 
     def start_app(self, appdef=None, config=None):
         """
@@ -143,6 +162,7 @@ class AppManager(LifecycleStateMixin):
     def stop_app(self, appdef):
         log.debug("App '%s' stopping" % appdef.name)
         try:
-            appdef._mod_loaded.stop(self.container, appdef._state)
+            if '_mod_loaded' in appdef:
+                appdef._mod_loaded.stop(self.container, appdef._state)
         except Exception, ex:
             log.exception("Application %s stop failed" % appdef.name)

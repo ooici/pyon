@@ -5,8 +5,8 @@ __license__ = 'Apache 2.0'
 
 import yaml
 
-from pyon.util.log import *
 from pyon.util.containers import DotDict, dict_merge
+from pyon.core.exception import ConfigNotFound
 
 class Config(object):
     """
@@ -14,20 +14,20 @@ class Config(object):
     Later paths get deep-merged over earlier ones.
     """
 
-    def __init__(self, paths=(), dict_class=DotDict):
+    def __init__(self, paths=(), dict_class=DotDict, ignore_not_found=False):
         self.paths = list(paths)
         self.paths_loaded = set()
         self.dict_class = dict_class
         self.data = self.dict_class()
 
-        if paths: self.load()
+        if paths: self.load(ignore_not_found)
 
-    def add_path(self, path):
+    def add_path(self, path, ignore_not_found=False):
         """ Add this path at the end of the list and load/merge its contents. """
         self.paths.append(path)
-        self.load()
+        self.load(ignore_not_found)
 
-    def load(self):
+    def load(self, ignore_not_found=False):
         """ Load each path in order. Remember paths already loaded and only load new ones. """
         data = self.dict_class()
         
@@ -40,9 +40,8 @@ class Config(object):
                     data = dict_merge(data, path_data)
                 self.paths_loaded.add(path)
             except IOError:
-                # TODO: Log this correctly once logging is implemented
-                if not path.endswith('.local.yml'):
-                    print 'CONFIG NOT FOUND: %s' % (path)
+                if not ignore_not_found:
+                    raise ConfigNotFound("Config URL '%s' not found" % path)
 
         self.data = data
 

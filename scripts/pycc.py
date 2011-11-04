@@ -108,14 +108,22 @@ def main(opts, *args, **kwargs):
     ready = container.start()
     ready.get()
 
+    start_ok = True
+    error_msg = None
+
     if opts.rel:
         client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
-        client.start_rel_from_url(opts.rel)
+        start_ok = client.start_rel_from_url(opts.rel)
+        if not start_ok: error_msg = "Cannot start deploy file '%s'" % opts.rel
 
-    if not opts.noshell and not opts.daemon:
-        setup_ipython(get_shell_api(container))
+
+    if start_ok:
+        if not opts.noshell and not opts.daemon:
+            setup_ipython(get_shell_api(container))
+        else:
+            container.serve_forever()
     else:
-        container.serve_forever()
+        print "ABORTING CONTAINER START - ERROR: %s" % error_msg
 
     container.quit()
 
