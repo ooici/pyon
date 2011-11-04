@@ -11,17 +11,27 @@ from interface.services.idatastore_service import BaseDatastoreService
 class DataStoreService(BaseDatastoreService):
 
     def service_init(self):
-        if self.CFG["type"] == 'CouchDB':
-            self.datastore = CouchDB_DataStore()
-            if 'force_clean' in self.CFG:
+        datastore_name = "Resource"
+        persistent = False
+        force_clean = False
+        if 'datastore' in self.CFG:
+            datastore_cfg = self.CFG['datastore']
+            if 'persistent' in datastore_cfg:
+                if self.CFG['persistent'] == True:
+                    persistent = True
+            if 'force_clean' in datastore_cfg:
                 if self.CFG['force_clean'] == True:
-                    try:
-                        self.datastore.delete_datastore()
-                    except NotFound:
-                        pass
-                    self.datastore.create_datastore()
+                    force_clean = True
+        if persistent:
+            self.datastore = CouchDB_DataStore(datastore_name=datastore_name)
         else:
-             self.datastore = MockDB_DataStore()
+            self.datastore = MockDB_DataStore(datastore_name=datastore_name)
+        if force_clean:
+            try:
+                self.datastore.delete_datastore()
+            except NotFound:
+                pass
+        self.datastore.create_datastore()
 
     def create_datastore(self, datastore_name=''):
         return self.datastore.create_datastore(datastore_name)
