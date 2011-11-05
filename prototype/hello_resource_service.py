@@ -61,7 +61,7 @@ class HelloResourceService(BaseHelloResourceService):
 
         # Persist resource.  This is comparable to:
         #    yield self.rc.put_instance(resource)
-        create_result = self.clients.datastore.create(resource)
+        create_result = self.clients.resource_registry.create(resource)
 
         # resource id and revision number are always returned from create
         resource_id, version = create_result
@@ -84,7 +84,7 @@ class HelloResourceService(BaseHelloResourceService):
 
         # Read object.  This is comparable to:
         #    resource = yield self.rc.get_instance(request.resource_reference)
-        resource = self.clients.datastore.read(resource_id)
+        resource = self.clients.resource_registry.read(resource_id)
 
         # Update fields.  This is comparable to:
         #    if request.configuration.IsFieldSet('name'):
@@ -113,7 +113,7 @@ class HelloResourceService(BaseHelloResourceService):
 
         # Persist resource.  This is comparable to:
         #    yield self.rc.put_instance(resource)
-        self.clients.datastore.update(resource)
+        self.clients.resource_registry.update(resource)
 
         # Just return.  This takes the place of the following:
         #    response = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_RESPONSE_TYPE)
@@ -131,7 +131,7 @@ class HelloResourceService(BaseHelloResourceService):
 
         # Read object.  This is comparable to:
         #    resource = yield self.rc.get_instance(request.resource_reference)
-        resource = self.clients.datastore.read(resource_id)
+        resource = self.clients.resource_registry.read(resource_id)
 
         global ACTIVATE
         global DEACTIVATE
@@ -163,7 +163,7 @@ class HelloResourceService(BaseHelloResourceService):
 
         # Persist resource.  This is comparable to:
         #    yield self.rc.put_instance(resource)
-        self.clients.datastore.update(resource)
+        self.clients.resource_registry.update(resource)
 
         # Just return.  This takes the place of the following:
         #    response = yield self.mc.create_instance(MessageContentTypeID = RESOURCE_RESPONSE_TYPE)
