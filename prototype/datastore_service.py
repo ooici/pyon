@@ -12,7 +12,7 @@ from interface.services.idatastore_service import BaseDatastoreService
 class DataStoreService(BaseDatastoreService):
 
     def on_init(self):
-        datastore_name = sys_name + "_resources"
+        datastore_name = sys_name + "_scratch"
         datastore_name = datastore_name.lower()
         persistent = False
         force_clean = False
@@ -30,22 +30,26 @@ class DataStoreService(BaseDatastoreService):
             self.datastore = MockDB_DataStore(datastore_name=datastore_name)
         if force_clean:
             try:
-                self.datastore.delete_datastore()
+                self.datastore.delete_datastore(datastore_name)
             except NotFound:
                 pass
-        self.datastore.create_datastore()
+        if not self.datastore_exists(datastore_name):
+            self.datastore.create_datastore(datastore_name)
 
     def create_datastore(self, datastore_name=''):
         return self.datastore.create_datastore(datastore_name)
 
     def delete_datastore(self, datastore_name=''):
-        return self.datastore.delete(object, datastore_name)
+        return self.datastore.delete_datastore(datastore_name)
 
     def list_datastores(self):
         return self.datastore.list_datastores()
 
     def info_datastore(self, datastore_name=''):
         return self.datastore.info_datastore(datastore_name)
+
+    def datastore_exists(self, datastore_name=''):
+        return self.datastore.datastore_exists(datastore_name)
 
     def list_objects(self, datastore_name=''):
         return self.datastore.list_objects(datastore_name)
