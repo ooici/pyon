@@ -25,7 +25,8 @@ hsclient = RPCClient(node=node, name="hello", iface=IHelloService)
 def notif(*args, **kwargs):
     print "GOT A BACKPRESSURE NOTICE", str(args), str(kwargs)
 
-#node.client.add_backpressure_callback(notif)
+node.client.add_backpressure_callback(notif)
+node.client.set_backpressure_multiplier(2)
 
 # make data (bytes)
 DATA_SIZE = opts.datasize
