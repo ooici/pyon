@@ -103,16 +103,13 @@ class Endpoint(object):
         """
         """
         log.debug("In Endpoint.send")
-        # interceptor point
 
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+        # interceptor point
+        inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        new_msg = inv_prime.message
+
 
         self.channel.send(new_msg)
 
@@ -684,14 +681,11 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         """
         Override to send incoming messages through the process_incoming interceptor stack
         """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+
+        inv = self._build_invocation(path=Invocation.PATH_IN,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
+        new_msg = inv_prime.message
 
         RPCResponseEndpoint._message_received(self, new_msg)
 
@@ -699,14 +693,11 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         """
         Override to send outgoing messages through the process_outgoing interceptor stack
         """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+
+        inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        new_msg = inv_prime.message
 
         return RPCResponseEndpoint._send(self, new_msg)
 

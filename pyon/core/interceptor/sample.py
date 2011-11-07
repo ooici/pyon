@@ -9,7 +9,7 @@ class SampleInterceptor(Interceptor):
 
     def incoming(self, invocation):
         log.debug("SampleInterceptor.incoming: %s", invocation)
-        if invocation.message['header'].has_key('sample_interceptor'):
+        if isinstance(invocation.message, dict) and invocation.message['header'].has_key('sample_interceptor'):
             log.debug("This message has been sampleintercepted!")
         else:
             log.debug("This message was NOT sample intercepted!")
@@ -23,7 +23,7 @@ class SampleProcessOnlyInterceptor(Interceptor):
 
     def incoming(self, invocation):
         log.debug("SampleProcessOnlyInterceptor.incoming: %s", invocation)
-        if invocation.message['header'].has_key('process_only'):
+        if isinstance(invocation.message, dict) and invocation.message['header'].has_key('process_only'):
             log.debug("This message has been PROCESS ONLY SAMPLE INTERCEPTED!")
         else:
             log.debug("This message was NOT process only sample intercepted!")
