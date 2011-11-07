@@ -71,7 +71,7 @@ class Endpoint(object):
         inv = Invocation(**kwargs)
         return inv
 
-    def _message_received(self, msg):
+    def _message_received(self, msg, headers):
         """
         Entry point for received messages in below channel layer. This method puts the message through
         the interceptor stack, then funnels the message into the message_received method.
@@ -81,11 +81,13 @@ class Endpoint(object):
         """
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_IN,
-                                     message=msg)
+                                     message=msg,
+                                     headers=headers)
         inv_prime = self._intercept_msg_in(inv)
-        new_msg = inv_prime.message
+        new_msg     = inv_prime.message
+        new_headers = inv_prime.headers
 
-        self.message_received(new_msg)
+        self.message_received(new_msg, new_headers)
 
     def _intercept_msg_in(self, inv):
         """
@@ -98,7 +100,7 @@ class Endpoint(object):
         inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
         return inv_prime
 
-    def message_received(self, msg):
+    def message_received(self, msg, headers):
         """
         """
         log.debug("In Endpoint.message_received")
@@ -108,22 +110,22 @@ class Endpoint(object):
         Public send method.
         Calls _build_msg, then _send. Override either one of these methods to inject your logic.
         """
-        msg = self._build_msg(raw_msg)
-        return self._send(msg)
+        msg, header = self._build_msg(raw_msg)
+        return self._send(msg, header)
 
-    def _send(self, msg):
+    def _send(self, msg, headers=None):
         """
         """
-        log.debug("In Endpoint.send")
-
+        log.debug("In Endpoint._send: %s", headers)
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                     message=msg)
+                                     message=msg,
+                                     headers=headers)
         inv_prime = self._intercept_msg_out(inv)
         new_msg = inv_prime.message
+        new_headers = inv_prime.headers
 
-
-        self.channel.send(new_msg)
+        self.channel.send(new_msg, new_headers)
 
     def _intercept_msg_out(self, inv):
         """
@@ -140,9 +142,9 @@ class Endpoint(object):
         def client_recv():
             while True:
                 log.debug("client_recv waiting for a message")
-                data = self.channel.recv()
+                msg, headers = self.channel.recv()
                 log.debug("client_recv got a message")
-                self._message_received(data)
+                self._message_received(msg, headers)
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
@@ -173,14 +175,13 @@ class Endpoint(object):
         You typically do not need to override this method, but override the _build_header
         and _build_payload methods.
 
-        @returns A dict containing two keys: header and payload.
+        @returns A 2-tuple of payload, headers
         """
         log.debug("Endpoint _build_msg")
         header = self._build_header(raw_msg)
         payload = self._build_payload(raw_msg)
 
-        msg = {"header": header, "payload": payload}
-        return msg
+        return payload, header
 
 class EndpointFactory(object):
     """
@@ -296,11 +297,11 @@ class BinderListener(object):
             log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
             try:
                 req_chan = self._chan.accept()
-                msg = req_chan.recv()
-                log.debug("BinderListener %s received message: %s" % (str(self._name),str(msg)))
+                msg, headers = req_chan.recv()
+                log.debug("BinderListener %s received message: %s, headers: %s", self._name, msg, headers)
                 e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
 
-                self._spawn(e._message_received, msg)
+                self._spawn(e._message_received, msg, headers)
 
             except ChannelError as ex:
                 log.exception('Channel error during BinderListener.listen')
@@ -366,11 +367,11 @@ class SubscriberEndpoint(Endpoint):
         """
         self._callback = callback
 
-    def message_received(self, msg):
-        Endpoint.message_received(self, msg)
+    def message_received(self, msg, headers):
+        Endpoint.message_received(self, msg, headers)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
-        self._callback(msg)
+        self._callback(msg, headers)
 
 
 class Subscriber(ListeningEndpointFactory):
@@ -404,20 +405,20 @@ class BidirectionalListeningEndpoint(Endpoint):
 #
 
 class RequestEndpoint(BidirectionalEndpoint):
-    def _send(self, msg):
+    def _send(self, msg, headers=None):
         log.debug("RequestEndpoint.send")
 
         if not self._recv_greenlet:
             self.spawn_listener()
 
         self.response_queue = event.AsyncResult()
-        self.message_received = lambda m: self.response_queue.set(m)
+        self.message_received = lambda m, h: self.response_queue.set((m, h))
 
-        Endpoint._send(self, msg)
+        Endpoint._send(self, msg, headers=headers)
 
-        result_data = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
-        log.debug("got response to our request: %s" % str(result_data))
-        return result_data
+        result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
+        log.debug("got response to our request: %s, headers: %s" % (str(result_data), str(result_headers)))
+        return result_data, result_headers
 
 class RequestResponseClient(EndpointFactory):
     """
@@ -429,7 +430,7 @@ class RequestResponseClient(EndpointFactory):
         log.debug("RequestResponseClient.request: %s" % str(msg))
         e = self.create_endpoint(self.name)
         try:
-            retval = e.send(msg)
+            retval, headers = e.send(msg)
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
@@ -449,23 +450,22 @@ class RequestResponseServer(ListeningEndpointFactory):
 
 class RPCRequestEndpoint(RequestEndpoint):
 
-    def _send(self, msg):
+    def _send(self, msg, headers=None):
         log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
 
-        res = RequestEndpoint._send(self, msg)
-        log.debug("RPCRequestEndpoint got this response: %s" % str(res))
+        res, res_headers = RequestEndpoint._send(self, msg, headers=headers)
+        log.debug("RPCRequestEndpoint got this response: %s, headers: %s" % (str(res), str(res_headers)))
 
         # Check response header
-        header = res["header"]
-        if header["status_code"] == 200:
+        if res_headers["status_code"] == 200:
             log.debug("OK status")
-            return res["payload"]
+            return res, res_headers
         else:
-            log.debug("Bad status: %d" % header["status_code"])
-            log.debug("Error message: %s" % header["error_message"])
-            self._raise_exception(header["status_code"], header["error_message"])
+            log.debug("Bad status: %d" % res_headers["status_code"])
+            log.debug("Error message: %s" % res_headers["error_message"])
+            self._raise_exception(res_headers["status_code"], res_headers["error_message"])
 
-        return res
+        return res, res_headers
 
     def _raise_exception(self, code, message):
         if code == exception.BAD_REQUEST:
@@ -540,18 +540,15 @@ class RPCResponseEndpoint(ResponseEndpoint):
         hdrs.update(self._response_headers)
         return hdrs
 
-    def message_received(self, msg):
+    def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
 
         log.debug("In RPCResponseEndpoint.message_received")
         log.debug("chan: %s" % str(self.channel))
         log.debug("msg: %s" % str(msg))
+        log.debug("headers: %s" % str(headers))
 
-        #wrapped_req = json.loads(msg, object_hook=as_ionObject)
-        #wrapped_req = msgpack.loads(msg)
-        #wrapped_req = as_ionObject(wrapped_req)
-        #cmd_dict = wrapped_req["payload"]
-        cmd_dict = msg["payload"]
+        cmd_dict = msg
 
         result = None
         try:
@@ -561,7 +558,6 @@ class RPCResponseEndpoint(ResponseEndpoint):
             log.debug("Got error response")
             wrapped_result = self._create_error_response(ex)
 
-        #self.channel.send(response_msg)
         self.send(result)
 
     def _call_cmd(self, cmd_dict):

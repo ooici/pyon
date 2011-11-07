@@ -15,6 +15,7 @@ class Invocation(object):
         self.args = kwargs
         self.path = kwargs.get('path')
         self.message = kwargs.get('message')
+        self.headers = kwargs.get('headers') or {}  # ensure dict
 
 class Interceptor(object):
     """

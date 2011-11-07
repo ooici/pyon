@@ -10,7 +10,7 @@ class CodecInterceptor(Interceptor):
     def outgoing(self, invocation):
         log.debug("CodecInterceptor.outgoing: %s", invocation)
 
-        payload = invocation.message['payload']
+        payload = invocation.message
         log.debug("Payload, pre-transform: %s", payload)
 
         def translate_ionobj(obj):
@@ -21,7 +21,7 @@ class CodecInterceptor(Interceptor):
             return obj
 
         payload = walk(payload, translate_ionobj)
-        invocation.message['payload'] = payload
+        invocation.message = payload
 
         log.debug("Payload, post-transform: %s", payload)
         return invocation
@@ -29,7 +29,7 @@ class CodecInterceptor(Interceptor):
     def incoming(self, invocation):
         log.debug("CodecInterceptor.incoming: %s", invocation)
 
-        payload = invocation.message['payload']
+        payload = invocation.message
         log.debug("Payload, pre-transform: %s", payload)
 
         def untranslate_ionobj(obj):
@@ -40,7 +40,7 @@ class CodecInterceptor(Interceptor):
             return obj
 
         payload = walk(payload, untranslate_ionobj)
-        invocation.message['payload'] = payload
+        invocation.message = payload
 
         log.debug("Payload, post-transform: %s", payload)
         return invocation

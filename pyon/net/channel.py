@@ -90,15 +90,15 @@ class _AMQPHandlerMixin(object):
         log.debug("code: %d" % code)
         log.debug("text: %s" % str(text))
 
-class ChannelProtocol(object):
-    """
-    """
-    def message_received(self, msg):
-        """
-        msg is a unit of data, some kind of object depending on what kind
-        of Channel it is
-        """
-        log.debug("In ChannelProtocol.message_received")
+#class ChannelProtocol(object):
+#    """
+#    """
+#    def message_received(self, msg):
+#        """
+#        msg is a unit of data, some kind of object depending on what kind
+#        of Channel it is
+#        """
+#        log.debug("In ChannelProtocol.message_received")
 
 class BaseChannel(object):
     """
@@ -426,15 +426,17 @@ class BaseChannel(object):
         # raised here before the simple message_received. It's all about
         # funneling/organizing context to keep the endpoint handlers simple
         # and functional
-        self.message_received(body)
+        headers = header_frame.__dict__
+        headers.update(header_frame.headers)
+        self.message_received(body, headers)
 
-    def send(self, data):
+    def send(self, data, headers=None):
         """
         use when 'connected' to an endpoint (sending end of a channel)
         """
         log.debug("In BaseChannel.send")
         log.debug("data: %s" % str(data))
-        self._send(self._peer_name, data)
+        self._send(self._peer_name, data, headers=headers)
 
     def sendto(self, name, data):
         """
@@ -547,7 +549,7 @@ class _Bidirectional_accepted(BaseChannel):
         """
         log.debug("In _Bidirectional_Listener._on_basic_deliver")
 
-    def send(self, data):
+    def send(self, data, headers=None):
         """
         use reply_to and correlation_id so each endpoint in a pair can
         converse in an arbitrary stream of messages.
@@ -555,13 +557,15 @@ class _Bidirectional_accepted(BaseChannel):
         a listening Channel can establish a temp queue for interactions
         specific to this Node/Channel
         """
-        log.debug("In _Bidirectional_Listener.send")
+        log.debug("In _Bidirectional_accepted.send")
         message_type = "rr-data" # request-response data
         #reply_to = "%s,%s" % self._chan_name # encode the tuple 
         #correlation_id = uuid.uuid4().hex # move to lower level
-        self._send(self._peer_name, data, 
-                                message_type=message_type)
-                                #reply_to=reply_to)
+        self._send(self._peer_name,
+                   data,
+                   message_type=message_type,
+                   headers=headers)
+                    #reply_to=reply_to)
 
 
 class Bidirectional(BaseChannel):
@@ -598,16 +602,18 @@ class Bidirectional(BaseChannel):
         #self.message_received(body)
         log.debug("In Bidirectional._on_basic_deliver")
         reply_to = tuple(header_frame.reply_to.split(','))
-        self._build_accepted_channel(reply_to, body)
+        headers = header_frame.__dict__
+        headers.update(header_frame.headers)
+        self._build_accepted_channel(reply_to, body, headers)
 
-    def _build_accepted_channel(self, peer_name, body):
+    def _build_accepted_channel(self, peer_name, body, headers):
         """Only set send context (can't receive yet)"""
         log.debug("In Bidirectional._build_accepted_channel")
         log.debug("peer_name: %s" % str(peer_name))
         new_chan = _Bidirectional_accepted()
         new_chan.amq_chan = self.amq_chan #hack
         new_chan._peer_name = peer_name
-        self.message_received((new_chan, body)) # XXX hack
+        self.message_received((new_chan, body), headers) # XXX hack  ugh serious bad hack here, totally unfollowable
 
     def connect(self, name, callback):
         """
@@ -637,7 +643,7 @@ class Bidirectional(BaseChannel):
         #self._connect_callback = callback
 
 
-    def send(self, data):
+    def send(self, data, headers=None):
         """
         use reply_to and correlation_id so each endpoint in a pair can
         converse in an arbitrary stream of messages.
@@ -651,9 +657,11 @@ class Bidirectional(BaseChannel):
         log.debug("_peer_name: %s" % str(self._peer_name))
         log.debug("reply_to: %s" % str(reply_to))
         #correlation_id = uuid.uuid4().hex # move to lower level
-        self._send(self._peer_name, data, 
-                                message_type=message_type,
-                                reply_to=reply_to)
+        self._send(self._peer_name,
+                   data,
+                   message_type=message_type,
+                   reply_to=reply_to,
+                   headers=headers)
 
 class BidirectionalClient(BaseChannel):
 
@@ -702,7 +710,7 @@ class BidirectionalClient(BaseChannel):
             callback()
 
 
-    def send(self, data):
+    def send(self, data, headers=None):
         """
         use reply_to and correlation_id so each endpoint in a pair can
         converse in an arbitrary stream of messages.
@@ -716,9 +724,11 @@ class BidirectionalClient(BaseChannel):
         message_type = "rr-data" # request-response data
         reply_to = "%s,%s" % self._chan_name # encode the tuple 
         #correlation_id = uuid.uuid4().hex # move to lower level
-        self._send(self._peer_name, data, 
-                                message_type=message_type,
-                                reply_to=reply_to)
+        self._send(self._peer_name,
+                   data,
+                   message_type=message_type,
+                   reply_to=reply_to,
+                   headers=headers)
 
     def close(self):
         """
@@ -783,9 +793,11 @@ class PubSub(BaseChannel):
         log.debug("In PubSub._on_basic_deliver")
         log.debug("\nhf: %s\nbody: %s" % (str(header_frame), str(body)))
         #reply_to = tuple(header_frame.reply_to.split(','))
-        self._build_accepted_channel("", body)
+        headers = header_frame.__dict__
+        headers.update(header_frame.headers)
+        self._build_accepted_channel("", body, headers)
 
-    def _build_accepted_channel(self, peer_name, body):
+    def _build_accepted_channel(self, peer_name, body, headers):
         """
         only set send context (can't receive yet)
         """
@@ -794,7 +806,7 @@ class PubSub(BaseChannel):
         new_chan = BaseChannel()
         new_chan.amq_chan = self.amq_chan #hack
         new_chan._peer_name = peer_name
-        self.message_received((new_chan, body)) # XXX hack
+        self.message_received((new_chan, body), headers) # XXX hack  ugh serious bad hack here, totally unfollowable
 
     def on_connect(self):
         self.exchange = self._peer_name[0]
@@ -849,9 +861,9 @@ class SocketInterface(object):
         inst = cls(amq_chan, ch_proto)
         return inst
 
-    def message_received(self, msg):
+    def message_received(self, msg, headers):
         log.debug("In SocketInterface.message_received")
-        self._receive_queue.put(msg)
+        self._receive_queue.put((msg, headers))
 
     def accept(self):
         """
@@ -869,7 +881,7 @@ class SocketInterface(object):
         if not self._listening:
             raise ChannelError('Channel not listening')#?
         #new_serv_ch_proto, body = self._receive_queue.get()
-        fullon = self._next_in_queue()
+        fullon, headers = self._next_in_queue()
         log.debug("we got %d items: %s" % (len(fullon), str(fullon)))
 
         new_serv_ch_proto, body = fullon[0:2]
@@ -877,7 +889,7 @@ class SocketInterface(object):
         new_chan = SocketInterface(self.amq_chan, new_serv_ch_proto)
         #new_chan.ch_proto.connect() # need
         new_chan._connected = 1 # hack
-        new_chan.message_received(body) # hack
+        new_chan.message_received(body, headers) # hack
         return new_chan
 
     def bind(self, name):
@@ -956,11 +968,11 @@ class SocketInterface(object):
         """
         log.debug("In SocketInterface.recv_into")
 
-    def send(self, data):
+    def send(self, data, headers=None):
         """
         """
         log.debug("In SocketInterface.send")
-        self.ch_proto.send(data)
+        self.ch_proto.send(data, headers=headers)
 
     def sendto(self, data, name):
         """

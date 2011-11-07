@@ -29,7 +29,7 @@ class FakeChannel(object):
         self._sendcount = 0
         self._closecount = 0
         self._sentone = False
-    def send(self, _):
+    def send(self, msg, headers):
         self._sendcount += 1
     def close(self):
         self._closecount += 1
@@ -38,7 +38,7 @@ class FakeChannel(object):
     def recv(self):
         if not self._sentone:
             self._sentone = True
-            return "a msg"
+            return "a msg", {'fake':'fakevalue'}
         else:
             res = event.AsyncResult()
             res.get()
@@ -65,9 +65,7 @@ class FakeRPCChannel(FakeChannel):
     def recv(self):
         if not self._sentone:
             self._sentone = True
-            return { 'header' : { 'status_code': self._code,
-                                  'error_message': self._msg },
-                     'payload' : 'some payload' }
+            return 'some payload', { 'status_code': self._code, 'error_message': self._msg }
         else:
             res = event.AsyncResult()
             res.get()
@@ -131,14 +129,14 @@ class TestEndpoint(PyonTestCase):
         msg = self._endpoint._build_payload(fakemsg)
         self.assertEquals(msg, fakemsg)
 
-    def test_build_header(self):
+    def test_build_msg(self):
         fakemsg = {'fake':'content'}
         msg = self._endpoint._build_msg(fakemsg)
-        self.assertTrue(isinstance(msg, dict))
-        self.assertTrue(msg.has_key('header'))
-        self.assertTrue(msg.has_key('payload'))
-        self.assertTrue(isinstance(msg['header'], dict))
-        self.assertEquals(fakemsg, msg['payload'])
+#        self.assertTrue(isinstance(msg, dict))
+#        self.assertTrue(msg.has_key('header'))
+#        self.assertTrue(msg.has_key('payload'))
+#        self.assertTrue(isinstance(msg['header'], dict))
+#        self.assertEquals(fakemsg, msg['payload'])
 
 
 class TestEndpointFactory(PyonTestCase):
@@ -235,7 +233,7 @@ class TestSubscriber(PyonTestCase):
         self.assertRaises(AssertionError, Subscriber, node=self._node, name="testsub")
 
     def test_create_endpoint(self):
-        def mycb(msg):
+        def mycb(msg, headers):
             return "test"
 
         sub = Subscriber(node=self._node, name="testsub", callback=mycb)
@@ -244,7 +242,7 @@ class TestSubscriber(PyonTestCase):
         self.assertEquals(e._callback, mycb)
 
     def test_subscribe(self):
-        def mycb(msg):
+        def mycb(msg, headers):
             raise GreenletExit(msg)
 
         sub = Subscriber(node=self._node, name="testsub", callback=mycb)
@@ -265,7 +263,7 @@ class TestRequestResponse(PyonTestCase):
         ch = FakeChannel()
         e.attach_channel(ch)
 
-        retval = e.send("msg")
+        retval, heads = e.send("msg")
         self.assertEquals(retval, "a msg")
 
         # cleanup
@@ -309,11 +307,11 @@ class FakeRPCServerChannel(FakeChannel):
         if not self._sentone:
             self._sentone = True
             info = ISimpleInterface.namesAndDescriptions()[0]
-            print "\n\nINFO:", info, "class", info.__class__
+            #print "\n\nINFO:", info, "class", info.__class__
             cmd = _Command(None, info[0], info[1].getSignatureInfo(), "")
             pl = cmd._command_dict_from_call('ein', 'zwei')
-            print "\n\n\nMY PAYLOAD IS", str(pl), "\n\n\n"
-            return {'header':{}, 'payload':pl}
+            #print "\n\n\nMY PAYLOAD IS", str(pl), "\n\n\n"
+            return pl, {}
         else:
             res = event.AsyncResult()
             res.get()
@@ -333,7 +331,7 @@ class TestRPCRequestEndpoint(PyonTestCase):
         ch = FakeRPCChannel()
         e.attach_channel(ch)
 
-        ret = e.send("rpc call")
+        ret, heads = e.send("rpc call")
         self.assertEquals(ret, 'some payload')      # we just get payload back due to success RPC code 200
 
         e.close()

@@ -18,13 +18,13 @@ class ValidateInterceptor(Interceptor):
         # Set validate flag in header if IonObject(s) found in message
         log.debug("ValidateInterceptor.outgoing: %s", invocation)
 
-        if self.enabled == True:
-            payload = invocation.message['payload']
+        if self.enabled:
+            payload = invocation.message
             log.debug("Payload, pre-validate: %s", payload)
 
             def validate_ionobj(obj):
                 if isinstance(obj, IonObjectBase):
-                    invocation.message["header"]["validate"] = True
+                    invocation.headers["validate"] = True
                 return obj
 
             walk(payload, validate_ionobj)
@@ -33,8 +33,8 @@ class ValidateInterceptor(Interceptor):
     def incoming(self, invocation):
         log.debug("ValidateInterceptor.incoming: %s", invocation)
 
-        if self.enabled == True:
-            payload = invocation.message['payload']
+        if self.enabled:
+            payload = invocation.message
             log.debug("Payload, pre-validate: %s", payload)
 
             # IonObject _validate will throw AttributeError on validation failure.
