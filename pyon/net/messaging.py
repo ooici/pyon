@@ -108,7 +108,7 @@ class NodeB(amqp.Node):
             if ch_type == channel.BidirectionalClient:
                 chid = self._pool.get_id()
                 if chid in self._bidir_pool:
-                    assert not chid in self._pool_map
+                    assert not chid in self._pool_map.values()
                     self._pool_map[self._bidir_pool[chid].amq_chan.channel_number] = chid
                     ch = self._bidir_pool[chid]
                     socket = channel.SocketInterface.Socket(ch.amq_chan, ch)
