@@ -97,6 +97,8 @@ def main(opts, *args, **kwargs):
     threading.current_thread().name = "CC-Main"
 
     print 'Starting ION CC with options: ', opts
+    # The import of pyon.public triggers many starting actions:
+    # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container
     from pyon.container.cc import IContainerAgent
     from pyon.container.shell_api import get_shell_api
@@ -106,7 +108,6 @@ def main(opts, *args, **kwargs):
 
     # start and wait for container to signal ready
     ready = container.start()
-    ready.get()
 
     start_ok = True
     error_msg = None
