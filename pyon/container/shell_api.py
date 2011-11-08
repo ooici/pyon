@@ -90,7 +90,7 @@ def ms():
     from pyon.net.endpoint import EndpointFactory
     for name in sorted(EndpointFactory.endpoint_by_name.keys()):
         print name
-        print "\n".join(("  %s"%(ed) for ed in EndpointFactory.endpoint_by_name[name]))
+        print "\n".join(("  %s, %s"%(ed, ed.name if hasattr(ed,'name') else '') for ed in EndpointFactory.endpoint_by_name[name]))
 
 def apps():
     print "List of active pyon apps"
