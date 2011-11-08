@@ -82,10 +82,21 @@ class Endpoint(object):
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_IN,
                                      message=msg)
-        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+        inv_prime = self._intercept_msg_in(inv)
         new_msg = inv_prime.message
 
         self.message_received(new_msg)
+
+    def _intercept_msg_in(self, inv):
+        """
+        Performs interceptions of incoming messages.
+        Override this to change what interceptor stack to go through and ordering.
+
+        @param  inv     An Invocation instance.
+        @returns        A processed Invocation instance.
+        """
+        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+        return inv_prime
 
     def message_received(self, msg):
         """
@@ -108,11 +119,22 @@ class Endpoint(object):
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
                                      message=msg)
-        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        inv_prime = self._intercept_msg_out(inv)
         new_msg = inv_prime.message
 
 
         self.channel.send(new_msg)
+
+    def _intercept_msg_out(self, inv):
+        """
+        Performs interceptions of outgoing messages.
+        Override this to change what interceptor stack to go through and ordering.
+
+        @param  inv     An Invocation instance.
+        @returns        A processed Invocation instance.
+        """
+        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        return inv_prime
 
     def spawn_listener(self):
         def client_recv():
@@ -583,35 +605,26 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         inv = RPCRequestEndpoint._build_invocation(self, **newkwargs)
         return inv
 
-    def _message_received(self, msg):
+    def _intercept_msg_in(self, inv):
         """
-        Override to send incoming messages through the process_incoming interceptor stack
-        """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+        Override for incoming message interception.
 
-        RPCRequestEndpoint._message_received(self, new_msg)
-
-    def _send(self, msg):
+        This is a request, so the order should be Message, Process
         """
-        Override to send outgoing messages through the process_outgoing interceptor stack
-        """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+        inv_one = RPCRequestEndpoint._intercept_msg_in(self, inv)
+        inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
+        return inv_two
 
-        return RPCRequestEndpoint._send(self, new_msg)
+    def _intercept_msg_out(self, inv):
+        """
+        Override for outgoing message interception.
+
+        This is request, so the order should be Process, Message
+        """
+        inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        inv_two = RPCRequestEndpoint._intercept_msg_out(self, inv_one)
+
+        return inv_two
 
     def _build_header(self, raw_msg):
         """
@@ -678,29 +691,25 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         inv = RPCResponseEndpoint._build_invocation(self, **newkwargs)
         return inv
 
-    def _message_received(self, msg):
+    def _intercept_msg_in(self, inv):
         """
-        Override to send incoming messages through the process_incoming interceptor stack
+        Override for incoming message interception.
+
+        This is response incoming, so the order should be Message, Process
         """
+        inv_one = RPCResponseEndpoint._intercept_msg_in(self, inv)
+        inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
+        return inv_two
 
-        inv = self._build_invocation(path=Invocation.PATH_IN,
-                                     message=msg)
-        inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
-        new_msg = inv_prime.message
-
-        RPCResponseEndpoint._message_received(self, new_msg)
-
-    def _send(self, msg):
+    def _intercept_msg_out(self, inv):
         """
-        Override to send outgoing messages through the process_outgoing interceptor stack
+        Override for outgoing message interception.
+
+        This is response outgoing, so the order should be Process, Message
         """
-
-        inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                     message=msg)
-        inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-        new_msg = inv_prime.message
-
-        return RPCResponseEndpoint._send(self, new_msg)
+        inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        inv_two = RPCResponseEndpoint._intercept_msg_out(self, inv_one)
+        return inv_two
 
 class ProcessRPCServer(RPCServer):
     endpoint_type = ProcessRPCResponseEndpoint
