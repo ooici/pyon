@@ -31,7 +31,7 @@ from pyon.directory.directory import Directory
 from pyon.net.endpoint import ProcessRPCServer, BinderListener
 from pyon.net import messaging
 from pyon.util.log import log
-from pyon.util.containers import DictModifier
+from pyon.util.containers import DictModifier, dict_merge
 from pyon.util.state_object import  LifecycleStateMixin
 
 from pyon.ion.exchange import ExchangeManager
@@ -84,7 +84,8 @@ class Container(LifecycleStateMixin):
         self.spawn_args = DictModifier(CFG, kwargs)
 
         # TODO: Bug: this does not work because CFG instance references are already public. Update directly
-        CFG.update(kwargs)
+        #CFG.update(kwargs)
+        dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
 
