@@ -1,5 +1,6 @@
 
-from pyon.core.bootstrap import IonObject, CFG, sys_name
+from pyon.core import bootstrap
+from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import Conflict, NotFound
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
@@ -16,7 +17,7 @@ class Directory(object):
 
         def __init__(self):
             persistent = False
-            datastore_name = sys_name + "_directory"
+            datastore_name = bootstrap.sys_name + "_directory"
             if 'directory' in CFG:
                 directory_cfg = CFG['directory']
                 if 'persistent' in directory_cfg:

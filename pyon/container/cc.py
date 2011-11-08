@@ -71,6 +71,12 @@ class Container(LifecycleStateMixin):
     def __init__(self, *args, **kwargs):
         log.debug("Container.__init__")
 
+        # TODO: Bug: this does not work because CFG instance references are already public. Update directly
+        #CFG.update(kwargs)
+        dict_merge(CFG, kwargs)
+        from pyon.core import bootstrap
+        bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
+
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
 
@@ -82,12 +88,6 @@ class Container(LifecycleStateMixin):
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
-
-        # TODO: Bug: this does not work because CFG instance references are already public. Update directly
-        #CFG.update(kwargs)
-        dict_merge(CFG, kwargs)
-        from pyon.core import bootstrap
-        bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
 
         self.init(*args, **kwargs)
 
