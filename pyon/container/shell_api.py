@@ -82,7 +82,7 @@ def ps():
 def procs():
     print "\nList of pyon processes"
     print "----------------------"
-    print "\n".join((str(p) for p in container.proc_sup.children))
+    print "\n".join((str(p) for p in container.proc_manager.proc_sup.children))
 
 def ms():
     print "List of messaging endpoints"
@@ -90,7 +90,7 @@ def ms():
     from pyon.net.endpoint import EndpointFactory
     for name in sorted(EndpointFactory.endpoint_by_name.keys()):
         print name
-        print "\n".join(("  %s"%(ed) for ed in EndpointFactory.endpoint_by_name[name]))
+        print "\n".join(("  %s, %s"%(ed, ed.name if hasattr(ed,'name') else '') for ed in EndpointFactory.endpoint_by_name[name]))
 
 def apps():
     print "List of active pyon apps"
@@ -177,7 +177,7 @@ def ionhelp():
     print "ION R2 CC interactive shell"
     print
     print "Available functions: %s" % ", ".join(sorted([func.__name__ for func in public_api]))
-    print "Available variables: cc, %s" % ", ".join(sorted(public_vars.keys()))
+    print "Available variables: cc, proc, %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
 public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs]
@@ -201,5 +201,7 @@ def get_shell_api(cc):
         ns_dict[func.__name__] = func
     ns_dict.update(public_vars)
     ns_dict['cc'] = cc
+    from pyon.util.containers import DotDict
+    ns_dict['proc'] = DotDict(container.proc_manager.procs)
 
     return ns_dict

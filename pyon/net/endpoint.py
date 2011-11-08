@@ -5,7 +5,8 @@
 from gevent import event
 from zope import interface
 
-from pyon.core.bootstrap import CFG, sys_name
+from pyon.core import bootstrap
+from pyon.core.bootstrap import CFG
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition
 from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError, BaseChannel
@@ -103,16 +104,13 @@ class Endpoint(object):
         """
         """
         log.debug("In Endpoint.send")
-        # interceptor point
 
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+        # interceptor point
+        inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        new_msg = inv_prime.message
+
 
         self.channel.send(new_msg)
 
@@ -203,7 +201,7 @@ class EndpointFactory(object):
             name = to_name or self.name
             assert name
             if not isinstance(name, tuple):
-                name = (sys_name, name)
+                name = (bootstrap.sys_name, name)
             ch = self.node.channel(self.channel_type)
             ch.connect(name)
 
@@ -267,7 +265,7 @@ class BinderListener(object):
     def listen(self):
         log.debug("BinderListener.listen")
         self._chan = self._node.channel(self._ch_type)
-        self._chan.bind((sys_name, self._name))
+        self._chan.bind((bootstrap.sys_name, self._name))
         self._chan.listen()
 
         self._ready_event.set(True)
@@ -684,14 +682,11 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         """
         Override to send incoming messages through the process_incoming interceptor stack
         """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_IN,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+
+        inv = self._build_invocation(path=Invocation.PATH_IN,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv)
+        new_msg = inv_prime.message
 
         RPCResponseEndpoint._message_received(self, new_msg)
 
@@ -699,14 +694,11 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         """
         Override to send outgoing messages through the process_outgoing interceptor stack
         """
-        # @TODO dict check is a hax
-        if isinstance(msg, dict):
-            inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                         message=msg)
-            inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-            new_msg = inv_prime.message
-        else:
-            new_msg = msg
+
+        inv = self._build_invocation(path=Invocation.PATH_OUT,
+                                     message=msg)
+        inv_prime = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        new_msg = inv_prime.message
 
         return RPCResponseEndpoint._send(self, new_msg)
 
