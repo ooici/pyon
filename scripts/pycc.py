@@ -153,7 +153,7 @@ def entry():
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
-    parser.add_argument('--version', action='version', version='pyon v%s' % (version))
+    parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
