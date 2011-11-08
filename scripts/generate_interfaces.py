@@ -23,6 +23,9 @@ class IonServiceDefinitionError(Exception):
 templates = {
       'file':
 '''#!/usr/bin/env python
+#
+# File generated on {when_generated}
+#
 
 from zope.interface import Interface, implements
 
@@ -165,7 +168,7 @@ def main():
                 _class = templates['class'].format(name=class_name, servicename=service_name_str, dependencies=dependencies_str,
                                                        methods=methods_str, classmethods=classmethods_str)
 
-                interface_contents = templates['file'].format(classes=_class)
+                interface_contents = templates['file'].format(classes=_class, when_generated=str(datetime.datetime.today()))
                 open(interface_file, 'w').write(interface_contents)
 
 if __name__ == '__main__':
