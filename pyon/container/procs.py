@@ -78,7 +78,7 @@ class ProcManager(LifecycleStateMixin):
 
         # Add to global dict
         # TODO: This needs to go into the process list
-        add_service_by_name(name, process_instance)
+        #add_service_by_name(name, process_instance)
         self.procs[name] = process_instance
 
         rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
