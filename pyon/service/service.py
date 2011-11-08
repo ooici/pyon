@@ -4,6 +4,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.state_object import LifecycleStateMixin
+from pyon.util.containers import named_any
 
 class BaseService(LifecycleStateMixin):
     """
@@ -43,12 +44,17 @@ class BaseService(LifecycleStateMixin):
 
 services_by_name = {}
 
+def load_service_mods():
+    import pkgutil
+    mods = [name for _, name, _ in pkgutil.iter_modules(['interface/services'])]
+    for mod in mods:
+        named_any("interface.services.%s" % mod)
+
 def build_service_map():
     global services_by_name
 
     for cls in BaseService.__subclasses__():
-        if cls.name is None:
-            raise AssertionError('Service class must define name value. Service class in error: %s' % (str(cls)))
+        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
         services_by_name[cls.name] = cls
 
 def add_service_by_name(name, service):
@@ -60,4 +66,6 @@ def get_service_by_name(name):
     else:
         return None
 
+load_service_mods()
 build_service_map()
+

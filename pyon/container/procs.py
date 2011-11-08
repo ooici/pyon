@@ -6,14 +6,14 @@ __author__ = 'Michael Meisinger'
 
 import os
 
-from zope.interface import providedBy
+from zope.interface import providedBy, implementedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
-from pyon.service.service import BaseService
+from pyon.service.service import BaseService, services_by_name
 from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient
 from pyon.service.service import add_service_by_name, get_service_by_name
-from pyon.util.containers import DictModifier, DotDict, for_name
+from pyon.util.containers import DictModifier, DotDict, for_name, named_any
 from pyon.util.log import log
 from pyon.util.state_object import  LifecycleStateMixin
 
@@ -34,6 +34,7 @@ class ProcManager(LifecycleStateMixin):
 
         # The pyon worker process supervisor
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
+
 
     def on_start(self, *args, **kwargs):
         log.debug("ProcManager: start")
@@ -65,7 +66,7 @@ class ProcManager(LifecycleStateMixin):
         # TODO: Service dependency != process dependency
         for dependency in process_instance.dependencies:
             dependency_service = get_service_by_name(dependency)
-            dependency_interface = list(providedBy(dependency_service))[0]
+            dependency_interface = list(implementedBy(dependency_service))[0]
 
             # @TODO: start_client call instead?
             client = ProcessRPCClient(node=self.container.node, name=dependency, iface=dependency_interface, process=process_instance)
