@@ -362,7 +362,7 @@ class IonServiceRegistry(IonObjectRegistry):
 
                 # Register the service and its ops in/out objects
                 if 'name' in def_set:
-                    name, deps, version = def_set['name'], def_set.get('dependencies', None), def_set.get('version', '')
+                    name, deps, version = def_set['name'], def_set.get('dependencies', []), def_set.get('version', '')
                     svc_def = IonServiceDefinition(name, deps, version)
                     log.debug('Registering service "%s"' % (name))
 
