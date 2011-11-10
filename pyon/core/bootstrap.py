@@ -34,6 +34,6 @@ obj_registry = IonServiceRegistry()
 IonObject = obj_registry.new
 
 def populate_registry():
-    obj_registry.register_obj_dir('obj', ['ion.yml'], ['services'])
+    obj_registry.register_obj_dir('obj/data')
     obj_registry.register_svc_dir('obj/services')
 
