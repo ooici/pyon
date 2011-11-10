@@ -8,6 +8,9 @@ from interface.services.examples.hello.ihello_service import BaseHelloService
 
 class HelloService(BaseHelloService):
 
+    def on_init(self, *args, **kwargs):
+        log.debug("Hello service starting. Self.id=%s" % self.id)
+
     def hello(self, text=''):
         log.debug("In hello_service.hello. Text=%s" % text)
         return "BACK:%s" % text

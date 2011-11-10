@@ -368,7 +368,9 @@ class IonServiceRegistry(IonObjectRegistry):
                     svc_def = IonServiceDefinition(name, deps, version)
                     log.debug('Registering service "%s"' % (name))
 
-                    for op_name,op_def in def_set.get('methods', {}).iteritems():
+                    # It seems that despite the get with default arg, there still can be None resulting (YAML?)
+                    meth_list = def_set.get('methods', {}) or {}
+                    for op_name,op_def in meth_list.iteritems():
                         if not op_def: continue
                         def_in, def_out = (self._reg_method_part(svc_name, op_name, op_def, d) for d in ('in', 'out'))
                         [obj_defs.append(reg_def) for reg_def in (def_in, def_out)]
