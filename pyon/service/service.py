@@ -44,11 +44,18 @@ class BaseService(LifecycleStateMixin):
 
 services_by_name = {}
 
-def load_service_mods():
+def load_service_mods(path):
     import pkgutil
-    mods = [name for _, name, _ in pkgutil.iter_modules(['interface/services'])]
-    for mod in mods:
-        named_any("interface.services.%s" % mod)
+    import string
+    mod_prefix = string.replace(path, "/", ".")
+
+    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
+        if is_pkg:
+            load_service_mods(path+"/"+mod_name)
+        else:
+            mod_qual = "%s.%s" % (mod_prefix, mod_name)
+            #print "Import", mod_qual
+            named_any(mod_qual)
 
 def build_service_map():
     global services_by_name
@@ -66,6 +73,6 @@ def get_service_by_name(name):
     else:
         return None
 
-load_service_mods()
+load_service_mods('interface/services')
 build_service_map()
 
