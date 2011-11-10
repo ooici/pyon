@@ -3,6 +3,7 @@
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from pyon.util.log import log
 from pyon.util.state_object import LifecycleStateMixin
 from pyon.util.containers import named_any
 
@@ -55,7 +56,10 @@ def load_service_mods(path):
         else:
             mod_qual = "%s.%s" % (mod_prefix, mod_name)
             #print "Import", mod_qual
-            named_any(mod_qual)
+            try:
+                named_any(mod_qual)
+            except Exception, ex:
+                log.warning("Import module '%s' failed: %s" % (mod_qual, ex))
 
 def build_service_map():
     global services_by_name
