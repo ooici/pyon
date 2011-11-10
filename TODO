@@ -3,9 +3,7 @@ Current pyon TODO list:
 
 PACKAGING:
 
-- Remove all unnecessary imports from setup.py
 - Automate versioning and packaging of pyon egg
-- Use buildbot
 
 CODE:
 
@@ -13,14 +11,11 @@ CODE:
 - More str() output
 - Clear distinction between ION process and pyon process
 - Clear confusion with service vs process
-- Move all services out of pyon
+- Move all non-core services out of pyon plus their code
 
 STARTUP
 
 - Enable to start more than one CC out of the same directory (logging, pid file)
-- Enable other packages to import pyon and run it from their directory
-- Process spawnargs
-- Assertion of execution environment. Proper exit and message if false
 
 OBJECTS:
 
@@ -30,9 +25,11 @@ CONTAINER:
 
 - Enhanced shell API
 - Enhanced messaging bookkeeping
+- Exchange space
 - Shutdown
 - Add event framework
 - Apply command line config to app/rel config
+- Check service implementation against service definition (parameters, order)
 
 TESTING:
 
@@ -48,6 +45,9 @@ PROCESS:
 MESSAGING:
 
 - Use AMQP headers
+- Check use of ACKS
+- Messaging properties
+- Non-AMQP
 
 TERMINOLOGY:
 
@@ -61,3 +61,5 @@ BUGS:
 
 - control_cc induced stop does not work
 - Remove PID file even in case of abnormal termination
+- Source path from not the current repo (e.g. pyon/examples not found)
+-

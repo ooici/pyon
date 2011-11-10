@@ -4,7 +4,7 @@ __author__ = 'Michael Meisinger'
 
 from pyon.util.log import log
 
-from interface.services.ihello_service import BaseHelloService
+from interface.services.examples.hello.ihello_service import BaseHelloService
 
 class HelloService(BaseHelloService):
 
