@@ -161,7 +161,9 @@ def main():
                 dependencies = def_set.get('dependencies', None)
                 methods, class_methods = [], []
 
-                for op_name,op_def in def_set.get('methods', {}).iteritems():
+                # It seems that despite the get with default arg, there still can be None resulting (YAML?)
+                meth_list = def_set.get('methods', {}) or {}
+                for op_name,op_def in meth_list.iteritems():
                     if not op_def: continue
                     def_in, def_out = op_def.get('in', None), op_def.get('out', None)
 

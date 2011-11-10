@@ -62,4 +62,3 @@ BUGS:
 - control_cc induced stop does not work
 - Remove PID file even in case of abnormal termination
 - Source path from not the current repo (e.g. pyon/examples not found)
--
