@@ -656,7 +656,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         header.update({'sender-name'  : self._process.name,     # @TODO
                        'sender'       : 'todo',#self.channel._chan_name,
-                       'conv-id'      : None,                   # @TODO
+                       'conv-id'      : 'none',                   # @TODO
                        'conv-seq'     : 1,
                        'performative' : 'request'})
 
