@@ -177,31 +177,36 @@ def ionhelp():
     print "ION R2 CC interactive shell"
     print
     print "Available functions: %s" % ", ".join(sorted([func.__name__ for func in public_api]))
-    print "Available variables: cc, proc, %s" % ", ".join(sorted(public_vars.keys()))
+    print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
 public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs]
+public_vars = None
+
+def get_proc():
+    from pyon.util.containers import DotDict
+    return DotDict(container.proc_manager.procs)
 
 def define_vars():
+    if public_vars: return public_vars
     from pyon.core.bootstrap import CFG, sys_name, obj_registry
+    cc = container
+    proc = get_proc()
 
     return locals()
-
-public_vars = define_vars()
 
 def get_shell_api(cc):
     """Returns an API to introspect and manipulate the container
     @retval dict that can be added to locals() namespace
     """
     global container
+    global public_vars
     container = cc
 
     ns_dict = dict()
     for func in public_api:
         ns_dict[func.__name__] = func
+    public_vars = define_vars()
     ns_dict.update(public_vars)
-    ns_dict['cc'] = cc
-    from pyon.util.containers import DotDict
-    ns_dict['proc'] = DotDict(container.proc_manager.procs)
 
     return ns_dict
