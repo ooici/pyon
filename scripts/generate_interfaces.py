@@ -124,8 +124,8 @@ def main():
 
             file_path = file_match.group(2)
             interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
-            print 'Generating "%s"...' % (interface_name)
             interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
+            print 'Generating %40s -> %s' % (interface_name, interface_file)
 
             parent_dir = os.path.dirname(interface_file)
             if not os.path.exists(parent_dir):
