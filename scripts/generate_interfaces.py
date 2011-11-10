@@ -130,6 +130,19 @@ def main():
             parent_dir = os.path.dirname(interface_file)
             if not os.path.exists(parent_dir):
                 os.makedirs(parent_dir)
+                parent = parent_dir
+                while True:
+                    # Add __init__.py files to parent dirs as necessary
+                    curdir = os.path.split(os.path.abspath(parent))[1]
+                    if curdir == 'services':
+                        break
+                    else:
+                        parent = os.path.split(os.path.abspath(parent))[0]
+
+                        pkg_file = os.path.join(parent, '__init__.py')
+                        if not os.path.exists(pkg_file):
+                            open(pkg_file, 'w').close()
+
             pkg_file = os.path.join(parent_dir, '__init__.py')
             if not os.path.exists(pkg_file):
                 open(pkg_file, 'w').close()
