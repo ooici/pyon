@@ -97,7 +97,7 @@ class Container(LifecycleStateMixin):
         # Check if this UNIX process already runs a Container.
         self.pidfile = "cc-pid-%d" % os.getpid()
         if os.path.exists(self.pidfile):
-            raise Exception("Existing pid file already found: %s" % self.pidfile)
+            raise Exception("Container.on_start(): Container is a singleton per UNIX process. Existing pid file found: %s" % self.pidfile)
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:

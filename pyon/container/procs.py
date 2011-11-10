@@ -48,6 +48,13 @@ class ProcManager(LifecycleStateMixin):
     def on_quit(self, *args, **kwargs):
         log.debug("ProcManager: quit")
 
+        # Call quit on procs to give them ability to clean up
+        for procname, proc in self.procs.iteritems():
+            try:
+                proc.quit()
+            except Exception, ex:
+                log.exception("Process %s quit failed" % procname)
+
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
 
@@ -91,6 +98,7 @@ class ProcManager(LifecycleStateMixin):
 
         rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
 
+        # Service RPC endpoint
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.container.node, name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
@@ -102,6 +110,7 @@ class ProcManager(LifecycleStateMixin):
 
         rsvc_proc = ProcessRPCServer(node=self.container.node, name=process_instance.id, service=process_instance, process=process_instance)
 
+        # Process exclusive RPC endpoint
         # Start an ION process with the right kind of endpoint factory
         listener1 = BinderListener(self.container.node, process_instance.id, rsvc_proc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener1)
@@ -110,3 +119,5 @@ class ProcManager(LifecycleStateMixin):
         log.debug("Waiting for server %s listener ready", process_instance.id)
         listener1.get_ready_event().get()
         log.debug("Server %s listener ready", process_instance.id)
+
+        process_instance.start()

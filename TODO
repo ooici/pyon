@@ -12,6 +12,7 @@ CODE:
 - Clear distinction between ION process and pyon process
 - Clear confusion with service vs process
 - Move all non-core services out of pyon plus their code
+- Move directory and datastore to COI services if possible
 
 STARTUP
 
