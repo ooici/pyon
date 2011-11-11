@@ -65,14 +65,14 @@ class DataStore(object):
         """
         pass
 
-    def create(self, object, datastore_name=""):
+    def create(self, object, object_id=None, datastore_name=""):
         """"
         Persist a new Ion object in the data store. An '_id' and initial
         '_rev' value will be added to the doc.
         """
         pass
 
-    def create_doc(self, object, datastore_name=""):
+    def create_doc(self, object, object_id=None, datastore_name=""):
         """"
         Persist a new raw doc in the data store. An '_id' and initial
         '_rev' value will be added to the doc.
@@ -158,7 +158,7 @@ class DataStore(object):
         In SQL, this is equivalent to:
             select * from datastore_name where type = 'foo' and name = 'bar'
 
-        This function returns AnodeObjects
+        This function returns IonObjects
         """
         pass
 
@@ -200,7 +200,7 @@ class DataStore(object):
         following:
             [['type_', DataStore.EQUAL, 'foo'], DataStore.AND, ['name', DataStore.EQUAL, 'bar']]
 
-        This function returns AnodeObjects
+        This function returns IonObjects
         """
         pass
 
@@ -226,7 +226,7 @@ class DataStore(object):
             via predicate
 
         This function returns a set of tuples in the form
-            [(AnodeObject, <predicate>, AnodeObject), ...]
+            [(IonObject, <predicate>, IonObject), ...]
         """
         pass
 

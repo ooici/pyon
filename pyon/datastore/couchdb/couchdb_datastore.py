@@ -90,15 +90,15 @@ class CouchDB_DataStore(DataStore):
         log.debug('Versions: %s' % str(res))
         return res
 
-    def create(self, object, datastore_name=""):
-        return self.create_doc(self._ion_object_to_persistence_dict(object))
+    def create(self, object, object_id=None, datastore_name=""):
+        return self.create_doc(self._ion_object_to_persistence_dict(object), object_id=object_id, datastore_name=datastore_name)
 
-    def create_doc(self, doc, datastore_name=""):
+    def create_doc(self, doc, object_id=None, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
 
         # Assign an id to doc (recommended in CouchDB documentation)
-        doc["_id"] = uuid4().hex
+        doc["_id"] = object_id or uuid4().hex
         log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 

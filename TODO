@@ -42,6 +42,7 @@ PROCESS:
 - Unique process IO
 - Process attachment (direct or via container)
 - Lifecycle
+- IDE code completion for service clients and methods
 
 MESSAGING:
 
@@ -63,3 +64,6 @@ BUGS:
 - control_cc induced stop does not work
 - Remove PID file even in case of abnormal termination
 - Source path from not the current repo (e.g. pyon/examples not found)
+- Datastore fails bad if object not found
+- More than one worker per queue (ACCESS REFUCED, exclusive mode)
+- Make sure datastore only gets dicts as documents. Fail otherwise
