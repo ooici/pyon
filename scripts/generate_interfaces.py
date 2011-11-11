@@ -101,6 +101,8 @@ def main():
     # in terms of common data objects
     file_re = re.compile('(obj)/(.*)[.](yml)')
     data_dir = 'obj/data'
+    entag = u'!enum'
+    yaml.add_constructor(entag, lambda loader, node: {})
     for root, dirs, files in os.walk(data_dir):
         for filename in fnmatch.filter(files, '*.yml'):
             yaml_file = os.path.join(root, filename)
@@ -113,6 +115,8 @@ def main():
                 for name,_def in def_set.iteritems():
                     tag = u'!%s' % (name)
                     yaml.add_constructor(tag, lambda loader, node: {})
+                    xtag = u'!Extends_%s' % (name)
+                    yaml.add_constructor(xtag, lambda loader, node: {})
 
 # Generate the new definitions, for now giving each
 # yaml file its own python service

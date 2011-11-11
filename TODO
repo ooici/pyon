@@ -21,6 +21,7 @@ STARTUP
 OBJECTS:
 
 - Revise service YML files (look at WSDL)
+- Add association abstraction
 
 CONTAINER:
 
