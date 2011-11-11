@@ -36,8 +36,9 @@ You need the following installed before you can use pyon:
       Linux: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh.
   - zeromq 2.1.x
       Mac: Use Homebrew install (see below)
-  - couchdb 0.8 (optional if memory mockdb is used)
+  - couchdb 1.1.0 (optional if memory mockdb is used)
       Mac: Use Homebrew install (see below)
+      Linux: Note that many installs have much older versions installed by default. You will need to upgrade couchdb to at least 1.1.0.
   - rabbitmq 2.6.1 (optional if amoeba is used)
       Download generic Linux version and unpack
       Note: May need erl (Erlang) and some dependencies installed before
@@ -152,6 +153,10 @@ DEBUG
 =====
 
 Real-time debugging is possible with Pycharm. Start pycc from Pycharm.
+
+
+You will need to make sure the Pycharm debug egg is available in your path, something like:
+export PYTHONPATH=.:/Applications/PyCharm\ 1.5.2.app/pycharm-debug.egg
 
 Remote debugging of services in a running container is possible too. Setup a remote debugging configuration to use the localhost and port 8585.
 First start the remote debuging server, then start the container from the command line below ( the -n seems to be required )
