@@ -3,6 +3,8 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
+from pyon.util.log import log
+
 class DataStore(object):
     """
     Think of this class as a database server.
@@ -237,3 +239,70 @@ class DataStore(object):
             [({}, <predicate>, {}), ...]
         """
         pass
+
+    def create_association(self, subject_id='', predicate='', object_id=''):
+        """
+        Create an association between two IonObjects with a given predicate
+        """
+        sub = self.read(subject_id)
+        obj = self.read(object_id)
+        from pyon.public import IonObject
+        assoc = IonObject("Association",s=subject_id, st=type(sub).__name__, p=predicate, o=object_id, ot=type(obj).__name__)
+        return self.create(assoc)
+
+    def delete_association(self, association_id=''):
+        """
+        Delete an association between two IonObjects
+        """
+        assoc = self.read(association_id)
+        return self.delete(assoc)
+
+    def find_associations(self, subject_id=None, predicate=None, object_id=None):
+        if subject_id == predicate == object_id == None: raise Exception("find_associations: no args")
+
+        search1 = [['type_','==','Association']]
+        if subject_id:
+            search1.append(0)
+            search1.append(['s','==',subject_id])
+
+        if object_id:
+            search1.append(0)
+            search1.append(['o','==',object_id])
+
+        if predicate:
+            search1.append(0)
+            search1.append(['p','==',predicate])
+
+        assoc_list = self.find(search1)
+        log.debug("find_associations(sub_id=%s, pred=%s, obj_id=%s) found %s associations" % (subject_id, predicate, object_id, len(assoc_list)))
+        return assoc_list
+
+    def find_objects(self, subject_id, predicate=None):
+        # HACK until triple store is in place
+        # Step 1: Find associations
+        assoc_list = self.find_associations(subject_id, predicate)
+
+        # Step 2: Find destinations
+        search2 = []
+        for assoc in assoc_list:
+            if search2:
+                search2.append(1)
+            search2.append(['_id','==',assoc.o])
+        obj_list = self.find(search2)
+        log.debug("find_objects(sub_id=%s, pred=%s) found %s objects" % (subject_id, predicate, len(obj_list)))
+        return obj_list
+
+    def find_subjects(self, object_id, predicate=None):
+        # HACK until triple store is in place
+        # Step 1: Find associations
+        assoc_list = self.find_associations(None, predicate, object_id)
+
+        # Step 2: Find destinations
+        search2 = []
+        for assoc in assoc_list:
+            if search2:
+                search2.append(1)
+            search2.append(['_id','==',assoc.s])
+        subj_list = self.find(search2)
+        log.debug("find_subjects(obj_id=%s, pred=%s) found %s subjects" % (object, predicate, len(subj_list)))
+        return subj_list

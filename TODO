@@ -21,7 +21,6 @@ STARTUP
 OBJECTS:
 
 - Revise service YML files (look at WSDL)
-- Add association abstraction
 
 CONTAINER:
 
@@ -69,3 +68,4 @@ BUGS:
 - More than one worker per queue (ACCESS REFUCED, exclusive mode)
 - Make sure datastore only gets dicts as documents. Fail otherwise
 - Kwargs and clients
+- Find result does not pass validate interceptor
