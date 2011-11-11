@@ -128,6 +128,15 @@ class IonObjectBase(object):
                     if isinstance(subval, IonObjectBase):
                         subval._validate()
 
+class IonEnumObject(object):
+    def __init__(self, enum, default_key=None):
+        self.enum = enum
+        self.default_key = default_key
+        self.value = self.enum.get(default_key) if default_key else None
+
+    def __str__(self):
+        return str(self.value)
+
 def hashfunc(text):
     return hashlib.sha1(text).hexdigest()
 
@@ -255,10 +264,32 @@ class IonObjectRegistry(object):
         log.debug('Added YAML constructor for tag: %s' % tag)
         yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
 
+        # Support for extended objects in definitions via YAML tags
+        xtag = u'!Extends_%s' % (name)
+        def extends_constructor(loader, node):
+            if isinstance(node, yaml.MappingNode):
+                value = loader.construct_mapping(node)
+            else:
+                value = {}
+            value.update(_def.schema)
+            return value
+        yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
         return _def
 
     def register_yaml(self, yaml_text):
         """ Parse the contents of a YAML file that contains one or more object definitions. """
+
+        # Add support for enum types in definitions via YAML tags
+        enum_tag = u'!enum'
+        def enum_constructor(loader, node):
+            if isinstance(node, yaml.MappingNode):
+                value = loader.construct_mapping(node)
+            else:
+                value = {}
+            enum_val = IonEnumObject(value, value.get("_default", None))
+            return enum_val
+        yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
 
         defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
         obj_defs = []

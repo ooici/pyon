@@ -67,3 +67,4 @@ BUGS:
 - Datastore fails bad if object not found
 - More than one worker per queue (ACCESS REFUCED, exclusive mode)
 - Make sure datastore only gets dicts as documents. Fail otherwise
+- Kwargs and clients
