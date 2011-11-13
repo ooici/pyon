@@ -104,17 +104,19 @@ class CouchRun(object):
 
         print "Inserting docs: %s" % num
 
-        doc_list = [dict(_id=uuid4().hex,type=types[random.randint(0,typecnt-1)],num=str(i)) for i in xrange(num)]
-        self.update_docs(doc_list)
+        self.doc_list = [dict(_id=uuid4().hex,type=types[random.randint(0,typecnt-1)],num=str(i)) for i in xrange(num)]
+        self.update_docs(self.doc_list)
 
         print "Inserting associations: %s" % numassoc
 
-        assoc_list = [dict(_id=uuid4().hex,
+        self.assoc_list = [dict(_id=uuid4().hex,
                            type_="Association",
-                           s=doc_list[random.randint(0,num-1)]["_id"],
+                           s=self.doc_list[random.randint(0,num-1)]["_id"],
                            p=preds[random.randint(0,predcnt-1)],
-                           o=doc_list[random.randint(0,num-1)]["_id"]) for i in xrange(numassoc)]
-        self.update_docs(assoc_list)
+                           o=self.doc_list[random.randint(0,num-1)]["_id"]) for i in xrange(numassoc)]
+        self.update_docs(self.assoc_list)
+
+        self.assoc_subject = sorted(set([ass['s'] for ass in self.assoc_list]))
 
     @timing_val
     def test_query(self, num, func):
@@ -127,7 +129,7 @@ class CouchRun(object):
         self.db["_design/%s" % design] = {"views": {
                         name: {
                           "map": mapfunc,
-                          #"reduce": redfunc
+                          #"reduce": "_count"
                         }
                       }
                     }
@@ -139,6 +141,29 @@ class CouchRun(object):
         print "View %s rows: %s" % (view_name, len(view))
 
         for row in view:
+            print row
+
+    def print_view_key(self, design, name, keys, keye):
+        view_name = "%s/%s" % (design, name)
+        print "View direct access"
+        view1 = self.db.view(view_name, inclusive_end=True, include_docs=True)
+        #rows = view1[[self.assoc_subject[2]]:[self.assoc_subject[2]]]
+        rows = view1[keys:keye]
+        for row in rows:
+            print row
+
+    def test_views(self, design, name):
+        view_name = "%s/%s" % (design, name)
+        print "View direct access"
+        view1 = self.db.view(view_name, inclusive_end=True)
+
+        rows = view1[[self.assoc_subject[2]]:[self.assoc_subject[2],'ZZZ']]
+        for row in rows:
+            print row
+
+        print "View again"
+        rows = view1[[self.assoc_subject[3]]:[self.assoc_subject[3],'ZZZ']]
+        for row in rows:
             print row
 
 def main():
@@ -156,7 +181,9 @@ def main():
 
     #print list(cr.db.view("_all_docs"))
 
-    cr.print_view(assoc_view_name, assoc_view_name)
+    #cr.print_view(assoc_view_name, assoc_view_name)
+
+    cr.test_views(assoc_view_name, assoc_view_name)
 
     #cr.test_query(1, cr._id_index())
 
