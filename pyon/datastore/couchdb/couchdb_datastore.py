@@ -11,6 +11,7 @@ from couchdb.http import ResourceConflict, ResourceNotFound
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.datastore.datastore import DataStore
+from pyon.util.containers import DotDict
 from pyon.util.log import log
 
 # Marks key range upper bound
@@ -521,7 +522,7 @@ function(doc) {
             'by_name':{
                 'map':"""
 function(doc) {
-  emit([doc.name, doc.type_], doc._id);
+  emit([doc.name, doc.type_, doc.lcstate], doc._id);
 }""",
             }
 
@@ -554,6 +555,7 @@ function(doc) {
         return "_design/%s/_view/%s" % (design, name)
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
         db = self.server[self.datastore_name]
 
         subject_id = subject if type(subject) is str else subject["_id"]
@@ -570,7 +572,7 @@ function(doc) {
         obj_assocs = [row['key'] for row in rows]
         obj_ids = [row[3] for row in obj_assocs]
 
-        log.debug("find_objects(sub_id=%s, pred=%s, obj_type=%s) found %s objects" % (subject_id, predicate, object_type, len(obj_ids)))
+        log.debug("find_objects() found %s objects" % (len(obj_ids)))
         if id_only:
             return (obj_ids, obj_assocs)
 
@@ -578,6 +580,7 @@ function(doc) {
         return (obj_list, obj_assocs)
 
     def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
         db = self.server[self.datastore_name]
 
         object_id = object if type(object) is str else object["_id"]
@@ -594,9 +597,71 @@ function(doc) {
         sub_assocs = [row['key'] for row in rows]
         sub_ids = [row[3] for row in sub_assocs]
 
-        log.debug("find_subjects(obj_id=%s, pred=%s, sub_type=%s) found %s subjects" % (object_id, predicate, subject_type, len(sub_ids)))
+        log.debug("find_subjects() found %s subjects" % (len(sub_ids)))
         if id_only:
             return (sub_ids, sub_assocs)
 
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
+
+    def find_res_bytype(self, restype, lcstate=None, id_only=False):
+        log.debug("find_res_bytype(restype=%s, lcstate=%s)" % (restype, lcstate))
+        db = self.server[self.datastore_name]
+        view = db.view(self._get_viewname("resource","by_type"), include_docs=(not id_only))
+        key = [restype]
+        if lcstate:
+            key.append(lcstate)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(type_=row['key'][0], lcstate=row['key'][1], name=row['key'][2], _id=row['value']) for row in rows]
+        log.debug("find_res_bytype() found %s objects" % (len(res_assocs)))
+        if id_only:
+            res_ids = [row['_id'] for row in res_assocs]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            return (res_docs, res_assocs)
+
+    def find_res_bylcstate(self, lcstate, restype=None, id_only=False):
+        log.debug("find_res_bytype(lcstate=%s, restype=%s)" % (lcstate, restype))
+        db = self.server[self.datastore_name]
+        view = db.view(self._get_viewname("resource","by_lcstate"), include_docs=(not id_only))
+        key = [lcstate]
+        if restype:
+            key.append(restype)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(lcstate=row['key'][0], type_=row['key'][1], name=row['key'][2], _id=row['value']) for row in rows]
+        log.debug("find_res_bytype() found %s objects" % (len(res_assocs)))
+        if id_only:
+            res_ids = [row['_id'] for row in res_assocs]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            return (res_docs, res_assocs)
+
+    def find_res_byname(self, name, restype=None, id_only=False):
+        log.debug("find_res_byname(name=%s, restype=%s)" % (name, restype))
+        db = self.server[self.datastore_name]
+        view = db.view(self._get_viewname("resource","by_name"), include_docs=(not id_only))
+        key = [name]
+        if restype:
+            key.append(restype)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(name=row['key'][0], type_=row['key'][1], lcstate=row['key'][2], _id=row['value']) for row in rows]
+        log.debug("find_res_bytype() found %s objects" % (len(res_assocs)))
+        if id_only:
+            res_ids = [row['_id'] for row in res_assocs]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            return (res_docs, res_assocs)
+
+

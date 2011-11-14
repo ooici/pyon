@@ -67,7 +67,7 @@ BUGS:
 - Remove PID file even in case of abnormal termination
 - Source path from not the current repo (e.g. pyon/examples not found)
 - Datastore fails bad if object not found
-- More than one worker per queue (ACCESS REFUCED, exclusive mode)
+- More than one worker per queue (ACCESS REFUSED, exclusive mode)
 - Make sure datastore only gets dicts as documents. Fail otherwise
-- Kwargs and clients
+- Kwargs and clients don't work
 - Find result does not pass validate interceptor

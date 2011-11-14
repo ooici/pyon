@@ -9,11 +9,27 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.test.pyontest import PyonTestCase
+from pyon.ion.public import RT, AT, LCS
+
 from unittest import SkipTest
 
 class Test_DataStores(PyonTestCase):
 
+    def test_non_persistent(self):
+        self._do_test(MockDB_DataStore(datastore_name='my_ds'))
+
+    def test_persistent(self):
+        import socket
+        try:
+            self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
+
+            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'))
+        except socket.error:
+            raise SkipTest('Failed to connect to CouchDB')
+
     def _do_test(self, data_store):
+        self.data_store = data_store
+        self.resources = {}
         # Just in case previous run failed without cleaning up,
         # delete data store
         try:
@@ -252,6 +268,8 @@ class Test_DataStores(PyonTestCase):
         self.assertNotIn('my_ds', data_store.list_datastores())
 
     def _do_test_views(self, data_store):
+        self.data_store = data_store
+        self.resources = {}
         # Just in case previous run failed without cleaning up,
         # delete data store
         try:
@@ -269,48 +287,161 @@ class Test_DataStores(PyonTestCase):
 
         data_store._update_views()
 
-        admin_role_obj = IonObject('UserRole', dict(name="Marine Operator",description="MarineOp"))
-        admin_role_res = data_store.create(admin_role_obj)
+        admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.ACTIVE)
 
-        inst1_obj = IonObject('Instrument', dict(name="CTD1",description="My Instrument"))
-        inst1_obj_res = data_store.create(inst1_obj)
+        admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Profile')
 
-        data_store.create_association(admin_role_res[0], "OWNS", inst1_obj_res[0])
+        other_user_id = self._create_resource(RT.UserIdentity, 'Paul Smithy', description='Other user')
 
-        obj_ids, obj_assocs = data_store.find_objects(admin_role_res[0], "OWNS")
-        self.assertEquals(len(obj_ids), 1)
-        self.assertEquals(len(obj_assocs), 1)
+        plat1_obj_id = self._create_resource(RT.Platform, 'Buoy1', description='My Platform')
 
-        obj_ids1, _ = data_store.find_objects(admin_role_res[0])
-        self.assertEquals(len(obj_ids1), 1)
+        inst1_obj_id = self._create_resource(RT.Instrument, 'CTD1', description='My Instrument')
 
-        obj_ids2, _ = data_store.find_objects(admin_role_res[0], "OWNS", "Instrument")
-        self.assertEquals(len(obj_ids2), 1)
+        inst2_obj_id = self._create_resource(RT.Instrument, 'CTD2', description='Other Instrument')
 
-        sub_ids, sub_assoc = data_store.find_subjects(inst1_obj_res[0], "OWNS")
-        self.assertEquals(len(sub_ids), 1)
-        self.assertEquals(len(sub_assoc), 1)
+        ds1_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.ACTIVE)
 
-        sub_ids1, _ = data_store.find_subjects(inst1_obj_res[0])
-        self.assertEquals(len(sub_ids1), 1)
+        ds2_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L1', description='My Dataset CTD L1')
 
-        sub_ids2, _ = data_store.find_subjects(inst1_obj_res[0], "OWNS", "UserRole")
+        data_store.create_association(admin_user_id, AT.OWNER_OF, inst1_obj_id)
+
+        data_store.create_association(admin_user_id, AT.HAS_A, admin_profile_id)
+
+        data_store.create_association(admin_user_id, AT.OWNER_OF, ds1_obj_id)
+
+        data_store.create_association(other_user_id, AT.OWNER_OF, inst2_obj_id)
+
+        data_store.create_association(plat1_obj_id, AT.HAS_A, inst1_obj_id)
+
+        data_store.create_association(inst1_obj_id, AT.HAS_A, ds1_obj_id)
+
+        data_store.create_association(ds1_obj_id, "BASED_ON", ds1_obj_id)
+
+        # Subject -> Object direction
+        obj_ids1, obj_assocs1 = data_store.find_objects(admin_user_id, id_only=True)
+        self.assertEquals(len(obj_ids1), 3)
+        self.assertEquals(len(obj_assocs1), 3)
+        self.assertEquals(set(obj_ids1), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
+
+        obj_ids1n, obj_assocs1n = data_store.find_objects("Non_Existent", id_only=True)
+        self.assertEquals(len(obj_ids1n), 0)
+        self.assertEquals(len(obj_assocs1n), 0)
+
+        obj_ids1a, obj_assocs1a = data_store.find_objects(admin_user_id, id_only=False)
+        self.assertEquals(len(obj_ids1a), 3)
+        self.assertEquals(len(obj_assocs1a), 3)
+        self.assertEquals(set([o._id for o in obj_ids1a]), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
+        self.assertEquals(set([o._def.type.name for o in obj_ids1a]), set([RT.UserInfo, RT.Instrument, RT.DataSet]))
+
+        obj_ids1an, obj_assocs1an = data_store.find_objects("Non_Existent", id_only=False)
+        self.assertEquals(len(obj_ids1an), 0)
+        self.assertEquals(len(obj_assocs1an), 0)
+
+        obj_ids2, obj_assocs2 = data_store.find_objects(admin_user_id, AT.OWNER_OF, id_only=True)
+        self.assertEquals(len(obj_ids2), 2)
+        self.assertEquals(len(obj_assocs2), 2)
+        self.assertEquals(set(obj_ids2), set([inst1_obj_id, ds1_obj_id]))
+
+        obj_ids3, _ = data_store.find_objects(admin_user_id, AT.OWNER_OF, RT.Instrument, id_only=True)
+        self.assertEquals(len(obj_ids3), 1)
+        self.assertEquals(obj_ids3[0], inst1_obj_id)
+
+        # Object -> Subject direction
+        sub_ids1, sub_assoc1 = data_store.find_subjects(inst1_obj_id, id_only=True)
+        self.assertEquals(len(sub_ids1), 2)
+        self.assertEquals(len(sub_assoc1), 2)
+        self.assertEquals(set(sub_ids1), set([admin_user_id, plat1_obj_id]))
+
+        sub_ids1a, sub_assoc1a = data_store.find_subjects(inst1_obj_id, id_only=False)
+        self.assertEquals(len(sub_ids1a), 2)
+        self.assertEquals(len(sub_assoc1a), 2)
+        self.assertEquals(set([o._id for o in sub_ids1a]), set([admin_user_id, plat1_obj_id]))
+
+        sub_ids1an, sub_assoc1an = data_store.find_subjects("Non_Existent", id_only=False)
+        self.assertEquals(len(sub_ids1an), 0)
+        self.assertEquals(len(sub_assoc1an), 0)
+
+        sub_ids2, sub_assoc2 = data_store.find_subjects(inst1_obj_id, AT.OWNER_OF, id_only=True)
         self.assertEquals(len(sub_ids2), 1)
+        self.assertEquals(len(sub_assoc2), 1)
+        self.assertEquals(set(sub_ids2), set([admin_user_id]))
+
+        sub_ids3, _ = data_store.find_subjects(inst1_obj_id, AT.OWNER_OF, RT.UserIdentity, id_only=True)
+        self.assertEquals(len(sub_ids3), 1)
+        self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
         data_store._update_views()
 
+        # Find resources by type
+        res_ids1, res_assoc1 = data_store.find_res_bytype(RT.UserIdentity, id_only=True)
+        self.assertEquals(len(res_ids1), 2)
+        self.assertEquals(len(res_assoc1), 2)
+        self.assertEquals(set(res_ids1), set([admin_user_id, other_user_id]))
 
-    def test_non_persistent(self):
-        self._do_test(MockDB_DataStore(datastore_name='my_ds'))
+        res_ids1a, res_assoc1a = data_store.find_res_bytype(RT.UserIdentity, id_only=False)
+        self.assertEquals(len(res_ids1a), 2)
+        self.assertEquals(len(res_assoc1a), 2)
+        self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
+        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.NEW, LCS.ACTIVE]))
 
-    def test_persistent(self):
-        import socket
-        try:
-            self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
+        res_ids2, res_assoc2 = data_store.find_res_bytype(RT.UserIdentity, LCS.ACTIVE, id_only=True)
+        self.assertEquals(len(res_ids2), 1)
+        self.assertEquals(len(res_assoc2), 1)
+        self.assertEquals(set(res_ids2), set([admin_user_id]))
 
-            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'))
-        except socket.error:
-            raise SkipTest('Failed to connect to CouchDB')
+        res_ids2n, res_assoc2n = data_store.find_res_bytype("NONE##", LCS.ACTIVE, id_only=True)
+        self.assertEquals(len(res_ids2n), 0)
+        self.assertEquals(len(res_assoc2n), 0)
+
+        # Find resources by lcstate
+        res_ids1, res_assoc1 = data_store.find_res_bylcstate(LCS.ACTIVE, id_only=True)
+        self.assertEquals(len(res_ids1), 2)
+        self.assertEquals(len(res_assoc1), 2)
+        self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
+
+        res_ids1a, res_assoc1a = data_store.find_res_bylcstate(LCS.ACTIVE, id_only=False)
+        self.assertEquals(len(res_ids1a), 2)
+        self.assertEquals(len(res_assoc1a), 2)
+        self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
+        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
+
+        res_ids2, res_assoc2 = data_store.find_res_bylcstate( LCS.ACTIVE, RT.UserIdentity, id_only=True)
+        self.assertEquals(len(res_ids2), 1)
+        self.assertEquals(len(res_assoc2), 1)
+        self.assertEquals(set(res_ids2), set([admin_user_id]))
+
+        res_ids2n, res_assoc2n = data_store.find_res_bytype("NONE##", "XXXXX", id_only=True)
+        self.assertEquals(len(res_ids2n), 0)
+        self.assertEquals(len(res_assoc2n), 0)
+
+        # Find resources by name
+        res_ids1, res_assoc1 = data_store.find_res_byname('CTD1', id_only=True)
+        self.assertEquals(len(res_ids1), 1)
+        self.assertEquals(len(res_assoc1), 1)
+        self.assertEquals(set(res_ids1), set([inst1_obj_id]))
+
+        res_ids1a, res_assoc1a = data_store.find_res_byname('CTD2', id_only=False)
+        self.assertEquals(len(res_ids1a), 1)
+        self.assertEquals(len(res_assoc1a), 1)
+        self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
+        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.Instrument]))
+
+        res_ids2, res_assoc2 = data_store.find_res_byname( 'John Doe', RT.UserIdentity, id_only=True)
+        self.assertEquals(len(res_ids2), 1)
+        self.assertEquals(len(res_assoc2), 1)
+        self.assertEquals(set(res_ids2), set([admin_user_id]))
+
+        res_ids2n, res_assoc2n = data_store.find_res_byname("NONE##", "XXXXX", id_only=True)
+        self.assertEquals(len(res_ids2n), 0)
+        self.assertEquals(len(res_assoc2n), 0)
+
+
+    def _create_resource(self, restype, name, *args, **kwargs):
+        res_obj = IonObject(restype, dict(name=name, **kwargs))
+        res_obj_res = self.data_store.create(res_obj)
+        res_obj._id = res_obj_res[0]
+        self.resources[name] = res_obj
+        return res_obj_res[0]
 
 
 if __name__ == "__main__":

@@ -514,3 +514,23 @@ class MockDB_DataStore(DataStore):
         type = init_dict.pop("type_")
         ion_object = IonObject(type, init_dict)
         return ion_object
+
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
+        return NotImplementedError()
+
+    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
+        return NotImplementedError()
+
+    def find_res_bytype(self, restype, lcstate=None, id_only=False):
+        log.debug("find_res_bytype(restype=%s, lcstate=%s)" % (restype, lcstate))
+        return NotImplementedError()
+
+    def find_res_bylcstate(self, lcstate, restype=None, id_only=False):
+        log.debug("find_res_bytype(lcstate=%s, restype=%s)" % (lcstate, restype))
+        return NotImplementedError()
+
+    def find_res_byname(self, name, restype=None, id_only=False):
+        log.debug("find_res_byname(name=%s, restype=%s)" % (name, restype))
+        return NotImplementedError()

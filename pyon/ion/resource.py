@@ -28,7 +28,10 @@ AT_LIST = [
     ]
 
 RT = DotDict(zip(RT_LIST, RT_LIST))
+ResourceTypes = RT
 
 AT = DotDict(zip(AT_LIST, AT_LIST))
+AssocTypes = AT
 
 LCS = DotDict(zip(LCS_LIST, LCS_LIST))
+LifeCycleStates = LCS
