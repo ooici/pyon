@@ -9,5 +9,5 @@ __license__ = 'Apache 2.0'
 
 __all__ = []
 
-from pyon.ion.resource import RT, AT
-__all__ += ['RT', 'AT']
+from pyon.ion.resource import RT, AT, LCS
+__all__ += ['RT', 'AT', 'LCS']

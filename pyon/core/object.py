@@ -29,6 +29,8 @@ def service_name_from_file_name(file_name):
     file_name = os.path.basename(file_name).split('.', 1)[0]
     return file_name.title().replace('_', '').replace('-', '')
 
+resource_objects = set()
+
 class IonObjectMetaType(type):
     """
     Metaclass that automatically generates subclasses of IonObject with the appropriate defaults for each field.
@@ -328,6 +330,14 @@ class IonObjectRegistry(object):
         yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
 
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
+
+        # Extract resource types (everything that extends from Resource)
+        # TODO: What if a resource extends from another resource?
+        import re
+        res = re.findall(r'(\w+?):\s+!Extends_Resource\s', yaml_text)
+        global resource_objects
+        resource_objects.update(res)
+
         obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
         return obj_defs
