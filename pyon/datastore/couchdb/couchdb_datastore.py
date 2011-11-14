@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'Thomas R. Lennan'
+__author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from uuid import uuid4
@@ -12,6 +12,9 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
+
+# Marks key range upper bound
+END_MARKER = "ZZZZZ"
 
 class CouchDB_DataStore(DataStore):
     """
@@ -28,11 +31,13 @@ class CouchDB_DataStore(DataStore):
         log.debug('Connecting to couchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
-    def create_datastore(self, datastore_name=""):
+    def create_datastore(self, datastore_name="", create_indexes=True):
         if datastore_name == "":
             datastore_name = self.datastore_name
         log.debug('Creating data store %s' % datastore_name)
         self.server.create(datastore_name)
+        if create_indexes:
+            self._define_views(datastore_name)
         return True
 
     def delete_datastore(self, datastore_name=""):
@@ -82,7 +87,7 @@ class CouchDB_DataStore(DataStore):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        log.debug('Listing all versions of object %s/%s' % (datastore_name, str(object_id)))
+        log.debug('Listing all versions of object %s/%s' % (datastore_name, object_id))
         gen = db.revisions(object_id)
         res = []
         for ent in gen:
@@ -121,14 +126,33 @@ class CouchDB_DataStore(DataStore):
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         if rev_id == "":
-            log.debug('Reading head version of object %s/%s' % (datastore_name, str(doc_id)))
+            log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
         else:
-            log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(doc_id)))
+            log.debug('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
             doc = db.get(doc_id, rev=rev_id)
         log.debug('read doc contents: %s', doc)
         return doc
 
+    def read_mult(self, object_ids, datastore_name="", id_only=False):
+        docs = self.read_doc_mult(object_ids, datastore_name, id_only)
+
+        # Convert docs into Ion objects
+        obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
+        return obj_list
+
+    def read_doc_mult(self, object_ids, datastore_name="", id_only=False):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
+        docs = db.view("_all_docs", keys=object_ids, include_docs=(not id_only))
+        if id_only:
+            doc_list = [dict(_id=row.key, **row.value) for row in docs]
+        else:
+            doc_list = [row.doc.copy() for row in docs]
+        return doc_list
+    
     def update(self, object, datastore_name=""):
         return self.update_doc(self._ion_object_to_persistence_dict(object))
 
@@ -146,15 +170,21 @@ class CouchDB_DataStore(DataStore):
         return [id, version]
 
     def delete(self, object, datastore_name=""):
-        return self.delete_doc(self._ion_object_to_persistence_dict(object))
+        if type(object) is str:
+            return self.delete_doc(object, datastore_name=datastore_name)
+        return self.delete_doc(self._ion_object_to_persistence_dict(object), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
-        res = db.delete(doc)
-        log.debug('Delete result: %s' % str(res))
+        if type(doc) is str:
+            log.debug('Deleting object %s/%s' % (datastore_name, doc))
+            del db[doc]
+        else:
+            log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+            res = db.delete(doc)
+            log.debug('Delete result: %s' % str(res))
         return True
 
     def find(self, criteria=[], datastore_name=""):
@@ -217,8 +247,8 @@ class CouchDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def find_by_association(self, criteria=[], association="", datastore_name=""):
-        doc_list = self.find_by_association_doc(criteria, association, datastore_name)
+    def find_by_idref(self, criteria=[], association="", datastore_name=""):
+        doc_list = self.find_by_idref_doc(criteria, association, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -229,7 +259,7 @@ class CouchDB_DataStore(DataStore):
 
         return results
 
-    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+    def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
@@ -305,8 +335,8 @@ class CouchDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def resolve_association(self, subject="", predicate="", object="", datastore_name=""):
-        res_list = self.resolve_association_doc(subject, predicate, object, datastore_name)
+    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
+        res_list = self.resolve_idref_doc(subject, predicate, object, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -321,7 +351,7 @@ class CouchDB_DataStore(DataStore):
 
         return results
 
-    def resolve_association_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
@@ -447,3 +477,126 @@ class CouchDB_DataStore(DataStore):
         type = init_dict.pop("type_")
         ion_object = IonObject(type, init_dict)
         return ion_object
+
+    COUCHDB_VIEWS = {
+        'association':{
+            'by_sub':{
+                'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.p, doc.ot, doc.o, doc._id], null);
+  }
+}""",
+            },
+            'by_obj':{
+                'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.o, doc.p, doc.st, doc.s, doc._id], null);
+  }
+}""",
+            }
+        },
+        'object':{
+            'by_type':{
+                'map':"""
+function(doc) {
+  emit([doc.type_], null);
+}""",
+            },
+        },
+        'resource':{
+            'by_type':{
+                'map':"""
+function(doc) {
+  emit([doc.type_, doc.lcstate, doc.name], doc._id);
+}""",
+            },
+            'by_lcstate':{
+                'map':"""
+function(doc) {
+  emit([doc.lcstate, doc.type_, doc.name], doc._id);
+}""",
+            },
+            'by_name':{
+                'map':"""
+function(doc) {
+  emit([doc.name, doc.type_], doc._id);
+}""",
+            }
+
+       }
+    }
+
+    def _define_views(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        for design, viewdef in self.COUCHDB_VIEWS.iteritems():
+            self._define_view(design, viewdef, datastore_name=datastore_name)
+
+    def _define_view(self, design, viewdef, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        db["_design/%s" % design] = dict(views=viewdef)
+
+    def _update_views(self, datastore_name=""):
+        if datastore_name == "":
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+
+        for design, viewdef in self.COUCHDB_VIEWS.iteritems():
+            for viewname in viewdef:
+                rows = db.view("_design/%s/_view/%s" % (design, viewname))
+                log.debug("View %s/_design/%s/_view/%s: %s rows" % (datastore_name, design, viewname, len(rows)))
+
+    def _get_viewname(self, design, name):
+        return "_design/%s/_view/%s" % (design, name)
+
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+        db = self.server[self.datastore_name]
+
+        subject_id = subject if type(subject) is str else subject["_id"]
+        view = db.view(self._get_viewname("association","by_sub"))
+        key = [subject_id]
+        if predicate:
+            key.append(predicate)
+            if object_type:
+                key.append(object_type)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        obj_assocs = [row['key'] for row in rows]
+        obj_ids = [row[3] for row in obj_assocs]
+
+        log.debug("find_objects(sub_id=%s, pred=%s, obj_type=%s) found %s objects" % (subject_id, predicate, object_type, len(obj_ids)))
+        if id_only:
+            return (obj_ids, obj_assocs)
+
+        obj_list = self.read_mult(obj_ids)
+        return (obj_list, obj_assocs)
+
+    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+        db = self.server[self.datastore_name]
+
+        object_id = object if type(object) is str else object["_id"]
+        view = db.view(self._get_viewname("association","by_obj"))
+        key = [object_id]
+        if predicate:
+            key.append(predicate)
+            if subject_type:
+                key.append(subject_type)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        sub_assocs = [row['key'] for row in rows]
+        sub_ids = [row[3] for row in sub_assocs]
+
+        log.debug("find_subjects(obj_id=%s, pred=%s, sub_type=%s) found %s subjects" % (object_id, predicate, subject_type, len(sub_ids)))
+        if id_only:
+            return (sub_ids, sub_assocs)
+
+        sub_list = self.read_mult(sub_ids)
+        return (sub_list, sub_assocs)

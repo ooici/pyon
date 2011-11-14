@@ -21,7 +21,7 @@ class MockDB_DataStore(DataStore):
         log.debug('Creating in-memory dict of dicts that will simulate data stores')
         self.root = {}
 
-    def create_datastore(self, datastore_name=""):
+    def create_datastore(self, datastore_name="", create_indexes=True):
         if datastore_name == "":
             datastore_name = self.datastore_name
         log.debug('Creating data store %s' % datastore_name)
@@ -291,8 +291,8 @@ class MockDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def find_by_association(self, criteria=[], association="", datastore_name=""):
-        doc_list = self.find_by_association_doc(criteria, association, datastore_name)
+    def find_by_idref(self, criteria=[], association="", datastore_name=""):
+        doc_list = self.find_by_idref_doc(criteria, association, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -303,7 +303,7 @@ class MockDB_DataStore(DataStore):
 
         return results
 
-    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+    def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:
@@ -386,8 +386,8 @@ class MockDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def resolve_association(self, subject="", predicate="", object="", datastore_name=""):
-        res_list = self.resolve_association_doc(subject, predicate, object, datastore_name)
+    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
+        res_list = self.resolve_idref_doc(subject, predicate, object, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -402,7 +402,7 @@ class MockDB_DataStore(DataStore):
 
         return results
 
-    def resolve_association_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         try:

@@ -30,6 +30,9 @@ class Test_DataStores(PyonTestCase):
         # Something should be returned
         self.assertTrue(data_store.info_datastore() is not None)
 
+        res = data_store.list_objects()
+        numcoredocs = len(res)
+
         # Construct user role objects
         admin_role = {
             "name":"Admin",
@@ -99,7 +102,8 @@ class Test_DataStores(PyonTestCase):
 
         # List all objects in data store and confirm there are six docs
         res = data_store.list_objects()
-        self.assertTrue(len(res) == 6)
+        # There are indices. Therefore can't could all docs
+        self.assertTrue(len(res) == 6 + numcoredocs)
 
         # Find all the UserInfo records
         res = data_store.find([["type_", "==", "UserInfo"]])
@@ -112,31 +116,31 @@ class Test_DataStores(PyonTestCase):
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
 
         # Find role(s) for user Heitor Villa-Lobos
-        res = data_store.find_by_association([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]], "roles")
+        res = data_store.find_by_idref([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]], "roles")
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Find role association(s) for user Heitor Villa-Lobos
-        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, 'roles', "")
+        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, 'roles', "")
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0][2]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Assert Admin role association exists for user Heitor Villa-Lobos
-        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id)
+        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_role_obj = res[0][2]
         self.assertTrue(user_role_obj.name == "Admin")
 
         # Find every subject with an association to the Admin role
-        res = data_store.resolve_association("", 'roles', admin_role_ooi_id)
+        res = data_store.resolve_idref("", 'roles', admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0][0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
 
         # Find every association involving object
-        res = data_store.resolve_association("", "", admin_role_ooi_id)
+        res = data_store.resolve_idref("", "", admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0][0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
@@ -144,7 +148,7 @@ class Test_DataStores(PyonTestCase):
         self.assertTrue(predicate == "roles")
 
         # Find every association between the subject and object
-        res = data_store.resolve_association(heitor_villa_lobos_ooi_id, "", admin_role_ooi_id)
+        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, "", admin_role_ooi_id)
         self.assertTrue(len(res) == 1)
         predicate = res[0][1]
         self.assertTrue(predicate == "roles")
@@ -235,7 +239,7 @@ class Test_DataStores(PyonTestCase):
 
         # List all objects in data store, should be back to six
         res = data_store.list_objects()
-        self.assertTrue(len(res) == 6)
+        self.assertTrue(len(res) == 6 + numcoredocs)
 
         # List revisions of now deleted DataSet, should be empty list
         res = data_store.list_object_revisions(data_set_uuid)
@@ -247,6 +251,55 @@ class Test_DataStores(PyonTestCase):
         # Assert data store is now gone
         self.assertNotIn('my_ds', data_store.list_datastores())
 
+    def _do_test_views(self, data_store):
+        # Just in case previous run failed without cleaning up,
+        # delete data store
+        try:
+            data_store.delete_datastore()
+        except NotFound:
+            pass
+
+        # Create should succeed and report True
+        self.assertTrue(data_store.create_datastore())
+
+        res = data_store.list_objects()
+        numcoredocs = len(res)
+
+        self.assertTrue(numcoredocs > 1)
+
+        data_store._update_views()
+
+        admin_role_obj = IonObject('UserRole', dict(name="Marine Operator",description="MarineOp"))
+        admin_role_res = data_store.create(admin_role_obj)
+
+        inst1_obj = IonObject('Instrument', dict(name="CTD1",description="My Instrument"))
+        inst1_obj_res = data_store.create(inst1_obj)
+
+        data_store.create_association(admin_role_res[0], "OWNS", inst1_obj_res[0])
+
+        obj_ids, obj_assocs = data_store.find_objects(admin_role_res[0], "OWNS")
+        self.assertEquals(len(obj_ids), 1)
+        self.assertEquals(len(obj_assocs), 1)
+
+        obj_ids1, _ = data_store.find_objects(admin_role_res[0])
+        self.assertEquals(len(obj_ids1), 1)
+
+        obj_ids2, _ = data_store.find_objects(admin_role_res[0], "OWNS", "Instrument")
+        self.assertEquals(len(obj_ids2), 1)
+
+        sub_ids, sub_assoc = data_store.find_subjects(inst1_obj_res[0], "OWNS")
+        self.assertEquals(len(sub_ids), 1)
+        self.assertEquals(len(sub_assoc), 1)
+
+        sub_ids1, _ = data_store.find_subjects(inst1_obj_res[0])
+        self.assertEquals(len(sub_ids1), 1)
+
+        sub_ids2, _ = data_store.find_subjects(inst1_obj_res[0], "OWNS", "UserRole")
+        self.assertEquals(len(sub_ids2), 1)
+
+        data_store._update_views()
+
+
     def test_non_persistent(self):
         self._do_test(MockDB_DataStore(datastore_name='my_ds'))
 
@@ -254,6 +307,8 @@ class Test_DataStores(PyonTestCase):
         import socket
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
+
+            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'))
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
 

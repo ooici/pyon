@@ -20,7 +20,7 @@ class DataStore(object):
     AND = 0
     OR = 1
 
-    def create_datastore(self, datastore_name=""):
+    def create_datastore(self, datastore_name="", create_indexes=True):
         """
         Create a data store with the given name.  This is
         equivalent to creating a database on a database server.
@@ -97,6 +97,19 @@ class DataStore(object):
         """
         pass
 
+    def read_mult(self, object_ids, datastore_name="", id_only=False):
+        """"
+        Fetch multiple Ion object instances, HEAD rev.
+        """
+        pass
+
+    def read_doc_mult(self, object_ids, datastore_name="", id_only=False):
+        """"
+        Fetch a raw doc instances, HEAD rev.
+        """
+        pass
+
+
     def update(self, object, datastore_name=""):
         """
         Update an existing Ion object in the data store.  The '_rev' value
@@ -119,6 +132,8 @@ class DataStore(object):
         This method will check the '_rev' value to ensure that the object
         provided is the most recent known object version.  If not, a
         Conflict exception is thrown.
+        If object id (str) is given instead of an object, deletes the
+        object with the given id.
         """
         pass
 
@@ -128,6 +143,8 @@ class DataStore(object):
         This method will check the '_rev' value to ensure that the doc
         provided is the most recent known doc version.  If not, a
         Conflict exception is thrown.
+        If object id (str) is given instead of an object, deletes the
+        object with the given id.
         """
         pass
 
@@ -170,7 +187,7 @@ class DataStore(object):
         """
         pass
 
-    def find_by_association(self, criteria=[], association="", datastore_name=""):
+    def find_by_idref(self, criteria=[], association="", datastore_name=""):
         """
         Generic query function that allows searching on zero
         or more criteria represented in the following format:
@@ -206,13 +223,13 @@ class DataStore(object):
         """
         pass
 
-    def find_by_association_doc(self, criteria=[], association="", datastore_name=""):
+    def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
         """
         Same as the find_by_association method except that this function returns raw doc dicts
         """
         pass
 
-    def resolve_association(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
         """
         Generic association query function that allows queries for associations
         by subject, predicate and/or object.  Examples:
@@ -232,7 +249,7 @@ class DataStore(object):
         """
         pass
 
-    def resolve_association_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
         """
         Same as the resolve_association_tuple method except that this function returns
         a set of tuples in the form
@@ -240,69 +257,45 @@ class DataStore(object):
         """
         pass
 
-    def create_association(self, subject_id='', predicate='', object_id=''):
+    def create_association(self, subject='', predicate='', object=''):
         """
         Create an association between two IonObjects with a given predicate
         """
-        sub = self.read(subject_id)
-        obj = self.read(object_id)
-        from pyon.public import IonObject
-        assoc = IonObject("Association",s=subject_id, st=type(sub).__name__, p=predicate, o=object_id, ot=type(obj).__name__)
+        if subject and type(subject) is str:
+            subject_id = subject
+            subject = self.read(subject_id)
+        if object and type(object) is str:
+            object_id = object
+            object = self.read(object_id)
+            
+        from pyon.core.bootstrap import IonObject
+        assoc = IonObject("Association",
+                          s=subject_id, st=subject._def.type.name,
+                          p=predicate,
+                          o=object_id, ot=object._def.type.name)
         return self.create(assoc)
 
-    def delete_association(self, association_id=''):
+    def delete_association(self, association=''):
         """
         Delete an association between two IonObjects
         """
-        assoc = self.read(association_id)
-        return self.delete(assoc)
+        return self.delete(association)
 
-    def find_associations(self, subject_id=None, predicate=None, object_id=None):
-        if subject_id == predicate == object_id == None: raise Exception("find_associations: no args")
 
-        search1 = [['type_','==','Association']]
-        if subject_id:
-            search1.append(0)
-            search1.append(['s','==',subject_id])
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+        """
+        Find objects (or object ids) by association from a given subject or subject id (if str).
+        Returns a tuple (list_of_objects, list_of_associations) if id_only == False, or
+        (list_of_object_ids, list_of_associations) if id_only == True.
+        Predicate and object_type are optional to narrow the search down. Object_type can only
+        be set if predicate is set as well.
+        """
 
-        if object_id:
-            search1.append(0)
-            search1.append(['o','==',object_id])
-
-        if predicate:
-            search1.append(0)
-            search1.append(['p','==',predicate])
-
-        assoc_list = self.find(search1)
-        log.debug("find_associations(sub_id=%s, pred=%s, obj_id=%s) found %s associations" % (subject_id, predicate, object_id, len(assoc_list)))
-        return assoc_list
-
-    def find_objects(self, subject_id, predicate=None):
-        # HACK until triple store is in place
-        # Step 1: Find associations
-        assoc_list = self.find_associations(subject_id, predicate)
-
-        # Step 2: Find destinations
-        search2 = []
-        for assoc in assoc_list:
-            if search2:
-                search2.append(1)
-            search2.append(['_id','==',assoc.o])
-        obj_list = self.find(search2)
-        log.debug("find_objects(sub_id=%s, pred=%s) found %s objects" % (subject_id, predicate, len(obj_list)))
-        return obj_list
-
-    def find_subjects(self, object_id, predicate=None):
-        # HACK until triple store is in place
-        # Step 1: Find associations
-        assoc_list = self.find_associations(None, predicate, object_id)
-
-        # Step 2: Find destinations
-        search2 = []
-        for assoc in assoc_list:
-            if search2:
-                search2.append(1)
-            search2.append(['_id','==',assoc.s])
-        subj_list = self.find(search2)
-        log.debug("find_subjects(obj_id=%s, pred=%s) found %s subjects" % (object, predicate, len(subj_list)))
-        return subj_list
+    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+        """
+        Find subjects (or subject ids) by association from a given object or object id (if str).
+        Returns a tuple (list_of_subjects, list_of_associations) if id_only == False, or
+        (list_of_subject_ids, list_of_associations) if id_only == True.
+        Predicate and subject_type are optional to narrow the search down. Subject_type can only
+        be set if predicate is set as well.
+        """
