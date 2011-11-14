@@ -12,6 +12,8 @@ import re
 import sys
 
 import yaml
+import hashlib
+import argparse
 
 # Do not remove any of the imports below this comment!!!!!!
 from pyon.core.object import IonYamlLoader, service_name_from_file_name
@@ -83,6 +85,11 @@ def build_args_str(_def, include_self=True):
     return args_str
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--force', action='store_true', help='Do not do MD5 comparisons, always generate new files')
+    parser.add_argument('-d', '--dryrun', action='store_true', help='Do not generate new files, just print status and exit with 1 if changes need to be made')
+    opts = parser.parse_args()
+
     if os.getcwd().endswith('scripts'):
         sys.exit('This script needs to be run from the pyon root.')
 
@@ -92,7 +99,8 @@ def main():
 
     # Clear old generated files
     files = os.listdir(interface_dir)
-    for file in fnmatch.filter(files, '*.py') + fnmatch.filter(files, '*.pyc'):
+    for file in fnmatch.filter(files, '*.pyc'):
+    #for file in fnmatch.filter(files, '*.py') + fnmatch.filter(files, '*.pyc'):
         os.unlink(os.path.join(interface_dir, file))
 
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
@@ -118,18 +126,27 @@ def main():
                     xtag = u'!Extends_%s' % (name)
                     yaml.add_constructor(xtag, lambda loader, node: {})
 
-# Generate the new definitions, for now giving each
-# yaml file its own python service
+    svc_signatures = {}
+    sigfile = os.path.join('interface', '.svc_signatures.yml')
+    if os.path.exists(sigfile):
+        with open(sigfile, 'r') as f:
+            cnts = f.read()
+            svc_signatures = yaml.load(cnts)
+
+    count = 0
+
+    # Generate the new definitions, for now giving each
+    # yaml file its own python service
     for root, dirs, files in os.walk(service_dir):
         for filename in fnmatch.filter(files, '*.yml'):
             yaml_file = os.path.join(root, filename)
             file_match = file_re.match(yaml_file)
+            if '.svc_signatures' in filename: continue
             if file_match is None: continue
 
             file_path = file_match.group(2)
             interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
             interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
-            print 'Generating %40s -> %s' % (interface_name, interface_file)
 
             parent_dir = os.path.dirname(interface_file)
             if not os.path.exists(parent_dir):
@@ -151,7 +168,26 @@ def main():
             if not os.path.exists(pkg_file):
                 open(pkg_file, 'w').close()
 
-            yaml_text = open(yaml_file, 'r').read()
+            with open(yaml_file, 'r') as f:
+                yaml_text = f.read()
+                m = hashlib.md5()
+                m.update(yaml_text)
+                cur_md5 = m.hexdigest()
+
+                if yaml_file in svc_signatures and not opts.force:
+                    if cur_md5 == svc_signatures[yaml_file]:
+                        print "Skipping   %40s (md5 signature match)" % interface_name
+                        continue
+
+                if opts.dryrun:
+                    count += 1
+                    print "Changed    %40s (needs update)" % interface_name
+                    continue
+
+                # update signature set
+                svc_signatures[yaml_file] = cur_md5
+                print 'Generating %40s -> %s' % (interface_name, interface_file)
+
             defs = yaml.load_all(yaml_text)
             for def_set in defs:
                 # Handle object definitions first; make dummy constructors so tags will parse
@@ -189,6 +225,20 @@ def main():
 
                 interface_contents = templates['file'].format(classes=_class, when_generated=str(datetime.datetime.today()))
                 open(interface_file, 'w').write(interface_contents)
+
+                count+=1
+
+    # write current svc_signatures
+    if count > 0 and not opts.dryrun:
+        print "Writing signature file to ", sigfile
+        with open(sigfile, 'w') as f:
+            f.write(yaml.dump(svc_signatures))
+
+    exitcode = 0
+    if count > 0:
+        exitcode = 1
+
+    sys.exit(exitcode)
 
 if __name__ == '__main__':
     main()
