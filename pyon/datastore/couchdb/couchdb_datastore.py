@@ -188,7 +188,7 @@ class CouchDB_DataStore(DataStore):
         return True
 
     def find(self, criteria=[], datastore_name=""):
-        doc_list = self.find_docs(criteria, datastore_name)
+        doc_list = self.find_doc(criteria, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -199,7 +199,7 @@ class CouchDB_DataStore(DataStore):
 
         return results
 
-    def find_docs(self, criteria=[], datastore_name=""):
+    def find_doc(self, criteria=[], datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
