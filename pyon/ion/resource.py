@@ -7,11 +7,23 @@ Resource specific definitions
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-all_resources = {}
+from pyon.util.containers import DotDict
 
-ASSOC_HAS_A = "HAS-A"
-ASSOC_IS_A = "IS-A"
-ASSOC_OWNER_OF = "OWNER-OF"
+RT_LIST = [
+    "ExchangeSpace",
+    "ExchangeName",
+    "ExchangePoint",
+    "Org",
+    "Policy",
+    "Instrument",
+    ]
 
-ASSOC_TYPES = {
-}
+AT_LIST = [
+    'HAS_A',
+    'IS_A',
+    'OWNER_OF',
+    ]
+
+RT = DotDict(zip(RT_LIST, RT_LIST))
+
+AT = DotDict(zip(AT_LIST, AT_LIST))

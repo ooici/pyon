@@ -21,6 +21,8 @@ STARTUP
 OBJECTS:
 
 - Revise service YML files (look at WSDL)
+- ID part of resource?
+- Before and after create: what's with ID and REV? with it get updated?
 
 CONTAINER:
 
