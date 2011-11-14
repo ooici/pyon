@@ -289,6 +289,10 @@ class MockDB_DataStore(DataStore):
                 pass
 
         log.debug('Find results: %s' % str(results))
+
+        if len(results) == 0:
+            raise NotFound('No objects matched criteria %s' % criteria)
+
         return results
 
     def find_by_idref(self, criteria=[], association="", datastore_name=""):
@@ -384,6 +388,10 @@ class MockDB_DataStore(DataStore):
             results.append(doc)
 
         log.debug('Find results: %s' % str(results))
+
+        if len(results) == 0:
+            raise NotFound('No objects matched criteria %s' % criteria)
+
         return results
 
     def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
