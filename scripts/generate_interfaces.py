@@ -43,15 +43,20 @@ from pyon.service.service import BaseService
 '''
     , 'class':
 '''class I{name}(Interface):
+{classdocstring}
 {methods}
 '''
 '''class Base{name}(BaseService):
     implements(I{name})
-
+{classdocstring}
 {servicename}
 {dependencies}
 {classmethods}
 '''
+    , 'clssdocstr':
+'    """\n\
+    {classdocstr}\n\
+    """'
     , 'svcname':
 '    name = \'{name}\''
     , 'depends':
@@ -59,12 +64,17 @@ from pyon.service.service import BaseService
     , 'method':
 '''
     def {name}({args}):
+        {methoddocstring}
         # Return Value
         # ------------
         # {outargs}
         pass
 '''
     , 'arg': '{name}={val}'
+    , 'methdocstr':
+'"""\n\
+        {methoddocstr}\n\
+        """'
 }
 
 def build_args_str(_def, include_self=True):
@@ -203,6 +213,7 @@ def main():
                     continue
 
                 service_name = def_set.get('name', None)
+                class_docstring = def_set.get('docstring', "class docstring")
                 dependencies = def_set.get('dependencies', None)
                 methods, class_methods = [], []
 
@@ -210,22 +221,24 @@ def main():
                 meth_list = def_set.get('methods', {}) or {}
                 for op_name,op_def in meth_list.iteritems():
                     if not op_def: continue
-                    def_in, def_out = op_def.get('in', None), op_def.get('out', None)
+                    def_docstring, def_in, def_out = op_def.get('docstring', "method docstring"), op_def.get('in', None), op_def.get('out', None)
 
                     args_str, class_args_str = build_args_str(def_in, False), build_args_str(def_in, True)
+                    docstring_str = templates['methdocstr'].format(methoddocstr=def_docstring)
                     outargs_str = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
-                    methods.append(templates['method'].format(name=op_name, args=args_str, outargs=outargs_str))
-                    class_methods.append(templates['method'].format(name=op_name, args=class_args_str, outargs=outargs_str))
+                    methods.append(templates['method'].format(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
+                    class_methods.append(templates['method'].format(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
 
                 if service_name is None:
                     raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
                 service_name_str = templates['svcname'].format(name=service_name)
+                class_docstring_str = templates['clssdocstr'].format(classdocstr=class_docstring)
                 dependencies_str = templates['depends'].format(namelist=dependencies)
                 methods_str = ''.join(methods) or '    pass\n'
                 classmethods_str = ''.join(class_methods)
                 class_name = service_name_from_file_name(interface_name)
-                _class = templates['class'].format(name=class_name, servicename=service_name_str, dependencies=dependencies_str,
+                _class = templates['class'].format(name=class_name, classdocstring=class_docstring_str, servicename=service_name_str, dependencies=dependencies_str,
                                                        methods=methods_str, classmethods=classmethods_str)
 
                 interface_contents = templates['file'].format(classes=_class, when_generated=currtime)
