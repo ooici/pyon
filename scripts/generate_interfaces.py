@@ -7,6 +7,7 @@ __license__ = 'Apache 2.0'
 
 import datetime
 import fnmatch
+import inspect
 import os
 import re
 import sys
@@ -14,6 +15,9 @@ import sys
 import yaml
 import hashlib
 import argparse
+
+from pyon.service.service import BaseService
+from pyon.util.containers import named_any
 
 # Do not remove any of the imports below this comment!!!!!!
 from pyon.core.object import IonYamlLoader, service_name_from_file_name
@@ -107,14 +111,14 @@ def main():
 
     # Load data yaml files in case services define interfaces
     # in terms of common data objects
-    file_re = re.compile('(obj)/(.*)[.](yml)')
+    yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
     data_dir = 'obj/data'
     entag = u'!enum'
     yaml.add_constructor(entag, lambda loader, node: {})
     for root, dirs, files in os.walk(data_dir):
         for filename in fnmatch.filter(files, '*.yml'):
             yaml_file = os.path.join(root, filename)
-            file_match = file_re.match(yaml_file)
+            file_match = yaml_file_re.match(yaml_file)
             if file_match is None: continue
 
             yaml_text = open(yaml_file, 'r').read()
@@ -135,12 +139,13 @@ def main():
 
     count = 0
 
+    currtime = str(datetime.datetime.today())
     # Generate the new definitions, for now giving each
     # yaml file its own python service
     for root, dirs, files in os.walk(service_dir):
         for filename in fnmatch.filter(files, '*.yml'):
             yaml_file = os.path.join(root, filename)
-            file_match = file_re.match(yaml_file)
+            file_match = yaml_file_re.match(yaml_file)
             if '.svc_signatures' in filename: continue
             if file_match is None: continue
 
@@ -223,7 +228,7 @@ def main():
                 _class = templates['class'].format(name=class_name, servicename=service_name_str, dependencies=dependencies_str,
                                                        methods=methods_str, classmethods=classmethods_str)
 
-                interface_contents = templates['file'].format(classes=_class, when_generated=str(datetime.datetime.today()))
+                interface_contents = templates['file'].format(classes=_class, when_generated=currtime)
                 open(interface_file, 'w').write(interface_contents)
 
                 count+=1
@@ -234,11 +239,102 @@ def main():
         with open(sigfile, 'w') as f:
             f.write(yaml.dump(svc_signatures))
 
+        # Load interface base classes
+        load_mods("interface/services", True)
+        base_subtypes = find_subtypes(BaseService)
+        # Load impl classes
+        load_mods("ion", False)
+
+    # Generate validation report
+    validation_results = "Report generated on " + currtime + "\n"
+    load_mods("interface/services", True)
+    base_subtypes = find_subtypes(BaseService)
+    load_mods("ion", False)
+    for base_subtype in base_subtypes:
+        base_subtype_name = base_subtype.__module__ + "." + base_subtype.__name__
+        compare_methods = {}
+        for method_tuple in inspect.getmembers(base_subtype, inspect.ismethod):
+            method_name = method_tuple[0]
+            method = method_tuple[1]
+            # Ignore private methods
+            if method_name.startswith("_"):
+                continue
+            # Ignore methods not implemented in the class
+            if method_name not in base_subtype.__dict__:
+                continue
+            compare_methods[method_name] = method
+
+        # Find implementing subtypes of each base interface
+        impl_subtypes = find_subtypes(base_subtype)
+        if len(impl_subtypes) == 0:
+            validation_results += "\nBase service: %s \n" % base_subtype_name
+            validation_results += "  No impl subtypes found\n"
+        for impl_subtype in find_subtypes(base_subtype):
+            impl_subtype_name = impl_subtype.__module__ + "." + impl_subtype.__name__
+
+            # Compare parameters
+            added_class_names = False
+            found_error = False
+            for key in compare_methods:
+                if key not in impl_subtype.__dict__:
+                    if not added_class_names:
+                        added_class_names = True
+                        validation_results += "\nBase service: %s\n" % base_subtype_name
+                        validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                    validation_results += "  Method '%s' not implemented" % key
+                else:
+                    base_params = inspect.getargspec(compare_methods[key])
+                    impl_params = inspect.getargspec(impl_subtype.__dict__[key])
+
+                    if base_params != impl_params:
+                        if not added_class_names:
+                            added_class_names = True
+                            validation_results += "\nBase service: %s\n" % base_subtype_name
+                            validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                        validation_results +=  "  Method '%s' implementation is out of sync\n" % key
+                        validation_results +=  "    Base: %s\n" % str(base_params)
+                        validation_results +=  "    Impl: %s\n" % str(impl_params)
+
+            if found_error == False:
+                validation_results += "\nBase service: %s\n" % base_subtype_name
+                validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                validation_results += "  OK\n"
+
+    reportfile = os.path.join('interface', 'validation_report')
+    os.unlink(reportfile)
+    print "Writing validation report to '" + reportfile + "'"
+    with open(reportfile, 'w') as f:
+        f.write(validation_results)
+
     exitcode = 0
     if count > 0:
         exitcode = 1
 
     sys.exit(exitcode)
+
+def load_mods(path, interfaces):
+    import pkgutil
+    import string
+    mod_prefix = string.replace(path, "/", ".")
+
+    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
+        if is_pkg:
+            load_mods(path+"/"+mod_name, interfaces)
+        else:
+            mod_qual = "%s.%s" % (mod_prefix, mod_name)
+            try:
+                named_any(mod_qual)
+            except Exception, ex:
+                print "Import module '%s' failed: %s" % (mod_qual, ex)
+                if not interfaces:
+                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
+
+def find_subtypes(clz):
+    res = []
+    for cls in clz.__subclasses__():
+        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
+        res.append(cls)
+    return res
 
 if __name__ == '__main__':
     main()
