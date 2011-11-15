@@ -71,3 +71,4 @@ BUGS:
 - Make sure datastore only gets dicts as documents. Fail otherwise
 - Kwargs and clients don't work
 - Find result does not pass validate interceptor
+- Check IonObject validation vs. extends (does it work?)
