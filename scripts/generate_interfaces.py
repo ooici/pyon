@@ -300,8 +300,11 @@ def main():
                 validation_results += "Impl subtype: %s\n" % impl_subtype_name
                 validation_results += "  OK\n"
 
-    reportfile = os.path.join('interface', 'validation_report')
-    os.unlink(reportfile)
+    reportfile = os.path.join('interface', 'validation_report.txt')
+    try:
+        os.unlink(reportfile)
+    except:
+        pass
     print "Writing validation report to '" + reportfile + "'"
     with open(reportfile, 'w') as f:
         f.write(validation_results)
