@@ -11,6 +11,7 @@ from couchdb.http import ResourceConflict, ResourceNotFound
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.datastore.datastore import DataStore
+from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.util.containers import DotDict
 from pyon.util.log import log
 
@@ -20,8 +21,9 @@ END_MARKER = "ZZZZZ"
 class CouchDB_DataStore(DataStore):
     """
     Data store implementation utilizing CouchDB to persist documents.
-    For API info, see: http://packages.python.org/CouchDB/client.html#
+    For API info, see: http://packages.python.org/CouchDB/client.html
     """
+    couchdb_views = get_couchdb_views('all')
 
     def __init__(self, host='localhost', port=5984, datastore_name='prototype', options=""):
         log.debug('host %s port %d data store name %s options %s' % (host, port, datastore_name, options))
@@ -460,66 +462,23 @@ class CouchDB_DataStore(DataStore):
         ion_object = IonObject(type, init_dict)
         return ion_object
 
-    COUCHDB_VIEWS = {
-        'association':{
-            'by_sub':{
-                'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.s, doc.p, doc.ot, doc.o, doc._id], null);
-  }
-}""",
-            },
-            'by_obj':{
-                'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.o, doc.p, doc.st, doc.s, doc._id], null);
-  }
-}""",
-            }
-        },
-        'object':{
-            'by_type':{
-                'map':"""
-function(doc) {
-  emit([doc.type_], null);
-}""",
-            },
-        },
-        'resource':{
-            'by_type':{
-                'map':"""
-function(doc) {
-  emit([doc.type_, doc.lcstate, doc.name], doc._id);
-}""",
-            },
-            'by_lcstate':{
-                'map':"""
-function(doc) {
-  emit([doc.lcstate, doc.type_, doc.name], doc._id);
-}""",
-            },
-            'by_name':{
-                'map':"""
-function(doc) {
-  emit([doc.name, doc.type_, doc.lcstate], doc._id);
-}""",
-            }
-
-       }
-    }
+    def _get_viewname(self, design, name):
+        return "_design/%s/_view/%s" % (design, name)
 
     def _define_views(self, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        for design, viewdef in self.COUCHDB_VIEWS.iteritems():
+        for design, viewdef in self.couchdb_views.iteritems():
             self._define_view(design, viewdef, datastore_name=datastore_name)
 
     def _define_view(self, design, viewdef, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
+        try:
+            del db["_design/%s" % design]
+        except ResourceNotFound:
+            pass
         db["_design/%s" % design] = dict(views=viewdef)
 
     def _update_views(self, datastore_name=""):
@@ -527,13 +486,25 @@ function(doc) {
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
-        for design, viewdef in self.COUCHDB_VIEWS.iteritems():
+        for design, viewdef in self.couchdb_views.iteritems():
             for viewname in viewdef:
-                rows = db.view("_design/%s/_view/%s" % (design, viewname))
-                log.debug("View %s/_design/%s/_view/%s: %s rows" % (datastore_name, design, viewname, len(rows)))
+                try:
+                    rows = db.view("_design/%s/_view/%s" % (design, viewname))
+                    log.debug("View %s/_design/%s/_view/%s: %s rows" % (datastore_name, design, viewname, len(rows)))
+                except Exception, ex:
+                    log.exception("Problem with view %s/_design/%s/_view/%s" % (datastore_name, design, viewname))
 
-    def _get_viewname(self, design, name):
-        return "_design/%s/_view/%s" % (design, name)
+    _refresh_views = _update_views
+
+    def _delete_views(self, datastore_name=""):
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        for design, viewdef in self.couchdb_views.iteritems():
+            try:
+                del db["_design/%s" % design]
+            except ResourceNotFound:
+                pass
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))

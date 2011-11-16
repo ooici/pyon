@@ -30,6 +30,7 @@ CONTAINER:
 - Add event framework
 - Check service implementation against service definition (parameters, order)
 - Error handling
+- Standard entry point for
 
 TESTING:
 
@@ -45,6 +46,8 @@ PROCESS/SERVICE:
 - More extensive Lifecycle
 - IDE code completion for service clients and methods
 - Be able to start non-service process in container
+- Optional vs. mandatory service arguments
+- Validate object content vs. service operations
 
 MESSAGING:
 

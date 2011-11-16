@@ -4,11 +4,16 @@ __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
+from pyon.util.containers import DotDict
 
 class DataStore(object):
     """
     Think of this class as a database server.
+    Every instance is a different schema.
+    Every type of ION object is a table
     """
+    DS_CONFIG_LIST = ['object_store','resource_store','directory_store','all']
+    DATASTORE_CONFIG = DotDict(zip(DS_CONFIG_LIST,DS_CONFIG_LIST))
 
     EQUAL = '=='
     NOT_EQUAL = '!='
