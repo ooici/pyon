@@ -175,8 +175,7 @@ class Container(LifecycleStateMixin):
         self.quit(*args, **kwargs)
 
     def on_error(self, reason, *args, **kwargs):
-        log.error(str(reason))
-        log.error("HI I AM ERROR")
+        log.error("Error in container: %s", reason)
 
     def serve_forever(self):
         """ Run the container until killed. """
