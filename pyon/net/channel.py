@@ -580,8 +580,6 @@ class Bidirectional(BaseChannel):
     to the peer
     """
 
-    consumer_exclusive = True
-
 #    def __str__(self):
 #        res = "_peer_name: "
 #        res += "None" if self._peer_name is None else str(self._peer_name)
