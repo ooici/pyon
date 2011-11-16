@@ -13,6 +13,7 @@ actual handlers functional.
 [ ] Determine a container ID
 [ ] Use the unique container ID in the name
 """
+import sys
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -23,6 +24,8 @@ from zope.interface import Interface, implements
 import string
 import os
 import msgpack
+import atexit
+import signal
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
@@ -105,6 +108,17 @@ class Container(LifecycleStateMixin):
                             'container-agent': self.name,
                             'container-xp': sys_name }
             f.write(msgpack.dumps(pid_contents))
+            atexit.register(self._cleanup_pid)
+
+        # set up abnormal termination handler for this container
+        def handl(signum, frame):
+            try:
+                self._cleanup_pid()     # cleanup the pidfile first
+                self.quit()             # now try to quit - will not error on second cleanup pidfile call
+            finally:
+                signal.signal(signal.SIGTERM, self._normal_signal)
+                os.kill(os.getpid(), signal.SIGTERM)
+        self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
         # Bootstrap object registry
         populate_registry()
@@ -133,6 +147,15 @@ class Container(LifecycleStateMixin):
         res = listener.get_ready_event()
         res.get()
 
+    def _cleanup_pid(self):
+        if self.pidfile:
+            log.debug("Cleanup pidfile: %s", self.pidfile)
+            try:
+                os.remove(self.pidfile)
+            except Exception, e:
+                log.warn("Pidfile could not be deleted: %s" % str(e))
+            self.pidfile = None
+        
     def on_quit(self):
         log.debug("In Container.on_quit")
 
@@ -145,10 +168,15 @@ class Container(LifecycleStateMixin):
         # Unregister from directory
         self.directory.remove("/","Container")
 
-        try:
-            os.remove(self.pidfile)
-        except Exception, e:
-            log.warn("Pidfile could not be deleted: %s" % str(e))
+        self._cleanup_pid()
+
+    def on_stop(self, *args, **kwargs):
+        log.debug("In Container.on_stop - call quit")
+        self.quit(*args, **kwargs)
+
+    def on_error(self, reason, *args, **kwargs):
+        log.error(str(reason))
+        log.error("HI I AM ERROR")
 
     def serve_forever(self):
         """ Run the container until killed. """
