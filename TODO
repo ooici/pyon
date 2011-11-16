@@ -7,12 +7,9 @@ PACKAGING:
 
 CODE:
 
-- Enforce naming conventions for generated interface dirs
 - More str() output
 - Clear distinction between ION process and pyon process
-- Clear confusion with service vs process
-- Move all non-core services out of pyon plus their code
-- Move directory and datastore to COI services if possible
+- Move directory and datastore code to COI services if possible
 
 STARTUP
 
@@ -20,55 +17,47 @@ STARTUP
 
 OBJECTS:
 
-- Revise service YML files (look at WSDL)
-- ID part of resource?
-- Before and after create: what's with ID and REV? with it get updated?
+- Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
+- Before and after create: what's with ID and REV? Will it get updated?
+- Service default arguments set to {} and [] in base class. Dangerous Python idiom.
 
 CONTAINER:
 
 - Enhanced shell API
-- Enhanced messaging bookkeeping
-- Exchange space
-- Shutdown
+- Enhanced messaging bookkeeping: ms() more telling
+- Exchange spaces introduced
 - Add event framework
-- Apply command line config to app/rel config
 - Check service implementation against service definition (parameters, order)
+- Error handling
 
 TESTING:
 
 - Work with pypi mock (in particular specs)
-- Have an IonTest base class
 
-PROCESS:
+PROCESS/SERVICE:
 
-- Unique process IO
+- Clear confusion with service vs process
+- Unique process ID
+- Process as instance aggegating one state and multiple endpoints
+- Process (greenlet) accepts messages from endpoints
 - Process attachment (direct or via container)
-- Lifecycle
+- More extensive Lifecycle
 - IDE code completion for service clients and methods
+- Be able to start non-service process in container
 
 MESSAGING:
 
-- Use AMQP headers
-- Check use of ACKS
-- Messaging properties
-- Non-AMQP
+- Use ACKs
+- Messaging properties set:
+- Non-AMQP (ZeroMQ)
 
-TERMINOLOGY:
+OPEN QUESTIONS:
+- How to declare mandatory (non null) service parameters?
+- Should we support kwargs in service clients
 
-- Node ~ AMQP connection
-  - Variants: blocking, non-blocking
-- Channel ~ AMQP channel + more
-- Socket: abstracts a Channel
-- Endpoint ~ AMQP publisher/consumer + conversation
+BUGS (see also Jira project CISWCORE)
 
-BUGS:
-
-- control_cc induced stop does not work
-- Remove PID file even in case of abnormal termination
 - Source path from not the current repo (e.g. pyon/examples not found)
-- Datastore fails bad if object not found
-- More than one worker per queue (ACCESS REFUSED, exclusive mode)
-- Make sure datastore only gets dicts as documents. Fail otherwise
-- Kwargs and clients don't work
 - Find result does not pass validate interceptor
 - Check IonObject validation vs. extends (does it work?)
+
