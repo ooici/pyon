@@ -24,44 +24,41 @@ class CouchDB_DataStore(DataStore):
     """
 
     def __init__(self, host='localhost', port=5984, datastore_name='prototype', options=""):
-        log.debug('host %s port %d data store name %s options %s' % (host, port, str(datastore_name), str(options)))
+        log.debug('host %s port %d data store name %s options %s' % (host, port, datastore_name, options))
         self.host = host
         self.port = port
         self.datastore_name = datastore_name
-        connection_str = "http://" + host + ":" + str(port)
-        log.debug('Connecting to couchDB server: %s' % connection_str)
+        connection_str = "http://%s:%s" % (host,port)
+        log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
     def create_datastore(self, datastore_name="", create_indexes=True):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
-        log.debug('Creating data store %s' % datastore_name)
+        log.info('Creating data store %s' % datastore_name)
         self.server.create(datastore_name)
         if create_indexes:
             self._define_views(datastore_name)
         return True
 
     def delete_datastore(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
-        log.debug('Deleting data store %s' % datastore_name)
+        log.info('Deleting data store %s' % datastore_name)
         try:
             self.server.delete(datastore_name)
             return True
         except ResourceNotFound:
-            log.info('Data store delete failed.  Data store %s not found' % datastore_name)
+            log.error('Data store delete failed.  Data store %s not found' % datastore_name)
             raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
 
     def list_datastores(self):
-        log.debug('Listing all data stores')
-        dbs = []
-        for db in self.server:
-            dbs.append(db)
+        dbs = [db for db in self.server]
         log.debug('Data stores: %s' % str(dbs))
         return dbs
 
     def info_datastore(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.debug('Listing information about data store %s' % datastore_name)
         info = self.server[datastore_name].info()
@@ -77,42 +74,40 @@ class CouchDB_DataStore(DataStore):
     def list_objects(self, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        log.debug('Listing all objects in data store %s' % datastore_name)
-        objs = []
-        for obj in self.server[datastore_name]:
-            objs.append(obj)
+        log.warning('Listing all objects in data store %s' % datastore_name)
+        objs = [obj for obj in self.server[datastore_name]]
         log.debug('Objects: %s' % str(objs))
         return objs
 
     def list_object_revisions(self, object_id, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         log.debug('Listing all versions of object %s/%s' % (datastore_name, object_id))
         gen = db.revisions(object_id)
-        res = []
-        for ent in gen:
-            res.append(ent["_rev"])
-        log.debug('Versions: %s' % str(res))
+        res = [ent["_rev"] for ent in gen]
+        log.debug('Object versions: %s' % str(res))
         return res
 
     def create(self, object, object_id=None, datastore_name=""):
-        return self.create_doc(self._ion_object_to_persistence_dict(object), object_id=object_id, datastore_name=datastore_name)
+        return self.create_doc(self._ion_object_to_persistence_dict(object),
+                               object_id=object_id, datastore_name=datastore_name)
 
     def create_doc(self, doc, object_id=None, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
+        assert '_id' not in doc, "Create cannot create document with ID: %s" % doc
 
         # Assign an id to doc (recommended in CouchDB documentation)
         doc["_id"] = object_id or uuid4().hex
-        log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
+        log.info('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 
         # Save doc.  CouchDB will assign version to doc.
         res = self.server[datastore_name].save(doc)
         log.debug('Create result: %s' % str(res))
         id, version = res
-        return [id, version]
+        return (id, version)
 
     def read(self, object_id, rev_id="", datastore_name=""):
         doc = self.read_doc(object_id, rev_id, datastore_name)
@@ -123,30 +118,29 @@ class CouchDB_DataStore(DataStore):
         return obj
 
     def read_doc(self, doc_id, rev_id="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        if rev_id == "":
-            log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
+        if not rev_id:
+            log.info('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
         else:
-            log.debug('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
+            log.info('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
             doc = db.get(doc_id, rev=rev_id)
         log.debug('read doc contents: %s', doc)
         return doc
 
     def read_mult(self, object_ids, datastore_name="", id_only=False):
         docs = self.read_doc_mult(object_ids, datastore_name, id_only)
-
         # Convert docs into Ion objects
         obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
         return obj_list
 
     def read_doc_mult(self, object_ids, datastore_name="", id_only=False):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
+        log.info('Reading head version of objects %s/%s' % (datastore_name, object_ids))
         docs = db.view("_all_docs", keys=object_ids, include_docs=(not id_only))
         if id_only:
             doc_list = [dict(_id=row.key, **row.value) for row in docs]
@@ -158,9 +152,11 @@ class CouchDB_DataStore(DataStore):
         return self.update_doc(self._ion_object_to_persistence_dict(object))
 
     def update_doc(self, doc, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
-        log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
+        assert '_id' in doc, "Update failed: Document has no ID: %s" % doc
+
+        log.info('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('update doc contents: %s', doc)
         try:
             res = self.server[datastore_name].save(doc)
@@ -168,7 +164,7 @@ class CouchDB_DataStore(DataStore):
             raise Conflict('Object not based on most current version')
         log.debug('Update result: %s' % str(res))
         id, version = res
-        return [id, version]
+        return (id, version)
 
     def delete(self, object, datastore_name=""):
         if type(object) is str:
@@ -176,32 +172,31 @@ class CouchDB_DataStore(DataStore):
         return self.delete_doc(self._ion_object_to_persistence_dict(object), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         if type(doc) is str:
-            log.debug('Deleting object %s/%s' % (datastore_name, doc))
-            del db[doc]
+            log.info('Deleting object %s/%s' % (datastore_name, doc))
+            try:
+                del db[doc]
+            except ResourceNotFound:
+                return False
         else:
-            log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
-            res = db.delete(doc)
+            log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+            try:
+                res = db.delete(doc)
+            except ResourceNotFound:
+                return False
             log.debug('Delete result: %s' % str(res))
         return True
 
     def find(self, criteria=[], datastore_name=""):
         doc_list = self.find_doc(criteria, datastore_name)
-
-        results = []
-        # Convert each returned doc to its associated Ion object
-        for doc in doc_list:
-            obj = self._persistence_dict_to_ion_object(doc)
-            log.debug('Ion object: %s' % str(obj))
-            results.append(obj)
-
+        results = [self._persistence_dict_to_ion_object(doc) for doc in doc_list]
         return results
 
     def find_doc(self, criteria=[], datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
@@ -239,29 +234,19 @@ class CouchDB_DataStore(DataStore):
             raise NotFound("Data store query for criteria %s failed" % str(criteria))
         if len(queryList) == 0:
             raise NotFound("Data store query for criteria %s returned no objects" % str(criteria))
-        results = []
-        for row in queryList:
-            doc = row.value
-            log.debug('find doc contents: %s', doc)
-            results.append(doc)
+        results = [row.value for row in queryList]
 
         log.debug('Find results: %s' % str(results))
+        log.warning('Find is an expensive debug only function. Use a specific find function instead.')
         return results
 
     def find_by_idref(self, criteria=[], association="", datastore_name=""):
         doc_list = self.find_by_idref_doc(criteria, association, datastore_name)
-
-        results = []
-        # Convert each returned doc to its associated Ion object
-        for doc in doc_list:
-            obj = self._persistence_dict_to_ion_object(doc)
-            log.debug('Ion object: %s' % str(obj))
-            results.append(obj)
-
+        results = [self._persistence_dict_to_ion_object(doc) for doc in doc_list]
         return results
 
     def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
@@ -328,11 +313,7 @@ class CouchDB_DataStore(DataStore):
             raise NotFound("Data store query for criteria %s failed" % str(criteria))
         if len(queryList) == 0:
             raise NotFound("Data store query for criteria %s returned no objects" % str(criteria))
-        results = []
-        for row in queryList:
-            doc = row.doc
-            results.append(doc)
-
+        results = [row.doc for row in queryList]
         log.debug('Find results: %s' % str(results))
         return results
 
@@ -353,7 +334,7 @@ class CouchDB_DataStore(DataStore):
         return results
 
     def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
@@ -530,19 +511,19 @@ function(doc) {
     }
 
     def _define_views(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         for design, viewdef in self.COUCHDB_VIEWS.iteritems():
             self._define_view(design, viewdef, datastore_name=datastore_name)
 
     def _define_view(self, design, viewdef, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         db["_design/%s" % design] = dict(views=viewdef)
 
     def _update_views(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 

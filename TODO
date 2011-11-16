@@ -10,6 +10,7 @@ CODE:
 - More str() output
 - Clear distinction between ION process and pyon process
 - Move directory and datastore code to COI services if possible
+- Use log.info for relevant output, debug for debug level
 
 STARTUP
 
