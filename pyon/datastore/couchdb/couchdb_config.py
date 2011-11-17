@@ -105,5 +105,4 @@ def get_couchdb_views(config):
     res_views = {}
     for view in views:
         res_views[view] = COUCHDB_VIEWS[view]
-    print "************", res_views
     return res_views
