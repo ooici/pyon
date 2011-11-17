@@ -10,8 +10,6 @@ TODO:
 per request. This will also facilitate the Endpoint holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional.
-[ ] Determine a container ID
-[ ] Use the unique container ID in the name
 """
 import sys
 
@@ -147,6 +145,24 @@ class Container(LifecycleStateMixin):
         res = listener.get_ready_event()
         res.get()
 
+    def serve_forever(self):
+        """ Run the container until killed. """
+        log.debug("In Container.serve_forever")
+        
+        if not self.proc_manager.proc_sup.running:
+            self.start()
+            
+        try:
+            # This just wait in this Greenlet for all child processes to complete,
+            # which is triggered somewhere else.
+            self.proc_manager.proc_sup.join_children()
+        except (KeyboardInterrupt, SystemExit) as ex:
+            log.info('Received a kill signal, shutting down the container.')
+        except:
+            log.exception('Unhandled error! Forcing container shutdown')
+
+        self.proc_manager.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+            
     def _cleanup_pid(self):
         if self.pidfile:
             log.debug("Cleanup pidfile: %s", self.pidfile)
@@ -155,7 +171,11 @@ class Container(LifecycleStateMixin):
             except Exception, e:
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
-        
+
+    def on_stop(self, *args, **kwargs):
+        log.debug("In Container.on_stop - call quit")
+        self.quit(*args, **kwargs)
+
     def on_quit(self):
         log.debug("In Container.on_quit")
 
@@ -170,26 +190,6 @@ class Container(LifecycleStateMixin):
 
         self._cleanup_pid()
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("In Container.on_stop - call quit")
-        self.quit(*args, **kwargs)
-
     def on_error(self, reason, *args, **kwargs):
         log.error("Error in container: %s", reason)
 
-    def serve_forever(self):
-        """ Run the container until killed. """
-        log.debug("In Container.serve_forever")
-        
-        if not self.proc_manager.proc_sup.running:
-            self.start()
-            
-        try:
-            self.proc_manager.proc_sup.join_children()
-        except (KeyboardInterrupt, SystemExit) as ex:
-            log.info('Received a kill signal, shutting down the container.')
-        except:
-            log.exception('Unhandled error! Forcing container shutdown')
-
-        self.proc_manager.proc_sup.shutdown(CFG.cc.timeout.shutdown)
-            
