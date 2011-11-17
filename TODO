@@ -11,6 +11,7 @@ CODE:
 - Clear distinction between ION process and pyon process
 - Move directory and datastore code to COI services if possible
 - Use log.info for relevant output, debug for debug level
+- Rename EndpointFactory -> Endpoint and Endpoint -> Conversation
 
 STARTUP
 
@@ -41,7 +42,7 @@ PROCESS/SERVICE:
 - Clear confusion with service vs process
 - Unique process ID
 - Process as instance aggegating one state and multiple endpoints
-- Process (greenlet) accepts messages from endpoints
+- Process (greenlet) accepts messages from endpoints. One greenlet per process; one message at a time.
 - Process attachment (direct or via container)
 - More extensive Lifecycle
 - IDE code completion for service clients and methods
@@ -54,6 +55,7 @@ MESSAGING:
 - Use ACKs
 - Messaging properties set:
 - Non-AMQP (ZeroMQ)
+- Local messaging with greenlet handover
 
 OPEN QUESTIONS:
 - How to declare mandatory (non null) service parameters?
