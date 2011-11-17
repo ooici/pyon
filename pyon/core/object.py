@@ -334,7 +334,7 @@ class IonObjectRegistry(object):
         # Extract resource types (everything that extends from Resource)
         # TODO: What if a resource extends from another resource?
         import re
-        res = re.findall(r'(\w+?):\s+!Extends_Resource\s', yaml_text)
+        res = re.findall(r'(\w+?):\s+!Extends_\w*Resource\s', yaml_text)
         global resource_objects
         resource_objects.update(res)
 
