@@ -105,13 +105,17 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.message_received")
 
-    def send(self, raw_msg):
+    def send(self, msg, headers=None):
         """
         Public send method.
-        Calls _build_msg, then _send. Override either one of these methods to inject your logic.
+        Calls _build_msg (_build_header and _build_payload), then _send which puts it through the Interceptor stack(s).
+
+        @param  msg         The message to send. Will be passed into _build_payload. You may modify the contents there.
+        @param  headers     Optional headers to send. Will override anything produced by _build_header.
         """
-        msg, header = self._build_msg(raw_msg)
-        return self._send(msg, header)
+        _msg, _header = self._build_msg(msg)
+        if headers: _header.update(headers)
+        return self._send(_msg, _header)
 
     def _send(self, msg, headers=None):
         """
@@ -165,6 +169,8 @@ class Endpoint(object):
     def _build_payload(self, raw_msg):
         """
         Assembles the payload of a message from the raw message's content.
+
+        @TODO will this be used? seems unlikely right now.
         """
         log.debug("Endpoint _build_payload")
         return raw_msg
@@ -532,13 +538,6 @@ class RPCResponseEndpoint(ResponseEndpoint):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpoint.__init__(self)
         self._routing_obj = routing_obj
-        self._response_headers = None
-#        self._response_payload = None
-
-    def _build_header(self, raw_msg):
-        hdrs = ResponseEndpoint._build_header(self, raw_msg)
-        hdrs.update(self._response_headers)
-        return hdrs
 
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -551,14 +550,15 @@ class RPCResponseEndpoint(ResponseEndpoint):
         cmd_dict = msg
 
         result = None
+        response_headers = {}
         try:
             result = self._call_cmd(cmd_dict)
-            self._response_headers = { 'status_code': 200, 'error_message': '' }
+            response_headers = { 'status_code': 200, 'error_message': '' }
         except exception.IonException as ex:
             log.debug("Got error response")
-            wrapped_result = self._create_error_response(ex)
+            response_headers = self._create_error_response(ex)
 
-        self.send(result)
+        self.send(result, response_headers)
 
     def _call_cmd(self, cmd_dict):
         log.debug("In RPCResponseEndpoint._call_cmd")
@@ -570,7 +570,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         return meth(*args)
 
     def _create_error_response(self, ex):
-        self._response_headers = {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
+        return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
 
 class RPCServer(RequestResponseServer):
     endpoint_type = RPCResponseEndpoint
