@@ -651,6 +651,9 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         """
 
+        context = self._process.get_context()
+        log.info('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
+
         # must set here: sender-name, conv-id, conv-seq, performative
         header = RPCRequestEndpoint._build_header(self, raw_msg)
 
@@ -659,6 +662,17 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
                        'conv-id'      : 'none',                   # @TODO
                        'conv-seq'     : 1,
                        'performative' : 'request'})
+        
+        # use context to set security attributes forward
+        if isinstance(context, dict):
+            # @TODO: these names, get them right
+            user_id             = context.get('user-id', None)
+            container_signature = context.get('signature', None)
+            role_id             = context.get('role-id', None)
+
+            if user_id:             header['user-id'] = user_id
+            if container_signature: header['signature'] = signature
+            if role_id:             header['role-id'] = role_id
 
         return header
     
@@ -679,6 +693,16 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
     def __init__(self, process=None, **kwargs):
         RPCResponseEndpoint.__init__(self, **kwargs)
         self._process = process
+        assert process
+
+    def message_received(self, msg, headers):
+        """
+        Message received override.
+
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services.
+        """
+        with self._process.push_context(headers):
+            return RPCResponseEndpoint.message_received(self, msg, headers)
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
@@ -711,6 +735,7 @@ class ProcessRPCServer(RPCServer):
     endpoint_type = ProcessRPCResponseEndpoint
 
     def __init__(self, process=None, **kwargs):
+        assert process
         self._process = process
         RPCServer.__init__(self, **kwargs)
 

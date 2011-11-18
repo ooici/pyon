@@ -6,8 +6,9 @@ __license__ = 'Apache 2.0'
 from pyon.util.log import log
 from pyon.util.state_object import LifecycleStateMixin
 from pyon.util.containers import named_any
+from pyon.util.context import LocalContextMixin
 
-class BaseService(LifecycleStateMixin):
+class BaseService(LifecycleStateMixin, LocalContextMixin):
     """
     A process class that provides a 'service'.
     Not dependent on messaging.
@@ -18,6 +19,7 @@ class BaseService(LifecycleStateMixin):
 
     def __init__(self, *args, **kwargs):
         LifecycleStateMixin.__init__(self, *args, autoinit=False, **kwargs)
+        LocalContextMixin.__init__(self)
 
     def on_init(self, *args, **kwargs):
         """

@@ -454,9 +454,7 @@ class BaseChannel(object):
         TODO: redo without intermediate props dict
         how expensive is constructing the BasicProperties for each send?
         """
-        log.debug("In BaseChannel._send")
-        log.debug("name: %s" % str(name))
-        log.debug("data: %s" % str(data))
+        log.debug("In BaseChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
         exchange, routing_key = name
         headers = headers or {}
         props = BasicProperties(headers=headers,
