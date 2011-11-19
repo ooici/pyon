@@ -263,6 +263,7 @@ def main():
     load_mods("interface/services", True)
     base_subtypes = find_subtypes(BaseService)
     load_mods("ion", False)
+    load_mods("examples", False)
     for base_subtype in base_subtypes:
         base_subtype_name = base_subtype.__module__ + "." + base_subtype.__name__
         compare_methods = {}
