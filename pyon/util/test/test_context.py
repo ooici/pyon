@@ -20,8 +20,8 @@ class LocalContextMixinTest(PyonTestCase):
         old = self.lcm.set_context('new_context')
         self.assertTrue(old is None)
 
-        self.assertTrue(hasattr(self.lcm.context, 'ctx'))
-        self.assertEquals(self.lcm.context.ctx, 'new_context')
+        self.assertTrue(hasattr(self.lcm._lcm_context, 'ctx'))
+        self.assertEquals(self.lcm._lcm_context.ctx, 'new_context')
 
     def test_get_context(self):
         obj =  {'one':1, 'two':2}
@@ -34,9 +34,9 @@ class LocalContextMixinTest(PyonTestCase):
 
     def test_push_context(self):
         with self.lcm.push_context('thecontext'):
-            self.assertEqual(self.lcm.context.ctx, 'thecontext')
+            self.assertEqual(self.lcm._lcm_context.ctx, 'thecontext')
 
-        self.assertTrue(self.lcm.context.ctx is None)
+        self.assertTrue(self.lcm._lcm_context.ctx is None)
 
         with self.lcm.push_context('thecontext2') as f:
             self.assertEqual(f, 'thecontext2')

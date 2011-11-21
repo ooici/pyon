@@ -10,10 +10,10 @@ import threading
 from contextlib import contextmanager
 
 class LocalContextMixin(object):
-    context = None
+    _lcm_context = None
 
     def __init__(self):
-        self.context = threading.local()    # in gevent this is monkey patched to be a gevent.local
+        self._lcm_context = threading.local()    # in gevent this is monkey patched to be a gevent.local
 
     @contextmanager
     def push_context(self, context):
@@ -40,7 +40,7 @@ class LocalContextMixin(object):
         @returns    The current context prior to this call. Should be used to push state.
         """
         cur_ctx = self.get_context()
-        self.context.ctx = context
+        self._lcm_context.ctx = context
         return cur_ctx
 
     def get_context(self):
@@ -52,6 +52,6 @@ class LocalContextMixin(object):
 
         If not set, returns None.
         """
-        if hasattr(self.context, 'ctx'):
-            return self.context.ctx
+        if hasattr(self._lcm_context, 'ctx'):
+            return self._lcm_context.ctx
         return None
