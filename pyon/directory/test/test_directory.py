@@ -13,31 +13,30 @@ class Test_Directory(PyonTestCase):
         directory_service = Directory()
 
         root = directory_service.read("/")
-        self.assertEquals(root,{})
+        self.assertEquals(root, None)
 
-        # Add empty Services subtree
-        self.assertEquals(directory_service.add("/","Services",{}),{})
+        self.assertEquals(directory_service.register("/","temp"), None)
 
-        root = directory_service.read("/")
-        self.assertEquals(root, {"Services":{}} )
+        # Create a node
+        root = directory_service.read("/temp")
+        self.assertEquals(root, {} )
 
-        # Add a Service instance
-        self.assertEquals(directory_service.add("/Services", "serv_foo.inst1", {"bar":"awesome"}),{"bar":"awesome"})
+        # The create case
+        entry_old = directory_service.register("/temp", "entry1", foo="awesome")
+        self.assertEquals(entry_old, None)
+        entry_new = directory_service.read("/temp/entry1")
+        self.assertEquals(entry_new, {"foo":"awesome"})
 
-        root = directory_service.read("/")
-        self.assertEquals(root, {"Services":{"serv_foo.inst1":{"bar":"awesome"}}})
+        # The update case
+        entry_old = directory_service.register("/temp", "entry1", foo="ingenious")
+        self.assertEquals(entry_old, {"foo":"awesome"})
 
-        # Update a Service instance
-        directory_service.update("/Services", "serv_foo.inst1", {"bar":"totally awesome"})
+        # The delete case
+        entry_old = directory_service.unregister("/temp", "entry1")
+        self.assertEquals(entry_old, {"foo":"ingenious"})
+        entry_new = directory_service.read("/temp/entry1")
+        self.assertEquals(entry_new, None)
 
-        root = directory_service.read("/")
-        self.assertEquals(root, {"Services":{"serv_foo.inst1":{"bar":"totally awesome"}}})
-
-        # Delete a Service instance
-        self.assertEquals(directory_service.remove("/Services", "serv_foo.inst1"), {"bar":"totally awesome"})
-
-        root = directory_service.read("/")
-        self.assertEquals(root, {"Services":{}} )
 
 if __name__ == "__main__":
     unittest.main()

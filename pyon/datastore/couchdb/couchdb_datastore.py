@@ -452,11 +452,13 @@ class CouchDB_DataStore(DataStore):
                     raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
 
     def _ion_object_to_persistence_dict(self, ion_object):
+        if ion_object is None: return None
         obj_dict = ion_object.__dict__.copy()
         obj_dict["type_"] = ion_object._def.type.name
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
+        if obj_dict is None: return None
         init_dict = obj_dict.copy()
         type = init_dict.pop("type_")
         ion_object = IonObject(type, init_dict)

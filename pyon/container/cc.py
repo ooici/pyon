@@ -130,7 +130,7 @@ class Container(LifecycleStateMixin):
 
         # Instantiate Directory singleton and self-register
         self.directory = Directory()
-        self.directory.add("/","Container",{"name": self.name, "sysname": sys_name})
+        self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         self.proc_manager.start()
 
@@ -188,7 +188,7 @@ class Container(LifecycleStateMixin):
         self.ex_manager.quit()
 
         # Unregister from directory
-        self.directory.remove("/","Container")
+        self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
 

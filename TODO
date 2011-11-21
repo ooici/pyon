@@ -22,6 +22,8 @@ OBJECTS:
 - Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
 - Before and after create: what's with ID and REV? Will it get updated?
 - Service default arguments set to {} and [] in base class. Dangerous Python idiom.
+- Parse all !Extends_XXXX and form an inheritance tree.
+- Check associations
 
 CONTAINER:
 

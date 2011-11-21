@@ -120,4 +120,6 @@ class ProcManager(LifecycleStateMixin):
         listener1.get_ready_event().get()
         log.debug("Server %s listener ready", process_instance.id)
 
+        self.container.directory.register("/Containers/%s/Processes" % self.container.id, process_instance.id, name=name)
+
         process_instance.start()
