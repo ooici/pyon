@@ -54,8 +54,7 @@ from pyon.service.service import BaseService
 {classmethods}
 '''
     , 'clssdocstr':
-'    """\n\
-    {classdocstr}\n\
+'    """{classdocstr}\n\
     """'
     , 'svcname':
 '    name = \'{name}\''
@@ -72,8 +71,7 @@ from pyon.service.service import BaseService
 '''
     , 'arg': '{name}={val}'
     , 'methdocstr':
-'"""\n\
-        {methoddocstr}\n\
+'"""{methoddocstr}\n\
         """'
 }
 
