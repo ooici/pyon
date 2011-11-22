@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'Thomas R. Lennan'
+__author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import obj_registry, IonObject
@@ -12,6 +12,10 @@ from pyon.test.pyontest import PyonTestCase
 from pyon.ion.public import RT, AT, LCS
 
 from unittest import SkipTest
+
+OWNER_OF = "OWNER_OF"
+HAS_A = "HAS_A"
+BASED_ON = "BASED_ON"
 
 class Test_DataStores(PyonTestCase):
 
@@ -305,19 +309,19 @@ class Test_DataStores(PyonTestCase):
 
         ds2_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L1', description='My Dataset CTD L1')
 
-        data_store.create_association(admin_user_id, AT.OWNER_OF, inst1_obj_id)
+        data_store.create_association(admin_user_id, OWNER_OF, inst1_obj_id)
 
-        data_store.create_association(admin_user_id, AT.HAS_A, admin_profile_id)
+        data_store.create_association(admin_user_id, HAS_A, admin_profile_id)
 
-        data_store.create_association(admin_user_id, AT.OWNER_OF, ds1_obj_id)
+        data_store.create_association(admin_user_id, OWNER_OF, ds1_obj_id)
 
-        data_store.create_association(other_user_id, AT.OWNER_OF, inst2_obj_id)
+        data_store.create_association(other_user_id, OWNER_OF, inst2_obj_id)
 
-        data_store.create_association(plat1_obj_id, AT.HAS_A, inst1_obj_id)
+        data_store.create_association(plat1_obj_id, HAS_A, inst1_obj_id)
 
-        data_store.create_association(inst1_obj_id, AT.HAS_A, ds1_obj_id)
+        data_store.create_association(inst1_obj_id, HAS_A, ds1_obj_id)
 
-        data_store.create_association(ds1_obj_id, "BASED_ON", ds1_obj_id)
+        data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
         # Subject -> Object direction
         obj_ids1, obj_assocs1 = data_store.find_objects(admin_user_id, id_only=True)
@@ -339,12 +343,12 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(len(obj_ids1an), 0)
         self.assertEquals(len(obj_assocs1an), 0)
 
-        obj_ids2, obj_assocs2 = data_store.find_objects(admin_user_id, AT.OWNER_OF, id_only=True)
+        obj_ids2, obj_assocs2 = data_store.find_objects(admin_user_id, OWNER_OF, id_only=True)
         self.assertEquals(len(obj_ids2), 2)
         self.assertEquals(len(obj_assocs2), 2)
         self.assertEquals(set(obj_ids2), set([inst1_obj_id, ds1_obj_id]))
 
-        obj_ids3, _ = data_store.find_objects(admin_user_id, AT.OWNER_OF, RT.Instrument, id_only=True)
+        obj_ids3, _ = data_store.find_objects(admin_user_id, OWNER_OF, RT.Instrument, id_only=True)
         self.assertEquals(len(obj_ids3), 1)
         self.assertEquals(obj_ids3[0], inst1_obj_id)
 
@@ -363,12 +367,12 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(len(sub_ids1an), 0)
         self.assertEquals(len(sub_assoc1an), 0)
 
-        sub_ids2, sub_assoc2 = data_store.find_subjects(inst1_obj_id, AT.OWNER_OF, id_only=True)
+        sub_ids2, sub_assoc2 = data_store.find_subjects(inst1_obj_id, OWNER_OF, id_only=True)
         self.assertEquals(len(sub_ids2), 1)
         self.assertEquals(len(sub_assoc2), 1)
         self.assertEquals(set(sub_ids2), set([admin_user_id]))
 
-        sub_ids3, _ = data_store.find_subjects(inst1_obj_id, AT.OWNER_OF, RT.UserIdentity, id_only=True)
+        sub_ids3, _ = data_store.find_subjects(inst1_obj_id, OWNER_OF, RT.UserIdentity, id_only=True)
         self.assertEquals(len(sub_ids3), 1)
         self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
