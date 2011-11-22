@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 import copy
@@ -21,6 +21,7 @@ class IonObjectError(Exception):
 class IonYamlLoader(yaml.Loader):
     """ For ION-specific overrides of YAML loading behavior. """
     pass
+
 class IonYamlDumper(yaml.Dumper):
     """ For ION-specific overrides of YAML dumping behavior. """
     pass
@@ -29,7 +30,10 @@ def service_name_from_file_name(file_name):
     file_name = os.path.basename(file_name).split('.', 1)[0]
     return file_name.title().replace('_', '').replace('-', '')
 
-resource_objects = set()
+# Maps object name and extends
+extends_objects = dict()
+extended_objects = defaultdict(set)
+allextends = defaultdict(set)
 
 class IonObjectMetaType(type):
     """
@@ -129,6 +133,9 @@ class IonObjectBase(object):
                 for subval in field_val:
                     if isinstance(subval, IonObjectBase):
                         subval._validate()
+
+    def __contains__(self, item):
+        return hasattr(self, item)
 
 class IonEnumObject(object):
     def __init__(self, enum, default_key=None):
@@ -321,6 +328,19 @@ class IonObjectRegistry(object):
 
         return all_files
 
+    def _register_extends(self, name, extends):
+        global extends_objects, extended_objects
+        extends_objects[name] = extends
+        extended_objects[extends].add(name)
+
+    def _compute_allextends(self):
+        global allextends
+        for name,base in extends_objects.iteritems():
+            while base:
+                # Now go up the inheritance tree
+                allextends[base].add(name)
+                base = extends_objects.get(base, None)
+
     def register_obj_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         """
         Recursively find all *.yml files under yaml_dir, concatenate into a big blob, and merge the yaml
@@ -334,10 +354,11 @@ class IonObjectRegistry(object):
         # Extract resource types (everything that extends from Resource)
         # TODO: What if a resource extends from another resource?
         import re
-        res = re.findall(r'(\w+?):\s+!Extends_\w*Resource\s', yaml_text)
-        global resource_objects
-        resource_objects.update(res)
-
+        res = re.findall(r'(\w+?):\s+!Extends_(\w*)\s', yaml_text)
+        # Returns a list of matches or tuples of matches
+        [self._register_extends(name, extends) for (name, extends) in res]
+        self._compute_allextends()
+        
         obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
         return obj_defs

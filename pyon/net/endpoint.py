@@ -105,13 +105,17 @@ class Endpoint(object):
         """
         log.debug("In Endpoint.message_received")
 
-    def send(self, raw_msg):
+    def send(self, msg, headers=None):
         """
         Public send method.
-        Calls _build_msg, then _send. Override either one of these methods to inject your logic.
+        Calls _build_msg (_build_header and _build_payload), then _send which puts it through the Interceptor stack(s).
+
+        @param  msg         The message to send. Will be passed into _build_payload. You may modify the contents there.
+        @param  headers     Optional headers to send. Will override anything produced by _build_header.
         """
-        msg, header = self._build_msg(raw_msg)
-        return self._send(msg, header)
+        _msg, _header = self._build_msg(msg)
+        if headers: _header.update(headers)
+        return self._send(_msg, _header)
 
     def _send(self, msg, headers=None):
         """
@@ -165,6 +169,8 @@ class Endpoint(object):
     def _build_payload(self, raw_msg):
         """
         Assembles the payload of a message from the raw message's content.
+
+        @TODO will this be used? seems unlikely right now.
         """
         log.debug("Endpoint _build_payload")
         return raw_msg
@@ -532,13 +538,6 @@ class RPCResponseEndpoint(ResponseEndpoint):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpoint.__init__(self)
         self._routing_obj = routing_obj
-        self._response_headers = None
-#        self._response_payload = None
-
-    def _build_header(self, raw_msg):
-        hdrs = ResponseEndpoint._build_header(self, raw_msg)
-        hdrs.update(self._response_headers)
-        return hdrs
 
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -551,14 +550,15 @@ class RPCResponseEndpoint(ResponseEndpoint):
         cmd_dict = msg
 
         result = None
+        response_headers = {}
         try:
             result = self._call_cmd(cmd_dict)
-            self._response_headers = { 'status_code': 200, 'error_message': '' }
+            response_headers = { 'status_code': 200, 'error_message': '' }
         except exception.IonException as ex:
             log.debug("Got error response")
-            wrapped_result = self._create_error_response(ex)
+            response_headers = self._create_error_response(ex)
 
-        self.send(result)
+        self.send(result, response_headers)
 
     def _call_cmd(self, cmd_dict):
         log.debug("In RPCResponseEndpoint._call_cmd")
@@ -570,7 +570,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         return meth(*args)
 
     def _create_error_response(self, ex):
-        self._response_headers = {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
+        return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
 
 class RPCServer(RequestResponseServer):
     endpoint_type = RPCResponseEndpoint
@@ -651,6 +651,9 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         """
 
+        context = self._process.get_context()
+        log.info('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
+
         # must set here: sender-name, conv-id, conv-seq, performative
         header = RPCRequestEndpoint._build_header(self, raw_msg)
 
@@ -659,6 +662,17 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
                        'conv-id'      : 'none',                   # @TODO
                        'conv-seq'     : 1,
                        'performative' : 'request'})
+        
+        # use context to set security attributes forward
+        if isinstance(context, dict):
+            # @TODO: these names, get them right
+            user_id             = context.get('user-id', None)
+            container_signature = context.get('signature', None)
+            role_id             = context.get('role-id', None)
+
+            if user_id:             header['user-id'] = user_id
+            if container_signature: header['signature'] = signature
+            if role_id:             header['role-id'] = role_id
 
         return header
     
@@ -679,6 +693,16 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
     def __init__(self, process=None, **kwargs):
         RPCResponseEndpoint.__init__(self, **kwargs)
         self._process = process
+        assert process
+
+    def message_received(self, msg, headers):
+        """
+        Message received override.
+
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services.
+        """
+        with self._process.push_context(headers):
+            return RPCResponseEndpoint.message_received(self, msg, headers)
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
@@ -711,6 +735,7 @@ class ProcessRPCServer(RPCServer):
     endpoint_type = ProcessRPCResponseEndpoint
 
     def __init__(self, process=None, **kwargs):
+        assert process
         self._process = process
         RPCServer.__init__(self, **kwargs)
 

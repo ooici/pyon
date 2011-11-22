@@ -29,7 +29,7 @@ from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.directory.directory import Directory
-from pyon.net.endpoint import ProcessRPCServer, BinderListener
+from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
@@ -130,14 +130,16 @@ class Container(LifecycleStateMixin):
 
         # Instantiate Directory singleton and self-register
         self.directory = Directory()
-        self.directory.add("/","Container",{"name": self.name, "sysname": sys_name})
+        self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         self.proc_manager.start()
 
         self.app_manager.start()
 
         # Start the CC-Agent API
-        rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
+        #rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
+        # @TODO: must have a process (currently BaseService??) to pass into ProcessRPCServer, so use regular RPCServer for now
+        rsvc = RPCServer(node=self.node, name=self.name, service=self)
 
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.node, self.name, rsvc, None, None)
@@ -186,7 +188,7 @@ class Container(LifecycleStateMixin):
         self.ex_manager.quit()
 
         # Unregister from directory
-        self.directory.remove("/","Container")
+        self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
 
