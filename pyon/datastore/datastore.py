@@ -5,6 +5,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.containers import DotDict
+from pyon.core.exception import NotFound, BadRequest
 
 class DataStore(object):
     """
@@ -113,7 +114,6 @@ class DataStore(object):
         Fetch a raw doc instances, HEAD rev.
         """
         pass
-
 
     def update(self, object, datastore_name=""):
         """
@@ -262,22 +262,51 @@ class DataStore(object):
         """
         pass
 
-    def create_association(self, subject='', predicate='', object=''):
+    def create_association(self, subject=None, predicate=None, object=None):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if subject and type(subject) is str:
+        assert subject and predicate and object, "Association must have all elements set"
+        if type(subject) is str:
             subject_id = subject
             subject = self.read(subject_id)
-        if object and type(object) is str:
+        else:
+            subject_id = subject._id
+
+        if type(object) is str:
             object_id = object
             object = self.read(object_id)
-            
+        else:
+            object_id = object._id
+
+        st = subject._def.type.name
+        ot = object._def.type.name
+        # Check that subject and object type are permitted by association definition
+        # Note: Need import here, so that import orders are not screwed up
+        from pyon.core.object import allextends
+        from pyon.ion.resource import AssociationTypes
+        at = AssociationTypes.get(predicate, None)
+        if not at:
+            raise BadRequest("Predicate unknown %s" % predicate)
+        if not st in at['domain']:
+            found_st = False
+            for domt in at['domain']:
+                if st in allextends[domt]:
+                    found_st = True
+                    break
+            if not found_st:
+                raise BadRequest("Illegal subject type %s for predicate %s" % (st, predicate))
+        if not ot in at['range']:
+            found_ot = False
+            for rant in at['range']:
+                if ot in allextends[rant]:
+                    found_ot = True
+                    break
+            if not found_ot:
+                raise BadRequest("Illegal object type %s for predicate %s" % (ot, predicate))
+
         from pyon.core.bootstrap import IonObject
-        assoc = IonObject("Association",
-                          s=subject_id, st=subject._def.type.name,
-                          p=predicate,
-                          o=object_id, ot=object._def.type.name)
+        assoc = IonObject("Association", s=subject_id, st=st, p=predicate, o=object_id, ot=ot)
         return self.create(assoc)
 
     def delete_association(self, association=''):
@@ -285,7 +314,6 @@ class DataStore(object):
         Delete an association between two IonObjects
         """
         return self.delete(association)
-
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         """

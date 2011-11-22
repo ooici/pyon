@@ -13,9 +13,9 @@ from pyon.ion.public import RT, AT, LCS
 
 from unittest import SkipTest
 
-OWNER_OF = "OWNER_OF"
-HAS_A = "HAS_A"
-BASED_ON = "BASED_ON"
+OWNER_OF = "XOWNER_OF"
+HAS_A = "XHAS_A"
+BASED_ON = "XBASED_ON"
 
 class Test_DataStores(PyonTestCase):
 
@@ -292,6 +292,12 @@ class Test_DataStores(PyonTestCase):
         if is_persistent:
             self.assertTrue(numcoredocs > 1)
             data_store._update_views()
+
+        # HACK: Both AssociationTypes so that this test works
+        from pyon.ion.resource import AssociationTypes
+        AssociationTypes[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.Instrument, RT.DataSet])
+        AssociationTypes[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
+        AssociationTypes[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
 
         admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.ACTIVE)
 

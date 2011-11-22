@@ -33,7 +33,7 @@ def service_name_from_file_name(file_name):
 # Maps object name and extends
 extends_objects = dict()
 extended_objects = defaultdict(set)
-extendedall_objects = defaultdict(set)
+allextends = defaultdict(set)
 
 class IonObjectMetaType(type):
     """
@@ -333,12 +333,12 @@ class IonObjectRegistry(object):
         extends_objects[name] = extends
         extended_objects[extends].add(name)
 
-    def _compute_extendedall(self):
-        global extendedall_objects
+    def _compute_allextends(self):
+        global allextends
         for name,base in extends_objects.iteritems():
             while base:
                 # Now go up the inheritance tree
-                extendedall_objects[base].add(name)
+                allextends[base].add(name)
                 base = extends_objects.get(base, None)
 
     def register_obj_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
@@ -357,7 +357,7 @@ class IonObjectRegistry(object):
         res = re.findall(r'(\w+?):\s+!Extends_(\w*)\s', yaml_text)
         # Returns a list of matches or tuples of matches
         [self._register_extends(name, extends) for (name, extends) in res]
-        self._compute_extendedall()
+        self._compute_allextends()
         
         obj_defs = self.register_yaml(yaml_text)
         self.source_files += yaml_files
