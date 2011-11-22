@@ -38,13 +38,10 @@ point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
 
-from pika import BasicProperties
-
-from gevent import queue as gqueue
-from gevent import event
-
 from pyon.util.async import blocking_cb
 from pyon.util.log import log
+from pika import BasicProperties
+from gevent import queue as gqueue
 
 class ChannelError(Exception):
     """
@@ -55,50 +52,6 @@ class ChannelClosedError(Exception):
     """
     Denote activity on a closed channel (usually during shutdown).
     """
-
-class Admin(object):
-    """
-    Service thing to look up what exchanges should be available to the Node.
-    Thing could also be used to register exchanges (ex points).
-    Defaults could be in local file (e.g. /etc/hosts)
-
-    An actual network service could give more accurate/dynamic info.
-    """
-
-class _AMQPHandlerMixin(object):
-    # UNUSED
-
-    def on_channel_open(self, amq_chan):
-        log.debug("In _AMQPHandlerMixin.on_channel_open")
-        log.debug("amq_chan: %s" % str(amq_chan))
-        amq_chan.add_on_close_callback(self.on_channel_close)
-        self.amq_chan = amq_chan
-
-    def on_channel_close(self, code, text):
-        """
-        handle possible channel errors
-
-        propagate close where appropriate 
-
-        respond to broker with channel_close_ok
-
-        use instance state (current sync handler) to decide how to report
-        channel exceptions 
-        """
-        log.debug("In _AMQPHandlerMixin.on_channel_close")
-        log.debug("channel: %d", self.amq_chan.channel_number)
-        log.debug("code: %d" % code)
-        log.debug("text: %s" % str(text))
-
-#class ChannelProtocol(object):
-#    """
-#    """
-#    def message_received(self, msg):
-#        """
-#        msg is a unit of data, some kind of object depending on what kind
-#        of Channel it is
-#        """
-#        log.debug("In ChannelProtocol.message_received")
 
 class BaseChannel(object):
     """
@@ -150,7 +103,7 @@ class BaseChannel(object):
 
     _consuming = False
     _consumer_tag = None
-    _channel_bind_cb = None
+#    _channel_bind_cb = None
 
     immediate = False # don't use
     mandatory = False # don't use
@@ -265,34 +218,25 @@ class BaseChannel(object):
                                                                 durable=self.exchange_durable,
                                                                 auto_delete=self.exchange_auto_delete)
 
-    def bind(self, callback, name, shared_queue=False):
+    def bind(self, name):
         """
         bind a channel to a name.
         a name [(exchange, routing_key)] is a member of a name space
         (exchange space; where the exchange is an exchange point)
-
-        shared_queue option is injected here until the best place for it is
-        clear.
-        shared_queue means, use a common (probably already created) queue,
-        or a unique/exclusive (auto_delete True) queue
         """
         log.debug("In BaseChannel.bind")
         log.debug("name: %s" % str(name))
-        log.debug("shared_queue: %s" % str(shared_queue))
         if self._chan_name:
             raise ChannelError('Channel already bound') #?
         self._chan_name = name
-        if shared_queue:
-            self.exchange = name[0]
-            self.queue = ".".join(name)     # prefix sysname so we don't clobber others please
-        else:
-            assert False        # @TODO is this used?
-            self.queue = ''
-        #self._bind_callback = callback
+        self.exchange = name[0]
+        self.queue = ".".join(name)     # prefix sysname so we don't clobber others please
 
         self.config_exchange()
-        self.do_queue(callback)
-        
+        self.do_queue()
+
+        self.on_bind()
+
     def on_bind(self):
         """
         on_transport_bind
@@ -300,7 +244,7 @@ class BaseChannel(object):
         """
         log.debug("In BaseChannel.on_bind")
 
-    def connect(self, name, callback=None):
+    def connect(self, name):
         """
         connect to a channel such that this protocol can send a message to
         it.
@@ -315,9 +259,6 @@ class BaseChannel(object):
         if self._peer_name:
             raise ChannelError('Channel already connected') # this is more "Client" than "Protocol"
         self._peer_name = name
-        if callback:
-            self._connect_callback = callback
-            callback()
 
         self.on_connect()
 
@@ -346,47 +287,29 @@ class BaseChannel(object):
         log.debug("In BaseChannel.on_listen")
         self._start_consumer()
 
-    def do_queue(self, callback=None):
+    def do_queue(self):
         log.debug("In BaseChannel.do_queue")
         log.debug("------> queue: %s" % str(self.queue))
-        if callback:
-            self._channel_bind_cb = callback
-        self.amq_chan.queue_declare(callback=self._on_queue_declare_ok,
-                                    queue=self.queue or '',
-                                    auto_delete=self.queue_auto_delete,
-                                    durable=self.queue_durable)
 
-    def _on_queue_declare_ok(self, frame):
-        """
-        reply contains queue name, number of messages and number of
-        consumers
+        frame = blocking_cb(self.amq_chan.queue_declare, 'callback',
+                            queue=self.queue or '',
+                            auto_delete=self.queue_auto_delete,
+                            durable=self.queue_durable)
+        log.debug("Queue declare ok, frame received")
 
-        when binding unique queues, get the name from here.
-        """
-        log.debug("In BaseChannel._on_queue_declare_ok")
         self.queue = frame.method.queue #XXX who really defines queue!!
         log.debug("queue: %s" % str(self.queue))
         if not self._chan_name[1]:
             self._chan_name = (self._chan_name[0], self.queue) # XXX total HACK!!!
         log.debug("_chan_name: %s" % str(self._chan_name))
-        log.debug("------> queue: %s" % str(self.queue))
-        self.amq_chan.queue_bind(callback=self._on_queue_bind_ok,
-                                queue=self.queue,
-                                exchange=self._chan_name[0],
-                                routing_key=self._chan_name[1])
 
-    def _on_queue_bind_ok(self, frame):
-        """
-        or queue_bind can be called with no wait, and we handle a channel
-        exception in the case of an error
+        # do a bind
+        frame2 = blocking_cb(self.amq_chan.queue_bind, 'callback',
+                             queue=self.queue,
+                             exchange=self._chan_name[0],
+                             routing_key=self._chan_name[1])
 
-        nowait with consumer raises channel exception on error
-        """
-        log.debug("In BaseChannel._on_queue_bind_ok")
-        if self._channel_bind_cb:
-            self._channel_bind_cb()
-        else:
-            self._start_consumer()
+        log.debug("Queue bind ok")
 
     def _start_consumer(self):
         """
@@ -438,11 +361,6 @@ class BaseChannel(object):
         log.debug("data: %s" % str(data))
         self._send(self._peer_name, data, headers=headers)
 
-    def sendto(self, name, data):
-        """
-        """
-        log.debug("In BaseChannel.sendto")
-
     def _send(self, name, data, headers=None,
                                 content_type=None,
                                 content_encoding=None,
@@ -472,53 +390,6 @@ class BaseChannel(object):
                                 immediate=False, #todo 
                                 mandatory=False) #todo
 
-class _Bidirectional_Listener(BaseChannel):
-    """
-    the client methods of a listening channel that an application would
-    invoke.
-
-    the event handlers a listening channel need to handle for configuration
-    and context/connection listening/acception/closing.
-    """
-
-#    def __str__(self):
-#        res = "_peer_name: "
-#        res += "None" if self._peer_name is None else str(self._peer_name)
-#        res += "\n"
-#        res += "_chan_name: "
-#        res += "None" if self._chan_name is None else self._chan_name
-#        res += "\n"
-#        res += "queue: "
-#        res += "None" if self.queue is None else self.queue
-#        res += "\n"
-#        res += "exchange: "
-#        res += "None" if self.exchange is None else self.exchange
-#        return res
-
-    def _accept(self):
-        """
-        would the non-blocking interface actually return a new protocol? or
-        just context for creating a new protocol?
-
-        Any message received received by the chan in listening mode is 
-        retrieved through this method (recv wouldn't not be used by the 
-        listener)
-
-        the bind step creates (or identifies an existing) queue and binds
-        that queue to an exchange of specified name with a specified key.
-
-        listen puts the protocol into a state where connections can be
-        made.
-        the consumer is started, and each received message is a new
-        connection.
-        when a connection is made (in the form a receiving a message) a new
-        Channel Protocol instance is made that:
-         - can receive the first message (and extract the peer address 
-           to use as a send context)
-         - can send a contextualized message (amqp headers)
-        """
-        log.debug("In _Bidirectional_Listener._accept")
-
 class _Bidirectional_accepted(BaseChannel):
     """
     services actual requests 
@@ -545,7 +416,7 @@ class _Bidirectional_accepted(BaseChannel):
         """
         Not Implemented yet (can't receive yet) (only send)
         """
-        log.debug("In _Bidirectional_Listener._on_basic_deliver")
+        log.debug("In _Bidirectional_accepted._on_basic_deliver")
 
     def send(self, data, headers=None):
         """
@@ -611,7 +482,7 @@ class Bidirectional(BaseChannel):
         new_chan._peer_name = peer_name
         self.message_received((new_chan, body), headers) # XXX hack  ugh serious bad hack here, totally unfollowable
 
-    def connect(self, name, callback):
+    def connect(self, name):
         """
         Connect to a channel such that this protocol can send a message to it.
 
@@ -630,14 +501,8 @@ class Bidirectional(BaseChannel):
         self.exchange = self._peer_name[0]
 
         self.config_exchange()
-
-        # bind to temp reply queue
-        def set_reply_name():
-            self._chan_name = (self._peer_name[0], self.queue)
-            callback()
-        self.do_queue(set_reply_name)
-        #self._connect_callback = callback
-
+        self.do_queue()
+        self._chan_name = (self._peer_name[0], self.queue)
 
     def send(self, data, headers=None):
         """
@@ -677,7 +542,7 @@ class BidirectionalClient(BaseChannel):
 #        res += "None" if self.exchange is None else self.exchange
 #        return res
 
-    def connect(self, name, callback):
+    def connect(self, name):
         """
         connect to a channel such that this protocol can send a message to
         it.
@@ -695,16 +560,10 @@ class BidirectionalClient(BaseChannel):
         self._chan_name = (self._peer_name[0], self.queue)
 
         if self.queue_do_declare:
-            # bind to temp reply queue
-            def set_reply_name():
-                self._chan_name = (self._peer_name[0], self.queue)
-                self._start_consumer()
-                callback()
-            self.do_queue(set_reply_name)
+            self.do_queue()
+            self._chan_name = (self._peer_name[0], self.queue)
+            self._start_consumer()
             self.queue_do_declare = False
-        else:
-            callback()
-
 
     def send(self, data, headers=None):
         """
@@ -735,29 +594,6 @@ class BidirectionalClient(BaseChannel):
         self._peer_name = None
 
         BaseChannel.close(self)
-
-
-
-class PointToPoint(BaseChannel):
-    """
-    recv receives the point 2 point message.
-    accept does nothing.
-    """
-
-#    def __str__(self):
-#        res = "_peer_name: "
-#        res += "None" if self._peer_name is None else str(self._peer_name)
-#        res += "\n"
-#        res += "_chan_name: "
-#        res += "None" if self._chan_name is None else self._chan_name
-#        res += "\n"
-#        res += "queue: "
-#        res += "None" if self.queue is None else self.queue
-#        res += "\n"
-#        res += "exchange: "
-#        res += "None" if self.exchange is None else self.exchange
-#        return res
-
 
 class PubSub(BaseChannel):
     """
@@ -896,12 +732,8 @@ class SocketInterface(object):
         """
         log.debug("In SocketInterface.bind")
         log.debug("name: %s" % str(name))
-        result = event.AsyncResult()
-        def bind_callback():
-            result.set()
 
-        self.ch_proto.bind(bind_callback, name, shared_queue=True)
-        result.wait()
+        self.ch_proto.bind(name)
         self._bound = 1 
         return
 
@@ -924,12 +756,8 @@ class SocketInterface(object):
         """
         log.debug("In SocketInterface.connect")
         log.debug("name: %s" % str(name))
-        result = event.AsyncResult()
-        def connect_callback():
-            result.set()
 
-        self.ch_proto.connect(name, connect_callback)
-        result.wait()
+        self.ch_proto.connect(name)
         self._connected = 1 # hmm, used for blocking interface only; redundant with chan proto tho
         return
 
@@ -959,19 +787,8 @@ class SocketInterface(object):
             raise ChannelError('Channel not connected')#?
         return self._next_in_queue()
 
-    def recv_into(self, callback):
-        """
-        """
-        log.debug("In SocketInterface.recv_into")
-
     def send(self, data, headers=None):
         """
         """
         log.debug("In SocketInterface.send")
         self.ch_proto.send(data, headers=headers)
-
-    def sendto(self, data, name):
-        """
-        """
-        log.debug("In SocketInterface.sendto")
-
