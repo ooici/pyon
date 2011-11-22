@@ -1,6 +1,12 @@
 #! /usr/bin/env pythoon
-from mock import Mock, mocksignature, patch
+from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
+
+from pyon.core.object import IonServiceRegistry
+
+test_obj_registry = IonServiceRegistry()
+test_obj_registry.register_obj_dir('obj/data')
+test_obj_registry.register_svc_dir('obj/services')
 
 def  pop_last_call(mock):
     if not mock.call_count:
@@ -14,8 +20,17 @@ def  pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonUnitTestCase(unittest.TestCase):
-    def _create_patch(self, name):
-        patcher = patch(name)
+
+    # Call this function at the beginning of setUp if you need a mock ion
+    # obj
+    def _create_object_mock(self, name):
+        mock_ionobj = Mock(name='IonObject')
+        def side_effect(_def, _dict=None, **kwargs):
+            test_obj = test_obj_registry.new(_def, _dict, **kwargs)
+            test_obj._validate()
+            return DEFAULT
+        mock_ionobj.side_effect = side_effect
+        patcher = patch(name, mock_ionobj)
         thing = patcher.start()
         self.addCleanup(patcher.stop)
         return thing
