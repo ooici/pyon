@@ -130,6 +130,9 @@ class IonObjectBase(object):
                     if isinstance(subval, IonObjectBase):
                         subval._validate()
 
+    def __contains__(self, item):
+        return hasattr(self, item)
+
 class IonEnumObject(object):
     def __init__(self, enum, default_key=None):
         self.enum = enum

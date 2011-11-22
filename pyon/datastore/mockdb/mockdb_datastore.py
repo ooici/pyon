@@ -504,33 +504,149 @@ class MockDB_DataStore(DataStore):
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
 
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        subject_id = subject if type(subject) is str else subject["_id"]
+        assoc_list = []
+        target_id_list = []
+        target_list = []
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'type_' in obj and obj['type_'] == "Association":
+                if obj['s'] == subject_id:
+                    if predicate and obj['p'] == predicate:
+                        if (object_type and obj['ot'] == object_type) or not object_type:
+                            assoc_list.append(obj)
+                            target_id_list.append(obj['o'])
+                            target_list.append(self.read(obj['o']))
+                    elif not predicate:
+                        assoc_list.append(obj)
+                        target_id_list.append(obj['o'])
+                        target_list.append(self.read(obj['o']))
+
+        log.debug("find_objects() found %s objects" % (len(target_list)))
+        if id_only:
+            return (target_id_list, assoc_list)
+        else:
+            return (target_list, assoc_list)
+
+    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        object_id = object if type(object) is str else object["_id"]
+        assoc_list = []
+        target_id_list = []
+        target_list = []
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'type_' in obj and obj['type_'] == "Association":
+                if obj['o'] == object_id:
+                    if predicate and obj['p'] == predicate:
+                        if (subject_type and obj['st'] == subject_type) or not subject_type:
+                            assoc_list.append(obj)
+                            target_id_list.append(obj['s'])
+                            target_list.append(self.read(obj['s']))
+                    elif not predicate:
+                        assoc_list.append(obj)
+                        target_id_list.append(obj['s'])
+                        target_list.append(self.read(obj['s']))
+
+        log.debug("find_subjects() found %s subjects" % (len(target_list)))
+        if id_only:
+            return (target_id_list, assoc_list)
+        else:
+            return (target_list, assoc_list)
+
+    def find_res_by_type(self, restype, lcstate=None, id_only=False):
+        log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        assoc_list = []
+        target_id_list = []
+        target_list = []
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'type_' in obj and obj['type_'] == restype:
+                if (lcstate and 'lcstate' in obj and obj['lcstate'] == lcstate) or not lcstate:
+                    target_id_list.append(obj['_id'])
+                    target_list.append(self._persistence_dict_to_ion_object(obj))
+                    assoc_list.append([])
+
+        log.debug("find_res_by_type() found %s resources" % (len(target_list)))
+        if id_only:
+            return (target_id_list, assoc_list)
+        else:
+            return (target_list, assoc_list)
+
+    def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
+        log.debug("find_res_by_type(lcstate=%s, restype=%s)" % (lcstate, restype))
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        assoc_list = []
+        target_id_list = []
+        target_list = []
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'lcstate' in obj and obj['lcstate'] == lcstate:
+                if (restype and obj['type_'] == restype) or not restype:
+                    target_id_list.append(obj['_id'])
+                    target_list.append(self._persistence_dict_to_ion_object(obj))
+                    assoc_list.append([])
+
+        log.debug("find_res_by_lcstate() found %s resources" % (len(target_list)))
+        if id_only:
+            return (target_id_list, assoc_list)
+        else:
+            return (target_list, assoc_list)
+
+    def find_res_by_name(self, name, restype=None, id_only=False):
+        log.debug("find_res_by_name(name=%s, restype=%s)" % (name, restype))
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        assoc_list = []
+        target_id_list = []
+        target_list = []
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'name' in obj and obj['name'] == name:
+                if (restype and obj['type_'] == restype) or not restype:
+                    target_id_list.append(obj['_id'])
+                    target_list.append(self._persistence_dict_to_ion_object(obj))
+                    assoc_list.append([])
+
+        log.debug("find_res_by_name() found %s resources" % (len(target_list)))
+        if id_only:
+            return (target_id_list, assoc_list)
+        else:
+            return (target_list, assoc_list)
+
     def _ion_object_to_persistence_dict(self, ion_object):
+        if ion_object is None: return None
         obj_dict = ion_object.__dict__.copy()
         obj_dict["type_"] = ion_object._def.type.name
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
+        if obj_dict is None: return None
         init_dict = obj_dict.copy()
-        type = init_dict.pop("type_")
+        type = init_dict["type_"]
         ion_object = IonObject(type, init_dict)
         return ion_object
-
-    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
-        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
-        return NotImplementedError()
-
-    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
-        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
-        return NotImplementedError()
-
-    def find_res_bytype(self, restype, lcstate=None, id_only=False):
-        log.debug("find_res_bytype(restype=%s, lcstate=%s)" % (restype, lcstate))
-        return NotImplementedError()
-
-    def find_res_bylcstate(self, lcstate, restype=None, id_only=False):
-        log.debug("find_res_bytype(lcstate=%s, restype=%s)" % (lcstate, restype))
-        return NotImplementedError()
-
-    def find_res_byname(self, name, restype=None, id_only=False):
-        log.debug("find_res_byname(name=%s, restype=%s)" % (name, restype))
-        return NotImplementedError()
