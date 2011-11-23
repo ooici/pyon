@@ -2,6 +2,9 @@
 from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
+from zope.interface import implementedBy
+
+from pyon.service.service import get_service_by_name
 from pyon.core.object import IonServiceRegistry
 
 test_obj_registry = IonServiceRegistry()
@@ -35,18 +38,24 @@ class PyonUnitTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         return thing
 
-    def _create_service_mock(self, service_name, interface_base_class,
-            func_name_list):
-        try:
-            self.clients
-        except AttributeError:
-            self.clients = Mock(name='self.clients')
-        mock_service = self.clients.__getattr__(service_name)
-        # set self.service_name
-        self.__setattr__(service_name, mock_service)
-        for func_name in func_name_list:
-            mock_func = mocksignature(interface_base_class.__dict__[func_name],
-                    mock=Mock(name='self.clients.%s.%s' % (service_name,
-                        func_name)),
-                    skipfirst=True)
-            mock_service.__setattr__(func_name, mock_func)
+    def _create_service_mock(self, service_name):
+        # set self.clients if not already set
+        if getattr(self, 'clients', None) is None:
+            setattr(self, 'clients', Mock(name='self.clients'))
+        base_service = get_service_by_name(service_name)
+        dependencies = base_service.dependencies
+        for dep_name in dependencies:
+            dep_service = get_service_by_name(dep_name)
+            # Force mock service to use interface
+            mock_service = Mock(name='self.clients.%s' % dep_name,
+                    spec=dep_service)
+            setattr(self.clients, dep_name, mock_service)
+            # set self.dep_name for conevenience
+            setattr(self, dep_name, mock_service)
+            iface = list(implementedBy(dep_service))[0]
+            names_and_methods = iface.namesAndDescriptions()
+            for func_name, _ in names_and_methods:
+                mock_func = mocksignature(getattr(dep_service, func_name),
+                        mock=Mock(name='self.clients.%s.%s' % (dep_name,
+                            func_name)), skipfirst=True)
+                setattr(mock_service, func_name, mock_func)
