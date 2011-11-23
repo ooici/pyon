@@ -14,10 +14,3 @@ class PyonTestCase(unittest.TestCase):
 
     def run(self, result=None):
         unittest.TestCase.run(self, result)
-
-    def _start_container(self):
-        self.container = Container()
-        self.container.start()
-
-    def _stop_container(self):
-        self.container.stop()

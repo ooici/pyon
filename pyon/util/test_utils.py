@@ -1,8 +1,13 @@
-#! /usr/bin/env pythoon
+#!/usr/bin/env python
+
+__author__ = 'Jamie Chen'
+__license__ = 'Apache 2.0'
+
+
 from mock import Mock, mocksignature, patch
 import unittest
 
-def  pop_last_call(mock):
+def pop_last_call(mock):
     if not mock.call_count:
         raise AssertionError('Cannot pop last call: call_count is 0')
     mock.call_args_list.pop()
@@ -14,6 +19,9 @@ def  pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonUnitTestCase(unittest.TestCase):
+    """
+    Base class for all Pyon unit tests
+    """
     def _create_patch(self, name):
         patcher = patch(name)
         thing = patcher.start()
@@ -35,3 +43,8 @@ class PyonUnitTestCase(unittest.TestCase):
                         func_name)),
                     skipfirst=True)
             mock_service.__setattr__(func_name, mock_func)
+
+class PyonIntegrationTestCase(PyonUnitTestCase):
+    """
+    Base class for all Pyon integration tests
+    """

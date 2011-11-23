@@ -7,11 +7,12 @@ PACKAGING:
 
 CODE:
 
-- More str() output
+- More __str__() output for classes
 - Clear distinction between ION process and pyon process
-- Move directory and datastore code to COI services if possible
+- Move directory and datastore code to coi_services if possible
 - Use log.info for relevant output, debug for debug level
 - Rename EndpointFactory -> Endpoint and Endpoint -> Conversation
+- Make module import (and static initialization) order more specific
 
 STARTUP
 
@@ -21,9 +22,7 @@ OBJECTS:
 
 - Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
 - Before and after create: what's with ID and REV? Will it get updated?
-- Service default arguments set to {} and [] in base class. Dangerous Python idiom.
-- Parse all !Extends_XXXX and form an inheritance tree.
-- Check associations
+- Service default arguments set to {} and [] in base class. Dangerous Python idiom. Solutions?
 
 CONTAINER:
 
@@ -37,7 +36,8 @@ CONTAINER:
 
 TESTING:
 
-- Work with pypi mock (in particular specs)
+- ION framework for Mock tests
+- PyonIntegrationTestCase
 
 PROCESS/SERVICE:
 
