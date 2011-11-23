@@ -8,7 +8,7 @@ from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.public import RT, AT, LCS
 
 from unittest import SkipTest
@@ -17,7 +17,7 @@ OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
-class Test_DataStores(PyonTestCase):
+class Test_DataStores(IonIntegrationTestCase):
 
     def test_non_persistent(self):
         self._do_test(MockDB_DataStore(datastore_name='my_ds'))

@@ -4,10 +4,10 @@ __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
 from pyon.directory.directory import Directory
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from unittest import SkipTest
 
-class Test_Directory(PyonTestCase):
+class Test_Directory(IonIntegrationTestCase):
 
     def test_non_persistent(self):
         directory_service = Directory()

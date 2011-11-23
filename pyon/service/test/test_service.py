@@ -5,12 +5,12 @@ __license__ = 'Apache 2.0'
 
 import pyon
 from pyon.service.service import BaseService
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 
 class TestService(BaseService):
     name = 'test-service'
 
-class ServiceTest(PyonTestCase):
+class ServiceTest(IonIntegrationTestCase):
     def test_serve(self):
         # TODO: Make an equivalent of R1's ServiceProcess
         srv = TestService()

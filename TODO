@@ -38,6 +38,7 @@ TESTING:
 
 - ION framework for Mock tests
 - PyonIntegrationTestCase
+- Log and print in tests: visible on run
 
 PROCESS/SERVICE:
 

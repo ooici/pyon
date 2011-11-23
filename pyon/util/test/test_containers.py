@@ -4,9 +4,9 @@ __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
 from pyon.util.containers import DictModifier, DotDict
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 
-class Test_Containers(PyonTestCase):
+class Test_Containers(IonIntegrationTestCase):
 
     def test_dot_dict(self):
         dotDict = DotDict({"foo": {"bar": {"bah": "fah"}}})

@@ -4,12 +4,12 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from unittest import SkipTest
 
 import time
 
-class ProcessTest(PyonTestCase):
+class ProcessTest(IonIntegrationTestCase):
     def setUp(self):
         self.counter = 0
 

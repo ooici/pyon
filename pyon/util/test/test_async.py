@@ -4,9 +4,9 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 from pyon.util.async import blocking_cb
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 
-class AsyncTest(PyonTestCase):
+class AsyncTest(IonIntegrationTestCase):
     def i_call_callbacks(self, cb):
         cb(1, 2, 3, foo='bar')
 
