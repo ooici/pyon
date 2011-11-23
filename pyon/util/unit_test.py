@@ -22,7 +22,7 @@ def  pop_last_call(mock):
         mock.called = False
     mock.call_count -= 1
 
-class PyonUnitTestCase(unittest.TestCase):
+class PyonTestCase(unittest.TestCase):
 
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
