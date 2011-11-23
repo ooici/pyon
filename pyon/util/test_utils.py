@@ -50,3 +50,8 @@ class PyonUnitTestCase(unittest.TestCase):
                         func_name)),
                     skipfirst=True)
             mock_service.__setattr__(func_name, mock_func)
+
+class PyonIntegrationTestCase(PyonUnitTestCase):
+    """
+    Standard integration test case base class.
+    """
