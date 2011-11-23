@@ -1,13 +1,14 @@
-#!/usr/bin/env python
-
-__author__ = 'Jamie Chen'
-__license__ = 'Apache 2.0'
-
-
-from mock import Mock, mocksignature, patch
+#! /usr/bin/env pythoon
+from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
-def pop_last_call(mock):
+from pyon.core.object import IonServiceRegistry
+
+test_obj_registry = IonServiceRegistry()
+test_obj_registry.register_obj_dir('obj/data')
+test_obj_registry.register_svc_dir('obj/services')
+
+def  pop_last_call(mock):
     if not mock.call_count:
         raise AssertionError('Cannot pop last call: call_count is 0')
     mock.call_args_list.pop()
@@ -19,11 +20,17 @@ def pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonUnitTestCase(unittest.TestCase):
-    """
-    Base class for all Pyon unit tests
-    """
-    def _create_patch(self, name):
-        patcher = patch(name)
+
+    # Call this function at the beginning of setUp if you need a mock ion
+    # obj
+    def _create_object_mock(self, name):
+        mock_ionobj = Mock(name='IonObject')
+        def side_effect(_def, _dict=None, **kwargs):
+            test_obj = test_obj_registry.new(_def, _dict, **kwargs)
+            test_obj._validate()
+            return DEFAULT
+        mock_ionobj.side_effect = side_effect
+        patcher = patch(name, mock_ionobj)
         thing = patcher.start()
         self.addCleanup(patcher.stop)
         return thing
@@ -43,8 +50,3 @@ class PyonUnitTestCase(unittest.TestCase):
                         func_name)),
                     skipfirst=True)
             mock_service.__setattr__(func_name, mock_func)
-
-class PyonIntegrationTestCase(PyonUnitTestCase):
-    """
-    Base class for all Pyon integration tests
-    """
