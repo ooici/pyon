@@ -562,7 +562,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
@@ -582,7 +582,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_name(self, name, restype=None, id_only=False):
@@ -602,7 +602,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def _ion_object_to_persistence_dict(self, ion_object):

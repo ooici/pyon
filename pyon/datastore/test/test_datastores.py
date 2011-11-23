@@ -340,6 +340,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(len(obj_assocs1n), 0)
 
         obj_ids1a, obj_assocs1a = data_store.find_objects(admin_user_id, id_only=False)
+        self.assertTrue(obj_ids1a[0]._def)
         self.assertEquals(len(obj_ids1a), 3)
         self.assertEquals(len(obj_assocs1a), 3)
         self.assertEquals(set([o._id for o in obj_ids1a]), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
@@ -365,6 +366,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(sub_ids1), set([admin_user_id, plat1_obj_id]))
 
         sub_ids1a, sub_assoc1a = data_store.find_subjects(inst1_obj_id, id_only=False)
+        self.assertTrue(sub_ids1a[0]._def)
         self.assertEquals(len(sub_ids1a), 2)
         self.assertEquals(len(sub_assoc1a), 2)
         self.assertEquals(set([o._id for o in sub_ids1a]), set([admin_user_id, plat1_obj_id]))
@@ -392,6 +394,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, other_user_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_type(RT.UserIdentity, id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
@@ -413,6 +416,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.ACTIVE, id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
@@ -434,6 +438,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([inst1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_name('CTD2', id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 1)
         self.assertEquals(len(res_assoc1a), 1)
         self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
