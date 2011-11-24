@@ -3,13 +3,17 @@ from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
 from zope.interface import implementedBy
-
 from pyon.service.service import get_service_by_name
 from pyon.core.object import IonServiceRegistry
 
 test_obj_registry = IonServiceRegistry()
 test_obj_registry.register_obj_dir('obj/data')
 test_obj_registry.register_svc_dir('obj/services')
+
+def func_names(cls):
+    import types
+    return [name for name, value in cls.__dict__.items() if
+            isinstance(value, types.FunctionType)]
 
 def  pop_last_call(mock):
     if not mock.call_count:
@@ -43,6 +47,8 @@ class PyonTestCase(unittest.TestCase):
         if getattr(self, 'clients', None) is None:
             setattr(self, 'clients', Mock(name='self.clients'))
         base_service = get_service_by_name(service_name)
+        # Save it to use in test_verify_service
+        self.base_service = base_service
         dependencies = base_service.dependencies
         for dep_name in dependencies:
             dep_service = get_service_by_name(dep_name)
@@ -59,3 +65,19 @@ class PyonTestCase(unittest.TestCase):
                         mock=Mock(name='self.clients.%s.%s' % (dep_name,
                             func_name)), skipfirst=True)
                 setattr(mock_service, func_name, mock_func)
+
+    # Assuming your service is the only subclass of the Base Service
+    def test_verify_service(self):
+        if not getattr(self, 'base_service', None):
+            raise unittest.SkipTest('Not implementing an Ion Service')
+        from zope.interface.verify import verifyClass
+        base_service = self.base_service
+        implemented_service = base_service.__subclasses__()[0]
+        iface = list(implementedBy(base_service))[0]
+        verifyClass(iface, implemented_service)
+        # Check if defined functions in Base Service are all implemented
+        difference = set(func_names(base_service)) - set(func_names(implemented_service))
+        if difference:
+            self.fail('Following function declarations in %s do not exist in %s : %s' %
+                    (iface, implemented_service,
+                        list(difference)))
