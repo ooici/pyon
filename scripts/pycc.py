@@ -119,7 +119,7 @@ def main(opts, *args, **kwargs):
         mod, proc = opts.proc.rsplit('.', 1)
         print "Starting process %s" % opts.proc
         container.spawn_process(proc, mod, proc)
-        container.quit()
+        container.stop()
         return
 
     if opts.rel:
@@ -136,7 +136,7 @@ def main(opts, *args, **kwargs):
     else:
         print "ABORTING CONTAINER START - ERROR: %s" % error_msg
 
-    container.quit()
+    container.stop()
 
 def parse_args(tokens):
     """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """

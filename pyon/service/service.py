@@ -4,11 +4,10 @@ __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.util.state_object import LifecycleStateMixin
 from pyon.util.containers import named_any
 from pyon.util.context import LocalContextMixin
 
-class BaseService(LifecycleStateMixin, LocalContextMixin):
+class BaseService(LocalContextMixin):
     """
     A process class that provides a 'service'.
     Not dependent on messaging.
@@ -18,10 +17,12 @@ class BaseService(LifecycleStateMixin, LocalContextMixin):
     running = 0
 
     def __init__(self, *args, **kwargs):
-        LifecycleStateMixin.__init__(self, *args, autoinit=False, **kwargs)
         LocalContextMixin.__init__(self)
 
-    def on_init(self, *args, **kwargs):
+    def init(self):
+        return self.on_init()
+
+    def on_init(self):
         """
         Method to be overridden as neccessary by
         implementing service classes to perform
@@ -30,17 +31,26 @@ class BaseService(LifecycleStateMixin, LocalContextMixin):
         accessible via the self.CFG dict.
         """
 
-    def on_start(self, *args, **kwargs):
+    def start(self):
+        return self.on_start()
+
+    def on_start(self):
         """
         Method called at service startup.
         """
 
-    def on_stop(self, *args, **kwargs):
+    def stop(self):
+        return self.on_stop()
+
+    def on_stop(self):
         """
         Method called at service stop.
         """
 
-    def on_quit(self, *args, **kwargs):
+    def quit(self):
+        return self.on_quit()
+
+    def on_quit(self):
         """
         Method called at service quit.
         """

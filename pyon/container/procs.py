@@ -16,12 +16,11 @@ from pyon.net.messaging import IDPool
 from pyon.service.service import add_service_by_name, get_service_by_name
 from pyon.util.containers import DictModifier, DotDict, for_name, named_any
 from pyon.util.log import log
-from pyon.util.state_object import  LifecycleStateMixin
 
 from pyon.ion.process import IonProcessSupervisor
 
-class ProcManager(LifecycleStateMixin):
-    def on_init(self, container, *args, **kwargs):
+class ProcManager(object):
+    def __init__(self, container):
         self.container = container
 
         # Define the callables that can be added to Container public API
@@ -35,22 +34,21 @@ class ProcManager(LifecycleStateMixin):
 
         self.procs = {}
 
-
         # The pyon worker process supervisor
         self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
 
-
-    def on_start(self, *args, **kwargs):
+    def start(self):
         log.debug("ProcManager: start")
 
         self.proc_sup.start()
 
-    def on_quit(self, *args, **kwargs):
-        log.debug("ProcManager: quit")
+    def stop(self):
+        log.debug("ProcManager: stop")
 
         # Call quit on procs to give them ability to clean up
         for procname, proc in self.procs.iteritems():
             try:
+                # These are service processes with full life cycle
                 proc.quit()
             except Exception, ex:
                 log.exception("Process %s quit failed" % procname)

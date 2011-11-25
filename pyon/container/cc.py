@@ -34,7 +34,7 @@ from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
-from pyon.util.state_object import  LifecycleStateMixin
+from pyon.util.state_object import  BasicLifecycleStateMixin
 from pyon.ion.exchange import ExchangeManager
 
 
@@ -58,7 +58,7 @@ class IContainerAgent(Interface):
     def stop():
         pass
 
-class Container(LifecycleStateMixin):
+class Container(object):
     implements(IContainerAgent)
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
@@ -69,12 +69,12 @@ class Container(LifecycleStateMixin):
     name = "cc_agent_%s" % (id)
     pidfile = None
 
-    def on_init(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
-        log.debug("Container.on_init(). sysname=%s" % bootstrap.sys_name)
+        log.debug("Container.__init__(). sysname=%s" % bootstrap.sys_name)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
@@ -92,7 +92,7 @@ class Container(LifecycleStateMixin):
         self.app_manager = AppManager(self)
 
 
-    def on_start(self):
+    def start(self):
         log.debug("In Container.on_start")
 
         # Check if this UNIX process already runs a Container.
@@ -172,24 +172,16 @@ class Container(LifecycleStateMixin):
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("In Container.on_stop - call quit")
-        self.quit(*args, **kwargs)
+    def stop(self):
+        log.debug("In Container.on_stop")
 
-    def on_quit(self):
-        log.debug("In Container.on_quit")
+        self.app_manager.stop()
 
-        self.app_manager.quit()
+        self.proc_manager.stop()
 
-        self.proc_manager.quit()
-
-        self.ex_manager.quit()
+        self.ex_manager.stop()
 
         # Unregister from directory
         self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
-
-    def on_error(self, reason, *args, **kwargs):
-        log.error("Error in container: %s", reason)
-

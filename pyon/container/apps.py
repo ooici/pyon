@@ -14,12 +14,11 @@ from pyon.core.exception import ContainerConfigError, ContainerStartupError, Con
 from pyon.util.config import Config
 from pyon.util.containers import DictModifier, DotDict, named_any
 from pyon.util.log import log
-from pyon.util.state_object import  LifecycleStateMixin
 
 START_PERMANENT = "permanent"
 
-class AppManager(LifecycleStateMixin):
-    def on_init(self, container, *args, **kwargs):
+class AppManager(object):
+    def __init__(self, container):
         self.container = container
 
         # Define the callables that can be added to Container public API
@@ -34,11 +33,11 @@ class AppManager(LifecycleStateMixin):
 
         self.apps = []
 
-    def on_start(self, *args, **kwargs):
+    def start(self):
         log.debug("AppManager: start")
 
-    def on_quit(self, *args, **kwargs):
-        log.debug("AppManager: quit")
+    def stop(self):
+        log.debug("AppManager: stop")
         # Stop apps in reverse order of startup
         for appdef in reversed(self.apps):
             self.stop_app(appdef)
