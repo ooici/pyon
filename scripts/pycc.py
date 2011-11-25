@@ -103,6 +103,8 @@ def main(opts, *args, **kwargs):
     from pyon.container.cc import IContainerAgent
     from pyon.container.shell_api import get_shell_api
     from pyon.net.endpoint import RPCClient
+    # More automatic boostrapping
+    from pyon.ion.public import RT
 
     container = Container(*args, **kwargs)
 

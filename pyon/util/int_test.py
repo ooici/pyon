@@ -5,10 +5,10 @@
 import unittest
 
 from pyon.container.cc import Container
-from pyon.core.bootstrap import obj_registry, populate_registry
+from pyon.core.bootstrap import bootstrap_pyon
 
 # Make this call more deterministic in time.
-populate_registry()
+bootstrap_pyon()
 
 class IonIntegrationTestCase(unittest.TestCase):
     """

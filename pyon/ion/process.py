@@ -70,34 +70,3 @@ class IonProcessSupervisor(GreenProcessSupervisor):
           'green': GreenIonProcess
         , 'python': PythonIonProcess
     }
-
-if __name__ == '__main__':
-    ips = IonProcessSupervisor()
-    
-    def target():
-        print 'foo'
-    p = ips.spawn('green', target)
-    p.join()
-
-    class DummyIonProcess(GreenIonProcess):
-        def on_activate(self, *args, **kwargs):
-            print 'activate'
-        def on_deactivate(self, *args, **kwargs):
-            print 'deactivate'
-        def on_error(self, *args, **kwargs):
-            print 'error'
-        def on_initialize(self, *args, **kwargs):
-            print 'initialize'
-        def on_terminate(self, *args, **kwargs):
-            print 'terminate'
-        def on_terminate_active(self, *args, **kwargs):
-            print 'terminate_active'
-
-        def target(self):
-            print 'running the target'
-            super(DummyIonProcess, self).target()
-
-
-    p = ips.spawn(DummyIonProcess, None)
-    p.join()
-    

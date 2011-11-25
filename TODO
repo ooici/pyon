@@ -52,6 +52,7 @@ PROCESS/SERVICE:
 - Be able to start non-service process in container
 - Optional vs. mandatory service arguments
 - Validate object content vs. service operations
+- Make ion process use new lifecyclemixin - problem name conflict
 
 MESSAGING:
 

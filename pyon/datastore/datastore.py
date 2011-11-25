@@ -283,7 +283,7 @@ class DataStore(object):
         ot = object._def.type.name
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
-        from pyon.core.object import allextends
+        from pyon.core.object import IonObjectRegistry
         from pyon.ion.resource import AssociationTypes
         at = AssociationTypes.get(predicate, None)
         if not at:
@@ -291,7 +291,7 @@ class DataStore(object):
         if not st in at['domain']:
             found_st = False
             for domt in at['domain']:
-                if st in allextends[domt]:
+                if st in IonObjectRegistry.allextends[domt]:
                     found_st = True
                     break
             if not found_st:
@@ -299,7 +299,7 @@ class DataStore(object):
         if not ot in at['range']:
             found_ot = False
             for rant in at['range']:
-                if ot in allextends[rant]:
+                if ot in IonObjectRegistry.allextends[rant]:
                     found_ot = True
                     break
             if not found_ot:

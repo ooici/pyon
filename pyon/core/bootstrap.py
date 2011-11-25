@@ -9,7 +9,10 @@ from pyon.core.object import IonServiceRegistry
 import logging.config
 import os
 
-# Note: do we really want to do the res folder like this again?
+# THE CODE BELOW EXECUTES ON IMPORT OF THIS MODULE
+# IT BOOTSTRAPS THE PYON ENVIRONMENT
+
+# LOGGING. Read the logging config files
 logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
 LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
 
@@ -24,11 +27,12 @@ for handler in LOGGING_CFG.get('handlers', {}).itervalues():
 if LOGGING_CFG:
     logging.config.dictConfig(LOGGING_CFG)
 
-# Read global configuration
+# CONFIG. Read global configuration
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
 CFG = Config(conf_paths, ignore_not_found=True).data
 sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
+# OBJECTS. Object and service definitions.
 # Make a default factory for IonObjects
 obj_registry = IonServiceRegistry()
 IonObject = obj_registry.new
@@ -37,3 +41,5 @@ def populate_registry():
     obj_registry.register_obj_dir('obj/data', do_first=['ion.yml', 'resource.yml'])
     obj_registry.register_svc_dir('obj/services')
 
+def bootstrap_pyon():
+    populate_registry()

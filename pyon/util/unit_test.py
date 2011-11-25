@@ -1,4 +1,7 @@
-#! /usr/bin/env pythoon
+#! /usr/bin/env python
+
+"""Unit test base class and utils"""
+
 from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
@@ -15,7 +18,7 @@ def func_names(cls):
     return [name for name, value in cls.__dict__.items() if
             isinstance(value, types.FunctionType)]
 
-def  pop_last_call(mock):
+def pop_last_call(mock):
     if not mock.call_count:
         raise AssertionError('Cannot pop last call: call_count is 0')
     mock.call_args_list.pop()
@@ -27,7 +30,6 @@ def  pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonTestCase(unittest.TestCase):
-
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
     def _create_object_mock(self, name):

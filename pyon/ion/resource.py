@@ -7,11 +7,11 @@ __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import sys_name
 from pyon.util.containers import DotDict
-from pyon.core.object import allextends
+from pyon.core.object import IonObjectRegistry
 from pyon.util.config import Config
 
 # Resource Types
-RT_LIST = list(allextends.get('Resource', []))
+RT_LIST = list(IonObjectRegistry.allextends.get('Resource', []))
 RT_LIST.append('Resource')
 RT = DotDict(zip(RT_LIST, RT_LIST))
 ResourceTypes = RT

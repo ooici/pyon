@@ -91,9 +91,7 @@ class ProcManager(LifecycleStateMixin):
         process_instance.CFG = config
         process_instance.init()
 
-        # Add to global dict
-        # TODO: This needs to go into the process list
-        #add_service_by_name(name, process_instance)
+        # Add to process dict
         self.procs[name] = process_instance
 
         rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
@@ -112,6 +110,7 @@ class ProcManager(LifecycleStateMixin):
 
         # Process exclusive RPC endpoint
         # Start an ION process with the right kind of endpoint factory
+        # TODO: Don't start in its own Greenlet!
         listener1 = BinderListener(self.container.node, process_instance.id, rsvc_proc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener1)
 

@@ -25,16 +25,16 @@ import msgpack
 import atexit
 import signal
 
+from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
+
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
-from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.directory.directory import Directory
 from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.util.state_object import  LifecycleStateMixin
-
 from pyon.ion.exchange import ExchangeManager
 
 
@@ -65,18 +65,22 @@ class Container(LifecycleStateMixin):
     that do the bulk of the work in the ION system.
     """
     node = None
-    id = string.replace('%s.%d' % (os.uname()[1], os.getpid()), ".", "_")
+    id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
     name = "cc_agent_%s" % (id)
     pidfile = None
 
-    def __init__(self, *args, **kwargs):
-        log.debug("Container.__init__")
-
-        # TODO: Bug: this does not work because CFG instance references are already public. Update directly
-        #CFG.update(kwargs)
+    def on_init(self, *args, **kwargs):
+        # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
+        log.debug("Container.on_init(). sysname=%s" % bootstrap.sys_name)
+
+        # Keep track of the overrides from the command-line, so they can trump app/rel file data
+        self.spawn_args = DictModifier(CFG, kwargs)
+
+        # Load object and service registry
+        bootstrap_pyon()
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -87,10 +91,6 @@ class Container(LifecycleStateMixin):
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
 
-        # Keep track of the overrides from the command-line, so they can trump app/rel file data
-        self.spawn_args = DictModifier(CFG, kwargs)
-
-        self.init(*args, **kwargs)
 
     def on_start(self):
         log.debug("In Container.on_start")
@@ -118,8 +118,6 @@ class Container(LifecycleStateMixin):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
-        # Bootstrap object registry
-        populate_registry()
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
@@ -155,7 +153,7 @@ class Container(LifecycleStateMixin):
             self.start()
             
         try:
-            # This just wait in this Greenlet for all child processes to complete,
+            # This just waits in this Greenlet for all child processes to complete,
             # which is triggered somewhere else.
             self.proc_manager.proc_sup.join_children()
         except (KeyboardInterrupt, SystemExit) as ex:
