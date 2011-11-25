@@ -60,18 +60,11 @@ Use Buildout to install the python package dependencies with:
     > python bootstrap.py
     > bin/buildout
 
-Alternative: Install the python package dependencies with:
-    pip --upgrade numpy
-    Note: easy_install / setup.py do not like numpy.
-    python setup.py install
-
 
 ION-DEFINITIONS SUBMODULE:
 
 Link git submodule ion-definitions, containing object and service definitions and resource files:
     git submodule update --init
-    cd extern/ion-definitions
-    git checkout master
 
 Note: This git-submodule always references a specific commit of ion-definitions used by pyon.
 
@@ -96,7 +89,7 @@ See more about submodules:
 GENERATE SERVICE STUBS:
 
 Generate service definition interfaces and abstract base classes files:
-    > python scripts/generate_interfaces.py
+    > bin/generate_interfaces
     Note: These will be placed in the interfaces/ subdirectory (and not in GIT nor in the egg).
 
 
@@ -124,11 +117,11 @@ TEST
 ====
 
 Run the unittests:
-    bin/unittest (if using buildout)
-    ./unittest
+    bin/unittest
+    bin/nosetests -a unit
 
 Run code coverage:
-    nosetests -w pyon --with-coverage --cover-package=pyon
+    bin/nosetests -w pyon --with-coverage --cover-package=pyon
 
 
 USE
@@ -139,15 +132,16 @@ Provide local configuration overrides in:
     res/config/logging.local.yml
 
 Start the capability container in interactive mode:
-    bin/pycc (if using buildout)
-    ./pycc
+    > bin/pycc
 
 List supported arguments:
-    bin/pycc --help
+    > bin/pycc --help
 
 Start the CC with a deploy file:
-    bin/pycc --rel res/deploy/r2deploy.yml
+    > bin/pycc --rel res/deploy/r2deploy.yml
 
+Start the CC with a process to execute and then quit:
+    > bin/pycc --proc examples.service.hello_service.HelloService
 
 DEBUG
 =====
@@ -161,7 +155,7 @@ export PYTHONPATH=.:/Applications/PyCharm\ 1.5.2.app/pycharm-debug.egg
 Remote debugging of services in a running container is possible too. Setup a remote debugging configuration to use the localhost and port 8585.
 First start the remote debuging server, then start the container from the command line below ( the -n seems to be required )
 
-    ./pyccd -n --rel res/deploy/r2services.yml
+    > bin/pyccd -n --rel res/deploy/r2services.yml
 
 
 EXAMPLES

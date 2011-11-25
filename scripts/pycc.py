@@ -112,6 +112,14 @@ def main(opts, *args, **kwargs):
     start_ok = True
     error_msg = None
 
+    if opts.proc:
+        # One off process
+        mod, proc = opts.proc.rsplit('.', 1)
+        print "Starting process %s" % opts.proc
+        container.spawn_process(proc, mod, proc)
+        container.quit()
+        return
+
     if opts.rel:
         client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
         start_ok = client.start_rel_from_url(opts.rel)
@@ -152,6 +160,7 @@ def entry():
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
+    parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
