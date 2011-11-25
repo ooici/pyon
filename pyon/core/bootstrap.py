@@ -43,3 +43,9 @@ def populate_registry():
 
 def bootstrap_pyon():
     populate_registry()
+
+    # Resource definitions
+    from pyon.ion.resource import load_definitions
+    load_definitions()
+
+    # Code in pyon.service.service: Load service modules

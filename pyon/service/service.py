@@ -24,7 +24,7 @@ class BaseService(LocalContextMixin):
 
     def on_init(self):
         """
-        Method to be overridden as neccessary by
+        Method to be overridden as necessary by
         implementing service classes to perform
         initialization actions prior to service
         start.  Configuration parameters are
