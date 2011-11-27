@@ -12,8 +12,7 @@ from pyon.util.log import log
 
 class Directory(object):
     """
-    Singleton class that uses a data store to
-    provide a directory lookup mechanism
+    Singleton class that uses a data store to provide a directory lookup mechanism
     """
     class __impl:
 
@@ -119,7 +118,7 @@ class Directory(object):
 
             return entry_old
 
-        def read(self, qualified_key='/'):
+        def lookup(self, qualified_key='/'):
             """
             Read entry residing in directory at parent node level.
             """
