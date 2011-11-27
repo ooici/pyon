@@ -12,6 +12,19 @@ import os
 # THE CODE BELOW EXECUTES ON IMPORT OF THIS MODULE
 # IT BOOTSTRAPS THE PYON ENVIRONMENT
 
+# ENVIRONMENT. Check we are started in a proper way.
+def assert_environment():
+    """This asserts the mandatory (minimal) execution environment for pyon"""
+    import os.path
+    if not os.path.exists("res"):
+        raise Exception("pyon environment assertion failed: res/ directory not found")
+    if not os.path.exists("res/config"):
+        raise Exception("pyon environment assertion failed: res/config directory not found")
+    if not os.path.exists("res/config/pyon.yml"):
+        raise Exception("pyon environment assertion failed: pyon.yml config missing")
+
+assert_environment()
+
 # LOGGING. Read the logging config files
 logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
 LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data

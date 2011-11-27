@@ -119,6 +119,21 @@ class ProcManager(object):
                 listener.get_ready_event().get()
                 log.debug("Process %s stream listener ready: %s", name, listen_name)
 
+            elif process_type == "agent":
+                # TODO: Determine special treatment of agents
+                pass
+
+            elif process_type == "immediate":
+                # One off process. No extra listeners
+                pass
+
+            elif process_type == "simple":
+                # In this case we don't want any extra listeners
+                pass
+
+            else:
+                raise Exception("Unknown process type: %s" % process_type)
+
             # Process exclusive RPC endpoint
             rsvc_proc = ProcessRPCServer(node=self.container.node, name=process_instance.id, service=process_instance, process=process_instance)
             # Start an ION process with the right kind of endpoint factory

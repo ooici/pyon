@@ -9,7 +9,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.public import RT, AT, LCS
+from pyon.public import RT, AT, LCS
 
 from unittest import SkipTest
 
