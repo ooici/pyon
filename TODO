@@ -5,11 +5,11 @@ PACKAGING/CODE:
 
 - Automate versioning and packaging of pyon egg
 - More __str__() output for classes
-- Clear distinction between ION process and pyon process
 - Move directory and datastore code to coi_services if possible
 - Use log.info for relevant output, debug for debug level
 - Rename EndpointFactory -> Endpoint and Endpoint -> Conversation
 - More consistent and fewer packages
+- Refactor imports to use pyon.public as much as possible
 
 CONTAINER/STARTUP:
 
@@ -20,8 +20,9 @@ CONTAINER/STARTUP:
 - Check service implementation against service definition (parameters, order)
 - Error handling improved
 - Fail quick on startup
-- Standard entry point for ?
 - DualModifierDict for two overrides in order (reference not copy the first one)
+- Check DotDict, DictModifier efficiency and use
+- Bootstrap mode for container: Directory before started.
 
 OBJECTS:
 
@@ -31,31 +32,32 @@ OBJECTS:
 PROCESS/SERVICE:
 
 - Clear confusion with service vs process
-- Unique process ID
+- System-wide unique process ID
 - Process as instance aggregating one state and multiple endpoints
 - Process (greenlet) accepts messages from endpoints. One greenlet per process; one message at a time.
 - Process ioloop (picking messages and activating on schedule)
 - Process attachment (direct or via container)
-- IDE code completion for service clients and methods
-- Be able to start non-service process in container
+- IDE code completion for service clients and methods (generated clients)
 - Optional vs. mandatory service arguments
 - Validate object content vs. service operations
-- Infinite and recurring processes (in on_start)
+- Container support for infinite and recurring processes (in on_start)
 - Do not create message processing worker thread in BinderListener by default (use the process ioloop)
 
 MESSAGING:
 
 - Use ACKs
-- Messaging properties set:
-- Non-AMQP (ZeroMQ)
-- Local messaging with greenlet handover
+- Messaging properties set in pyon.net
+- Non-AMQP (ZeroMQ, Flask) nodes
+- Local messaging with greenlet handover (one actor)
+- ION endpoints in pyon.ion.endpoint (not pyon.net)
 
 TESTING:
 
-- Switch to nosetests
-- Log and print in tests: visible on run
+- Switch to nosetests (remove/alias bin/unittest)
+- Log and print in tests: visible on run if desired
 
 OPEN QUESTIONS:
+
 - How to declare mandatory (non null) service parameters?
 - Should we support kwargs in service clients?
 - How to start stream processes?

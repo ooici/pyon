@@ -51,7 +51,6 @@ class CouchDB_DataStore(DataStore):
             self.server.delete(datastore_name)
             return True
         except ResourceNotFound:
-            log.error('Data store delete failed.  Data store %s not found' % datastore_name)
             raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
 
     def list_datastores(self):
@@ -124,10 +123,10 @@ class CouchDB_DataStore(DataStore):
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         if not rev_id:
-            log.info('Reading head version of object %s/%s' % (datastore_name, doc_id))
+            log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
         else:
-            log.info('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
+            log.debug('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
             doc = db.get(doc_id, rev=rev_id)
         log.debug('read doc contents: %s', doc)
         return doc

@@ -5,24 +5,20 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import sys_name
 from pyon.util.containers import DotDict
 from pyon.core.object import IonObjectRegistry
 from pyon.util.config import Config
 
 # Resource Types
-RT_LIST = list()
 ResourceTypes = DotDict()
 RT = ResourceTypes
 
 # Association Types
 AssociationTypes = DotDict()
-AT_LIST = list()
 AssocTypes = DotDict()
 AT = AssocTypes
 
 # Life cycle states
-LCS_LIST = list()
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
 
@@ -37,27 +33,24 @@ def load_definitions():
     imported them (BAD).
     """
     # Resource Types
-    del RT_LIST[:]
-    RT_LIST.extend(IonObjectRegistry.allextends.get('Resource', []))
-    RT_LIST.append('Resource')
+    rt_list = list(IonObjectRegistry.allextends.get('Resource', []))
+    rt_list.append('Resource')
     ResourceTypes.clear()
-    ResourceTypes.update(zip(RT_LIST, RT_LIST))
+    ResourceTypes.update(zip(rt_list, rt_list))
 
     # Association Types
-    del AT_LIST[:]
-    AT_LIST.extend(get_association_type_list())
+    at_list = get_association_type_list()
     AssocTypes.clear()
-    AssocTypes.update(zip(AT_LIST, AT_LIST))
+    AssocTypes.update(zip(at_list, at_list))
 
     # Life cycle states
-    del LCS_LIST[:]
-    LCS_LIST.extend([
+    lcs_list = [
         'NEW',
         'REGISTERED',
         'DEVELOPED',
         'COMMISSIONED',
         'ACTIVE',
         'DECOMMISSIONED'
-        ])
+        ]
     LifeCycleStates.clear()
-    LifeCycleStates.update(zip(LCS_LIST, LCS_LIST))
+    LifeCycleStates.update(zip(lcs_list, lcs_list))

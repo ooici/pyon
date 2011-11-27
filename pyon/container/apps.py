@@ -4,8 +4,6 @@
 
 __author__ = 'Michael Meisinger'
 
-import os.path
-
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
@@ -14,6 +12,7 @@ from pyon.core.exception import ContainerConfigError, ContainerStartupError, Con
 from pyon.util.config import Config
 from pyon.util.containers import DictModifier, DotDict, named_any
 from pyon.util.log import log
+
 
 START_PERMANENT = "permanent"
 
@@ -34,23 +33,25 @@ class AppManager(object):
         self.apps = []
 
     def start(self):
-        log.debug("AppManager: start")
+        log.debug("AppManager starting ...")
 
     def stop(self):
-        log.debug("AppManager: stop")
+        log.debug("AppManager stopping ...")
         # Stop apps in reverse order of startup
         for appdef in reversed(self.apps):
             self.stop_app(appdef)
+        log.debug("AppManager stopped, OK.")
 
     def start_rel_from_url(self, rel_url=""):
         """
         @brief Read the rel file and call start_rel
         """
-        log.debug("In AppManager.start_rel_from_url  rel_url: %s" % str(rel_url))
+        log.info("AppManager.start_rel_from_url(rel_url=%s) ..." % str(rel_url))
 
         try:
             rel = Config([rel_url]).data
             self.start_rel(rel)
+            log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK." % str(rel_url))
             return True
         except ConfigNotFound as cnf:
             log.warning("Could not find container deploy file '%s'" % rel_url)
@@ -66,7 +67,7 @@ class AppManager(object):
         1 processapp: In-line defined process to be started as app
         2 app file: Reference to an app definition in an app file
         """
-        log.debug("In AppManager.start_rel  rel: %s" % str(rel))
+        log.debug("AppManager.start_rel(rel=%s) ..." % str(rel))
 
         if rel is None: rel = {}
 
@@ -96,7 +97,7 @@ class AppManager(object):
         """
         @brief Read the app file and call start_app
         """
-        log.debug("In AppManager.start_app_from_url  app_url: %s" % app_url)
+        log.debug("AppManager.start_app_from_url(app_url=%s) ..." % app_url)
 
         try:
             app = Config([app_url]).data
@@ -117,7 +118,7 @@ class AppManager(object):
         1 processapp: In-line defined process to be started
         2 regular app: Full app definition
         """
-        log.debug("start_app: appdef=%s" % appdef)
+        log.debug("AppManager.start_app(appdef=%s) ..." % appdef)
 
         appdef = DotDict(appdef)
         app_config = DictModifier(CFG)

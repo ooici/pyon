@@ -20,7 +20,7 @@ class ExchangeManager(object):
     Manager object for the CC to manage Exchange related resources.
     """
     def __init__(self, container):
-        log.debug("ExchangeManager: init")
+        log.debug("ExchangeManager initializing ...")
         self.container = container
 
         # Define the callables that can be added to Container public API
@@ -35,13 +35,15 @@ class ExchangeManager(object):
         self.xs_by_name = {}
         self.default_xs = ExchangeSpace(ION_ROOT_XS)
 
+        # TODO: Do more initializing here, not in container
+
     def start(self):
         # Establish connection to broker
         #self.container.node, self.container.ioloop = messaging.make_node() # TODO: shortcut hack
 
         # Declare root exchange
         #self.default_xs.ensure_exists(self.container.node)
-        log.debug("ExchangeManager: start")
+        log.debug("ExchangeManager starting ...")
 
     def create_xs(self, name):
         pass
@@ -53,7 +55,7 @@ class ExchangeManager(object):
         pass
 
     def stop(self, *args, **kwargs):
-        log.debug("ExchangeManager: stop")
+        log.debug("ExchangeManager stopping ...")
 
 
 class ExchangeSpace(object):

@@ -16,9 +16,16 @@ class BaseService(LocalContextMixin):
     # The following are set one per implementation (class)
     name = None
     running = 0
+    dependencies = []
 
     def __init__(self, *args, **kwargs):
-        LocalContextMixin.__init__(self)
+        self.id = None
+        self._proc_name = None
+        self._proc_type = None
+        self.errcause = None
+        self.container = None
+        self.CFG = None
+        super(BaseService, self).__init__()
 
     def init(self):
         return self.on_init()
@@ -53,6 +60,13 @@ class BaseService(LocalContextMixin):
         """
         Method called just before service termination.
         """
+
+    def __str__(self):
+        return "".join((self.__class__.__name__,"(",
+                        "name=", self._proc_name,
+                        ",id=", self.id,
+                        ",type=", self._proc_type,
+                        ")"))
 
 services_by_name = {}
 
