@@ -9,10 +9,11 @@ from pyon.util.context import LocalContextMixin
 
 class BaseService(LocalContextMixin):
     """
-    A process class that provides a 'service'.
-    Not dependent on messaging.
+    Base class providing a 'service'. Pure Python class. Not dependent on messaging.
+    Such services can be executed by ION processes.
     """
 
+    # The following are set one per implementation (class)
     name = None
     running = 0
 
@@ -24,10 +25,8 @@ class BaseService(LocalContextMixin):
 
     def on_init(self):
         """
-        Method to be overridden as necessary by
-        implementing service classes to perform
-        initialization actions prior to service
-        start.  Configuration parameters are
+        Method to be overridden as necessary by implementing service classes to perform
+        initialization actions prior to service start.  Configuration parameters are
         accessible via the self.CFG dict.
         """
 
@@ -44,7 +43,7 @@ class BaseService(LocalContextMixin):
 
     def on_stop(self):
         """
-        Method called at service stop.
+        Method called at service stop. (May not be called if service is terminated immediately).
         """
 
     def quit(self):
@@ -52,7 +51,7 @@ class BaseService(LocalContextMixin):
 
     def on_quit(self):
         """
-        Method called at service quit.
+        Method called just before service termination.
         """
 
 services_by_name = {}
@@ -89,6 +88,4 @@ def get_service_by_name(name):
     else:
         return None
 
-load_service_mods('interface/services')
-build_service_map()
 

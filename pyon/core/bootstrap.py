@@ -42,10 +42,14 @@ def populate_registry():
     obj_registry.register_svc_dir('obj/services')
 
 def bootstrap_pyon():
+    # Objects
     populate_registry()
 
     # Resource definitions
-    from pyon.ion.resource import load_definitions
-    load_definitions()
+    from pyon.ion import resource
+    resource.load_definitions()
 
-    # Code in pyon.service.service: Load service modules
+    # Services.
+    from pyon.service import service
+    service.load_service_mods('interface/services')
+    service.build_service_map()

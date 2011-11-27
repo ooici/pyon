@@ -94,6 +94,14 @@ class DictModifier(DotDict):
             # Delegate to base
             return getattr(self.base, key)
 
+    def __str__(self):
+        merged = self.base.copy()
+        merged.update(self)
+        return str(merged)
+
+    def __repr__(self):
+        return self.__str__()
+
 # dict_merge from: http://appdelegateinc.com/blog/2011/01/12/merge-deeply-nested-dicts-in-python/
 
 def quacks_like_dict(object):

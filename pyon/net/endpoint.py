@@ -389,7 +389,7 @@ class Subscriber(ListeningEndpointFactory):
         """
         @param  callback should be a callable with one arg: msg
         """
-        assert callback
+        assert callback, "No callback provided"
         self._callback = callback
         ListeningEndpointFactory.__init__(self, **kwargs)
 

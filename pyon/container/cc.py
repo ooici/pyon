@@ -34,7 +34,6 @@ from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
-from pyon.util.state_object import  BasicLifecycleStateMixin
 from pyon.ion.exchange import ExchangeManager
 
 
@@ -93,7 +92,7 @@ class Container(object):
 
 
     def start(self):
-        log.debug("In Container.on_start")
+        log.debug("In Container.start")
 
         # Check if this UNIX process already runs a Container.
         self.pidfile = "cc-pid-%d" % os.getpid()
@@ -173,7 +172,7 @@ class Container(object):
             self.pidfile = None
 
     def stop(self):
-        log.debug("In Container.on_stop")
+        log.debug("Container stopping...")
 
         self.app_manager.stop()
 
@@ -185,3 +184,4 @@ class Container(object):
         self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
+        log.debug("Container stopped. OK")
