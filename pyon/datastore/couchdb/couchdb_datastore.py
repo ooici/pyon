@@ -110,6 +110,28 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
+    def create_mult(self, objects, object_ids=None):
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
+                                    object_ids)
+
+    def create_doc_mult(self, docs, object_ids=None):
+        assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
+        assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
+
+        # Assign an id to doc (recommended in CouchDB documentation)
+        object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
+
+        for doc, oid in zip(docs, object_ids):
+            doc["_id"] = oid
+
+        # Update docs.  CouchDB will assign versions to docs.
+        res = self.server[self.datastore_name].update(docs)
+        if not res or not all([success for success, oid, rev in res]):
+            log.error('Create error. Result: %s' % str(res))
+        else:
+            log.debug('Create result: %s' % str(res))
+        return res
+
     def read(self, object_id, rev_id="", datastore_name=""):
         doc = self.read_doc(object_id, rev_id, datastore_name)
 

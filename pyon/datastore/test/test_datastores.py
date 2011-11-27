@@ -267,6 +267,14 @@ class Test_DataStores(IonIntegrationTestCase):
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 0)
 
+        o1 = IonObject("DataSet", name="One more")
+        o2 = IonObject("DataSet", name="Another one")
+        res = data_store.create_mult((o1, o2))
+        self.assertTrue(all([success for success, oid, rev in res]))
+
+        res = data_store.list_objects()
+        self.assertTrue(len(res) == 8 + numcoredocs)
+
         # Delete data store to clean up
         self.assertTrue(data_store.delete_datastore())
 

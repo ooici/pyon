@@ -87,6 +87,19 @@ class DataStore(object):
         """
         pass
 
+    def create_mult(self, objects, object_ids=None):
+        """
+        Create more than one ION object.
+        """
+        pass
+
+    def create_doc_mult(self, docs, object_ids=None):
+        """
+        Create multiple raw docs.
+        Returns list of (Success, Oid, rev)
+        """
+        pass
+
     def read(self, object_id, rev_id="", datastore_name=""):
         """"
         Fetch an Ion object instance.  If rev_id is specified, an attempt
