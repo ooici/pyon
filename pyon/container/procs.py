@@ -4,20 +4,18 @@
 
 __author__ = 'Michael Meisinger'
 
-import os
-
 from zope.interface import providedBy, implementedBy
 from zope.interface import Interface, implements
 
 from pyon.core.bootstrap import CFG
-from pyon.service.service import BaseService, services_by_name
-from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient
+from pyon.ion.process import IonProcessSupervisor
+from pyon.net.channel import PubSub
+from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, Subscriber
 from pyon.net.messaging import IDPool
-from pyon.service.service import add_service_by_name, get_service_by_name
-from pyon.util.containers import DictModifier, DotDict, for_name, named_any
+from pyon.service.service import BaseService, get_service_by_name
+from pyon.util.containers import DictModifier, DotDict, for_name
 from pyon.util.log import log
 
-from pyon.ion.process import IonProcessSupervisor
 
 class ProcManager(object):
     def __init__(self, container):
@@ -32,6 +30,7 @@ class ProcManager(object):
 
         self.proc_id_pool = IDPool()
 
+        # Temporary registry of running processes
         self.procs = {}
 
         # The pyon worker process supervisor
@@ -60,63 +59,84 @@ class ProcManager(object):
         """
         Spawn a process within the container.
         """
-        log.debug("AppManager.spawn_process(name=%s, module=%s, config=%s)" % (name, module, config))
+        log.debug("AppManager.spawn_process(name=%s, module=%s)" % (name, module))
 
         if config is None:
             config = DictModifier(CFG)
 
-        log.debug("AppManager.spawn_process: for_name(mod=%s, cls=%s)" % (module, cls))
-        process_instance = for_name(module, cls)
-        assert isinstance(process_instance, BaseService), "Instantiated process not a BaseService %r" % process_instance
+        errcause = "instantiating service"
+        try:
+            log.debug("AppManager.spawn_process: for_name(mod=%s, cls=%s)" % (module, cls))
+            process_instance = for_name(module, cls)
+            assert isinstance(process_instance, BaseService), "Instantiated process not a BaseService %r" % process_instance
 
-        # Prepare process instance
-        process_instance.id = "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
-        process_instance.container = self.container
+            # Prepare process instance
+            process_instance.id = "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
+            process_instance.container = self.container
+            process_instance.CFG = config
 
-        # Inject dependencies
-        process_instance.clients = DotDict()
-        log.debug("AppManager.spawn_process dependencies: %s" % process_instance.dependencies)
-        # TODO: Service dependency != process dependency
-        for dependency in process_instance.dependencies:
-            dependency_service = get_service_by_name(dependency)
-            dependency_interface = list(implementedBy(dependency_service))[0]
+            # Set dependencies (clients)
+            errcause = "setting service dependencies"
+            process_instance.clients = DotDict()
+            log.debug("AppManager.spawn_process dependencies: %s" % process_instance.dependencies)
+            # TODO: Service dependency != process dependency
+            for dependency in process_instance.dependencies:
+                dependency_service = get_service_by_name(dependency)
+                dependency_interface = list(implementedBy(dependency_service))[0]
 
-            # @TODO: start_client call instead?
-            client = ProcessRPCClient(node=self.container.node, name=dependency, iface=dependency_interface, process=process_instance)
-            process_instance.clients[dependency] = client
+                # @TODO: start_client call instead?
+                client = ProcessRPCClient(node=self.container.node, name=dependency, iface=dependency_interface, process=process_instance)
+                process_instance.clients[dependency] = client
 
-        # Init process
-        process_instance.CFG = config
-        process_instance.init()
+            # Init process
+            errcause = "initializing service"
+            process_instance.init()
 
-        # Add to process dict
-        self.procs[name] = process_instance
+            # Add to process dict
+            self.procs[name] = process_instance
+            errcause = "setting process messaging endpoints"
 
-        rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
+            process_type = config.get("process",{}).get("type", "service")
+            listen_name = config.get("process",{}).get("listen_name", name)
 
-        # Service RPC endpoint
-        # Start an ION process with the right kind of endpoint factory
-        listener = BinderListener(self.container.node, name, rsvc, None, None)
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+            if process_type == "service":
+                # Service RPC endpoint
+                rsvc = ProcessRPCServer(node=self.container.node, name=name, service=process_instance, process=process_instance)
+                # Start an ION process with the right kind of endpoint factory
+                listener = BinderListener(self.container.node, listen_name, rsvc, None, None)
+                self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+                # Wait for app to spawn
+                listener.get_ready_event().get()
+                log.debug("Process %s service listener ready: %s", name, listen_name)
 
-        # Wait for app to spawn
-        log.debug("Waiting for server %s listener ready", name)
-        listener.get_ready_event().get()
-        log.debug("Server %s listener ready", name)
+            elif process_type == "stream_process":
+                # Start pubsub listener
+                sub = Subscriber(node=self.container.node, name=listen_name,
+                                 callback=lambda m,h: process_instance.process(m))
+                listener = BinderListener(self.container.node, listen_name, sub, PubSub, None)
+                self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
+                # Wait for app to spawn
+                listener.get_ready_event().get()
+                log.debug("Process %s stream listener ready: %s", name, listen_name)
 
-        rsvc_proc = ProcessRPCServer(node=self.container.node, name=process_instance.id, service=process_instance, process=process_instance)
+            # Process exclusive RPC endpoint
+            rsvc_proc = ProcessRPCServer(node=self.container.node, name=process_instance.id, service=process_instance, process=process_instance)
+            # Start an ION process with the right kind of endpoint factory
+            # TODO: Don't start in its own Greenlet!
+            listener1 = BinderListener(self.container.node, process_instance.id, rsvc_proc, None, None)
+            self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener1)
+            # Wait for app to spawn
+            listener1.get_ready_event().get()
+            log.debug("Process %s pid listener ready: %s", name, process_instance.id)
 
-        # Process exclusive RPC endpoint
-        # Start an ION process with the right kind of endpoint factory
-        # TODO: Don't start in its own Greenlet!
-        listener1 = BinderListener(self.container.node, process_instance.id, rsvc_proc, None, None)
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener1)
+            errcause = "registering"
+            self.container.directory.register("/Containers/%s/Processes" % self.container.id, process_instance.id, name=name)
 
-        # Wait for app to spawn
-        log.debug("Waiting for server %s listener ready", process_instance.id)
-        listener1.get_ready_event().get()
-        log.debug("Server %s listener ready", process_instance.id)
+            errcause = "starting service"
+            process_instance.start()
 
-        self.container.directory.register("/Containers/%s/Processes" % self.container.id, process_instance.id, name=name)
-
-        process_instance.start()
+            log.info("AppManager.spawn_process: %s.%s -> id=%s OK" % (module, cls, process_instance.id))
+            return True
+        except Exception as ex:
+            log.exception("Error %s for process: %s.%s" % (errcause, module, cls))
+            return False
