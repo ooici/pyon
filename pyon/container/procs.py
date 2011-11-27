@@ -4,13 +4,12 @@
 
 __author__ = 'Michael Meisinger'
 
-from zope.interface import providedBy, implementedBy
-from zope.interface import Interface, implements
+from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
-from pyon.ion.process import IonProcessSupervisor
 from pyon.net.channel import PubSub
-from pyon.net.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, Subscriber
+from pyon.ion.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, StreamSubscriber
+from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService, get_service_by_name
 from pyon.util.containers import DictModifier, DotDict, for_name
@@ -51,7 +50,7 @@ class ProcManager(object):
             try:
                 # These are service processes with full life cycle
                 proc.quit()
-            except Exception, ex:
+            except Exception:
                 log.exception("Process %s quit failed" % procid)
 
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
@@ -74,7 +73,7 @@ class ProcManager(object):
 
         # PROCESS TYPE.
         # One of: service, stream_process, agent, simple, immediate
-        process_type = process_type or config.get("process",{}).get("type", "service")
+        process_type = process_type or config.get("process", {}).get("type", "service")
 
         service_instance = None
         try:
@@ -99,12 +98,12 @@ class ProcManager(object):
 
             service_instance._proc_type = process_type
             self._register_process(service_instance, name)
-            
+
             service_instance.errcause = "OK"
             log.info("AppManager.spawn_process: %s.%s -> pid=%s OK" % (module, cls, process_id))
             return True
-        
-        except Exception as ex:
+
+        except Exception:
             errcause = service_instance.errcause if service_instance else "instantiating service"
             log.exception("Error spawning process %s: %s" % (process_id, errcause))
             return False
@@ -116,8 +115,7 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process",{}).get("listen_name", name)
-        print "**********", name, listen_name
+        listen_name = config.get("process", {}).get("listen_name", name)
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
@@ -130,7 +128,7 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process",{}).get("listen_name", name)
+        listen_name = config.get("process", {}).get("listen_name", name)
         self._set_subscription_endpoint(service_instance, listen_name)
         self._service_start(service_instance)
         return service_instance
@@ -218,7 +216,6 @@ class ProcManager(object):
         # Start an ION process with the right kind of endpoint factory
         listener = BinderListener(self.container.node, listen_name, rsvc, None, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener, name=listen_name)
-        # Wait for app to spawn
         listener.get_ready_event().get()
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
@@ -227,12 +224,12 @@ class ProcManager(object):
 
         # Start pubsub listener
         # TODO: Use Refactored ION endpoint for streams once ready.
-        sub = Subscriber(node=self.container.node,
+        sub = StreamSubscriber(node=self.container.node,
                          name=listen_name,
+                         process=service_instance,
                          callback=lambda m,h: service_instance.process(m))
         listener = BinderListener(self.container.node, listen_name, sub, PubSub, None)
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener, name=listen_name)
-        # Wait for app to spawn
         listener.get_ready_event().get()
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 

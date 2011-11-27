@@ -188,4 +188,4 @@ class Container(object):
         self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
-        log.debug("Container stopped. OK")
+        log.debug("Container stopped, OK.")

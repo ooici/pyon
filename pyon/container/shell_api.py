@@ -72,25 +72,40 @@ def pprint_list(l, c, pad=1, indent=0):
 
 # -------------------------------------------------
 
-def ps():
+def ps(ret=False):
     print "List of ION processes"
     print "---------------------"
     from pyon.service.service import services_by_name
     #print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
     print "\n".join(("%s: %s"%(name, p) for (name,p) in container.proc_manager.procs.iteritems()))
+    if ret:
+        return container.proc_manager.procs
 
-def procs():
+def procs(ret=False):
     print "\nList of pyon processes"
     print "----------------------"
     print "\n".join((str(p) for p in container.proc_manager.proc_sup.children))
+    if ret:
+        return container.proc_manager.proc_sup.children
 
 def ms():
     print "List of messaging endpoints"
     print "---------------------------"
+    #print "Servers (listeners):"
     from pyon.net.endpoint import EndpointFactory
-    for name in sorted(EndpointFactory.endpoint_by_name.keys()):
-        print name
-        print "\n".join(("  %s, %s"%(ed, ed.name if hasattr(ed,'name') else '') for ed in EndpointFactory.endpoint_by_name[name]))
+    from collections import defaultdict
+    endpoint_by_group = defaultdict(list)
+    for elist in EndpointFactory.endpoint_by_name.values():
+        for ep in elist:
+            if hasattr(ep, "_process"):
+                endpoint_by_group[ep._process.id].append(ep)
+            else:
+                endpoint_by_group["none"].append(ep)
+
+    for name in sorted(endpoint_by_group.keys()):
+        print "%s (%s)" % (name, container.proc_manager.procs[name]._proc_name if not name == "none" else "")
+        print "\n".join(("  %s, %s"%(ed.name if hasattr(ed,'name') else '', ed) for ed in sorted(endpoint_by_group[name],
+                                        key=lambda ep: (ep.__class__.__name__, getattr(ep, 'name')))))
 
 def apps():
     print "List of active pyon apps"

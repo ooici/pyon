@@ -9,7 +9,11 @@ from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Sub
 
 
 class StreamPublisher(Publisher):
-    pass
+    def __init__(self, process=None, **kwargs):
+        self._process = process
+        Publisher.__init__(self, **kwargs)
 
 class StreamSubscriber(Subscriber):
-    pass
+    def __init__(self, process=None, **kwargs):
+        self._process = process
+        Subscriber.__init__(self, **kwargs)
