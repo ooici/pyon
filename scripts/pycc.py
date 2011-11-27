@@ -96,8 +96,7 @@ def main(opts, *args, **kwargs):
     import threading
     threading.current_thread().name = "CC-Main"
 
-    print 'Starting ION CC with options: ', opts
-    # The import of pyon.public triggers many starting actions:
+    # The import of pyon.public triggers many module initializers:
     # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container
     from pyon.container.cc import IContainerAgent
@@ -116,7 +115,7 @@ def main(opts, *args, **kwargs):
         # One off process
         mod, proc = opts.proc.rsplit('.', 1)
         print "Starting process %s" % opts.proc
-        container.spawn_process(proc, mod, proc)
+        container.spawn_process(proc, mod, proc, process_type='immediate')
         container.stop()
         return
 
@@ -177,10 +176,10 @@ def entry():
         # TODO: May need to generate a pidfile based on some parameter or cc name
         pidfile = opts.pidfile or 'cc-%s.pid' % str(uuid4())[0:4]
         with DaemonContext(pidfile=FileLock(pidfile)):#, stdout=logg, stderr=slogg):
-            print "Starting ION CC in deamon context"
+            print "Starting ION CC ... deamon=True, opts=%s" % str(opts)
             main(opts, *args, **kwargs)
     else:
-        print "Starting ION CC in non deamon context"
+        print "Starting ION CC ... deamon=False, opts=%s" % str(opts)
         main(opts, *args, **kwargs)
 
 if __name__ == '__main__':

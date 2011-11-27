@@ -73,7 +73,7 @@ class Container(object):
         dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
-        log.debug("Container.__init__(). sysname=%s" % bootstrap.sys_name)
+        log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
@@ -89,10 +89,12 @@ class Container(object):
 
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
+        
+        log.debug("Container initialized, OK.")
 
 
     def start(self):
-        log.debug("In Container.start")
+        log.debug("Container starting...")
 
         # Check if this UNIX process already runs a Container.
         self.pidfile = "cc-pid-%d" % os.getpid()
@@ -126,6 +128,7 @@ class Container(object):
 
 
         # Instantiate Directory singleton and self-register
+        # TODO: At this point, there is no special config override
         self.directory = Directory()
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
@@ -143,6 +146,7 @@ class Container(object):
         self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
         res = listener.get_ready_event()
         res.get()
+        log.info("Container started, OK.")
 
     def serve_forever(self):
         """ Run the container until killed. """
