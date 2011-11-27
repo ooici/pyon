@@ -2,11 +2,9 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.util.log import log
+from pyon.public import log, StreamProcess
 
-from interface.services.istream_process import BaseStreamProcess
-
-class StreamConsumer(BaseStreamProcess):
+class StreamConsumer(StreamProcess):
 
     def on_start(self):
         log.debug("StreamConsumer start")

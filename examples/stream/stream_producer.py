@@ -5,12 +5,9 @@ __author__ = 'Michael Meisinger'
 import time
 import threading
 
-from pyon.util.log import log
-from pyon.net.endpoint import Publisher
+from pyon.public import log, BaseService, endpoint
 
-from interface.services.inoop_service import BaseNoopService
-
-class StreamProducer(BaseNoopService):
+class StreamProducer(BaseService):
 
     def on_init(self):
         log.debug("StreamProducer init. Self.id=%s" % self.id)
@@ -27,7 +24,7 @@ class StreamProducer(BaseNoopService):
     def _trigger_func(self):
         interval = self.CFG.stream_producer.interval
         stream_route = self.CFG.stream_producer.stream_route
-        pub = Publisher(name=stream_route, node=self.container.node)
+        pub = endpoint.Publisher(node=self.container.node, name=stream_route)
         num = 1
         while True:
             msg = dict(num=str(num))
