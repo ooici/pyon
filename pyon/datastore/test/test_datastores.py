@@ -24,7 +24,7 @@ class Test_DataStores(IonIntegrationTestCase):
         
         self._do_test_views(MockDB_DataStore(datastore_name='my_ds'))
 
-    def Xtest_persistent(self):
+    def test_persistent(self):
         import socket
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
@@ -428,7 +428,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
-        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
+        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.ACTIVE, RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
@@ -450,7 +450,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 1)
         self.assertEquals(len(res_assoc1a), 1)
         self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
-        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.InstrumentDevice]))
+        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.InstrumentDevice]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_name( 'John Doe', RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
