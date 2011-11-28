@@ -51,7 +51,6 @@ class CouchDB_DataStore(DataStore):
             self.server.delete(datastore_name)
             return True
         except ResourceNotFound:
-            log.error('Data store delete failed.  Data store %s not found' % datastore_name)
             raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
 
     def list_datastores(self):
@@ -111,6 +110,28 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
+    def create_mult(self, objects, object_ids=None):
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
+                                    object_ids)
+
+    def create_doc_mult(self, docs, object_ids=None):
+        assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
+        assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
+
+        # Assign an id to doc (recommended in CouchDB documentation)
+        object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
+
+        for doc, oid in zip(docs, object_ids):
+            doc["_id"] = oid
+
+        # Update docs.  CouchDB will assign versions to docs.
+        res = self.server[self.datastore_name].update(docs)
+        if not res or not all([success for success, oid, rev in res]):
+            log.error('Create error. Result: %s' % str(res))
+        else:
+            log.debug('Create result: %s' % str(res))
+        return res
+
     def read(self, object_id, rev_id="", datastore_name=""):
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
@@ -124,10 +145,10 @@ class CouchDB_DataStore(DataStore):
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
         if not rev_id:
-            log.info('Reading head version of object %s/%s' % (datastore_name, doc_id))
+            log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
         else:
-            log.info('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
+            log.debug('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
             doc = db.get(doc_id, rev=rev_id)
         log.debug('read doc contents: %s', doc)
         return doc
@@ -562,7 +583,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
@@ -582,7 +603,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_name(self, name, restype=None, id_only=False):
@@ -602,7 +623,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['_id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [DotDict(**row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
             return (res_docs, res_assocs)
 
     def _ion_object_to_persistence_dict(self, ion_object):

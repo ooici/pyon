@@ -30,11 +30,6 @@ def service_name_from_file_name(file_name):
     file_name = os.path.basename(file_name).split('.', 1)[0]
     return file_name.title().replace('_', '').replace('-', '')
 
-# Maps object name and extends
-extends_objects = dict()
-extended_objects = defaultdict(set)
-allextends = defaultdict(set)
-
 class IonObjectMetaType(type):
     """
     Metaclass that automatically generates subclasses of IonObject with the appropriate defaults for each field.
@@ -196,11 +191,14 @@ class IonObjectRegistry(object):
     """
     A simple key-value store that stores by name and by definition hash for versioning.
     Also includes optional persistence to a document database.
-
-    TODO: Implement persistence once the document DB type is chosen.
     """
 
     do_validate = True
+
+    # Maps object name and extends
+    extends_objects = dict()
+    extended_objects = defaultdict(set)
+    allextends = defaultdict(set)
 
     def __init__(self):
         self.def_by_hash = {}
@@ -318,28 +316,29 @@ class IonObjectRegistry(object):
         skip_me = set(all_files)
         exclude_dirs = set([os.path.join(file_dir, path) for path in exclude_dirs])
 
+        new_files = []
         for root, dirs, files in os.walk(file_dir):
             if root in exclude_dirs: continue
             log.debug('Registering yaml files in dir: %s', root)
             for file in fnmatch.filter(files, pattern):
                 path = os.path.join(root, file)
                 if not path in skip_me:
-                    all_files.append(path)
+                    new_files.append(path)
 
+        # Make imports more predictable by sorting by filename
+        all_files.extend(sorted(new_files))
         return all_files
 
     def _register_extends(self, name, extends):
-        global extends_objects, extended_objects
-        extends_objects[name] = extends
-        extended_objects[extends].add(name)
+        self.extends_objects[name] = extends
+        self.extended_objects[extends].add(name)
 
     def _compute_allextends(self):
-        global allextends
-        for name,base in extends_objects.iteritems():
+        for name,base in self.extends_objects.iteritems():
             while base:
                 # Now go up the inheritance tree
-                allextends[base].add(name)
-                base = extends_objects.get(base, None)
+                self.allextends[base].add(name)
+                base = self.extends_objects.get(base, None)
 
     def register_obj_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
         """

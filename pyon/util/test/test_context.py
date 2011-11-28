@@ -5,10 +5,10 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.context import LocalContextMixin
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from gevent import spawn, event
 
-class LocalContextMixinTest(PyonTestCase):
+class LocalContextMixinTest(IonIntegrationTestCase):
     """
     Tests LocalContextMixin for thread-level storage
     """

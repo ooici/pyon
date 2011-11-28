@@ -4,46 +4,69 @@ __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.util.state_object import LifecycleStateMixin
 from pyon.util.containers import named_any
 from pyon.util.context import LocalContextMixin
 
-class BaseService(LifecycleStateMixin, LocalContextMixin):
+class BaseService(LocalContextMixin):
     """
-    A process class that provides a 'service'.
-    Not dependent on messaging.
+    Base class providing a 'service'. Pure Python class. Not dependent on messaging.
+    Such services can be executed by ION processes.
     """
 
+    # The following are set one per implementation (class)
     name = None
     running = 0
+    dependencies = []
 
     def __init__(self, *args, **kwargs):
-        LifecycleStateMixin.__init__(self, *args, autoinit=False, **kwargs)
-        LocalContextMixin.__init__(self)
+        self.id = None
+        self._proc_name = None
+        self._proc_type = None
+        self.errcause = None
+        self.container = None
+        self.CFG = None
+        super(BaseService, self).__init__()
 
-    def on_init(self, *args, **kwargs):
+    def init(self):
+        return self.on_init()
+
+    def on_init(self):
         """
-        Method to be overridden as neccessary by
-        implementing service classes to perform
-        initialization actions prior to service
-        start.  Configuration parameters are
+        Method to be overridden as necessary by implementing service classes to perform
+        initialization actions prior to service start.  Configuration parameters are
         accessible via the self.CFG dict.
         """
 
-    def on_start(self, *args, **kwargs):
+    def start(self):
+        return self.on_start()
+
+    def on_start(self):
         """
         Method called at service startup.
         """
 
-    def on_stop(self, *args, **kwargs):
+    def stop(self):
+        return self.on_stop()
+
+    def on_stop(self):
         """
-        Method called at service stop.
+        Method called at service stop. (May not be called if service is terminated immediately).
         """
 
-    def on_quit(self, *args, **kwargs):
+    def quit(self):
+        return self.on_quit()
+
+    def on_quit(self):
         """
-        Method called at service quit.
+        Method called just before service termination.
         """
+
+    def __str__(self):
+        return "".join((self.__class__.__name__,"(",
+                        "name=", self._proc_name,
+                        ",id=", self.id,
+                        ",type=", self._proc_type,
+                        ")"))
 
 services_by_name = {}
 
@@ -79,6 +102,4 @@ def get_service_by_name(name):
     else:
         return None
 
-load_service_mods('interface/services')
-build_service_map()
 

@@ -25,16 +25,15 @@ import msgpack
 import atexit
 import signal
 
+from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
+
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
-from pyon.core.bootstrap import CFG, sys_name, populate_registry
 from pyon.directory.directory import Directory
 from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
-from pyon.util.state_object import  LifecycleStateMixin
-
 from pyon.ion.exchange import ExchangeManager
 
 
@@ -58,25 +57,29 @@ class IContainerAgent(Interface):
     def stop():
         pass
 
-class Container(LifecycleStateMixin):
+class Container(object):
     implements(IContainerAgent)
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
     that do the bulk of the work in the ION system.
     """
     node = None
-    id = string.replace('%s.%d' % (os.uname()[1], os.getpid()), ".", "_")
+    id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
     name = "cc_agent_%s" % (id)
     pidfile = None
 
     def __init__(self, *args, **kwargs):
-        log.debug("Container.__init__")
-
-        # TODO: Bug: this does not work because CFG instance references are already public. Update directly
-        #CFG.update(kwargs)
+        # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
+        log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
+
+        # Keep track of the overrides from the command-line, so they can trump app/rel file data
+        self.spawn_args = DictModifier(CFG, kwargs)
+
+        # Load object and service registry
+        bootstrap_pyon()
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -86,14 +89,12 @@ class Container(LifecycleStateMixin):
 
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
+        
+        log.debug("Container initialized, OK.")
 
-        # Keep track of the overrides from the command-line, so they can trump app/rel file data
-        self.spawn_args = DictModifier(CFG, kwargs)
 
-        self.init(*args, **kwargs)
-
-    def on_start(self):
-        log.debug("In Container.on_start")
+    def start(self):
+        log.debug("Container starting...")
 
         # Check if this UNIX process already runs a Container.
         self.pidfile = "cc-pid-%d" % os.getpid()
@@ -118,8 +119,6 @@ class Container(LifecycleStateMixin):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
-        # Bootstrap object registry
-        populate_registry()
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
@@ -129,6 +128,7 @@ class Container(LifecycleStateMixin):
 
 
         # Instantiate Directory singleton and self-register
+        # TODO: At this point, there is no special config override
         self.directory = Directory()
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
@@ -146,6 +146,7 @@ class Container(LifecycleStateMixin):
         self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
         res = listener.get_ready_event()
         res.get()
+        log.info("Container started, OK.")
 
     def serve_forever(self):
         """ Run the container until killed. """
@@ -155,7 +156,7 @@ class Container(LifecycleStateMixin):
             self.start()
             
         try:
-            # This just wait in this Greenlet for all child processes to complete,
+            # This just waits in this Greenlet for all child processes to complete,
             # which is triggered somewhere else.
             self.proc_manager.proc_sup.join_children()
         except (KeyboardInterrupt, SystemExit) as ex:
@@ -174,24 +175,17 @@ class Container(LifecycleStateMixin):
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("In Container.on_stop - call quit")
-        self.quit(*args, **kwargs)
+    def stop(self):
+        log.debug("Container stopping...")
 
-    def on_quit(self):
-        log.debug("In Container.on_quit")
+        self.app_manager.stop()
 
-        self.app_manager.quit()
+        self.proc_manager.stop()
 
-        self.proc_manager.quit()
-
-        self.ex_manager.quit()
+        self.ex_manager.stop()
 
         # Unregister from directory
         self.directory.unregister("/Container", self.id)
 
         self._cleanup_pid()
-
-    def on_error(self, reason, *args, **kwargs):
-        log.error("Error in container: %s", reason)
-
+        log.debug("Container stopped, OK.")

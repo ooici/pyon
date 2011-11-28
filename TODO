@@ -1,71 +1,71 @@
 Current pyon TODO list:
 =======================
 
-PACKAGING:
+PACKAGING/CODE:
 
 - Automate versioning and packaging of pyon egg
-
-CODE:
-
-- More str() output
-- Clear distinction between ION process and pyon process
-- Move directory and datastore code to COI services if possible
+- More __str__() output for classes
+- Move directory and datastore code to coi_services if possible
 - Use log.info for relevant output, debug for debug level
 - Rename EndpointFactory -> Endpoint and Endpoint -> Conversation
+- More consistent and fewer packages
+- Refactor imports to use pyon.public as much as possible (but not in pyon core modules)
 
-STARTUP
-
-- Enable to start more than one CC out of the same directory (logging, pid file)
-
-OBJECTS:
-
-- Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
-- Before and after create: what's with ID and REV? Will it get updated?
-- Service default arguments set to {} and [] in base class. Dangerous Python idiom.
-- Parse all !Extends_XXXX and form an inheritance tree.
-- Check associations
-
-CONTAINER:
+CONTAINER/STARTUP:
 
 - Enhanced shell API
 - Enhanced messaging bookkeeping: ms() more telling
 - Exchange spaces introduced
 - Add event framework
 - Check service implementation against service definition (parameters, order)
-- Error handling
-- Standard entry point for
+- Error handling improved
+- Fail quick on startup error
+- DualModifierDict for two overrides in order (reference not copy the first one)
+- Check DotDict, DictModifier efficiency and where use
+- Bootstrap mode for container: Directory before started.
 
-TESTING:
+OBJECTS:
 
-- Work with pypi mock (in particular specs)
+- Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
+- Service default arguments set to {} and [] in base class. Dangerous Python idiom. Solutions?
+- Datastore does not modify original object on create or update. Do it.
 
 PROCESS/SERVICE:
 
 - Clear confusion with service vs process
-- Unique process ID
-- Process as instance aggegating one state and multiple endpoints
+- System-wide unique process ID
+- Process as instance aggregating one state and multiple endpoints
 - Process (greenlet) accepts messages from endpoints. One greenlet per process; one message at a time.
+- Process ioloop (picking messages and activating on schedule)
 - Process attachment (direct or via container)
-- More extensive Lifecycle
-- IDE code completion for service clients and methods
-- Be able to start non-service process in container
+- IDE code completion for service clients and methods (generated clients)
 - Optional vs. mandatory service arguments
 - Validate object content vs. service operations
+- Container support for infinite and recurring processes (in on_start)
+- Do not create message processing worker thread in BinderListener by default (use the process ioloop)
 
 MESSAGING:
 
 - Use ACKs
-- Messaging properties set:
-- Non-AMQP (ZeroMQ)
-- Local messaging with greenlet handover
+- Messaging properties set in pyon.net
+- Non-AMQP (ZeroMQ, Flask) nodes
+- Local messaging with greenlet handover (one actor)
+- ION endpoints in pyon.ion.endpoint (not pyon.net)
+
+TESTING:
+
+- Switch to nosetests (remove/alias bin/unittest)
+- Log and print in tests: visible on run if desired
 
 OPEN QUESTIONS:
+
 - How to declare mandatory (non null) service parameters?
-- Should we support kwargs in service clients
+- Should we support kwargs in service clients?
+- How to start stream processes?
 
 BUGS (see also Jira project CISWCORE)
 
 - Source path from not the current repo (e.g. pyon/examples not found)
 - Find result does not pass validate interceptor
 - Check IonObject validation vs. extends (does it work?)
-
+- DictModifier str() does not print full merge

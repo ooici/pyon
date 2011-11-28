@@ -9,7 +9,23 @@ from pyon.core.object import IonServiceRegistry
 import logging.config
 import os
 
-# Note: do we really want to do the res folder like this again?
+# THE CODE BELOW EXECUTES ON IMPORT OF THIS MODULE
+# IT BOOTSTRAPS THE PYON ENVIRONMENT
+
+# ENVIRONMENT. Check we are started in a proper way.
+def assert_environment():
+    """This asserts the mandatory (minimal) execution environment for pyon"""
+    import os.path
+    if not os.path.exists("res"):
+        raise Exception("pyon environment assertion failed: res/ directory not found")
+    if not os.path.exists("res/config"):
+        raise Exception("pyon environment assertion failed: res/config directory not found")
+    if not os.path.exists("res/config/pyon.yml"):
+        raise Exception("pyon environment assertion failed: pyon.yml config missing")
+
+assert_environment()
+
+# LOGGING. Read the logging config files
 logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
 LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
 
@@ -24,11 +40,12 @@ for handler in LOGGING_CFG.get('handlers', {}).itervalues():
 if LOGGING_CFG:
     logging.config.dictConfig(LOGGING_CFG)
 
-# Read global configuration
+# CONFIG. Read global configuration
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
 CFG = Config(conf_paths, ignore_not_found=True).data
 sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
+# OBJECTS. Object and service definitions.
 # Make a default factory for IonObjects
 obj_registry = IonServiceRegistry()
 IonObject = obj_registry.new
@@ -37,3 +54,15 @@ def populate_registry():
     obj_registry.register_obj_dir('obj/data', do_first=['ion.yml', 'resource.yml'])
     obj_registry.register_svc_dir('obj/services')
 
+def bootstrap_pyon():
+    # Objects
+    populate_registry()
+
+    # Resource definitions
+    from pyon.ion import resource
+    resource.load_definitions()
+
+    # Services.
+    from pyon.service import service
+    service.load_service_mods('interface/services')
+    service.build_service_map()

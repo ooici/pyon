@@ -389,7 +389,7 @@ class Subscriber(ListeningEndpointFactory):
         """
         @param  callback should be a callable with one arg: msg
         """
-        assert callback
+        assert callback, "No callback provided"
         self._callback = callback
         ListeningEndpointFactory.__init__(self, **kwargs)
 
@@ -652,7 +652,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         """
 
         context = self._process.get_context()
-        log.info('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
+        log.debug('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
 
         # must set here: sender-name, conv-id, conv-seq, performative
         header = RPCRequestEndpoint._build_header(self, raw_msg)

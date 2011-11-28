@@ -96,8 +96,7 @@ def main(opts, *args, **kwargs):
     import threading
     threading.current_thread().name = "CC-Main"
 
-    print 'Starting ION CC with options: ', opts
-    # The import of pyon.public triggers many starting actions:
+    # The import of pyon.public triggers many module initializers:
     # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container
     from pyon.container.cc import IContainerAgent
@@ -111,6 +110,14 @@ def main(opts, *args, **kwargs):
 
     start_ok = True
     error_msg = None
+
+    if opts.proc:
+        # One off process
+        mod, proc = opts.proc.rsplit('.', 1)
+        print "Starting process %s" % opts.proc
+        container.spawn_process(proc, mod, proc, process_type='immediate')
+        container.stop()
+        return
 
     if opts.rel:
         client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
@@ -126,7 +133,7 @@ def main(opts, *args, **kwargs):
     else:
         print "ABORTING CONTAINER START - ERROR: %s" % error_msg
 
-    container.quit()
+    container.stop()
 
 def parse_args(tokens):
     """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """
@@ -152,6 +159,7 @@ def entry():
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
+    parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
@@ -168,10 +176,10 @@ def entry():
         # TODO: May need to generate a pidfile based on some parameter or cc name
         pidfile = opts.pidfile or 'cc-%s.pid' % str(uuid4())[0:4]
         with DaemonContext(pidfile=FileLock(pidfile)):#, stdout=logg, stderr=slogg):
-            print "Starting ION CC in deamon context"
+            print "Starting ION CC ... deamon=True, opts=%s" % str(opts)
             main(opts, *args, **kwargs)
     else:
-        print "Starting ION CC in non deamon context"
+        print "Starting ION CC ... deamon=False, opts=%s" % str(opts)
         main(opts, *args, **kwargs)
 
 if __name__ == '__main__':

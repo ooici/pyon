@@ -13,12 +13,12 @@ def resolve(filename):
     if not filename:
         return None
 
-    resolved_file = None
+    resolved_file = filename
 
     if not '/' in filename: # Looking for a package
-        resolved_file = filename
+        pass
     else:
-        if not os.path.isabs(resolved_file):
+        if not os.path.isabs(filename):
             # First try relative to the local directory
             relative_path = filename
             if os.getcwd().endswith("_temp"):

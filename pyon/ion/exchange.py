@@ -7,7 +7,6 @@ __license__ = 'Apache 2.0'
 
 from pyon.net import messaging
 from pyon.util.log import log
-from pyon.util.state_object import  LifecycleStateMixin
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -16,12 +15,12 @@ ION_ROOT_XS = "ioncore"
 def valid_xname(name):
     return name and str(name).find(":") == -1 and str(name).find(" ") == -1
 
-class ExchangeManager(LifecycleStateMixin):
+class ExchangeManager(object):
     """
     Manager object for the CC to manage Exchange related resources.
     """
-    def on_init(self, container, *args, **kwargs):
-        log.debug("ExchangeManager: init")
+    def __init__(self, container):
+        log.debug("ExchangeManager initializing ...")
         self.container = container
 
         # Define the callables that can be added to Container public API
@@ -36,13 +35,15 @@ class ExchangeManager(LifecycleStateMixin):
         self.xs_by_name = {}
         self.default_xs = ExchangeSpace(ION_ROOT_XS)
 
-    def on_start(self, *args, **kwargs):
+        # TODO: Do more initializing here, not in container
+
+    def start(self):
         # Establish connection to broker
         #self.container.node, self.container.ioloop = messaging.make_node() # TODO: shortcut hack
 
         # Declare root exchange
         #self.default_xs.ensure_exists(self.container.node)
-        log.debug("ExchangeManager: start")
+        log.debug("ExchangeManager starting ...")
 
     def create_xs(self, name):
         pass
@@ -53,8 +54,8 @@ class ExchangeManager(LifecycleStateMixin):
     def create_xn(self, xs, name):
         pass
 
-    def on_quit(self, *args, **kwargs):
-        log.debug("ExchangeManager: quit")
+    def stop(self, *args, **kwargs):
+        log.debug("ExchangeManager stopping ...")
 
 
 class ExchangeSpace(object):

@@ -1,25 +1,12 @@
 #!/usr/bin/env python
 
-"""
-Entry point for importing common Ion packages. Most files should only need to import from here.
-"""
+"""Entry point for importing common Pyon/ION packages. Most files should only need to import from here."""
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 __all__ = []
 
-def assert_environment():
-    """This asserts the mandatory (minimal) execution environment for pyon"""
-    import os.path
-    if not os.path.exists("res"):
-        raise StandardError("pyon environment assertion failed: res/ directory not found")
-    if not os.path.exists("res/config"):
-        raise StandardError("pyon environment assertion failed: res/config directory not found")
-    if not os.path.exists("res/config/pyon.yml"):
-        raise StandardError("pyon environment assertion failed: pyon.yml config missing")
-
-assert_environment()
 
 # Tell the magic import log setup to pass through this file
 from pyon.util.log import import_paths
@@ -45,3 +32,16 @@ __all__ += ['IonProcessSupervisor']
 
 from pyon.container.cc import Container
 __all__ += ['Container']
+
+from pyon.service.service import BaseService
+__all__ += ['BaseService']
+
+from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, BinderListener
+__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber', 'BinderListener']
+
+from pyon.ion.resource import ResourceTypes, RT, AssocTypes, AT, LifeCycleStates, LCS
+__all__ += ['RT', 'AT', 'LCS']
+__all__ += ['ResourceTypes', 'AssocTypes', 'LifeCycleStates']
+
+from pyon.ion.streamproc import StreamProcess
+__all__ += ['StreamProcess']

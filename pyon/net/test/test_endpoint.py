@@ -8,7 +8,7 @@ from pyon.net import endpoint
 from pyon.net.endpoint import Endpoint, EndpointFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event, GreenletExit
 from pyon.service.service import BaseService
-from pyon.test.pyontest import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.async import wait, spawn
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
@@ -82,7 +82,7 @@ class FakeNode(object):
         self._chan = self._chan_type(**self._chan_kwargs)
         return self._chan
 
-class TestEndpoint(PyonTestCase):
+class TestEndpoint(IonIntegrationTestCase):
 
 
     def setUp(self):
@@ -139,7 +139,7 @@ class TestEndpoint(PyonTestCase):
 #        self.assertEquals(fakemsg, msg['payload'])
 
 
-class TestEndpointFactory(PyonTestCase):
+class TestEndpointFactory(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
         self._ef = EndpointFactory(node=self._node, name="EFTest")
@@ -186,7 +186,7 @@ class TestEndpointFactory(PyonTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
-class TestBinderListener(PyonTestCase):
+class TestBinderListener(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
 
@@ -209,7 +209,7 @@ class TestBinderListener(PyonTestCase):
 
         self.assertEquals(str(listen_g.value), "spawner")
 
-class TestPublisher(PyonTestCase):
+class TestPublisher(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
         self._pub = Publisher(node=self._node, name="testpub")
@@ -225,7 +225,7 @@ class TestPublisher(PyonTestCase):
         self._pub.publish("pub2")
         self.assertEquals(self._node._chan._sendcount, 2)
 
-class TestSubscriber(PyonTestCase):
+class TestSubscriber(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
 
@@ -254,7 +254,7 @@ class TestSubscriber(PyonTestCase):
         # from FakeChannel
         self.assertEquals(str(listen_g.value), "a msg")
 
-class TestRequestResponse(PyonTestCase):
+class TestRequestResponse(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
 
@@ -316,7 +316,7 @@ class FakeRPCServerChannel(FakeChannel):
             res = event.AsyncResult()
             res.get()
 
-class TestRPCRequestEndpoint(PyonTestCase):
+class TestRPCRequestEndpoint(IonIntegrationTestCase):
 
     def test_build_msg(self):
         e = RPCRequestEndpoint()
@@ -346,7 +346,7 @@ class TestRPCRequestEndpoint(PyonTestCase):
 
             self.assertRaises(err, e.send, 'payload')
 
-class TestRPCClient(PyonTestCase):
+class TestRPCClient(IonIntegrationTestCase):
 
     def test_rpc_client(self):
         node = FakeNode(chan_type=FakeRPCChannel, code=200, msg="OK")
@@ -357,7 +357,7 @@ class TestRPCClient(PyonTestCase):
         ret = rpcc.simple("zap", "zip")
         self.assertEquals(ret, "some payload")
 
-class TestRPCResponseEndpoint(PyonTestCase):
+class TestRPCResponseEndpoint(IonIntegrationTestCase):
 
     def simple(self, *args):
         """
@@ -377,7 +377,7 @@ class TestRPCResponseEndpoint(PyonTestCase):
 
         self.assertEquals(args, ("ein", "zwei"))
 
-class TestRPCServer(PyonTestCase):
+class TestRPCServer(IonIntegrationTestCase):
 
     def test_rpc_server(self):
         node = FakeNode(chan_type=FakeRPCServerChannel)

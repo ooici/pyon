@@ -8,8 +8,8 @@ from pyon.core.exception import NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from pyon.test.pyontest import PyonTestCase
-from pyon.ion.public import RT, AT, LCS
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.public import RT, AT, LCS
 
 from unittest import SkipTest
 
@@ -17,14 +17,14 @@ OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
-class Test_DataStores(PyonTestCase):
+class Test_DataStores(IonIntegrationTestCase):
 
     def test_non_persistent(self):
         self._do_test(MockDB_DataStore(datastore_name='my_ds'))
         
         self._do_test_views(MockDB_DataStore(datastore_name='my_ds'))
 
-    def Xtest_persistent(self):
+    def test_persistent(self):
         import socket
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
@@ -267,6 +267,14 @@ class Test_DataStores(PyonTestCase):
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 0)
 
+        o1 = IonObject("DataSet", name="One more")
+        o2 = IonObject("DataSet", name="Another one")
+        res = data_store.create_mult((o1, o2))
+        self.assertTrue(all([success for success, oid, rev in res]))
+
+        res = data_store.list_objects()
+        self.assertTrue(len(res) == 8 + numcoredocs)
+
         # Delete data store to clean up
         self.assertTrue(data_store.delete_datastore())
 
@@ -295,7 +303,7 @@ class Test_DataStores(PyonTestCase):
 
         # HACK: Both AssociationTypes so that this test works
         from pyon.ion.resource import AssociationTypes
-        AssociationTypes[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.Instrument, RT.DataSet])
+        AssociationTypes[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.InstrumentDevice, RT.DataSet])
         AssociationTypes[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
         AssociationTypes[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
 
@@ -305,11 +313,11 @@ class Test_DataStores(PyonTestCase):
 
         other_user_id = self._create_resource(RT.UserIdentity, 'Paul Smithy', description='Other user')
 
-        plat1_obj_id = self._create_resource(RT.Platform, 'Buoy1', description='My Platform')
+        plat1_obj_id = self._create_resource(RT.PlatformDevice, 'Buoy1', description='My Platform')
 
-        inst1_obj_id = self._create_resource(RT.Instrument, 'CTD1', description='My Instrument')
+        inst1_obj_id = self._create_resource(RT.InstrumentDevice, 'CTD1', description='My Instrument')
 
-        inst2_obj_id = self._create_resource(RT.Instrument, 'CTD2', description='Other Instrument')
+        inst2_obj_id = self._create_resource(RT.InstrumentDevice, 'CTD2', description='Other Instrument')
 
         ds1_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.ACTIVE)
 
@@ -340,10 +348,11 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(len(obj_assocs1n), 0)
 
         obj_ids1a, obj_assocs1a = data_store.find_objects(admin_user_id, id_only=False)
+        self.assertTrue(obj_ids1a[0]._def)
         self.assertEquals(len(obj_ids1a), 3)
         self.assertEquals(len(obj_assocs1a), 3)
         self.assertEquals(set([o._id for o in obj_ids1a]), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
-        self.assertEquals(set([o._def.type.name for o in obj_ids1a]), set([RT.UserInfo, RT.Instrument, RT.DataSet]))
+        self.assertEquals(set([o._def.type.name for o in obj_ids1a]), set([RT.UserInfo, RT.InstrumentDevice, RT.DataSet]))
 
         obj_ids1an, obj_assocs1an = data_store.find_objects("Non_Existent", id_only=False)
         self.assertEquals(len(obj_ids1an), 0)
@@ -354,7 +363,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(len(obj_assocs2), 2)
         self.assertEquals(set(obj_ids2), set([inst1_obj_id, ds1_obj_id]))
 
-        obj_ids3, _ = data_store.find_objects(admin_user_id, OWNER_OF, RT.Instrument, id_only=True)
+        obj_ids3, _ = data_store.find_objects(admin_user_id, OWNER_OF, RT.InstrumentDevice, id_only=True)
         self.assertEquals(len(obj_ids3), 1)
         self.assertEquals(obj_ids3[0], inst1_obj_id)
 
@@ -365,6 +374,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(sub_ids1), set([admin_user_id, plat1_obj_id]))
 
         sub_ids1a, sub_assoc1a = data_store.find_subjects(inst1_obj_id, id_only=False)
+        self.assertTrue(sub_ids1a[0]._def)
         self.assertEquals(len(sub_ids1a), 2)
         self.assertEquals(len(sub_assoc1a), 2)
         self.assertEquals(set([o._id for o in sub_ids1a]), set([admin_user_id, plat1_obj_id]))
@@ -392,6 +402,7 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, other_user_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_type(RT.UserIdentity, id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
@@ -413,10 +424,11 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.ACTIVE, id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
-        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
+        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.ACTIVE, RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
@@ -434,10 +446,11 @@ class Test_DataStores(PyonTestCase):
         self.assertEquals(set(res_ids1), set([inst1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_name('CTD2', id_only=False)
+        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 1)
         self.assertEquals(len(res_assoc1a), 1)
         self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
-        self.assertEquals(set([o.type_ for o in res_ids1a]), set([RT.Instrument]))
+        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.InstrumentDevice]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_name( 'John Doe', RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)

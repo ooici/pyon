@@ -114,6 +114,23 @@ class MockDB_DataStore(DataStore):
         log.debug('Create result: %s' % str(res))
         return res
 
+    def create_mult(self, objects, object_ids=None):
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
+                                    object_ids)
+
+    def create_doc_mult(self, docs, object_ids=None):
+        assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
+        assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
+
+        # Assign an id to doc (recommended in CouchDB documentation)
+        object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
+
+        res = []
+        for doc, oid in zip(docs, object_ids):
+            oid,rev = self.create_doc(doc, oid)
+            res.append((True,oid,rev))
+        return res
+
     def read(self, object_id, rev_id="", datastore_name=""):
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
