@@ -359,6 +359,46 @@ class Publisher(EndpointFactory):
         if self._pub_ep:
             self._pub_ep.close()
 
+class PrototypePublisher(Publisher):
+    """
+    High level abstraction of EndPoint for publishing messages to a stream
+    """
+
+    def __init__(self, exchange_name, credential, **kwargs):
+        """
+        init method used by a publisher factory
+        """
+        self._exchange_name = exchange_name
+        self._credential = credential
+
+        # @TODO Magic to make the endpoint factory do what we want - have a name and publish TO credential
+
+class PrototypePublisherFactory(object):
+    """
+    A factory which creates an end point on initialization and then uses that end point in many publishers for different
+    streams
+    """
+
+    def __init__(self, exchange_name=''):
+        """
+        Call EMS (container for now) to make an end point in the exchange which will be used to publish to streams
+        """
+
+        self._exchange_name = exchange_name # could also be an anonymous name...
+
+        # @TODO create an endpoint - what kind? It should not have any binding - it is a producer only
+
+    def create_publisher(self, streamid):
+        """
+        Call pubsub service to register this exchange name (endpoint) to publish on a particular stream
+        """
+
+        # @TODO make a pubsub service client...
+        credential = clients.pubsub.register_producer(self._exchange_name, streamid)
+
+        return PrototypePublisher(ep=self, credential=credential)
+
+
 class SubscriberEndpoint(Endpoint):
     """
     @TODO: Should have routing mechanics, possibly shared with other listener endpoint types
@@ -396,6 +436,40 @@ class Subscriber(ListeningEndpointFactory):
     def create_endpoint(self, **kwargs):
         log.debug("Subscriber.create_endpoint override")
         return ListeningEndpointFactory.create_endpoint(self, callback=self._callback, **kwargs)
+
+
+class PrototypeSubscriber(Subscriber):
+
+    def __init__(self, exchange_name, **kwargs):
+
+        self._exchange_name = exchange_name
+
+        Subscriber.__init__(self, **kwargs)
+        # Queue creation happens here
+
+    def set_callback(self, callback):
+
+        self._callback = callback
+
+
+    def subscribe(self, subscription):
+
+        subscription.exchange_name=self._exchange_name # the name of the subscriber to bind the routing rule to
+        res = clients.pubsub.subscribe(subscription)
+        # The binding happens in the pubsub service
+
+
+    def activate_subscriber(self):
+        """
+        Start consuming from the queue
+        """
+
+    def deactivate_subscriber(self):
+        """
+        Stop consuming from the queue
+        """
+
+
 
 #
 # BIDIRECTIONAL ENDPOINTS
