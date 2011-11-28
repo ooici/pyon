@@ -212,6 +212,23 @@ def main():
 
                 service_name = def_set.get('name', None)
                 class_docstring = def_set.get('docstring', "class docstring")
+                class_docstring_lines = class_docstring.split('\n')
+
+                # Annoyingly, we have to hand format the doc strings to introduce
+                # the correct indentation on multi-line strings           
+                first_time = True
+                class_docstring_formatted = ""
+                for i in range(len(class_docstring_lines)):
+                    class_docstring_line = class_docstring_lines[i]
+                    # Potentially remove excess blank line
+                    if class_docstring_line == "" and i == len(class_docstring_lines) - 1:
+                        break
+                    if first_time:
+                        first_time = False
+                    else:
+                        class_docstring_formatted += "\n    "
+                    class_docstring_formatted += class_docstring_line
+
                 dependencies = def_set.get('dependencies', None)
                 methods, class_methods = [], []
 
@@ -220,9 +237,25 @@ def main():
                 for op_name,op_def in meth_list.iteritems():
                     if not op_def: continue
                     def_docstring, def_in, def_out = op_def.get('docstring', "method docstring"), op_def.get('in', None), op_def.get('out', None)
+                    docstring_lines = def_docstring.split('\n')
+
+                    # Annoyingly, we have to hand format the doc strings to introduce
+                    # the correct indentation on multi-line strings           
+                    first_time = True
+                    docstring_formatted = ""
+                    for i in range(len(docstring_lines)):
+                        docstring_line = docstring_lines[i]
+                        # Potentially remove excess blank line
+                        if docstring_line == "" and i == len(docstring_lines) - 1:
+                            break
+                        if first_time:
+                            first_time = False
+                        else:
+                            docstring_formatted += "\n        "
+                        docstring_formatted += docstring_line
 
                     args_str, class_args_str = build_args_str(def_in, False), build_args_str(def_in, True)
-                    docstring_str = templates['methdocstr'].format(methoddocstr=def_docstring)
+                    docstring_str = templates['methdocstr'].format(methoddocstr=docstring_formatted)
                     outargs_str = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
                     methods.append(templates['method'].format(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
@@ -231,7 +264,7 @@ def main():
                 if service_name is None:
                     raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
                 service_name_str = templates['svcname'].format(name=service_name)
-                class_docstring_str = templates['clssdocstr'].format(classdocstr=class_docstring)
+                class_docstring_str = templates['clssdocstr'].format(classdocstr=class_docstring_formatted)
                 dependencies_str = templates['depends'].format(namelist=dependencies)
                 methods_str = ''.join(methods) or '    pass\n'
                 classmethods_str = ''.join(class_methods)
