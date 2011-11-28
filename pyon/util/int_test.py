@@ -2,6 +2,7 @@
 
 """Integration test base class and utils"""
 
+from contextlib import contextmanager
 import unittest
 
 from pyon.container.cc import Container
@@ -18,6 +19,21 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def run(self, result=None):
         unittest.TestCase.run(self, result)
+
+    @contextmanager
+    def container(self):
+        """
+        Context Manager for container in tests.
+        To use:
+        with self.container() as cc:
+            # your tests in here
+        # container stopped here
+        """
+        self._start_container()
+        try:
+            yield self.container
+        finally:
+            self._stop_container()
 
     def _start_container(self):
         self.container = Container()
