@@ -359,44 +359,59 @@ class Publisher(EndpointFactory):
         if self._pub_ep:
             self._pub_ep.close()
 
-class PrototypePublisher(Publisher):
+
+class StreamPublisher(Publisher): # Could be an object that uses a publisher?
     """
-    High level abstraction of EndPoint for publishing messages to a stream
+    Data management abstraction of EndPoint layer for publishing messages to a stream
     """
 
-    def __init__(self, exchange_name, credential, **kwargs):
+    def __init__(self, stream_route, **kwargs):
         """
         init method used by a publisher factory
         """
-        self._exchange_name = exchange_name
-        self._credential = credential
+        self._stream_route = stream_route
 
-        # @TODO Magic to make the endpoint factory do what we want - have a name and publish TO credential
+        Publisher.__init__(self, name=stream_route.exchange_name) # not correct interface yet!
 
-class PrototypePublisherFactory(object):
+        # @TODO Cant distinguish my exchange name from the to_name in the endpoint layer. Need a concept of FROM
+
+
+class PublisherRegistrar(object):
     """
-    A factory which creates an end point on initialization and then uses that end point in many publishers for different
-    streams
+    A Data Management level object for creating a publisher for a stream
+    This object manages registration of publishers for different streams and creates the abstracted endpoint with the
+    publish method
     """
 
-    def __init__(self, exchange_name=''):
+    def __init__(self, process):
         """
-        Call EMS (container for now) to make an end point in the exchange which will be used to publish to streams
+        Use the process's exchange name to publish messages to a stream
         """
 
-        self._exchange_name = exchange_name # could also be an anonymous name...
+        self._process = process
+        self._exchange_name = '' # @TODO get the processes exchange name as the FROM ?
 
-        # @TODO create an endpoint - what kind? It should not have any binding - it is a producer only
+        self.pubsub_client = {} # @TODO make a pubsub service client...
+
+        # @TODO For now don't worry about the endpoint - use the process endpoint
+
+    def create_stream(self, args):
+        """
+        Should we add a method here to create a stream as a convenience? or should the pubsub service call not happen
+        from within this object?
+        """
 
     def create_publisher(self, streamid):
         """
         Call pubsub service to register this exchange name (endpoint) to publish on a particular stream
+        Return a stream publisher object to publish (send) messages on a particular stream
         """
 
-        # @TODO make a pubsub service client...
-        credential = clients.pubsub.register_producer(self._exchange_name, streamid)
+        # Call the pubsub service to register the exchange name as a publisher for this stream
+        stream_route = self.pubsub_client.register_producer(self._exchange_name, streamid)
 
-        return PrototypePublisher(ep=self, credential=credential)
+        # Create the Stream publisher, ready to publish messages to the stream
+        return StreamPublisher(ep=self, stream_route)
 
 
 class SubscriberEndpoint(Endpoint):
@@ -438,38 +453,80 @@ class Subscriber(ListeningEndpointFactory):
         return ListeningEndpointFactory.create_endpoint(self, callback=self._callback, **kwargs)
 
 
-class PrototypeSubscriber(Subscriber):
+class StreamSubscriber(object):
+    """
+    Data management abstraction of the subscriber endpoint
+    """
+    def __init__(self, subscriber, subscription_id=None):
 
-    def __init__(self, exchange_name, **kwargs):
+        self._subscriber = subscriber
 
-        self._exchange_name = exchange_name
+        self._subscription_id = subscription_id
 
-        Subscriber.__init__(self, **kwargs)
-        # Queue creation happens here
-
-    def set_callback(self, callback):
-
-        self._callback = callback
-
-
-    def subscribe(self, subscription):
-
-        subscription.exchange_name=self._exchange_name # the name of the subscriber to bind the routing rule to
-        res = clients.pubsub.subscribe(subscription)
-        # The binding happens in the pubsub service
-
-
-    def activate_subscriber(self):
+    def attach_subscriber(self):
         """
         Start consuming from the queue
         """
+        # I now believe this is incorrect - how can this be implemented properly?
+        channel = self._subscriber_endpoint.channel
+        self._subscriber_endpoint.attach_channel(channel)
+        # what should the correct behavior be for already attached?
 
-    def deactivate_subscriber(self):
+    def detach_subscriber(self):
         """
         Stop consuming from the queue
         """
 
+        # @TODO - not implemented in the endpoint layer yet.
 
+
+
+class SubscriberRegistrar(object):
+    """
+    Class to create and register subscriptions in the pubsub service, create a StreamSubscriber
+    """
+
+
+    def __init__(self, process):
+
+        self._process = process
+        # @TODO create the pubsub service client - how from here?
+        self.pubsub_client = {}
+
+    def subscribe(self, exchange_name='', callback=None, query=None):
+        """
+        This method creates a new subscriber, a new exchange_name if it does not already exist, and a new subscription
+        if a query is provided.
+        """
+
+        # @TODO what about node - do I need to pass that?
+        # @TODO what about an anonymous exchange name - how can we allow that?
+        # Is there automatically a binding for the exchange name when it is created? We want the pubsub service to
+        # control routes for this exchange name
+        # Will this No-op if the exhange name already exists? That is what I intended...
+        s = Subscriber(callback=callback, name=exchange_name)
+
+        # @TODO - Is the subscriber already attached - is that the correct behavior?
+
+        sub_id = None
+        if query is not None:
+            # Call the pubsub service to create a subscription if a query is provided
+            subscription = IonObject("Subscription", {'exchange_name':exchange_name,'query':query})
+            sub_id = self.pubsub_client.subscribe(subscription)
+
+        return StreamSubscriber(s, sub_id)
+
+    def activate_subscriber(self, stream_subscriber):
+        """
+        Call the pubsub service to activate the subscription
+        """
+        self.pubsub_client.activate(stream_subscriber._subscription_id)
+
+    def deactivate_subscriber(self, stream_subscriber):
+        """
+        Call the pubsub service to deactivate the subscription
+        """
+        self.pubsub_client.deactivate(stream_subscriber._subscription_id)
 
 #
 # BIDIRECTIONAL ENDPOINTS
