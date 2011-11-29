@@ -28,9 +28,20 @@ class IonServiceDefinitionError(Exception):
 
 class IonServiceDefinitionGenerator(object):
 
-    SIGFILE    = os.path.join('interface', '.svc_signatures.yml')
-    REPORTFILE = os.path.join('interface', 'validation_report.txt')
+    INPUT_DIR     = 'obj'
+    IN_SERVICES   = os.path.join(INPUT_DIR, 'services')
+    IN_DATA       = os.path.join(INPUT_DIR, 'data')
 
+    LOCAL_OVERRIDE_INPUT_DIR = 'obj-local'
+
+    OUTPUT_DIR    = 'interface'
+    OUT_SERVICES  = os.path.join(OUTPUT_DIR, 'services')
+
+
+    SIGFILE     = os.path.join(OUTPUT_DIR, '.svc_signatures.yml')
+    REPORTFILE  = os.path.join(OUTPUT_DIR, 'validation_report.txt')
+
+    YAML_FILE_RE = re.compile('(' + INPUT_DIR + ')/(.*)[.](yml)')
 
     TEMPLATE = {
         'file':
@@ -110,30 +121,34 @@ from pyon.service.service import BaseService
         args_str = ', '.join(args)
         return args_str
 
-
-    # for a given interface, generate the relevant file.
-    def generate_service_definition(self, yaml_file, interface_name, interface_file):
+    
+    # place __init__.py files in parent directories of a path as appropriate
+    def init_py_parent_dirs(self, path):
+        #if the end case isn't in the path, abort
+        endcase = os.path.abspath(self.OUTPUT_DIR)
+        assert endcase in os.path.abspath(path)
         
-        parent_dir = os.path.dirname(interface_file)
+        parent_dir = os.path.dirname(path)
 
         if not os.path.exists(parent_dir):
             os.makedirs(parent_dir)
             parent = parent_dir
             while True:
                 # Add __init__.py files to parent dirs as necessary
-                curdir = os.path.split(os.path.abspath(parent))[1]
-                if curdir == 'services':
+                pkg_file = os.path.join(parent, '__init__.py')
+                self.touch(pkg_file)
+
+                if parent == endcase:
                     break
-                else:
-                    parent = os.path.split(os.path.abspath(parent))[0]
+                
+                parent = os.path.split(os.path.abspath(parent))[0]
 
-                    pkg_file = os.path.join(parent, '__init__.py')
-                    if not os.path.exists(pkg_file):
-                        self.touch(pkg_file)
 
-        pkg_file = os.path.join(parent_dir, '__init__.py')
-        if not os.path.exists(pkg_file):
-            self.touch(pkg_file)
+
+    # for a given interface, generate the relevant file.
+    def generate_service_definition(self, yaml_file, interface_name, interface_file):
+        
+        self.init_py_parent_dirs(interface_file)
 
         with open(yaml_file, 'r') as f:
             yaml_text = f.read()
@@ -143,12 +158,12 @@ from pyon.service.service import BaseService
 
             if yaml_file in self.svc_signatures and not self.opts.force:
                 if cur_md5 == self.svc_signatures[yaml_file]:
-                    print "Skipping   %40s (md5 signature match)" % interface_name
+                    print "%10s %40s (md5 signature match)" % ("Skipping", interface_name)
                     return
 
             if self.opts.dryrun:
                 self.service_definition_count += 1
-                print "Changed    %40s (needs update)" % interface_name
+                print "%10s %40s (needs update)" % ("Changed", interface_name)
                 return
 
             # update signature set
@@ -161,13 +176,14 @@ from pyon.service.service import BaseService
             if 'obj' in def_set:
                 for obj_name in def_set['obj']:
                     tag = u'!%s' % (obj_name)
-                    yaml.add_constructor(tag, lambda loader, node: {})
+                    self.yaml_add_constructor(tag)
                 continue
 
-            service_name = def_set.get('name', None)
-            class_docstring = def_set.get('docstring', "class docstring")
-            dependencies = def_set.get('dependencies', None)
-            methods, class_methods = [], []
+            service_name     = def_set.get('name', None)
+            class_docstring  = def_set.get('docstring', "class docstring")
+            dependencies     = def_set.get('dependencies', None)
+            methods          = []
+            class_methods    = []
 
             # It seems that despite the get with default arg, there still can be None resulting (YAML?)
             meth_list = def_set.get('methods', {}) or {}
@@ -239,7 +255,36 @@ from pyon.service.service import BaseService
 
     #copy of unix "touch" command
     def touch(self, path):
-        open(path, 'w').close()
+        if not os.path.exists(path):
+            open(path, 'w').close()
+
+
+    #add a dummy constructor to aid parsing
+    def yaml_add_constructor(self, tag):
+        yaml.add_constructor(tag, lambda loader, node: {})
+
+
+    #walk a directory and execute a function on yaml files
+    def yml_dir_walk(self, some_dir, work_fn):
+        for root, dirs, files in os.walk(some_dir):
+            for filename in fnmatch.filter(files, '*.yml'):
+                yaml_file = os.path.join(root, filename)
+                #get the relative path with a regexp
+                file_match = self.YAML_FILE_RE.match(yaml_file)
+                if file_match:
+                    rel_path = file_match.group(2)
+                    
+                    #FIXME
+                    #look for matching file in the local override 
+                    #local_rel_path  = os.path.join(self.LOCAL_OVERRIDE_INPUT_DIR, rel_path)
+                    #local_yaml_file = local_rel_path + ".yml"
+
+                    #if os.path.exists(local_yaml_file):
+                    # FIXME: work_fn(local_yaml_file, SOMEHOW
+                    #ELSE:
+
+                    work_fn(yaml_file, rel_path)
+        
 
     # prepare to generate interfaces -- initialize any necessary stuff
     def getready(self):
@@ -248,64 +293,52 @@ from pyon.service.service import BaseService
         self.currtime = str(datetime.datetime.today())
 
 
+    # main function of this file
     def go(self):
 
-        service_dir    = 'obj/services'
-        data_dir       = 'obj/data'
-        interface_dir  = 'interface'
-        yaml_file_re   = re.compile('(obj)/(.*)[.](yml)')
+        #work function for making an object definition in a directory walk
+        def process_data_object(yaml_file, _):
+            yaml_text = open(yaml_file, 'r').read()
+            defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
+            for def_set in defs:
+                for name,_def in def_set.iteritems():
+                    tag  = u'!%s' % (name)
+                    xtag = u'!Extends_%s' % (name)
+                    self.yaml_add_constructor(tag)
+                    self.yaml_add_constructor(xtag)
 
-        if not os.path.exists(interface_dir):
-            os.makedirs(interface_dir)
+        #work function for making a service definition in a directory walk
+        def process_service(yaml_file, file_path):
+            interface_base  = os.path.dirname(file_path)
+            interface_name  = os.path.basename(file_path)
+            interface_file  = os.path.join(self.OUTPUT_DIR, interface_base, 'i%s.py' % interface_name)
 
+            self.generate_service_definition(yaml_file, interface_name, interface_file)
+
+        
         #initialize output directory
-        self.clean_interface_dir(interface_dir)
-        self.touch(os.path.join(interface_dir, '__init__.py'))
+        if not os.path.exists(self.OUTPUT_DIR):
+            os.makedirs(self.OUTPUT_DIR)
+        self.clean_interface_dir(self.OUTPUT_DIR)
 
         # Load data yaml files in case services define interfaces
         # in terms of common data objects
         entag = u'!enum'
-        yaml.add_constructor(entag, lambda loader, node: {})
-        for root, dirs, files in os.walk(data_dir):
-            for filename in fnmatch.filter(files, '*.yml'):
-                yaml_file = os.path.join(root, filename)
-                file_match = yaml_file_re.match(yaml_file)
-                if file_match is None: continue
+        self.yaml_add_constructor(entag)
+        self.yml_dir_walk(self.IN_DATA, process_data_object)
 
-                yaml_text = open(yaml_file, 'r').read()
-                defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
-                for def_set in defs:
-                    for name,_def in def_set.iteritems():
-                        tag = u'!%s' % (name)
-                        yaml.add_constructor(tag, lambda loader, node: {})
-                        xtag = u'!Extends_%s' % (name)
-                        yaml.add_constructor(xtag, lambda loader, node: {})
-
-
-        self.sigfile_read()
 
         # Generate the new definitions, for now giving each
         # yaml file its own python service
-        for root, dirs, files in os.walk(service_dir):
-            for filename in fnmatch.filter(files, '*.yml'):
-                yaml_file = os.path.join(root, filename)
-                file_match = yaml_file_re.match(yaml_file)
-                if '.svc_signatures' in filename: continue
-                if file_match is None: continue
-
-                file_path = file_match.group(2)
-                interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
-                interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
-
-
-                self.generate_service_definition(yaml_file, interface_name, interface_file)
+        self.sigfile_read()
+        self.yml_dir_walk(self.IN_SERVICES, process_service)
 
         #things to do if its not a dry run (and we actually have material)
         if self.service_definition_count > 0 and not self.opts.dryrun:
             self.sigfile_write()
 
             # Load interface base classes
-            self.load_mods("interface/services", True)
+            self.load_mods(self.OUT_SERVICES, True)
             self.find_subtypes(BaseService) #ijk5: does this even need to be here?
             # Load impl classes
             self.load_mods("ion", False)
@@ -336,7 +369,7 @@ from pyon.service.service import BaseService
 
         # Generate validation report
         validation_results = "Report generated on " + self.currtime + "\n"
-        self.load_mods("interface/services", True)
+        self.load_mods(self.OUT_SERVICES, True)
         base_subtypes = self.find_subtypes(BaseService)
         self.load_mods("ion", False)
         self.load_mods("examples", False)
@@ -393,16 +426,15 @@ from pyon.service.service import BaseService
         return validation_results
 
 
-
-    #FIXME: convert slashes to os-inspecific code
+    #load modules in a given path
     def load_mods(self, path, interfaces):
         import pkgutil
         import string
-        mod_prefix = string.replace(path, "/", ".")
+        mod_prefix = string.replace(path, os.path.sep, ".")
 
         for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
             if is_pkg:
-                self.load_mods(path+"/"+mod_name, interfaces)
+                self.load_mods(os.path.join(path, mod_name), interfaces)
             else:
                 mod_qual = "%s.%s" % (mod_prefix, mod_name)
                 try:
