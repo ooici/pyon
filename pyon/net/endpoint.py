@@ -504,8 +504,6 @@ class RPCClient(RequestResponseClient):
             self._define_interface(iface)
         elif isinstance(iface, IonServiceDefinition):
             self._define_svcdef(iface)
-        else:
-            raise RuntimeError("interface is not a zope.interface or an IonServiceDefinition")
 
         RequestResponseClient.__init__(self, **kwargs)
 
@@ -684,6 +682,9 @@ class ProcessRPCClient(RPCClient):
         RPCClient.__init__(self, **kwargs)
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        if not self._process:
+            raise StandardError("No Process specified")
+
         newkwargs = kwargs.copy()
         newkwargs['process'] = self._process
         return RPCClient.create_endpoint(self, to_name, existing_channel, **newkwargs)

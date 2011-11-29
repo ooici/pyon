@@ -7,6 +7,13 @@ from pyon.util.log import log
 from pyon.util.containers import named_any
 from pyon.util.context import LocalContextMixin
 
+class BaseClients(object):
+    """
+    Basic object to hold clients for a service. Derived in implementations.
+    Placeholder, may not need any functionality.
+    """
+    pass
+
 class BaseService(LocalContextMixin):
     """
     Base class providing a 'service'. Pure Python class. Not dependent on messaging.

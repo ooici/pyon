@@ -176,23 +176,22 @@ class ProcManager(object):
         service_instance.CFG = config
         service_instance._proc_name = name
 
-        # Set service dependencies (RPC clients)
-        self._set_service_dependencies(service_instance)
+        # start service dependencies (RPC clients)
+        self._start_service_dependencies(service_instance)
         
         return service_instance
 
-    def _set_service_dependencies(self, service_instance):
+    def _start_service_dependencies(self, service_instance):
         service_instance.errcause = "setting service dependencies"
-        service_instance.clients = DotDict()
         log.debug("spawn_process dependencies: %s" % service_instance.dependencies)
         # TODO: Service dependency != process dependency
         for dependency in service_instance.dependencies:
-            dependency_service = get_service_by_name(dependency)
-            dependency_interface = list(implementedBy(dependency_service))[0]
+            client = getattr(service_instance.clients, dependency)
+            assert client, "Client for dependency not found: %s" % dependency
 
-            # @TODO: start_client call instead?
-            client = ProcessRPCClient(node=self.container.node, name=dependency, iface=dependency_interface, process=service_instance)
-            service_instance.clients[dependency] = client
+            # @TODO: should be in a start_client in RPCClient chain
+            client.process  = service_instance
+            client.node     = self.container.node
 
     def _service_init(self, service_instance):
         # Init process

@@ -11,6 +11,7 @@ import inspect
 import os
 import re
 import sys
+import string
 
 import yaml
 import hashlib
@@ -26,60 +27,137 @@ from pyon.util import yaml_ordered_dict
 class IonServiceDefinitionError(Exception):
     pass
 
+currtime = str(datetime.datetime.today())
+
 templates = {
       'file':
 '''#!/usr/bin/env python
 #
-# File generated on {when_generated}
+# File generated on ${when_generated}
 #
 
 from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
-from pyon.service.service import BaseService
+from pyon.service.service import BaseService, BaseClients
+from pyon.net.endpoint import RPCClient, ProcessRPCClient
+${dep_client_imports}
 
-{classes}
+${clientsholder}
+
+${classes}
+
+${client}
+'''
+    , 'clientsholder':
+'''class ${name}Clients(BaseClients):
+    def __init__(self, process=None):
+        BaseClients.__init__(self)
+${dep_clients}
+'''
+    , 'client_file':
+'''#!/usr/bin/env python
+#
+# File generated on ${when_generated}
+#
+${client_imports}
 '''
     , 'class':
-'''class I{name}(Interface):
-{classdocstring}
-{methods}
+'''class I${name}(Interface):
+${classdocstring}
+${methods}
 '''
-'''class Base{name}(BaseService):
-    implements(I{name})
-{classdocstring}
-{servicename}
-{dependencies}
-{classmethods}
+'''class Base${name}(BaseService):
+    implements(I${name})
+${classdocstring}
+${servicename}
+${dependencies}
+
+    def __init__(self, *args, **kwargs):
+        BaseService.__init__(self, *args, **kwargs)
+        self.clients = ${name}Clients(process=self)
+
+${classmethods}
 '''
+    , 'dep_client':
+'''        self.${svc} = ${clientclass}(process=process)'''
+    , 'dep_client_imports':
+'''from ${clientmodule} import ${clientclass}'''
     , 'clssdocstr':
-'    """{classdocstr}\n\
+'    """${classdocstr}\n\
     """'
     , 'svcname':
-'    name = \'{name}\''
+'    name = \'${name}\''
     , 'depends':
-'    dependencies = {namelist}'
+'    dependencies = ${namelist}'
     , 'method':
 '''
-    def {name}({args}):
-        {methoddocstring}
+    def ${name}(${args}):
+        ${methoddocstring}
         # Return Value
         # ------------
-        # {outargs}
+        # ${outargs}
         pass
 '''
-    , 'arg': '{name}={val}'
+    , 'arg': '${name}=${val}'
     , 'methdocstr':
-'"""{methoddocstr}\n\
+'"""${methoddocstr}\n\
         """'
 }
+
+client_templates = {
+    'full':
+'''
+${client}
+
+${rpcclient}
+
+${processrpcclient}
+''',
+    'class':
+'''class ${name}ClientMixin(object):
+    """
+    ${clientdocstring}
+    """
+    implements(I${name})
+
+${methods}
+''',
+    'method':
+'''
+    def ${name}(${args}):
+        ${methoddocstring}
+        # Return Value
+        # ------------
+        # ${outargs}
+        return self.request({'method': '${name}', 'args': [${argssmall}]})
+''',
+    'rpcclient':
+'''class ${name}Client(RPCClient, ${name}ClientMixin):
+    def __init__(self, name=None, node=None, **kwargs):
+        name = name or '${targetname}'
+        RPCClient.__init__(self, name=name, node=node, **kwargs)
+        ${name}ClientMixin.__init__(self)
+''',
+    'processrpcclient':
+'''class ${name}ProcessClient(ProcessRPCClient, ${name}ClientMixin):
+    def __init__(self, process=None, name=None, node=None, **kwargs):
+        name = name or '${targetname}'
+        ProcessRPCClient.__init__(self, process=process, name=name, node=node, **kwargs)
+        ${name}ClientMixin.__init__(self)
+'''
+}
+
+# convert both to string.Template
+templates           = dict(((k, string.Template(v)) for k, v in templates.iteritems()))
+client_templates    = dict(((k, string.Template(v)) for k, v in client_templates.iteritems()))
 
 def build_args_str(_def, include_self=True):
     # Handle case where method has no parameters
     args = []
     if include_self: args.append('self')
-        
+
     for key,val in (_def or {}).iteritems():
         if isinstance(val, basestring):
             val = "'%s'" % (val)
@@ -91,10 +169,117 @@ def build_args_str(_def, include_self=True):
             val = []
         elif isinstance(val, dict):
             val = {}
-        args.append(templates['arg'].format(name=key, val=val))
-        
+        args.append(templates['arg'].substitute(name=key, val=val))
+
     args_str = ', '.join(args)
     return args_str
+
+def generate_service(interface_file, svc_def, client_defs):
+    """
+    Generates a single service/client/interface definition.
+
+    @param  interface_file      The file on disk this def should be written to.
+    @param  svc_def             Hash of info about service.
+    @param  client_defs         Static mapping of service names to their defined clients.
+    """
+    service_name    = svc_def['name']
+    class_docstring = svc_def['docstring']
+    dependencies    = svc_def['dependencies']
+    meth_list       = svc_def['methods']
+    interface_name  = svc_def['interface_name']
+
+    print 'Generating %40s -> %s' % (interface_name, interface_file)
+
+    methods         = []
+    class_methods   = []
+    client_methods  = []
+
+    for op_name, op_def in meth_list.iteritems():
+        if not op_def: continue
+
+        def_docstring, def_in, def_out  = op_def.get('docstring', "method docstring"), op_def.get('in', None), op_def.get('out', None)
+
+        # multiline docstring for method
+        docstring_lines = def_docstring.split('\n')
+
+        # Annoyingly, we have to hand format the doc strings to introduce
+        # the correct indentation on multi-line strings           
+        first_time = True
+        docstring_formatted = ""
+        for i in range(len(docstring_lines)):
+            docstring_line = docstring_lines[i]
+            # Potentially remove excess blank line
+            if docstring_line == "" and i == len(docstring_lines) - 1:
+                break
+            if first_time:
+                first_time = False
+            else:
+                docstring_formatted += "\n        "
+            docstring_formatted += docstring_line
+
+        args_str, class_args_str        = build_args_str(def_in, False), build_args_str(def_in, True)
+        docstring_str                   = templates['methdocstr'].substitute(methoddocstr=docstring_formatted)
+        outargs_str                     = '\n        # '.join(yaml.dump(def_out).split('\n'))
+
+        methods.append(templates['method'].substitute(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
+        class_methods.append(templates['method'].substitute(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
+
+        clientargspass = ''
+        if def_in:
+            clientargspass = ','.join((k for k in def_in))   # enumerates keys only, which are names, aka what we want here
+        client_methods.append(client_templates['method'].substitute(name=op_name,
+                                                                    args=class_args_str,
+                                                                    methoddocstring=docstring_str,
+                                                                    argssmall=clientargspass,
+                                                                    outargs=outargs_str))
+
+    if service_name is None:
+        raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
+
+    # dep client names
+    dep_clients             = [(x, client_defs[x][1]) for x in dependencies]
+    dep_clients_str         = "\n".join(map(lambda x2: templates['dep_client'].substitute(svc=x2[0], clientclass=x2[1]), dep_clients))
+    dep_client_imports_str  = "\n".join([templates['dep_client_imports'].substitute(clientmodule=client_defs[x][0], clientclass=client_defs[x][1]) for x in dependencies])
+
+    service_name_str    = templates['svcname'].substitute(name=service_name)
+    class_docstring_str = templates['clssdocstr'].substitute(classdocstr=class_docstring)
+    dependencies_str    = templates['depends'].substitute(namelist=dependencies)
+    methods_str         = ''.join(methods) or '    pass\n'
+    classmethods_str    = ''.join(class_methods)
+    class_name          = service_name_from_file_name(interface_name)
+
+    _class = templates['class'].substitute(name=class_name,
+                                           classdocstring=class_docstring_str,
+                                           servicename=service_name_str,
+                                           dependencies=dependencies_str,
+                                           methods=methods_str,
+                                           classmethods=classmethods_str)
+
+    # dependent clients generation
+    clients_holder_str = templates['clientsholder'].substitute(name=class_name,
+                                                               dep_clients=dep_clients_str)
+
+    # this service's client generation
+    _client_methods             = ''.join(client_methods)
+    _client_class               = client_templates['class'].substitute(name=class_name,
+                                                                       clientdocstring='#todo',
+                                                                       methods=_client_methods)
+    _client_rpcclient           = client_templates['rpcclient'].substitute(name=class_name,
+                                                                           targetname=service_name)
+    _client_processrpc_client   = client_templates['processrpcclient'].substitute(name=class_name,
+                                                                                  targetname=service_name)
+
+    _client                     = client_templates['full'].substitute(client=_client_class,
+                                                                      rpcclient=_client_rpcclient,
+                                                                      processrpcclient=_client_processrpc_client)
+
+    interface_contents          = templates['file'].substitute(dep_client_imports=dep_client_imports_str,
+                                                               clientsholder=clients_holder_str,
+                                                               classes=_class,
+                                                               when_generated=currtime,
+                                                               client=_client)
+    with open(interface_file, 'w') as f:
+        f.write(interface_contents)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -147,7 +332,15 @@ def main():
 
     count = 0
 
-    currtime = str(datetime.datetime.today())
+    # mapping of service name -> { name, docstring, deps, methods }
+    raw_services = {}
+
+    # dependency graph, maps svcs -> deps by service name as a list
+    service_dep_graph = {}
+
+    # completed service client definitions, maps service name -> full module path to find module
+    client_defs = {}
+
     # Generate the new definitions, for now giving each
     # yaml file its own python service
     for root, dirs, files in os.walk(service_dir):
@@ -181,6 +374,7 @@ def main():
             if not os.path.exists(pkg_file):
                 open(pkg_file, 'w').close()
 
+            skip_file = False
             with open(yaml_file, 'r') as f:
                 yaml_text = f.read()
                 m = hashlib.md5()
@@ -190,16 +384,18 @@ def main():
                 if yaml_file in svc_signatures and not opts.force:
                     if cur_md5 == svc_signatures[yaml_file]:
                         print "Skipping   %40s (md5 signature match)" % interface_name
-                        continue
+                        skip_file = True
+                        # do not continue here, we want to read the service deps below
 
                 if opts.dryrun:
                     count += 1
                     print "Changed    %40s (needs update)" % interface_name
-                    continue
+                    skip_file = True
+                    # do not continue here, we want to read the service deps below
 
                 # update signature set
-                svc_signatures[yaml_file] = cur_md5
-                print 'Generating %40s -> %s' % (interface_name, interface_file)
+                if not skip_file:
+                    svc_signatures[yaml_file] = cur_md5
 
             defs = yaml.load_all(yaml_text)
             for def_set in defs:
@@ -210,8 +406,13 @@ def main():
                         yaml.add_constructor(tag, lambda loader, node: {})
                     continue
 
-                service_name = def_set.get('name', None)
+                service_name    = def_set.get('name', None)
                 class_docstring = def_set.get('docstring', "class docstring")
+                dependencies    = def_set.get('dependencies', None)
+                meth_list       = def_set.get('methods', {}) or {}
+                client_path     = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % service_name_from_file_name(interface_name))
+
+                # format multiline docstring
                 class_docstring_lines = class_docstring.split('\n')
 
                 # Annoyingly, we have to hand format the doc strings to introduce
@@ -229,57 +430,66 @@ def main():
                         class_docstring_formatted += "\n    "
                     class_docstring_formatted += class_docstring_line
 
-                dependencies = def_set.get('dependencies', None)
-                methods, class_methods = [], []
+                # load into raw_services (if we're not skipping)
+                if not skip_file:
+                    if service_name in raw_services:
+                        raise StandardError("Duplicate service name found: %s" % service_name)
 
-                # It seems that despite the get with default arg, there still can be None resulting (YAML?)
-                meth_list = def_set.get('methods', {}) or {}
-                for op_name,op_def in meth_list.iteritems():
-                    if not op_def: continue
-                    def_docstring, def_in, def_out = op_def.get('docstring', "method docstring"), op_def.get('in', None), op_def.get('out', None)
-                    docstring_lines = def_docstring.split('\n')
+                    raw_services[service_name] = { 'name'           : service_name,
+                                                   'docstring'      : class_docstring_formatted,
+                                                   'dependencies'   : dependencies,
+                                                   'methods'        : meth_list,
+                                                   'interface_file' : interface_file,
+                                                   'interface_name' : interface_name,
+                                                   'client_path'    : client_path }
 
-                    # Annoyingly, we have to hand format the doc strings to introduce
-                    # the correct indentation on multi-line strings           
-                    first_time = True
-                    docstring_formatted = ""
-                    for i in range(len(docstring_lines)):
-                        docstring_line = docstring_lines[i]
-                        # Potentially remove excess blank line
-                        if docstring_line == "" and i == len(docstring_lines) - 1:
-                            break
-                        if first_time:
-                            first_time = False
-                        else:
-                            docstring_formatted += "\n        "
-                        docstring_formatted += docstring_line
+                # dep capturing (we check cycles when we topologically sort later)
+                if not service_name in service_dep_graph:
+                    service_dep_graph[service_name] = set()
 
-                    args_str, class_args_str = build_args_str(def_in, False), build_args_str(def_in, True)
-                    docstring_str = templates['methdocstr'].format(methoddocstr=docstring_formatted)
-                    outargs_str = '\n        # '.join(yaml.dump(def_out).split('\n'))
+                for dep in dependencies:
+                    service_dep_graph[service_name].add(dep)
 
-                    methods.append(templates['method'].format(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
-                    class_methods.append(templates['method'].format(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
+                # update list of client paths for the client to this service
+                client_defs[service_name] = client_path
 
-                if service_name is None:
-                    raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
-                service_name_str = templates['svcname'].format(name=service_name)
-                class_docstring_str = templates['clssdocstr'].format(classdocstr=class_docstring_formatted)
-                dependencies_str = templates['depends'].format(namelist=dependencies)
-                methods_str = ''.join(methods) or '    pass\n'
-                classmethods_str = ''.join(class_methods)
-                class_name = service_name_from_file_name(interface_name)
-                _class = templates['class'].format(name=class_name, classdocstring=class_docstring_str, servicename=service_name_str, dependencies=dependencies_str,
-                                                       methods=methods_str, classmethods=classmethods_str)
+    print "About to generate", len(raw_services), "services"
 
-                interface_contents = templates['file'].format(classes=_class, when_generated=currtime)
-                open(interface_file, 'w').write(interface_contents)
+    # topological sort of services to make sure we do things in order
+    # http://en.wikipedia.org/wiki/Topological_sorting
+    sorted_services = []
+    service_set = set([k for k,v in service_dep_graph.iteritems() if len(v) == 0])
 
-                count+=1
+    while len(service_set) > 0:
+        n = service_set.pop()
+        sorted_services.append((n, raw_services[n]))
 
-    # write current svc_signatures
+        # get list of all services that depend on the current service
+        depending_services = [k for k,v in service_dep_graph.iteritems() if n in v]
+
+        for depending_service in depending_services:
+
+            # remove this dep
+            service_dep_graph[depending_service].remove(n)
+
+            # if it has no more deps, add it to the service_set list
+            if len(service_dep_graph[depending_service]) == 0:
+                service_set.add(depending_service)
+
+    # ok, check for any remaining deps that we never found - indicates a cycle
+    remaining_deps = set([k for k,v in service_dep_graph.iteritems() if len(v) > 0])
+    if len(remaining_deps):
+        raise StandardError("Cycle found in dependencies: could not resolve %s" % str(remaining_deps))
+
+    for svc in sorted_services:
+        svc_name, raw_def = svc
+        generate_service(raw_def['interface_file'], raw_def, client_defs)
+        count+=1
+
     if count > 0 and not opts.dryrun:
-        print "Writing signature file to ", sigfile
+
+        # write current svc_signatures
+        print "Writing signature file to", sigfile
         with open(sigfile, 'w') as f:
             f.write(yaml.dump(svc_signatures))
 
@@ -288,6 +498,17 @@ def main():
         base_subtypes = find_subtypes(BaseService)
         # Load impl classes
         load_mods("ion", False)
+
+        # write client public file
+        # @TODO: reenable when 'as' directory goes away
+        '''
+        clientfile = os.path.join('interface', 'clients.py')
+        print "Writing public client file to", clientfile
+
+        with open(clientfile, 'w') as f:
+            f.write(templates['client_file'].substitute(when_generated=currtime,
+                                                        client_imports="\n".join([templates['dep_client_imports'].substitute(clientmodule=x[0], clientclass=x[1]) for x in client_defs.itervalues()])))
+        '''
 
     # Generate validation report
     validation_results = "Report generated on " + currtime + "\n"
