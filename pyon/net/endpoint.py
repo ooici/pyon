@@ -411,7 +411,7 @@ class PublisherRegistrar(object):
         stream_route = self.pubsub_client.register_producer(self._exchange_name, streamid)
 
         # Create the Stream publisher, ready to publish messages to the stream
-        return StreamPublisher(ep=self, stream_route)
+        return StreamPublisher(stream_route)
 
 
 class SubscriberEndpoint(Endpoint):
