@@ -580,7 +580,9 @@ def main():
         f.write(validation_results)
 
     exitcode = 0
-    if count > 0:
+
+    # only exit with 1 if we notice changes, and we specified dryrun
+    if count > 0 and opts.dryrun:
         exitcode = 1
 
     sys.exit(exitcode)
