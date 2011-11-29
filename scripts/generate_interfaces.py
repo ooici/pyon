@@ -462,7 +462,11 @@ def main():
 
     while len(service_set) > 0:
         n = service_set.pop()
-        sorted_services.append((n, raw_services[n]))
+
+        # topo sort is over the whole dep tree, but raw_services only contains the stuff we're really generating
+        # so if it doesn't exist in raw_services, don't bother!
+        if n in raw_services:
+            sorted_services.append((n, raw_services[n]))
 
         # get list of all services that depend on the current service
         depending_services = [k for k,v in service_dep_graph.iteritems() if n in v]
@@ -576,7 +580,9 @@ def main():
         f.write(validation_results)
 
     exitcode = 0
-    if count > 0:
+
+    # only exit with 1 if we notice changes, and we specified dryrun
+    if count > 0 and opts.dryrun:
         exitcode = 1
 
     sys.exit(exitcode)
