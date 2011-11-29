@@ -5,7 +5,7 @@ __author__ = 'Michael Meisinger'
 import time
 import threading
 
-from pyon.public import log, BaseService, StreamPublisher
+from pyon.public import log, BaseService, ProcessPublisher
 
 class StreamProducer(BaseService):
 
@@ -24,7 +24,7 @@ class StreamProducer(BaseService):
     def _trigger_func(self):
         interval = self.CFG.stream_producer.interval
         stream_route = self.CFG.stream_producer.stream_route
-        pub = StreamPublisher(node=self.container.node, name=stream_route, process=self)
+        pub = ProcessPublisher(node=self.container.node, name=stream_route, process=self)
         num = 1
         while True:
             msg = dict(num=str(num))

@@ -8,7 +8,7 @@ from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
 from pyon.net.channel import PubSub
-from pyon.ion.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, StreamSubscriber
+from pyon.ion.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService, get_service_by_name
@@ -223,7 +223,7 @@ class ProcManager(object):
 
         # Start pubsub listener
         # TODO: Use Refactored ION endpoint for streams once ready.
-        sub = StreamSubscriber(node=self.container.node,
+        sub = ProcessSubscriber(node=self.container.node,
                          name=listen_name,
                          process=service_instance,
                          callback=lambda m,h: service_instance.process(m))
