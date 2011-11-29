@@ -520,7 +520,7 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
         db = self.server[self.datastore_name]
 
-        subject_id = subject if type(subject) is str else subject["_id"]
+        subject_id = subject if type(subject) is str else subject._id
         view = db.view(self._get_viewname("association","by_sub"))
         key = [subject_id]
         if predicate:
@@ -545,7 +545,7 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
         db = self.server[self.datastore_name]
 
-        object_id = object if type(object) is str else object["_id"]
+        object_id = object if type(object) is str else object._id
         view = db.view(self._get_viewname("association","by_obj"))
         key = [object_id]
         if predicate:

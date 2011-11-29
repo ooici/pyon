@@ -528,7 +528,7 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        subject_id = subject if type(subject) is str else subject["_id"]
+        subject_id = subject if type(subject) is str else subject._id
         assoc_list = []
         target_id_list = []
         target_list = []
@@ -559,7 +559,7 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = object if type(object) is str else object["_id"]
+        object_id = object if type(object) is str else object._id
         assoc_list = []
         target_id_list = []
         target_list = []
