@@ -301,7 +301,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     # this service's client generation
     _client_methods             = ''.join(client_methods)
     _client_class               = client_templates['class'].substitute(name=class_name,
-                                                                       clientdocstring='#todo',
+                                                                       clientdocstring='# @todo Fill in client documentation.',
                                                                        methods=_client_methods)
     _client_rpcclient           = client_templates['rpcclient'].substitute(name=class_name,
                                                                            targetname=service_name)
