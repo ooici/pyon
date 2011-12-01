@@ -32,7 +32,7 @@ def pop_last_call(mock):
 class PyonTestCase(unittest.TestCase):
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
-    def _create_object_mock(self, name):
+    def _create_IonObject_mock(self, name):
         mock_ionobj = Mock(name='IonObject')
         def side_effect(_def, _dict=None, **kwargs):
             test_obj = test_obj_registry.new(_def, _dict, **kwargs)
@@ -78,7 +78,7 @@ class PyonTestCase(unittest.TestCase):
         iface = list(implementedBy(base_service))[0]
         verifyClass(iface, implemented_service)
         # Check if defined functions in Base Service are all implemented
-        difference = set(func_names(base_service)) - set(func_names(implemented_service))
+        difference = set(func_names(base_service)) - set(func_names(implemented_service)) - set(['__init__'])
         if difference:
             self.fail('Following function declarations in %s do not exist in %s : %s' %
                     (iface, implemented_service,
