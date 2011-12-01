@@ -792,3 +792,151 @@ class SocketInterface(object):
         """
         log.debug("In SocketInterface.send")
         self.ch_proto.send(data, headers=headers)
+
+
+
+class BaseChannel2(object):
+
+    _amq_chan = None
+
+    def __init__(self, close_callback=None):
+        """
+        Initializes a BaseChannel instance.
+
+        @param  close_callback  The method to invoke when close() is called on this BaseChannel. May be left as None,
+                                in which case close_impl() will be called. This expects to be a callable taking one
+                                param, this channel instance.
+        """
+        self._close_callback = close_callback
+
+    def _declare_exchange_point(self, xp):
+        pass
+
+    def attach_underlying_channel(self, amq_chan):
+        """
+        Attaches an AMQP channel and indicates this channel is now open.
+        @TODO silly name
+        """
+        self._amq_chan = amq_chan
+
+    def close(self):
+        pass
+
+    def close_impl(self):
+        pass
+
+class SendChannel(BaseChannel2):
+    """
+    A channel that can only send.
+    """
+    def connect(self, name):
+        pass
+
+    def send(self, data, headers=None):
+        pass
+
+class RecvChannel(BaseChannel2):
+    """
+    A channel that can only receive.
+    """
+    _recv_queue = None
+
+    # defaults, override in derived classes
+    _consumer_exclusive = False
+    _consumer_no_ack    = False     # endpoint layers do the acking as they call recv()
+    _queue_auto_delete  = False
+    # @TODO more
+
+    def __init__(self, **kwargs):
+        self._recv_queue = gqueue()
+        BaseChannel2.__init__(self, **kwargs)
+
+    def setup_listener(self, xp=None, queue=None, binding=None):
+        self._declare_exchange_point(xp)
+        self._declare_queue(queue)
+        self._bind(binding)
+
+    def start_consume(self):
+        pass
+
+    def stop_consume(self):
+        pass
+
+    def recv(self):
+        """
+        Pulls a message off the queue.
+        Typically done by the Endpoint layer. Should ack the message there as it is "taking ownership".
+        """
+        return self._recv_queue.get()
+
+    def close_impl(self):
+        """
+        Close implementation override. If we've declared and we're not auto_delete, must delete here.
+        """
+        if not self._queue_auto_delete:
+            self._amq_chan.delete_queue()   # TODO
+
+        BaseChannel2.close_impl(self)
+
+    def _declare_queue(self, queue):
+        pass
+
+    def _bind(self, binding):
+        pass
+
+    def _on_deliver(self, chan, method_frame, header_frame, body):
+        self._recv_queue.put(body)  # and more
+
+
+class PubChannel(SendChannel):
+    pass
+
+class SubChannel(RecvChannel):
+    pass
+
+class BidirClientChannel(SendChannel, RecvChannel):
+    """
+    This should be pooled for the receiving side?
+
+    As opposed to current endpoint scheme - no need to spawn a listening greenlet simply to loop on recv(),
+    you can use this channel to send first then call recieve linearly, no need for greenletting.
+    """
+    pass
+
+class ServerChannel(RecvChannel):
+    """
+    Used for RR patterns.
+    Main use is accept() - listens continously on one queue, pulls messages off, creates a new channel
+                           to interact and returns it
+    """
+
+    class BidirAccept(SendChannel, RecvChannel):
+        """
+        The type of channel returned by accept.
+        """
+        def close_impl(self):
+            """
+            Do not close underlying amqp channel!
+            """
+            pass
+
+    def accept(self):
+        """
+        @returns A new channel that can:
+                    - takes a copy of the underlying transport channel
+                    - send() aka reply
+                    - close without closing underlying transport channel
+                    - FUTURE: receive (use a preexisting listening pool), for more complicated patterns
+                              aka AGREE/STATUS/CANCEL
+                    - has the initial received message here put onto its recv gqueue
+                    - recv() returns messages in its gqueue, endpoint should ack
+        """
+        while True:
+            m = self.recv()
+
+            ch = self.BidirAccept()
+            ch.attach_underlying_channel(self._amq_chan)
+            # FUTURE: setup listener here
+            ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
+
+            return ch
