@@ -462,19 +462,19 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_assoc2n), 0)
 
         # Find associations by triple
-        assocs = data_store.find_associations(admin_user_id, inst1_obj_id, OWNER_OF, id_only=True)
+        assocs = data_store.find_associations(admin_user_id, OWNER_OF, inst1_obj_id, id_only=True)
         self.assertEquals(len(assocs), 1)
         self.assertEquals(assocs[0], aid1)
 
-        assocs = data_store.find_associations(admin_user_id, inst1_obj_id, OWNER_OF, id_only=False)
+        assocs = data_store.find_associations(admin_user_id, OWNER_OF, inst1_obj_id, id_only=False)
         self.assertEquals(len(assocs), 1)
         self.assertEquals(assocs[0]._def.type.name, "Association")
 
-        assocs = data_store.find_associations(admin_user_id, inst1_obj_id, None, id_only=True)
+        assocs = data_store.find_associations(admin_user_id, None, inst1_obj_id, id_only=True)
         self.assertEquals(len(assocs), 1)
         self.assertEquals(assocs[0], aid1)
 
-        assocs = data_store.find_associations(None, None, OWNER_OF, id_only=True)
+        assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
 
     def _create_resource(self, restype, name, *args, **kwargs):

@@ -336,6 +336,7 @@ class DataStore(object):
         Predicate and object_type are optional to narrow the search down. Object_type can only
         be set if predicate is set as well.
         """
+        pass
 
     def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
         """
@@ -345,6 +346,15 @@ class DataStore(object):
         Predicate and subject_type are optional to narrow the search down. Subject_type can only
         be set if predicate is set as well.
         """
+        pass
+
+    def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
+        """
+        Find associations by subject, predicate, object. Either subject and predicate have
+        to be provided or predicate only. Returns either a list of associations or
+        a list of association ids.
+        """
+        pass
 
     def find_resources(self, restype=None, lcstate=None, name=None, id_only=True):
         if name is not None:

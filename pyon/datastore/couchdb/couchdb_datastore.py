@@ -567,8 +567,8 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
-    def find_associations(self, subject=None, object=None, predicate=None, id_only=True):
-        log.debug("find_associations(subject=%s, object=%s, predicate=%s)" % (subject, object, predicate))
+    def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
+        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, object))
         assert (subject and object) or predicate, "Illegal parameters"
         db = self.server[self.datastore_name]
 
