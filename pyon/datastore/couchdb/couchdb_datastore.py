@@ -541,8 +541,9 @@ class CouchDB_DataStore(DataStore):
         obj_list = self.read_mult(obj_ids)
         return (obj_list, obj_assocs)
 
-    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
-        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
+    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
+        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
+        assert object, "Must provide object"
         db = self.server[self.datastore_name]
 
         object_id = object if type(object) is str else object._id
@@ -566,6 +567,35 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
+    def find_associations(self, subject=None, object=None, predicate=None, id_only=True):
+        log.debug("find_associations(subject=%s, object=%s, predicate=%s)" % (subject, object, predicate))
+        assert (subject and object) or predicate, "Illegal parameters"
+        db = self.server[self.datastore_name]
+
+        if subject and object:
+            subject_id = subject if type(subject) is str else subject._id
+            object_id = object if type(object) is str else object._id
+            view = db.view(self._get_viewname("association","by_ids"), include_docs=(not id_only))
+            key = [subject_id, object_id]
+            if predicate:
+                key.append(predicate)
+            endkey = list(key)
+            endkey.append(END_MARKER)
+            rows = view[key:endkey]
+        else:
+            view = db.view(self._get_viewname("association","by_pred"), include_docs=(not id_only))
+            key = [predicate]
+            endkey = list(key)
+            endkey.append(END_MARKER)
+            rows = view[key:endkey]
+
+        if id_only:
+            assocs = [row.id for row in rows]
+        else:
+            assocs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
+        log.debug("find_associations() found %s associations" % (len(assocs)))
+        return assocs
+
     def find_res_by_type(self, restype, lcstate=None, id_only=False):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
         db = self.server[self.datastore_name]
@@ -577,13 +607,13 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(type_=row['key'][0], lcstate=row['key'][1], name=row['key'][2], _id=row['value']) for row in rows]
+        res_assocs = [dict(type_=row['key'][0], lcstate=row['key'][1], _id=row.id) for row in rows]
         log.debug("find_res_by_type() found %s objects" % (len(res_assocs)))
         if id_only:
-            res_ids = [row['_id'] for row in res_assocs]
+            res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
         else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
@@ -597,13 +627,13 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(lcstate=row['key'][0], type_=row['key'][1], name=row['key'][2], _id=row['value']) for row in rows]
+        res_assocs = [dict(lcstate=row['key'][0], type_=row['key'][1], _id=row.id) for row in rows]
         log.debug("find_res_by_lcstate() found %s objects" % (len(res_assocs)))
         if id_only:
-            res_ids = [row['_id'] for row in res_assocs]
+            res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
         else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_name(self, name, restype=None, id_only=False):
@@ -617,13 +647,13 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(name=row['key'][0], type_=row['key'][1], lcstate=row['key'][2], _id=row['value']) for row in rows]
+        res_assocs = [dict(name=row['key'][0], type_=row['key'][1], lcstate=row['key'][2], _id=row.id) for row in rows]
         log.debug("find_res_by_name() found %s objects" % (len(res_assocs)))
         if id_only:
-            res_ids = [row['_id'] for row in res_assocs]
+            res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
         else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
     def _ion_object_to_persistence_dict(self, ion_object):

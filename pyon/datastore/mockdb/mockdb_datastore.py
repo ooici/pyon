@@ -552,8 +552,9 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
-    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
-        log.debug("find_subjects(object=%s, predicate=%s, subject_type=%s, id_only=%s" % (object, predicate, subject_type, id_only))
+    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
+        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
+        assert object, "Must provide object"
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
@@ -583,6 +584,38 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
+    def find_associations(self, subject=None, object=None, predicate=None, id_only=True):
+        log.debug("find_associations(subject=%s, object=%s, predicate=%s)" % (subject, object, predicate))
+        assert (subject and object) or predicate, "Illegal parameters"
+        try:
+            datastore_dict = self.root[self.datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        if subject and object:
+            subject_id = subject if type(subject) is str else subject._id
+            object_id = object if type(object) is str else object._id
+            target_list = []
+            for objname,obj in datastore_dict.iteritems():
+                if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+                if 'type_' in obj and obj['type_'] == "Association":
+                    if obj['s'] == subject_id and obj['o'] == object_id:
+                        target_list.append(obj)
+        else:
+            target_list = []
+            for objname,obj in datastore_dict.iteritems():
+                if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+                if 'type_' in obj and obj['type_'] == "Association":
+                    if obj['p'] == predicate:
+                        target_list.append(obj)
+
+        if id_only:
+            assocs = [row['_id'] for row in target_list]
+        else:
+            assocs = [self._persistence_dict_to_ion_object(row) for row in target_list]
+        log.debug("find_associations() found %s associations" % (len(assocs)))
+        return assocs
+        
     def find_res_by_type(self, restype, lcstate=None, id_only=False):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
         try:

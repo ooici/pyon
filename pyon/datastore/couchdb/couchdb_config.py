@@ -25,7 +25,7 @@ COUCHDB_VIEWS = {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-emit([doc.s, doc.p, doc.ot, doc.o, doc._id], null);
+    emit([doc.s, doc.p, doc.ot, doc.o], null);
   }
 }""",
         },
@@ -33,7 +33,23 @@ emit([doc.s, doc.p, doc.ot, doc.o, doc._id], null);
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-emit([doc.o, doc.p, doc.st, doc.s, doc._id], null);
+    emit([doc.o, doc.p, doc.st, doc.s], null);
+  }
+}""",
+        },
+        'by_ids':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.o, doc.p], null);
+  }
+}""",
+        },
+        'by_pred':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.p, doc.s, doc.o], null);
   }
 }""",
         }
@@ -56,19 +72,19 @@ function(doc) {
         'by_type':{
             'map':"""
 function(doc) {
-  emit([doc.type_, doc.lcstate, doc.name], doc._id);
+  emit([doc.type_, doc.lcstate], null);
 }""",
         },
         'by_lcstate':{
             'map':"""
 function(doc) {
-  emit([doc.lcstate, doc.type_, doc.name], doc._id);
+  emit([doc.lcstate, doc.type_], null);
 }""",
         },
         'by_name':{
             'map':"""
 function(doc) {
-  emit([doc.name, doc.type_, doc.lcstate], doc._id);
+  emit([doc.name, doc.type_, doc.lcstate], null);
 }""",
         }
     },

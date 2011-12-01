@@ -337,7 +337,7 @@ class DataStore(object):
         be set if predicate is set as well.
         """
 
-    def find_subjects(self, object, predicate=None, subject_type=None, id_only=False):
+    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
         """
         Find subjects (or subject ids) by association from a given object or object id (if str).
         Returns a tuple (list_of_subjects, list_of_associations) if id_only == False, or
@@ -345,3 +345,15 @@ class DataStore(object):
         Predicate and subject_type are optional to narrow the search down. Subject_type can only
         be set if predicate is set as well.
         """
+
+    def find_resources(self, restype=None, lcstate=None, name=None, id_only=True):
+        if name is not None:
+            assert lcstate is None, "find by name does not support lcstate"
+            return self.find_res_by_name(name, restype, id_only)
+        elif restype and lcstate:
+            return self.find_res_by_type(restype, lcstate, id_only)
+        elif restype:
+            return self.find_res_by_type(restype, lcstate, id_only)
+        elif lcstate:
+            return self.find_res_by_lcstate(lcstate, restype, id_only)
+
