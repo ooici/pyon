@@ -113,6 +113,10 @@ class IonObjectBase(object):
                         fields[key] = long(fields[key])
                         continue
 
+                # TODO work around for msgpack issue
+                if type(fields[key]) == tuple and type(schema[key]) == list:
+                    continue
+
                 raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, type(schema[key])))
             if isinstance(field_val, IonObjectBase):
