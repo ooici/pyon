@@ -32,7 +32,7 @@ def pop_last_call(mock):
 class PyonTestCase(unittest.TestCase):
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
-    def _create_object_mock(self, name):
+    def _create_IonObject_mock(self, name):
         mock_ionobj = Mock(name='IonObject')
         def side_effect(_def, _dict=None, **kwargs):
             test_obj = test_obj_registry.new(_def, _dict, **kwargs)

@@ -149,9 +149,43 @@ ${methods}
 '''
 }
 
-# convert both to string.Template
+
+confluence_doc_templates = {
+    'confluence_service_page_include':
+'''${methods}''',
+    'method_doc':
+'''<div class="panel" style="border-width: 1px;"><div class="panelContent">
+<h3>${name}</h3>
+<div class='table-wrap'>
+<table class='confluenceTable'><tbody>
+<tr>
+<th class='confluenceTh'> Description: </th>
+<td class='confluenceTd'> ${methoddocstring}</td>
+</tr>
+<tr>
+<th class='confluenceTh'> Input Parameters: </th>
+<td class='confluenceTd'>${args}</td>
+</tr>
+
+<tr>
+<th class='confluenceTh'> Output Parameters: </th>
+<td class='confluenceTd'>${outargs}</td>
+</tr>
+<tr>
+<th class='confluenceTh'> Error Exceptions: </th>
+<td class='confluenceTd'> TBD </td>
+</tr>
+</tbody></table>
+</div>
+</div></div>
+
+<p><br class="atl-forced-newline" /></p>'''
+}
+
+# convert to string.Template
 templates           = dict(((k, string.Template(v)) for k, v in templates.iteritems()))
 client_templates    = dict(((k, string.Template(v)) for k, v in client_templates.iteritems()))
+confluence_doc_templates    = dict(((k, string.Template(v)) for k, v in confluence_doc_templates.iteritems()))
 
 def build_args_str(_def, include_self=True):
     # Handle case where method has no parameters
@@ -174,7 +208,7 @@ def build_args_str(_def, include_self=True):
     args_str = ', '.join(args)
     return args_str
 
-def generate_service(interface_file, svc_def, client_defs):
+def generate_service(interface_file, svc_def, client_defs, opts):
     """
     Generates a single service/client/interface definition.
 
@@ -193,6 +227,7 @@ def generate_service(interface_file, svc_def, client_defs):
     methods         = []
     class_methods   = []
     client_methods  = []
+    doc_methods     = []
 
     for op_name, op_def in meth_list.iteritems():
         if not op_def: continue
@@ -233,6 +268,10 @@ def generate_service(interface_file, svc_def, client_defs):
                                                                     argssmall=clientargspass,
                                                                     outargs=outargs_str))
 
+        methoddocstring=docstring_formatted.replace("method docstring","")
+        doc_methods.append(confluence_doc_templates['method_doc'].substitute(name=op_name, args=args_str, methoddocstring=methoddocstring, outargs=outargs_str))
+
+
     if service_name is None:
         raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
 
@@ -262,7 +301,7 @@ def generate_service(interface_file, svc_def, client_defs):
     # this service's client generation
     _client_methods             = ''.join(client_methods)
     _client_class               = client_templates['class'].substitute(name=class_name,
-                                                                       clientdocstring='#todo',
+                                                                       clientdocstring='# @todo Fill in client documentation.',
                                                                        methods=_client_methods)
     _client_rpcclient           = client_templates['rpcclient'].substitute(name=class_name,
                                                                            targetname=service_name)
@@ -278,13 +317,27 @@ def generate_service(interface_file, svc_def, client_defs):
                                                                classes=_class,
                                                                when_generated=currtime,
                                                                client=_client)
+
+
+
     with open(interface_file, 'w') as f:
         f.write(interface_contents)
+
+    doc_methods_str    = ''.join(doc_methods)
+    doc_page_contents                    = confluence_doc_templates['confluence_service_page_include'].substitute(name=class_name,methods=doc_methods_str)
+
+    if opts.servicedoc:
+        doc_file = interface_file.replace(".py", ".html")
+
+        with open(doc_file, 'w') as f1:
+            f1.write(doc_page_contents)
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--force', action='store_true', help='Do not do MD5 comparisons, always generate new files')
     parser.add_argument('-d', '--dryrun', action='store_true', help='Do not generate new files, just print status and exit with 1 if changes need to be made')
+    parser.add_argument('-sd', '--servicedoc', action='store_true', help='Generate HTML service doc inclusion files')
     opts = parser.parse_args()
 
     if os.getcwd().endswith('scripts'):
@@ -487,7 +540,7 @@ def main():
 
     for svc in sorted_services:
         svc_name, raw_def = svc
-        generate_service(raw_def['interface_file'], raw_def, client_defs)
+        generate_service(raw_def['interface_file'], raw_def, client_defs, opts)
         count+=1
 
     if count > 0 and not opts.dryrun:

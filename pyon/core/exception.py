@@ -56,6 +56,12 @@ class Conflict(IonException):
     '''
     status_code = 409
 
+class Inconsistent(IonException):
+    '''
+    Client request failed due to internal error of the datastore
+    '''
+    status_code = 410
+
 class ServerError(IonException):
     '''
     For reporting generic service failure

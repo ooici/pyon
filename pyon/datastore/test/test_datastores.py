@@ -323,7 +323,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         ds2_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L1', description='My Dataset CTD L1')
 
-        data_store.create_association(admin_user_id, OWNER_OF, inst1_obj_id)
+        aid1, _ = data_store.create_association(admin_user_id, OWNER_OF, inst1_obj_id)
 
         data_store.create_association(admin_user_id, HAS_A, admin_profile_id)
 
@@ -368,27 +368,27 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(obj_ids3[0], inst1_obj_id)
 
         # Object -> Subject direction
-        sub_ids1, sub_assoc1 = data_store.find_subjects(inst1_obj_id, id_only=True)
+        sub_ids1, sub_assoc1 = data_store.find_subjects(None, None, inst1_obj_id, id_only=True)
         self.assertEquals(len(sub_ids1), 2)
         self.assertEquals(len(sub_assoc1), 2)
         self.assertEquals(set(sub_ids1), set([admin_user_id, plat1_obj_id]))
 
-        sub_ids1a, sub_assoc1a = data_store.find_subjects(inst1_obj_id, id_only=False)
+        sub_ids1a, sub_assoc1a = data_store.find_subjects(None, None, inst1_obj_id, id_only=False)
         self.assertTrue(sub_ids1a[0]._def)
         self.assertEquals(len(sub_ids1a), 2)
         self.assertEquals(len(sub_assoc1a), 2)
         self.assertEquals(set([o._id for o in sub_ids1a]), set([admin_user_id, plat1_obj_id]))
 
-        sub_ids1an, sub_assoc1an = data_store.find_subjects("Non_Existent", id_only=False)
+        sub_ids1an, sub_assoc1an = data_store.find_subjects(None, None, "Non_Existent", id_only=False)
         self.assertEquals(len(sub_ids1an), 0)
         self.assertEquals(len(sub_assoc1an), 0)
 
-        sub_ids2, sub_assoc2 = data_store.find_subjects(inst1_obj_id, OWNER_OF, id_only=True)
+        sub_ids2, sub_assoc2 = data_store.find_subjects(None, OWNER_OF, inst1_obj_id, id_only=True)
         self.assertEquals(len(sub_ids2), 1)
         self.assertEquals(len(sub_assoc2), 1)
         self.assertEquals(set(sub_ids2), set([admin_user_id]))
 
-        sub_ids3, _ = data_store.find_subjects(inst1_obj_id, OWNER_OF, RT.UserIdentity, id_only=True)
+        sub_ids3, _ = data_store.find_subjects(RT.UserIdentity, OWNER_OF, inst1_obj_id, id_only=True)
         self.assertEquals(len(sub_ids3), 1)
         self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
@@ -461,6 +461,21 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids2n), 0)
         self.assertEquals(len(res_assoc2n), 0)
 
+        # Find associations by triple
+        assocs = data_store.find_associations(admin_user_id, OWNER_OF, inst1_obj_id, id_only=True)
+        self.assertEquals(len(assocs), 1)
+        self.assertEquals(assocs[0], aid1)
+
+        assocs = data_store.find_associations(admin_user_id, OWNER_OF, inst1_obj_id, id_only=False)
+        self.assertEquals(len(assocs), 1)
+        self.assertEquals(assocs[0]._def.type.name, "Association")
+
+        assocs = data_store.find_associations(admin_user_id, None, inst1_obj_id, id_only=True)
+        self.assertEquals(len(assocs), 1)
+        self.assertEquals(assocs[0], aid1)
+
+        assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
+        self.assertEquals(len(assocs), 3)
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))

@@ -29,6 +29,8 @@ OBJECTS:
 - Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
 - Service default arguments set to {} and [] in base class. Dangerous Python idiom. Solutions?
 - Datastore does not modify original object on create or update. Do it.
+- List to tuples through msgpack
+- Object base classes generated.
 
 PROCESS/SERVICE:
 
