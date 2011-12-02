@@ -21,7 +21,7 @@ class HelloResourceService(BaseHelloResourceService):
     def on_quit(self):
         log.debug("Hello resource service quit")
 
-    def create_my_resource(self, my_resource=None):
+    def create_my_resource(self, my_resource={}):
         log.debug("create_my_resource(my_resource=%s)" % (my_resource))
         assert my_resource, "Arguments not set"
         import random
@@ -29,7 +29,7 @@ class HelloResourceService(BaseHelloResourceService):
         myres_id,_ = self.clients.resource_registry.create(my_resource)
         return myres_id
 
-    def update_my_resource(self, my_resource=None):
+    def update_my_resource(self, my_resource={}):
         log.debug("update_my_resource(my_resource=%s)" % (my_resource))
         assert my_resource, "Arguments not set"
         success = self.clients.resource_registry.update(my_resource)
@@ -44,7 +44,7 @@ class HelloResourceService(BaseHelloResourceService):
         self.clients.resource_registry.execute_lifecycle_transition(my_resource_id, LCS.RETIRED)
         return True
 
-    def find_my_resources(self, filters=None):
+    def find_my_resources(self, filters={}):
         res_objs, _ = self.clients.resource_registry.find_resources(RT.SampleResource, None, None, False)
         log.debug("find_my_resources(): Found %s, ids=%s" % (len(res_objs), [o._id for o in res_objs]))
         return res_objs
