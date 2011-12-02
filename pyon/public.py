@@ -24,6 +24,9 @@ __all__ += ['spawn', 'switch']
 from pyon.core.process import PyonProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
 __all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
 
+from pyon.core import exception as iex
+__all__ += ['iex']
+
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 

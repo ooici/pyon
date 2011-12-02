@@ -4,6 +4,7 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import collections
+import time
 
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
@@ -177,6 +178,8 @@ def for_name(modpath, classname):
     classobj = getattr(module, classname)
     return classobj()
 
+def current_time_millis():
+    return int(time.time() * 1000)
 
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})

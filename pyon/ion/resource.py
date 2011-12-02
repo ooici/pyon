@@ -50,7 +50,8 @@ def load_definitions():
         'DEVELOPED',
         'COMMISSIONED',
         'ACTIVE',
-        'DECOMMISSIONED'
+        'DECOMMISSIONED',
+        'RETIRED'
         ]
     LifeCycleStates.clear()
     LifeCycleStates.update(zip(lcs_list, lcs_list))
