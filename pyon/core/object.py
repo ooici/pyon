@@ -13,6 +13,7 @@ from weakref import WeakSet, WeakValueDictionary
 
 import yaml
 
+from pyon.core.path import list_files_recursive
 from pyon.util.log import log
 
 class IonObjectError(Exception):
@@ -311,28 +312,6 @@ class IonObjectRegistry(object):
 
         return obj_defs
 
-    def _list_files_recursive(self, file_dir, pattern, do_first=[], exclude_dirs=[]):
-        """
-        Recursively find all files matching pattern under file_dir and return a list.
-        """
-
-        all_files = [os.path.join(file_dir, file) for file in do_first]
-        skip_me = set(all_files)
-        exclude_dirs = set([os.path.join(file_dir, path) for path in exclude_dirs])
-
-        new_files = []
-        for root, dirs, files in os.walk(file_dir):
-            if root in exclude_dirs: continue
-            log.debug('Registering yaml files in dir: %s', root)
-            for file in fnmatch.filter(files, pattern):
-                path = os.path.join(root, file)
-                if not path in skip_me:
-                    new_files.append(path)
-
-        # Make imports more predictable by sorting by filename
-        all_files.extend(sorted(new_files))
-        return all_files
-
     def _register_extends(self, name, extends):
         self.extends_objects[name] = extends
         self.extended_objects[extends].add(name)
@@ -350,7 +329,7 @@ class IonObjectRegistry(object):
         contents into the registry. Files in do_first will be prepended to the blob if found.
         """
 
-        yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
+        yaml_files = list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
 
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
 
@@ -409,7 +388,7 @@ class IonServiceRegistry(IonObjectRegistry):
         return reg_def
 
     def register_svc_dir(self, yaml_dir, do_first=[], exclude_dirs=[]):
-        yaml_files = self._list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
+        yaml_files = list_files_recursive(yaml_dir, '*.yml', do_first, exclude_dirs)
         obj_defs = []
         for yaml_file in yaml_files:
             svc_name = service_name_from_file_name(yaml_file)

@@ -17,6 +17,7 @@ import yaml
 import hashlib
 import argparse
 
+from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
 from pyon.util.containers import named_any
 
@@ -396,26 +397,20 @@ def main():
 
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
+    yaml.add_constructor(u'!enum', lambda loader, node: {})
+
+    yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+    yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
+
     # Load data yaml files in case services define interfaces
     # in terms of common data objects
-    yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
-    data_dir = 'obj/data'
-    entag = u'!enum'
-    yaml.add_constructor(entag, lambda loader, node: {})
-    for root, dirs, files in os.walk(data_dir):
-        for filename in fnmatch.filter(files, '*.yml'):
-            yaml_file = os.path.join(root, filename)
-            file_match = yaml_file_re.match(yaml_file)
-            if file_match is None: continue
-
-            yaml_text = open(yaml_file, 'r').read()
-            defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
-            for def_set in defs:
-                for name,_def in def_set.iteritems():
-                    tag = u'!%s' % (name)
-                    yaml.add_constructor(tag, doc_tag_constructor)
-                    xtag = u'!Extends_%s' % (name)
-                    yaml.add_constructor(xtag, lambda loader, node: {})
+    defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
+    for def_set in defs:
+        for name,_def in def_set.iteritems():
+            tag = u'!%s' % (name)
+            yaml.add_constructor(tag, doc_tag_constructor)
+            xtag = u'!Extends_%s' % (name)
+            yaml.add_constructor(xtag, lambda loader, node: {})
 
     svc_signatures = {}
     sigfile = os.path.join('interface', '.svc_signatures.yml')
@@ -435,6 +430,8 @@ def main():
     # completed service client definitions, maps service name -> full module path to find module
     client_defs = {}
 
+    yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
+    
     # Generate the new definitions, for now giving each
     # yaml file its own python service
     for root, dirs, files in os.walk(service_dir):

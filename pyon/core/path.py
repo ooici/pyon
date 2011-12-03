@@ -3,7 +3,9 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
+import fnmatch
 import os
+import os.path
 from pkg_resources import resource_filename
 
 def resolve(filename):
@@ -34,3 +36,23 @@ def resolve(filename):
                 resolved_file = os.path.abspath(resolved_file)
 
     return resolved_file
+
+def list_files_recursive(file_dir, pattern, do_first=[], exclude_dirs=[]):
+    """
+    Recursively find all files matching pattern under file_dir and return a list.
+    """
+    all_files = [os.path.join(file_dir, file) for file in do_first]
+    skip_me = set(all_files)
+    exclude_dirs = set([os.path.join(file_dir, path) for path in exclude_dirs])
+
+    new_files = []
+    for root, dirs, files in os.walk(file_dir):
+        if root in exclude_dirs: continue
+        for file in fnmatch.filter(files, pattern):
+            path = os.path.join(root, file)
+            if not path in skip_me:
+                new_files.append(path)
+
+    # Make imports more predictable by sorting by filename
+    all_files.extend(sorted(new_files))
+    return all_files
