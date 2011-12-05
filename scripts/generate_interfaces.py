@@ -185,6 +185,8 @@ html_doc_templates = {
 <p><br class="atl-forced-newline" /></p>''',
 
 'arg': '${name}: ${val}<BR>'
+
+
 }
 
 # convert to string.Template
@@ -238,6 +240,7 @@ def build_args_doc_html(_def):
 
     args_str = ''.join(args)
     return args_str
+
 
 def generate_service(interface_file, svc_def, client_defs, opts):
     """
@@ -371,6 +374,9 @@ def generate_service(interface_file, svc_def, client_defs, opts):
 #however, it keeps a dict of object names and a reference to the line in the yaml so that it can be found later
 #for generating HMTL doc. This probably is only a 90% solution
 def doc_tag_constructor(loader, node):
+    for key_node, value_node in node.value:
+        print key_node," = ", value_node
+
     object_references[str(node.tag[1:])]=str(node.start_mark)
     return {}
 
@@ -395,6 +401,9 @@ def main():
     #for file in fnmatch.filter(files, '*.py') + fnmatch.filter(files, '*.pyc'):
         os.unlink(os.path.join(interface_dir, file))
 
+    for file in fnmatch.filter(files, '*.html'):
+        os.unlink(os.path.join(interface_dir, file))
+        
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
     yaml.add_constructor(u'!enum', lambda loader, node: {})
@@ -489,8 +498,8 @@ def main():
                     svc_signatures[yaml_file] = cur_md5
 
 
+            object_references.clear()
             defs = yaml.load_all(yaml_text)
-
             for def_set in defs:
                 # Handle object definitions first; make dummy constructors so tags will parse
                 if 'obj' in def_set:
