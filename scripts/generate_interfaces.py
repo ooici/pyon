@@ -498,7 +498,6 @@ def main():
                     svc_signatures[yaml_file] = cur_md5
 
 
-            object_references.clear()
             defs = yaml.load_all(yaml_text)
             for def_set in defs:
                 # Handle object definitions first; make dummy constructors so tags will parse
