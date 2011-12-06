@@ -320,7 +320,7 @@ class DataStore(object):
 
         from pyon.core.bootstrap import IonObject
         assoc = IonObject("Association", s=subject_id, st=st, p=predicate, o=object_id, ot=ot,
-                          ts=current_time_millis())
+                          ts=str(current_time_millis()))
         return self.create(assoc)
 
     def delete_association(self, association=''):
