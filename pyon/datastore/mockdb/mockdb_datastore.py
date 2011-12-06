@@ -697,6 +697,6 @@ class MockDB_DataStore(DataStore):
     def _persistence_dict_to_ion_object(self, obj_dict):
         if obj_dict is None: return None
         init_dict = obj_dict.copy()
-        type = init_dict["type_"]
+        type = init_dict.pop("type_")
         ion_object = IonObject(type, init_dict)
         return ion_object
