@@ -36,9 +36,12 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._stop_container()
 
     def _start_container(self):
+        self.container = None
+        self.addCleanup(self._stop_container)
         self.container = Container()
         self.container.start()
 
     def _stop_container(self):
-        self.container.stop()
-
+        if self.container:
+            self.container.stop()
+            self.container = None

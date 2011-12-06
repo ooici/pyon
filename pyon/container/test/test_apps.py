@@ -28,10 +28,11 @@ class TestAppManager(IonIntegrationTestCase):
         am.stop()
 
     def test_appmanager(self):
-        with self.container() as cc:
-            am = cc.app_manager
-            filename = "res/deploy/examples/hello.yml"
-            success = am.start_rel_from_url(filename)
-            self.assertTrue(success)
-            self.assertTrue('hello' in cc.proc_manager.procs_by_name)
-            self.assertTrue('hello1' in cc.proc_manager.procs_by_name)
+        self._start_container()
+
+        am = self.container.app_manager
+        filename = "res/deploy/examples/hello.yml"
+        success = am.start_rel_from_url(filename)
+        self.assertTrue(success)
+        self.assertTrue('hello' in self.container.proc_manager.procs_by_name)
+        self.assertTrue('hello1' in self.container.proc_manager.procs_by_name)

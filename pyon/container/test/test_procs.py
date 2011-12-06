@@ -27,21 +27,22 @@ class TestProcManager(IonIntegrationTestCase):
         pm.stop()
 
     def test_procmanager(self):
-        with self.container() as cc:
-            pm = cc.proc_manager
+        self._start_container()
 
-            self._spawnproc(pm, 'service')
+        pm = self.container.proc_manager
 
-            self._spawnproc(pm, 'stream_process')
+        self._spawnproc(pm, 'service')
 
-            self._spawnproc(pm, 'agent')
+        self._spawnproc(pm, 'stream_process')
 
-            self._spawnproc(pm, 'simple')
+        self._spawnproc(pm, 'agent')
 
-            self._spawnproc(pm, 'immediate')
+        self._spawnproc(pm, 'simple')
 
-            success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, 'BAMM')
-            self.assertTrue(not success)
+        self._spawnproc(pm, 'immediate')
+
+        success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, 'BAMM')
+        self.assertTrue(not success)
 
     def _spawnproc(self, pm, ptype):
         success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, ptype)
