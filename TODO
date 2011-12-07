@@ -31,6 +31,7 @@ OBJECTS:
 - Datastore does not modify original object on create or update. Do it.
 - List to tuples through msgpack
 - Object base classes generated.
+- Make sure mockdb and couch have the same interface (exceptions returned etc).
 
 PROCESS/SERVICE:
 

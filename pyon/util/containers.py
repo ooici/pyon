@@ -181,6 +181,16 @@ def for_name(modpath, classname):
 def current_time_millis():
     return int(time.time() * 1000)
 
+def get_ion_ts():
+    """
+    Returns standard ION representation of a global timestamp.
+    Currently a str with an integer: current millis in epoch
+    """
+    return str(current_time_millis())
+
+def parse_ion_ts(ts):
+    return float(ts) / 1000.0
+
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})
     print dd.a.b.c, dd.a.b.d

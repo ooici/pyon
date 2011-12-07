@@ -4,7 +4,7 @@ __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.util.containers import DotDict, current_time_millis
+from pyon.util.containers import DotDict, get_ion_ts
 from pyon.core.exception import NotFound, BadRequest
 
 class DataStore(object):
@@ -320,7 +320,7 @@ class DataStore(object):
 
         from pyon.core.bootstrap import IonObject
         assoc = IonObject("Association", s=subject_id, st=st, p=predicate, o=object_id, ot=ot,
-                          ts=str(current_time_millis()))
+                          ts=get_ion_ts())
         return self.create(assoc)
 
     def delete_association(self, association=''):
