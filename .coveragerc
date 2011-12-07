@@ -1,6 +1,7 @@
 [run]
 source =
     pyon
+    examples
 omit =
     */test/*
 
