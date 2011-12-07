@@ -1,0 +1,10 @@
+[run]
+source =
+    pyon
+omit =
+    */test/*
+
+[report]
+
+[html]
+directory = coverage_results
