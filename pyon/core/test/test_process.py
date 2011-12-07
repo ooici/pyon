@@ -6,9 +6,11 @@ __license__ = 'Apache 2.0'
 from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
 from pyon.util.int_test import IonIntegrationTestCase
 from unittest import SkipTest
+from nose.plugins.attrib import attr
 
 import time
 
+@attr('UNIT')
 class ProcessTest(IonIntegrationTestCase):
     def setUp(self):
         self.counter = 0

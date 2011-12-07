@@ -118,7 +118,7 @@ TEST
 
 Run the unittests:
     bin/unittest
-    bin/nosetests -a unit
+    bin/nosetests -a UNIT
 
 Run code coverage:
     bin/nosetests -w pyon --with-coverage --cover-package=pyon

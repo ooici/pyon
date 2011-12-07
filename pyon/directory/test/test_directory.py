@@ -6,7 +6,9 @@ __license__ = 'Apache 2.0'
 from pyon.directory.directory import Directory
 from pyon.util.int_test import IonIntegrationTestCase
 from unittest import SkipTest
+from nose.plugins.attrib import attr
 
+@attr('UNIT')
 class Test_Directory(IonIntegrationTestCase):
 
     def test_non_persistent(self):
