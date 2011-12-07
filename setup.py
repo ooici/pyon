@@ -57,7 +57,7 @@ setup(  name = 'pyon',
             'nose==1.1.2',
             'ipython==0.11',
             'readline==6.2.1',
-            'mock',
+            'mock==0.7.2',
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
             # 'numexpr==1.4.2',
