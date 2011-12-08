@@ -104,6 +104,10 @@ ${classmethods}
     , 'methdocstr':
 '"""${methoddocstr}\n\
         """'
+    , 'at_see':
+'''
+        @see ${link}\
+'''
     , 'at_param':
 '''
         @param ${in_name}    ${in_type}\
@@ -229,8 +233,28 @@ def find_object_reference(arg):
 
     return "Unknown"
         
-def build_args_doc_string(base_doc_str, _def_in, _def_out, _def_throws):
+def build_class_doc_string(base_doc_str, _def_spec):
     doc_str = base_doc_str
+
+    if _def_spec:
+        first_time = True
+        for url in _def_spec.split(' '):
+            if first_time:
+                doc_str += '\n'
+                first_time = False
+            doc_str += "\n    @see " + url
+        return doc_str
+        
+def build_args_doc_string(base_doc_str, _def_spec, _def_in, _def_out, _def_throws):
+    doc_str = base_doc_str
+
+    if _def_spec:
+        first_time = True
+        for url in _def_spec.split(' '):
+            if first_time:
+                doc_str += '\n'
+                first_time = False
+            doc_str += templates['at_see'].substitute(link=url)
 
     first_time = True
     for key,val in (_def_in or {}).iteritems():
@@ -298,6 +322,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     """
     service_name    = svc_def['name']
     class_docstring = svc_def['docstring']
+    class_spec      = svc_def['spec']
     dependencies    = svc_def['dependencies']
     meth_list       = svc_def['methods']
     interface_name  = svc_def['interface_name']
@@ -312,7 +337,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     for op_name, op_def in meth_list.iteritems():
         if not op_def: continue
 
-        def_docstring, def_in, def_out, def_throws  = op_def.get('docstring', "TODO document this interface!!!"), op_def.get('in', None), op_def.get('out', None), op_def.get('throws', None)
+        def_docstring, def_spec, def_in, def_out, def_throws  = op_def.get('docstring', "@todo document this interface!!!"), op_def.get('spec', None), op_def.get('in', None), op_def.get('out', None), op_def.get('throws', None)
 
         # multiline docstring for method
         docstring_lines = def_docstring.split('\n')
@@ -333,7 +358,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
             docstring_formatted += docstring_line
 
         args_str, class_args_str        = build_args_str(def_in, False), build_args_str(def_in, True)
-        docstring_str                   = templates['methdocstr'].substitute(methoddocstr=build_args_doc_string(docstring_formatted, def_in, def_out, def_throws))
+        docstring_str                   = templates['methdocstr'].substitute(methoddocstr=build_args_doc_string(docstring_formatted, def_spec, def_in, def_out, def_throws))
         outargs_str                     = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
         methods.append(templates['method'].substitute(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
@@ -365,7 +390,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     dep_client_imports_str  = "\n".join([templates['dep_client_imports'].substitute(clientmodule=client_defs[x][0], clientclass=client_defs[x][1]) for x in dependencies])
 
     service_name_str    = templates['svcname'].substitute(name=service_name)
-    class_docstring_str = templates['clssdocstr'].substitute(classdocstr=class_docstring)
+    class_docstring_str = templates['clssdocstr'].substitute(classdocstr=build_class_doc_string(class_docstring, class_spec))
     dependencies_str    = templates['depends'].substitute(namelist=dependencies)
     methods_str         = ''.join(methods) or '    pass\n'
     classmethods_str    = ''.join(class_methods)
@@ -555,6 +580,7 @@ def main():
 
                 service_name    = def_set.get('name', None)
                 class_docstring = def_set.get('docstring', "class docstring")
+                spec            = def_set.get('spec', None)
                 dependencies    = def_set.get('dependencies', None)
                 meth_list       = def_set.get('methods', {}) or {}
                 client_path     = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % service_name_from_file_name(interface_name))
@@ -584,6 +610,7 @@ def main():
 
                     raw_services[service_name] = { 'name'           : service_name,
                                                    'docstring'      : class_docstring_formatted,
+                                                   'spec'           : spec,
                                                    'dependencies'   : dependencies,
                                                    'methods'        : meth_list,
                                                    'interface_file' : interface_file,
