@@ -189,6 +189,9 @@ def type_defs(ob=None):
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
 def lsdir(qname='/'):
+    """Prints all directory entries below the given node.
+    @param qname the directory node (must start with '/')
+    """
     from pyon.directory.directory import Directory
     ds = Directory()
     delist = ds.find_entries(qname)
