@@ -353,12 +353,15 @@ class ListeningEndpointFactory(EndpointFactory):
     def _create_main_channel(self):
         return ListenChannel()
 
+    def _setup_listener(self, name, binding=None):
+        self._chan.setup_listener(name, binding=binding)
+
     def listen(self):
         log.debug("LEF.listen")
 
         self._chan = self._create_main_channel()
         self.node.channel(self._chan)
-        self._chan.setup_listener(self.name, binding=self.name[1])
+        self._setup_listener(self.name, binding=self.name[1])
         self._chan.start_consume()
 
         # notify any listeners of our readiness
@@ -455,9 +458,17 @@ class Subscriber(ListeningEndpointFactory):
     def _create_main_channel(self):
         return SubscriberChannel()
 
+    def _setup_listener(self, name, binding=None):
+        """
+        Override for setup_listener to make sure we are listening on an anonymous queue.
+        @TODO: correct?
+        """
+        # we expect (xp, name) and binding=name
+        ListeningEndpointFactory._setup_listener(self, (name[0], None), binding=binding)
+
     def __init__(self, callback=None, **kwargs):
         """
-        @param  callback should be a callable with one arg: msg
+        @param  callback should be a callable with two args: msg, headers
         """
         assert callback, "No callback provided"
         self._callback = callback
