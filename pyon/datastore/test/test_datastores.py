@@ -44,8 +44,8 @@ class Test_DataStores(IonIntegrationTestCase):
         except NotFound:
             pass
 
-        # Create should succeed and report True
-        self.assertTrue(data_store.create_datastore())
+        # Create should succeed and not throw error
+        data_store.create_datastore()
 
         # Should see new data
         self.assertIn('my_ds', data_store.list_datastores())
@@ -259,7 +259,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(head.Description == "USGS instantaneous value data for station 01491000")
 
         # Delete DataSet
-        self.assertTrue(data_store.delete(head))
+        data_store.delete(head)
 
         # List all objects in data store, should be back to six
         res = data_store.list_objects()
@@ -278,7 +278,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(len(res) == 8 + numcoredocs)
 
         # Delete data store to clean up
-        self.assertTrue(data_store.delete_datastore())
+        data_store.delete_datastore()
 
         # Assert data store is now gone
         self.assertNotIn('my_ds', data_store.list_datastores())
@@ -293,8 +293,8 @@ class Test_DataStores(IonIntegrationTestCase):
         except NotFound:
             pass
 
-        # Create should succeed and report True
-        self.assertTrue(data_store.create_datastore())
+        # Create should succeed and not throw exception
+        data_store.create_datastore()
 
         res = data_store.list_objects()
         numcoredocs = len(res)
