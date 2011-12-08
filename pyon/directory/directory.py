@@ -62,6 +62,7 @@ class Directory(object):
             self._assert_existence("/", "Services")
             self._assert_existence("/", "ObjectTypes")
             self._assert_existence("/", "ResourceTypes")
+            self._assert_existence("/", "Agents")
 
         def _assert_existence(self, parent, key):
             dn = self._get_dn(parent, key)
@@ -140,6 +141,10 @@ class Directory(object):
                 self.datastore.delete(direntry)
 
             return entry_old
+
+        def find_entries(self, qname='/'):
+            delist = self.datastore.find_dir_entries(qname)
+            return delist
 
     # Storage for the instance reference
     __instance = None

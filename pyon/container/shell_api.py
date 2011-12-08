@@ -188,6 +188,12 @@ def type_defs(ob=None):
         print pprint_list(tnames, -1, 1, 2)
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
+def lsdir(qname='/'):
+    from pyon.directory.directory import Directory
+    ds = Directory()
+    delist = ds.find_entries(qname)
+    print "\n".join(["%s: %s" % (de._id, de.attributes) for de in delist])
+
 def ionhelp():
     print "ION R2 CC interactive shell"
     print
@@ -195,18 +201,20 @@ def ionhelp():
     print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs]
+public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs,lsdir]
 public_vars = None
 
 def get_proc():
     from pyon.util.containers import DotDict
-    return DotDict(container.proc_manager.procs)
+    procs = DotDict(container.proc_manager.procs)
+    pn = DotDict(container.proc_manager.procs_by_name)
+    return procs, pn
 
 def define_vars():
     if public_vars: return public_vars
     from pyon.core.bootstrap import CFG, sys_name, obj_registry
     cc = container
-    proc = get_proc()
+    proc, pn = get_proc()
 
     return locals()
 
