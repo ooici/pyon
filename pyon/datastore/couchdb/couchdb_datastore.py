@@ -196,7 +196,7 @@ class CouchDB_DataStore(DataStore):
         # First, try to read document to ensure it exists
         # Have to do this because save will create a new doc
         # if it doesn't exist.  We don't want this side-effect.
-        self.read_doc(doc._id, doc._rev, datastore_name)
+        self.read_doc(doc["_id"], doc["_rev"], datastore_name)
 
         log.info('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('update doc contents: %s', doc)
