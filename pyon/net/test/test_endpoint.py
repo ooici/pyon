@@ -3,9 +3,8 @@ from zope.interface import interface
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
-from pyon.net.channel import PubSub
 from pyon.net import endpoint
-from pyon.net.endpoint import Endpoint, EndpointFactory, BinderListener, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
+from pyon.net.endpoint import Endpoint, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event, GreenletExit
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
@@ -188,31 +187,6 @@ class TestEndpointFactory(IonIntegrationTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
-@attr('UNIT')
-class TestBinderListener(IonIntegrationTestCase):
-    def setUp(self):
-        self._node = FakeNode()
-
-    def test_create(self):
-        bl1 = BinderListener(self._node, "namey", None, None, None)
-        bl2 = BinderListener(self._node, "namey2", Subscriber(node=self._node, callback=lambda: True, name="namey2"), PubSub, None)
-
-    def test_create_with_spawn_and_listen(self):
-        """
-        Tests both listen() and a custom spawn function being passed.
-        """
-        def myspawn(cb, *args):
-            raise GreenletExit("spawner")
-
-        bl1 = BinderListener(self._node, "namey", None, FakeChannel, myspawn)
-
-        # spawn in greenlet, let myspawn get hit, make sure it got hit
-        listen_g = spawn(bl1.listen)
-        wait(listen_g)
-
-        self.assertEquals(str(listen_g.value), "spawner")
-
-@attr('UNIT')
 class TestPublisher(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()

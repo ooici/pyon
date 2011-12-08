@@ -7,7 +7,6 @@ __author__ = 'Michael Meisinger'
 from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
-from pyon.net.channel import PubSub
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool

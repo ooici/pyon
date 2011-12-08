@@ -9,7 +9,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition
-from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
+from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
@@ -279,58 +279,6 @@ class ExchangeManagement(EndpointFactory):
     def close(self):
         if self._exchange_ep:
             self._exchange_ep.close()
-
-class OLDBinderListener(object):
-    def __init__(self, node, name, endpoint_factory, listening_channel_type, spawn_callable):
-        """
-        @param spawn_callable   A callable to spawn a new received message worker thread. Calls with
-                                the callable to be spawned and args. If None specified, does not create
-                                a new thread: all processing is done synchronously.
-        """
-        self._node = node
-        self._name = name
-        self._ent_fact = endpoint_factory or ListeningEndpointFactory(node, name)
-        self._ch_type = listening_channel_type or Bidirectional
-        self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
-        self._chan = None
-        self._ready_event = event.AsyncResult()
-
-    def get_ready_event(self):
-        """
-        Returns an AsyncResult you can use to wait on to determine if this BinderListener has been setup
-        and is ready to accept messages.
-
-        @TODO: this sounds a lot like lifecycle
-        """
-        return self._ready_event
-
-    def listen(self):
-        log.debug("BinderListener.listen")
-        self._chan = self._node.channel(self._ch_type)
-        self._chan.bind((bootstrap.sys_name, self._name))
-        self._chan.listen()
-
-        self._ready_event.set(True)
-
-        while True:
-            log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
-            try:
-                req_chan = self._chan.accept()
-                msg, headers = req_chan.recv()
-                log.debug("BinderListener %s received message: %s, headers: %s", self._name, msg, headers)
-                e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
-
-                self._spawn(e._message_received, msg, headers)
-
-            except ChannelError as ex:
-                log.exception('Channel error during BinderListener.listen')
-                switch()
-            except ChannelClosedError as ex:
-                log.debug('Channel was closed during BinderListener.listen')
-                break
-
-    def close(self):
-        if self._chan: self._chan.close()
 
 class ListeningEndpointFactory(EndpointFactory):
     """
