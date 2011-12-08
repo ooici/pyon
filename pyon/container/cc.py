@@ -67,8 +67,11 @@ class Container(object):
     id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
     name = "cc_agent_%s" % (id)
     pidfile = None
+    instance = None
 
     def __init__(self, *args, **kwargs):
+        Container.instance = self
+
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs)
         from pyon.core import bootstrap
@@ -189,3 +192,5 @@ class Container(object):
 
         self._cleanup_pid()
         log.debug("Container stopped, OK.")
+
+        Container.instance = None

@@ -66,3 +66,5 @@ def bootstrap_pyon():
     from pyon.service import service
     service.load_service_mods('interface/services')
     service.build_service_map()
+
+    # TODO: Inteceptor loading (pyon.net)

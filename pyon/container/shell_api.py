@@ -16,10 +16,11 @@ def get_max_width(table, index):
     """Get the maximum width of the given column index"""
     return max([len(str(row[index])) for row in table])
 
-def pprint_table(table, pad=1, indent=0):
+def pprint_table(table, pad=1, indent=0, trunc=None):
     """Prints out a table of data, padded for alignment
     @param out: Output stream (file-like object)
     @param table: The table to print. A list of lists.
+    @param trunc: List of integers to truncate table to
     Each row must have the same number of columns.
     From:http://ginstrom.com/scribbles/2007/09/04/pretty-printing-a-table-in-python/
     """
@@ -27,12 +28,20 @@ def pprint_table(table, pad=1, indent=0):
 
     col_paddings = []
     for i in xrange(len(table[0])):
-        col_paddings.append(get_max_width(table, i))
+        if trunc and trunc[i]!=0:
+            col_paddings.append(abs(trunc[i]))
+        else:
+            col_paddings.append(get_max_width(table, i))
 
     for row in table:
         strl.append(' '*indent)
         for i in xrange(len(row)):
-            col = str(row[i]).ljust(col_paddings[i] + pad)
+            col = str(row[i])
+            if trunc and trunc[i]>2 and len(col)>trunc[i]:
+                col = col[0:trunc[i]-2] + ".."
+            elif trunc and trunc[i]<-2 and len(col)>abs(trunc[i]):
+                col = ".." + col[trunc[i]+2:]
+            col = col.ljust(col_paddings[i] + pad)
             strl.append(col)
         strl.append('\n')
 
@@ -188,6 +197,23 @@ def type_defs(ob=None):
         print pprint_list(tnames, -1, 1, 2)
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
+def lsdir(qname='/', truncate=True):
+    """Prints all directory entries below the given node.
+    @param qname the directory node (must start with '/')
+    """
+    from pyon.directory.directory import Directory
+    ds = Directory()
+    delist = ds.find_entries(qname)
+    detable = [(str(de._id), str(de.attributes)) for de in delist]
+
+    if truncate:
+        rows, columns = get_console_dimensions()
+        col1wid = get_max_width(detable, 0)
+        col1max = min(50 if columns>50 else 0, col1wid)
+        print pprint_table(detable, trunc=[-col1max,columns-col1max-2 if columns>col1max+3 else 0])
+    else:
+        print "\n".join(["%s: %s" % tup for tup in detable])
+
 def ionhelp():
     print "ION R2 CC interactive shell"
     print
@@ -195,18 +221,20 @@ def ionhelp():
     print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs]
+public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs,lsdir]
 public_vars = None
 
 def get_proc():
     from pyon.util.containers import DotDict
-    return DotDict(container.proc_manager.procs)
+    procs = DotDict(container.proc_manager.procs)
+    pn = DotDict(container.proc_manager.procs_by_name)
+    return procs, pn
 
 def define_vars():
     if public_vars: return public_vars
     from pyon.core.bootstrap import CFG, sys_name, obj_registry
     cc = container
-    proc = get_proc()
+    proc, pn = get_proc()
 
     return locals()
 

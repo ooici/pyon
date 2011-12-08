@@ -35,7 +35,11 @@ class BaseService(LocalContextMixin):
         super(BaseService, self).__init__()
 
     def init(self):
+        self._on_init()
         return self.on_init()
+
+    def _on_init(self):
+        """Framework hook to initialize"""
 
     def on_init(self):
         """
@@ -45,7 +49,11 @@ class BaseService(LocalContextMixin):
         """
 
     def start(self):
+        self._on_start()
         return self.on_start()
+
+    def _on_start(self):
+        """Framework hook to start"""
 
     def on_start(self):
         """
@@ -53,7 +61,12 @@ class BaseService(LocalContextMixin):
         """
 
     def stop(self):
-        return self.on_stop()
+        res = self.on_stop()
+        self._on_stop()
+        return res
+
+    def _on_stop(self):
+        """Framework hook to stop"""
 
     def on_stop(self):
         """
@@ -61,7 +74,12 @@ class BaseService(LocalContextMixin):
         """
 
     def quit(self):
-        return self.on_quit()
+        res = self.on_quit()
+        self._on_quit()
+        return res
+
+    def _on_quit(self):
+        """Framework hook to quit"""
 
     def on_quit(self):
         """
@@ -75,6 +93,16 @@ class BaseService(LocalContextMixin):
                         ",type=", self._proc_type,
                         ")"))
 
+class MultiService():
+    """
+    A metaclass taking a list of service classes as an argument, returning a specializes class object
+    that multiple inherits from the service classes. This way, more than one service can be combined.
+    """
+    pass
+
+
+# Module variable keeping services
+# TODO: Move to directory or container
 services_by_name = {}
 
 def load_service_mods(path):

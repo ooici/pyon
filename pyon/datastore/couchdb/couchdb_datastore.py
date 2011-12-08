@@ -667,6 +667,21 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
+    def find_dir_entries(self, qname):
+        log.debug("find_dir_entries(qname=%s)" % (qname))
+        if not str(qname).startswith('/'):
+            raise BadRequest("Illegal directory qname=%s" % qname)
+        db = self.server[self.datastore_name]
+        view = db.view(self._get_viewname("directory","by_path"))
+        key = str(qname).split('/')[1:]
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        if qname == '/': del endkey[0]
+        rows = view[key:endkey]
+        res_entries = [self._persistence_dict_to_ion_object(row.value) for row in rows]
+        log.debug("find_dir_entries() found %s objects" % (len(res_entries)))
+        return res_entries
+
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
         obj_dict = ion_object.__dict__.copy()

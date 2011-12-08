@@ -27,11 +27,16 @@ CONTAINER/STARTUP:
 OBJECTS:
 
 - Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
-- Service default arguments set to {} and [] in base class. Dangerous Python idiom. Solutions?
-- Datastore does not modify original object on create or update. Do it.
-- List to tuples through msgpack
+- Service default arguments set to {} and [] in base class. Dangerous Python idiom. Set to None? Solutions?
+- List to tuples through msgpack. Long to int (see timestamps). Double to float. (YAML)
 - Object base classes generated.
+
+DATASTORE:
+
+- Datastore does not modify original object on create or update. Do it.
 - Make sure mockdb and couch have the same interface (exceptions returned etc).
+- Efficient find by owner association
+- Find accepting arrays of restrict values (e.g. more than one LCS)
 
 PROCESS/SERVICE:
 
@@ -41,11 +46,17 @@ PROCESS/SERVICE:
 - Process (greenlet) accepts messages from endpoints. One greenlet per process; one message at a time.
 - Process ioloop (picking messages and activating on schedule)
 - Process attachment (direct or via container)
-- IDE code completion for service clients and methods (generated clients)
 - Optional vs. mandatory service arguments
 - Validate object content vs. service operations
 - Container support for infinite and recurring processes (in on_start)
 - Do not create message processing worker thread in BinderListener by default (use the process ioloop)
+- Extend the BinderListener so that it can dispatch into a list of service classes
+- Change success: True to raised exception
+- Namespace in generated interface clients not clean
+
+AGENTS/GOVERNANCE:
+
+- User agent?
 
 MESSAGING:
 

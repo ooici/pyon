@@ -96,10 +96,11 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "DirEntry") {
-    levels = [node for each (node in doc.parent.split('/'))]
-    //if (doc.parent == "/") { levels.pop(); }
-    //levels.splice(0,1)
-    levels.push(doc.key)
+    if (doc.parent.indexOf('/') != 0) return;
+    levels = doc.parent.split('/');
+    levels.splice(0,1);
+    if (doc.parent == "/") levels.pop();
+    levels.push(doc.key);
     emit(levels, doc);
   }
 }""",
@@ -108,7 +109,8 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "DirEntry") {
-emit([doc.key, doc.parent], doc);
+    if (doc.parent.indexOf('/') != 0) return;
+    emit([doc.key, doc.parent], doc);
   }
 }""",
         },

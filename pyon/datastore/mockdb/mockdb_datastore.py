@@ -685,6 +685,9 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
+    def find_dir_entries(self, qname):
+        raise NotImplementedError()
+
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
         obj_dict = ion_object.__dict__.copy()

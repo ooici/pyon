@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject, CFG
-from pyon.core.exception import Conflict, NotFound
+from pyon.core.exception import Conflict, NotFound, BadRequest
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.util.log import log
@@ -57,11 +57,13 @@ class Directory(object):
                 return "%s/%s" % (parent,key)
 
         def _init(self):
+            self._assert_existence("/", "Agents")
+            self._assert_existence("/", "Config")
             self._assert_existence("/", "Containers")
-            self._assert_existence("/", "ServiceDefinitions")
-            self._assert_existence("/", "Services")
             self._assert_existence("/", "ObjectTypes")
             self._assert_existence("/", "ResourceTypes")
+            self._assert_existence("/", "ServiceInterfaces")
+            self._assert_existence("/", "Services")
 
         def _assert_existence(self, parent, key):
             dn = self._get_dn(parent, key)
@@ -140,6 +142,12 @@ class Directory(object):
                 self.datastore.delete(direntry)
 
             return entry_old
+
+        def find_entries(self, qname='/'):
+            if not str(qname).startswith('/'):
+                raise BadRequest("Illegal directory node: qname=%s" % qname)
+            delist = self.datastore.find_dir_entries(qname)
+            return delist
 
     # Storage for the instance reference
     __instance = None
