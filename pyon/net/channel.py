@@ -958,7 +958,7 @@ class RecvChannel(BaseChannel2):
 
         self._declare_exchange_point(xp)
         queue   = self._declare_queue(queue)
-        binding = binding or queue
+        binding = binding or queue      # should only happen in the case of anon-queue
 
         self._bind(binding)
 
@@ -1026,16 +1026,21 @@ class RecvChannel(BaseChannel2):
         BaseChannel2.close_impl(self)
 
     def _declare_queue(self, queue):
-        queue = queue or ''
+
+        # prepend xp name in the queue for anti-clobbering
+        if queue:
+            queue = ".".join([self._recv_name[0], queue])
+
         log.info("RecvChannel._declare_queue: %s", queue)
         frame = blocking_cb(self._amq_chan.queue_declare, 'callback',
-                            queue=queue,
+                            queue=queue or '',
                             auto_delete=self._queue_auto_delete,
                             durable=self._queue_durable)
 
         # if the queue was anon, save it
-        if queue == '':
-            self._recv_name = (self._recv_name[0], frame.method.queue)
+        #if queue is None:
+        # always save the new recv_name - we may have created a new one
+        self._recv_name = (self._recv_name[0], frame.method.queue)
 
         return self._recv_name[1]
 

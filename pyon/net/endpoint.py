@@ -339,6 +339,17 @@ class ListeningEndpointFactory(EndpointFactory):
     #channel_type = Bidirectional
     #channel_type = ListenChannel        # channel type is perverted here - we don't produce this, we just make one to listen on
 
+    def __init__(self, node=None, name=None):
+        EndpointFactory.__init__(self, node=node, name=name)
+        self._ready_event = event.Event()
+
+    def get_ready_event(self):
+        """
+        Returns an async event you can .wait() on.
+        Used to indicate when listen() is ready to start listening.
+        """
+        return self._ready_event
+
     def _create_main_channel(self):
         return ListenChannel()
 
@@ -347,8 +358,11 @@ class ListeningEndpointFactory(EndpointFactory):
 
         self._chan = self._create_main_channel()
         self.node.channel(self._chan)
-        self._chan.setup_listener(self.name)
+        self._chan.setup_listener(self.name, binding=self.name[1])
         self._chan.start_consume()
+
+        # notify any listeners of our readiness
+        self._ready_event.set()
 
         while True:
             log.debug("LEF: %s blocking, waiting for a message" % str(self.name))
