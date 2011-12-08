@@ -57,12 +57,13 @@ class Directory(object):
                 return "%s/%s" % (parent,key)
 
         def _init(self):
+            self._assert_existence("/", "Agents")
+            self._assert_existence("/", "Config")
             self._assert_existence("/", "Containers")
-            self._assert_existence("/", "ServiceDefinitions")
-            self._assert_existence("/", "Services")
             self._assert_existence("/", "ObjectTypes")
             self._assert_existence("/", "ResourceTypes")
-            self._assert_existence("/", "Agents")
+            self._assert_existence("/", "ServiceInterfaces")
+            self._assert_existence("/", "Services")
 
         def _assert_existence(self, parent, key):
             dn = self._get_dn(parent, key)
