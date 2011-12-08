@@ -95,7 +95,10 @@ class CouchDB_DataStore(DataStore):
     def create_doc(self, doc, object_id=None, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        assert '_id' not in doc, "Create cannot create document with ID: %s" % doc
+        if '_id' in doc:
+            raise BadRequest("Create cannot create document with ID: %s" % doc)
+        if '_rev' in doc:
+            raise BadRequest("Create cannot create document with Rev: %s" % doc)
 
         # Assign an id to doc (recommended in CouchDB documentation)
         doc["_id"] = object_id or uuid4().hex
@@ -113,9 +116,12 @@ class CouchDB_DataStore(DataStore):
                                     object_ids)
 
     def create_doc_mult(self, docs, object_ids=None):
-        assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
-        assert not any(["_rev" in doc for doc in docs]), "Docs must not have '_rev'"
-        assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
+        if any(["_id" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_id'")
+        if any(["_rev" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_rev'")
+        if object_ids and len(object_ids) != len(docs):
+            raise BadRequest("Invalid object_ids")
 
         # Assign an id to doc (recommended in CouchDB documentation)
         object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
@@ -190,8 +196,10 @@ class CouchDB_DataStore(DataStore):
     def update_doc(self, doc, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        assert '_id' in doc, "Update failed: Document has no ID: %s" % doc
-        assert '_rev' in doc, "Update failed: Document has no Rev: %s" % doc
+        if '_id' not in doc:
+            raise BadRequest("Update failed: Document has no ID: %s" % doc)
+        if '_rev' not in doc:
+            raise BadRequest("Update failed: Document has no Rev: %s" % doc)
         
         # First, try to read document to ensure it exists
         # Have to do this because save will create a new doc
@@ -554,7 +562,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
-        assert object, "Must provide object"
+        if not object:
+            raise BadRequest("Must provide object")
         db = self.server[self.datastore_name]
 
         object_id = object if type(object) is str else object._id
@@ -580,7 +589,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, object))
-        assert (subject and object) or predicate, "Illegal parameters"
+        if not ((subject and object) or predicate):
+            raise BadRequest("Illegal parameters")
         db = self.server[self.datastore_name]
 
         if subject and object:

@@ -117,8 +117,10 @@ class MockDB_DataStore(DataStore):
                                     object_ids)
 
     def create_doc_mult(self, docs, object_ids=None):
-        assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
-        assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
+        if any(["_id" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_id'")
+        if object_ids or len(object_ids) == len(docs):
+            raise BadRequest("Invalid object_ids")
 
         # Assign an id to doc (recommended in CouchDB documentation)
         object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
@@ -551,7 +553,8 @@ class MockDB_DataStore(DataStore):
 
     def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
-        assert object, "Must provide object"
+        if not object:
+            raise BadRequest("Must provide object")
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
@@ -583,7 +586,8 @@ class MockDB_DataStore(DataStore):
 
     def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, object))
-        assert (subject and object) or predicate, "Illegal parameters"
+        if not ((subject and object) or predicate):
+            raise BadRequest("Illegal parameters")
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:

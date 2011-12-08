@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.containers import DotDict, get_ion_ts
-from pyon.core.exception import NotFound, BadRequest
+from pyon.core.exception import BadRequest
 
 class DataStore(object):
     """
@@ -279,7 +279,8 @@ class DataStore(object):
         """
         Create an association between two IonObjects with a given predicate
         """
-        assert subject and predicate and object, "Association must have all elements set"
+        if not subject and not predicate and not object:
+            raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
             subject = self.read(subject_id)
@@ -359,7 +360,8 @@ class DataStore(object):
 
     def find_resources(self, restype=None, lcstate=None, name=None, id_only=True):
         if name is not None:
-            assert lcstate is None, "find by name does not support lcstate"
+            if lcstate:
+                raise BadRequest("find by name does not support lcstate")
             return self.find_res_by_name(name, restype, id_only)
         elif restype and lcstate:
             return self.find_res_by_type(restype, lcstate, id_only)
