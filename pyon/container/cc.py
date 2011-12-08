@@ -70,7 +70,7 @@ class Container(object):
     instance = None
 
     def __init__(self, *args, **kwargs):
-        self.instance = self
+        Container.instance = self
 
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs)
@@ -193,4 +193,4 @@ class Container(object):
         self._cleanup_pid()
         log.debug("Container stopped, OK.")
 
-        self.instance = None
+        Container.instance = None
