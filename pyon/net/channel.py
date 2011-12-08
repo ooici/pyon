@@ -797,7 +797,14 @@ class SocketInterface(object):
 
 class BaseChannel2(object):
 
-    _amq_chan = None
+    _amq_chan                   = None      # underlying transport
+    _close_callback             = None      # close callback to use when closing, not always set (used for pooling)
+    _exchange                   = None      # exchange (too AMQP specific)
+
+    # exchange related settings @TODO: these should likely come from config instead
+    _exchange_type              = 'topic'
+    _exchange_auto_delete       = True
+    _exchange_durable           = False
 
     def __init__(self, close_callback=None):
         """
@@ -810,7 +817,20 @@ class BaseChannel2(object):
         self._close_callback = close_callback
 
     def _declare_exchange_point(self, xp):
-        pass
+        """
+
+        @TODO: this really shouldn't exist, messaging layer should not make this declaration.  it will be provided.
+               perhaps push into an ion layer derivation to help bootstrapping / getting started fast.
+        """
+        self._exchange = xp
+        assert self._exchange
+        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
+        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
+                                                                 self._exchange_durable, self._exchange_auto_delete)
+        blocking_cb(self._amq_chan.exchange_declare, 'callback', exchange=self._exchange,
+                                                                type=self._exchange_type,
+                                                                durable=self._exchange_durable,
+                                                                auto_delete=self._exchange_auto_delete)
 
     def attach_underlying_channel(self, amq_chan):
         """
@@ -820,78 +840,241 @@ class BaseChannel2(object):
         self._amq_chan = amq_chan
 
     def close(self):
-        pass
+        """
+        Default close method. If created via a Node (99% likely), the Node will take care of
+        calling close_impl for you at the proper time.
+        """
+        if self._close_callback:
+            self._close_callback(self)
+        else:
+            self.close_impl()
 
     def close_impl(self):
-        pass
+        """
+        Closes the AMQP connection.
+        @TODO: belongs here?
+        """
+        log.debug("BaseChannel.close_impl")
+        if self._amq_chan:
+            self._amq_chan.close()
+
+        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
+        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
+        # up for Pika here so we don't goof up when reusing a channel number.
+        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Basic.GetEmpty')
+        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Channel.Close')
+        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_deliver')
+        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_get')
+
+        # uncomment these lines to see the full callback list that Pika maintains
+        #stro = pprint.pformat(self.amq_chan.callbacks._callbacks)
+        #log.error(str(stro))
+
+    def on_channel_open(self, amq_chan):
+        amq_chan.add_on_close_callback(self.on_channel_close)
+        self.attach_underlying_channel(amq_chan)
+
+    def on_channel_close(self, code, text):
+        logmeth = log.debug
+        if code != 0:
+            logmeth = log.error
+        logmeth("In BaseChannel.on_channel_close\n\tchannel number: %d\n\tcode: %d\n\ttext: %s", self._amq_chan.channel_number, code, text)
 
 class SendChannel(BaseChannel2):
     """
     A channel that can only send.
     """
+    _send_name = None           # name that this channel is sending to - tuple (exchange, routing_key)
+
     def connect(self, name):
-        pass
+        log.debug("SendChannel.connect: %s", name)
+
+        self._send_name = name
+        self._exchange = name[0]
 
     def send(self, data, headers=None):
-        pass
+        log.debug("SendChannel.send")
+        self._send(self._send_name, data, headers=headers)
+
+    def _send(self, name, data, headers=None,
+                                content_type=None,
+                                content_encoding=None,
+                                message_type=None,
+                                reply_to=None,
+                                correlation_id=None,
+                                message_id=None):
+
+        log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
+        exchange, routing_key = name
+        headers = headers or {}
+        props = BasicProperties(headers=headers,
+                            content_type=content_type,
+                            content_encoding=content_encoding,
+                            type=message_type,
+                            reply_to=reply_to,
+                            correlation_id=correlation_id,
+                            message_id=message_id)
+
+        self._amq_chan.basic_publish(exchange=exchange, #todo
+                                routing_key=routing_key, #todo
+                                body=data,
+                                properties=props,
+                                immediate=False, #todo
+                                mandatory=False) #todo
 
 class RecvChannel(BaseChannel2):
     """
     A channel that can only receive.
     """
-    _recv_queue = None
+    # data for this receive channel
+    _recv_queue     = None
+    _consuming      = False
+    _consumer_tag   = None
+    _recv_name      = None      # name this receiving channel is receiving on - tuple (exchange, queue)
 
-    # defaults, override in derived classes
+    # queue defaults
+    _queue_auto_delete  = False
+    _queue_exclusive    = False
+    _queue_durable      = False
+
+    # consumer defaults
     _consumer_exclusive = False
     _consumer_no_ack    = False     # endpoint layers do the acking as they call recv()
-    _queue_auto_delete  = False
-    # @TODO more
 
     def __init__(self, **kwargs):
-        self._recv_queue = gqueue()
+        self._recv_queue = gqueue.Queue()
         BaseChannel2.__init__(self, **kwargs)
 
-    def setup_listener(self, xp=None, queue=None, binding=None):
+    def setup_listener(self, name, binding=None):
+        """
+        @param  name        A tuple of (exchange, queue)
+        @param  binding     If not set, uses name.
+        """
+        xp, queue = name
+
+        self._recv_name = (xp, queue)
+
+        log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s" % (xp, queue, binding))
+
         self._declare_exchange_point(xp)
-        self._declare_queue(queue)
+        queue   = self._declare_queue(queue)
+        binding = binding or queue
+
         self._bind(binding)
 
     def start_consume(self):
-        pass
+        log.debug("RecvChannel.start_consume")
+        if self._consuming:
+            raise StandardError("Already consuming")
+
+        if self._consumer_tag and self._queue_auto_delete:
+            log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
+
+        self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
+                                                          queue=self._recv_name[1],
+                                                          no_ack=self._consumer_no_ack,
+                                                          exclusive=self._consumer_exclusive)
+        self._consuming = True
 
     def stop_consume(self):
-        pass
+        """
+        Stops consuming messages.
+
+        If the queue has auto_delete, this will delete it.
+        """
+        log.debug("RecvChannel.stop_consume")
+        if not self._consuming:
+            raise StandardError("Not consuming")
+
+        if self._queue_auto_delete:
+            log.info("Autodelete is on, this will destroy this queue")
+
+        blocking_cb(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
+        self._consuming = False
 
     def recv(self):
         """
-        Pulls a message off the queue.
+        Pulls a message off the queue, will block if there are none.
         Typically done by the Endpoint layer. Should ack the message there as it is "taking ownership".
         """
-        return self._recv_queue.get()
+        msg = self._recv_queue.get()
+
+        # how we handle closed/closing calls, not the best @TODO
+        if isinstance(msg, ChannelShutdownMessage):
+            raise ChannelClosedError('Attempt to recv on a channel that is being closed.')
+
+        return msg
 
     def close_impl(self):
         """
-        Close implementation override. If we've declared and we're not auto_delete, must delete here.
+        Close implementation override.
+
+        If we've declared and we're not auto_delete, must delete here.
+        Also put a ChannelShutdownMessage in the recv queue so anything blocking on reading it will get notified via ChannelClosedError.
         """
-        if not self._queue_auto_delete:
-            self._amq_chan.delete_queue()   # TODO
+        # stop consuming if we are consuming
+        log.debug("BaseChannel.close_impl: consuming %s", self._consuming)
+        if self._consuming:
+            self.stop_consume()
+
+        if not self._queue_auto_delete and self._recv_name and self._recv_name[1]:
+            log.debug("Deleting queue %s", self._recv_name)
+            blocking_cb(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
+
+        self._recv_queue.put(ChannelShutdownMessage())
 
         BaseChannel2.close_impl(self)
 
     def _declare_queue(self, queue):
-        pass
+        queue = queue or ''
+        log.info("RecvChannel._declare_queue: %s", queue)
+        frame = blocking_cb(self._amq_chan.queue_declare, 'callback',
+                            queue=queue,
+                            auto_delete=self._queue_auto_delete,
+                            durable=self._queue_durable)
+
+        # if the queue was anon, save it
+        if queue == '':
+            self._recv_name = (self._recv_name[0], frame.method.queue)
+
+        return self._recv_name[1]
 
     def _bind(self, binding):
-        pass
+        log.debug("RecvChannel._bind: %s" % binding)
+        assert self._recv_name and self._recv_name[1]
+        
+        queue = self._recv_name[1]
+        blocking_cb(self._amq_chan.queue_bind, 'callback',
+                    queue=queue,
+                    exchange=self._recv_name[0],
+                    routing_key=binding)
 
     def _on_deliver(self, chan, method_frame, header_frame, body):
-        self._recv_queue.put(body)  # and more
+        log.debug("RecvChannel._on_deliver")
+
+        consumer_tag = method_frame.consumer_tag # use to further route?
+        delivery_tag = method_frame.delivery_tag # use to ack
+        redelivered = method_frame.redelivered
+        exchange = method_frame.exchange
+        routing_key = method_frame.routing_key
+
+        # merge down "user" headers with amqp headers
+        headers = header_frame.__dict__
+        headers.update(header_frame.headers)
+
+        # put body, headers, delivery tag (for acking) in the recv queue
+        self._recv_queue.put((body, headers, delivery_tag))  # and more
+
+    def ack(self, delivery_tag):
+        """
+        Acks a message using the delivery tag.
+        Should be called by the EP layer.
+        """
+        log.debug("RecvChannel.ack: %s" % delivery_tag)
+        self._amq_chan.basic_ack(delivery_tag)
 
 
 class PubChannel(SendChannel):
-    pass
-
-class SubChannel(RecvChannel):
     pass
 
 class BidirClientChannel(SendChannel, RecvChannel):
@@ -901,24 +1084,51 @@ class BidirClientChannel(SendChannel, RecvChannel):
     As opposed to current endpoint scheme - no need to spawn a listening greenlet simply to loop on recv(),
     you can use this channel to send first then call recieve linearly, no need for greenletting.
     """
-    pass
+    _queue_auto_delete = True
 
-class ServerChannel(RecvChannel):
+    def _send(self, name, data, headers=None,
+                                content_type=None,
+                                content_encoding=None,
+                                message_type=None,
+                                reply_to=None,
+                                correlation_id=None,
+                                message_id=None):
+        """
+        Override of internal send method.
+        Sets reply_to/message_type if not set as a kwarg.
+        """
+        reply_to        = reply_to or "%s,%s" % self._recv_name
+        message_type    = message_type or "rr-data"
+
+        SendChannel._send(self, name, data, headers=headers,
+                                            content_type=content_type,
+                                            content_encoding=content_encoding,
+                                            message_type=message_type,
+                                            reply_to=reply_to,
+                                            correlation_id=correlation_id,
+                                            message_id=message_id)
+
+class ListenChannel(RecvChannel):
     """
-    Used for RR patterns.
+    Used for listening patterns (RR server, Subscriber).
     Main use is accept() - listens continously on one queue, pulls messages off, creates a new channel
                            to interact and returns it
     """
 
-    class BidirAccept(SendChannel, RecvChannel):
+    class AcceptedListenChannel(RecvChannel):
         """
         The type of channel returned by accept.
         """
         def close_impl(self):
             """
-            Do not close underlying amqp channel!
+            Do not close underlying amqp channel
             """
             pass
+
+    def _create_accepted_channel(self, amq_chan, msg):
+        ch = self.AcceptedListenChannel()
+        ch.attach_underlying_channel(amq_chan)
+        return ch
 
     def accept(self):
         """
@@ -931,12 +1141,31 @@ class ServerChannel(RecvChannel):
                     - has the initial received message here put onto its recv gqueue
                     - recv() returns messages in its gqueue, endpoint should ack
         """
-        while True:
-            m = self.recv()
+        m = self.recv()
+        ch = self._create_accepted_channel(self._amq_chan, m)
+        ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
-            ch = self.BidirAccept()
-            ch.attach_underlying_channel(self._amq_chan)
-            # FUTURE: setup listener here
-            ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
+        return ch
 
-            return ch
+class SubscriberChannel(ListenChannel):
+    pass
+
+class ServerChannel(ListenChannel):
+
+    class BidirAcceptChannel(ListenChannel.AcceptedListenChannel, SendChannel):
+        pass
+
+    def _create_accepted_channel(self, amq_chan, msg):
+        send_name = tuple(msg[1].get('reply_to').split(','))        # @TODO: this seems very wrong
+        ch = self.BidirAcceptChannel()
+        ch.attach_underlying_channel(amq_chan)
+        ch._send_name = send_name
+        return ch
+
+#ch = self.BidirAccept()
+#        ch.attach_underlying_channel(self._amq_chan)
+#        ch._send_name = (self._recv_name[0], m[1]['reply-to'])
+#        # FUTURE: setup listener here
+#        ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
+#
+#        return ch
