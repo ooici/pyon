@@ -27,7 +27,6 @@ class MockDB_DataStore(DataStore):
         log.debug('Creating data store %s' % datastore_name)
         if datastore_name not in self.root:
             self.root[datastore_name] = {}
-        return True
 
     def delete_datastore(self, datastore_name=""):
         if datastore_name == "":
@@ -35,7 +34,6 @@ class MockDB_DataStore(DataStore):
         log.debug('Deleting data store %s' % datastore_name)
         if datastore_name in self.root:
             del self.root[datastore_name]
-        return True
 
     def list_datastores(self):
         log.debug('Listing all data stores')
@@ -220,7 +218,6 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise NotFound('Object ' + object_id + ' does not exist.')
         log.debug('Delete result: True')
-        return True
 
     def find(self, criteria=[], datastore_name=""):
         docList = self.find_doc(criteria, datastore_name)
