@@ -10,13 +10,14 @@ from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.public import RT, AT, LCS
-
+from nose.plugins.attrib import attr
 from unittest import SkipTest
 
 OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
+@attr('UNIT')
 class Test_DataStores(IonIntegrationTestCase):
 
     def test_non_persistent(self):

@@ -5,7 +5,9 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.containers import DictModifier, DotDict
 from pyon.util.int_test import IonIntegrationTestCase
+from nose.plugins.attrib import attr
 
+@attr('UNIT')
 class Test_Containers(IonIntegrationTestCase):
 
     def test_dot_dict(self):

@@ -10,6 +10,7 @@ from gevent import event, GreenletExit
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.async import wait, spawn
+from nose.plugins.attrib import attr
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -82,6 +83,7 @@ class FakeNode(object):
         self._chan = self._chan_type(**self._chan_kwargs)
         return self._chan
 
+@attr('UNIT')
 class TestEndpoint(IonIntegrationTestCase):
 
 
@@ -138,7 +140,7 @@ class TestEndpoint(IonIntegrationTestCase):
 #        self.assertTrue(isinstance(msg['header'], dict))
 #        self.assertEquals(fakemsg, msg['payload'])
 
-
+@attr('UNIT')
 class TestEndpointFactory(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -186,6 +188,7 @@ class TestEndpointFactory(IonIntegrationTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
+@attr('UNIT')
 class TestBinderListener(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -209,6 +212,7 @@ class TestBinderListener(IonIntegrationTestCase):
 
         self.assertEquals(str(listen_g.value), "spawner")
 
+@attr('UNIT')
 class TestPublisher(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -225,6 +229,7 @@ class TestPublisher(IonIntegrationTestCase):
         self._pub.publish("pub2")
         self.assertEquals(self._node._chan._sendcount, 2)
 
+@attr('UNIT')
 class TestSubscriber(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -254,6 +259,7 @@ class TestSubscriber(IonIntegrationTestCase):
         # from FakeChannel
         self.assertEquals(str(listen_g.value), "a msg")
 
+@attr('UNIT')
 class TestRequestResponse(IonIntegrationTestCase):
     def setUp(self):
         self._node = FakeNode()
@@ -315,7 +321,7 @@ class FakeRPCServerChannel(FakeChannel):
         else:
             res = event.AsyncResult()
             res.get()
-
+@attr('UNIT')
 class TestRPCRequestEndpoint(IonIntegrationTestCase):
 
     def test_build_msg(self):
@@ -346,6 +352,7 @@ class TestRPCRequestEndpoint(IonIntegrationTestCase):
 
             self.assertRaises(err, e.send, 'payload')
 
+@attr('UNIT')
 class TestRPCClient(IonIntegrationTestCase):
 
     def test_rpc_client(self):
@@ -357,6 +364,7 @@ class TestRPCClient(IonIntegrationTestCase):
         ret = rpcc.simple("zap", "zip")
         self.assertEquals(ret, "some payload")
 
+@attr('UNIT')
 class TestRPCResponseEndpoint(IonIntegrationTestCase):
 
     def simple(self, *args):
@@ -377,6 +385,7 @@ class TestRPCResponseEndpoint(IonIntegrationTestCase):
 
         self.assertEquals(args, ("ein", "zwei"))
 
+@attr('UNIT')
 class TestRPCServer(IonIntegrationTestCase):
 
     def test_rpc_server(self):

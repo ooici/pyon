@@ -98,15 +98,24 @@ ${classmethods}
 '''
     def ${name}(${args}):
         ${methoddocstring}
-        # Return Value
-        # ------------
-        # ${outargs}
         pass
 '''
     , 'arg': '${name}=${val}'
     , 'methdocstr':
 '"""${methoddocstr}\n\
         """'
+    , 'at_param':
+'''
+        @param ${in_name}    ${in_type}\
+'''
+    , 'at_return':
+'''
+        @retval ${out_name}    ${out_type}\
+'''
+    , 'at_throws':
+'''
+        @throws ${except_name}    ${except_info}\
+'''
 }
 
 client_templates = {
@@ -131,9 +140,6 @@ ${methods}
 '''
     def ${name}(${args}):
         ${methoddocstring}
-        # Return Value
-        # ------------
-        # ${outargs}
         return self.request({'method': '${name}', 'args': [${argssmall}]})
 ''',
     'rpcclient':
@@ -223,6 +229,46 @@ def find_object_reference(arg):
 
     return "Unknown"
         
+def build_args_doc_string(base_doc_str, _def_in, _def_out, _def_throws):
+    doc_str = base_doc_str
+
+    first_time = True
+    for key,val in (_def_in or {}).iteritems():
+        if isinstance(val, datetime.datetime):
+            val="datetime"
+        elif isinstance(val,dict):
+            val=find_object_reference(key)
+        elif isinstance(val,list):
+            val="[]"
+        else:
+            val = str(type(val)).replace("<type '","").replace("'>","")
+        if first_time:
+            doc_str += '\n'
+            first_time = False
+        doc_str += templates['at_param'].substitute(in_name=key, in_type=val)
+
+    for key,val in (_def_out or {}).iteritems():
+        if isinstance(val, datetime.datetime):
+            val="datetime"
+        elif isinstance(val,dict):
+            val=find_object_reference(key)
+        elif isinstance(val,list):
+            val="[]"
+        else:
+            val = str(type(val)).replace("<type '","").replace("'>","")
+        if first_time:
+            doc_str += '\n'
+            first_time = False
+        doc_str += templates['at_return'].substitute(out_name=key, out_type=val)
+
+    if _def_throws:
+        for key,val in (_def_throws or {}).iteritems():
+            if first_time:
+                doc_str += '\n'
+                first_time = False
+            doc_str += templates['at_throws'].substitute(except_name=key, except_info=val)
+    return doc_str
+        
 def build_args_doc_html(_def):
     # Handle case where method has no parameters
     args = []
@@ -266,7 +312,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     for op_name, op_def in meth_list.iteritems():
         if not op_def: continue
 
-        def_docstring, def_in, def_out  = op_def.get('docstring', "method docstring"), op_def.get('in', None), op_def.get('out', None)
+        def_docstring, def_in, def_out, def_throws  = op_def.get('docstring', "TODO document this interface!!!"), op_def.get('in', None), op_def.get('out', None), op_def.get('throws', None)
 
         # multiline docstring for method
         docstring_lines = def_docstring.split('\n')
@@ -287,7 +333,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
             docstring_formatted += docstring_line
 
         args_str, class_args_str        = build_args_str(def_in, False), build_args_str(def_in, True)
-        docstring_str                   = templates['methdocstr'].substitute(methoddocstr=docstring_formatted)
+        docstring_str                   = templates['methdocstr'].substitute(methoddocstr=build_args_doc_string(docstring_formatted, def_in, def_out, def_throws))
         outargs_str                     = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
         methods.append(templates['method'].substitute(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))

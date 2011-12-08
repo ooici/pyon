@@ -6,10 +6,12 @@ __license__ = 'Apache 2.0'
 from pyon.core.object import IonObjectRegistry
 from pyon.core.bootstrap import IonObject
 from pyon.util.int_test import IonIntegrationTestCase
+from nose.plugins.attrib import attr
 
 import os
 import datetime
 
+@attr('UNIT')
 class ObjectTest(IonIntegrationTestCase):
     def setUp(self):
         # TODO: Change the hacky hardcoded path once we have path management

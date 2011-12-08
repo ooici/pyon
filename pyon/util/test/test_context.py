@@ -7,7 +7,9 @@ from pyon.util.log import log
 from pyon.util.context import LocalContextMixin
 from pyon.util.int_test import IonIntegrationTestCase
 from gevent import spawn, event
+from nose.plugins.attrib import attr
 
+@attr('UNIT')
 class LocalContextMixinTest(IonIntegrationTestCase):
     """
     Tests LocalContextMixin for thread-level storage

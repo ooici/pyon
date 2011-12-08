@@ -5,7 +5,9 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.async import blocking_cb
 from pyon.util.int_test import IonIntegrationTestCase
+from nose.plugins.attrib import attr
 
+@attr('UNIT')
 class AsyncTest(IonIntegrationTestCase):
     def i_call_callbacks(self, cb):
         cb(1, 2, 3, foo='bar')
