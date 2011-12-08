@@ -41,7 +41,6 @@ class CouchDB_DataStore(DataStore):
         self.server.create(datastore_name)
         if create_indexes:
             self._define_views(datastore_name)
-        return True
 
     def delete_datastore(self, datastore_name=""):
         if not datastore_name:
@@ -49,7 +48,6 @@ class CouchDB_DataStore(DataStore):
         log.info('Deleting data store %s' % datastore_name)
         try:
             self.server.delete(datastore_name)
-            return True
         except ResourceNotFound:
             raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
 
@@ -116,6 +114,7 @@ class CouchDB_DataStore(DataStore):
 
     def create_doc_mult(self, docs, object_ids=None):
         assert not any(["_id" in doc for doc in docs]), "Docs must not have '_id'"
+        assert not any(["_rev" in doc for doc in docs]), "Docs must not have '_rev'"
         assert not object_ids or len(object_ids) == len(docs), "Invalid object_ids"
 
         # Assign an id to doc (recommended in CouchDB documentation)
@@ -147,9 +146,13 @@ class CouchDB_DataStore(DataStore):
         if not rev_id:
             log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
+            if doc is None:
+                raise NotFound('Object with id %s does not exist.' % str(doc_id))
         else:
             log.debug('Reading version %s of object %s/%s' % (rev_id, datastore_name, doc_id))
             doc = db.get(doc_id, rev=rev_id)
+            if doc is None:
+                raise NotFound('Object with id %s does not exist.' % str(doc_id))
         log.debug('read doc contents: %s', doc)
         return doc
 
@@ -165,6 +168,16 @@ class CouchDB_DataStore(DataStore):
         db = self.server[datastore_name]
         log.info('Reading head version of objects %s/%s' % (datastore_name, object_ids))
         docs = db.view("_all_docs", keys=object_ids, include_docs=(not id_only))
+        # Check for docs not found
+        error_str = ""
+        for row in docs:
+            if row.doc is None:
+                if error_str != "":
+                    error_str += "\n"
+                error_str += 'Object with id %s does not exist.' % str(row.key)
+        if error_str != "":
+            raise NotFound(error_str)
+
         if id_only:
             doc_list = [dict(_id=row.key, **row.value) for row in docs]
         else:
@@ -178,6 +191,12 @@ class CouchDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         assert '_id' in doc, "Update failed: Document has no ID: %s" % doc
+        assert '_rev' in doc, "Update failed: Document has no Rev: %s" % doc
+        
+        # First, try to read document to ensure it exists
+        # Have to do this because save will create a new doc
+        # if it doesn't exist.  We don't want this side-effect.
+        self.read_doc(doc._id, doc._rev, datastore_name)
 
         log.info('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('update doc contents: %s', doc)
@@ -203,15 +222,14 @@ class CouchDB_DataStore(DataStore):
             try:
                 del db[doc]
             except ResourceNotFound:
-                return False
+                return NotFound('Object with id %s does not exist.' % str(doc_id))
         else:
             log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
             try:
                 res = db.delete(doc)
             except ResourceNotFound:
-                return False
+                return NotFound('Object with id %s does not exist.' % str(doc_id))
             log.debug('Delete result: %s' % str(res))
-        return True
 
     def find(self, criteria=[], datastore_name=""):
         doc_list = self.find_doc(criteria, datastore_name)
@@ -333,9 +351,9 @@ class CouchDB_DataStore(DataStore):
         try:
             queryList = list(db.query(map_fun, include_docs=True))
         except ResourceNotFound:
-            raise NotFound("Data store query for criteria %s failed" % str(criteria))
+            return []
         if len(queryList) == 0:
-            raise NotFound("Data store query for criteria %s returned no objects" % str(criteria))
+            return []
         results = [row.doc for row in queryList]
         log.debug('Find results: %s' % str(results))
         return results
@@ -383,10 +401,7 @@ class CouchDB_DataStore(DataStore):
                                 if object == subject_doc[key]:
                                     res.append([subject_doc, key, object_doc])
 
-                    if len(res) == 0:
-                        raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
-                    else:
-                        return res
+                    return res
             else:
                 # Find all subjects with association to object
                 map_fun =\
@@ -416,19 +431,16 @@ class CouchDB_DataStore(DataStore):
                 try:
                     queryList = list(db.query(map_fun, include_docs=True))
                 except ResourceNotFound:
-                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                    return []
                 if len(queryList) == 0:
-                    raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
+                    return []
                 res = []
                 object_doc = self.read_doc(object, "", datastore_name)
                 for row in queryList:
                     subject_doc = row.doc
                     res.append([subject_doc, predicate, object_doc])
 
-                if len(res) == 0:
-                    raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
-                else:
-                    return res
+                return res
         else:
             if predicate == "":
                 if object == "":
@@ -449,7 +461,7 @@ class CouchDB_DataStore(DataStore):
                                 res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
-                        raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
+                        return []
                     else:
                         return res
             else:
@@ -461,8 +473,7 @@ class CouchDB_DataStore(DataStore):
                         for id in subject_doc[predicate]:
                             object_doc = self.read_doc(id, "", datastore_name)
                             res.append([subject_doc, predicate, object_doc])
-                        return res
-                    raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
+                    return res
                 else:
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
@@ -470,7 +481,7 @@ class CouchDB_DataStore(DataStore):
                     if predicate in subject_doc:
                         if object in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
-                    raise NotFound("Data store query for association %s/%s/%s returned no results" % (subject, predicate, object))
+                    return []
 
     def _get_viewname(self, design, name):
         return "_design/%s/_view/%s" % (design, name)
