@@ -1,15 +1,22 @@
 #!/usr/bin/env python
+import unittest
+from unittest.case import SkipTest
+from nose.plugins.attrib import attr
 from zope.interface import interface
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
+from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
 from pyon.net.endpoint import Endpoint, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event, GreenletExit
+from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import PyonTestCase
 from pyon.util.async import wait, spawn
 from nose.plugins.attrib import attr
+from mock import Mock
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -20,100 +27,38 @@ endpoint.interceptors = {'message-in': [],
                          'process-in': [],
                          'process-out': []}
 
-class FakeChannel(object):
-    """
-    A Channel-like object used for testing.
-    """
-    def __init__(self):
-        self._name = None
-        self._sendcount = 0
-        self._closecount = 0
-        self._sentone = False
-    def send(self, msg, headers):
-        self._sendcount += 1
-    def close(self):
-        self._closecount += 1
-    def connect(self, name):
-        self._name = name
-    def recv(self):
-        if not self._sentone:
-            self._sentone = True
-            return "a msg", {'fake':'fakevalue'}
-        else:
-            res = event.AsyncResult()
-            res.get()
-
-    def bind(self, *args):
-        pass
-    def listen(self):
-        pass
-    def accept(self):
-        return self
-
-class FakeRPCChannel(FakeChannel):
-    """
-    Channel-like object used for testing RPC.
-
-    When recv is called for the first time, responds with a dict of headers/payload,
-    with the statuscode and error message set to what was initialized in the constructor.
-    """
-    def __init__(self, code=None, msg=None, **kwargs):
-        self._code = code or 200
-        self._msg = msg or "OK"
-        FakeChannel.__init__(self)
-
-    def recv(self):
-        if not self._sentone:
-            self._sentone = True
-            return 'some payload', { 'status_code': self._code, 'error_message': self._msg }
-        else:
-            res = event.AsyncResult()
-            res.get()
-
-class FakeNode(object):
-    """
-    A Node-like object used for testing.
-    """
-    def __init__(self, chan_type=None, **kwargs):
-        self._chan_type = chan_type or FakeChannel
-        self._chan_kwargs = kwargs
-        self._chan = None
-    def channel(self, _):
-        self._chan = self._chan_type(**self._chan_kwargs)
-        return self._chan
-
 @attr('UNIT')
 class TestEndpoint(IonIntegrationTestCase):
-
 
     def setUp(self):
         self._endpoint = Endpoint()
 
     def test_attach_channel(self):
-        ch = FakeChannel()
+        ch = Mock(spec=BaseChannel)
         self._endpoint.attach_channel(ch)
 
         self.assertTrue(self._endpoint.channel is not None)
+        self.assertEquals(self._endpoint.channel, ch)
 
     def test_send(self):
 
         # need a channel to send on
         self.assertRaises(AttributeError, self._endpoint.send, "fake")
 
-        ch = FakeChannel()
+        ch = Mock(spec=SendChannel)
         self._endpoint.attach_channel(ch)
 
-        self._endpoint.send("hi")
-        self.assertEquals(ch._sendcount, 1)
+        self._endpoint.send("hi", {'header':'value'})
+        ch.send.assert_called_once_with('hi', {'header':'value'})
 
     def test_close(self):
-        ch = FakeChannel()
+        ch = Mock(spec=BaseChannel)
         self._endpoint.attach_channel(ch)
         self._endpoint.close()
-        self.assertEquals(ch._closecount, 1)
+        ch.close.assert_called_once_with()
 
     def test_spawn_listener(self):
-        ch = FakeChannel()
+        ch = Mock(spec=BidirClientChannel)
         self._endpoint.attach_channel(ch)
 
         self._endpoint.spawn_listener()
@@ -142,32 +87,39 @@ class TestEndpoint(IonIntegrationTestCase):
 @attr('UNIT')
 class TestEndpointFactory(IonIntegrationTestCase):
     def setUp(self):
-        self._node = FakeNode()
+        self._node = Mock(spec=NodeB)
         self._ef = EndpointFactory(node=self._node, name="EFTest")
+        self._ch = Mock(spec=SendChannel)
+        chtype = Mock()
+        chtype.return_value = self._ch
+        self._ef.channel_type = chtype
 
     def test_create_endpoint(self):
         e = self._ef.create_endpoint()
 
         # check attrs
         self.assertTrue(hasattr(e, 'channel'))
-        self.assertTrue(self._ef.name in e.channel._name)
+        self.assertEquals(self._ch.connect.call_count, 1)
+        self.assertTrue(self._ef.name in self._ch.connect.call_args[0])
 
         # make sure we can shut it down
         e.close()
+        self._ch.close.assert_any_call()
 
     def test_create_endpoint_new_name(self):
         e = self._ef.create_endpoint(to_name="reroute")
-        self.assertTrue("reroute" in e.channel._name)
+        self.assertEquals(self._ch.connect.call_count, 1)
+        self.assertTrue("reroute" in self._ch.connect.call_args[0][0])        # @TODO: this is obtuse
         e.close()
 
     def test_create_endpoint_existing_channel(self):
-        ch = FakeChannel()
+        ch = Mock(spec=SendChannel)
         e = self._ef.create_endpoint(existing_channel=ch)
         self.assertEquals(e.channel, ch)
-        self.assertTrue(e.channel._name is None)
+        self.assertEquals(ch.connect.call_count, 0)
 
         ch.connect("exist")
-        self.assertEquals(e.channel._name, 'exist')
+        ch.connect.assert_called_once_with('exist')
         
         e.close()
 
@@ -189,24 +141,58 @@ class TestEndpointFactory(IonIntegrationTestCase):
 
 class TestPublisher(IonIntegrationTestCase):
     def setUp(self):
-        self._node = FakeNode()
+        self._node = Mock(spec=NodeB)
         self._pub = Publisher(node=self._node, name="testpub")
+        self._ch = Mock(spec=SendChannel)
+        chtype = Mock()
+        chtype.return_value = self._ch
+        self._pub.channel_type = chtype
 
     def test_publish(self):
-        self.assertTrue(self._node._chan is None)
+        self.assertEquals(self._node.channel.call_count, 0)
 
         self._pub.publish("pub")
 
-        self.assertTrue(self._node._chan is not None)
-        self.assertEquals(self._node._chan._sendcount, 1)
+        self._node.channel.assert_called_once_with(self._ch)
+        self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self.assertEquals(self._node._chan._sendcount, 2)
+        self._node.channel.assert_called_once_with(self._ch)
+        self.assertEquals(self._ch.send.call_count, 2)
+
+class RecvMockMixin(object):
+    """
+    Helper mixin to get a properly mocked receiving channel into several tests.
+    """
+    def _setup_mock_channel(self, ch_type=BidirClientChannel, status_code=200, error_message="no problem", value="bidirmsg"):
+        """
+        Sets up a mocked channel, ready for fake bidir communication.
+
+        @param  ch_type         Channel type the mock should spec to.
+        @param  status_code     The status code of the operation, relevant only for RR comms.
+        @param  error_messge    The error message of the operation, relevant only for RR comms.
+        @param  value           The msg body to be returned.
+        """
+        ch = Mock(spec=ch_type())
+        # set a return value for recv so we get an immediate response
+        vals = [(value, {'status_code':status_code, 'error_message':error_message }, 2)]
+        def _ret(*args, **kwargs):
+            if len(vals):
+                return vals.pop()
+            raise ChannelClosedError()
+
+        ch.recv.side_effect = _ret
+
+        # need to set a send_name for now
+        ch._send_name = ('', '')
+
+        return ch
 
 @attr('UNIT')
-class TestSubscriber(IonIntegrationTestCase):
+class TestSubscriber(IonIntegrationTestCase, RecvMockMixin):
+
     def setUp(self):
-        self._node = FakeNode()
+        self._node = Mock(spec=NodeB)
 
     def test_create_sub_without_callback(self):
         self.assertRaises(AssertionError, Subscriber, node=self._node, name="testsub")
@@ -221,30 +207,38 @@ class TestSubscriber(IonIntegrationTestCase):
         self.assertEquals(e._callback, mycb)
 
     def test_subscribe(self):
-        def mycb(msg, headers):
-            raise GreenletExit(msg)
+        """
+        Test Subscriber.
+        The goal of this test is to get messages routed to the callback mock.
+        """
+        cbmock = Mock()
+        sub = Subscriber(node=self._node, name="testsub", callback=cbmock)
 
-        sub = Subscriber(node=self._node, name="testsub", callback=mycb)
-        bl = BinderListener(node=self._node, name="testsub", endpoint_factory=sub, listening_channel_type=FakeChannel, spawn_callable=None)
+        # tell the subscriber to create this as the main listening channel
+        listen_channel_mock = self._setup_mock_channel(ch_type=SubscriberChannel, value="subbed", error_message="")
+        sub._create_main_channel = lambda: listen_channel_mock
 
-        listen_g = spawn(bl.listen)
-        wait(listen_g)
+        # tell our channel to return itself when accepted
+        listen_channel_mock.accept.return_value = listen_channel_mock
 
-        # from FakeChannel
-        self.assertEquals(str(listen_g.value), "a msg")
+        # we're ready! call listen
+        sub.listen()
+
+        # make sure we got our message
+        cbmock.assert_called_once_with('subbed', {'status_code':200, 'error_message':''})
 
 @attr('UNIT')
-class TestRequestResponse(IonIntegrationTestCase):
+class TestRequestResponse(IonIntegrationTestCase, RecvMockMixin):
     def setUp(self):
-        self._node = FakeNode()
+        self._node = Mock(spec=NodeB)
 
     def test_endpoint_send(self):
         e = RequestEndpoint()
-        ch = FakeChannel()
+        ch = self._setup_mock_channel()
         e.attach_channel(ch)
 
         retval, heads = e.send("msg")
-        self.assertEquals(retval, "a msg")
+        self.assertEquals(retval, "bidirmsg")
 
         # cleanup
         e.close()
@@ -253,10 +247,12 @@ class TestRequestResponse(IonIntegrationTestCase):
         """
         """
         rr = RequestResponseClient(node=self._node, name="rr")
-        rr.channel_type = FakeChannel
+        chtype = Mock()
+        chtype.return_value = self._setup_mock_channel()
+        rr.channel_type = chtype
 
         ret = rr.request("request")
-        self.assertEquals(ret, "a msg")
+        self.assertEquals(ret, "bidirmsg")
 
     def test_rr_server(self):
         """
@@ -282,21 +278,8 @@ class SimpleService(BaseService):
         self._ar.set(args)
         return True
 
-class FakeRPCServerChannel(FakeChannel):
-    def recv(self):
-        if not self._sentone:
-            self._sentone = True
-            info = ISimpleInterface.namesAndDescriptions()[0]
-            #print "\n\nINFO:", info, "class", info.__class__
-            cmd = _Command(None, info[0], info[1].getSignatureInfo(), "")
-            pl = cmd._command_dict_from_call('ein', 'zwei')
-            #print "\n\n\nMY PAYLOAD IS", str(pl), "\n\n\n"
-            return pl, {}
-        else:
-            res = event.AsyncResult()
-            res.get()
 @attr('UNIT')
-class TestRPCRequestEndpoint(IonIntegrationTestCase):
+class TestRPCRequestEndpoint(IonIntegrationTestCase, RecvMockMixin):
 
     def test_build_msg(self):
         e = RPCRequestEndpoint()
@@ -308,11 +291,11 @@ class TestRPCRequestEndpoint(IonIntegrationTestCase):
 
     def test_endpoint_send(self):
         e = RPCRequestEndpoint()
-        ch = FakeRPCChannel()
+        ch = self._setup_mock_channel()
         e.attach_channel(ch)
 
         ret, heads = e.send("rpc call")
-        self.assertEquals(ret, 'some payload')      # we just get payload back due to success RPC code 200
+        self.assertEquals(ret, 'bidirmsg')      # we just get payload back due to success RPC code 200
 
         e.close()
 
@@ -321,25 +304,29 @@ class TestRPCRequestEndpoint(IonIntegrationTestCase):
 
         for err in errlist:
             e = RPCRequestEndpoint()
-            ch = FakeRPCChannel(err.status_code, str(err.status_code))
+            ch = self._setup_mock_channel(status_code=err.status_code, error_message=str(err.status_code))
             e.attach_channel(ch)
 
             self.assertRaises(err, e.send, 'payload')
 
 @attr('UNIT')
-class TestRPCClient(IonIntegrationTestCase):
+class TestRPCClient(IonIntegrationTestCase, RecvMockMixin):
 
     def test_rpc_client(self):
-        node = FakeNode(chan_type=FakeRPCChannel, code=200, msg="OK")
+        node = Mock(spec=NodeB)
+
         rpcc = RPCClient(node=node, name="simply", iface=ISimpleInterface)
+        chtype = Mock()
+        chtype.return_value = self._setup_mock_channel()
+        rpcc.channel_type = chtype
 
         self.assertTrue(hasattr(rpcc, 'simple'))
 
         ret = rpcc.simple("zap", "zip")
-        self.assertEquals(ret, "some payload")
+        self.assertEquals(ret, "bidirmsg")
 
 @attr('UNIT')
-class TestRPCResponseEndpoint(IonIntegrationTestCase):
+class TestRPCResponseEndpoint(IonIntegrationTestCase, RecvMockMixin):
 
     def simple(self, *args):
         """
@@ -350,8 +337,12 @@ class TestRPCResponseEndpoint(IonIntegrationTestCase):
     def test_endpoint_receive(self):
         self._ar = event.AsyncResult()
 
+        # build a command object to be returned by the mocked channel
+        c = _Command(None, 'simple', None, None)
+        cvalue = c._command_dict_from_call('ein', 'zwei')
+
         e = RPCResponseEndpoint(routing_obj=self)
-        ch = FakeRPCServerChannel()
+        ch = self._setup_mock_channel(value=cvalue)
         e.attach_channel(ch)
 
         e.spawn_listener()
@@ -360,16 +351,24 @@ class TestRPCResponseEndpoint(IonIntegrationTestCase):
         self.assertEquals(args, ("ein", "zwei"))
 
 @attr('UNIT')
-class TestRPCServer(IonIntegrationTestCase):
+class TestRPCServer(IonIntegrationTestCase, RecvMockMixin):
 
     def test_rpc_server(self):
-        node = FakeNode(chan_type=FakeRPCServerChannel)
+        node = Mock(spec=NodeB)
         svc = SimpleService()
         rpcs = RPCServer(node=node, name="testrpc", service=svc)
 
-        # uses the chan_type specified in FakeNode constructor for the listener
-        bl = BinderListener(node=node, name="testrpc", endpoint_factory=rpcs, listening_channel_type=None, spawn_callable=None)
-        listen_g = spawn(bl.listen)
+        # build a command object to be returned by the mocked channel
+        c = _Command(None, 'simple', None, None)
+        cvalue = c._command_dict_from_call('ein', 'zwei')
+
+        listen_channel_mock = self._setup_mock_channel(ch_type=ServerChannel)
+        rpcs._create_main_channel = lambda: listen_channel_mock
+
+        # tell our channel to return a mocked handler channel when accepted (listen() implementation detail)
+        listen_channel_mock.accept.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue)
+
+        rpcs.listen()
 
         # wait for first message to get passed in
         ret = svc._ar.get()
