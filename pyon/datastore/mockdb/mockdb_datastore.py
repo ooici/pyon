@@ -24,14 +24,14 @@ class MockDB_DataStore(DataStore):
     def create_datastore(self, datastore_name="", create_indexes=True):
         if datastore_name == "":
             datastore_name = self.datastore_name
-        log.debug('Creating data store %s' % datastore_name)
+        log.info('Creating data store %s' % datastore_name)
         if datastore_name not in self.root:
             self.root[datastore_name] = {}
 
     def delete_datastore(self, datastore_name=""):
         if datastore_name == "":
             datastore_name = self.datastore_name
-        log.debug('Deleting data store %s' % datastore_name)
+        log.info('Deleting data store %s' % datastore_name)
         if datastore_name in self.root:
             del self.root[datastore_name]
 
@@ -42,7 +42,7 @@ class MockDB_DataStore(DataStore):
         return dsList
 
     def info_datastore(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.debug('Listing information about data store %s' % datastore_name)
         if datastore_name in self.root:
@@ -56,7 +56,7 @@ class MockDB_DataStore(DataStore):
         return datastore_name in self.root
 
     def list_objects(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.debug('Listing all objects in data store %s' % datastore_name)
         objs = []
@@ -67,7 +67,7 @@ class MockDB_DataStore(DataStore):
         return objs
 
     def list_object_revisions(self, object_id, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.debug('Listing all versions of object %s/%s' % (datastore_name, str(object_id)))
         res = []
@@ -79,11 +79,16 @@ class MockDB_DataStore(DataStore):
         return res
 
     def create(self, object, object_id=None, datastore_name=""):
-        return self.create_doc(self._ion_object_to_persistence_dict(object), object_id=object_id, datastore_name=datastore_name)
+        return self.create_doc(self._ion_object_to_persistence_dict(object),
+                               object_id=object_id, datastore_name=datastore_name)
 
     def create_doc(self, doc, object_id=None, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
+        if '_id' in doc:
+            raise BadRequest("Create cannot create document with ID: %s" % doc)
+        if '_rev' in doc:
+            raise BadRequest("Create cannot create document with Rev: %s" % doc)
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
@@ -119,7 +124,9 @@ class MockDB_DataStore(DataStore):
     def create_doc_mult(self, docs, object_ids=None):
         if any(["_id" in doc for doc in docs]):
             raise BadRequest("Docs must not have '_id'")
-        if object_ids or len(object_ids) == len(docs):
+        if any(["_rev" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_rev'")
+        if object_ids and len(object_ids) != len(docs):
             raise BadRequest("Invalid object_ids")
 
         # Assign an id to doc (recommended in CouchDB documentation)
@@ -140,7 +147,7 @@ class MockDB_DataStore(DataStore):
         return obj
 
     def read_doc(self, object_id, rev_id="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         try:
             datastore_dict = self.root[datastore_name]
@@ -164,8 +171,12 @@ class MockDB_DataStore(DataStore):
         return self.update_doc(self._ion_object_to_persistence_dict(object))
 
     def update_doc(self, doc, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
+        if '_id' not in doc:
+            raise BadRequest("Update failed: Document has no ID: %s" % doc)
+        if '_rev' not in doc:
+            raise BadRequest("Update failed: Document has no Rev: %s" % doc)
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
@@ -198,7 +209,7 @@ class MockDB_DataStore(DataStore):
         return self.delete_doc(self._ion_object_to_persistence_dict(object))
 
     def delete_doc(self, doc, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         try:
             datastore_dict = self.root[datastore_name]
@@ -206,7 +217,7 @@ class MockDB_DataStore(DataStore):
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         object_id = doc["_id"]
-        log.debug('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+        log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
         try:
             if object_id in datastore_dict.keys():
                 # Find all version dicts and delete them
@@ -219,7 +230,7 @@ class MockDB_DataStore(DataStore):
                 del datastore_dict['__' + object_id + '_version_counter']
         except KeyError:
             raise NotFound('Object ' + object_id + ' does not exist.')
-        log.debug('Delete result: True')
+        log.info('Delete result: True')
 
     def find(self, criteria=[], datastore_name=""):
         docList = self.find_doc(criteria, datastore_name)
@@ -234,7 +245,7 @@ class MockDB_DataStore(DataStore):
         return results
 
     def find_doc(self, criteria=[], datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         try:
             datastore_dict = self.root[datastore_name]
@@ -324,7 +335,7 @@ class MockDB_DataStore(DataStore):
         return results
 
     def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         try:
             datastore_dict = self.root[datastore_name]
@@ -427,7 +438,7 @@ class MockDB_DataStore(DataStore):
         return results
 
     def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         try:
             datastore_dict = self.root[datastore_name]
