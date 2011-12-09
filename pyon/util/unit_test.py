@@ -7,11 +7,9 @@ import unittest
 
 from zope.interface import implementedBy
 from pyon.service.service import get_service_by_name
-from pyon.core.object import IonServiceRegistry
+from pyon.core.bootstrap import IonObject, populate_registry
 
-test_obj_registry = IonServiceRegistry()
-test_obj_registry.register_obj_dir('obj/data', do_first=['ion.yml', 'resource.yml'])
-test_obj_registry.register_svc_dir('obj/services')
+populate_registry()
 
 def func_names(cls):
     import types
@@ -35,7 +33,7 @@ class PyonTestCase(unittest.TestCase):
     def _create_IonObject_mock(self, name):
         mock_ionobj = Mock(name='IonObject')
         def side_effect(_def, _dict=None, **kwargs):
-            test_obj = test_obj_registry.new(_def, _dict, **kwargs)
+            test_obj = IonObject(_def, _dict, **kwargs)
             test_obj._validate()
             return DEFAULT
         mock_ionobj.side_effect = side_effect
