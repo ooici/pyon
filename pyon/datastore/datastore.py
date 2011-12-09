@@ -330,7 +330,7 @@ class DataStore(object):
         """
         return self.delete(association)
 
-    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+    def find_objects(self, subject, predicate="", object_type="", id_only=False):
         """
         Find objects (or object ids) by association from a given subject or subject id (if str).
         Returns a tuple (list_of_objects, list_of_associations) if id_only == False, or
@@ -340,7 +340,7 @@ class DataStore(object):
         """
         pass
 
-    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False):
         """
         Find subjects (or subject ids) by association from a given object or object id (if str).
         Returns a tuple (list_of_subjects, list_of_associations) if id_only == False, or
@@ -350,7 +350,7 @@ class DataStore(object):
         """
         pass
 
-    def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
+    def find_associations(self, subject="", predicate="", object="", id_only=True):
         """
         Find associations by subject, predicate, object. Either subject and predicate have
         to be provided or predicate only. Returns either a list of associations or
@@ -358,7 +358,7 @@ class DataStore(object):
         """
         pass
 
-    def find_resources(self, restype=None, lcstate=None, name=None, id_only=True):
+    def find_resources(self, restype="", lcstate="", name="", id_only=True):
         if name is not None:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
