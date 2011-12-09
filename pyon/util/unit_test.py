@@ -10,7 +10,7 @@ from pyon.service.service import get_service_by_name
 from pyon.core.object import IonServiceRegistry
 
 test_obj_registry = IonServiceRegistry()
-test_obj_registry.register_obj_dir('obj/data')
+test_obj_registry.register_obj_dir('obj/data', do_first=['ion.yml', 'resource.yml'])
 test_obj_registry.register_svc_dir('obj/services')
 
 def func_names(cls):
