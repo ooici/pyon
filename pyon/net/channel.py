@@ -80,7 +80,9 @@ class BaseChannel(object):
 
     def _declare_exchange_point(self, xp):
         """
+        Performs an AMQP exchange declare.
 
+        @param  xp      The name of the exchange to use.
         @TODO: this really shouldn't exist, messaging layer should not make this declaration.  it will be provided.
                perhaps push into an ion layer derivation to help bootstrapping / getting started fast.
         """
@@ -97,13 +99,17 @@ class BaseChannel(object):
     def attach_underlying_channel(self, amq_chan):
         """
         Attaches an AMQP channel and indicates this channel is now open.
-        @TODO silly name
         """
         self._amq_chan = amq_chan
 
     def close(self):
         """
-        Default close method. If created via a Node (99% likely), the Node will take care of
+        Default close method.
+
+        If a close callback was specified when creating this instance, it will call that,
+        otherwise it calls close_impl.
+
+        If created via a Node (99% likely), the Node will take care of
         calling close_impl for you at the proper time.
         """
         if self._close_callback:
@@ -114,7 +120,6 @@ class BaseChannel(object):
     def close_impl(self):
         """
         Closes the AMQP connection.
-        @TODO: belongs here?
         """
         log.debug("BaseChannel.close_impl")
         if self._amq_chan:
@@ -133,10 +138,17 @@ class BaseChannel(object):
         #log.error(str(stro))
 
     def on_channel_open(self, amq_chan):
+        """
+        The node calls here to attach an open Pika channel.
+        We attach our on_channel_close handler and then call attach_underlying_channel.
+        """
         amq_chan.add_on_close_callback(self.on_channel_close)
         self.attach_underlying_channel(amq_chan)
 
     def on_channel_close(self, code, text):
+        """
+        Callback for when the Pika channel is closed.
+        """
         logmeth = log.debug
         if code != 0:
             logmeth = log.error
@@ -149,6 +161,10 @@ class SendChannel(BaseChannel):
     _send_name = None           # name that this channel is sending to - tuple (exchange, routing_key)
 
     def connect(self, name):
+        """
+        Sets up this channel to send to a name.
+        @param  name    The name this channel should send to. Should be a tuple (exchange, routing_key).
+        """
         log.debug("SendChannel.connect: %s", name)
 
         self._send_name = name
