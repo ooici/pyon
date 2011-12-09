@@ -43,12 +43,12 @@ from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
 
-class ChannelError(Exception):
+class ChannelError(StandardError):
     """
     Exception raised for error using Channel Socket Interface.
     """
 
-class ChannelClosedError(Exception):
+class ChannelClosedError(StandardError):
     """
     Denote activity on a closed channel (usually during shutdown).
     """
@@ -225,7 +225,17 @@ class RecvChannel(BaseChannel):
 
     def setup_listener(self, name, binding=None):
         """
-        @param  name        A tuple of (exchange, queue)
+        Prepares this receiving channel for listening for messages.
+
+        Calls, in order:
+        - _declare_exchange_point
+        - _declare_queue
+        - _bind
+
+        Name must be a tuple of (xp, queue). If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
+        Binding may be left none and will use the queue name by default.
+
+        @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
         xp, queue = name
@@ -262,7 +272,7 @@ class RecvChannel(BaseChannel):
         """
         log.debug("RecvChannel.stop_consume")
         if not self._consuming:
-            raise StandardError("Not consuming")
+            raise ChannelError("Not consuming")
 
         if self._queue_auto_delete:
             log.info("Autodelete is on, this will destroy this queue")
