@@ -214,6 +214,11 @@ def lsdir(qname='/', truncate=True):
     else:
         print "\n".join(["%s: %s" % tup for tup in detable])
 
+def spawn(proc, procname=None):
+    procmod, proccls = proc.rsplit('.', 1)
+    procname = procname or proccls
+    container.spawn_process(procname, procmod, proccls)
+
 def ionhelp():
     print "ION R2 CC interactive shell"
     print
@@ -221,7 +226,7 @@ def ionhelp():
     print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs,lsdir]
+public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs,lsdir,spawn]
 public_vars = None
 
 def get_proc():
