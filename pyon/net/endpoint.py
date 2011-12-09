@@ -145,14 +145,18 @@ class Endpoint(object):
     def spawn_listener(self):
         def client_recv():
             while True:
-                log.debug("client_recv waiting for a message")
-                msg, headers, delivery_tag = self.channel.recv()
-                log.debug("client_recv got a message")
                 try:
-                    self._message_received(msg, headers)
-                finally:
-                    # always ack a listener response
-                    self.channel.ack(delivery_tag)
+                    log.debug("client_recv waiting for a message")
+                    msg, headers, delivery_tag = self.channel.recv()
+                    log.debug("client_recv got a message")
+                    try:
+                        self._message_received(msg, headers)
+                    finally:
+                        # always ack a listener response
+                        self.channel.ack(delivery_tag)
+                except ChannelClosedError:
+                    log.debug('Channel was closed during client_recv listen loop')
+                    break
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
