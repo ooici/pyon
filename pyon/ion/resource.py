@@ -45,13 +45,26 @@ def load_definitions():
 
     # Life cycle states
     lcs_list = [
-        'NEW',
-        'REGISTERED',
-        'DEVELOPED',
-        'COMMISSIONED',
-        'ACTIVE',
-        'DECOMMISSIONED',
-        'RETIRED'
+        'NEW',              # Newly created, potentially inconsistent
+        'REGISTERED',       # Aggregate state: Consistent, ready for cross-referencing, not retired
+         'UNDEPLOYED',      # Aggregate state: Not deployed in target environment
+          'PLANNED',        # Consistent, with actual resource not yet present
+          'DEVELOPED',      # The actual resource exists
+          'TESTED',         # The actual resource is tested by provider
+          'INTEGRATED',     # The actual resource is integrated into composite and tested
+          'COMMISSIONED',   # The actual resource is certified commissioned
+
+         'DEPLOYED',        # Aggregate state: Not Deployed in target environment
+          'OFF',            # Aggregate state: Off
+          'ON',             # Aggregate state: On
+          'PUBLIC',         # Aggregate state: Announced, discoverable
+          'PRIVATE',        # Aggregate state: Unannounced, not discoverable
+           'OFFLINE',       # Inactive, unannounced
+           'ONLINE',        # Active, unannounced
+           'INACTIVE',      # Inactive, announced (public)
+           'ACTIVE',        # Active, announced (public)
+        'RETIRED',          # For historic reference only
         ]
+    # ON, OFF, DEPLOYED, TESTED (various)
     LifeCycleStates.clear()
     LifeCycleStates.update(zip(lcs_list, lcs_list))
