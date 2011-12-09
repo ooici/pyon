@@ -206,7 +206,9 @@ class MockDB_DataStore(DataStore):
         return res
 
     def delete(self, object, datastore_name=""):
-        return self.delete_doc(self._ion_object_to_persistence_dict(object))
+        if type(object) is str:
+            return self.delete_doc(object, datastore_name=datastore_name)
+        return self.delete_doc(self._ion_object_to_persistence_dict(object), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
         if not datastore_name:
