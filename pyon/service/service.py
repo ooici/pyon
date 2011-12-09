@@ -3,6 +3,7 @@
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from pyon.core.exception import BadRequest
 from pyon.util.log import log
 from pyon.util.containers import named_any
 from pyon.util.context import LocalContextMixin
@@ -85,6 +86,10 @@ class BaseService(LocalContextMixin):
         """
         Method called just before service termination.
         """
+
+    def assert_condition(self, condition, errorstr):
+        if not condition:
+            raise BadRequest(errorstr)
 
     def __str__(self):
         return "".join((self.__class__.__name__,"(",
