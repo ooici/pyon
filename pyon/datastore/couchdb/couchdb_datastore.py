@@ -230,13 +230,13 @@ class CouchDB_DataStore(DataStore):
             try:
                 del db[doc]
             except ResourceNotFound:
-                raise NotFound('Object with id %s does not exist.' % str(doc_id))
+                raise NotFound('Object with id %s does not exist.' % str(doc["_id"]))
         else:
             log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
             try:
                 res = db.delete(doc)
             except ResourceNotFound:
-                raise NotFound('Object with id %s does not exist.' % str(doc_id))
+                raise NotFound('Object with id %s does not exist.' % str(doc["_id"]))
             log.debug('Delete result: %s' % str(res))
 
     def find(self, criteria=[], datastore_name=""):
