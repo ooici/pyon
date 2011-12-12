@@ -7,9 +7,9 @@ import unittest
 
 from zope.interface import implementedBy
 from pyon.service.service import get_service_by_name
-from pyon.core.bootstrap import IonObject, populate_registry
+from pyon.core.bootstrap import IonObject, bootstrap_pyon
 
-populate_registry()
+bootstrap_pyon()
 
 def func_names(cls):
     import types
