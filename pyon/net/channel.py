@@ -125,17 +125,17 @@ class BaseChannel(object):
         if self._amq_chan:
             self._amq_chan.close()
 
-        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
-        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
-        # up for Pika here so we don't goof up when reusing a channel number.
-        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Basic.GetEmpty')
-        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Channel.Close')
-        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_deliver')
-        self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_get')
+            # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
+            # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
+            # up for Pika here so we don't goof up when reusing a channel number.
+            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Basic.GetEmpty')
+            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Channel.Close')
+            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_deliver')
+            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_get')
 
-        # uncomment these lines to see the full callback list that Pika maintains
-        #stro = pprint.pformat(self.amq_chan.callbacks._callbacks)
-        #log.error(str(stro))
+            # uncomment these lines to see the full callback list that Pika maintains
+            #stro = pprint.pformat(self.amq_chan.callbacks._callbacks)
+            #log.error(str(stro))
 
     def on_channel_open(self, amq_chan):
         """
@@ -251,9 +251,14 @@ class RecvChannel(BaseChannel):
         self._bind(binding)
 
     def start_consume(self):
+        """
+        Starts consuming messages.
+
+        setup_listener must have been called first.
+        """
         log.debug("RecvChannel.start_consume")
         if self._consuming:
-            raise StandardError("Already consuming")
+            raise ChannelError("Already consuming")
 
         if self._consumer_tag and self._queue_auto_delete:
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
