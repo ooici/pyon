@@ -58,6 +58,8 @@ setup(  name = 'pyon',
             'ipython==0.11',
             'readline==6.2.1',
             'mock',
+            'Flask==0.8',
+            'ndg-xacml==0.4.0'
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
             # 'numexpr==1.4.2',
