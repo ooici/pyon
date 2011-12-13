@@ -250,6 +250,18 @@ class RecvChannel(BaseChannel):
 
         self._bind(binding)
 
+    def destroy_listener(self):
+        """
+        Tears down this channel.
+
+        You should only call this if you want to delete the queue. Even so, you must know you are
+        the only one on it - there appears to be no mechanic for determining if anyone else is listening.
+        """
+        assert self._recv_name and isinstance(self._recv_name, tuple), self._recv_name[1]
+
+        log.info("Destroying listener for queue %s", self._recv_name)
+        blocking_cb(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
+
     def start_consume(self):
         """
         Starts consuming messages.
@@ -309,10 +321,6 @@ class RecvChannel(BaseChannel):
         log.debug("BaseChannel.close_impl: consuming %s", self._consuming)
         if self._consuming:
             self.stop_consume()
-
-        if not self._queue_auto_delete and self._recv_name and self._recv_name[1]:
-            log.debug("Deleting queue %s", self._recv_name)
-            blocking_cb(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
 
         self._recv_queue.put(ChannelShutdownMessage())
 
