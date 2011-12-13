@@ -30,7 +30,7 @@ from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.directory.directory import Directory
-from pyon.net.endpoint import ProcessRPCServer, BinderListener, RPCServer
+from pyon.net.endpoint import ProcessRPCServer, RPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
@@ -145,10 +145,8 @@ class Container(object):
         rsvc = RPCServer(node=self.node, name=self.name, service=self)
 
         # Start an ION process with the right kind of endpoint factory
-        listener = BinderListener(self.node, self.name, rsvc, None, None)
-        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener)
-        res = listener.get_ready_event()
-        res.get()
+        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        rsvc.get_ready_event().wait(timeout=10)   # @TODO: no hardcode
         log.info("Container started, OK.")
 
     def serve_forever(self):

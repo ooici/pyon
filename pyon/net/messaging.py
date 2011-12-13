@@ -13,6 +13,7 @@ from pika import BasicProperties
 from pyon.core.bootstrap import CFG
 from pyon.net import amqp
 from pyon.net import channel
+from pyon.util.async import blocking_cb
 from pyon.util.log import log
 
 class IDPool(object):
@@ -85,7 +86,16 @@ class NodeB(amqp.Node):
         self.running = 1
         self.ready.set()
 
-    def channel(self, ch_type):
+    def channel(self, chan):
+        log.debug("NodeB.channel")
+        with self._lock:
+            amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
+            chan.on_channel_open(amq_chan)
+            #chan._close_callback = self.on_channel_request_close       # @TODO
+
+        return chan
+
+    def OLDchannel(self, ch_type):
         log.debug("In NodeB.channel, pool size is %d", len(self._bidir_pool))
         if not self.running:
             log.error("Attempt to open channel on node that is not running")

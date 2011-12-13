@@ -17,11 +17,23 @@ mooo=rpcs.listen()
 
 gevent.joinall([mooo])
 """
-
+"""
 from pyon.container.cc import Container
 cc=Container()
 cc.start()
 cc.start_rel_from_url('res/deploy/r2deploy.yml')
 
 cc.serve_forever()
+"""
+
+from pyon.net.endpoint import RPCServer
+from examples.service.hello_service import HelloService
+hs=HelloService()
+
+from pyon.net.messaging import make_node
+n,io=make_node()
+
+rpcs=RPCServer(service=hs, node=n, name=('qq', 'hello'))
+rpcs.listen()
+
 

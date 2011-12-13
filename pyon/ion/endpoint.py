@@ -5,7 +5,7 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Subscriber, BinderListener
+from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Subscriber
 
 class ProcessPublisher(Publisher):
     def __init__(self, process=None, **kwargs):

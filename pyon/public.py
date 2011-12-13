@@ -39,9 +39,9 @@ __all__ += ['Container']
 from pyon.service.service import BaseService
 __all__ += ['BaseService']
 
-from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, BinderListener, \
+from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, \
                                 ProcessSubscriber, ProcessPublisher
-__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber', 'BinderListener',
+__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
             'ProcessSubscriber', 'ProcessPublisher']
 
 from pyon.ion.resource import ResourceTypes, RT, AssocTypes, AT, LifeCycleStates, LCS
