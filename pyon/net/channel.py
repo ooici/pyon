@@ -376,9 +376,16 @@ class RecvChannel(BaseChannel):
         Acks a message using the delivery tag.
         Should be called by the EP layer.
         """
-        log.debug("RecvChannel.ack: %s" % delivery_tag)
+        log.debug("RecvChannel.ack: %s", delivery_tag)
         self._amq_chan.basic_ack(delivery_tag)
 
+    def reject(self, delivery_tag, requeue=False):
+        """
+        Rejects a message using the delivery tag.
+        Should be called by the EP layer.
+        """
+        log.debug("RecvChannel.reject: %s", delivery_tag)
+        blocking_cb(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
 
 class PubChannel(SendChannel):
     pass
