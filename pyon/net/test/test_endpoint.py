@@ -1,25 +1,21 @@
 #!/usr/bin/env python
+
+__author__ = 'Dave Foster <dfoster@asascience.com>'
+__license__ = 'Apache 2.0'
+
 import unittest
-from unittest.case import SkipTest
-from nose.plugins.attrib import attr
-from zope.interface import interface
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
-from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
+from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
 from pyon.net.endpoint import Endpoint, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
-from gevent import event, GreenletExit
+from gevent import event
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
-from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
-from pyon.util.async import wait, spawn
 from nose.plugins.attrib import attr
 from mock import Mock
-
-__author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
 endpoint.interceptors = {'message-in': [],
@@ -28,7 +24,7 @@ endpoint.interceptors = {'message-in': [],
                          'process-out': []}
 
 @attr('UNIT')
-class TestEndpoint(IonIntegrationTestCase):
+class TestEndpoint(PyonTestCase):
 
     def setUp(self):
         self._endpoint = Endpoint()
@@ -85,7 +81,7 @@ class TestEndpoint(IonIntegrationTestCase):
 #        self.assertEquals(fakemsg, msg['payload'])
 
 @attr('UNIT')
-class TestEndpointFactory(IonIntegrationTestCase):
+class TestEndpointFactory(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
         self._ef = EndpointFactory(node=self._node, name="EFTest")
@@ -139,7 +135,7 @@ class TestEndpointFactory(IonIntegrationTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
-class TestPublisher(IonIntegrationTestCase):
+class TestPublisher(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
         self._pub = Publisher(node=self._node, name="testpub")
@@ -189,7 +185,7 @@ class RecvMockMixin(object):
         return ch
 
 @attr('UNIT')
-class TestSubscriber(IonIntegrationTestCase, RecvMockMixin):
+class TestSubscriber(PyonTestCase, RecvMockMixin):
 
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -228,7 +224,7 @@ class TestSubscriber(IonIntegrationTestCase, RecvMockMixin):
         cbmock.assert_called_once_with('subbed', {'status_code':200, 'error_message':''})
 
 @attr('UNIT')
-class TestRequestResponse(IonIntegrationTestCase, RecvMockMixin):
+class TestRequestResponse(PyonTestCase, RecvMockMixin):
     def setUp(self):
         self._node = Mock(spec=NodeB)
 
@@ -279,7 +275,7 @@ class SimpleService(BaseService):
         return True
 
 @attr('UNIT')
-class TestRPCRequestEndpoint(IonIntegrationTestCase, RecvMockMixin):
+class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 
     def test_build_msg(self):
         e = RPCRequestEndpoint()
@@ -310,7 +306,7 @@ class TestRPCRequestEndpoint(IonIntegrationTestCase, RecvMockMixin):
             self.assertRaises(err, e.send, 'payload')
 
 @attr('UNIT')
-class TestRPCClient(IonIntegrationTestCase, RecvMockMixin):
+class TestRPCClient(PyonTestCase, RecvMockMixin):
 
     def test_rpc_client(self):
         node = Mock(spec=NodeB)
@@ -326,7 +322,7 @@ class TestRPCClient(IonIntegrationTestCase, RecvMockMixin):
         self.assertEquals(ret, "bidirmsg")
 
 @attr('UNIT')
-class TestRPCResponseEndpoint(IonIntegrationTestCase, RecvMockMixin):
+class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
     def simple(self, *args):
         """
@@ -351,7 +347,7 @@ class TestRPCResponseEndpoint(IonIntegrationTestCase, RecvMockMixin):
         self.assertEquals(args, ("ein", "zwei"))
 
 @attr('UNIT')
-class TestRPCServer(IonIntegrationTestCase, RecvMockMixin):
+class TestRPCServer(PyonTestCase, RecvMockMixin):
 
     def test_rpc_server(self):
         node = Mock(spec=NodeB)

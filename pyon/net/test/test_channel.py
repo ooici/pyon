@@ -1,34 +1,26 @@
 #!/usr/bin/env python
-import unittest
-from unittest.case import SkipTest
-from nose.plugins.attrib import attr
-from zope.interface import interface
-from zope.interface.declarations import implements
-from zope.interface.interface import Interface
-from pyon.core import exception
-from pyon.net import endpoint
-from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel
-from gevent import event, GreenletExit, queue
-from pyon.net.messaging import NodeB
-from pyon.service.service import BaseService
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.util.unit_test import PyonTestCase
-from pyon.util.async import wait, spawn
-from mock import Mock, sentinel, patch
-from pika import channel as pchannel
-from pika import BasicProperties
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-class TestBaseChannel(IonIntegrationTestCase):
+import unittest
+from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel
+from gevent import queue
+from pyon.util.unit_test import PyonTestCase
+from mock import Mock, sentinel, patch
+from pika import channel as pchannel
+from pika import BasicProperties
+from nose.plugins.attrib import attr
+
+@attr('UNIT')
+class TestBaseChannel(PyonTestCase):
 
     def test_init(self):
         ch = BaseChannel()
         self.assertIsNone(ch._close_callback)
 
-        ch = BaseChannel(close_callback=15)
-        self.assertEquals(ch._close_callback, 15)
+        ch = BaseChannel(close_callback=sentinel.closecb)
+        self.assertEquals(ch._close_callback, sentinel.closecb)
 
     def test_declare_exchange_point(self):
         # make sure no xp param results in assertion
@@ -55,9 +47,9 @@ class TestBaseChannel(IonIntegrationTestCase):
 
     def test_attach_underlying_channel(self):
         ch = BaseChannel()
-        ch.attach_underlying_channel(27)
+        ch.attach_underlying_channel(sentinel.amq_chan)
 
-        self.assertEquals(ch._amq_chan, 27)
+        self.assertEquals(ch._amq_chan, sentinel.amq_chan)
 
     def test_close(self):
         # with close callback
@@ -94,7 +86,8 @@ class TestBaseChannel(IonIntegrationTestCase):
         ch.on_channel_close(0, 'hi')
         ch.on_channel_close(1, 'onoes')
 
-class TestSendChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestSendChannel(PyonTestCase):
     def setUp(self):
         self.ch = SendChannel()
 
@@ -108,8 +101,8 @@ class TestSendChannel(IonIntegrationTestCase):
         self.ch._send = _sendmock
         self.ch.connect(('xp', 'key'))
 
-        self.ch.send('data', {'header':88})
-        _sendmock.assert_called_once_with(('xp', 'key'), 'data', headers={'header':88})
+        self.ch.send('data', {'header':sentinel.headervalue})
+        _sendmock.assert_called_once_with(('xp', 'key'), 'data', headers={'header':sentinel.headervalue})
 
     def test__send(self):
         ac = Mock(pchannel.Channel)
@@ -140,7 +133,8 @@ class TestSendChannel(IonIntegrationTestCase):
         self.assertIn('custom', props.headers)
         self.assertEquals(props.headers['custom'], 'val')
 
-class TestRecvChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestRecvChannel(PyonTestCase):
     def setUp(self):
         self.ch = RecvChannel()
 
@@ -419,14 +413,20 @@ class TestRecvChannel(IonIntegrationTestCase):
 
         ac.basic_ack.assert_called_once_with(sentinel.delivery_tag)
 
-class TestPubChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestPubChannel(PyonTestCase):
     """
     PubChannel currently doesnt have any meat
     """
     pass
 
+@attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
-class TestBidirClientChannel(IonIntegrationTestCase):
+class TestBidirClientChannel(PyonTestCase):
+
+    # @TODO: have to do this because i'm patching the class, anything to be done?
+    def test_verify_service(self, mocksendchannel):
+        PyonTestCase.test_verify_service(self)
 
     def setUp(self):
         self.ch = BidirClientChannel()
@@ -465,7 +465,8 @@ class TestBidirClientChannel(IonIntegrationTestCase):
                                                                                correlation_id=None,
                                                                                message_id=None)
 
-class TestListenChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestListenChannel(PyonTestCase):
 
     def setUp(self):
         self.ch = ListenChannel()
@@ -490,14 +491,15 @@ class TestListenChannel(IonIntegrationTestCase):
         cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
         retch._recv_queue.put.assert_called_once_with(sentinel.msg)
 
-
-class TestSusbcriberChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestSusbcriberChannel(PyonTestCase):
     """
     SubscriberChannel is a blank for now
     """
     pass
 
-class TestServerChannel(IonIntegrationTestCase):
+@attr('UNIT')
+class TestServerChannel(PyonTestCase):
 
     def test__create_accepted_channel(self):
         ch = ServerChannel()
@@ -510,7 +512,6 @@ class TestServerChannel(IonIntegrationTestCase):
         self.assertIsInstance(newch, ServerChannel.BidirAcceptChannel)
         self.assertEquals(newch._amq_chan, sentinel.amq_chan)
         self.assertEquals(newch._send_name, ('one', 'two'))
-
 
 if __name__ == "__main__":
     unittest.main()
