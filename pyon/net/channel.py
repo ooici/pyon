@@ -257,7 +257,7 @@ class RecvChannel(BaseChannel):
         You should only call this if you want to delete the queue. Even so, you must know you are
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
-        assert self._recv_name and isinstance(self._recv_name, tuple), self._recv_name[1]
+        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1]
 
         log.info("Destroying listener for queue %s", self._recv_name)
         blocking_cb(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])

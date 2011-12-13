@@ -180,6 +180,27 @@ class TestRecvChannel(PyonTestCase):
         mdq.assert_called_with(None)
         mb.assert_called_with('known')
 
+    def test_destroy_listener_no_recv_name(self):
+        self.assertRaises(AssertionError, self.ch.destroy_listener)
+
+    def test_destroy_listener(self):
+        self.ch._recv_name = (sentinel.xp, sentinel.queue)
+
+        def side(*args, **kwargs):
+            cb = kwargs.get('callback')
+            cb()
+
+        ac = Mock(spec=pchannel.Channel)
+        self.ch._amq_chan = ac
+
+        ac.queue_delete.side_effect = side
+
+        self.ch.destroy_listener()
+
+        self.assertTrue(ac.queue_delete.called)
+        self.assertIn('queue', ac.queue_delete.call_args[1])
+        self.assertIn(sentinel.queue, ac.queue_delete.call_args[1].itervalues())
+        
     def test_start_consume(self):
         ac = Mock(pchannel.Channel)
         self.ch._amq_chan = ac
@@ -292,28 +313,6 @@ class TestRecvChannel(PyonTestCase):
 
         self.ch.close_impl()
         scmock.assert_called_once_with()
-
-    @patch('pyon.net.channel.BaseChannel')
-    def test_close_impl_deletes_queue(self, mockbasechannel):
-        ac = Mock(pchannel.Channel)
-
-        # make callback sideeffect for blocking_cb
-        def side(*args, **kwargs):
-            cb = kwargs.get('callback')
-            cb()
-
-        ac.queue_delete.side_effect = side
-
-        self.ch._amq_chan = ac
-
-        self.ch._queue_auto_delete = False
-        self.ch._recv_name = (sentinel.xp, sentinel.queue)
-
-        self.ch.close_impl()
-
-        self.assertTrue(ac.queue_delete.called)
-        self.assertIn(sentinel.queue, ac.queue_delete.call_args[1].itervalues())
-        self.assertIn('queue', ac.queue_delete.call_args[1])
 
     def test_declare_queue(self):
         # sideeffect that passes a result back (important here)
