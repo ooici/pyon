@@ -9,7 +9,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition
-from pyon.net.channel import Bidirectional, BidirectionalClient, PubSub, ChannelError, ChannelClosedError, BaseChannel
+from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
@@ -145,10 +145,18 @@ class Endpoint(object):
     def spawn_listener(self):
         def client_recv():
             while True:
-                log.debug("client_recv waiting for a message")
-                msg, headers = self.channel.recv()
-                log.debug("client_recv got a message")
-                self._message_received(msg, headers)
+                try:
+                    log.debug("client_recv waiting for a message")
+                    msg, headers, delivery_tag = self.channel.recv()
+                    log.debug("client_recv got a message")
+                    try:
+                        self._message_received(msg, headers)
+                    finally:
+                        # always ack a listener response
+                        self.channel.ack(delivery_tag)
+                except ChannelClosedError:
+                    log.debug('Channel was closed during client_recv listen loop')
+                    break
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
@@ -199,7 +207,7 @@ class EndpointFactory(object):
     TODO Rename this.
     """
     endpoint_type = Endpoint
-    channel_type = BidirectionalClient
+    channel_type = BidirClientChannel
     name = None
     node = None     # connection to the broker, basically
 
@@ -212,6 +220,10 @@ class EndpointFactory(object):
         name can be a to address or a from address in the derived ListeningEndpointFactory. Either a string
         or a 2-tuple of (exchange, name).
         """
+
+        if not isinstance(name, tuple):
+            name = (bootstrap.sys_name, name)
+
         self.node = node
         self.name = name
 
@@ -231,8 +243,13 @@ class EndpointFactory(object):
             assert name
             if not isinstance(name, tuple):
                 name = (bootstrap.sys_name, name)
-            ch = self.node.channel(self.channel_type)
-            ch.connect(name)
+            #ch = self.node.channel(self.channel_type)
+            ch = self.channel_type()
+            self.node.channel(ch)
+
+            # @TODO: bla
+            if hasattr(ch, 'connect'):
+                ch.connect(name)
 
         e = self.endpoint_type(**kwargs)
         e.attach_channel(ch)
@@ -267,64 +284,66 @@ class ExchangeManagement(EndpointFactory):
         if self._exchange_ep:
             self._exchange_ep.close()
 
-class BinderListener(object):
-    def __init__(self, node, name, endpoint_factory, listening_channel_type, spawn_callable):
-        """
-        @param spawn_callable   A callable to spawn a new received message worker thread. Calls with
-                                the callable to be spawned and args. If None specified, does not create
-                                a new thread: all processing is done synchronously.
-        """
-        self._node = node
-        self._name = name
-        self._ent_fact = endpoint_factory or ListeningEndpointFactory(node, name)
-        self._ch_type = listening_channel_type or Bidirectional
-        self._spawn = spawn_callable or (lambda cb, *args: cb(*args))
-        self._chan = None
-        self._ready_event = event.AsyncResult()
-
-    def get_ready_event(self):
-        """
-        Returns an AsyncResult you can use to wait on to determine if this BinderListener has been setup
-        and is ready to accept messages.
-
-        @TODO: this sounds a lot like lifecycle
-        """
-        return self._ready_event
-
-    def listen(self):
-        log.debug("BinderListener.listen")
-        self._chan = self._node.channel(self._ch_type)
-        self._chan.bind((bootstrap.sys_name, self._name))
-        self._chan.listen()
-
-        self._ready_event.set(True)
-
-        while True:
-            log.debug("BinderListener: %s blocking waiting for message" % str(self._name))
-            try:
-                req_chan = self._chan.accept()
-                msg, headers = req_chan.recv()
-                log.debug("BinderListener %s received message: %s, headers: %s", self._name, msg, headers)
-                e = self._ent_fact.create_endpoint(existing_channel=req_chan)   # @TODO: reply-to here?
-
-                self._spawn(e._message_received, msg, headers)
-
-            except ChannelError as ex:
-                log.exception('Channel error during BinderListener.listen')
-                switch()
-            except ChannelClosedError as ex:
-                log.debug('Channel was closed during BinderListener.listen')
-                break
-
-    def close(self):
-        if self._chan: self._chan.close()
-
 class ListeningEndpointFactory(EndpointFactory):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
-    Designed to be used inside of a BinderListener.
     """
-    channel_type = Bidirectional
+    #channel_type = Bidirectional
+    #channel_type = ListenChannel        # channel type is perverted here - we don't produce this, we just make one to listen on
+
+    def __init__(self, node=None, name=None):
+        EndpointFactory.__init__(self, node=node, name=name)
+        self._ready_event = event.Event()
+
+    def get_ready_event(self):
+        """
+        Returns an async event you can .wait() on.
+        Used to indicate when listen() is ready to start listening.
+        """
+        return self._ready_event
+
+    def _create_main_channel(self):
+        return ListenChannel()
+
+    def _setup_listener(self, name, binding=None):
+        self._chan.setup_listener(name, binding=binding)
+
+    def listen(self):
+        log.debug("LEF.listen")
+
+        self._chan = self._create_main_channel()
+        self.node.channel(self._chan)
+        self._setup_listener(self.name, binding=self.name[1])
+        self._chan.start_consume()
+
+        # notify any listeners of our readiness
+        self._ready_event.set()
+
+        while True:
+            log.debug("LEF: %s blocking, waiting for a message" % str(self.name))
+            try:
+                newchan = self._chan.accept()
+                msg, headers, delivery_tag = newchan.recv()
+                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self.name, msg, headers, delivery_tag)
+
+                e = self.create_endpoint(existing_channel=newchan)
+
+                e._message_received(msg, headers)
+
+                # ack will only take place if message_received went ok
+                newchan.ack(delivery_tag)
+
+            except ChannelError as ex:
+                log.exception('Channel error during LEF.listen')
+                switch()
+
+            except ChannelClosedError as ex:
+                log.debug('Channel was closed during LEF.listen')
+                break
+
+    def close(self):
+        EndpointFactory.close(self)
+        self._chan.close()
 
 #
 # PUB/SUB
@@ -339,7 +358,8 @@ class Publisher(EndpointFactory):
     """
 
     endpoint_type = PublisherEndpoint
-    channel_type = PubSub
+    #channel_type = PubSub
+    channel_type = PubChannel
 
     def __init__(self, **kwargs):
         self._pub_ep = None
@@ -385,11 +405,22 @@ class SubscriberEndpoint(Endpoint):
 class Subscriber(ListeningEndpointFactory):
 
     endpoint_type = SubscriberEndpoint
-    channel_type = PubSub
+    #channel_type = PubSub
+
+    def _create_main_channel(self):
+        return SubscriberChannel()
+
+    def _setup_listener(self, name, binding=None):
+        """
+        Override for setup_listener to make sure we are listening on an anonymous queue.
+        @TODO: correct?
+        """
+        # we expect (xp, name) and binding=name
+        ListeningEndpointFactory._setup_listener(self, (name[0], None), binding=binding)
 
     def __init__(self, callback=None, **kwargs):
         """
-        @param  callback should be a callable with one arg: msg
+        @param  callback should be a callable with two args: msg, headers
         """
         assert callback, "No callback provided"
         self._callback = callback
@@ -418,6 +449,8 @@ class RequestEndpoint(BidirectionalEndpoint):
         log.debug("RequestEndpoint.send")
 
         if not self._recv_greenlet:
+            self.channel.setup_listener((self.channel._send_name[0], None)) # @TODO: not quite right..
+            self.channel.start_consume()
             self.spawn_listener()
 
         self.response_queue = event.AsyncResult()
@@ -425,8 +458,8 @@ class RequestEndpoint(BidirectionalEndpoint):
 
         Endpoint._send(self, msg, headers=headers)
 
-        result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
-        log.debug("got response to our request: %s, headers: %s" % (str(result_data), str(result_headers)))
+        result_data, result_headers = self.response_queue.get()#timeout=CFG.endpoint.receive.timeout)
+        log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
 class RequestResponseClient(EndpointFactory):
@@ -454,8 +487,8 @@ class ResponseEndpoint(BidirectionalListeningEndpoint):
 class RequestResponseServer(ListeningEndpointFactory):
     endpoint_type = ResponseEndpoint
 
-    pass
-
+    def _create_main_channel(self):
+        return ServerChannel()
 
 class RPCRequestEndpoint(RequestEndpoint):
 

@@ -7,8 +7,7 @@ __author__ = 'Michael Meisinger'
 from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
-from pyon.net.channel import PubSub
-from pyon.ion.endpoint import BinderListener, ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
+from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService, get_service_by_name
@@ -213,9 +212,8 @@ class ProcManager(object):
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        listener = BinderListener(self.container.node, listen_name, rsvc, None, None)
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener, name=listen_name)
-        listener.get_ready_event().get()
+        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
+        rsvc.get_ready_event().wait(timeout=10)
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
     def _set_subscription_endpoint(self, service_instance, listen_name):
@@ -227,9 +225,8 @@ class ProcManager(object):
                          name=listen_name,
                          process=service_instance,
                          callback=lambda m,h: service_instance.process(m))
-        listener = BinderListener(self.container.node, listen_name, sub, PubSub, None)
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=listener, name=listen_name)
-        listener.get_ready_event().get()
+        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
+        sub.get_ready_event().wait(timeout=10)
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
     def _register_process(self, service_instance, name):
