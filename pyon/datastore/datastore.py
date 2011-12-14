@@ -359,7 +359,7 @@ class DataStore(object):
         pass
 
     def find_resources(self, restype="", lcstate="", name="", id_only=True):
-        if name is not None:
+        if name:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
             return self.find_res_by_name(name, restype, id_only)
