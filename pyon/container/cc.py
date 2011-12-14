@@ -6,8 +6,8 @@ TODO:
 [ ] server and client name argument is a short cut
 [ ] generic server and client delivery loop
 [ ] decide on how Channel Type is passed/associated with gen server/client
-[ ] Endpoint might be better as a 'factory' that can make handler instances
-per request. This will also facilitate the Endpoint holding 'business'
+[ ] EndpointUnit might be better as a 'factory' that can make handler instances
+per request. This will also facilitate the EndpointUnit holding 'business'
 objects/resources that each request has access to. This will keep the
 actual handlers functional.
 """

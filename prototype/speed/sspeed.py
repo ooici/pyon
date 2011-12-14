@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-from pyon.net.endpoint import Publisher, PublisherEndpoint
+from pyon.net.endpoint import Publisher, PublisherEndpointUnit
 from pyon.net.messaging import make_node
 import gevent
 import time
 
-class SpeedPublisherEndpoint(PublisherEndpoint):
+class SpeedPublisherEndpoint(PublisherEndpointUnit):
     def _build_msg(self, raw_msg):
         return raw_msg
 

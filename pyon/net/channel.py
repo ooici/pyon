@@ -300,7 +300,7 @@ class RecvChannel(BaseChannel):
     def recv(self):
         """
         Pulls a message off the queue, will block if there are none.
-        Typically done by the Endpoint layer. Should ack the message there as it is "taking ownership".
+        Typically done by the EndpointUnit layer. Should ack the message there as it is "taking ownership".
         """
         msg = self._recv_queue.get()
 

@@ -30,7 +30,7 @@ class MessageCountSampler(object):
         print "count: %s msgs - rate: %s msg/sec " % (str(self.total_count), str(inst_rate),)
 
 
-class Counter(endpoint.Endpoint):
+class Counter(endpoint.EndpointUnit):
 
     def __init__(self):
         self.count = 0

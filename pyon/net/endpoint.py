@@ -47,13 +47,27 @@ def instantiate_interceptors(interceptor_cfg):
 
 instantiate_interceptors(CFG.interceptor)
 
-class Endpoint(object):
+class EndpointUnit(object):
+    """
+    A unit of conversation or one-way messaging.
+
+    An EndpointUnit is produced by Endpoints and exist solely for the duration of one
+    conversation. It can be thought of as a telephone call.
+
+    In the case of request-response, an EndpointUnit is created on each side of the
+    conversation, and exists for the life of that request and response. It is then
+    torn down.
+
+    You typically do not need to deal with these objects - they are created for you
+    by an Endpoint-derived class and encapsulate the "business-logic" of the communication,
+    on top of the Channel layer which is the "transport" aka AMQP or otherwise.
+    """
 
     channel = None
     _recv_greenlet = None
 
     def attach_channel(self, channel):
-        log.debug("In Endpoint.attach_channel")
+        log.debug("In EndpointUnit.attach_channel")
         log.debug("channel %s" % str(channel))
         self.channel = channel
 
@@ -61,7 +75,7 @@ class Endpoint(object):
     def channel_attached(self):
         """
         """
-        log.debug("In Endpoint.channel_attached")
+        log.debug("In EndpointUnit.channel_attached")
 
     def _build_invocation(self, **kwargs):
         """
@@ -103,7 +117,7 @@ class Endpoint(object):
     def message_received(self, msg, headers):
         """
         """
-        log.debug("In Endpoint.message_received")
+        log.debug("In EndpointUnit.message_received")
 
     def send(self, msg, headers=None):
         """
@@ -120,7 +134,7 @@ class Endpoint(object):
     def _send(self, msg, headers=None):
         """
         """
-        log.debug("In Endpoint._send: %s", headers)
+        log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
                                      message=msg,
@@ -171,7 +185,7 @@ class Endpoint(object):
         """
         Assembles the headers of a message from the raw message's content.
         """
-        log.debug("Endpoint _build_header")
+        log.debug("EndpointUnit _build_header")
         return {}
 
     def _build_payload(self, raw_msg):
@@ -180,7 +194,7 @@ class Endpoint(object):
 
         @TODO will this be used? seems unlikely right now.
         """
-        log.debug("Endpoint _build_payload")
+        log.debug("EndpointUnit _build_payload")
         return raw_msg
 
     def _build_msg(self, raw_msg):
@@ -191,7 +205,7 @@ class Endpoint(object):
 
         @returns A 2-tuple of payload, headers
         """
-        log.debug("Endpoint _build_msg")
+        log.debug("EndpointUnit _build_msg")
         header = self._build_header(raw_msg)
         payload = self._build_payload(raw_msg)
 
@@ -206,7 +220,7 @@ class EndpointFactory(object):
 
     TODO Rename this.
     """
-    endpoint_type = Endpoint
+    endpoint_type = EndpointUnit
     channel_type = BidirClientChannel
     name = None
     node = None     # connection to the broker, basically
@@ -262,12 +276,12 @@ class EndpointFactory(object):
         """
         pass
 
-class ExchangeManagementEndpoint(Endpoint):
+class ExchangeManagementEndpointUnit(EndpointUnit):
     def create_xs(self, name):
         pass
 
 class ExchangeManagement(EndpointFactory):
-    endpoint_type = ExchangeManagementEndpoint
+    endpoint_type = ExchangeManagementEndpointUnit
     channel_type = BaseChannel
 
     def __init__(self, **kwargs):
@@ -349,7 +363,7 @@ class ListeningEndpointFactory(EndpointFactory):
 # PUB/SUB
 #
 
-class PublisherEndpoint(Endpoint):
+class PublisherEndpointUnit(EndpointUnit):
     pass
 
 class Publisher(EndpointFactory):
@@ -357,7 +371,7 @@ class Publisher(EndpointFactory):
     Simple publisher sends out broadcast messages.
     """
 
-    endpoint_type = PublisherEndpoint
+    endpoint_type = PublisherEndpointUnit
     #channel_type = PubSub
     channel_type = PubChannel
 
@@ -381,22 +395,22 @@ class Publisher(EndpointFactory):
 
 
 
-class SubscriberEndpoint(Endpoint):
+class SubscriberEndpointUnit(EndpointUnit):
     """
     @TODO: Should have routing mechanics, possibly shared with other listener endpoint types
     """
     def __init__(self, callback):
-        Endpoint.__init__(self)
+        EndpointUnit.__init__(self)
         self.set_callback(callback)
 
     def set_callback(self, callback):
         """
-        Sets the callback to be used by this SubscriberEndpoint when a message is received.
+        Sets the callback to be used by this SubscriberEndpointUnit when a message is received.
         """
         self._callback = callback
 
     def message_received(self, msg, headers):
-        Endpoint.message_received(self, msg, headers)
+        EndpointUnit.message_received(self, msg, headers)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
         self._callback(msg, headers)
@@ -404,7 +418,7 @@ class SubscriberEndpoint(Endpoint):
 
 class Subscriber(ListeningEndpointFactory):
 
-    endpoint_type = SubscriberEndpoint
+    endpoint_type = SubscriberEndpointUnit
     #channel_type = PubSub
 
     def _create_main_channel(self):
@@ -434,17 +448,17 @@ class Subscriber(ListeningEndpointFactory):
 #
 # BIDIRECTIONAL ENDPOINTS
 #
-class BidirectionalEndpoint(Endpoint):
+class BidirectionalEndpointUnit(EndpointUnit):
     pass
 
-class BidirectionalListeningEndpoint(Endpoint):
+class BidirectionalListeningEndpointUnit(EndpointUnit):
     pass
 
 #
 #  REQ / RESP (and RPC)
 #
 
-class RequestEndpoint(BidirectionalEndpoint):
+class RequestEndpoint(BidirectionalEndpointUnit):
     def _send(self, msg, headers=None):
         log.debug("RequestEndpoint.send")
 
@@ -456,7 +470,7 @@ class RequestEndpoint(BidirectionalEndpoint):
         self.response_queue = event.AsyncResult()
         self.message_received = lambda m, h: self.response_queue.set((m, h))
 
-        Endpoint._send(self, msg, headers=headers)
+        EndpointUnit._send(self, msg, headers=headers)
 
         result_data, result_headers = self.response_queue.get()#timeout=CFG.endpoint.receive.timeout)
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
@@ -478,7 +492,7 @@ class RequestResponseClient(EndpointFactory):
             e.close()
         return retval
 
-class ResponseEndpoint(BidirectionalListeningEndpoint):
+class ResponseEndpoint(BidirectionalListeningEndpointUnit):
     """
     The listener side makes one of these.
     """

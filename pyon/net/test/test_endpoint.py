@@ -9,7 +9,7 @@ from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
-from pyon.net.endpoint import Endpoint, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
+from pyon.net.endpoint import EndpointUnit, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
@@ -24,56 +24,56 @@ endpoint.interceptors = {'message-in': [],
                          'process-out': []}
 
 @attr('UNIT')
-class TestEndpoint(PyonTestCase):
+class TestEndpointUnit(PyonTestCase):
 
     def setUp(self):
-        self._endpoint = Endpoint()
+        self._endpoint_unit = EndpointUnit()
 
     def test_attach_channel(self):
         ch = Mock(spec=BaseChannel)
-        self._endpoint.attach_channel(ch)
+        self._endpoint_unit.attach_channel(ch)
 
-        self.assertTrue(self._endpoint.channel is not None)
-        self.assertEquals(self._endpoint.channel, ch)
+        self.assertTrue(self._endpoint_unit.channel is not None)
+        self.assertEquals(self._endpoint_unit.channel, ch)
 
     def test_send(self):
 
         # need a channel to send on
-        self.assertRaises(AttributeError, self._endpoint.send, "fake")
+        self.assertRaises(AttributeError, self._endpoint_unit.send, "fake")
 
         ch = Mock(spec=SendChannel)
-        self._endpoint.attach_channel(ch)
+        self._endpoint_unit.attach_channel(ch)
 
-        self._endpoint.send("hi", {'header':'value'})
+        self._endpoint_unit.send("hi", {'header':'value'})
         ch.send.assert_called_once_with('hi', {'header':'value'})
 
     def test_close(self):
         ch = Mock(spec=BaseChannel)
-        self._endpoint.attach_channel(ch)
-        self._endpoint.close()
+        self._endpoint_unit.attach_channel(ch)
+        self._endpoint_unit.close()
         ch.close.assert_called_once_with()
 
     def test_spawn_listener(self):
         ch = Mock(spec=BidirClientChannel)
-        self._endpoint.attach_channel(ch)
+        self._endpoint_unit.attach_channel(ch)
 
-        self._endpoint.spawn_listener()
+        self._endpoint_unit.spawn_listener()
 
-        self._endpoint.close()
-        self.assertTrue(self._endpoint._recv_greenlet.ready())
+        self._endpoint_unit.close()
+        self.assertTrue(self._endpoint_unit._recv_greenlet.ready())
 
     def test_build_header(self):
-        head = self._endpoint._build_header({'fake': 'content'})
+        head = self._endpoint_unit._build_header({'fake': 'content'})
         self.assertTrue(isinstance(head, dict))
 
     def test_build_payload(self):
         fakemsg = {'fake':'content'}
-        msg = self._endpoint._build_payload(fakemsg)
+        msg = self._endpoint_unit._build_payload(fakemsg)
         self.assertEquals(msg, fakemsg)
 
     def test_build_msg(self):
         fakemsg = {'fake':'content'}
-        msg = self._endpoint._build_msg(fakemsg)
+        msg = self._endpoint_unit._build_msg(fakemsg)
 #        self.assertTrue(isinstance(msg, dict))
 #        self.assertTrue(msg.has_key('header'))
 #        self.assertTrue(msg.has_key('payload'))
@@ -124,12 +124,12 @@ class TestEndpointFactory(PyonTestCase):
         Make sure our kwarg gets set.
         """
 
-        class OptEndpoint(Endpoint):
+        class OptEndpointUnit(EndpointUnit):
             def __init__(self, opt=None, **kwargs):
                 self._opt = opt
-                Endpoint.__init__(self, **kwargs)
+                EndpointUnit.__init__(self, **kwargs)
 
-        self._ef.endpoint_type = OptEndpoint
+        self._ef.endpoint_type = OptEndpointUnit
 
         e = self._ef.create_endpoint(opt="stringer")
         self.assertTrue(hasattr(e, "_opt"))
