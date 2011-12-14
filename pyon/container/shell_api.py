@@ -101,10 +101,10 @@ def ms():
     print "List of messaging endpoints"
     print "---------------------------"
     #print "Servers (listeners):"
-    from pyon.net.endpoint import EndpointFactory
+    from pyon.net.endpoint import BaseEndpoint
     from collections import defaultdict
     endpoint_by_group = defaultdict(list)
-    for elist in EndpointFactory.endpoint_by_name.values():
+    for elist in BaseEndpoint.endpoint_by_name.values():
         for ep in elist:
             if hasattr(ep, "_process"):
                 endpoint_by_group[ep._process.id].append(ep)

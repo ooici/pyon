@@ -9,7 +9,7 @@ from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
-from pyon.net.endpoint import EndpointUnit, EndpointFactory, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
+from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
 from gevent import event
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
@@ -81,10 +81,10 @@ class TestEndpointUnit(PyonTestCase):
 #        self.assertEquals(fakemsg, msg['payload'])
 
 @attr('UNIT')
-class TestEndpointFactory(PyonTestCase):
+class TestBaseEndpoint(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
-        self._ef = EndpointFactory(node=self._node, name="EFTest")
+        self._ef = BaseEndpoint(node=self._node, name="EFTest")
         self._ch = Mock(spec=SendChannel)
         chtype = Mock()
         chtype.return_value = self._ch
@@ -129,7 +129,7 @@ class TestEndpointFactory(PyonTestCase):
                 self._opt = opt
                 EndpointUnit.__init__(self, **kwargs)
 
-        self._ef.endpoint_type = OptEndpointUnit
+        self._ef.endpoint_unit_type = OptEndpointUnit
 
         e = self._ef.create_endpoint(opt="stringer")
         self.assertTrue(hasattr(e, "_opt"))

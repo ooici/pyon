@@ -59,7 +59,7 @@ class EndpointUnit(object):
     torn down.
 
     You typically do not need to deal with these objects - they are created for you
-    by an Endpoint-derived class and encapsulate the "business-logic" of the communication,
+    by an BaseEndpoint-derived class and encapsulate the "business-logic" of the communication,
     on top of the Channel layer which is the "transport" aka AMQP or otherwise.
     """
 
@@ -211,16 +211,17 @@ class EndpointUnit(object):
 
         return payload, header
 
-class EndpointFactory(object):
+class BaseEndpoint(object):
     """
-    Creates new channel/endpoint pairs for communication.
-    This base class only deals with communication
-    patterns that send first (and possibly get a response). The derived ListeningEventFactory listens
-    first.
+    An Endpoint is an object capable of communication with one or more other Endpoints.
 
-    TODO Rename this.
+    You should not use this BaseEndpoint base class directly, but one of the derived types such as
+    RPCServer, Publisher, Subscriber, etc.
+
+    An BaseEndpoint creates EndpointUnits, which are instances of communication/conversation,
+    like a Factory.
     """
-    endpoint_type = EndpointUnit
+    endpoint_unit_type = EndpointUnit
     channel_type = BidirClientChannel
     name = None
     node = None     # connection to the broker, basically
@@ -231,7 +232,7 @@ class EndpointFactory(object):
 
     def __init__(self, node=None, name=None):
         """
-        name can be a to address or a from address in the derived ListeningEndpointFactory. Either a string
+        name can be a to address or a from address in the derived ListeningBaseEndpoint. Either a string
         or a 2-tuple of (exchange, name).
         """
 
@@ -265,7 +266,7 @@ class EndpointFactory(object):
             if hasattr(ch, 'connect'):
                 ch.connect(name)
 
-        e = self.endpoint_type(**kwargs)
+        e = self.endpoint_unit_type(**kwargs)
         e.attach_channel(ch)
 
         return e
@@ -280,13 +281,13 @@ class ExchangeManagementEndpointUnit(EndpointUnit):
     def create_xs(self, name):
         pass
 
-class ExchangeManagement(EndpointFactory):
-    endpoint_type = ExchangeManagementEndpointUnit
+class ExchangeManagement(BaseEndpoint):
+    endpoint_unit_type = ExchangeManagementEndpointUnit
     channel_type = BaseChannel
 
     def __init__(self, **kwargs):
         self._pub_ep = None
-        EndpointFactory.__init__(self, **kwargs)
+        BaseEndpoint.__init__(self, **kwargs)
 
     def create_xs(self, name):
         if not self._exchange_ep:
@@ -298,7 +299,7 @@ class ExchangeManagement(EndpointFactory):
         if self._exchange_ep:
             self._exchange_ep.close()
 
-class ListeningEndpointFactory(EndpointFactory):
+class ListeningBaseEndpoint(BaseEndpoint):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
     """
@@ -306,7 +307,7 @@ class ListeningEndpointFactory(EndpointFactory):
     #channel_type = ListenChannel        # channel type is perverted here - we don't produce this, we just make one to listen on
 
     def __init__(self, node=None, name=None):
-        EndpointFactory.__init__(self, node=node, name=name)
+        BaseEndpoint.__init__(self, node=node, name=name)
         self._ready_event = event.Event()
 
     def get_ready_event(self):
@@ -356,7 +357,7 @@ class ListeningEndpointFactory(EndpointFactory):
                 break
 
     def close(self):
-        EndpointFactory.close(self)
+        BaseEndpoint.close(self)
         self._chan.close()
 
 #
@@ -366,18 +367,18 @@ class ListeningEndpointFactory(EndpointFactory):
 class PublisherEndpointUnit(EndpointUnit):
     pass
 
-class Publisher(EndpointFactory):
+class Publisher(BaseEndpoint):
     """
     Simple publisher sends out broadcast messages.
     """
 
-    endpoint_type = PublisherEndpointUnit
+    endpoint_unit_type = PublisherEndpointUnit
     #channel_type = PubSub
     channel_type = PubChannel
 
     def __init__(self, **kwargs):
         self._pub_ep = None
-        EndpointFactory.__init__(self, **kwargs)
+        BaseEndpoint.__init__(self, **kwargs)
 
     def publish(self, msg):
         # @TODO: needs thread safety
@@ -416,9 +417,9 @@ class SubscriberEndpointUnit(EndpointUnit):
         self._callback(msg, headers)
 
 
-class Subscriber(ListeningEndpointFactory):
+class Subscriber(ListeningBaseEndpoint):
 
-    endpoint_type = SubscriberEndpointUnit
+    endpoint_unit_type = SubscriberEndpointUnit
     #channel_type = PubSub
 
     def _create_main_channel(self):
@@ -430,7 +431,7 @@ class Subscriber(ListeningEndpointFactory):
         @TODO: correct?
         """
         # we expect (xp, name) and binding=name
-        ListeningEndpointFactory._setup_listener(self, (name[0], None), binding=binding)
+        ListeningBaseEndpoint._setup_listener(self, (name[0], None), binding=binding)
 
     def __init__(self, callback=None, **kwargs):
         """
@@ -438,11 +439,11 @@ class Subscriber(ListeningEndpointFactory):
         """
         assert callback, "No callback provided"
         self._callback = callback
-        ListeningEndpointFactory.__init__(self, **kwargs)
+        ListeningBaseEndpoint.__init__(self, **kwargs)
 
     def create_endpoint(self, **kwargs):
         log.debug("Subscriber.create_endpoint override")
-        return ListeningEndpointFactory.create_endpoint(self, callback=self._callback, **kwargs)
+        return ListeningBaseEndpoint.create_endpoint(self, callback=self._callback, **kwargs)
 
 
 #
@@ -476,11 +477,11 @@ class RequestEndpoint(BidirectionalEndpointUnit):
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
-class RequestResponseClient(EndpointFactory):
+class RequestResponseClient(BaseEndpoint):
     """
     Sends a request, waits for a response.
     """
-    endpoint_type = RequestEndpoint
+    endpoint_unit_type = RequestEndpoint
 
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
@@ -498,8 +499,8 @@ class ResponseEndpoint(BidirectionalListeningEndpointUnit):
     """
     pass
 
-class RequestResponseServer(ListeningEndpointFactory):
-    endpoint_type = ResponseEndpoint
+class RequestResponseServer(ListeningBaseEndpoint):
+    endpoint_unit_type = ResponseEndpoint
 
     def _create_main_channel(self):
         return ServerChannel()
@@ -547,7 +548,7 @@ class RPCRequestEndpoint(RequestEndpoint):
             raise exception.ServerError(message)
 
 class RPCClient(RequestResponseClient):
-    endpoint_type = RPCRequestEndpoint
+    endpoint_unit_type = RPCRequestEndpoint
 
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
@@ -621,7 +622,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
 
 class RPCServer(RequestResponseServer):
-    endpoint_type = RPCResponseEndpoint
+    endpoint_unit_type = RPCResponseEndpoint
 
     def __init__(self, service=None, **kwargs):
         log.debug("In RPCServer.__init__")
@@ -725,7 +726,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         return header
     
 class ProcessRPCClient(RPCClient):
-    endpoint_type = ProcessRPCRequestEndpoint
+    endpoint_unit_type = ProcessRPCRequestEndpoint
 
     def __init__(self, process=None, **kwargs):
         self._process = process
@@ -783,7 +784,7 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         return inv_two
 
 class ProcessRPCServer(RPCServer):
-    endpoint_type = ProcessRPCResponseEndpoint
+    endpoint_unit_type = ProcessRPCResponseEndpoint
 
     def __init__(self, process=None, **kwargs):
         assert process
