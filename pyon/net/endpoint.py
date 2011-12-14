@@ -459,9 +459,9 @@ class BidirectionalListeningEndpointUnit(EndpointUnit):
 #  REQ / RESP (and RPC)
 #
 
-class RequestEndpoint(BidirectionalEndpointUnit):
+class RequestEndpointUnit(BidirectionalEndpointUnit):
     def _send(self, msg, headers=None):
-        log.debug("RequestEndpoint.send")
+        log.debug("RequestEndpointUnit.send")
 
         if not self._recv_greenlet:
             self.channel.setup_listener((self.channel._send_name[0], None)) # @TODO: not quite right..
@@ -481,7 +481,7 @@ class RequestResponseClient(BaseEndpoint):
     """
     Sends a request, waits for a response.
     """
-    endpoint_unit_type = RequestEndpoint
+    endpoint_unit_type = RequestEndpointUnit
 
     def request(self, msg):
         log.debug("RequestResponseClient.request: %s" % str(msg))
@@ -493,25 +493,25 @@ class RequestResponseClient(BaseEndpoint):
             e.close()
         return retval
 
-class ResponseEndpoint(BidirectionalListeningEndpointUnit):
+class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
     """
     The listener side makes one of these.
     """
     pass
 
 class RequestResponseServer(ListeningBaseEndpoint):
-    endpoint_unit_type = ResponseEndpoint
+    endpoint_unit_type = ResponseEndpointUnit
 
     def _create_main_channel(self):
         return ServerChannel()
 
-class RPCRequestEndpoint(RequestEndpoint):
+class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None):
-        log.debug("RPCRequestEndpoint.send (call_remote): %s" % str(msg))
+        log.debug("RPCRequestEndpointUnit.send (call_remote): %s" % str(msg))
 
-        res, res_headers = RequestEndpoint._send(self, msg, headers=headers)
-        log.debug("RPCRequestEndpoint got this response: %s, headers: %s" % (str(res), str(res_headers)))
+        res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers)
+        log.debug("RPCRequestEndpointUnit got this response: %s, headers: %s" % (str(res), str(res_headers)))
 
         # Check response header
         if res_headers["status_code"] == 200:
@@ -548,7 +548,7 @@ class RPCRequestEndpoint(RequestEndpoint):
             raise exception.ServerError(message)
 
 class RPCClient(RequestResponseClient):
-    endpoint_unit_type = RPCRequestEndpoint
+    endpoint_unit_type = RPCRequestEndpointUnit
 
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
@@ -583,15 +583,15 @@ class RPCClient(RequestResponseClient):
             #log.debug("doc: %s" % str(doc))
             setattr(self, name, _Command(self.request, name, info, doc))        # @TODO: _Command is a callable is non-obvious, make callback to call_remote here explicit
 
-class RPCResponseEndpoint(ResponseEndpoint):
+class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
-        ResponseEndpoint.__init__(self)
+        ResponseEndpointUnit.__init__(self)
         self._routing_obj = routing_obj
 
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
 
-        log.debug("In RPCResponseEndpoint.message_received")
+        log.debug("In RPCResponseEndpointUnit.message_received")
         log.debug("chan: %s" % str(self.channel))
         log.debug("msg: %s" % str(msg))
         log.debug("headers: %s" % str(headers))
@@ -610,7 +610,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         self.send(result, response_headers)
 
     def _call_cmd(self, cmd_dict):
-        log.debug("In RPCResponseEndpoint._call_cmd")
+        log.debug("In RPCResponseEndpointUnit._call_cmd")
         log.debug("cmd_dict: %s" % str(cmd_dict))
         meth = getattr(self._routing_obj, cmd_dict['method'])
         log.debug("meth: %s" % str(meth))
@@ -622,7 +622,7 @@ class RPCResponseEndpoint(ResponseEndpoint):
         return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
 
 class RPCServer(RequestResponseServer):
-    endpoint_unit_type = RPCResponseEndpoint
+    endpoint_unit_type = RPCResponseEndpointUnit
 
     def __init__(self, service=None, **kwargs):
         log.debug("In RPCServer.__init__")
@@ -637,17 +637,17 @@ class RPCServer(RequestResponseServer):
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
 
-class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
+class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
     def __init__(self, process=None, **kwargs):
-        RPCRequestEndpoint.__init__(self, **kwargs)
+        RPCRequestEndpointUnit.__init__(self, **kwargs)
         self._process = process
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs.update({'process':self._process})
 
-        inv = RPCRequestEndpoint._build_invocation(self, **newkwargs)
+        inv = RPCRequestEndpointUnit._build_invocation(self, **newkwargs)
         return inv
 
     def _intercept_msg_in(self, inv):
@@ -656,7 +656,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
 
         This is a request, so the order should be Message, Process
         """
-        inv_one = RPCRequestEndpoint._intercept_msg_in(self, inv)
+        inv_one = RPCRequestEndpointUnit._intercept_msg_in(self, inv)
         inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
         return inv_two
 
@@ -667,7 +667,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         This is request, so the order should be Process, Message
         """
         inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-        inv_two = RPCRequestEndpoint._intercept_msg_out(self, inv_one)
+        inv_two = RPCRequestEndpointUnit._intercept_msg_out(self, inv_one)
 
         return inv_two
 
@@ -704,7 +704,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         log.debug('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
 
         # must set here: sender-name, conv-id, conv-seq, performative
-        header = RPCRequestEndpoint._build_header(self, raw_msg)
+        header = RPCRequestEndpointUnit._build_header(self, raw_msg)
 
         header.update({'sender-name'  : self._process.name,     # @TODO
                        'sender'       : 'todo',#self.channel._chan_name,
@@ -726,7 +726,7 @@ class ProcessRPCRequestEndpoint(RPCRequestEndpoint):
         return header
     
 class ProcessRPCClient(RPCClient):
-    endpoint_unit_type = ProcessRPCRequestEndpoint
+    endpoint_unit_type = ProcessRPCRequestEndpointUnit
 
     def __init__(self, process=None, **kwargs):
         self._process = process
@@ -740,10 +740,10 @@ class ProcessRPCClient(RPCClient):
         newkwargs['process'] = self._process
         return RPCClient.create_endpoint(self, to_name, existing_channel, **newkwargs)
 
-class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
+class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
 
     def __init__(self, process=None, **kwargs):
-        RPCResponseEndpoint.__init__(self, **kwargs)
+        RPCResponseEndpointUnit.__init__(self, **kwargs)
         self._process = process
         assert process
 
@@ -754,13 +754,13 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         Sets the process' context here to be picked up by subsequent calls out by this service to other services.
         """
         with self._process.push_context(headers):
-            return RPCResponseEndpoint.message_received(self, msg, headers)
+            return RPCResponseEndpointUnit.message_received(self, msg, headers)
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs.update({'process':self._process})
 
-        inv = RPCResponseEndpoint._build_invocation(self, **newkwargs)
+        inv = RPCResponseEndpointUnit._build_invocation(self, **newkwargs)
         return inv
 
     def _intercept_msg_in(self, inv):
@@ -769,7 +769,7 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
 
         This is response incoming, so the order should be Message, Process
         """
-        inv_one = RPCResponseEndpoint._intercept_msg_in(self, inv)
+        inv_one = RPCResponseEndpointUnit._intercept_msg_in(self, inv)
         inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
         return inv_two
 
@@ -780,11 +780,11 @@ class ProcessRPCResponseEndpoint(RPCResponseEndpoint):
         This is response outgoing, so the order should be Process, Message
         """
         inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
-        inv_two = RPCResponseEndpoint._intercept_msg_out(self, inv_one)
+        inv_two = RPCResponseEndpointUnit._intercept_msg_out(self, inv_one)
         return inv_two
 
 class ProcessRPCServer(RPCServer):
-    endpoint_unit_type = ProcessRPCResponseEndpoint
+    endpoint_unit_type = ProcessRPCResponseEndpointUnit
 
     def __init__(self, process=None, **kwargs):
         assert process

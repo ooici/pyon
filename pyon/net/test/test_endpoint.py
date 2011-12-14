@@ -9,7 +9,7 @@ from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
-from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpoint, RPCRequestEndpoint, RPCClient, _Command, RPCResponseEndpoint
+from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, _Command, RPCResponseEndpointUnit
 from gevent import event
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
@@ -229,7 +229,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         self._node = Mock(spec=NodeB)
 
     def test_endpoint_send(self):
-        e = RequestEndpoint()
+        e = RequestEndpointUnit()
         ch = self._setup_mock_channel()
         e.attach_channel(ch)
 
@@ -278,7 +278,7 @@ class SimpleService(BaseService):
 class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 
     def test_build_msg(self):
-        e = RPCRequestEndpoint()
+        e = RPCRequestEndpointUnit()
         fakemsg = {'fake':'content'}
         msg = e._build_msg(fakemsg)
 
@@ -286,7 +286,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
         self.assertNotEquals(str(msg), str(fakemsg))
 
     def test_endpoint_send(self):
-        e = RPCRequestEndpoint()
+        e = RPCRequestEndpointUnit()
         ch = self._setup_mock_channel()
         e.attach_channel(ch)
 
@@ -299,7 +299,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
         errlist = [exception.BadRequest, exception.Unauthorized, exception.NotFound, exception.Timeout, exception.Conflict, exception.ServerError, exception.ServiceUnavailable]
 
         for err in errlist:
-            e = RPCRequestEndpoint()
+            e = RPCRequestEndpointUnit()
             ch = self._setup_mock_channel(status_code=err.status_code, error_message=str(err.status_code))
             e.attach_channel(ch)
 
@@ -337,7 +337,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         c = _Command(None, 'simple', None, None)
         cvalue = c._command_dict_from_call('ein', 'zwei')
 
-        e = RPCResponseEndpoint(routing_obj=self)
+        e = RPCResponseEndpointUnit(routing_obj=self)
         ch = self._setup_mock_channel(value=cvalue)
         e.attach_channel(ch)
 
