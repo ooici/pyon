@@ -44,8 +44,7 @@ class PyonTestCase(unittest.TestCase):
 
     def _create_service_mock(self, service_name):
         # set self.clients if not already set
-        if getattr(self, 'clients', None) is None:
-            setattr(self, 'clients', Mock(name='self.clients'))
+        clients = Mock(name='clients')
         base_service = get_service_by_name(service_name)
         # Save it to use in test_verify_service
         self.base_service = base_service
@@ -53,19 +52,19 @@ class PyonTestCase(unittest.TestCase):
         for dep_name in dependencies:
             dep_service = get_service_by_name(dep_name)
             # Force mock service to use interface
-            mock_service = Mock(name='self.clients.%s' % dep_name,
+            mock_service = Mock(name='clients.%s' % dep_name,
                     spec=dep_service)
-            setattr(self.clients, dep_name, mock_service)
+            setattr(clients, dep_name, mock_service)
             # set self.dep_name for conevenience
             setattr(self, dep_name, mock_service)
             iface = list(implementedBy(dep_service))[0]
             names_and_methods = iface.namesAndDescriptions()
             for func_name, _ in names_and_methods:
                 mock_func = mocksignature(getattr(dep_service, func_name),
-                        mock=Mock(name='self.clients.%s.%s' % (dep_name,
+                        mock=Mock(name='clients.%s.%s' % (dep_name,
                             func_name)), skipfirst=True)
                 setattr(mock_service, func_name, mock_func)
-        return self.clients
+        return clients
 
     # Assuming your service is the only subclass of the Base Service
     def test_verify_service(self):
