@@ -65,6 +65,7 @@ class PyonTestCase(unittest.TestCase):
                         mock=Mock(name='self.clients.%s.%s' % (dep_name,
                             func_name)), skipfirst=True)
                 setattr(mock_service, func_name, mock_func)
+        return self.clients
 
     # Assuming your service is the only subclass of the Base Service
     def test_verify_service(self):
