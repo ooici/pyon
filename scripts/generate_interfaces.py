@@ -721,6 +721,7 @@ def main():
             found_error = False
             for key in compare_methods:
                 if key not in impl_subtype.__dict__:
+                    found_error = True
                     if not added_class_names:
                         added_class_names = True
                         validation_results += "\nBase service: %s\n" % base_subtype_name
@@ -731,6 +732,7 @@ def main():
                     impl_params = inspect.getargspec(impl_subtype.__dict__[key])
 
                     if base_params != impl_params:
+                        found_error = True
                         if not added_class_names:
                             added_class_names = True
                             validation_results += "\nBase service: %s\n" % base_subtype_name
