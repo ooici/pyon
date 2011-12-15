@@ -14,6 +14,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.util.containers import DotDict
 from pyon.util.log import log
+from pyon.core.bootstrap import CFG
 
 # Marks key range upper bound
 END_MARKER = "ZZZZZ"
@@ -25,12 +26,15 @@ class CouchDB_DataStore(DataStore):
     """
     couchdb_views = get_couchdb_views('all')
 
-    def __init__(self, host='localhost', port=5984, datastore_name='prototype', options=""):
+    def __init__(self, host=None, port=5984, datastore_name='prototype', options=""):
         log.debug('host %s port %d data store name %s options %s' % (host, port, datastore_name, options))
-        self.host = host
+        try:
+            self.host = host or CFG.server.couchdb.host
+        except AttributeError:
+            self.host = 'localhost'
         self.port = port
         self.datastore_name = datastore_name
-        connection_str = "http://%s:%s" % (host,port)
+        connection_str = "http://%s:%s" % (self.host, self.port)
         log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
