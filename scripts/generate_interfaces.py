@@ -725,7 +725,7 @@ def main():
                         added_class_names = True
                         validation_results += "\nBase service: %s\n" % base_subtype_name
                         validation_results += "Impl subtype: %s\n" % impl_subtype_name
-                    validation_results += "  Method '%s' not implemented" % key
+                    validation_results += "  Method '%s' not implemented\n" % key
                 else:
                     base_params = inspect.getargspec(compare_methods[key])
                     impl_params = inspect.getargspec(impl_subtype.__dict__[key])
