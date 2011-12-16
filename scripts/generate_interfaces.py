@@ -43,6 +43,7 @@ from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
+from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient, ProcessRPCClient
 ${dep_client_imports}
@@ -144,8 +145,9 @@ ${methods}
 '''
     def ${name}(${args}):
         ${methoddocstring}
-        return self.request({'method': '${name}', 'args': [${argssmall}]})
+        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}')
 ''',
+    'obj_arg': "'${name}': ${name}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
     def __init__(self, name=None, node=None, **kwargs):
@@ -326,6 +328,10 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     dependencies    = svc_def['dependencies']
     meth_list       = svc_def['methods']
     interface_name  = svc_def['interface_name']
+    class_name      = service_name_from_file_name(interface_name)
+
+    if service_name is None:
+        raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
 
     print 'Generating %40s -> %s' % (interface_name, interface_file)
 
@@ -364,13 +370,19 @@ def generate_service(interface_file, svc_def, client_defs, opts):
         methods.append(templates['method'].substitute(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
         class_methods.append(templates['method'].substitute(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
 
-        clientargspass = ''
+        clientobjargs = ''
         if def_in:
-            clientargspass = ','.join((k for k in def_in))   # enumerates keys only, which are names, aka what we want here
+            all_client_obj_args = [client_templates['obj_arg'].substitute(name=k) for k in def_in]
+            clientobjargs       = ",".join(all_client_obj_args)
+
+        # determine object in name: follows <ServiceName>_<MethodName>_in
+        req_in_obj_name = "%s_%s_in" % (class_name, op_name)
+
         client_methods.append(client_templates['method'].substitute(name=op_name,
                                                                     args=class_args_str,
                                                                     methoddocstring=docstring_str,
-                                                                    argssmall=clientargspass,
+                                                                    req_in_obj_name=req_in_obj_name,
+                                                                    req_in_obj_args=clientobjargs,
                                                                     outargs=outargs_str))
         if opts.servicedoc:
 
@@ -380,9 +392,6 @@ def generate_service(interface_file, svc_def, client_defs, opts):
             methoddocstring=docstring_formatted.replace("method docstring","")
             doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str))
 
-
-    if service_name is None:
-        raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
 
     # dep client names
     dep_clients             = [(x, client_defs[x][1]) for x in dependencies]
@@ -394,7 +403,6 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     dependencies_str    = templates['depends'].substitute(namelist=dependencies)
     methods_str         = ''.join(methods) or '    pass\n'
     classmethods_str    = ''.join(class_methods)
-    class_name          = service_name_from_file_name(interface_name)
 
     _class = templates['class'].substitute(name=class_name,
                                            classdocstring=class_docstring_str,
@@ -458,6 +466,8 @@ def main():
     parser.add_argument('-sd', '--servicedoc', action='store_true', help='Generate HTML service doc inclusion files')
     opts = parser.parse_args()
 
+    print "Forcing --force, we keep changing generate_interfaces, sorry!"
+    opts.force = True
 
     if os.getcwd().endswith('scripts'):
         sys.exit('This script needs to be run from the pyon root.')
