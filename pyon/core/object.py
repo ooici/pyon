@@ -15,6 +15,7 @@ import yaml
 
 from pyon.core.path import list_files_recursive
 from pyon.util.log import log
+from pyon.util import yaml_ordered_dict
 
 class IonObjectError(Exception):
     pass

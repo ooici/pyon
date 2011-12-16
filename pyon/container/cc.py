@@ -25,17 +25,16 @@ import msgpack
 import atexit
 import signal
 
-from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
+from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon, obj_registry
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.directory.directory import Directory
-from pyon.net.endpoint import ProcessRPCServer, RPCServer
+from pyon.net.endpoint import ProcessRPCServer, RPCServer, RPCClient
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
-
 
 class IContainerAgent(Interface):
 
@@ -57,12 +56,24 @@ class IContainerAgent(Interface):
     def stop():
         pass
 
+# messaging the container means we need to have the "in" object defined for each of the methods in the container
+def reg_in_methods_for_container():
+    log.debug("Registering IContainerAgent *_in object types, for messaging")
+    methods = IContainerAgent.namesAndDescriptions()
+    for name, command in methods:
+        objname = "ContainerAgent_%s_in" % name
+        obj_registry.register_def(objname, command.getSignatureInfo()['optional'], name)
+
+reg_in_methods_for_container()
+
 class Container(object):
-    implements(IContainerAgent)
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
     that do the bulk of the work in the ION system.
     """
+
+    implements(IContainerAgent)
+
     node = None
     id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
     name = "cc_agent_%s" % (id)
