@@ -275,7 +275,7 @@ class DataStore(object):
         """
         pass
 
-    def create_association(self, subject=None, predicate=None, object=None):
+    def create_association(self, subject=None, predicate=None, object=None, assoc_type='H2H'):
         """
         Create an association between two IonObjects with a given predicate
         """
@@ -286,19 +286,29 @@ class DataStore(object):
             subject = self.read(subject_id)
         else:
             subject_id = subject._id
+        if "_rev" not in subject or not subject_id:
+            raise BadRequest("Subject rev or id not available")
+        st = subject._def.type.name
 
         if type(object) is str:
             object_id = object
             object = self.read(object_id)
         else:
             object_id = object._id
-
-        st = subject._def.type.name
+        if "_rev" not in object or not object_id:
+            raise BadRequest("Object rev or id not available")
         ot = object._def.type.name
+
+        assoc_type = assoc_type or 'H2H'
+        if not assoc_type in ('H2H', 'R2R', 'H2R', 'R2H', 'R2R'):
+            raise BadRequest("Unsupported assoc_type: %s" % assoc_type)
+
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
         from pyon.core.object import IonObjectRegistry
         from pyon.ion.resource import AssociationTypes
+        from pyon.core.bootstrap import IonObject
+
         at = AssociationTypes.get(predicate, None)
         if not at:
             raise BadRequest("Predicate unknown %s" % predicate)
@@ -319,8 +329,11 @@ class DataStore(object):
             if not found_ot:
                 raise BadRequest("Illegal object type %s for predicate %s" % (ot, predicate))
 
-        from pyon.core.bootstrap import IonObject
-        assoc = IonObject("Association", s=subject_id, st=st, p=predicate, o=object_id, ot=ot,
+        assoc = IonObject("Association",
+                          at=assoc_type,
+                          s=subject_id, st=st, srv=subject._rev,
+                          p=predicate,
+                          o=object_id, ot=ot, orv=object._rev,
                           ts=get_ion_ts())
         return self.create(assoc)
 

@@ -68,17 +68,18 @@ function(doc) {
 
     # Resource ION object related views
     # Resources have a type, life cycle state and name
+    # Note: the name in  the indexes leads to a sort by name
     'resource':{
         'by_type':{
             'map':"""
 function(doc) {
-  emit([doc.type_, doc.lcstate], null);
+  emit([doc.type_, doc.lcstate, doc.name], null);
 }""",
         },
         'by_lcstate':{
             'map':"""
 function(doc) {
-  emit([doc.lcstate, doc.type_], null);
+  emit([doc.lcstate, doc.type_, doc.name], null);
 }""",
         },
         'by_name':{
