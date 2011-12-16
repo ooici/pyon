@@ -292,7 +292,7 @@ class RecvChannel(BaseChannel):
             raise ChannelError("Not consuming")
 
         if self._queue_auto_delete:
-            log.info("Autodelete is on, this will destroy this queue")
+            log.debug("Autodelete is on, this will destroy this queue")
 
         blocking_cb(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
         self._consuming = False

@@ -6,7 +6,7 @@ from gevent import event
 from zope import interface
 
 from pyon.core import bootstrap
-from pyon.core.bootstrap import CFG
+from pyon.core.bootstrap import CFG, IonObject
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
@@ -483,11 +483,11 @@ class RequestResponseClient(BaseEndpoint):
     """
     endpoint_unit_type = RequestEndpointUnit
 
-    def request(self, msg):
-        log.debug("RequestResponseClient.request: %s" % str(msg))
+    def request(self, msg, headers=None):
+        log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self.name)
         try:
-            retval, headers = e.send(msg)
+            retval, headers = e.send(msg, headers=headers)
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
@@ -508,7 +508,7 @@ class RequestResponseServer(ListeningBaseEndpoint):
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None):
-        log.debug("RPCRequestEndpointUnit.send (call_remote): %s" % str(msg))
+        log.info("RPCRequestEndpointUnit.send (call_remote): %s" % str(msg))
 
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers)
         log.debug("RPCRequestEndpointUnit got this response: %s, headers: %s" % (str(res), str(res_headers)))
@@ -548,6 +548,15 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
             raise exception.ServerError(message)
 
 class RPCClient(RequestResponseClient):
+    """
+    Base RPCClient class.
+
+    RPC Clients are defined via generate_interfaces for each service, but also may be defined
+    on the fly by instantiating one and passing a service Interface class (from the same files
+    as the predefined clients) or an IonServiceDefinition, typically obtained from the pycc shell.
+    This way, a developer debugging a live system has access to a service he/she may not know about
+    at compile time.
+    """
     endpoint_unit_type = RPCRequestEndpointUnit
 
     def __init__(self, iface=None, **kwargs):
@@ -563,25 +572,60 @@ class RPCClient(RequestResponseClient):
         Defines an RPCClient's attributes from an IonServiceDefinition.
         """
         for meth in svc_def.methods:
-            name = meth.op_name
-            info = meth.def_in
-            doc = meth.__doc__
+            name        = meth.op_name
+            in_obj      = meth.def_in
+            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
+            doc         = meth.__doc__
 
-            setattr(self, name, _Command(self.request, name, info, doc))
+            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
 
     def _define_interface(self, iface):
         """
         from dorian's RPCClientEntityFromInterface: sets attrs on this client instance from an interface definition.
         """
-        namesAndDesc = iface.namesAndDescriptions()
-        for name, command in namesAndDesc:
-            #log.debug("name: %s" % str(name))
-            #log.debug("command: %s" % str(command))
-            info = command.getSignatureInfo()
-            #log.debug("info: %s" % str(info))
-            doc = command.getDoc()
-            #log.debug("doc: %s" % str(doc))
-            setattr(self, name, _Command(self.request, name, info, doc))        # @TODO: _Command is a callable is non-obvious, make callback to call_remote here explicit
+        methods = iface.namesAndDescriptions()
+
+        # @TODO: hack to get the name of the svc for object name building
+        svc_name = iface.getName()[1:]
+
+        for name, command in methods:
+            in_obj_name = "%s_%s_in" % (svc_name, name)
+            doc         = command.getDoc()
+
+            self._set_svc_method(name, in_obj_name, command.getSignatureInfo()['positional'], doc)
+
+    def _set_svc_method(self, name, in_obj, callargs, doc):
+        """
+        Common method to properly set a friendly-named remote call method on this RPCClient.
+
+        Since it is not possible to dynamically generate a method signature at run-time (without exec/eval),
+        the method has to do translations between *args and **kwargs. Therefore, it needs to know what the
+        kwargs are meant to be, either via the interface's method signature, or the IonServiceDefinition's method
+        schema.
+        """
+        def svcmethod(self, *args, **kwargs):
+            passkwargs = {}
+            passkwargs.update(dict(zip(callargs, args)))    # map *args to their real kwarg names
+            passkwargs.update(kwargs)
+            ionobj = IonObject(in_obj, **passkwargs)
+            return self.request(ionobj, op=name)
+
+        newmethod           = svcmethod
+        newmethod.__doc__   = doc
+        setattr(self.__class__, name, newmethod)
+
+    def request(self, msg, headers=None, op=None):
+        """
+        Request override for RPCClients.
+
+        Puts the op into the headers and calls the base class version.
+        """
+        assert op
+        headers = headers or {}
+        headers['op'] = op
+
+        return RequestResponseClient.request(self, msg, headers=headers)
+
 
 class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
@@ -591,32 +635,33 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
 
-        log.debug("In RPCResponseEndpointUnit.message_received")
-        log.debug("chan: %s" % str(self.channel))
-        log.debug("msg: %s" % str(msg))
-        log.debug("headers: %s" % str(headers))
+        log.debug("RPCResponseEndpointUnit.message_received\n\tmsg: %s\n\theaders: %s", msg, headers)
 
-        cmd_dict = msg
+        cmd_arg_obj = msg
+        cmd_op      = headers.get('op', None)
+
+        # op name must exist!
+        if not hasattr(self._routing_obj, cmd_op):
+            response_headers = self._create_error_response(exception.BadRequest("Unknown op name: %s" % cmd_op))
+            self.send(None, response_headers)
+            return
+
+        ro_meth     = getattr(self._routing_obj, cmd_op)
 
         result = None
         response_headers = {}
         try:
-            result = self._call_cmd(cmd_dict)
+            result = ro_meth(**cmd_arg_obj.__dict__)
+
             response_headers = { 'status_code': 200, 'error_message': '' }
+        except TypeError as ex:
+            log.exception("TypeError while attempting to call routing object's method")
+            response_headers = self._create_error_response(exception.ServerError(ex.message))
         except exception.IonException as ex:
             log.debug("Got error response")
             response_headers = self._create_error_response(ex)
 
         self.send(result, response_headers)
-
-    def _call_cmd(self, cmd_dict):
-        log.debug("In RPCResponseEndpointUnit._call_cmd")
-        log.debug("cmd_dict: %s" % str(cmd_dict))
-        meth = getattr(self._routing_obj, cmd_dict['method'])
-        log.debug("meth: %s" % str(meth))
-        args = cmd_dict['args']
-        log.debug("args: %s" % str(args))
-        return meth(*args)
 
     def _create_error_response(self, ex):
         return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
@@ -795,44 +840,3 @@ class ProcessRPCServer(RPCServer):
         newkwargs = kwargs.copy()
         newkwargs['process'] = self._process
         return RPCServer.create_endpoint(self, **newkwargs)
-
-class _Command(object):
-    """
-    RPC Message Format
-    Command method generated from interface.
-
-    @TODO: CURRENTLY UNUSED SIGINFO FOR VALIDATION
-    Note: the required siginfo could be used by the client to catch bad
-    calls before it makes them. 
-    If calls are only made using named arguments, then the optional siginfo
-    can validate that the correct named arguments are used.
-    """
-
-    def __init__(self, callback, name, siginfo, doc):
-        #log.debug("In _Command.__init__")
-        #log.debug("client: %s" % str(client))
-        #log.debug("name: %s" % str(name))
-        #log.debug("siginfo: %s" % str(siginfo))
-        #log.debug("doc: %s" % str(doc))
-        self.callback = callback
-        self.name = name
-#        self.positional = siginfo['positional']
-#        self.required = siginfo['required']
-#        self.optional = siginfo['optional']
-        self.__doc__ = doc
-
-    def __call__(self, *args):
-        log.debug("In _Command.__call__")
-        command_dict = self._command_dict_from_call(*args)
-        return self.callback(command_dict)
-
-    def _command_dict_from_call(self, *args):
-        """
-        parameters specified by name
-        """
-        log.debug("In _Command._command_dict_from_call")
-        cmd_dict = {}
-        cmd_dict['method'] = self.name
-        cmd_dict['args'] = args
-        log.debug("cmd_dict: %s" % str(cmd_dict))
-        return cmd_dict
