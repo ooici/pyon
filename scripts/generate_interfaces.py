@@ -55,7 +55,7 @@ ${classes}
 ${client}
 '''
     , 'clientsholder':
-'''class ${name}Clients(BaseClients):
+'''class ${name}DependentClients(BaseClients):
     def __init__(self, process=None):
         BaseClients.__init__(self)
 ${dep_clients}
@@ -80,7 +80,7 @@ ${dependencies}
 
     def __init__(self, *args, **kwargs):
         BaseService.__init__(self, *args, **kwargs)
-        self.clients = ${name}Clients(process=self)
+        self.clients = ${name}DependentClients(process=self)
 
 ${classmethods}
 '''
