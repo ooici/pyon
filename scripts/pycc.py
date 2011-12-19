@@ -99,9 +99,8 @@ def main(opts, *args, **kwargs):
     # The import of pyon.public triggers many module initializers:
     # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container
-    from pyon.container.cc import IContainerAgent
     from pyon.container.shell_api import get_shell_api
-    from pyon.net.endpoint import RPCClient
+    from interface.services.icontainer_agent import ContainerAgentClient
 
     container = Container(*args, **kwargs)
 
@@ -120,7 +119,7 @@ def main(opts, *args, **kwargs):
         return
 
     if opts.rel:
-        client = RPCClient(node=container.node, name=container.name, iface=IContainerAgent)
+        client = ContainerAgentClient(node=container.node, name=container.name)
         start_ok = client.start_rel_from_url(opts.rel)
         if not start_ok: error_msg = "Cannot start deploy file '%s'" % opts.rel
 

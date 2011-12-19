@@ -2,22 +2,22 @@
 
 """
 Capability Container base class
-TODO:
-[ ] server and client name argument is a short cut
-[ ] generic server and client delivery loop
-[ ] decide on how Channel Type is passed/associated with gen server/client
-[ ] EndpointUnit might be better as a 'factory' that can make handler instances
-per request. This will also facilitate the EndpointUnit holding 'business'
-objects/resources that each request has access to. This will keep the
-actual handlers functional.
 """
-import sys
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from zope.interface import providedBy
-from zope.interface import Interface, implements
+from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
+
+from pyon.container.apps import AppManager
+from pyon.container.procs import ProcManager
+from pyon.directory.directory import Directory
+from pyon.net.endpoint import ProcessRPCServer
+from pyon.net import messaging
+from pyon.util.log import log
+from pyon.util.containers import DictModifier, dict_merge
+from pyon.ion.exchange import ExchangeManager
+from interface.services.icontainer_agent import BaseContainerAgent
 
 import string
 import os
@@ -25,62 +25,25 @@ import msgpack
 import atexit
 import signal
 
-from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon, obj_registry
-
-from pyon.container.apps import AppManager
-from pyon.container.procs import ProcManager
-from pyon.directory.directory import Directory
-from pyon.net.endpoint import ProcessRPCServer, RPCServer, RPCClient
-from pyon.net import messaging
-from pyon.util.log import log
-from pyon.util.containers import DictModifier, dict_merge
-from pyon.ion.exchange import ExchangeManager
-
-class IContainerAgent(Interface):
-
-    def spawn_process(name=None, module=None, cls=None, config=None):
-        pass
-
-    def start_app(appdef=None, processapp=None, config=None):
-        pass
-
-    def start_app_from_url(app_url=""):
-        pass
-
-    def start_rel(rel=None):
-        pass
-
-    def start_rel_from_url(rel_url=""):
-        pass
-
-    def stop():
-        pass
-
-# messaging the container means we need to have the "in" object defined for each of the methods in the container
-def reg_in_methods_for_container():
-    log.debug("Registering IContainerAgent *_in object types, for messaging")
-    methods = IContainerAgent.namesAndDescriptions()
-    for name, command in methods:
-        objname = "ContainerAgent_%s_in" % name
-        obj_registry.register_def(objname, command.getSignatureInfo()['optional'], name)
-
-reg_in_methods_for_container()
-
-class Container(object):
+class Container(BaseContainerAgent):
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
     that do the bulk of the work in the ION system.
     """
 
-    implements(IContainerAgent)
-
-    node = None
-    id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
-    name = "cc_agent_%s" % (id)
-    pidfile = None
-    instance = None
+    node        = None
+    id          = None
+    name        = None
+    pidfile     = None
+    instance    = None
 
     def __init__(self, *args, **kwargs):
+        BaseContainerAgent.__init__(self, *args, **kwargs)
+
+        # set id and name (as they are set in base class call)
+        self.id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
+        self.name = "cc_agent_%s" % self.id
+
         Container.instance = self
 
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
@@ -151,9 +114,7 @@ class Container(object):
         self.app_manager.start()
 
         # Start the CC-Agent API
-        #rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self)
-        # @TODO: must have a process (currently BaseService??) to pass into ProcessRPCServer, so use regular RPCServer for now
-        rsvc = RPCServer(node=self.node, name=self.name, service=self)
+        rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
         self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
