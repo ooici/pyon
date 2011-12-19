@@ -621,6 +621,7 @@ class RPCClient(RequestResponseClient):
         Puts the op into the headers and calls the base class version.
         """
         assert op
+        assert headers is None or isinstance(headers, dict)
         headers = headers or {}
         headers['op'] = op
 

@@ -137,15 +137,15 @@ ${processrpcclient}
     """
     ${clientdocstring}
     """
-    implements(I${name})
+    #implements(I${name})
 
 ${methods}
 ''',
     'method':
 '''
-    def ${name}(${args}):
+    def ${name}(${args}, headers=None):
         ${methoddocstring}
-        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}')
+        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers)
 ''',
     'obj_arg': "'${name}': ${name}",
     'rpcclient':
@@ -362,6 +362,10 @@ def generate_service(interface_file, svc_def, client_defs, opts):
             else:
                 docstring_formatted += "\n        "
             docstring_formatted += docstring_line
+
+        # headers is reserved keyword, catch problems here!
+        if def_in is not None and 'headers' in def_in:
+            raise StandardError("Reserved argument name 'headers' found in method '%s' of service '%s', please rename" % (op_name, service_name))
 
         args_str, class_args_str        = build_args_str(def_in, False), build_args_str(def_in, True)
         docstring_str                   = templates['methdocstr'].substitute(methoddocstr=build_args_doc_string(docstring_formatted, def_spec, def_in, def_out, def_throws))
