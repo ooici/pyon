@@ -180,10 +180,10 @@ class TestRecvChannel(PyonTestCase):
         mdq.assert_called_with(None)
         mb.assert_called_with('known')
 
-    def test_destroy_listener_no_recv_name(self):
+    def test__destroy_queue_no_recv_name(self):
         self.assertRaises(AssertionError, self.ch.destroy_listener)
 
-    def test_destroy_listener(self):
+    def test__destroy_queue(self):
         self.ch._recv_name = (sentinel.xp, sentinel.queue)
 
         def side(*args, **kwargs):
@@ -200,7 +200,41 @@ class TestRecvChannel(PyonTestCase):
         self.assertTrue(ac.queue_delete.called)
         self.assertIn('queue', ac.queue_delete.call_args[1])
         self.assertIn(sentinel.queue, ac.queue_delete.call_args[1].itervalues())
-        
+
+    def test_destroy_listener(self):
+        m = Mock()
+        self.ch._destroy_queue = m
+
+        self.ch.destroy_listener()
+        m.assert_called_once_with()
+
+    def test__destroy_binding_no_recv_name_or_binding(self):
+        self.assertRaises(AssertionError, self.ch._destroy_binding)
+
+    def test__destroy_binding(self):
+        self.ch._recv_name = (sentinel.xp, sentinel.queue)
+        self.ch._recv_binding = sentinel.binding
+
+        def side(*args, **kwargs):
+            cb = kwargs.get('callback')
+            cb()
+
+        ac = Mock(spec=pchannel.Channel)
+        self.ch._amq_chan = ac
+
+        ac.queue_unbind.side_effect = side
+
+        self.ch._destroy_binding()
+
+        self.assertTrue(ac.queue_unbind.called)
+        self.assertIn('queue', ac.queue_unbind.call_args[1])
+        self.assertIn('exchange', ac.queue_unbind.call_args[1])
+        self.assertIn('routing_key', ac.queue_unbind.call_args[1])
+
+        self.assertIn(sentinel.queue, ac.queue_unbind.call_args[1].itervalues())
+        self.assertIn(sentinel.xp, ac.queue_unbind.call_args[1].itervalues())
+        self.assertIn(sentinel.binding, ac.queue_unbind.call_args[1].itervalues())
+
     def test_start_consume(self):
         ac = Mock(pchannel.Channel)
         self.ch._amq_chan = ac

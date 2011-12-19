@@ -209,6 +209,7 @@ class RecvChannel(BaseChannel):
     _consuming      = False
     _consumer_tag   = None
     _recv_name      = None      # name this receiving channel is receiving on - tuple (exchange, queue)
+    _recv_binding   = None      # binding this queue is listening on (set via _bind)
 
     # queue defaults
     _queue_auto_delete  = False
@@ -219,11 +220,23 @@ class RecvChannel(BaseChannel):
     _consumer_exclusive = False
     _consumer_no_ack    = False     # endpoint layers do the acking as they call recv()
 
-    def __init__(self, **kwargs):
+    def __init__(self, name=None, binding=None, **kwargs):
+        """
+        Initializer for a recv channel.
+
+        You may set the receiving name and binding here if you wish, otherwise they will
+        be set when you call setup_listener.
+        """
         self._recv_queue = gqueue.Queue()
+
+        # set recv name and binding if given
+        assert name is None or isinstance(name, tuple)
+        self._recv_name = name
+        self._recv_binding = binding
+
         BaseChannel.__init__(self, **kwargs)
 
-    def setup_listener(self, name, binding=None):
+    def setup_listener(self, name=None, binding=None):
         """
         Prepares this receiving channel for listening for messages.
 
@@ -238,6 +251,7 @@ class RecvChannel(BaseChannel):
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
+        name = name or self._recv_name
         xp, queue = name
 
         self._recv_name = (xp, queue)
@@ -246,7 +260,7 @@ class RecvChannel(BaseChannel):
 
         self._declare_exchange_point(xp)
         queue   = self._declare_queue(queue)
-        binding = binding or queue      # should only happen in the case of anon-queue
+        binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
 
         self._bind(binding)
 
@@ -254,6 +268,24 @@ class RecvChannel(BaseChannel):
         """
         Tears down this channel.
 
+        For performance reasons, only calls destroy queue. Derived implementations that want to tear down the
+        binding should override this method.
+        """
+        #self._destroy_binding()
+        self._destroy_queue()
+
+    def _destroy_binding(self):
+        """
+        Deletes the binding from the listening queue.
+        """
+        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
+
+        blocking_cb(self._amq_chan.queue_unbind, 'callback', queue=self._recv_name[1],
+                                                             exchange=self._recv_name[0],
+                                                             routing_key=self._recv_binding)
+
+    def _destroy_queue(self):
+        """
         You should only call this if you want to delete the queue. Even so, you must know you are
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
@@ -346,7 +378,7 @@ class RecvChannel(BaseChannel):
         return self._recv_name[1]
 
     def _bind(self, binding):
-        log.debug("RecvChannel._bind: %s" % binding)
+        log.debug("RecvChannel._bind: %s", binding)
         assert self._recv_name and self._recv_name[1]
         
         queue = self._recv_name[1]
@@ -354,6 +386,8 @@ class RecvChannel(BaseChannel):
                     queue=queue,
                     exchange=self._recv_name[0],
                     routing_key=binding)
+
+        self._recv_binding = binding
 
     def _on_deliver(self, chan, method_frame, header_frame, body):
         log.debug("RecvChannel._on_deliver")
