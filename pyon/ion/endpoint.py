@@ -6,11 +6,19 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Subscriber
+from pyon.public import CFG
 
 class ProcessPublisher(Publisher):
     def __init__(self, process=None, **kwargs):
         self._process = process
         Publisher.__init__(self, **kwargs)
+
+class EventPublisher(ProcessPublisher):
+    """
+    Class for process event publication - place holder
+    """
+    #XP = CFG.exchange_point
+
 
 class StreamPublisher(ProcessPublisher):
     """
@@ -21,7 +29,7 @@ class StreamPublisher(ProcessPublisher):
     def __init__(self, stream_route, **kwargs):
         self._stream_route = stream_route
 
-        ProcessPublisher.__init__(self, name=stream_route.exchange_name, **kwargs) # not correct interface yet!
+        ProcessPublisher.__init__(self, name=stream_route.exchange_name, **kwargs)
         # @TODO Cant distinguish my exchange name from the to_name in the endpoint layer. Need a concept of FROM
 
 class StreamPublisherRegistrar(object):
@@ -55,6 +63,12 @@ class ProcessSubscriber(Subscriber):
     def __init__(self, process=None, **kwargs):
         self._process = process
         Subscriber.__init__(self, **kwargs)
+
+class EventSubscriber(ProcessSubscriber):
+    """
+    Event Subscriber class for a process - place holder
+    """
+
 
 class StreamSubscriber(ProcessSubscriber):
     """
