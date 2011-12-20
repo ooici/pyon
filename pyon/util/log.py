@@ -45,9 +45,15 @@ def _import(name, globals=None, locals=None, fromlist=None, level=-1):
 
     Inspects the stack; should be harmless since this is just syntactic sugar for module declarations.
     """
-    
-    module = _orig___import__(name, globals, locals, fromlist)
-
+    kwargs = dict()
+    if globals:
+        kwargs['globals'] = globals
+    if locals:
+        kwargs['locals'] = locals
+    if fromlist:
+        kwargs['fromlist'] = fromlist
+    kwargs['level'] = level
+    module = _orig___import__(name, **kwargs)
     if name in import_paths and ('log' in fromlist or '*' in fromlist):
         log = get_scoped_log(2)
         setattr(module, 'log', log)
