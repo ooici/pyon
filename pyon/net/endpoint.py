@@ -379,12 +379,19 @@ class Publisher(BaseEndpoint):
         self._pub_ep = None
         BaseEndpoint.__init__(self, **kwargs)
 
-    def publish(self, msg):
-        # @TODO: needs thread safety
-        if not self._pub_ep:
-            self._pub_ep = self.create_endpoint(self.name)
+    def publish(self, msg, to_name=None):
 
-        self._pub_ep.send(msg)
+        ep = None
+        if not to_name:
+            # @TODO: needs thread safety
+            if not self._pub_ep:
+                self._pub_ep = self.create_endpoint(self.name)
+            ep = self._pub_ep
+        else:
+            ep = self.create_endpoint(to_name)
+
+        ep.send(msg)
+        return ep
 
     def close(self):
         """
