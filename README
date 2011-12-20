@@ -12,43 +12,42 @@ https://confluence.oceanobservatories.org/x/ehdTAQ
 INSTALL
 =======
 
-You need the following installed before you can use pyon:
-  - python 2.7
-    - Download and use installer on a Mac
-    - If you need to build from source (like on some linux distributions), enable the following in the build:
+Install the following if not yet present:
+
+* OS Packages and package management:
+For Mac, use homebrew
+    > /usr/bin/ruby -e "$(curl -fsSL https://raw.github.com/gist/323731)"
+- python 2.7.2
+    Download and use installer on a Mac.
+    If you need to build from source (like on some linux distributions), enable the following in the build:
       - SSL
       - sqlite
-  - distutils 2.7.2
-    - Download egg and execute with sh
-  - pip
-      > easy_install pip
-  - homebrew (Mac, optional)
-      > /usr/bin/ruby -e "$(curl -fsSL https://raw.github.com/gist/323731)"
-  - virtualenv and virtualenvwrapper modules for your python 2.7 installation
-      > easy_install --upgrade virtualenv
-      > easy_install --upgrade virtualenvwrapper
-      Note: This may require XCode (use XCode 3.3 free version)
-  - libevent 2.0
-      Mac: Use Homebrew install (see below)
-      Linux: Install with package manager
-  - libyaml 0.1.4 
-      Mac: Use Homebrew install (see below)
-      Linux: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh.
-  - zeromq 2.1.x
-      Mac: Use Homebrew install (see below)
-  - couchdb 1.1.0 (optional if memory mockdb is used)
-      Mac: Use Homebrew install (see below)
-      Linux: Note that many installs have much older versions installed by default. You will need to upgrade couchdb to at least 1.1.0.
-  - rabbitmq 2.6.1 (optional if amoeba is used)
-      Download generic Linux version and unpack
-      Note: May need erl (Erlang) and some dependencies installed before
+- git 1.7.7: Use brew or download the Mac or Linux installer and run it
+- couchdb 1.1.0 (optional if memory mockdb is used)
+    You will need to upgrade couchdb to at least 1.1.0.
+- rabbitmq 2.6.1 or later (recommended, but can use rabbitmq on amoeba)
+    Use brew.
+    Alternative: download generic Linux version and unpack into a suitable directory.
+- Install libevent, libyaml, zeromq, couchdb, python, and rabbitmq with Homebrew
+    > brew install libevent libyaml zeromq couchdb python rabbitmq
+    You can even reinstall git using brew to clean up your /usr/local directory
+    Linux: Note that many installs have much older versions installed by default.
+      - libevent: Install with package manager
+      - libyaml: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh
+      - couchdb: Make sure to have the appropriate version
 
-Short version to setup a Mac (assumes python 2.7 is already setup):
-    brew install libevent libyaml zeromq couchdb
+* python packages and environment management:
+- pip
+    > easy_install pip
+- virtualenv and virtualenvwrapper modules for your python 2.7 installation
+    > easy_install --upgrade virtualenv
+    > easy_install --upgrade virtualenvwrapper
+    Note: This may require Mac's XCode (use XCode 3.3 free version)
 
-Now setup a virtualenv with a command like the following (substitute your own name for "ion27"):
-    mkvirtualenv --no-site-packages --python=python2.7 ion27
-    workon ion27
+* Setup a virtualenv to for Pyon (use any name you like):
+    > mkvirtualenv --no-site-packages --python=python2.7 ion27
+    > workon ion27
+
 
 
 DEVELOPMENT TIME DEPENDENCIES
@@ -146,15 +145,15 @@ Start the CC with a process to execute and then quit:
 DEBUG
 =====
 
-Real-time debugging is possible with Pycharm. Start pycc from Pycharm.
-
+Real-time debugging is possible with Pycharm. Start pycc from Pycharm. Use the -n option to
+avoid the interactive ipython shell. It does not work property with the debugger.
 
 You will need to make sure the Pycharm debug egg is available in your path, something like:
 export PYTHONPATH=.:/Applications/PyCharm\ 1.5.2.app/pycharm-debug.egg
 
-Remote debugging of services in a running container is possible too. Setup a remote debugging configuration to use the localhost and port 8585.
-First start the remote debuging server, then start the container from the command line below ( the -n seems to be required )
-
+Remote debugging of services in a running container is possible too. Setup a remote debugging
+configuration to use the localhost and port 8585. First start the remote debuging server, then start the
+container from the command line below (the -n seems to be required)
     > bin/pyccd -n --rel res/deploy/r2services.yml
 
 
@@ -168,3 +167,4 @@ SEE ALSO
 ========
 
 https://confluence.oceanobservatories.org/x/ehdTAQ
+https://github.com/ooici/coi-services
