@@ -606,9 +606,10 @@ class RPCClient(RequestResponseClient):
         def svcmethod(self, *args, **kwargs):
             passkwargs = {}
             passkwargs.update(dict(zip(callargs, args)))    # map *args to their real kwarg names
+            headers = kwargs.pop('headers', None)           # pull headers off, cannot put this in the signature due to *args for ordering
             passkwargs.update(kwargs)
             ionobj = IonObject(in_obj, **passkwargs)
-            return self.request(ionobj, op=name)
+            return self.request(ionobj, op=name, headers=headers)
 
         newmethod           = svcmethod
         newmethod.__doc__   = doc
