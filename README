@@ -142,18 +142,30 @@ Start the CC with a deploy file:
 Start the CC with a process to execute and then quit:
     > bin/pycc --proc examples.service.hello_service.HelloService
 
+Command line configuration options for pycc:
+    Use a different message broker:
+    > bin/pycc server.amqp.host=amoeba.ucsd.edu
+
+    Use a different database server:
+    > bin/pycc server.couchdb.host=amoeba.ucsd.edu
+
+    Set the container's system name:
+    > bin/pycc system.name=MINE
+
+
 DEBUG
 =====
 
-Real-time debugging is possible with Pycharm. Start pycc from Pycharm. Use the -n option to
-avoid the interactive ipython shell. It does not work property with the debugger.
+USE Pycharm or any other Python IDE to debug; breakpoints and step-by-step are possible.
+Set the executable to the bin/pycc and set the working directory to the repository root.
+Use the -n option to avoid the interactive ipython shell. It does not work property with the debugger.
 
 You will need to make sure the Pycharm debug egg is available in your path, something like:
-export PYTHONPATH=.:/Applications/PyCharm\ 1.5.2.app/pycharm-debug.egg
+    > export PYTHONPATH=.:/Applications/PyCharm\ 1.5.2.app/pycharm-debug.egg
 
 Remote debugging of services in a running container is possible too. Setup a remote debugging
-configuration to use the localhost and port 8585. First start the remote debuging server, then start the
-container from the command line below (the -n seems to be required)
+configuration to use the localhost and port 8585. First start the remote debuging server, then
+start the container from the command line below (the -n seems to be required)
     > bin/pyccd -n --rel res/deploy/r2services.yml
 
 
@@ -165,6 +177,13 @@ Make sure to look in the examples directory for a README and examples.
 
 SEE ALSO
 ========
+
+https://confluence.oceanobservatories.org/display/CIDev/ION+R2+Development
+https://confluence.oceanobservatories.org/display/CIDev/R2+Container+Use+Guide
+https://confluence.oceanobservatories.org/display/CIDev/R2+Development+Conventions
+https://confluence.oceanobservatories.org/display/CIDev/R2+Resource+Development+Guide
+https://confluence.oceanobservatories.org/display/CIDev/R2+Service+Implementation+Guide
+https://confluence.oceanobservatories.org/display/CIDev/R2+Service+Testing+Guide
 
 https://confluence.oceanobservatories.org/x/ehdTAQ
 https://github.com/ooici/coi-services

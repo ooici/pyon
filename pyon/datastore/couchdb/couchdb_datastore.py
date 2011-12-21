@@ -26,15 +26,27 @@ class CouchDB_DataStore(DataStore):
     """
     couchdb_views = get_couchdb_views('all')
 
-    def __init__(self, host=None, port=5984, datastore_name='prototype', options=""):
-        log.debug('host %s port %d data store name %s options %s' % (host, port, datastore_name, options))
+    def __init__(self, host=None, port=None, datastore_name='prototype', options=""):
+        log.debug('host %s port %s data store name %s options %s' % (host, port, datastore_name, options))
         try:
             self.host = host or CFG.server.couchdb.host
         except AttributeError:
             self.host = 'localhost'
-        self.port = port
+        try:
+            self.port = port or CFG.server.couchdb.port
+        except AttributeError:
+            self.port = 5984
         self.datastore_name = datastore_name
-        connection_str = "http://%s:%s" % (self.host, self.port)
+        self.auth_str = ""
+        try:
+            if CFG.server.couchdb.username and CFG.server.couchdb.password:
+                self.auth_str = "%s:%s@" % (CFG.server.couchdb.username, CFG.server.couchdb.password)
+                log.debug("Using username:password authentication to connect to datastore")
+        except AttributeError:
+            log.error("CouchDB username:password not configured correctly. Trying anonymous...")
+
+        connection_str = "http://%s%s:%s" % (self.auth_str, self.host, self.port)
+        # TODO: Security risk to emit password into log. Remove later.
         log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
