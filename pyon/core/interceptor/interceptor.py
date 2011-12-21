@@ -17,6 +17,8 @@ class Invocation(object):
         self.message = kwargs.get('message')
         self.headers = kwargs.get('headers') or {}  # ensure dict
 
+        self.message_annotations = {}
+
 class Interceptor(object):
     """
     Basic interceptor model.
