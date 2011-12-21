@@ -100,7 +100,7 @@ class EndpointUnit(object):
         new_msg     = inv_prime.message
         new_headers = inv_prime.headers
 
-        self.message_received(new_msg, new_headers)
+        return self.message_received(new_msg, new_headers)
 
     def _intercept_msg_in(self, inv):
         """
@@ -472,7 +472,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         EndpointUnit._send(self, msg, headers=headers)
 
-        result_data, result_headers = self.response_queue.get()#timeout=CFG.endpoint.receive.timeout)
+        result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
@@ -633,6 +633,22 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         ResponseEndpointUnit.__init__(self)
         self._routing_obj = routing_obj
 
+    def _message_received(self, msg, headers):
+        """
+        Internal _message_received override.
+
+        We need to be able to detect IonExceptions raised in the Interceptor stacks as well as in the actual
+        call to the op we're routing into. This override will handle the return value being sent to the caller.
+        """
+        result = None
+        try:
+            result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
+        except exception.IonException as ex:
+            log.debug("Got error response")
+            response_headers = self._create_error_response(ex)
+
+        return self.send(result, response_headers)
+
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
 
@@ -643,9 +659,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         # op name must exist!
         if not hasattr(self._routing_obj, cmd_op):
-            response_headers = self._create_error_response(exception.BadRequest("Unknown op name: %s" % cmd_op))
-            self.send(None, response_headers)
-            return
+            raise exception.BadRequest("Unknown op name: %s" % cmd_op)
 
         ro_meth     = getattr(self._routing_obj, cmd_op)
 
@@ -658,11 +672,8 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         except TypeError as ex:
             log.exception("TypeError while attempting to call routing object's method")
             response_headers = self._create_error_response(exception.ServerError(ex.message))
-        except exception.IonException as ex:
-            log.debug("Got error response")
-            response_headers = self._create_error_response(ex)
 
-        self.send(result, response_headers)
+        return result, response_headers
 
     def _create_error_response(self, ex):
         return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
@@ -793,14 +804,14 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
         self._process = process
         assert process
 
-    def message_received(self, msg, headers):
+    def _message_received(self, msg, headers):
         """
         Message received override.
 
-        Sets the process' context here to be picked up by subsequent calls out by this service to other services.
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
         """
         with self._process.push_context(headers):
-            return RPCResponseEndpointUnit.message_received(self, msg, headers)
+            return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.core.interceptor.interceptor import Invocation
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -79,6 +80,23 @@ class TestEndpointUnit(PyonTestCase):
 #        self.assertTrue(msg.has_key('payload'))
 #        self.assertTrue(isinstance(msg['header'], dict))
 #        self.assertEquals(fakemsg, msg['payload'])
+
+    def test__message_received(self):
+        self._endpoint_unit._build_invocation = Mock()
+        self._endpoint_unit._intercept_msg_in = Mock()
+        self._endpoint_unit.message_received  = Mock()
+        self._endpoint_unit.message_received.return_value = sentinel.msg_return
+
+
+        retval = self._endpoint_unit._message_received(sentinel.msg, sentinel.headers)
+
+        self.assertEquals(retval, sentinel.msg_return)
+
+        self._endpoint_unit._build_invocation.assert_called_once_with(path=Invocation.PATH_IN,
+                                                                      message=sentinel.msg,
+                                                                      headers=sentinel.headers)
+        self.assertTrue(self._endpoint_unit._intercept_msg_in.called)
+        self.assertTrue(self._endpoint_unit.message_received.called)
 
 @attr('UNIT')
 class TestBaseEndpoint(PyonTestCase):
@@ -385,6 +403,41 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
         # test to make sure send got called with our error
         ch.send.assert_called_once_with(None, {'status_code':500, 'error_message':'simple() got an unexpected keyword argument \'not_named\''})
+
+    def test__message_received_interceptor_exception(self):
+        e = RPCResponseEndpointUnit(routing_obj=self)
+        e.send = Mock()
+        e.send.return_value = sentinel.sent
+        with patch('pyon.net.endpoint.ResponseEndpointUnit._message_received', new=Mock(side_effect=exception.IonException)):
+            retval = e._message_received(sentinel.msg, sentinel.headers)
+
+            self.assertEquals(retval, sentinel.sent)
+            e.send.assert_called_once_with(None, {'status_code': -1, 'error_message':''})
+
+    def error_op(self):
+        """
+        Routing method for next test, raises an IonException.
+        """
+        raise exception.Unauthorized(sentinel.unauth)
+
+    def test__message_received_error_in_op(self):
+        # we want to make sure IonExceptions raised in business logic get a response, now that
+        # _message_received sends the responses
+
+        class FakeMsg(object):
+            pass
+        cvalue = FakeMsg()
+
+        e = RPCResponseEndpointUnit(routing_obj=self)
+        ch = self._setup_mock_channel(value=cvalue, op="error_op")
+        e.attach_channel(ch)
+
+        e.send = Mock()
+
+        e.spawn_listener()
+        e._recv_greenlet.join()
+
+        e.send.assert_called_once_with(None, {'status_code': 401, 'error_message': sentinel.unauth})
 
 
 @attr('UNIT')
