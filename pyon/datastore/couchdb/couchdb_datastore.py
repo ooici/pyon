@@ -46,6 +46,7 @@ class CouchDB_DataStore(DataStore):
             log.error("CouchDB username:password not configured correctly. Trying anonymous...")
 
         connection_str = "http://%s%s:%s" % (self.auth_str, self.host, self.port)
+        #connection_str = "http://%s:%s" % (self.host, self.port)
         # TODO: Security risk to emit password into log. Remove later.
         log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
