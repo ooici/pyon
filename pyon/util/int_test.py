@@ -7,6 +7,7 @@ import unittest
 
 from pyon.container.cc import Container
 from pyon.core.bootstrap import bootstrap_pyon
+from mock import patch
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
@@ -45,3 +46,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
+
+    def _turn_on_queue_auto_delete(self):
+        patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
