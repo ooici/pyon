@@ -21,7 +21,6 @@ def construct_ordered_mapping(self, node, deep=False):
         mapping[key] = value
     return mapping
 
-yaml.constructor.BaseConstructor.construct_mapping = construct_ordered_mapping
 
 
 def construct_yaml_map_with_ordered_dict(self, node):
@@ -30,9 +29,6 @@ def construct_yaml_map_with_ordered_dict(self, node):
     value = self.construct_mapping(node)
     data.update(value)
 
-yaml.constructor.Constructor.add_constructor(
-        'tag:yaml.org,2002:map',
-        construct_yaml_map_with_ordered_dict)
 
 
 def represent_ordered_mapping(self, tag, mapping, flow_style=None):
@@ -58,7 +54,22 @@ def represent_ordered_mapping(self, tag, mapping, flow_style=None):
             node.flow_style = best_style
     return node
 
-yaml.representer.BaseRepresenter.represent_mapping = represent_ordered_mapping
 
-yaml.representer.Representer.add_representer(collections.OrderedDict,
+def apply_yaml_patch():
+    """
+    This function applies a monkey patch to the current YAML library, so that
+    it returns OrderedDict instead of dict
+    """
+    if yaml.constructor.BaseConstructor.construct_mapping == construct_ordered_mapping:
+        return
+
+    yaml.constructor.BaseConstructor.construct_mapping = construct_ordered_mapping
+
+    yaml.constructor.Constructor.add_constructor(
+        'tag:yaml.org,2002:map',
+        construct_yaml_map_with_ordered_dict)
+
+    yaml.representer.BaseRepresenter.represent_mapping = represent_ordered_mapping
+
+    yaml.representer.Representer.add_representer(collections.OrderedDict,
         yaml.representer.SafeRepresenter.represent_dict)

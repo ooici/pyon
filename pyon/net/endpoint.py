@@ -16,6 +16,7 @@ from pyon.util.log import log
 
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
+# Note: This is now called from pyon.core.bootstrap
 def instantiate_interceptors(interceptor_cfg):
     stack = interceptor_cfg["stack"]
     defs = interceptor_cfg["interceptors"]
@@ -44,8 +45,6 @@ def instantiate_interceptors(interceptor_cfg):
                 by_name_dict[name] = classinst
 
             interceptors[type_and_direction].append(classinst)
-
-instantiate_interceptors(CFG.interceptor)
 
 class EndpointUnit(object):
     """
