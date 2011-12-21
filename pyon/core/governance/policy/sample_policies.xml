@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Policy xmlns="urn:oasis:names:tc:xacml:2.0:policy:schema:os"
+    xmlns:xacml-context="urn:oasis:names:tc:xacml:2.0:context:schema:os"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="urn:oasis:names:tc:xacml:2.0:policy:schema:os http://docs.oasis-open.org/xacml/access_control-xacml-2.0-policy-schema-os.xsd"
+    xmlns:xf="http://www.w3.org/TR/2002/WD-xquery-operators-20020816/#"
+    xmlns:md="http:www.med.example.com/schemas/record.xsd"
+    PolicyId="urn:oasis:names:tc:xacml:2.0:example:policyid:1"
+    RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:deny-overrides">
+    <PolicyDefaults>
+        <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
+    </PolicyDefaults>
+    
+    <Target>
+        
+        <Subjects>
+            <Subject>
+                <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ooi</AttributeValue>
+                     <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-qualifier" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                </SubjectMatch>
+            </Subject>
+        </Subjects>
+        <!--
+        <Resources>
+            <Resource>
+                <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
+                     <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                </ResourceMatch>
+            </Resource>
+        </Resources>
+
+        -->
+    </Target>
+
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
+        <Description>
+            Only all shenrie to access this resource
+        </Description>
+        <!--
+
+        <Target>
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+-->
+        
+        <Condition>
+
+
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                        <SubjectAttributeDesignator
+                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
+                            DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </Apply>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">shenrie</AttributeValue>
+                </Apply>
+
+        </Condition>
+    </Rule>
+
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Deny">
+        <Description>
+            anonymous cannot access this service
+        </Description>
+<!--
+        <Target>
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+-->
+        <Condition>
+
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                        <SubjectAttributeDesignator
+                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
+                            DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </Apply>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                </Apply>
+
+
+
+        </Condition>
+    </Rule>
+
+
+
+</Policy>

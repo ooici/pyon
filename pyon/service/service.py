@@ -92,10 +92,12 @@ class BaseService(LocalContextMixin):
             raise BadRequest(errorstr)
 
     def __str__(self):
+        proc_name = 'Unknown proc_name' if self._proc_name is None else self._proc_name
+        proc_type = 'Unknown proc_type' if self._proc_type is None else self._proc_type
         return "".join((self.__class__.__name__,"(",
-                        "name=", self._proc_name,
+                        "name=", proc_name,
                         ",id=", self.id,
-                        ",type=", self._proc_type,
+                        ",type=", proc_type,
                         ")"))
 
 class MultiService():
