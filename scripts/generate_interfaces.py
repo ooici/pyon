@@ -147,7 +147,7 @@ ${methods}
         ${methoddocstring}
         return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers)
 ''',
-    'obj_arg': "'${name}': ${name}",
+    'obj_arg': "'${name}': ${name} or ${default}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
     def __init__(self, name=None, node=None, **kwargs):
@@ -375,8 +375,20 @@ def generate_service(interface_file, svc_def, client_defs, opts):
         class_methods.append(templates['method'].substitute(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
 
         clientobjargs = ''
+
+        def _get_default(v):
+            if type(v) is str:
+                return "'%s'" % v
+            elif type(v) in (int, long, float):
+                return str(v)
+            elif type(v) is bool:
+                return "True" if v else "False"
+            else:
+                return "None"
+            # TODO: list, dict, object etc
         if def_in:
-            all_client_obj_args = [client_templates['obj_arg'].substitute(name=k) for k in def_in]
+            d = "''"
+            all_client_obj_args = [client_templates['obj_arg'].substitute(name=k, default=_get_default(v)) for k,v in def_in.iteritems()]
             clientobjargs       = ",".join(all_client_obj_args)
 
         # determine object in name: follows <ServiceName>_<MethodName>_in
