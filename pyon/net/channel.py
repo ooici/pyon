@@ -174,24 +174,11 @@ class SendChannel(BaseChannel):
         log.debug("SendChannel.send")
         self._send(self._send_name, data, headers=headers)
 
-    def _send(self, name, data, headers=None,
-                                content_type=None,
-                                content_encoding=None,
-                                message_type=None,
-                                reply_to=None,
-                                correlation_id=None,
-                                message_id=None):
-
+    def _send(self, name, data, headers=None):
         log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
         exchange, routing_key = name
         headers = headers or {}
-        props = BasicProperties(headers=headers,
-                            content_type=content_type,
-                            content_encoding=content_encoding,
-                            type=message_type,
-                            reply_to=reply_to,
-                            correlation_id=correlation_id,
-                            message_id=message_id)
+        props = BasicProperties(headers=headers)
 
         self._amq_chan.basic_publish(exchange=exchange, #todo
                                 routing_key=routing_key, #todo
@@ -398,12 +385,8 @@ class RecvChannel(BaseChannel):
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
 
-        # merge down "user" headers with amqp headers
-        headers = header_frame.__dict__
-        headers.update(header_frame.headers)
-
         # put body, headers, delivery tag (for acking) in the recv queue
-        self._recv_queue.put((body, headers, delivery_tag))  # and more
+        self._recv_queue.put((body, header_frame.headers, delivery_tag))
 
     def ack(self, delivery_tag):
         """
@@ -434,27 +417,20 @@ class BidirClientChannel(SendChannel, RecvChannel):
     _queue_auto_delete  = True
     _consumer_exclusive = True
 
-    def _send(self, name, data, headers=None,
-                                content_type=None,
-                                content_encoding=None,
-                                message_type=None,
-                                reply_to=None,
-                                correlation_id=None,
-                                message_id=None):
+    def _send(self, name, data, headers=None):
         """
         Override of internal send method.
-        Sets reply_to/message_type if not set as a kwarg.
+        Sets reply-to ION level header. (we don't use AMQP if we can avoid it)
         """
-        reply_to        = reply_to or "%s,%s" % self._recv_name
-        message_type    = message_type or "rr-data"
+        if headers:
+            headers = headers.copy()
+        else:
+            headers = {}
 
-        SendChannel._send(self, name, data, headers=headers,
-                                            content_type=content_type,
-                                            content_encoding=content_encoding,
-                                            message_type=message_type,
-                                            reply_to=reply_to,
-                                            correlation_id=correlation_id,
-                                            message_id=message_id)
+        if not 'reply-to' in headers:
+            headers['reply-to'] = "%s,%s" % self._recv_name
+
+        SendChannel._send(self, name, data, headers=headers)
 
 class ListenChannel(RecvChannel):
     """
@@ -504,7 +480,7 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = tuple(msg[1].get('reply_to').split(','))        # @TODO: this seems very wrong
+        send_name = tuple(msg[1].get('reply-to').split(','))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel()
         ch.attach_underlying_channel(amq_chan)
         ch._send_name = send_name

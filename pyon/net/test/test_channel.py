@@ -415,10 +415,9 @@ class TestRecvChannel(PyonTestCase):
         m.exchange      = sentinel.exchange
         m.routing_key   = sentinel.routing_key
 
-        # mock up the headers (they get merged down)
+        # mock up the header-frame
         h = Mock()
-        h.this_exists = sentinel.exists
-        h.headers = { 'this_also_exists': sentinel.also_exists }
+        h.headers = { 'this_exists': sentinel.exists }
 
         # use a mock for the recv queue
         rqmock = Mock(spec=queue.Queue)
@@ -427,16 +426,11 @@ class TestRecvChannel(PyonTestCase):
         # now we can call!
         self.ch._on_deliver(sentinel.chan, m, h, sentinel.body)
 
-        # build what we expect from the header merging (is this proper?)
-        headers = h.__dict__
-        headers.update(h.headers)
-
         # assert the call
-        rqmock.put.assert_called_once_with((sentinel.body, headers, sentinel.delivery_tag))
+        rqmock.put.assert_called_once_with((sentinel.body, h.headers, sentinel.delivery_tag))
 
         # assert the headers look ok
         self.assertIn(sentinel.exists, rqmock.put.call_args[0][0][1].itervalues())
-        self.assertIn(sentinel.also_exists, rqmock.put.call_args[0][0][1].itervalues())
 
     def test_ack(self):
         ac = Mock(spec=pchannel.Channel)
@@ -483,21 +477,14 @@ class TestBidirClientChannel(PyonTestCase):
 
     def test__send_with_reply_to(self, mocksendchannel):
 
-        self.ch._send(sentinel.name, sentinel.data, headers=sentinel.headers,
-                                                    content_type=sentinel.content_type,
-                                                    content_encoding=sentinel.content_encoding,
-                                                    message_type=sentinel.message_type,
-                                                    reply_to=(sentinel.xp_replyto, sentinel.queue_replyto),
-                                                    correlation_id=sentinel.correlation_id,
-                                                    message_id=sentinel.message_id)
+        self.ch._recv_name = (sentinel.xp, sentinel.queue)
 
-        mocksendchannel._send.assert_called_with(self.ch, sentinel.name, sentinel.data, headers=sentinel.headers,
-                                                                               content_type=sentinel.content_type,
-                                                                               content_encoding=sentinel.content_encoding,
-                                                                               message_type=sentinel.message_type,
-                                                                               reply_to=(sentinel.xp_replyto, sentinel.queue_replyto),
-                                                                               correlation_id=sentinel.correlation_id,
-                                                                               message_id=sentinel.message_id)
+        self.ch._send(sentinel.name, sentinel.data, headers={sentinel.header_key: sentinel.header_value})
+
+        mocksendchannel._send.assert_called_with(self.ch,
+                                                 sentinel.name,
+                                                 sentinel.data,
+                                                 headers={sentinel.header_key: sentinel.header_value, 'reply-to': '%s,%s' % (sentinel.xp, sentinel.queue)})
 
 
     def test__send_with_no_reply_to(self, mocksendchannel):
@@ -507,13 +494,7 @@ class TestBidirClientChannel(PyonTestCase):
 
         self.ch._send(sentinel.name, sentinel.data)
 
-        mocksendchannel._send.assert_called_with(self.ch, sentinel.name, sentinel.data, headers=None,
-                                                                               content_type=None,
-                                                                               content_encoding=None,
-                                                                               message_type='rr-data',
-                                                                               reply_to="%s,%s" % self.ch._recv_name,
-                                                                               correlation_id=None,
-                                                                               message_id=None)
+        mocksendchannel._send.assert_called_with(self.ch, sentinel.name, sentinel.data, headers={'reply-to':"%s,%s" % self.ch._recv_name})
 
 @attr('UNIT')
 class TestListenChannel(PyonTestCase):
@@ -555,7 +536,7 @@ class TestServerChannel(PyonTestCase):
         ch = ServerChannel()
 
         # this is not all that great
-        msg = [None, {'reply_to':'one,two'}]
+        msg = [None, {'reply-to':'one,two'}]
 
         newch = ch._create_accepted_channel(sentinel.amq_chan, msg)
 
