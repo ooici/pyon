@@ -8,6 +8,7 @@ from pyon.container.apps import AppManager
 from pyon.core.path import resolve
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
+from nose.plugins.attrib import attr
 
 class FakeContainer(object):
     def __init__(self):
@@ -18,6 +19,7 @@ class SampleProcess(BaseService):
     name = 'sample'
     dependencies = []
 
+@attr('INT')
 class TestAppManager(IonIntegrationTestCase):
 
     def test_appmanager_iso(self):

@@ -7,6 +7,7 @@ from unittest import SkipTest
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
+from nose.plugins.attrib import attr
 
 class FakeContainer(object):
     def __init__(self):
@@ -17,6 +18,7 @@ class SampleProcess(BaseService):
     name = 'sample'
     dependencies = []
 
+@attr('INT')
 class TestProcManager(IonIntegrationTestCase):
 
     def test_procmanager_iso(self):
