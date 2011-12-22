@@ -1,46 +1,31 @@
 from pyon.core.interceptor.interceptor import Interceptor, walk
-from pyon.core.bootstrap import IonObject
-from pyon.core.object import IonObjectBase
+from pyon.core.bootstrap import obj_registry
+from pyon.core.object import IonObjectBase, IonObjectDeserializer, IonObjectSerializer
 from pyon.util.log import log
 
 class CodecInterceptor(Interceptor):
     """
     Transforms IonObject <-> dict
     """
+    def __init__(self):
+        Interceptor.__init__(self)
+        self._io_serializer = IonObjectSerializer()
+        self._io_deserializer = IonObjectDeserializer(obj_registry=obj_registry)
+
     def outgoing(self, invocation):
         log.debug("CodecInterceptor.outgoing: %s", invocation)
 
-        payload = invocation.message
-        log.debug("Payload, pre-transform: %s", payload)
+        log.debug("Payload, pre-transform: %s", invocation.message)
+        invocation.message = self._io_serializer.serialize(invocation.message)
+        log.debug("Payload, post-transform: %s", invocation.message)
 
-        def translate_ionobj(obj):
-            if isinstance(obj, IonObjectBase):
-                res = obj.__dict__
-                res["__isAnIonObject"] = obj._def.type.name
-                return res
-            return obj
-
-        payload = walk(payload, translate_ionobj)
-        invocation.message = payload
-
-        log.debug("Payload, post-transform: %s", payload)
         return invocation
 
     def incoming(self, invocation):
         log.debug("CodecInterceptor.incoming: %s", invocation)
 
-        payload = invocation.message
-        log.debug("Payload, pre-transform: %s", payload)
+        log.debug("Payload, pre-transform: %s", invocation.message)
+        invocation.message = self._io_deserializer.deserialize(invocation.message)
+        log.debug("Payload, post-transform: %s", invocation.message)
 
-        def untranslate_ionobj(obj):
-            if isinstance(obj, dict) and "__isAnIonObject" in obj:
-                type = obj.pop("__isAnIonObject")
-                ionObj = IonObject(type.encode('ascii'), obj)
-                return ionObj
-            return obj
-
-        payload = walk(payload, untranslate_ionobj)
-        invocation.message = payload
-
-        log.debug("Payload, post-transform: %s", payload)
         return invocation

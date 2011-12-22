@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+
+__author__ = 'Dave Foster <dfoster@asascience.com>, Thomas R. Lennan'
+__license__ = 'Apache 2.0'
 
 class Invocation(object):
     """
@@ -48,16 +52,13 @@ def walk(o, cb):
 
     @TODO move to a general utils area?
     """
-    if hasattr(o, '__iter__'):
-        newo = cb(o)
+    newo = cb(o)
 
-        # still an iterable? iterate it.
-        if hasattr(newo, '__iter__'):
-            if isinstance(newo, dict):
-                return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
-            else:
-                return [walk(x, cb) for x in newo]
+    # is now or is still an iterable? iterate it.
+    if hasattr(newo, '__iter__'):
+        if isinstance(newo, dict):
+            return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
         else:
-            return newo
+            return [walk(x, cb) for x in newo]
     else:
-        return cb(o)
+        return newo

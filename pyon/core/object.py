@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.core.interceptor.interceptor import walk
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -426,4 +427,66 @@ class IonServiceRegistry(IonObjectRegistry):
                     self.services_by_name[svc_def.name] = svc_def
 
         return obj_defs
+
+class IonObjectSerializationBase(object):
+    """
+    Base serialization class for serializing/deserializing IonObjects.
+
+    Provides the operate method, which walks and applies a transform method. The operate method is
+    renamed serialize/deserialize in derived classes.
+
+    At this base level, the _transform method is undefined - you must pass one in. Using
+    IonObjectSerializer or IonObjectDeserializer defines them for you.
+    """
+    def __init__(self, transform_method=None, **kwargs):
+        self._transform_method  = transform_method or self._transform
+
+    def operate(self, obj):
+        return walk(obj, self._transform_method)
+
+    def _transform(self, obj):
+        raise NotImplementedError("Implement _transform in a derived class")
     
+class IonObjectSerializer(IonObjectSerializationBase):
+    """
+    Serializer for IonObjects.
+
+    Defines a _transform method to turn IonObjects into dictionaries to be deserialized by
+    an IonObjectDeserializer.
+
+    Used by the codec interceptor and when being written to CouchDB.
+    """
+
+    serialize = IonObjectSerializationBase.operate
+
+    def _transform(self, obj):
+        if isinstance(obj, IonObjectBase):
+            res = obj.__dict__
+            res["type_"] = obj._def.type.name
+            return res
+        return obj
+
+class IonObjectDeserializer(IonObjectSerializationBase):
+    """
+    Deserializer for IonObjects.
+
+    Defines a _transform method to transform dictionaries produced by IonObjectSerializer back
+    into IonObjects. You *MUST* pass an object registry
+    """
+
+    deserialize = IonObjectSerializationBase.operate
+
+    def __init__(self, transform_method=None, obj_registry=None, **kwargs):
+        assert obj_registry
+        self._obj_registry = obj_registry
+        IonObjectSerializationBase.__init__(self, transform_method=transform_method)
+
+    def _transform(self, obj):
+        if isinstance(obj, dict) and "type_" in obj:
+            objc    = obj.copy()
+            type    = objc.pop('type_')
+            ionObj  = self._obj_registry.new(type.encode('ascii'), objc)
+            return ionObj
+        return obj
+
+
