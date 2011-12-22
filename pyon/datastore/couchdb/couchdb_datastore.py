@@ -8,7 +8,8 @@ from uuid import uuid4
 import couchdb
 from couchdb.http import ResourceConflict, ResourceNotFound
 
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import obj_registry
+from pyon.core.object import IonObjectSerializer, IonObjectDeserializer
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
@@ -50,6 +51,10 @@ class CouchDB_DataStore(DataStore):
         # TODO: Security risk to emit password into log. Remove later.
         log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
+
+        # serializers
+        self._io_serializer     = IonObjectSerializer()
+        self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
 
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:
@@ -711,14 +716,13 @@ class CouchDB_DataStore(DataStore):
 
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
-        obj_dict = ion_object.__dict__.copy()
-        obj_dict["type_"] = ion_object._def.type.name
+
+        obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
         if obj_dict is None: return None
-        init_dict = obj_dict.copy()
-        type = init_dict.pop("type_")
-        ion_object = IonObject(type, init_dict)
+
+        ion_object = self._io_deserializer.deserialize(obj_dict)
         return ion_object
 
