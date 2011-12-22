@@ -60,8 +60,8 @@ def apply_yaml_patch():
     This function applies a monkey patch to the current YAML library, so that
     it returns OrderedDict instead of dict
     """
-    if yaml.constructor.BaseConstructor.construct_mapping == construct_ordered_mapping:
-        return
+    #if yaml.constructor.BaseConstructor.construct_mapping == construct_ordered_mapping:
+    #    return
 
     yaml.constructor.BaseConstructor.construct_mapping = construct_ordered_mapping
 
@@ -73,3 +73,5 @@ def apply_yaml_patch():
 
     yaml.representer.Representer.add_representer(collections.OrderedDict,
         yaml.representer.SafeRepresenter.represent_dict)
+
+apply_yaml_patch()

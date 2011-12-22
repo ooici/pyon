@@ -84,7 +84,8 @@ def bootstrap_pyon():
 
     # YAML patch: OrderedDicts instead of dicts
     from pyon.util.yaml_ordered_dict import apply_yaml_patch
-    apply_yaml_patch()
+    # OK the following does not work (early enough??)!!!!
+    #apply_yaml_patch()
 
     # Objects
     populate_registry()
