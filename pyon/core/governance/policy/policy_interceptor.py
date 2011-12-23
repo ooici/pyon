@@ -45,7 +45,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #Annonate the message has completed policy checking
         invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
 
-        if ret != Decision.PERMIT:
+        if ret == Decision.DENY:
             self.policy_denied_message(invocation)
 
         return invocation
