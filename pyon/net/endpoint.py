@@ -603,11 +603,9 @@ class RPCClient(RequestResponseClient):
         schema.
         """
         def svcmethod(self, *args, **kwargs):
-            passkwargs = {}
-            passkwargs.update(dict(zip(callargs, args)))    # map *args to their real kwarg names
+            assert len(args)==0, "You MUST used named keyword args when calling a dynamically generated remote method"      # we have no way of getting correct order
             headers = kwargs.pop('headers', None)           # pull headers off, cannot put this in the signature due to *args for ordering
-            passkwargs.update(kwargs)
-            ionobj = IonObject(in_obj, **passkwargs)
+            ionobj = IonObject(in_obj, **kwargs)
             return self.request(ionobj, op=name, headers=headers)
 
         newmethod           = svcmethod

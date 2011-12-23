@@ -338,10 +338,14 @@ class TestRPCClient(PyonTestCase, RecvMockMixin):
 
         self.assertTrue(hasattr(rpcc, 'simple'))
 
-        ret = rpcc.simple("zap", "zip")
+        ret = rpcc.simple(one="zap", two="zip")
 
         iomock.assert_called_once_with('SimpleInterface_simple_in', one='zap', two='zip')
         self.assertEquals(ret, "bidirmsg")
+
+    def test_rpc_client_with_unnamed_args(self):
+        rpcc = RPCClient(name="simply", iface=ISimpleInterface)
+        self.assertRaises(AssertionError, rpcc.simple, "zap", "zip")
 
 @attr('UNIT')
 class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
