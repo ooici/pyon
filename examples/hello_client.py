@@ -14,12 +14,16 @@ class FakeProcess(LocalContextMixin):
 def hello_client(container, user_id='anonymous', org_id='no-ooi'):
 
    # client = ProcessRPCClient(node=container.node, name="hello", iface=IHelloService,  process=FakeProcess())
-    client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
-    ret = client.hello(" initial text sent is 123 ", headers={'ion-user-id': user_id, 'ion-org-id': org_id})
+    try:
+        client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
-    print "Returned: " + str(ret)
-    
+        ret = client.hello(" initial text sent is 123 ", headers={'ion-user-id': user_id, 'ion-org-id': org_id})
+
+        print "Returned: " + str(ret)
+    except Exception, e:
+        print "client.hello() failed: " + e.message
+
 
 
 if __name__ == '__main__':
