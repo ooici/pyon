@@ -17,12 +17,14 @@ import yaml
 import hashlib
 import argparse
 
+from collections import OrderedDict
+from pyon.core.object import IonServiceRegistry
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
 from pyon.util.containers import named_any
 
 # Do not remove any of the imports below this comment!!!!!!
-from pyon.core.object import IonYamlLoader, service_name_from_file_name
+from pyon.core.object import IonYamlDumper, IonYamlLoader, service_name_from_file_name
 from pyon.util import yaml_ordered_dict
 
 class IonServiceDefinitionError(Exception):
@@ -43,6 +45,7 @@ from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
+import interface.data.data_model
 from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient, ProcessRPCClient
@@ -474,6 +477,268 @@ def doc_tag_constructor(loader, node):
 
     object_references[str(node.tag[1:])]=str(node.start_mark)
     return {}
+#
+#def enum_constructor(loader, node):
+#    value = loader.construct_scalar(node)
+#    value_str = value.replace('(','{').replace(')','}').replace('=',':')
+#    value_dict = ast.literal_eval(value_str)
+#    print "XXXXXXXXXXXX value_dict: " + str(value_dict)
+#    return type(value_dict["_typename"], (), {'value_str': value_str, 'value_dict': value_dict})
+
+def load_mods(path, interfaces):
+    import pkgutil
+    import string
+    mod_prefix = string.replace(path, "/", ".")
+
+    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
+        if is_pkg:
+            load_mods(path+"/"+mod_name, interfaces)
+        else:
+            mod_qual = "%s.%s" % (mod_prefix, mod_name)
+            try:
+                named_any(mod_qual)
+            except Exception, ex:
+                print "Import module '%s' failed: %s" % (mod_qual, ex)
+                if not interfaces:
+                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
+
+def find_subtypes(clz):
+    res = []
+    for cls in clz.__subclasses__():
+        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
+        res.append(cls)
+    return res
+
+    
+def generate_data_objects():
+    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+    data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
+
+    service_yaml_files = list_files_recursive('obj/services', '*.yml')
+    service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
+
+    combined_yaml_text = data_yaml_text + "\n" + service_yaml_text
+
+    # Parse once looking for enum types
+    enums_by_name = {}
+    dataobject_output_text = "#!/usr/bin/env python\n\n# Enums\n"
+
+    for line in combined_yaml_text.split('\n'):
+        if '!enum ' in line:
+            # If stand alone enum type definition
+            tokens = line.split(':')
+            classname = tokens[0].strip()
+                    
+            enum_def = tokens[1].strip(' )').replace('!enum (', '')
+            if 'name' in enum_def:
+                name_str = enum_def.split(',', 1)[0]
+                name_val = name_str.split('=')[1].strip()
+                if line[0].isalpha():
+                    assert line.startswith(name_val + ':'), "enum name/class name mismatch %s/%s" % (classname, name_val)
+            else:
+                name_str = ''
+                name_val = classname
+            default_str = enum_def.rsplit(',', 1)[1]
+            default_val = default_str.split('=')[1].strip()
+            value_str = enum_def.replace(name_str, '').replace(default_str, '').strip(', ')
+            value_val = value_str.split('=')[1].replace(' ', '').strip('()').split(',')
+            assert name_val not in enums_by_name, "enum with type name %s redefined" % name_val
+            enums_by_name[name_val] = {"values": value_val, "default": default_val}
+
+            dataobject_output_text += "\ndef " + name_val + "():\n"
+            i = 1
+            for val in value_val:
+                dataobject_output_text += "    " + val + " = " + str(i) + "\n"
+                i += 1
+
+    enum_tag = u'!enum'
+    def enum_constructor(loader, node):
+        val_str = str(node.value)
+        val_str = val_str[1:-1].strip()
+        if 'name' in val_str:
+            name_str = val_str.split(',', 1)[0]
+            name_val = name_str.split('=')[1].strip()
+            return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"]}
+
+        else:
+            return {"__IsEnum": True, "_NameNotProvided": True}
+    yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
+
+    defs = yaml.load_all(data_yaml_text, Loader=IonYamlLoader)
+    def_dict = {}
+    for def_set in defs:
+        for name,_def in def_set.iteritems():
+            if isinstance(_def, OrderedDict):
+                def_dict[name] = _def
+            tag = u'!%s' % (name)
+            def constructor(loader, node):
+                value = node.tag.strip('!')
+                # See if this is an enum ref
+                if value in enums_by_name:
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                else:
+                    return value + "()"
+            yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+            xtag = u'!Extends_%s' % (name)
+            def extends_constructor(loader, node):
+                if isinstance(node, yaml.MappingNode):
+                    value = loader.construct_mapping(node)
+                else:
+                    value = {}
+                return value
+            yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+    defs = yaml.load_all(service_yaml_text, Loader=IonYamlLoader)
+    for def_set in defs:
+        for name,_def in def_set.get('obj', {}).iteritems():
+            if isinstance(_def, OrderedDict):
+                def_dict[name] = _def
+            tag = u'!%s' % (name)
+            def constructor(loader, node):
+                value = node.tag.strip('!')
+                # See if this is an enum ref
+                if value in enums_by_name:
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                else:
+                    return value + "()"
+            yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+            xtag = u'!Extends_%s' % (name)
+            def extends_constructor(loader, node):
+                if isinstance(node, yaml.MappingNode):
+                    value = loader.construct_mapping(node)
+                else:
+                    value = {}
+                return value
+            yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+    dataobject_output_text += "\n\n# Data Objects\n"
+
+    def convert_val(value):
+        if isinstance(value, list):
+            outline = '['
+            first_time = True
+            for val in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += convert_val(val)
+            outline += ']'
+        elif isinstance(value, dict) and "__IsEnum" in value:
+            outline = value["value"]
+        elif isinstance(value, OrderedDict):
+            outline = '{'
+            first_time = True
+            for key in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += "'" + key + "': " + convert_val(value[key])
+            outline +=  '}'
+        elif isinstance(value, str):
+            outline = "'" + value + "'"
+        else:
+            outline = str(value)
+        return outline
+            
+    # process data object definition yaml first
+    current_class_def_dict = None
+    for line in data_yaml_text.split('\n'):
+        if line.isspace():
+            continue
+        elif line.startswith('  #'):
+            dataobject_output_text += '      ' + line + '\n'
+        elif line.startswith('  '):
+            if current_class_def_dict:
+                field = line.split(":")[0].strip()
+                try:
+                    value = current_class_def_dict[field]
+                except KeyError:
+                    # Ignore key error because value is nested
+                    continue
+                    
+                dataobject_output_text += '        self.' + field + " = " + convert_val(value) + "\n"
+        elif line and line[0].isalpha():
+            if '!enum' in line:
+                continue
+            dataobject_output_text += '\n'
+            current_class = line.split(":")[0]
+            try:
+                current_class_def_dict = def_dict[current_class]
+            except KeyError:
+                current_class_def_dict = None
+            super_class = "object"
+            if ': !Extends_' in line:
+                super_class = line.split("!Extends_")[1]
+                line = line.replace(': !Extends_','(')
+            else:
+                line = line.replace(':','(object')
+            dataobject_output_text += 'class ' + line + '):\n    def __init__(self):\n'
+            if super_class != "object":
+                dataobject_output_text += '        ' + super_class + ".__init__(self)\n"
+
+    # Now process service def yaml
+    lines = service_yaml_text.split('\n')
+    for index in range(1,len(lines)):
+        if lines[index].startswith('obj:'):
+            index += 1
+            while not lines[index].startswith('---'):
+                line = lines[index]
+                if line.isspace():
+                    index += 1
+                    continue
+                line = line.replace('  ', '', 1)
+                if line.startswith('  #'):
+                    dataobject_output_text += '  ' + line + '\n'
+                elif line.startswith('  '):
+                    if current_class_def_dict:
+                        field = line.split(":")[0].strip()
+                        try:
+                            value = current_class_def_dict[field]
+                        except KeyError:
+                            # Ignore key error because value is nested
+                            index += 1
+                            continue
+                    
+                        dataobject_output_text += '        self.' + field + " = " + convert_val(value) + "\n"
+                elif line and line[0].isalpha():
+                    if '!enum' in line:
+                        index += 1
+                        continue
+                    dataobject_output_text += '\n'
+                    current_class = line.split(":")[0]
+                    try:
+                        current_class_def_dict = def_dict[current_class]
+                    except KeyError:
+                        current_class_def_dict = None
+                    super_class = "object"
+                    if ': !Extends_' in line:
+                        super_class = line.split("!Extends_")[1]
+                        line = line.replace(': !Extends_','(')
+                    else:
+                        line = line.replace(':','(object')
+                    dataobject_output_text += 'class ' + line + '):\n    def __init__(self):\n'
+                    if super_class != "object":
+                        dataobject_output_text += '        ' + super_class + ".__init__(self)\n"
+                    
+                index += 1
+            
+    datadir = 'interface/data'
+    if not os.path.exists(datadir):
+        os.makedirs(datadir)
+        open(os.path.join(datadir, '__init__.py'), 'w').close()
+    datamodelfile = os.path.join(datadir, 'data_model.py')
+    try:
+        os.unlink(datamodelfile)
+    except:
+        pass
+    print "Writing data model to '" + datamodelfile + "'"
+    with open(datamodelfile, 'w') as f:
+        f.write(dataobject_output_text)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -502,6 +767,9 @@ def main():
         os.unlink(os.path.join(interface_dir, file))
         
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
+
+    # Generate data object definitions into python classes
+    generate_data_objects()
 
     yaml.add_constructor(u'!enum', lambda loader, node: {})
 
@@ -788,30 +1056,6 @@ def main():
         exitcode = 1
 
     sys.exit(exitcode)
-
-def load_mods(path, interfaces):
-    import pkgutil
-    import string
-    mod_prefix = string.replace(path, "/", ".")
-
-    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
-        if is_pkg:
-            load_mods(path+"/"+mod_name, interfaces)
-        else:
-            mod_qual = "%s.%s" % (mod_prefix, mod_name)
-            try:
-                named_any(mod_qual)
-            except Exception, ex:
-                print "Import module '%s' failed: %s" % (mod_qual, ex)
-                if not interfaces:
-                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
-
-def find_subtypes(clz):
-    res = []
-    for cls in clz.__subclasses__():
-        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
-        res.append(cls)
-    return res
 
 if __name__ == '__main__':
     main()
