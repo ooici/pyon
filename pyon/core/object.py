@@ -115,6 +115,19 @@ class IonObjectBase(object):
                         fields[key] = long(fields[key])
                         continue
 
+                # argh, annoying work around for OrderedDict vs dict issue
+                if type(field_val) == dict and type(schema_val) == OrderedDict:
+                     fields[key] = OrderedDict(field_val)
+                     continue
+
+                # optional fields ok?
+                if field_val is None:
+                    continue
+
+                # IonObjects are ok for dict fields too!
+                if isinstance(field_val, IonObjectBase) and type(schema_val) == OrderedDict:
+                    continue
+
                 # TODO work around for msgpack issue
                 if type(fields[key]) == tuple and type(schema[key]) == list:
                     continue
@@ -256,7 +269,7 @@ class IonObjectRegistry(object):
         typically be in YAML canonical form (for consistent hashing).
         """
 
-        log.debug('Registering object definition')
+        log.debug('Registering object definition: %s', name)
         if def_text is None:
             # TODO: Hook into pyyaml's event emitting stuff to try to get the canonical form without re-dumping
             def_text = yaml.dump(schema, canonical=True, allow_unicode=True, Dumper=IonYamlDumper)
