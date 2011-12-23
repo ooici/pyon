@@ -1,6 +1,6 @@
-from pyon.core.interceptor.interceptor import Interceptor, walk
+from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.bootstrap import obj_registry
-from pyon.core.object import IonObjectBase, IonObjectDeserializer, IonObjectSerializer
+from pyon.core.object import IonObjectDeserializer, IonObjectSerializer
 from pyon.util.log import log
 
 class CodecInterceptor(Interceptor):

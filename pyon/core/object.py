@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from pyon.core.interceptor.interceptor import walk
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -427,6 +426,43 @@ class IonServiceRegistry(IonObjectRegistry):
                     self.services_by_name[svc_def.name] = svc_def
 
         return obj_defs
+
+
+def walk(o, cb):
+    """
+    Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
+    You supply a callback which receives an object. That object may be an iterable (which will then be walked
+    after you return it, as long as it remains an iterable), or it may be another object inside of that.
+
+    If a dict is discovered, your callback will receive the dict as a whole and the contents of values only. Keys are left untouched.
+
+    @TODO move to a general utils area?
+    """
+    newo = cb(o)
+
+    # is now or is still an iterable? iterate it.
+    if hasattr(newo, '__iter__'):
+        if isinstance(newo, dict):
+            return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
+        else:
+            return [walk(x, cb) for x in newo]
+    elif isinstance(newo, IonObjectBase):
+        # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
+        # @TODO consolidate with _validate method in IonObjectBase
+        fields, set_fields = newo.__dict__, set(newo._def.schema)
+        set_fields.intersection_update(fields)
+
+        for fieldname in set_fields:
+            fieldval = getattr(newo, fieldname)
+            newfo = walk(fieldval, cb)
+            if newfo != fieldval:
+                setattr(newo, fieldname, newfo)
+
+        return newo
+
+    else:
+        return newo
+
 
 class IonObjectSerializationBase(object):
     """

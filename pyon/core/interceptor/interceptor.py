@@ -42,23 +42,3 @@ def process_interceptors(interceptors, invocation):
         invocation = func(invocation)
     return invocation
 
-def walk(o, cb):
-    """
-    Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
-    You supply a callback which receives an object. That object may be an iterable (which will then be walked
-    after you return it, as long as it remains an iterable), or it may be another object inside of that.
-
-    If a dict is discovered, your callback will receive the dict as a whole and the contents of values only. Keys are left untouched.
-
-    @TODO move to a general utils area?
-    """
-    newo = cb(o)
-
-    # is now or is still an iterable? iterate it.
-    if hasattr(newo, '__iter__'):
-        if isinstance(newo, dict):
-            return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
-        else:
-            return [walk(x, cb) for x in newo]
-    else:
-        return newo

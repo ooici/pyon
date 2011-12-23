@@ -1,6 +1,6 @@
-from pyon.core.interceptor.interceptor import Interceptor, walk
+from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.exception import BadRequest
-from pyon.core.object import IonObjectBase
+from pyon.core.object import IonObjectBase, walk
 from pyon.util.log import log
 
 class ValidateInterceptor(Interceptor):

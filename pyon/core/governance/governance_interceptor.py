@@ -6,7 +6,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.core.governance.governance_controller import GovernanceController
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
-from pyon.core.interceptor.interceptor import Interceptor, walk
+from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
 
 #
