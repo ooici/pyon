@@ -187,8 +187,8 @@ html_doc_templates = {
 <td class='confluenceTd'>${outargs}</td>
 </tr>
 <tr>
-<th class='confluenceTh'> Error Exceptions: </th>
-<td class='confluenceTd'> TBD </td>
+<th class='confluenceTh'> Error Exception(s): </th>
+<td class='confluenceTd'> ${exceptions} </td>
 </tr>
 </tbody></table>
 </div>
@@ -196,7 +196,8 @@ html_doc_templates = {
 
 <p><br class="atl-forced-newline" /></p>''',
 
-'arg': '${name}: ${val}<BR>'
+'arg': '${name}: ${val}<BR>',
+'exception': '${type}: ${description}<BR>'
 
 
 }
@@ -313,6 +314,15 @@ def build_args_doc_html(_def):
     args_str = ''.join(args)
     return args_str
 
+def build_exception_doc_html(_def):
+    # Handle case where method has no parameters
+    args = []
+
+    for key,val in (_def or {}).iteritems():
+        args.append(html_doc_templates['exception'].substitute(type=key, description=val))
+
+    args_str = ''.join(args)
+    return args_str
 
 def generate_service(interface_file, svc_def, client_defs, opts):
     """
@@ -403,10 +413,11 @@ def generate_service(interface_file, svc_def, client_defs, opts):
         if opts.servicedoc:
 
 
-            doc_inargs_str                     = build_args_doc_html(def_in)
-            doc_outargs_str                     = build_args_doc_html(def_out)
-            methoddocstring=docstring_formatted.replace("method docstring","")
-            doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str))
+            doc_inargs_str             = build_args_doc_html(def_in)
+            doc_outargs_str            = build_args_doc_html(def_out)
+            doc_exceptions_str         = build_exception_doc_html(def_throws)
+            methoddocstring            = docstring_formatted.replace("method docstring","")
+            doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str, exceptions=doc_exceptions_str))
 
 
     # dep client names
