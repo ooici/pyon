@@ -27,6 +27,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self._do_test_views(MockDB_DataStore(datastore_name='my_ds'))
 
     def test_persistent(self):
+        import socket
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
 
