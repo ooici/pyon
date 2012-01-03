@@ -12,6 +12,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.public import RT, AT, LCS
 from nose.plugins.attrib import attr
 from unittest import SkipTest
+import socket
 
 OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
