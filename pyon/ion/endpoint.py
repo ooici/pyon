@@ -17,14 +17,17 @@ class EventPublisher(ProcessPublisher):
     """
     Class for process event publication - place holder
     """
-    #XP = CFG.exchange_point
-
+    XS = CFG.exchanges.ioncore.name
+    XP = CFG.exchanges.ioncore.exchange_points.events.name
 
 class StreamPublisher(ProcessPublisher):
     """
     Data management abstraction of EndPoint layer for publishing messages to a stream
     TODO: Could be an object that uses a publisher?
     """
+
+    XS = CFG.exchanges.ioncore.name
+    XP = CFG.exchanges.ioncore.exchange_points.science_data.name
 
     def __init__(self, stream_route, **kwargs):
         self._stream_route = stream_route
