@@ -12,6 +12,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.public import RT, AT, LCS
 from nose.plugins.attrib import attr
 from unittest import SkipTest
+import socket
 
 OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
@@ -26,7 +27,6 @@ class Test_DataStores(IonIntegrationTestCase):
         self._do_test_views(MockDB_DataStore(datastore_name='my_ds'))
 
     def test_persistent(self):
-        raise SkipTest('Temporarily broken due to nested object bug in datastore')
         import socket
         try:
             self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
