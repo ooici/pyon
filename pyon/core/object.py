@@ -104,6 +104,11 @@ class IonObjectBase(object):
                 continue
             field_val, schema_val = fields[key], schema[key]
             if type(field_val) is not type(schema_val):
+
+                # if the schema doesn't define a type, we can't very well validate it
+                if type(schema_val) == type(None):
+                    continue
+
                 # Special handle numeric types.  Allow int to be
                 # passed for long and float.  Auto convert to the
                 # right type.
