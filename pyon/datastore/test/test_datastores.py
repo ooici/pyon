@@ -18,7 +18,7 @@ OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
-@attr('UNIT')
+@attr('UNIT', group='datastore')
 class Test_DataStores(IonIntegrationTestCase):
 
     def test_non_persistent(self):

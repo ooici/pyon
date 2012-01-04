@@ -536,6 +536,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
         IonObjectSerializationBase.__init__(self, transform_method=transform_method)
 
     def _transform(self, obj):
+        # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict) and "type_" in obj:
             objc    = obj.copy()
             type    = objc.pop('type_')

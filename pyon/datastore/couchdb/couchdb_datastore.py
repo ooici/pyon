@@ -699,7 +699,7 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(type_=row['key'][0], lcstate=row['key'][1], _id=row.id) for row in rows]
+        res_assocs = [dict(type=row['key'][0], lcstate=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_type() found %s objects" % (len(res_assocs)))
         if id_only:
             res_ids = [row.id for row in rows]
@@ -719,7 +719,7 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(lcstate=row['key'][0], type_=row['key'][1], _id=row.id) for row in rows]
+        res_assocs = [dict(lcstate=row['key'][0], type=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_lcstate() found %s objects" % (len(res_assocs)))
         if id_only:
             res_ids = [row.id for row in rows]
@@ -739,7 +739,7 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(name=row['key'][0], type_=row['key'][1], lcstate=row['key'][2], _id=row.id) for row in rows]
+        res_assocs = [dict(name=row['key'][0], type=row['key'][1], lcstate=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_name() found %s objects" % (len(res_assocs)))
         if id_only:
             res_ids = [row.id for row in rows]
