@@ -2,7 +2,7 @@
 
 """Provides the communication layer above channels."""
 
-from gevent import event
+from gevent import event, coros
 from zope import interface
 
 from pyon.core import bootstrap
@@ -530,6 +530,30 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         return res, res_headers
 
+    conv_id_counter = 0
+    _lock = coros.RLock()       # @TODO: is this safe?
+
+    def _build_conv_id(self):
+        """
+        Builds a unique conversation id based on the container name.
+        """
+        with RPCRequestEndpointUnit._lock:
+            RPCRequestEndpointUnit.conv_id_counter += 1
+        return "%s-%d" % (bootstrap.sys_name, RPCRequestEndpointUnit.conv_id_counter)
+
+    def _build_header(self, raw_msg):
+        """
+        Build header override.
+
+        This should set header values that are invariant or have nothing to do with the specific
+        call being made (such as op).
+        """
+        headers = RequestEndpointUnit._build_header(self, raw_msg)
+        headers['protocol'] = 'rpc'
+        headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
+        headers['conv-id'] = self._build_conv_id()
+        return headers
+
     def _raise_exception(self, code, message):
         if code == exception.BAD_REQUEST:
             log.debug("Raising BadRequest")
@@ -652,6 +676,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             log.debug("Got error response")
             response_headers = self._create_error_response(ex)
 
+        # REPLIES: propogate protocol, conv-id, conv-seq
+        response_headers['protocol']    = headers.get('protocol', '')
+        response_headers['conv-id']     = headers.get('conv-id', '')
+        response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+
         return self.send(result, response_headers)
 
     def message_received(self, msg, headers):
@@ -735,31 +764,8 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
     def _build_header(self, raw_msg):
         """
-        See: https://confluence.oceanobservatories.org/display/CIDev/Process+Model
-
-        From R1 Conversations:
-            headers: (many get copied to message instance via R1 interceptor)
-                sender              - set by envelope interceptor (headers.get('sender', message.get('sender'))
-                sender-name         - set in Process.send
-                conv-id             - set by envelope interceptor (passed in or ''), set by Process.send (from conv.conv_id, or created new if no conv)
-                conv-seq            - set by envelope interceptor (passed in or '1'), or set by Process.reply
-                performative        - set by envelope interceptor (passed in or ''), set by Process.send supercalls, possible values: request, inform_result, failure, [agree, refuse]
-                protocol            - set by envelope interceptor (passed in or ''), set by Process.send (from conv.protocol or CONV_TYPE_NONE), possible values: rpc...
-                reply-to            - set by envelope interceptor (reply-to, sender)
-                user-id             - set by envelope interceptor (passed in or "ANONYMOUS")
-                expiry              - set by envelope interceptor (passed in or "0")
-                quiet               - (unused)
-                encoding            - set by envelope interceptor (passed in or "json"), set by codec interceptor (ION_R1_GPB)
-                language            - set by envelope interceptor (passed in or "ion1")
-                format              - set by envelope interceptor (passed in or "raw")
-                ontology            - set by envelope interceptor (passed in or '')
-                status              - set by envelope interceptor (passed in or 'OK')
-                ts                  - set by envelope interceptor (always current time in ms)
-                op                  - set by envelope interceptor (copies 'operation' passed in)
-            conversation?
-            process
-            content
-
+        Builds the header for this Process-level RPC conversation.
+        https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
         """
 
         context = self._process.get_context()

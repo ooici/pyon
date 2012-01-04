@@ -389,7 +389,11 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e._recv_greenlet.join()
 
         # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':400, 'error_message':'Unknown op name: no_exist'})
+        ch.send.assert_called_once_with(None, {'status_code':400,
+                                               'error_message':'Unknown op name: no_exist',
+                                               'conv-id': '',
+                                               'conv-seq': 2,
+                                               'protocol':''})
 
     def test_recv_bad_kwarg(self):
         # we try to call simple with the kwarg "not_named" instead of the correct one
@@ -406,17 +410,25 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e._recv_greenlet.join()
 
         # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':500, 'error_message':'simple() got an unexpected keyword argument \'not_named\''})
+        ch.send.assert_called_once_with(None, {'status_code':500,
+                                               'error_message':'simple() got an unexpected keyword argument \'not_named\'',
+                                               'conv-id': '',
+                                               'conv-seq': 2,
+                                               'protocol':''})
 
     def test__message_received_interceptor_exception(self):
         e = RPCResponseEndpointUnit(routing_obj=self)
         e.send = Mock()
         e.send.return_value = sentinel.sent
         with patch('pyon.net.endpoint.ResponseEndpointUnit._message_received', new=Mock(side_effect=exception.IonException)):
-            retval = e._message_received(sentinel.msg, sentinel.headers)
+            retval = e._message_received(sentinel.msg, {})
 
             self.assertEquals(retval, sentinel.sent)
-            e.send.assert_called_once_with(None, {'status_code': -1, 'error_message':''})
+            e.send.assert_called_once_with(None, {'status_code': -1,
+                                                  'error_message':'',
+                                                  'conv-id': '',
+                                                  'conv-seq': 2,
+                                                  'protocol':''})
 
     def error_op(self):
         """
@@ -441,7 +453,11 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e.spawn_listener()
         e._recv_greenlet.join()
 
-        e.send.assert_called_once_with(None, {'status_code': 401, 'error_message': sentinel.unauth})
+        e.send.assert_called_once_with(None, {'status_code': 401,
+                                              'error_message': sentinel.unauth,
+                                              'conv-id': '',
+                                              'conv-seq': 2,
+                                              'protocol':''})
 
 
 @attr('UNIT')
