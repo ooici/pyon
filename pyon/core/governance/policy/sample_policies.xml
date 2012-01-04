@@ -21,7 +21,7 @@
                 </SubjectMatch>
             </Subject>
         </Subjects>
-        <!--
+
         <Resources>
             <Resource>
                 <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
@@ -31,7 +31,6 @@
             </Resource>
         </Resources>
 
-        -->
     </Target>
 
     <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
