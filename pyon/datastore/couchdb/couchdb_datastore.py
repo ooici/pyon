@@ -6,11 +6,12 @@ __license__ = 'Apache 2.0'
 from uuid import uuid4
 
 import couchdb
-from couchdb.http import ResourceConflict, ResourceNotFound
+from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
 from pyon.core.bootstrap import obj_registry
 from pyon.core.object import IonObjectSerializer, IonObjectDeserializer
 from pyon.core.exception import BadRequest, Conflict, NotFound
+from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.util.containers import DotDict
@@ -60,7 +61,12 @@ class CouchDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         log.info('Creating data store %s' % datastore_name)
-        self.server.create(datastore_name)
+        if self.datastore_exists(datastore_name):
+            raise BadRequest("Data store create failed.  Data store with name %s already exists" % datastore_name)
+        try:
+            self.server.create(datastore_name)
+        except ValueError:
+            raise BadRequest("Data store create failed.  Data store name %s invalid" % datastore_name)
         if create_indexes:
             self._define_views(datastore_name)
 
@@ -71,7 +77,9 @@ class CouchDB_DataStore(DataStore):
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
-            raise NotFound('Data store delete failed.  Data store %s not found' % datastore_name)
+            raise NotFound('Data store delete failed.  Data store %s does not exist' % datastore_name)
+        except ValueError:
+            raise BadRequest("Data store delete failed.  Data store name %s invalid" % datastore_name)
 
     def list_datastores(self):
         dbs = [db for db in self.server]
@@ -82,7 +90,12 @@ class CouchDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         log.debug('Listing information about data store %s' % datastore_name)
-        info = self.server[datastore_name].info()
+        try:
+            info = self.server[datastore_name].info()
+        except ResourceNotFound:
+            raise BadRequest("Data store info lookup failed.  Data store with name %s does not exist" % datastore_name)
+        except ValueError:
+            raise BadRequest("Data store info lookup failed.  Data store name %s invalid" % datastore_name)
         log.debug('Data store info: %s' % str(info))
         return info
 
@@ -96,22 +109,30 @@ class CouchDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         log.warning('Listing all objects in data store %s' % datastore_name)
-        objs = [obj for obj in self.server[datastore_name]]
+        try:
+            objs = [obj for obj in self.server[datastore_name]]
+        except ValueError:
+            raise BadRequest("Data store list objects failed.  Data store name %s invalid" % datastore_name)
         log.debug('Objects: %s' % str(objs))
         return objs
 
     def list_object_revisions(self, object_id, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store list object revisions failed.  Data store name %s invalid" % datastore_name)
         log.debug('Listing all versions of object %s/%s' % (datastore_name, object_id))
         gen = db.revisions(object_id)
         res = [ent["_rev"] for ent in gen]
         log.debug('Object versions: %s' % str(res))
         return res
 
-    def create(self, object, object_id=None, datastore_name=""):
-        return self.create_doc(self._ion_object_to_persistence_dict(object),
+    def create(self, obj, object_id=None, datastore_name=""):
+        if not isinstance(obj, IonObjectBase):
+            raise BadRequest("Data store create object failed.  Obj param is not object type")
+        return self.create_doc(self._ion_object_to_persistence_dict(obj),
                                object_id=object_id, datastore_name=datastore_name)
 
     def create_doc(self, doc, object_id=None, datastore_name=""):
@@ -128,12 +149,17 @@ class CouchDB_DataStore(DataStore):
         log.debug('create doc contents: %s', doc)
 
         # Save doc.  CouchDB will assign version to doc.
-        res = self.server[datastore_name].save(doc)
+        try:
+            res = self.server[datastore_name].save(doc)
+        except ResourceNotFound:
+            raise BadRequest("Data store create object failed.  Data store %s does not exist" % datastore_name)
         log.debug('Create result: %s' % str(res))
         id, version = res
         return (id, version)
 
     def create_mult(self, objects, object_ids=None):
+        if any([not isinstance(obj, IonObjectBase) for obj in objects]):
+            raise BadRequest("Data store create object failed.  Object param wrong type")
         return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
                                     object_ids)
 
@@ -160,6 +186,8 @@ class CouchDB_DataStore(DataStore):
         return res
 
     def read(self, object_id, rev_id="", datastore_name=""):
+        if not isinstance(object_id, str):
+            raise BadRequest("Data store read object failed.  Object id param is not string")
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Ion object
@@ -170,7 +198,10 @@ class CouchDB_DataStore(DataStore):
     def read_doc(self, doc_id, rev_id="", datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store read object failed.  Data store name %s is invalid" % datastore_name)
         if not rev_id:
             log.debug('Reading head version of object %s/%s' % (datastore_name, doc_id))
             doc = db.get(doc_id)
@@ -184,18 +215,23 @@ class CouchDB_DataStore(DataStore):
         log.debug('read doc contents: %s', doc)
         return doc
 
-    def read_mult(self, object_ids, datastore_name="", id_only=False):
-        docs = self.read_doc_mult(object_ids, datastore_name, id_only)
+    def read_mult(self, object_ids, datastore_name=""):
+        if any([not isinstance(object_id, str) for object_id in object_ids]):
+            raise BadRequest("Data store read object mult failed.  Object id param is not string")
+        docs = self.read_doc_mult(object_ids, datastore_name)
         # Convert docs into Ion objects
         obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
         return obj_list
 
-    def read_doc_mult(self, object_ids, datastore_name="", id_only=False):
+    def read_doc_mult(self, object_ids, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store read object mult failed.  Data store name %s is invalid" % datastore_name)
         log.info('Reading head version of objects %s/%s' % (datastore_name, object_ids))
-        docs = db.view("_all_docs", keys=object_ids, include_docs=(not id_only))
+        docs = db.view("_all_docs", keys=object_ids, include_docs=True)
         # Check for docs not found
         error_str = ""
         for row in docs:
@@ -206,14 +242,13 @@ class CouchDB_DataStore(DataStore):
         if error_str != "":
             raise NotFound(error_str)
 
-        if id_only:
-            doc_list = [dict(_id=row.key, **row.value) for row in docs]
-        else:
-            doc_list = [row.doc.copy() for row in docs]
+        doc_list = [row.doc.copy() for row in docs]
         return doc_list
     
-    def update(self, object, datastore_name=""):
-        return self.update_doc(self._ion_object_to_persistence_dict(object))
+    def update(self, obj, datastore_name=""):
+        if not isinstance(obj, IonObjectBase):
+            raise BadRequest("Data store update object failed.  Obj param is not object type")
+        return self.update_doc(self._ion_object_to_persistence_dict(obj))
 
     def update_doc(self, doc, datastore_name=""):
         if not datastore_name:
@@ -238,15 +273,20 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
-    def delete(self, object, datastore_name=""):
-        if type(object) is str:
-            return self.delete_doc(object, datastore_name=datastore_name)
-        return self.delete_doc(self._ion_object_to_persistence_dict(object), datastore_name=datastore_name)
+    def delete(self, obj, datastore_name=""):
+        if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
+            raise BadRequest("Data store delete object failed.  Obj param is not object type or string id")
+        if type(obj) is str:
+            return self.delete_doc(obj, datastore_name=datastore_name)
+        return self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store delete object failed.  Data store name %s is invalid" % datastore_name)
         if type(doc) is str:
             log.info('Deleting object %s/%s' % (datastore_name, doc))
             try:
@@ -269,7 +309,10 @@ class CouchDB_DataStore(DataStore):
     def find_doc(self, criteria=[], datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store find failed.  Data store name %s is invalid" % datastore_name)
 
         if len(criteria) == 0:
             # Return set of all objects indexed by doc id
@@ -319,7 +362,10 @@ class CouchDB_DataStore(DataStore):
     def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store find by idref failed.  Data store name %s is invalid" % datastore_name)
 
         if len(criteria) == 0:
             # Return set of all objects indexed by doc id
@@ -388,8 +434,8 @@ class CouchDB_DataStore(DataStore):
         log.debug('Find results: %s' % str(results))
         return results
 
-    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
-        res_list = self.resolve_idref_doc(subject, predicate, object, datastore_name)
+    def resolve_idref(self, subject="", predicate="", obj="", datastore_name=""):
+        res_list = self.resolve_idref_doc(subject, predicate, obj, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -398,37 +444,40 @@ class CouchDB_DataStore(DataStore):
             object_dict = item[2]
             subject = self._persistence_dict_to_ion_object(subject_dict)
             log.debug('Subject Ion object: %s' % str(subject))
-            object = self._persistence_dict_to_ion_object(object_dict)
-            log.debug('Object Ion object: %s' % str(object))
-            results.append([subject, item[1], object])
+            ion_obj = self._persistence_dict_to_ion_object(object_dict)
+            log.debug('Object Ion object: %s' % str(ion_obj))
+            results.append([subject, item[1], ion_obj])
 
         return results
 
-    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", obj="", datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        db = self.server[datastore_name]
+        try:
+            db = self.server[datastore_name]
+        except ValueError:
+            raise BadRequest("Data store resolve idref failed.  Data store name %s is invalid" % datastore_name)
 
         if subject == "":
             if predicate == "":
-                if object == "":
+                if obj == "":
                     # throw exception
                     raise BadRequest("Data store query does not specify subject, predicate or object")
                 else:
                     # Find all subjects with any association to object
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     res = []
                     all_doc_ids = self.list_objects(datastore_name)
                     for subject_doc_id in all_doc_ids:
-                        if subject_doc_id == object:
+                        if subject_doc_id == obj:
                             continue
                         subject_doc = self.read_doc(subject_doc_id, "", datastore_name)
                         for key in subject_doc:
                             if isinstance(subject_doc[key], list):
-                                if object in subject_doc[key]:
+                                if obj in subject_doc[key]:
                                     res.append([subject_doc, key, object_doc])
                             else:
-                                if object == subject_doc[key]:
+                                if obj == subject_doc[key]:
                                     res.append([subject_doc, key, object_doc])
 
                     return res
@@ -448,7 +497,7 @@ class CouchDB_DataStore(DataStore):
                 map_fun += predicate
                 map_fun +=\
 '''[i] == \"'''
-                map_fun += object
+                map_fun += obj
                 map_fun +=\
 '''") {
                 emit(doc._id, doc);
@@ -465,7 +514,7 @@ class CouchDB_DataStore(DataStore):
                 if len(queryList) == 0:
                     return []
                 res = []
-                object_doc = self.read_doc(object, "", datastore_name)
+                object_doc = self.read_doc(obj, "", datastore_name)
                 for row in queryList:
                     subject_doc = row.doc
                     res.append([subject_doc, predicate, object_doc])
@@ -473,21 +522,21 @@ class CouchDB_DataStore(DataStore):
                 return res
         else:
             if predicate == "":
-                if object == "":
+                if obj == "":
                     # Find all objects with any association to subject
                     # TODO would need some way to indicate a key is an association predicate
                     pass
                 else:
                     # Find all associations between subject and object
                     subject_doc = self.read_doc(subject, "", datastore_name)
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     res = []
                     for key in subject_doc:
                         if isinstance(subject_doc[key], list):
-                            if object in subject_doc[key]:
+                            if obj in subject_doc[key]:
                                 res.append([subject_doc, key, object_doc])
                         else:
-                            if object == subject_doc[key]:
+                            if obj == subject_doc[key]:
                                 res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
@@ -495,7 +544,7 @@ class CouchDB_DataStore(DataStore):
                     else:
                         return res
             else:
-                if object == "":
+                if obj == "":
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
@@ -507,9 +556,9 @@ class CouchDB_DataStore(DataStore):
                 else:
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     if predicate in subject_doc:
-                        if object in subject_doc[predicate]:
+                        if obj in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     return []
 
@@ -582,13 +631,13 @@ class CouchDB_DataStore(DataStore):
         obj_list = self.read_mult(obj_ids)
         return (obj_list, obj_assocs)
 
-    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
-        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
-        if not object:
+    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False):
+        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, obj, id_only))
+        if not obj:
             raise BadRequest("Must provide object")
         db = self.server[self.datastore_name]
 
-        object_id = object if type(object) is str else object._id
+        object_id = obj if type(obj) is str else obj._id
         view = db.view(self._get_viewname("association","by_obj"))
         key = [object_id]
         if predicate:
@@ -609,15 +658,15 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
-    def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
-        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, object))
-        if not ((subject and object) or predicate):
+    def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
+        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
+        if not ((subject and obj) or predicate):
             raise BadRequest("Illegal parameters")
         db = self.server[self.datastore_name]
 
-        if subject and object:
+        if subject and obj:
             subject_id = subject if type(subject) is str else subject._id
-            object_id = object if type(object) is str else object._id
+            object_id = obj if type(obj) is str else obj._id
             view = db.view(self._get_viewname("association","by_ids"), include_docs=(not id_only))
             key = [subject_id, object_id]
             if predicate:

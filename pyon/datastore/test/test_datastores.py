@@ -4,7 +4,7 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import obj_registry, IonObject
-from pyon.core.exception import NotFound
+from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
@@ -29,7 +29,107 @@ class Test_DataStores(IonIntegrationTestCase):
     def test_persistent(self):
         import socket
         try:
-            self._do_test(CouchDB_DataStore(datastore_name='my_ds'))
+            ds = CouchDB_DataStore(datastore_name='my_ds')
+            self._do_test(ds)
+
+            # CouchDB does not like upper case characters for database names
+            create_failed = False
+            try:
+                ds.create_datastore("BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                create_failed = True
+            self.assertTrue(create_failed)
+
+            delete_failed = False
+            try:
+                ds.delete_datastore("BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                delete_failed = True
+            self.assertTrue(delete_failed)
+
+            info_failed = False
+            try:
+                ds.info_datastore("BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                info_failed = True
+            self.assertTrue(info_failed)
+
+            list_objects_failed = False
+            try:
+                ds.list_objects("BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                list_objects_failed = True
+            self.assertTrue(list_objects_failed)
+
+            list_object_revisions_failed = False
+            try:
+                ds.list_object_revisions("badid", "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                list_object_revisions_failed = True
+            self.assertTrue(list_object_revisions_failed)
+
+            create_failed = False
+            try:
+                ds.create_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                create_failed = True
+            self.assertTrue(create_failed)
+
+            create_mult_failed = False
+            try:
+                ds.create_doc_mult([{"foo": "bar"}], "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                create_mult_failed = True
+            self.assertTrue(create_mult_failed)
+
+            read_failed = False
+            try:
+                ds.read_doc("badid", "3", "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                read_failed = True
+            self.assertTrue(read_failed)
+
+            read_mult_failed = False
+            try:
+                ds.read_doc_mult("badid", "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                read_mult_failed = True
+            self.assertTrue(read_mult_failed)
+
+            update_failed = False
+            try:
+                ds.update_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                update_failed = True
+            self.assertTrue(update_failed)
+
+            delete_failed = False
+            try:
+                ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                delete_failed = True
+            self.assertTrue(delete_failed)
+
+            find_failed = False
+            try:
+                ds.find_doc([['type_', DataStore.EQUAL, 'foo']], "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                find_failed = True
+            self.assertTrue(find_failed)
+
+            find__by_idref_failed = False
+            try:
+                ds.find_by_idref_doc([['type_', DataStore.EQUAL, 'UserInfo'], DataStore.AND, ['name', DataStore.EQUAL, 'foo']], 'roles', "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                find__by_idref_failed = True
+            self.assertTrue(find__by_idref_failed)
+
+            resolve_idref_failed = False
+            try:
+                ds.resolve_idref_doc("Subject", "Predicate", "Object", "BadDataStoreNamePerCouchDB")
+            except BadRequest:
+                resolve_idref_failed = True
+            self.assertTrue(resolve_idref_failed)
 
             self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'), is_persistent=True)
         except socket.error:
@@ -47,6 +147,57 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Create should succeed and not throw error
         data_store.create_datastore()
+
+        # Create should throw exception the second time
+        createFailed = False
+        try:
+            data_store.create_datastore()
+        except BadRequest:
+            createFailed = True
+        self.assertTrue(createFailed)
+
+        # Call ops with wrong object type and make sure exception is thrown
+        createFailed = False
+        try:
+            data_store.create({"foo": "bar"})
+        except BadRequest:
+            createFailed = True
+        self.assertTrue(createFailed)
+
+        createMultFailed = False
+        try:
+            data_store.create_mult([{"foo": "bar"}])
+        except BadRequest:
+            createMultFailed = True
+        self.assertTrue(createMultFailed)
+
+        readFailed = False
+        try:
+            data_store.read({"foo": "bar"})
+        except BadRequest:
+            readFailed = True
+        self.assertTrue(readFailed)
+
+        readMultFailed = False
+        try:
+            data_store.read_mult([{"foo": "bar"}])
+        except BadRequest:
+            readMultFailed = True
+        self.assertTrue(readMultFailed)
+
+        updateFailed = False
+        try:
+            data_store.update({"foo": "bar"})
+        except BadRequest:
+            updateFailed = True
+        self.assertTrue(updateFailed)
+
+        deleteFailed = False
+        try:
+            data_store.delete({"foo": "bar"})
+        except BadRequest:
+            deleteFailed = True
+        self.assertTrue(deleteFailed)
 
         # Should see new data
         self.assertIn('my_ds', data_store.list_datastores())
@@ -87,6 +238,12 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(len(marine_operator_role_tuple) == 2)
 
         marine_operator_role_ooi_id = marine_operator_role_tuple[0]
+
+        role_objs = data_store.read_mult([admin_role_ooi_id, data_provider_role_ooi_id, marine_operator_role_ooi_id])
+        self.assertTrue(len(role_objs) == 3)
+        self.assertTrue(role_objs[0]._id == admin_role_ooi_id)
+        self.assertTrue(role_objs[1]._id == data_provider_role_ooi_id)
+        self.assertTrue(role_objs[2]._id == marine_operator_role_ooi_id)
 
         # Construct three user info objects and assign them roles
         hvl_user_info = {
