@@ -104,9 +104,7 @@ class TestBaseEndpoint(PyonTestCase):
         self._node = Mock(spec=NodeB)
         self._ef = BaseEndpoint(node=self._node, name="EFTest")
         self._ch = Mock(spec=SendChannel)
-        chtype = Mock()
-        chtype.return_value = self._ch
-        self._ef.channel_type = chtype
+        self._node.channel.return_value = self._ch
 
     def test_create_endpoint(self):
         e = self._ef.create_endpoint()
@@ -153,25 +151,33 @@ class TestBaseEndpoint(PyonTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
+    def test_create_channel(self):
+        ctmock = Mock()
+        self._ef.channel_type = ctmock
+
+        self._ef.create_channel()
+        ctmock.assert_called_once_with()
+
+        self._ef.create_channel(zep=sentinel.zep)
+        ctmock.assert_called_with(zep=sentinel.zep)
+
 class TestPublisher(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
         self._pub = Publisher(node=self._node, name="testpub")
         self._ch = Mock(spec=SendChannel)
-        chtype = Mock()
-        chtype.return_value = self._ch
-        self._pub.channel_type = chtype
+        self._node.channel.return_value = self._ch
 
     def test_publish(self):
         self.assertEquals(self._node.channel.call_count, 0)
 
         self._pub.publish("pub")
 
-        self._node.channel.assert_called_once_with(self._ch)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, self._pub.create_channel)
         self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self._node.channel.assert_called_once_with(self._ch)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, self._pub.create_channel)
         self.assertEquals(self._ch.send.call_count, 2)
 
 class RecvMockMixin(object):
@@ -231,7 +237,7 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
 
         # tell the subscriber to create this as the main listening channel
         listen_channel_mock = self._setup_mock_channel(ch_type=SubscriberChannel, value="subbed", error_message="")
-        sub._create_main_channel = lambda: listen_channel_mock
+        sub.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return itself when accepted
         listen_channel_mock.accept.return_value = listen_channel_mock
@@ -262,9 +268,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         """
         """
         rr = RequestResponseClient(node=self._node, name="rr")
-        chtype = Mock()
-        chtype.return_value = self._setup_mock_channel()
-        rr.channel_type = chtype
+        rr.node.channel.return_value = self._setup_mock_channel()
 
         ret = rr.request("request")
         self.assertEquals(ret, "bidirmsg")
@@ -332,9 +336,7 @@ class TestRPCClient(PyonTestCase, RecvMockMixin):
         node = Mock(spec=NodeB)
 
         rpcc = RPCClient(node=node, name="simply", iface=ISimpleInterface)
-        chtype = Mock()
-        chtype.return_value = self._setup_mock_channel()
-        rpcc.channel_type = chtype
+        rpcc.node.channel.return_value = self._setup_mock_channel()
 
         self.assertTrue(hasattr(rpcc, 'simple'))
 
@@ -475,7 +477,7 @@ class TestRPCServer(PyonTestCase, RecvMockMixin):
         cvalue = FakeMsg()
 
         listen_channel_mock = self._setup_mock_channel(ch_type=ServerChannel)
-        rpcs._create_main_channel = lambda: listen_channel_mock
+        rpcs.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return a mocked handler channel when accepted (listen() implementation detail)
         listen_channel_mock.accept.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue, op="simple")

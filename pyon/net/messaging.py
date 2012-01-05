@@ -13,6 +13,7 @@ from pika import BasicProperties
 from pyon.core.bootstrap import CFG
 from pyon.net import amqp
 from pyon.net import channel
+from pyon.net.channel import BaseChannel
 from pyon.util.async import blocking_cb
 from pyon.util.log import log
 
@@ -86,65 +87,47 @@ class NodeB(amqp.Node):
         self.running = 1
         self.ready.set()
 
-    def channel(self, chan):
+    def channel(self, ch_type, channel_create_callback):
+        """
+        Creates a Channel object with an underlying transport callback and returns it.
+
+        @type ch_type   BaseChannel
+        """
         log.debug("NodeB.channel")
         with self._lock:
-            amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
-            chan.on_channel_open(amq_chan)
-            #chan._close_callback = self.on_channel_request_close       # @TODO
-
-        return chan
-
-    def OLDchannel(self, ch_type):
-        log.debug("In NodeB.channel, pool size is %d", len(self._bidir_pool))
-        if not self.running:
-            log.error("Attempt to open channel on node that is not running")
-            raise #?
-
-        log.debug("acquire semaphore")
-        with self._lock:
-            log.debug("acquired semaphore")
-
             def new_channel():
-                result = event.AsyncResult()
-                def on_channel_open_ok(amq_chan):
-                    sch = ch_type(close_callback=self.on_channel_request_close)
-                    sch.on_channel_open(amq_chan)
-                    ch = channel.SocketInterface.Socket(amq_chan, sch)
-                    result.set((ch, sch))
-                self.client.channel(on_channel_open_ok)
-                return result.get()
+                chan = channel_create_callback(close_callback=self.on_channel_request_close)
+                amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
+                chan.on_channel_open(amq_chan)
 
-            if ch_type == channel.BidirectionalClient:
+                return chan
+
+            if ch_type == channel.BidirClientChannel:
                 chid = self._pool.get_id()
                 if chid in self._bidir_pool:
+                    log.debug("BidirClientChannel requested, pulling from pool (%d)", chid)
                     assert not chid in self._pool_map.values()
-                    self._pool_map[self._bidir_pool[chid].amq_chan.channel_number] = chid
                     ch = self._bidir_pool[chid]
-                    socket = channel.SocketInterface.Socket(ch.amq_chan, ch)
+                    self._pool_map[ch.get_channel_id()] = chid
                 else:
-                    socket, ch = new_channel()
+                    log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
+                    ch = new_channel()
                     self._bidir_pool[chid] = ch
-                    self._pool_map[ch.amq_chan.channel_number] = chid
+                    self._pool_map[ch.get_channel_id()] = chid
             else:
-                socket, ch = new_channel()
+                ch = new_channel()
+            assert ch
 
-            assert socket and ch
-            log.debug("sock channel: %s" % str(socket))
-
-        log.debug("release semaphore")
-
-        return socket
+        return ch
 
     def on_channel_request_close(self, ch):
-        log.debug("NodeB: on_channel_request_close")
-        log.debug("ChType %s, Ch#: %d", ch.__class__, ch.amq_chan.channel_number)
-        log.debug("MAP: %s", self._pool_map)
+        log.debug("NodeB: on_channel_request_close\n\tChType %s, Ch#: %d", ch.__class__, ch.get_channel_id())
 
-        if ch.amq_chan.channel_number in self._pool_map:
+        if ch.get_channel_id() in self._pool_map:
             with self._lock:
-                chid = self._pool_map.pop(ch.amq_chan.channel_number)
-                log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.amq_chan.channel_number, chid)
+                ch.stop_consume()
+                chid = self._pool_map.pop(ch._amq_chan.channel_number)
+                log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
                 self._pool.release_id(chid)
         else:
             ch.close_impl()

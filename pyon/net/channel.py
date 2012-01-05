@@ -102,6 +102,17 @@ class BaseChannel(object):
         """
         self._amq_chan = amq_chan
 
+    def get_channel_id(self):
+        """
+        Gets the underlying AMQP channel's channel identifier (number).
+
+        @return Channel id, or None.
+        """
+        if not self._amq_chan:
+            return None
+
+        return self._amq_chan.channel_number
+
     def close(self):
         """
         Default close method.
@@ -221,6 +232,8 @@ class RecvChannel(BaseChannel):
         self._recv_name = name
         self._recv_binding = binding
 
+        self._setup_listener_called = False
+
         BaseChannel.__init__(self, **kwargs)
 
     def setup_listener(self, name=None, binding=None):
@@ -235,21 +248,29 @@ class RecvChannel(BaseChannel):
         Name must be a tuple of (xp, queue). If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
         Binding may be left none and will use the queue name by default.
 
+        Sets the _setup_listener_called internal flag, so if this method is called multiple times, such as in the case
+        of a pooled channel type, it will not run setup again. Pay attention to this in your override of this method.
+
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
         name = name or self._recv_name
         xp, queue = name
 
-        self._recv_name = (xp, queue)
-
         log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s" % (xp, queue, binding))
+        if self._setup_listener_called:
+            log.debug("setup_listener already called for this channel")
+            return
+
+        self._recv_name = (xp, queue)
 
         self._declare_exchange_point(xp)
         queue   = self._declare_queue(queue)
         binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
 
         self._bind(binding)
+
+        self._setup_listener_called = True
 
     def destroy_listener(self):
         """
@@ -411,10 +432,9 @@ class BidirClientChannel(SendChannel, RecvChannel):
     """
     This should be pooled for the receiving side?
 
-    As opposed to current endpoint scheme - no need to spawn a listening greenlet simply to loop on recv(),
+    @TODO: As opposed to current endpoint scheme - no need to spawn a listening greenlet simply to loop on recv(),
     you can use this channel to send first then call recieve linearly, no need for greenletting.
     """
-    _queue_auto_delete  = True
     _consumer_exclusive = True
 
     def _send(self, name, data, headers=None):
