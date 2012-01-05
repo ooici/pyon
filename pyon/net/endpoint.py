@@ -246,6 +246,14 @@ class BaseEndpoint(object):
         else:
             self.endpoint_by_name[name] = [self]
 
+    def create_channel(self, **kwargs):
+        """
+        Creates a channel object based on the channel_type specified as a class attribute.
+
+        Can pass through any kwargs.
+        """
+        return self.channel_type(**kwargs)
+
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """
         @param  to_name     Either a string or a 2-tuple of (exchange, name)
@@ -257,9 +265,8 @@ class BaseEndpoint(object):
             assert name
             if not isinstance(name, tuple):
                 name = (bootstrap.sys_name, name)
-            #ch = self.node.channel(self.channel_type)
-            ch = self.channel_type()
-            self.node.channel(ch)
+
+            ch = self.node.channel(self.channel_type, self.create_channel)
 
             # @TODO: bla
             if hasattr(ch, 'connect'):
@@ -302,8 +309,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
     """
-    #channel_type = Bidirectional
-    #channel_type = ListenChannel        # channel type is perverted here - we don't produce this, we just make one to listen on
+    channel_type = ListenChannel
 
     def __init__(self, node=None, name=None):
         BaseEndpoint.__init__(self, node=node, name=name)
@@ -316,17 +322,13 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
         return self._ready_event
 
-    def _create_main_channel(self):
-        return ListenChannel()
-
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
     def listen(self):
         log.debug("LEF.listen")
 
-        self._chan = self._create_main_channel()
-        self.node.channel(self._chan)
+        self._chan = self.node.channel(self.channel_type, self.create_channel)
         self._setup_listener(self.name, binding=self.name[1])
         self._chan.start_consume()
 
@@ -426,10 +428,7 @@ class SubscriberEndpointUnit(EndpointUnit):
 class Subscriber(ListeningBaseEndpoint):
 
     endpoint_unit_type = SubscriberEndpointUnit
-    #channel_type = PubSub
-
-    def _create_main_channel(self):
-        return SubscriberChannel()
+    channel_type = SubscriberChannel
 
     def _setup_listener(self, name, binding=None):
         """
@@ -507,9 +506,8 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
 
 class RequestResponseServer(ListeningBaseEndpoint):
     endpoint_unit_type = ResponseEndpointUnit
-
-    def _create_main_channel(self):
-        return ServerChannel()
+    channel_type = ServerChannel
+    pass
 
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
