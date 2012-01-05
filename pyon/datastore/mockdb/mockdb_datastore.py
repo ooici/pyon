@@ -266,17 +266,16 @@ class MockDB_DataStore(DataStore):
         else:
             object_id = doc["_id"]
         log.info('Deleting object %s/%s' % (datastore_name, object_id))
-        try:
-            if object_id in datastore_dict.keys():
-                # Find all version dicts and delete them
-                for key in datastore_dict.keys():
-                    if key.find(object_id + '_version_') == 0:
-                        del datastore_dict[key]
-                # Delete the HEAD dict
-                del datastore_dict[object_id]
-                # Delete the version counter dict
-                del datastore_dict['__' + object_id + '_version_counter']
-        except KeyError:
+        if object_id in datastore_dict.keys():
+            # Find all version dicts and delete them
+            for key in datastore_dict.keys():
+                if key.find(object_id + '_version_') == 0:
+                    del datastore_dict[key]
+            # Delete the HEAD dict
+            del datastore_dict[object_id]
+            # Delete the version counter dict
+            del datastore_dict['__' + object_id + '_version_counter']
+        else:
             raise NotFound('Object ' + object_id + ' does not exist.')
         log.info('Delete result: True')
 

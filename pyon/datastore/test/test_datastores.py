@@ -417,7 +417,15 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(head.Description == "USGS instantaneous value data for station 01491000")
 
         # Delete DataSet by object id
-        data_store.delete(head._id)
+        data_store.delete(head)
+
+        # Try to re-delete DataSet by object id.  Should throw exception.
+        delete_failed = False
+        try:
+            data_store.delete(head._id)
+        except NotFound:
+            delete_failed = True
+        self.assertTrue(delete_failed == True)
 
         # List all objects in data store, should be back to six
         res = data_store.list_objects()
