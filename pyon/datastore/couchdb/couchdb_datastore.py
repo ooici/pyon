@@ -292,7 +292,7 @@ class CouchDB_DataStore(DataStore):
             try:
                 del db[doc]
             except ResourceNotFound:
-                raise NotFound('Object with id %s does not exist.' % str(doc["_id"]))
+                raise NotFound('Object with id %s does not exist.' % str(doc))
         else:
             log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
             try:
