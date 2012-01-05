@@ -261,8 +261,11 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = doc["_id"]
-        log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+        if type(doc) is str:
+            object_id = doc
+        else:
+            object_id = doc["_id"]
+        log.info('Deleting object %s/%s' % (datastore_name, object_id))
         try:
             if object_id in datastore_dict.keys():
                 # Find all version dicts and delete them
