@@ -68,7 +68,7 @@ class TestScienceObjectCodec(PyonTestCase):
         # read the binary string representation of the file
         self.known_hdf_as_string = f.read() # this is a known string to compare against during tests
         f.close()
-
+        # cleaning up
         os.remove(self.filename)
 
     def random_name(self):
@@ -93,6 +93,22 @@ class TestScienceObjectCodec(PyonTestCase):
 
         self.assertEqual(hdf_string,self.known_hdf_as_string)
 
+    def test_encode_withfilename_and_compare(self):
+
+        # Create an encoder and add some (one) dataset/array
+        testfilename = '/tmp/testFile.hdf5'
+        hdfencoder = HDFEncoder(testfilename)
+        hdfencoder.add_hdf_dataset(self.path_to_dataset, self.known_array)
+        # get the string out from encoder
+        hdf_string = hdfencoder.encoder_close()
+
+        self.assertEqual(hdf_string,self.known_hdf_as_string)
+
+        hdfdecoder = HDFDecoder(self.known_hdf_as_string)
+        nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset)
+
+        self.assertEqual(nparray.tostring(), self.known_array.tostring())
+
     def test_decode_bad_string(self):
         # assert raises a known error if the string fed in is not that of an hdf file
         # create a decoder and feed in a bad string.. this should raise an error
@@ -110,11 +126,6 @@ class TestScienceObjectCodec(PyonTestCase):
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset) # get array out
 
         self.assertEqual(nparray.tostring(), self.known_array.tostring()) # works for arbitrarily shaped arrays
-
-#        # If the two arrays are the same, the boolean below should be an array of false values
-#        false_condition = nparray != self.known_array
-#        # now assert that the two read and known numpy arrays are the same
-#        assert not(false_condition.all()), 'Encode-decode sequence resulted in array mismatch.'
 
     def test_decode_encode(self):
 
@@ -154,19 +165,7 @@ class TestScienceObjectCodec(PyonTestCase):
             testencoder.add_hdf_dataset(self.dataset_name,'bad array')
         testencoder.encoder_close()
 
-    def test_hdf_to_string(self):
-#        testencoder = HDFEncoder()
-#        testencoder.add_hdf_dataset(self.dataset_name, self.known_array)
-#        out_string = testencoder.hdf_to_string()
-        pass
 
-
-#        # open the hdf5 file using python 'open()'
-#        f = open(self.filename, mode='rb')
-#        # read the binary string representation of the file
-#        hdf_string = f.read()
-#        f.close()
-#        self.assertEqual(hdf_string, self.known_hdf_as_string)
 
 
 
