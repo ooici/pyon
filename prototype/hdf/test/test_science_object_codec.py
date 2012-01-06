@@ -18,6 +18,7 @@ try:
     import numpy
 except ImportError:
     log.warn('h5py and numpy have not been installed. Some features of the science object transport framework will not work!')
+    no_numpy_h5py = True
 
 import uuid
 import hashlib
@@ -25,8 +26,7 @@ import os
 
 from prototype.hdf.science_object_codec import HDFEncoder, HDFDecoder
 from prototype.hdf.science_object_codec import HDFEncoderException, HDFDecoderException
-
-
+no_numpy_h5py = False
 
 @attr('UNIT', group='dm')
 class TestScienceObjectCodec(PyonTestCase):
@@ -50,6 +50,7 @@ class TestScienceObjectCodec(PyonTestCase):
     def tearDown(self):
         pass
 
+    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
     def create_known(self):
         # a known array to compare against during tests
         ##############################################################
@@ -79,6 +80,7 @@ class TestScienceObjectCodec(PyonTestCase):
     def random_name(self):
         return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
 
+    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
     def test_decode_known_and_compare(self):
 
         # create a decoder and read a numpy array from it
