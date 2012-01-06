@@ -382,4 +382,5 @@ class DataStore(object):
             return self.find_res_by_type(restype, lcstate, id_only)
         elif lcstate:
             return self.find_res_by_lcstate(lcstate, restype, id_only)
-
+        elif not restype and not lcstate and not name:
+            return self.find_res_by_type(None, None, id_only)

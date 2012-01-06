@@ -169,6 +169,12 @@ start the container from the command line below (the -n seems to be required)
     > bin/pyccd -n --rel res/deploy/r2services.yml
 
 
+DATASTORE
+=========
+
+View and manipulate the CouchDB datastore, by accessing http://localhost:5984/_utils
+
+
 EXAMPLES
 ========
 

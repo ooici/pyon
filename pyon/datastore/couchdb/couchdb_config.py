@@ -73,19 +73,25 @@ function(doc) {
         'by_type':{
             'map':"""
 function(doc) {
-  emit([doc.type_, doc.lcstate, doc.name], null);
+  if (doc.type_ && doc.type_!="Association") {
+    emit([doc.type_, doc.lcstate, doc.name], null);
+  }
 }""",
         },
         'by_lcstate':{
             'map':"""
 function(doc) {
-  emit([doc.lcstate, doc.type_, doc.name], null);
+  if (doc.type_ && doc.type_!="Association") {
+    emit([doc.lcstate, doc.type_, doc.name], null);
+  }
 }""",
         },
         'by_name':{
             'map':"""
 function(doc) {
-  emit([doc.name, doc.type_, doc.lcstate], null);
+  if (doc.type_ && doc.type_!="Association") {
+    emit([doc.name, doc.type_, doc.lcstate], null);
+  }
 }""",
         }
     },

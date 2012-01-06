@@ -643,12 +643,15 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
         db = self.server[self.datastore_name]
         view = db.view(self._get_viewname("resource","by_type"), include_docs=(not id_only))
-        key = [restype]
-        if lcstate:
-            key.append(lcstate)
-        endkey = list(key)
-        endkey.append(END_MARKER)
-        rows = view[key:endkey]
+        if restype:
+            key = [restype]
+            if lcstate:
+                key.append(lcstate)
+            endkey = list(key)
+            endkey.append(END_MARKER)
+            rows = view[key:endkey]
+        else:
+            rows = view
 
         res_assocs = [dict(type=row['key'][0], lcstate=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_type() found %s objects" % (len(res_assocs)))

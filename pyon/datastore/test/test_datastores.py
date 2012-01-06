@@ -398,6 +398,11 @@ class Test_DataStores(IonIntegrationTestCase):
         if is_persistent:
             data_store._update_views()
 
+        # Find all resources
+        res_ids1, res_assoc1 = data_store.find_res_by_type(None, None, id_only=True)
+        self.assertEquals(len(res_ids1), 8)
+        self.assertEquals(len(res_assoc1), 8)
+
         # Find resources by type
         res_ids1, res_assoc1 = data_store.find_res_by_type(RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids1), 2)
@@ -409,7 +414,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
-        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.NEW, LCS.ACTIVE]))
+        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.DRAFT, LCS.ACTIVE]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_type(RT.UserIdentity, LCS.ACTIVE, id_only=True)
         self.assertEquals(len(res_ids2), 1)

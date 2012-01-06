@@ -642,8 +642,8 @@ class MockDB_DataStore(DataStore):
         target_list = []
         for objname,obj in datastore_dict.iteritems():
             if (objname.find('_version_')>0) or (not type(obj) is dict): continue
-            if 'type_' in obj and obj['type_'] == restype:
-                if (lcstate and 'lcstate' in obj and obj['lcstate'] == lcstate) or not lcstate:
+            if 'type_' in obj and (obj['type_'] == restype or (not restype and obj['type_'] != "Association")):
+                if (lcstate and 'lcstate' in obj and obj['lcstate'] == lcstate) or not lcstate or not restype:
                     target_id_list.append(obj['_id'])
                     target_list.append(self._persistence_dict_to_ion_object(obj))
                     assoc_list.append([])
