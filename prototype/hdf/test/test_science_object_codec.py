@@ -12,8 +12,12 @@ from nose.plugins.attrib import attr
 from pyon.core.exception import NotFound
 import unittest
 
-import h5py
-import numpy
+try:
+    import h5py
+    import numpy
+except ImportError:
+    log.warn('h5py and numpy have not been installed. Some features of the science object transport framework will not work!')
+
 import uuid
 import hashlib
 import os
