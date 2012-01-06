@@ -73,14 +73,14 @@ class DataStore(object):
         """
         pass
 
-    def create(self, object, object_id=None, datastore_name=""):
+    def create(self, obj, object_id=None, datastore_name=""):
         """"
         Persist a new Ion object in the data store. An '_id' and initial
         '_rev' value will be added to the doc.
         """
         pass
 
-    def create_doc(self, object, object_id=None, datastore_name=""):
+    def create_doc(self, obj, object_id=None, datastore_name=""):
         """"
         Persist a new raw doc in the data store. An '_id' and initial
         '_rev' value will be added to the doc.
@@ -116,19 +116,19 @@ class DataStore(object):
         """
         pass
 
-    def read_mult(self, object_ids, datastore_name="", id_only=False):
+    def read_mult(self, object_ids, datastore_name=""):
         """"
         Fetch multiple Ion object instances, HEAD rev.
         """
         pass
 
-    def read_doc_mult(self, object_ids, datastore_name="", id_only=False):
+    def read_doc_mult(self, object_ids, datastore_name=""):
         """"
         Fetch a raw doc instances, HEAD rev.
         """
         pass
 
-    def update(self, object, datastore_name=""):
+    def update(self, obj, datastore_name=""):
         """
         Update an existing Ion object in the data store.  The '_rev' value
         must exist in the object and must be the most recent known object
@@ -136,7 +136,7 @@ class DataStore(object):
         """
         pass
 
-    def update_doc(self, object, datastore_name=""):
+    def update_doc(self, obj, datastore_name=""):
         """
         Update an existing raw doc in the data store.  The '_rev' value
         must exist in the doc and must be the most recent known doc
@@ -144,7 +144,7 @@ class DataStore(object):
         """
         pass
 
-    def delete(self, object, datastore_name=""):
+    def delete(self, obj, datastore_name=""):
         """
         Remove all versions of specified Ion object from the data store.
         This method will check the '_rev' value to ensure that the object
@@ -155,7 +155,7 @@ class DataStore(object):
         """
         pass
 
-    def delete_doc(self, object, datastore_name=""):
+    def delete_doc(self, obj, datastore_name=""):
         """
         Remove all versions of specified raw doc from the data store.
         This method will check the '_rev' value to ensure that the doc
@@ -247,7 +247,7 @@ class DataStore(object):
         """
         pass
 
-    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref(self, subject="", predicate="", obj="", datastore_name=""):
         """
         Generic association query function that allows queries for associations
         by subject, predicate and/or object.  Examples:
@@ -267,7 +267,7 @@ class DataStore(object):
         """
         pass
 
-    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", obj="", datastore_name=""):
         """
         Same as the resolve_association_tuple method except that this function returns
         a set of tuples in the form
@@ -275,11 +275,11 @@ class DataStore(object):
         """
         pass
 
-    def create_association(self, subject=None, predicate=None, object=None, assoc_type='H2H'):
+    def create_association(self, subject=None, predicate=None, obj=None, assoc_type='H2H'):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if not subject and not predicate and not object:
+        if not subject and not predicate and not obj:
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
@@ -290,14 +290,14 @@ class DataStore(object):
             raise BadRequest("Subject rev or id not available")
         st = subject._def.type.name
 
-        if type(object) is str:
-            object_id = object
-            object = self.read(object_id)
+        if type(obj) is str:
+            object_id = obj
+            obj = self.read(object_id)
         else:
-            object_id = object._id
-        if "_rev" not in object or not object_id:
+            object_id = obj._id
+        if "_rev" not in obj or not object_id:
             raise BadRequest("Object rev or id not available")
-        ot = object._def.type.name
+        ot = obj._def.type.name
 
         assoc_type = assoc_type or 'H2H'
         if not assoc_type in ('H2H', 'R2R', 'H2R', 'R2H', 'R2R'):
@@ -333,7 +333,7 @@ class DataStore(object):
                           at=assoc_type,
                           s=subject_id, st=st, srv=subject._rev,
                           p=predicate,
-                          o=object_id, ot=ot, orv=object._rev,
+                          o=object_id, ot=ot, orv=obj._rev,
                           ts=get_ion_ts())
         return self.create(assoc)
 
@@ -353,7 +353,7 @@ class DataStore(object):
         """
         pass
 
-    def find_subjects(self, subject_type="", predicate="", object="", id_only=False):
+    def find_subjects(self, subject_type="", predicate="", obj="", id_only=False):
         """
         Find subjects (or subject ids) by association from a given object or object id (if str).
         Returns a tuple (list_of_subjects, list_of_associations) if id_only == False, or
@@ -363,7 +363,7 @@ class DataStore(object):
         """
         pass
 
-    def find_associations(self, subject="", predicate="", object="", id_only=True):
+    def find_associations(self, subject="", predicate="", obj="", id_only=True):
         """
         Find associations by subject, predicate, object. Either subject and predicate have
         to be provided or predicate only. Returns either a list of associations or

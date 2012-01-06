@@ -11,14 +11,14 @@ from interface.services.examples.hello.ihello_service  import HelloServiceProces
 class FakeProcess(LocalContextMixin):
     name = ''
 
-def hello_client(container, user_id='anonymous', org_id='no-ooi'):
+def hello_client(container, user_id='anonymous', org_id='no-ooi', text='mytext 123'):
 
    # client = ProcessRPCClient(node=container.node, name="hello", iface=IHelloService,  process=FakeProcess())
 
     try:
         client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
-        ret = client.hello(" initial text sent is 123 ", headers={'ion-user-id': user_id, 'ion-org-id': org_id})
+        ret = client.hello(text, headers={'ion-user-id': user_id, 'ion-org-id': org_id})
 
         print "Returned: " + str(ret)
     except Exception, e:

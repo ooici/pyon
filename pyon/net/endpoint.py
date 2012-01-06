@@ -2,7 +2,7 @@
 
 """Provides the communication layer above channels."""
 
-from gevent import event
+from gevent import event, coros
 from zope import interface
 
 from pyon.core import bootstrap
@@ -246,6 +246,14 @@ class BaseEndpoint(object):
         else:
             self.endpoint_by_name[name] = [self]
 
+    def create_channel(self, **kwargs):
+        """
+        Creates a channel object based on the channel_type specified as a class attribute.
+
+        Can pass through any kwargs.
+        """
+        return self.channel_type(**kwargs)
+
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """
         @param  to_name     Either a string or a 2-tuple of (exchange, name)
@@ -257,9 +265,8 @@ class BaseEndpoint(object):
             assert name
             if not isinstance(name, tuple):
                 name = (bootstrap.sys_name, name)
-            #ch = self.node.channel(self.channel_type)
-            ch = self.channel_type()
-            self.node.channel(ch)
+
+            ch = self.node.channel(self.channel_type, self.create_channel)
 
             # @TODO: bla
             if hasattr(ch, 'connect'):
@@ -302,8 +309,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
     """
-    #channel_type = Bidirectional
-    #channel_type = ListenChannel        # channel type is perverted here - we don't produce this, we just make one to listen on
+    channel_type = ListenChannel
 
     def __init__(self, node=None, name=None):
         BaseEndpoint.__init__(self, node=node, name=name)
@@ -316,17 +322,13 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
         return self._ready_event
 
-    def _create_main_channel(self):
-        return ListenChannel()
-
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
     def listen(self):
         log.debug("LEF.listen")
 
-        self._chan = self._create_main_channel()
-        self.node.channel(self._chan)
+        self._chan = self.node.channel(self.channel_type, self.create_channel)
         self._setup_listener(self.name, binding=self.name[1])
         self._chan.start_consume()
 
@@ -426,10 +428,7 @@ class SubscriberEndpointUnit(EndpointUnit):
 class Subscriber(ListeningBaseEndpoint):
 
     endpoint_unit_type = SubscriberEndpointUnit
-    #channel_type = PubSub
-
-    def _create_main_channel(self):
-        return SubscriberChannel()
+    channel_type = SubscriberChannel
 
     def _setup_listener(self, name, binding=None):
         """
@@ -507,9 +506,8 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
 
 class RequestResponseServer(ListeningBaseEndpoint):
     endpoint_unit_type = ResponseEndpointUnit
-
-    def _create_main_channel(self):
-        return ServerChannel()
+    channel_type = ServerChannel
+    pass
 
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
@@ -529,6 +527,30 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
             self._raise_exception(res_headers["status_code"], res_headers["error_message"])
 
         return res, res_headers
+
+    conv_id_counter = 0
+    _lock = coros.RLock()       # @TODO: is this safe?
+
+    def _build_conv_id(self):
+        """
+        Builds a unique conversation id based on the container name.
+        """
+        with RPCRequestEndpointUnit._lock:
+            RPCRequestEndpointUnit.conv_id_counter += 1
+        return "%s-%d" % (bootstrap.sys_name, RPCRequestEndpointUnit.conv_id_counter)
+
+    def _build_header(self, raw_msg):
+        """
+        Build header override.
+
+        This should set header values that are invariant or have nothing to do with the specific
+        call being made (such as op).
+        """
+        headers = RequestEndpointUnit._build_header(self, raw_msg)
+        headers['protocol'] = 'rpc'
+        headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
+        headers['conv-id'] = self._build_conv_id()
+        return headers
 
     def _raise_exception(self, code, message):
         if code == exception.BAD_REQUEST:
@@ -652,6 +674,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             log.debug("Got error response")
             response_headers = self._create_error_response(ex)
 
+        # REPLIES: propogate protocol, conv-id, conv-seq
+        response_headers['protocol']    = headers.get('protocol', '')
+        response_headers['conv-id']     = headers.get('conv-id', '')
+        response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+
         return self.send(result, response_headers)
 
     def message_received(self, msg, headers):
@@ -735,31 +762,8 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
     def _build_header(self, raw_msg):
         """
-        See: https://confluence.oceanobservatories.org/display/CIDev/Process+Model
-
-        From R1 Conversations:
-            headers: (many get copied to message instance via R1 interceptor)
-                sender              - set by envelope interceptor (headers.get('sender', message.get('sender'))
-                sender-name         - set in Process.send
-                conv-id             - set by envelope interceptor (passed in or ''), set by Process.send (from conv.conv_id, or created new if no conv)
-                conv-seq            - set by envelope interceptor (passed in or '1'), or set by Process.reply
-                performative        - set by envelope interceptor (passed in or ''), set by Process.send supercalls, possible values: request, inform_result, failure, [agree, refuse]
-                protocol            - set by envelope interceptor (passed in or ''), set by Process.send (from conv.protocol or CONV_TYPE_NONE), possible values: rpc...
-                reply-to            - set by envelope interceptor (reply-to, sender)
-                user-id             - set by envelope interceptor (passed in or "ANONYMOUS")
-                expiry              - set by envelope interceptor (passed in or "0")
-                quiet               - (unused)
-                encoding            - set by envelope interceptor (passed in or "json"), set by codec interceptor (ION_R1_GPB)
-                language            - set by envelope interceptor (passed in or "ion1")
-                format              - set by envelope interceptor (passed in or "raw")
-                ontology            - set by envelope interceptor (passed in or '')
-                status              - set by envelope interceptor (passed in or 'OK')
-                ts                  - set by envelope interceptor (always current time in ms)
-                op                  - set by envelope interceptor (copies 'operation' passed in)
-            conversation?
-            process
-            content
-
+        Builds the header for this Process-level RPC conversation.
+        https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
         """
 
         context = self._process.get_context()

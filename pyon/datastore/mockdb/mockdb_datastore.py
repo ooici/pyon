@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Conflict, NotFound
+from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
 
@@ -22,18 +23,22 @@ class MockDB_DataStore(DataStore):
         self.root = {}
 
     def create_datastore(self, datastore_name="", create_indexes=True):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.info('Creating data store %s' % datastore_name)
+        if self.datastore_exists(datastore_name):
+            raise BadRequest("Data store create failed.  Data store with name %s already exists" % datastore_name)
         if datastore_name not in self.root:
             self.root[datastore_name] = {}
 
     def delete_datastore(self, datastore_name=""):
-        if datastore_name == "":
+        if not datastore_name:
             datastore_name = self.datastore_name
         log.info('Deleting data store %s' % datastore_name)
         if datastore_name in self.root:
             del self.root[datastore_name]
+        else:
+            raise NotFound('Data store delete failed.  Data store %s does not exist' % datastore_name)
 
     def list_datastores(self):
         log.debug('Listing all data stores')
@@ -48,7 +53,7 @@ class MockDB_DataStore(DataStore):
         if datastore_name in self.root:
             info = 'Data store exists'
         else:
-            info = 'Data store does not exist'
+            raise BadRequest("Data store info lookup failed.  Data store with name %s does not exist" % datastore_name)
         log.debug('Data store info: %s' % str(info))
         return info
 
@@ -78,8 +83,10 @@ class MockDB_DataStore(DataStore):
         log.debug('Versions: %s' % str(res))
         return res
 
-    def create(self, object, object_id=None, datastore_name=""):
-        return self.create_doc(self._ion_object_to_persistence_dict(object),
+    def create(self, obj, object_id=None, datastore_name=""):
+        if not isinstance(obj, IonObjectBase):
+            raise BadRequest("Data store create object failed.  Obj param is not object type")
+        return self.create_doc(self._ion_object_to_persistence_dict(obj),
                                object_id=object_id, datastore_name=datastore_name)
 
     def create_doc(self, doc, object_id=None, datastore_name=""):
@@ -118,6 +125,8 @@ class MockDB_DataStore(DataStore):
         return res
 
     def create_mult(self, objects, object_ids=None):
+        if any([not isinstance(obj, IonObjectBase) for obj in objects]):
+            raise BadRequest("Data store create object failed.  Object param wrong type")
         return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
                                     object_ids)
 
@@ -139,6 +148,8 @@ class MockDB_DataStore(DataStore):
         return res
 
     def read(self, object_id, rev_id="", datastore_name=""):
+        if not isinstance(object_id, str):
+            raise BadRequest("Data store read object failed.  Object id param is not string")
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Ion object
@@ -167,8 +178,38 @@ class MockDB_DataStore(DataStore):
         log.debug('Read result: %s' % str(doc))
         return doc
 
-    def update(self, object, datastore_name=""):
-        return self.update_doc(self._ion_object_to_persistence_dict(object))
+    def read_mult(self, object_ids, datastore_name=""):
+        if any([not isinstance(object_id, str) for object_id in object_ids]):
+            raise BadRequest("Data store read object mult failed.  Object id param is not string")
+        docs = self.read_doc_mult(object_ids, datastore_name)
+        # Convert docs into Ion objects
+        obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
+        return obj_list
+
+    def read_doc_mult(self, object_ids, datastore_name=""):
+        print "object_ids: " + str(object_ids)
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        try:
+            datastore_dict = self.root[datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        doc_list = []
+        try:
+            for object_id in object_ids:
+                log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
+                doc = datastore_dict[object_id]
+
+                doc_list.append(doc.copy())
+        except KeyError:
+            raise NotFound('Object with id %s does not exist.' % str(object_id))
+        return doc_list
+
+    def update(self, obj, datastore_name=""):
+        if not isinstance(obj, IonObjectBase):
+            raise BadRequest("Data store update object failed.  Obj param is not object type")
+        return self.update_doc(self._ion_object_to_persistence_dict(obj))
 
     def update_doc(self, doc, datastore_name=""):
         if not datastore_name:
@@ -205,10 +246,12 @@ class MockDB_DataStore(DataStore):
         log.debug('Update result: %s' % str(res))
         return res
 
-    def delete(self, object, datastore_name=""):
-        if type(object) is str:
-            return self.delete_doc(object, datastore_name=datastore_name)
-        return self.delete_doc(self._ion_object_to_persistence_dict(object), datastore_name=datastore_name)
+    def delete(self, obj, datastore_name=""):
+        if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
+            raise BadRequest("Data store delete object failed.  Obj param is not object type or string id")
+        if type(obj) is str:
+            return self.delete_doc(obj, datastore_name=datastore_name)
+        return self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
         if not datastore_name:
@@ -218,19 +261,21 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = doc["_id"]
-        log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
-        try:
-            if object_id in datastore_dict.keys():
-                # Find all version dicts and delete them
-                for key in datastore_dict.keys():
-                    if key.find(object_id + '_version_') == 0:
-                        del datastore_dict[key]
-                # Delete the HEAD dict
-                del datastore_dict[object_id]
-                # Delete the version counter dict
-                del datastore_dict['__' + object_id + '_version_counter']
-        except KeyError:
+        if type(doc) is str:
+            object_id = doc
+        else:
+            object_id = doc["_id"]
+        log.info('Deleting object %s/%s' % (datastore_name, object_id))
+        if object_id in datastore_dict.keys():
+            # Find all version dicts and delete them
+            for key in datastore_dict.keys():
+                if key.find(object_id + '_version_') == 0:
+                    del datastore_dict[key]
+            # Delete the HEAD dict
+            del datastore_dict[object_id]
+            # Delete the version counter dict
+            del datastore_dict['__' + object_id + '_version_counter']
+        else:
             raise NotFound('Object ' + object_id + ' does not exist.')
         log.info('Delete result: True')
 
@@ -423,8 +468,8 @@ class MockDB_DataStore(DataStore):
 
         return results
 
-    def resolve_idref(self, subject="", predicate="", object="", datastore_name=""):
-        res_list = self.resolve_idref_doc(subject, predicate, object, datastore_name)
+    def resolve_idref(self, subject="", predicate="", obj="", datastore_name=""):
+        res_list = self.resolve_idref_doc(subject, predicate, obj, datastore_name)
 
         results = []
         # Convert each returned doc to its associated Ion object
@@ -433,13 +478,13 @@ class MockDB_DataStore(DataStore):
             object_dict = item[2]
             subject = self._persistence_dict_to_ion_object(subject_dict)
             log.debug('Subject Ion object: %s' % str(subject))
-            object = self._persistence_dict_to_ion_object(object_dict)
-            log.debug('Object Ion object: %s' % str(object))
-            results.append([subject, item[1], object])
+            obj = self._persistence_dict_to_ion_object(object_dict)
+            log.debug('Object Ion object: %s' % str(obj))
+            results.append([subject, item[1], obj])
 
         return results
 
-    def resolve_idref_doc(self, subject="", predicate="", object="", datastore_name=""):
+    def resolve_idref_doc(self, subject="", predicate="", obj="", datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
         try:
@@ -449,72 +494,72 @@ class MockDB_DataStore(DataStore):
 
         if subject == "":
             if predicate == "":
-                if object == "":
+                if obj == "":
                     # throw exception
                     raise BadRequest("Data store query does not specify subject, predicate or object")
                 else:
                     # Find all subjects with any association to object
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     res = []
                     all_doc_ids = self.list_objects(datastore_name)
                     for subject_doc_id in all_doc_ids:
-                        if subject_doc_id == object:
+                        if subject_doc_id == obj:
                             continue
                         subject_doc = self.read_doc(subject_doc_id, "", datastore_name)
                         for key in subject_doc:
                             if isinstance(subject_doc[key], list):
-                                if object in subject_doc[key]:
+                                if obj in subject_doc[key]:
                                     res.append([subject_doc, key, object_doc])
                             else:
-                                if object == subject_doc[key]:
+                                if obj == subject_doc[key]:
                                     res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
-                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
                     else:
                         return res
             else:
                 # Find all subjects with association to object
-                object_doc = self.read_doc(object, "", datastore_name)
+                object_doc = self.read_doc(obj, "", datastore_name)
                 res = []
                 all_doc_ids = self.list_objects(datastore_name)
                 for subject_doc_id in all_doc_ids:
-                    if subject_doc_id == object:
+                    if subject_doc_id == obj:
                         continue
                     subject_doc = self.read_doc(subject_doc_id, "", datastore_name)
                     if predicate in subject_doc:
-                        if object in subject_doc[predicate]:
+                        if obj in subject_doc[predicate]:
                             res.append([subject_doc, predicate, object_doc])
 
                 if len(res) == 0:
-                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
                 else:
                     return res
         else:
             if predicate == "":
-                if object == "":
+                if obj == "":
                     # Find all objects with any association to subject
                     # TODO would need some way to indicate a key is an association predicate
                     pass
                 else:
                     # Find all associations between subject and object
                     subject_doc = self.read_doc(subject, "", datastore_name)
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     res = []
                     for key in subject_doc:
                         if isinstance(subject_doc[key], list):
-                            if object in subject_doc[key]:
+                            if obj in subject_doc[key]:
                                 res.append([subject_doc, key, object_doc])
                         else:
-                            if object == subject_doc[key]:
+                            if obj == subject_doc[key]:
                                 res.append([subject_doc, key, object_doc])
 
                     if len(res) == 0:
-                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                        raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
                     else:
                         return res
             else:
-                if object == "":
+                if obj == "":
                     # Find all associated objects
                     subject_doc = self.read_doc(subject, "", datastore_name)
                     res = []
@@ -523,15 +568,15 @@ class MockDB_DataStore(DataStore):
                             object_doc = self.read_doc(id, "", datastore_name)
                             res.append([subject_doc, predicate, object_doc])
                         return res
-                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
                 else:
                     # Determine if association exists
                     subject_doc = self.read_doc(subject, "", datastore_name)
-                    object_doc = self.read_doc(object, "", datastore_name)
+                    object_doc = self.read_doc(obj, "", datastore_name)
                     if predicate in subject_doc:
-                        if object in subject_doc[predicate]:
+                        if obj in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
-                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, object))
+                    raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
@@ -564,16 +609,16 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
-    def find_subjects(self, subject_type=None, predicate=None, object=None, id_only=False):
-        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, object, id_only))
-        if not object:
+    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False):
+        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, obj, id_only))
+        if not obj:
             raise BadRequest("Must provide object")
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = object if type(object) is str else object._id
+        object_id = obj if type(obj) is str else obj._id
         assoc_list = []
         target_id_list = []
         target_list = []
@@ -597,18 +642,18 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
-    def find_associations(self, subject=None, predicate=None, object=None, id_only=True):
-        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, object))
-        if not ((subject and object) or predicate):
+    def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
+        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
+        if not ((subject and obj) or predicate):
             raise BadRequest("Illegal parameters")
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        if subject and object:
+        if subject and obj:
             subject_id = subject if type(subject) is str else subject._id
-            object_id = object if type(object) is str else object._id
+            object_id = obj if type(obj) is str else obj._id
             target_list = []
             for objname,obj in datastore_dict.iteritems():
                 if (objname.find('_version_')>0) or (not type(obj) is dict): continue

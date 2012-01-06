@@ -57,7 +57,7 @@ class Node(object):
         """
         log.debug("In Node.stop_node")
 
-    def channel(self, ch_type):
+    def channel(self, ch_type, channel_create_callback):
         """
         Create a channel on current node.
         Implement this in subclass
