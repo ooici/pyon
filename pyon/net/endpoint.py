@@ -2,9 +2,6 @@
 
 """Provides the communication layer above channels."""
 
-from gevent import event, coros
-from zope import interface
-
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core import exception
@@ -13,6 +10,10 @@ from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubC
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
+
+from gevent import event, coros
+from zope import interface
+import uuid
 
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
@@ -530,6 +531,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     conv_id_counter = 0
     _lock = coros.RLock()       # @TODO: is this safe?
+    _conv_id_root = None
 
     def _build_conv_id(self):
         """
@@ -537,7 +539,20 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         """
         with RPCRequestEndpointUnit._lock:
             RPCRequestEndpointUnit.conv_id_counter += 1
-        return "%s-%d" % (bootstrap.sys_name, RPCRequestEndpointUnit.conv_id_counter)
+
+            if not RPCRequestEndpointUnit._conv_id_root:
+                # set default to use uuid-4, similar to what we'd get out of the container id anyway
+                RPCRequestEndpointUnit._conv_id_root = str(uuid.uuid4())[0:6]
+
+                # try to get the real one from the container, but do it safely
+                try:
+                    from pyon.container.cc import Container
+                    if Container.instance and Container.instance.id:
+                        RPCRequestEndpointUnit._conv_id_root = Container.instance.id
+                except:
+                    pass
+
+        return "%s-%d" % (RPCRequestEndpointUnit._conv_id_root, RPCRequestEndpointUnit.conv_id_counter)
 
     def _build_header(self, raw_msg):
         """
