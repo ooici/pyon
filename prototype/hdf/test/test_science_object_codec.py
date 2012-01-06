@@ -9,6 +9,7 @@
 from mock import Mock, sentinel, patch
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
+from pyon.public import log
 from pyon.core.exception import NotFound
 import unittest
 
