@@ -22,11 +22,11 @@ class IonIntegrationTestCase(unittest.TestCase):
         unittest.TestCase.run(self, result)
 
     @contextmanager
-    def container(self):
+    def start_container(self):
         """
         Context Manager for container in tests.
         To use:
-        with self.container() as cc:
+        with self.start_container() as cc:
             # your tests in here
         # container stopped here
         """
