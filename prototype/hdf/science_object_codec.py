@@ -7,7 +7,34 @@
 @author David Stuebe
 @author Swarbhanu Chatterjee
 @brief prototype codec for the science data object
+
+To run the encoder and decoder, please ensure that numpy and h5py are installed. Also make sure that the temporary
+folder, /tmp/, is available for use. Any hdf files that need to be temporarily written to the /tmp/ folder will
+be automatically cleaned at the end of the execution.
+
+Please follow these sequence of steps to run the demo example.
+
+1. In the pyon directory (where the pyon code base is located), run $bin/pycc
+2. In the pycc interactive shell that opens up, run the following command:
+    %loadpy prototype/hdf/example/encoder_decoder_demo.py
+3. The output will be a numpy array of ones and with shape (4,5).
+
+What is happening above is that the demo script, prototype/hdf/example/encoder_decoder_demo.py, is being run. If you read
+the script, you will know the commands to be followed to encode a numpy array (which results in a binary string being
+returned) and decode a binary string (which results in a numpy array to be read out). The demo script is essentially
+an encode-decode operation.
+
+Alternatively, if you dont want to use the script, run bin/pycc to get into the pycc interactive shell,
+and...
+1. Create an encoder object: $encoder = HDFEncoder()
+2. Add data as an array:  $encoder.add_hdf_dataset('/myGroup/measurements/pressure', numpy.ones((10,200)))
+3. Convert all the data to a binary string for easy transportation: $hdf_string = encoder.encoder_close()
+
+4. Create a decoder object: $decoder = HDFDecoder(hdf_string)
+5. Read the array out of the decoder: $decoder.read_hdf_dataset('/myGroup/measurements/pressure')
+
 '''
+
 
 import uuid
 import hashlib
