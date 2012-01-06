@@ -22,6 +22,9 @@ AT = AssocTypes
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
 
+# Life cycle events
+LCE = DotDict()
+
 lcs_workflows = {}
 
 def get_association_type_list():
@@ -58,6 +61,9 @@ def load_definitions():
     initialize_res_lcsms()
     LifeCycleStates.clear()
     LifeCycleStates.update(zip(ResourceLifeCycleSM.BASE_STATES, ResourceLifeCycleSM.BASE_STATES))
+
+    LCE.clear()
+    LCE.update(zip(ResourceLifeCycleSM.BASE_EVENTS, ResourceLifeCycleSM.BASE_EVENTS))
 
 def get_restype_lcsm(restype):
     return lcs_workflows['Resource']
@@ -121,6 +127,12 @@ class ResourceLifeCycleSM(object):
     PUBLISH = "publish"
     UNPUBLISH = "unpublish"
     RETIRE = "retire"
+
+    BASE_EVENTS = [
+        REGISTER,DEVELOP,TEST,INTEGRATE,COMMISSION,DECOMMISSION,
+        DEPLOY,RECOVER,
+        ACTIVATE,DEACTIVATE,PUBLISH,UNPUBLISH,RETIRE
+    ]
 
     BASE_TRANSITIONS = {
         (DRAFT, REGISTER) : PLANNED,
