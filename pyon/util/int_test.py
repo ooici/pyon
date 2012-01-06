@@ -41,6 +41,8 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._stop_container()
 
     def _start_container(self):
+        # hack to force queue auto delete on for int tests
+        self._turn_on_queue_auto_delete()
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
