@@ -2,7 +2,7 @@
 
 from pyon.net.endpoint import RPCClient
 #from interface.services.idatastore_service import IDatastoreService
-from interface.services.ihello_service import IHelloService
+from interface.services.examples.hello.ihello_service import HelloServiceClient, IHelloService
 from pyon.net.messaging import make_node
 import gevent
 import time
@@ -10,18 +10,22 @@ import base64
 import os
 import argparse
 import msgpack
+from pyon.core import bootstrap
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--datasize', type=int, help='Size of data in bytes')
 parser.add_argument('-p', '--parallel', type=int, help='Number of parallel requests to run')
 parser.add_argument('-m', '--msgpack', action='store_true', help='Encode data with msgpack')
-parser.set_defaults(datasize=1024, parallel=1)
+parser.add_argument('-s', '--sysname', action='store', help='ION System Name')
+parser.set_defaults(datasize=1024, parallel=1, sysname='tt')
 opts = parser.parse_args()
 
+bootstrap.sys_name = opts.sysname
+bootstrap.bootstrap_pyon()
 
 node,iowat=make_node()
 #dsclient = RPCClient(node=node, name="datastore", iface=IDatastoreService)
-hsclient = RPCClient(node=node, name="hello", iface=IHelloService)
+hsclient = HelloServiceClient(node=node)#RPCClient(node=node, name="hello", iface=IHelloService)
 
 # make data (bytes)
 DATA_SIZE = opts.datasize

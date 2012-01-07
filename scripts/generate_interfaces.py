@@ -145,9 +145,9 @@ ${methods}
 '''
     def ${name}(${args}, headers=None):
         ${methoddocstring}
-        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers)
+        return self.request(IonObject('${req_in_obj_name}', $req_in_obj_args), op='${name}', headers=headers)
 ''',
-    'obj_arg': "'${name}': ${name} or ${default}",
+    'obj_arg': "${name}=${name} or ${default}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
     def __init__(self, name=None, node=None, **kwargs):

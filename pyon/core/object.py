@@ -40,6 +40,10 @@ class IonObjectMetaType(type):
     _type_cache = {}
 
     def __call__(cls, _def, _dict=None, *args, **kwargs):
+
+        # some schemas are None
+        schema = _def.schema or OrderedDict()
+
         if _def in IonObjectMetaType._type_cache:
             cls_type = IonObjectMetaType._type_cache[_def]
         else:
@@ -51,14 +55,14 @@ class IonObjectMetaType(type):
             base_name = 'IonObject'
             cls_name = '%s_%s_%s' % (base_name, _def.type.name, _def.hash[:8])
             cls_dict = {'_def': _def}
-            cls_dict.update(copy.deepcopy(_def.schema))
+            cls_dict.update(copy.deepcopy(schema))
             #cls_dict['__slots__'] = cls_dict.keys() + ['__weakref__']
 
             cls_type = IonObjectMetaType.__new__(IonObjectMetaType, cls_name, (cls,), cls_dict)
             IonObjectMetaType._type_cache[_def] = cls_type
 
         # Auto-copy the schema so we can use __dict__ authoritatively and simplify the code
-        __dict__ = copy.deepcopy(dict(_def.schema))
+        __dict__ = copy.deepcopy(dict(schema))
         if _dict is not None:
             __dict__.update(_dict)
             
@@ -467,7 +471,7 @@ def walk(o, cb):
     elif isinstance(newo, IonObjectBase):
         # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
         # @TODO consolidate with _validate method in IonObjectBase
-        fields, set_fields = newo.__dict__, set(newo._def.schema)
+        fields, set_fields = newo.__dict__, set(newo._def.schema or {})
         set_fields.intersection_update(fields)
 
         for fieldname in set_fields:

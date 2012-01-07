@@ -102,7 +102,8 @@ class NodeB(amqp.Node):
 
                 return chan
 
-            if ch_type == channel.BidirClientChannel:
+            # having _queue_auto_delete on is a pre-req to being able to pool.
+            if ch_type == channel.BidirClientChannel and not ch_type._queue_auto_delete:
                 chid = self._pool.get_id()
                 if chid in self._bidir_pool:
                     log.debug("BidirClientChannel requested, pulling from pool (%d)", chid)
@@ -129,6 +130,14 @@ class NodeB(amqp.Node):
                 chid = self._pool_map.pop(ch._amq_chan.channel_number)
                 log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
                 self._pool.release_id(chid)
+
+                # sanity check: if auto delete got turned on, we must remove this channel from the pool
+                if ch._queue_auto_delete:
+                    log.warn("A pooled channel now has _queue_auto_delete set true, we must remove it: check what caused this as it's likely a timing error")
+
+                    self._bidir_pool.pop(chid)
+                    self._pool.ids_free.remove(chid)
+
         else:
             ch.close_impl()
 
