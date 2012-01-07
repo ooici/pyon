@@ -612,6 +612,21 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids2n), 0)
         self.assertEquals(len(res_assoc2n), 0)
 
+        # Find resources by lcstate - hierarchical
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.ON, id_only=True)
+        self.assertEquals(len(res_ids1), 2)
+        self.assertEquals(len(res_assoc1), 2)
+        self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
+
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.REGISTERED, id_only=True)
+        self.assertEquals(len(res_ids1), 2)
+        self.assertEquals(len(res_assoc1), 2)
+        self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
+
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.OFF, id_only=True)
+        self.assertEquals(len(res_ids1), 0)
+        self.assertEquals(len(res_assoc1), 0)
+
         # Find resources by name
         res_ids1, res_assoc1 = data_store.find_res_by_name('CTD1', id_only=True)
         self.assertEquals(len(res_ids1), 1)

@@ -28,8 +28,8 @@ For Mac, use homebrew
 - rabbitmq 2.6.1 or later (recommended, but can use rabbitmq on amoeba)
     Use brew.
     Alternative: download generic Linux version and unpack into a suitable directory.
-- Install libevent, libyaml, zeromq, couchdb, python, and rabbitmq with Homebrew
-    > brew install libevent libyaml zeromq couchdb python rabbitmq
+- Install libevent, libyaml, couchdb, python, and rabbitmq with Homebrew
+    > brew install libevent libyaml couchdb python rabbitmq
     You can even reinstall git using brew to clean up your /usr/local directory
     Linux: Note that many installs have much older versions installed by default.
       - libevent: Install with package manager

@@ -9,6 +9,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
+from pyon.ion.resource import ResourceLifeCycleSM
 from pyon.util.log import log
 
 class MockDB_DataStore(DataStore):
@@ -706,12 +707,16 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
+        if lcstate in ResourceLifeCycleSM.STATE_ALIASES:
+            lcstate_match = ResourceLifeCycleSM.STATE_ALIASES[lcstate]
+        else:
+            lcstate_match = [lcstate]
         assoc_list = []
         target_id_list = []
         target_list = []
         for objname,obj in datastore_dict.iteritems():
             if (objname.find('_version_')>0) or (not type(obj) is dict): continue
-            if 'lcstate' in obj and obj['lcstate'] == lcstate:
+            if 'lcstate' in obj and obj['lcstate'] in lcstate_match:
                 if (restype and obj['type_'] == restype) or not restype:
                     target_id_list.append(obj['_id'])
                     target_list.append(self._persistence_dict_to_ion_object(obj))
@@ -722,6 +727,9 @@ class MockDB_DataStore(DataStore):
             return (target_id_list, assoc_list)
         else:
             return (target_list, assoc_list)
+
+    def _pass(self):
+        pass
 
     def find_res_by_name(self, name, restype=None, id_only=False):
         log.debug("find_res_by_name(name=%s, restype=%s)" % (name, restype))

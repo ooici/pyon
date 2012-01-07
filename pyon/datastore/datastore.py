@@ -377,7 +377,7 @@ class DataStore(object):
                 raise BadRequest("find by name does not support lcstate")
             return self.find_res_by_name(name, restype, id_only)
         elif restype and lcstate:
-            return self.find_res_by_type(restype, lcstate, id_only)
+            return self.find_res_by_lcstate(lcstate, restype, id_only)
         elif restype:
             return self.find_res_by_type(restype, lcstate, id_only)
         elif lcstate:

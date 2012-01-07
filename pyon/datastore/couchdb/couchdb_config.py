@@ -78,11 +78,36 @@ function(doc) {
   }
 }""",
         },
+        # The following is a more sophisticated index. It does two things for each Resource object:
+        # 1: It emits an index value prefixed by 0 for the actual lcstate
+        # 2: It emits an index value prefixed by 1,parent_state for all parent states
+        # Thereby it is possible to search for resources by hieararchical state and still be able
+        # to return result sets that objects once only.
+        # Note: the order of the type_ in the key is important for case 2, so that range queries are possible
+        # with both type_ without.
         'by_lcstate':{
             'map':"""
 function(doc) {
   if (doc.type_ && doc.type_!="Association") {
-    emit([doc.lcstate, doc.type_, doc.name], null);
+    emit([0, doc.lcstate, doc.type_, doc.name], null);
+    if (doc.lcstate != undefined && doc.lcstate != "" && doc.lcstate != "DRAFT" && doc.lcstate != "RETIRED") {
+      emit([1, "REGISTERED", doc.type_, doc.lcstate, doc.name], null);
+      if (doc.lcstate == "PLANNED" || doc.lcstate == "DEVELOPED" || doc.lcstate == "TESTED" || doc.lcstate == "INTEGRATED" || doc.lcstate == "COMMISSIONED") {
+        emit([1, "UNDEPLOYED", doc.type_, doc.lcstate, doc.name], null);
+      } else {
+        emit([1, "DEPLOYED", doc.type_, doc.lcstate, doc.name], null);
+        if (doc.lcstate == "OFFLINE" || doc.lcstate == "ONLINE") {
+          emit([1, "PRIVATE", doc.type_, doc.lcstate, doc.name], null);
+        } else {
+          emit([1, "PUBLIC", doc.type_, doc.lcstate, doc.name], null);
+        }
+        if (doc.lcstate == "OFFLINE" || doc.lcstate == "INACTIVE") {
+          emit([1, "OFF", doc.type_, doc.lcstate, doc.name], null);
+        } else {
+          emit([1, "ON", doc.type_, doc.lcstate, doc.name], null);
+        }
+      }
+    }
   }
 }""",
         },

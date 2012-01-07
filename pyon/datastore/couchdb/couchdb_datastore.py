@@ -14,7 +14,7 @@ from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
-from pyon.util.containers import DotDict
+from pyon.ion.resource import ResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.core.bootstrap import CFG
 
@@ -715,14 +715,23 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_res_by_lcstate(lcstate=%s, restype=%s)" % (lcstate, restype))
         db = self.server[self.datastore_name]
         view = db.view(self._get_viewname("resource","by_lcstate"), include_docs=(not id_only))
-        key = [lcstate]
+        is_hierarchical = (lcstate in ResourceLifeCycleSM.STATE_ALIASES)
+        # lcstate is a hiearachical state and we need to treat the view differently
+        if is_hierarchical:
+            key = [1, lcstate]
+        else:
+            key = [0, lcstate]
         if restype:
             key.append(restype)
         endkey = list(key)
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(lcstate=row['key'][0], type=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
+        if is_hierarchical:
+            res_assocs = [dict(lcstate=row['key'][3], type=row['key'][2], name=row['key'][4], id=row.id) for row in rows]
+        else:
+            res_assocs = [dict(lcstate=row['key'][1], type=row['key'][2], name=row['key'][3], id=row.id) for row in rows]
+
         log.debug("find_res_by_lcstate() found %s objects" % (len(res_assocs)))
         if id_only:
             res_ids = [row.id for row in rows]

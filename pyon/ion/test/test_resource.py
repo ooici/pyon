@@ -17,7 +17,7 @@ class TestResources(PyonTestCase):
 
         self.assertEquals(len(ResourceLifeCycleSM.BASE_STATES), 11)
         self.assertEquals(len(default_workflow.BASE_STATES), 11)
-        self.assertEquals(len(LCS), len(ResourceLifeCycleSM.BASE_STATES))
+        self.assertEquals(len(LCS), len(ResourceLifeCycleSM.BASE_STATES) + len(ResourceLifeCycleSM.STATE_ALIASES))
 
         self.assert_(LCS.DRAFT in ResourceLifeCycleSM.BASE_STATES)
 

@@ -60,7 +60,8 @@ def load_definitions():
     # Life cycle states
     initialize_res_lcsms()
     LifeCycleStates.clear()
-    LifeCycleStates.update(zip(ResourceLifeCycleSM.BASE_STATES, ResourceLifeCycleSM.BASE_STATES))
+    allstates = list(ResourceLifeCycleSM.BASE_STATES) + ResourceLifeCycleSM.STATE_ALIASES.keys()
+    LifeCycleStates.update(zip(allstates, allstates))
 
     LCE.clear()
     LCE.update(zip(ResourceLifeCycleSM.BASE_EVENTS, ResourceLifeCycleSM.BASE_EVENTS))
