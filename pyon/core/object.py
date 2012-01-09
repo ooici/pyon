@@ -15,6 +15,7 @@ import yaml
 
 from pyon.core.path import list_files_recursive
 from pyon.util.log import log
+from pyon.util.containers import DotDict
 #from pyon.util import yaml_ordered_dict
 
 class IonObjectError(Exception):
@@ -82,6 +83,18 @@ class IonObjectBase(object):
         if _dict is not None:
             self.__dict__ = _dict       # Don't copy here, assume this came through the metaclass
         self.__dict__.update(kwargs)
+
+    def __setattr__(self, key, value):
+        """
+        Protect against clobbering enum values.
+        If you actually wanted to clobber an enum value, either access the __dict__ directly, or
+        use an unbound object.__setattr__ call.
+        """
+        if key in self.__dict__ and isinstance(self.__dict__[key], IonEnumObject):
+            self.__dict__[key].value = value
+            return
+
+        object.__setattr__(self, key, value)
 
     def __str__(self):
         """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
@@ -162,7 +175,7 @@ class IonObjectBase(object):
 
 class IonEnumObject(object):
     def __init__(self, enum, default_key=None):
-        self.enum = enum
+        self.enum = DotDict(enum)
         self.default_key = default_key
         self.value = self.enum.get(default_key) if default_key else None
 

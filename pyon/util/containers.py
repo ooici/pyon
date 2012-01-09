@@ -51,6 +51,11 @@ class DotDict(DotNotationGetItem, dict):
     do not use in performance-critical parts of your code.
     """
 
+    def __dir__(self):
+        dictdir = dir(dict(self))       # woof, this is slow, but a rarely called method anyway, really for interactive work
+        dictdir.extend(self.iterkeys())
+        return dictdir
+
     def __getattr__(self, key):
         """ Make attempts to lookup by nonexistent attributes also attempt key lookups. """
         try:
