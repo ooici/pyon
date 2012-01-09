@@ -77,7 +77,7 @@ class CouchDB_DataStore(DataStore):
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
-            raise NotFound('Data store delete failed.  Data store %s does not exist' % datastore_name)
+            log.info('Data store delete failed.  Data store %s does not exist' % datastore_name)
         except ValueError:
             raise BadRequest("Data store delete failed.  Data store name %s invalid" % datastore_name)
 

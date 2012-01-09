@@ -140,10 +140,12 @@ class Test_DataStores(IonIntegrationTestCase):
         self.resources = {}
         # Just in case previous run failed without cleaning up,
         # delete data store
+        deleteFailed = False
         try:
             data_store.delete_datastore()
         except NotFound:
-            pass
+            deleteFailed = True
+        self.assertFalse(deleteFailed)
 
         # Create should succeed and not throw error
         data_store.create_datastore()

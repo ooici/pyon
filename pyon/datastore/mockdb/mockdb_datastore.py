@@ -39,7 +39,7 @@ class MockDB_DataStore(DataStore):
         if datastore_name in self.root:
             del self.root[datastore_name]
         else:
-            raise NotFound('Data store delete failed.  Data store %s does not exist' % datastore_name)
+            log.info('Data store delete failed.  Data store %s does not exist' % datastore_name)
 
     def list_datastores(self):
         log.debug('Listing all data stores')
