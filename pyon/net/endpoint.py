@@ -312,9 +312,10 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     channel_type = ListenChannel
 
-    def __init__(self, node=None, name=None):
+    def __init__(self, node=None, name=None, binding=None):
         BaseEndpoint.__init__(self, node=node, name=name)
         self._ready_event = event.Event()
+        self._binding = binding
 
     def get_ready_event(self):
         """
@@ -326,11 +327,13 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
-    def listen(self):
-        log.debug("LEF.listen")
+    def listen(self, binding=None):
+        log.debug("LEF.listen: binding %s", binding)
+
+        binding = binding or self._binding or self.name[1]
 
         self._chan = self.node.channel(self.channel_type, self.create_channel)
-        self._setup_listener(self.name, binding=self.name[1])
+        self._setup_listener(self.name, binding=binding)
         self._chan.start_consume()
 
         # notify any listeners of our readiness
@@ -434,7 +437,7 @@ class Subscriber(ListeningBaseEndpoint):
     def _setup_listener(self, name, binding=None):
         """
         Override for setup_listener to make sure we are listening on an anonymous queue.
-        @TODO: correct?
+        @TODO: correct? XXX SEEMS WRONG
         """
         # we expect (xp, name) and binding=name
         ListeningBaseEndpoint._setup_listener(self, (name[0], None), binding=binding)

@@ -5,22 +5,30 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-EVENTS_XP = "pyon.events"
-EVENTS_XP_TYPE = "topic"
 
-from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit
+
+from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
+from pyon.core import bootstrap
 from pyon.net.channel import PubChannel, SubscriberChannel
 from pyon.util.log import log
+import time
+
+# @TODO: configurable
+EVENTS_XP = "pyon.events"
+EVENTS_XP_TYPE = "topic"
+def get_events_exchange_point():
+    return "%s.%s" % (bootstrap.sys_name, EVENTS_XP)
 
 class EventPublisher(Publisher):
 
-    event_name = "BASE_EVENT"       # override this in your derived publisher
+    event_name  = "BASE_EVENT"      # override this in your derived publisher
+    msg_type    = "Event"           # same
 
     def __init__(self, xp=None, **kwargs):
 
         # generate a name
-        xp = xp or EVENTS_XP
-        name = (xp, self.event_name)
+        xp = xp or get_events_exchange_point()
+        name = (xp, None)
 
         Publisher.__init__(self, name=name, **kwargs)
 
@@ -31,19 +39,435 @@ class EventPublisher(Publisher):
         assert self.event_name and origin
         return "%s.%s" % (str(self.event_name), str(origin))
 
+    def _set_event_msg_fields(self, msg, msgargs):
+        """
+        Helper method to set fields of an event message instance. Used by create_event.
+
+        @param msg      The Message instance to set fields on.
+        @param msgargs  The dict of field -> values to set fields on the msg with.
+        @returns        A set of field names in msgargs that were NOT set on the object.
+        """
+        set_fields = set()
+
+        for k,v in msgargs.items():
+            if k in msg.__dict__:
+                setattr(msg, k, v)
+                set_fields.add(k)
+
+        rem_fields = set(msgargs.iterkeys())
+        return rem_fields.difference(set_fields)
+
     def create_event(self, **kwargs):
-        pass
+        assert self.msg_type
+        kwargs = kwargs.copy()
+        if 'ts_created' not in kwargs:
+            kwargs['ts_created'] = time.time()
+
+        msg = bootstrap.IonObject(self.msg_type)
+        rem = self._set_event_msg_fields(msg, kwargs)
+
+        if len(rem):
+            raise EventError("create_event: unused kwargs remaining (%s) for event type %s" % (str(rem), self.msg_type))
+
+        return msg
 
     def publish_event(self, event_msg, origin=None, **kwargs):
         assert origin
 
-        to_name=self._topic(origin)
+        to_name = (self.name[0], self._topic(origin))
         log.debug("Publishing message to %s", to_name)
 
-        ep = self.publish(event_msg, to_name=routing_key)
+        ep = self.publish(event_msg, to_name=to_name)
         ep.close()
 
     def create_and_publish_event(self, origin=None, **kwargs):
         msg = self.create_event(**kwargs)
         self.publish_event(msg, origin=origin)
+
+
+class EventSubscriber(Subscriber):
+    event_name = None       # either set this in your derived class or use None for everything
+
+    def _topic(self, origin):
+        """
+        Builds the topic that this event should be published to.
+        If either side of the event_id.origin pair are missing, will subscribe to anything.
+        """
+        event_name  = self._event_name or "*"
+        origin      = origin or "#"
+
+        return "%s.%s" % (str(event_name), str(origin))
+
+    def __init__(self, xp_name=None, event_name=None, origin=None, queue_name=None, callback=None, *args, **kwargs):
+        """
+        Initializer.
+
+        If the queue_name is specified here, the sysname is prefixed automatically to it. This is becuase
+        named queues are not namespaces to their exchanges, so two different systems on the same broker
+        can cross-pollute messages if a named queue is used.
+        """
+        self._event_name = event_name or self.event_name
+
+        xp_name = xp_name or get_events_exchange_point()
+        binding = self._topic(origin)
+
+        # prefix the queue_name, if specified, with the sysname
+        # this is because queue names transcend xp boundaries (see R1 OOIION-477)
+        if queue_name is not None:
+            if not queue_name.startswith(bootstrap.sys_name):
+                queue_name = "%s.%s" % (bootstrap.sys_name, queue_name)
+                log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
+
+        name = (xp_name, queue_name)
+
+        Subscriber.__init__(self, name=name, binding=binding, callback=callback, **kwargs)
+
+    def _setup_listener(self, name, binding=None):
+        """
+        Override Subscriber - we may have specified a queue name.
+
+        XXX BASECLASS SEEMS WRONG
+        """
+        ListeningBaseEndpoint._setup_listener(self, name, binding=binding)
+
+#############################################################################
+#
+# Specific EventPublisher and EventSubscriber pairs
+#
+#############################################################################
+
+class ResourceLifecycleEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Resource lifecycle events. Used as a concrete derived class, and as a base for
+    specializations such as ContainerLifecycleEvents and ProcessLifecycleEvents.
+
+    The "origin" parameter in this class' initializer should be the resource id (UUID).
+    """
+    msg_type    = "ResourceLifecycleEvent"
+    event_name  = "RESOURCE_LIFECYCLE_EVENT"
+
+class ResourceLifecycleEventSubscriber(EventSubscriber):
+    event_name  = "RESOURCE_LIFECYCLE_EVENT"
+
+#############################################################################
+
+class ContainerLifecycleEventPublisher(ResourceLifecycleEventPublisher):
+    """
+    Event Notification Publisher for Container lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the container name.
+    """
+    event_name  = "CONTAINER_LIFECYCLE_EVENT"
+
+class ContainerLifecycleEventSubscriber(ResourceLifecycleEventSubscriber):
+    event_name = "CONTAINER_LIFECYCLE_EVENT"
+
+#############################################################################
+
+class ProcessLifecycleEventPublisher(ResourceLifecycleEventPublisher):
+    """
+    Event Notification Publisher for Process lifecycle events.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name.
+    """
+    event_name = "PROCESS_LIFECYCLE_EVENT"
+
+class ProcessLifecycleEventSubscriber(ResourceLifecycleEventSubscriber):
+    event_name = "PROCESS_LIFECYCLE_EVENT"
+
+#############################################################################
+
+class InfrastructureEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for infrastructure related events. An abstract base class, should be
+    inherited and overridden.
+    """
+    pass
+
+class AppLoaderEventPublisher(InfrastructureEventPublisher):
+    """
+    Event Notification Publisher for Applications starting and stopping.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    msg_type    = "AppLoaderEvent"
+    event_name  = "APP_LOADER_EVENT"
+
+class ContainerStartupEventPublisher(InfrastructureEventPublisher):
+    """
+    Event Notification Publisher for a Container finishing its running and startup apps.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    msg_type    = "ContainerStartupEvent"
+    event_name  = "CONTAINER_STARTUP_EVENT"
+
+class InfrastructureEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for infrastructure related events. An abstract base class, should be
+    inherited and overridden.
+    """
+    pass
+
+class AppLoaderEventSubscriber(InfrastructureEventSubscriber):
+    """
+    Event Notification Subscriber for Applications starting and stopping.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    event_name  = "APP_LOADER_EVENT"
+
+class ContainerStartupEventSubscriber(InfrastructureEventSubscriber):
+    """
+    Event Notification Subscriber for a Container finishing its running and startup apps.
+
+    The "origin" parameter in this class' initializer should be the application's name.
+    """
+    event_name  = "CONTAINER_STARTUP_EVENT"
+
+#############################################################################
+
+class TriggerEventPublisher(EventPublisher):
+    """
+    Base Publisher class for "triggered" Event Notifications.
+    """
+    msg_type = "TRIGGER_EVENT"
+
+class DatasourceUpdateEventPublisher(TriggerEventPublisher):
+    """
+    Event Notification Publisher for Datasource updates.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_name = "DATASOURCE_UPDATE_EVENT"
+
+class ScheduleEventPublisher(TriggerEventPublisher):
+    """
+    Event Notification Publisher for Scheduled events (ie from the Scheduler service).
+    """
+    event_name  = "SCHEDULE_EVENT"
+
+class TriggerEventSubscriber(EventSubscriber):
+    """
+    Base Subscriber class for "triggered" Event Notifications.
+    """
+    pass
+
+class DatasourceUpdateEventSubscriber(TriggerEventSubscriber):
+    """
+    Event Notification Subscriber for Datasource updates.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_name = "DATASOURCE_UPDATE_EVENT"
+
+class ScheduleEventSubscriber(TriggerEventSubscriber):
+    """
+    Event Notification Subscriber for Scheduled events (ie from the Scheduler service).
+    """
+    event_name = "DATASOURCE_UPDATE_EVENT"
+
+#############################################################################
+
+class ResourceModifiedEventPublisher(EventPublisher):
+    """
+    Base Publisher class for resource modification Event Notifications. This is distinct from resource lifecycle state
+    Event Notifications.
+    """
+    msg_type    = "ResourceModifiedEvent"
+
+class DatasourceUnavailableEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for the Datasource Unavailable event.
+    """
+    event_name  = "DATASOURCE_UNAVAILABLE_EVENT"
+    msg_type    = "DatasourceUnavailableEvent"
+
+class DatasetSupplementAddedEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Supplement Added.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "DATASET_SUPPLEMENT_ADDED_EVENT"
+    msg_type    = "DatasetSupplementAddedEvent"
+
+class BusinessStateModificationEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Modifications.
+
+    The "origin" parameter in this class' initializer should be the process' exchange name (TODO: correct?)
+    """
+    event_name  = "BUSINESS_STATE_MODIFICATION_EVENT"
+
+class DatasetChangeEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Dataset Change Event - Will Cause AIS to clear the cache for this UUID.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "DATASET_CHANGE_EVENT"
+    msg_type    = "DatasetChangeEvent"
+
+class DatasourceChangeEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Datasource Change Event - Will Cause AIS to clear the cache for this UUID.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_name  = "DATASOURCE_CHANGE_EVENT"
+    msg_type    = "DatasourceChangeEvent"
+
+class IngestionProcessingEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Publisher for Ingestion Processing Event - Ingestion telling JAW that it is still working,
+    and increase its delay.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "INGESTION_PROCESSING_EVENT"
+    msg_type    = "IngestionProcessingEvent"
+
+class ResourceModifiedEventSubscriber(EventSubscriber):
+    """
+    Base Subscriber class for resource modification Event Notifications. This is distinct from resource lifecycle state
+    Event Notifications.
+    """
+    pass
+
+class DatasourceUnavailableEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for the Datasource Unavailable event.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_name  = "DATASOURCE_UNAVAILABLE_EVENT"
+
+class DatasetSupplementAddedEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Supplement Added.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "DATASET_SUPPLEMENT_ADDED_EVENT"
+
+class BusinessStateChangeSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_name  = "BUSINESS_STATE_MODIFICATION_EVENT"
+
+class DatasetChangeEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Dataset Change Event.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "DATASET_CHANGE_EVENT"
+
+class DatasourceChangeEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Datasource Change Event.
+
+    The "origin" parameter in this class' initializer should be the datasource resource id (UUID).
+    """
+    event_name  = "DATASOURCE_CHANGE_EVENT"
+
+class IngestionProcessingEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Ingestion Processing Event - Ingestion telling JAW that it is still working,
+    and increase its delay.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_name  = "INGESTION_PROCESSING_EVENT"
+
+class DatasetStreamingEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    @TODO: THIS IS IN R1, WILL REVISIT
+
+    Event Notification Subscriber for Dataset Streaming Event - actual mechanism for getting data from DatasetAgent
+    to Ingestion.
+
+    NOTE: There is no "Publisher" of this event - as it only comes from DatasetAgent (Java) and does not use the
+    standard Message Types for events.  Instead, expect messages of ids 10001, 2001, and 2005.
+
+    The "origin" parameter in this class' initializer should be the dataset resource id (UUID).
+    """
+    event_id = "DATASET_STREAMING_EVENT"
+
+#############################################################################
+
+class NewSubscriptionEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    msg_type    = "NewSubscriptionEvent"
+    event_name  = "NEW_SUBSCRIPTION_EVENT"
+
+class DelSubscriptionEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for Subscription Modifications.
+
+    The "origin" parameter in this class' initializer should be the dispatcher resource id (UUID).
+    """
+    msg_type    = "DelSubscriptionEvent"
+    event_name  = "DEL_SUBSCRIPTION_EVENT"
+
+#############################################################################
+
+# @TODO MOVE THESE TO ION?
+
+class DataEventPublisher(EventPublisher):
+    """
+    Event Notification Publisher for
+
+    The "origin" parameter in this class' initializer should be
+    """
+    msg_type    = "DataEvent"
+    event_name  = "DATA_EVENT"
+
+class DataBlockEventPublisher(DataEventPublisher):
+    """
+    Event Notification Publisher for
+
+    The "origin" parameter in this class' initializer should be
+    """
+    event_name  = "DATABLOCK_EVENT"
+
+class InstrumentSampleDataEventPublisher(DataBlockEventPublisher):
+    """
+    Event Notification Publisher for
+
+    The "origin" parameter in this class' initializer should be
+    """
+    msg_type    = "InstrumentSampleDataEvent"
+
+class DataEventSubscriber(EventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_name  = "DATA_EVENT"
+
+class DataBlockEventSubscriber(DataEventSubscriber):
+    """
+    Event Notification Subscriber for Data Block changes.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_name  = "DATABLOCK_EVENT"
+
+class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
+    """
+    Event Notification Subscriber for Instrument Data.
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    pass
 

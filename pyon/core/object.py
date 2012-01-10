@@ -535,6 +535,11 @@ class IonObjectSerializer(IonObjectSerializationBase):
             res = obj.__dict__
             res["type_"] = obj._def.type.name
             return res
+
+        # just serialize value, the deserialization side will take care of this type
+        if isinstance(obj, IonEnumObject):
+            return obj.value
+
         return obj
 
 class IonObjectDeserializer(IonObjectSerializationBase):
@@ -557,8 +562,15 @@ class IonObjectDeserializer(IonObjectSerializationBase):
         if isinstance(obj, dict) and "type_" in obj:
             objc    = obj.copy()
             type    = objc.pop('type_')
-            ionObj  = self._obj_registry.new(type.encode('ascii'), objc)
-            return ionObj
+
+            # don't supply a dict - we want the object to initialize with all its defaults intact,
+            # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
+            ion_obj = self._obj_registry.new(type.encode('ascii'))
+            for k, v in objc.iteritems():
+                setattr(ion_obj, k, v)
+
+            return ion_obj
+
         return obj
 
 
