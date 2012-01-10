@@ -7,7 +7,7 @@ Capability Container base class
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import CFG, sys_name, bootstrap_pyon
+from pyon.core.bootstrap import CFG, bootstrap_pyon
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
@@ -80,6 +80,7 @@ class Container(BaseContainerAgent):
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:
+            from pyon.core.bootstrap import sys_name
             pid_contents = {'messaging': dict(CFG.server.amqp),
                             'container-agent': self.name,
                             'container-xp': sys_name }

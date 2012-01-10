@@ -161,7 +161,7 @@ class BaseChannel(object):
         Callback for when the Pika channel is closed.
         """
         logmeth = log.debug
-        if code != 0:
+        if not (code == 0 or code == 200):
             logmeth = log.error
         logmeth("BaseChannel.on_channel_close\n\tchannel number: %d\n\tcode: %d\n\ttext: %s", self._amq_chan.channel_number, code, text)
 
