@@ -19,6 +19,8 @@ try:
 except ImportError:
     log.warn('h5py and numpy have not been installed. Some features of the science object transport framework will not work!')
     no_numpy_h5py = True
+    from unittest import SkipTest
+    raise SkipTest('Numpy not installed')
 
 import uuid
 import hashlib
