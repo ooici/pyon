@@ -16,48 +16,7 @@ from pyon.net import channel
 from pyon.net.channel import BaseChannel
 from pyon.util.async import blocking_cb
 from pyon.util.log import log
-
-class IDPool(object):
-    """
-    Create a pool of IDs to allow reuse.
-    The "new_id" function generates the next valid ID from the previous one. If not given, defaults to
-    incrementing an integer.
-    """
-
-    def __init__(self, new_id=None):
-        log.debug("In IDPool.__init__")
-        if new_id is None: new_id = lambda x: x + 1
-        log.debug("new_id: %s" % str(new_id))
-
-        self.ids_in_use = set()
-        self.ids_free = set()
-        self.new_id = new_id
-        self.last_id = 0
-
-    def get_id(self):
-        log.debug("In IDPool.get_id")
-        log.debug("idsfree: %s", self.ids_free)
-        log.debug("idsinuse: %s", self.ids_in_use)
-        if len(self.ids_free) > 0:
-            #log.debug("new_id: %s" % str(new_id))
-            id = self.ids_free.pop()
-            self.ids_in_use.add(id)
-            log.debug("id: %s" % str(id))
-            return id
-
-        self.last_id = id_ = self.new_id(self.last_id)
-        self.ids_in_use.add(id_)
-        log.debug("id: %s" % str(id_))
-        return id_
-
-    def release_id(self, the_id):
-        log.debug("In IDPool.release_id")
-        log.debug("the_id: %s" % str(the_id))
-        log.debug("idsfree: %s", self.ids_free)
-        log.debug("idsinuse: %s", self.ids_in_use)
-        if the_id in self.ids_in_use:
-            self.ids_in_use.remove(the_id)
-            self.ids_free.add(the_id)
+from pyon.util.pool import IDPool
 
 class NodeB(amqp.Node):
     """
@@ -136,7 +95,7 @@ class NodeB(amqp.Node):
                     log.warn("A pooled channel now has _queue_auto_delete set true, we must remove it: check what caused this as it's likely a timing error")
 
                     self._bidir_pool.pop(chid)
-                    self._pool.ids_free.remove(chid)
+                    self._pool._ids_free.remove(chid)
 
         else:
             ch.close_impl()
