@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
@@ -10,6 +9,10 @@ from pyon.util.unit_test import PyonTestCase
 from mock import Mock, sentinel, patch
 from nose.plugins.attrib import attr
 from pyon.core import bootstrap
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.async import spawn
+from gevent import event, queue
+import time
 
 @attr('UNIT')
 class TestEventPublisher(PyonTestCase):
@@ -180,3 +183,126 @@ class TestEventSubscriber(PyonTestCase):
         self._sub._event_name = "pancakes"
         self.assertEquals(self._sub._topic(sentinel.origin), "pancakes.%s" % str(sentinel.origin))
 
+@attr('INT')
+class TestEvents(IonIntegrationTestCase):
+
+    class TestEventPublisher(EventPublisher):
+        event_name = "TESTEVENT"
+    class TestEventSubscriber(EventSubscriber):
+        event_name = "TESTEVENT"
+
+    def setUp(self):
+        self._listens = []
+        self._start_container()
+
+    def tearDown(self):
+        for x in self._listens:
+            x.kill()
+        self._stop_container()
+
+    def _listen(self, sub):
+        """
+        Pass in a subscriber here, this will make it listen in a background greenlet.
+        """
+        gl = spawn(sub.listen)
+        self._listens.append(gl)
+        sub._ready_event.wait(timeout=5)
+
+        return gl
+
+    def test_pub_and_sub(self):
+        ar = event.AsyncResult()
+        def cb(*args, **kwargs):
+            ar.set(args)
+        sub = self.TestEventSubscriber(node=self.container.node, callback=cb, origin="specific")
+        pub = self.TestEventPublisher(node=self.container.node)
+
+        self._listen(sub)
+        pub.create_and_publish_event(origin="specific", description="hello")
+
+        evmsg, evheaders = ar.get(timeout=5)
+
+        self.assertEquals(evmsg.description, "hello")
+        self.assertAlmostEquals(evmsg.ts_created, time.time(), delta=5000)
+
+    def test_pub_on_different_origins(self):
+        ar = event.AsyncResult()
+        gq = queue.Queue()
+        self.count = 0
+
+        def cb(*args, **kwargs):
+            self.count += 1
+            gq.put(args[0])
+            if self.count == 3:
+                ar.set()
+
+        sub = self.TestEventSubscriber(node=self.container.node, callback=cb)
+        pub = self.TestEventPublisher(node=self.container.node)
+
+        self._listen(sub)
+
+        pub.create_and_publish_event(origin="one", description="1")
+        pub.create_and_publish_event(origin="two", description="2")
+        pub.create_and_publish_event(origin="three", description="3")
+
+        ar.get(timeout=5)
+
+        res = []
+        for x in xrange(self.count):
+            res.append(gq.get(timeout=5))
+
+        self.assertEquals(len(res), 3)
+        self.assertEquals(res[0].description, "1")
+        self.assertEquals(res[1].description, "2")
+        self.assertEquals(res[2].description, "3")
+
+    def test_base_subscriber_as_catchall(self):
+        ar = event.AsyncResult()
+        gq = queue.Queue()
+        self.count = 0
+
+        def cb(*args, **kwargs):
+            self.count += 1
+            gq.put(args[0])
+            if self.count == 2:
+                ar.set()
+
+        sub = EventSubscriber(node=self.container.node, callback=cb)
+        pub1 = self.TestEventPublisher(node=self.container.node)
+        pub2 = EventPublisher(node=self.container.node)
+
+        self._listen(sub)
+
+        pub1.create_and_publish_event(origin="some", description="1")
+        pub2.create_and_publish_event(origin="other", description="2")
+
+        ar.get(timeout=5)
+
+        res = []
+        for x in xrange(self.count):
+            res.append(gq.get(timeout=5))
+
+        self.assertEquals(len(res), 2)
+        self.assertEquals(res[0].description, "1")
+        self.assertEquals(res[1].description, "2")
+
+    def test_subscriber_listening_for_specific_origin(self):
+        ar = event.AsyncResult()
+        self.count = 0
+        def cb(*args, **kwargs):
+            self.count += 1
+            ar.set(args[0])
+
+        sub = self.TestEventSubscriber(node=self.container.node, origin="specific", callback=cb)
+        pub = self.TestEventPublisher(node=self.container.node)
+
+        self._listen(sub)
+
+        pub.create_and_publish_event(origin="notspecific", description="1")
+        pub.create_and_publish_event(origin="notspecific", description="2")
+        pub.create_and_publish_event(origin="specific", description="3")
+        pub.create_and_publish_event(origin="notspecific", description="4")
+
+        evmsg = ar.get(timeout=5)
+        self.assertEquals(self.count, 1)
+        self.assertEquals(evmsg.description, "3")
