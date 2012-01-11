@@ -19,6 +19,9 @@ EVENTS_XP_TYPE = "topic"
 def get_events_exchange_point():
     return "%s.%s" % (bootstrap.sys_name, EVENTS_XP)
 
+class EventError(StandardError):
+    pass
+
 class EventPublisher(Publisher):
 
     event_name  = "BASE_EVENT"      # override this in your derived publisher
