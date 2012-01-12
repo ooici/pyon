@@ -6,7 +6,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core import exception
 from pyon.core.object import IonServiceDefinition, IonObjectBase
-from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
+from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
@@ -378,8 +378,7 @@ class Publisher(BaseEndpoint):
     """
 
     endpoint_unit_type = PublisherEndpointUnit
-    #channel_type = PubSub
-    channel_type = PubChannel
+    channel_type = PublisherChannel
 
     def __init__(self, **kwargs):
         self._pub_ep = None

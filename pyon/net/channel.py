@@ -425,8 +425,17 @@ class RecvChannel(BaseChannel):
         log.debug("RecvChannel.reject: %s", delivery_tag)
         blocking_cb(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
 
-class PubChannel(SendChannel):
-    pass
+class PublisherChannel(SendChannel):
+    def __init__(self, close_callback=None):
+        self._declared = False
+        SendChannel.__init__(self, close_callback=close_callback)
+
+    def send(self, data, headers=None):
+        if not self._declared:
+            assert self._send_name and self._send_name[0]
+            self._declare_exchange_point(self._send_name[0])
+            self._declared = True
+        SendChannel.send(self, data, headers=headers)
 
 class BidirClientChannel(SendChannel, RecvChannel):
     """

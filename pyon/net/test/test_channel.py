@@ -4,7 +4,7 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 import unittest
-from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel
+from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
 from gevent import queue
 from pyon.util.unit_test import PyonTestCase
 from mock import Mock, sentinel, patch
@@ -488,11 +488,39 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
 
 @attr('UNIT')
-class TestPubChannel(PyonTestCase):
-    """
-    PubChannel currently doesnt have any meat
-    """
-    pass
+@patch('pyon.net.channel.SendChannel')
+class TestPublisherChannel(PyonTestCase):
+
+    # @TODO: have to do this because i'm patching the class, anything to be done?
+    def test_verify_service(self, mocksendchannel):
+        PyonTestCase.test_verify_service(self)
+
+    def test_init(self, mocksendchannel):
+        pubchan = PublisherChannel()
+        self.assertFalse(pubchan._declared)
+
+    def test_send_no_name(self, mocksendchannel):
+        pubchan = PublisherChannel()
+        self.assertRaises(AssertionError, pubchan.send, sentinel.data)
+
+    def test_send(self, mocksendchannel):
+        depmock = Mock()
+        pubchan = PublisherChannel()
+        pubchan._declare_exchange_point = depmock
+
+        pubchan._send_name = (sentinel.xp, sentinel.routing_key)
+
+        pubchan.send(sentinel.data)
+
+        depmock.assert_called_once_with(sentinel.xp)
+        mocksendchannel.send.assert_called_once_with(pubchan, sentinel.data, headers=None)
+        self.assertTrue(pubchan._declared)
+
+        # call send again, to show declare is not called again
+        pubchan.send(sentinel.data2)
+        depmock.assert_called_once_with(sentinel.xp)
+        self.assertEquals(mocksendchannel.send.call_count, 2)
+        mocksendchannel.send.assert_called_with(pubchan, sentinel.data2, headers=None)
 
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')

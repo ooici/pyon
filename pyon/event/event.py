@@ -9,7 +9,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
 from pyon.core import bootstrap
-from pyon.net.channel import PubChannel, SubscriberChannel
+from pyon.net.channel import PublisherChannel, SubscriberChannel
 from pyon.util.log import log
 import time
 
