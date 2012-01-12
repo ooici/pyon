@@ -5,7 +5,7 @@
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core import exception
-from pyon.core.object import IonServiceDefinition
+from pyon.core.object import IonServiceDefinition, IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PubChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -312,9 +312,10 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     channel_type = ListenChannel
 
-    def __init__(self, node=None, name=None):
+    def __init__(self, node=None, name=None, binding=None):
         BaseEndpoint.__init__(self, node=node, name=name)
         self._ready_event = event.Event()
+        self._binding = binding
 
     def get_ready_event(self):
         """
@@ -326,11 +327,13 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
-    def listen(self):
-        log.debug("LEF.listen")
+    def listen(self, binding=None):
+        log.debug("LEF.listen: binding %s", binding)
+
+        binding = binding or self._binding or self.name[1]
 
         self._chan = self.node.channel(self.channel_type, self.create_channel)
-        self._setup_listener(self.name, binding=self.name[1])
+        self._setup_listener(self.name, binding=binding)
         self._chan.start_consume()
 
         # notify any listeners of our readiness
@@ -434,7 +437,7 @@ class Subscriber(ListeningBaseEndpoint):
     def _setup_listener(self, name, binding=None):
         """
         Override for setup_listener to make sure we are listening on an anonymous queue.
-        @TODO: correct?
+        @TODO: correct? XXX SEEMS WRONG
         """
         # we expect (xp, name) and binding=name
         ListeningBaseEndpoint._setup_listener(self, (name[0], None), binding=binding)
@@ -704,6 +707,14 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         cmd_arg_obj = msg
         cmd_op      = headers.get('op', None)
 
+        # transform cmd_arg_obj into a dict
+        if hasattr(cmd_arg_obj, '__dict__'):
+            cmd_arg_obj = cmd_arg_obj.__dict__
+        elif isinstance(cmd_arg_obj, dict):
+            pass
+        else:
+            raise exception.BadRequest("Unknown message type, cannot convert into kwarg dict: %s" % str(type(cmd_arg_obj)))
+
         # op name must exist!
         if not hasattr(self._routing_obj, cmd_op):
             raise exception.BadRequest("Unknown op name: %s" % cmd_op)
@@ -713,7 +724,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
         try:
-            result = ro_meth(**cmd_arg_obj.__dict__)
+            result = ro_meth(**cmd_arg_obj)
 
             response_headers = { 'status_code': 200, 'error_message': '' }
         except TypeError as ex:

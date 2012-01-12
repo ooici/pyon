@@ -8,9 +8,9 @@ __license__ = 'Apache 2.0'
 import argparse
 import msgpack
 import os
-from pyon.net.endpoint import RPCClient
-from pyon.container.cc import IContainerAgent
+from interface.services.icontainer_agent import IContainerAgent
 from pyon.net.messaging import make_node
+from pyon.net.endpoint import RPCClient
 
 def main():
     parser = argparse.ArgumentParser(description="CC Control script")
@@ -31,10 +31,15 @@ def main():
     assert parms, "No content in pidfile"
 
     node, ioloop = make_node(parms['messaging'])
-    cc = RPCClient(node=node, name=(parms['container-xp'], parms['container-agent']), iface=IContainerAgent)
+    cc = RPCClient(node=node, name=(parms['container-xp'], parms['container-agent']))
 
-    meth = getattr(cc, opts.command)
-    retval = meth(*opts.commandargs)
+    # make a manual call - this is to avoid having to have the IonObject for the call
+    methdefs = [x[1] for x in IContainerAgent.namesAndDescriptions() if x[0] == opts.command]
+    assert len(methdefs) == 1
+
+    arg_names = methdefs[0].positional                                  # ('name', 'module', 'cls', 'config')
+    msg_args = msgpack.dumps(dict(zip(arg_names, opts.commandargs)))    # ('name', <usrinp1>, 'cls', <usrinp2>) -> { 'name' : <usrinp1>, 'cls': <usrinp2> }
+    retval = cc.request(msg_args, op=opts.command)
 
     print "Returned", retval
     node.client.close()

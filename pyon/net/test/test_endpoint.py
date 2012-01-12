@@ -19,12 +19,13 @@ from nose.plugins.attrib import attr
 from mock import Mock, sentinel, patch
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
-endpoint.interceptors = {'message-in': [],
-                         'message-out': [],
-                         'process-in': [],
-                         'process-out': []}
+no_interceptors = {'message-in': [],
+                   'message-out': [],
+                   'process-in': [],
+                   'process-out': []}
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestEndpointUnit(PyonTestCase):
 
     def setUp(self):
@@ -99,6 +100,7 @@ class TestEndpointUnit(PyonTestCase):
         self.assertTrue(self._endpoint_unit.message_received.called)
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestBaseEndpoint(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -161,6 +163,7 @@ class TestBaseEndpoint(PyonTestCase):
         self._ef.create_channel(zep=sentinel.zep)
         ctmock.assert_called_with(zep=sentinel.zep)
 
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestPublisher(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -210,6 +213,7 @@ class RecvMockMixin(object):
         return ch
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestSubscriber(PyonTestCase, RecvMockMixin):
 
     def setUp(self):
@@ -249,6 +253,7 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         cbmock.assert_called_once_with('subbed', {'status_code':200, 'error_message':'', 'op': None})
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestRequestResponse(PyonTestCase, RecvMockMixin):
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -298,6 +303,7 @@ class SimpleService(BaseService):
         return True
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 
     def test_build_msg(self):
@@ -329,6 +335,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
             self.assertRaises(err, e.send, 'payload')
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestRPCClient(PyonTestCase, RecvMockMixin):
 
     @patch('pyon.net.endpoint.IonObject')
@@ -350,6 +357,7 @@ class TestRPCClient(PyonTestCase, RecvMockMixin):
         self.assertRaises(AssertionError, rpcc.simple, "zap", "zip")
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
     def simple(self, named=None):
@@ -463,6 +471,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
 
 @attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestRPCServer(PyonTestCase, RecvMockMixin):
 
     def test_rpc_server(self):
