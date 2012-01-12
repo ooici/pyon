@@ -167,6 +167,29 @@ class ResourceLifeCycleSM(object):
         """
         return self.transitions.get((current_state, transition_event), None)
 
+    def get_successors(self, some_state):
+        """ 
+        For a given state, return a dict of possible transition events => successor states
+        """
+        ret = {}
+        for (a_state, a_transition), a_newstate in self.transitions.iteritems():
+            if a_state == some_state:
+                #keyed on transition because they are unique with respect to origin state
+                ret[a_transition] = a_newstate
+
+        return ret
+
+    def get_predecessors(self, some_state):
+        """
+        For a given state, return a dict of possible predecessor states => the transition to move
+        """
+        ret = {}
+        for (a_state, a_transition), a_newstate in self.transitions.iteritems():
+            if a_newstate == some_state:
+                #keyed on state because they are unique with respect to destination state
+                ret[a_state] = a_transition
+
+        return ret
 
 class InformationResourceLCSM(ResourceLifeCycleSM):
     ILLEGAL_STATES = []

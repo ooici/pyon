@@ -37,3 +37,8 @@ class TestResources(PyonTestCase):
 
         self.assertEquals(default_workflow.get_successor(LCS.PLANNED, ResourceLifeCycleSM.DEVELOP), LCS.DEVELOPED)
         self.assertEquals(default_workflow.get_successor(LCS.DEVELOPED, ResourceLifeCycleSM.RETIRE), LCS.RETIRED)
+
+        self.assertEquals(default_workflow.get_successors(LCS.PLANNED), {ResourceLifeCycleSM.DEPLOY: LCS.PRIVATE,
+                                                                         ResourceLifeCycleSM.DEVELOP: LCS.DEVELOPED,
+                                                                         ResourceLifeCycleSM.RETIRE: LCS.RETIRED})
+        self.assertEquals(default_workflow.get_predecessors(LCS.DEVELOPED), {LCS.PLANNED: ResourceLifeCycleSM.DEVELOP})
