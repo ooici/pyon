@@ -39,6 +39,7 @@ and...
 import uuid
 import hashlib
 import os
+import os.path
 import sys
 from pyon.public import log
 from pyon.core.exception import IonException
@@ -120,7 +121,12 @@ class HDFEncoder(object):
         # open an hdf file on disk - in /tmp to write data to since we can't yet do in memory
         try:
             log.debug("Creating h5py file object for the encoder at %s" % self.filename)
-            self.h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
+            if os.path.isfile(self.filename):
+                # if file exists, then append to it
+                self.h5pyfile = h5py.File(self.filename, mode = 'r+', driver='core')
+            else:
+                # if file does not already exist, write a new one
+                self.h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
             assert self.h5pyfile, 'No h5py file object created.'
         except IOError:
             log.debug("Error opening file for the HDFEncoder! Check if /tmp/ folder is available.")
@@ -154,7 +160,6 @@ class HDFEncoder(object):
         # ------------
         # name: ''
         #
-        log.debug("Checking for valid datagroup/dataset name")
         assert name, 'No name provided for group or dataset!'
         name = name.strip() # remove leading and trailing white spaces
         assert ' ' not in name, 'Whitespace not allowed within group or dataset names!'
@@ -198,17 +203,22 @@ class HDFEncoder(object):
         # if list is empty, hang the array in a group called data directly underneath '/',
         # otherwise, keep popping group names from the list of names and create them using h5py
         try:
-            group = []
             lowest_subgroup = self.h5pyfile.get('/')
-            group.append(lowest_subgroup)
+            group = lowest_subgroup
+
             for group_name in tree_list:
-                group.append(group.pop().create_group(group_name)) # use group methods for creating subgroup
-            lowest_subgroup = group.pop()
+                g = group.get(group_name) # if the group doesnt already exist in the file
+                if g is None:
+                    group = group.create_group(group_name) # use group methods for creating a new subgroup
+                else:
+                    group = g
+            lowest_subgroup = group
         except Exception as exc:
             log.debug('Error while creating group/subgroup/dataset using h5py.')
             raise HDFEncoderException(exc.message)
 
         return lowest_subgroup, dataset
+
 
 
     def add_hdf_dataset(self, name, nparray):
@@ -230,24 +240,26 @@ class HDFEncoder(object):
             # check that that the input arguments are of the type they are supposed to be
             assert isinstance(name, basestring), '1st argument of method add_hdf_dataset() is not a string!'
         except AssertionError as err:
-            log.debug('Error adding array to its proper place in the h5py file data tree structure.')
+            log.debug('Name and array assertion failed in add_hdf_dataset method.')
             raise HDFEncoderException(err.message)
-        # later we should parse the name and get the part pertaining to dataset below...
         lowest_subgroup, name_of_dataset = self.create_group_tree(name)
 
         try:
             assert lowest_subgroup, 'No datagroup.'
-            assert name_of_dataset, 'No dataset name. The name provided may have been an empty string'
+            assert name_of_dataset, 'No dataset name. provided.'
+
+            assert lowest_subgroup.get(name_of_dataset) is None, 'The dataset %s already exists in the file.' % name_of_dataset
+
             # create a dataset and hang it under the just created group...
             dataset = lowest_subgroup.create_dataset(name_of_dataset, nparray.shape, nparray.dtype.str, maxshape=(None,None))
-            assert dataset, 'No dataset was created by the h5py file object.'
+            assert dataset, 'Unable to create dataset.'
             # write the array in the dataset
             dataset.write_direct(nparray)
         except AssertionError as err:
             log.debug(err.message)
             raise HDFEncoderException(err.message)
         except Exception as exc:
-            log.debug('Error writing data in hdf file using the HDFEncoder.')
+            log.debug('Error writing dataset to HDFFile during encoding.')
             raise HDFEncoderException(exc.message)
 
         return True
@@ -292,9 +304,9 @@ class HDFEncoder(object):
             Check if /tmp/ folder is available.")
             raise HDFEncoderException("Error while trying to open file. \
             Check if /tmp/ folder is available.")
-        finally:
-            # cleaning up
-            os.remove(self.filename)
+#        finally:
+#            # cleaning up
+#            os.remove(self.filename)
         return hdf_string
 
 
