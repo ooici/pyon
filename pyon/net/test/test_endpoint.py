@@ -10,7 +10,7 @@ from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
-from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit
+from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError
 from gevent import event, sleep
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
@@ -162,6 +162,27 @@ class TestBaseEndpoint(PyonTestCase):
 
         self._ef.create_channel(zep=sentinel.zep)
         ctmock.assert_called_with(zep=sentinel.zep)
+
+    def test__ensure_node_errors(self):
+        bep = BaseEndpoint(name=sentinel.name)
+        gcimock = Mock()
+        gcimock.return_value = None
+        with patch('pyon.net.endpoint.BaseEndpoint._get_container_instance', gcimock):
+            self.assertRaises(EndpointError, bep._ensure_node)
+
+    @patch('pyon.net.endpoint.BaseEndpoint._get_container_instance')
+    def test__ensure_node_existing_node(self, gcimock):
+        self._ef._ensure_node()
+        self.assertFalse(gcimock.called)
+
+    @patch('pyon.net.endpoint.BaseEndpoint._get_container_instance')
+    def test__ensure_node(self, gcimock):
+        bep = BaseEndpoint(name=sentinel.name)
+        self.assertIsNone(bep.node)
+
+        bep._ensure_node()
+
+        self.assertEquals(bep.node, gcimock().node)
 
 @patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestPublisher(PyonTestCase):

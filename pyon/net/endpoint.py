@@ -47,6 +47,9 @@ def instantiate_interceptors(interceptor_cfg):
 
             interceptors[type_and_direction].append(classinst)
 
+class EndpointError(StandardError):
+    pass
+
 class EndpointUnit(object):
     """
     A unit of conversation or one-way messaging.
@@ -255,6 +258,32 @@ class BaseEndpoint(object):
         """
         return self.channel_type(**kwargs)
 
+    def _get_container_instance(self):
+        """
+        Helper method to return the singleton Container.instance.
+        This method helps single responsibility of _ensure_node and makes testing much easier.
+
+        We have to late import Container because Container depends on ProcessRPCServer in this file.
+        """
+        from pyon.container.cc import Container
+        return Container.instance
+
+    def _ensure_node(self):
+        """
+        Makes sure a node exists in this endpoint, and if it can, pulls from the Container singleton.
+        This method is automatically called before accessing the node in both create_endpoint and in
+        ListeningBaseEndpoint.listen.
+        """
+        log.debug("BaseEndpoint._ensure_node (current: %s)", self.node is not None)
+
+        if not self.node:
+            container_instance = self._get_container_instance()
+            if container_instance:
+                log.debug("Pulling node from Container.instance")
+                self.node = container_instance.node
+            else:
+                raise EndpointError("Cannot pull node from Container.instance and no node specified")
+
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """
         @param  to_name     Either a string or a 2-tuple of (exchange, name)
@@ -267,6 +296,7 @@ class BaseEndpoint(object):
             if not isinstance(name, tuple):
                 name = (bootstrap.sys_name, name)
 
+            self._ensure_node()
             ch = self.node.channel(self.channel_type, self.create_channel)
 
             # @TODO: bla
@@ -332,6 +362,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         binding = binding or self._binding or self.name[1]
 
+        self._ensure_node()
         self._chan = self.node.channel(self.channel_type, self.create_channel)
         self._setup_listener(self.name, binding=binding)
         self._chan.start_consume()
