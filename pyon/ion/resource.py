@@ -82,75 +82,58 @@ class ResourceLifeCycleSM(object):
     UNDEPLOYED =   'UNDEPLOYED'      # Aggregate state: Not deployed in target environment
     PLANNED =       'PLANNED'        # Consistent, with actual resource not yet present
     DEVELOPED =     'DEVELOPED'      # The actual resource exists
-    TESTED =        'TESTED'         # The actual resource is tested by provider
     INTEGRATED =    'INTEGRATED'     # The actual resource is integrated into composite and tested
-    COMMISSIONED =  'COMMISSIONED'   # The actual resource is certified commissioned
     DEPLOYED =     'DEPLOYED'        # Aggregate state: Not Deployed in target environment
-    OFF =           'OFF'            # Aggregate state: Off
-    ON =            'ON'             # Aggregate state: On
-    PUBLIC =        'PUBLIC'         # Aggregate state: Announced, discoverable
-    PRIVATE =       'PRIVATE'        # Aggregate state: Unannounced, not discoverable
-    OFFLINE =        'OFFLINE'       # Inactive, unannounced
-    ONLINE =         'ONLINE'        # Active, unannounced
-    INACTIVE =       'INACTIVE'      # Inactive, announced (public)
-    ACTIVE =         'ACTIVE'        # Active, announced (public)
+    PRIVATE =       'PRIVATE'        # Not discoverable
+    PUBLIC =        'PUBLIC'         # Aggregate state: discoverable
+    DISCOVERABLE =   'DISCOVERABLE'  # discoverable, not acquirable
+    AVAILABLE =      'AVAILABLE'     # discoverable, acquirable
     RETIRED =     'RETIRED'          # Resource for historic reference only
 
     BASE_STATES = [
         DRAFT,
-        PLANNED, DEVELOPED, TESTED, INTEGRATED, COMMISSIONED,
-        OFFLINE, ONLINE, INACTIVE, ACTIVE,
+        PLANNED, DEVELOPED, INTEGRATED,
+        PRIVATE, DISCOVERABLE, AVAILABLE,
         RETIRED
     ]
 
     STATE_ALIASES = {
-        REGISTERED: (PLANNED, DEVELOPED, TESTED, INTEGRATED, COMMISSIONED,
-                     OFFLINE, ONLINE, INACTIVE, ACTIVE),
-        UNDEPLOYED: (PLANNED, DEVELOPED, TESTED, INTEGRATED, COMMISSIONED),
-        DEPLOYED: (OFFLINE, ONLINE, INACTIVE, ACTIVE),
-        OFF: (OFFLINE, INACTIVE),
-        ON: (ONLINE, ACTIVE),
-        PUBLIC: (INACTIVE, ACTIVE),
-        PRIVATE: (OFFLINE, ONLINE),
+        REGISTERED: (PLANNED, DEVELOPED, INTEGRATED,
+                     PRIVATE, DISCOVERABLE, AVAILABLE),
+        UNDEPLOYED: (PLANNED, DEVELOPED, INTEGRATED),
+        DEPLOYED: (PRIVATE, DISCOVERABLE, AVAILABLE),
+        PUBLIC: (DISCOVERABLE, AVAILABLE),
     }
 
     # Names of transition events
     REGISTER = "register"
     DEVELOP = "develop"
-    TEST = "test"
     INTEGRATE = "integrate"
-    COMMISSION = "commission"
-    DECOMMISSION = "decommission"
     DEPLOY = "deploy"
     RECOVER = "recover"
-    ACTIVATE = "activate"
-    DEACTIVATE = "deactivate"
     PUBLISH = "publish"
-    UNPUBLISH = "unpublish"
+    ENABLE = "enable"
+    DISABLE = "disable"
+    HIDE = "hide"
     RETIRE = "retire"
 
     BASE_EVENTS = [
-        REGISTER,DEVELOP,TEST,INTEGRATE,COMMISSION,DECOMMISSION,
-        DEPLOY,RECOVER,
-        ACTIVATE,DEACTIVATE,PUBLISH,UNPUBLISH,RETIRE
+        REGISTER,DEVELOP,INTEGRATE, DEPLOY,RECOVER,
+        PUBLISH,ENABLE,DISABLE,HIDE,RETIRE
     ]
 
     BASE_TRANSITIONS = {
         (DRAFT, REGISTER) : PLANNED,
+        (DRAFT, DEPLOY): PRIVATE,
+        (DRAFT, ENABLE) : AVAILABLE,
         (PLANNED, DEVELOP): DEVELOPED,
-        (DEVELOPED, TEST): TESTED,
-        (TESTED, INTEGRATE): INTEGRATED,
-        (INTEGRATED, COMMISSION): COMMISSIONED,
-        (COMMISSIONED, DECOMMISSION): TESTED,
-        (COMMISSIONED, DEPLOY): OFFLINE,
-        (OFFLINE, ACTIVATE): ONLINE,
-        (OFFLINE, PUBLISH): INACTIVE,
-        (INACTIVE, ACTIVATE): ACTIVE,
-        (INACTIVE, UNPUBLISH): OFFLINE,
-        (ONLINE, PUBLISH): ACTIVE,
-        (ONLINE, DEACTIVATE): OFFLINE,
-        (ACTIVE, UNPUBLISH): ONLINE,
-        (ACTIVE, DEACTIVATE): INACTIVE,
+        (DEVELOPED, INTEGRATE): INTEGRATED,
+        (UNDEPLOYED, DEPLOY): PRIVATE,
+        (PRIVATE, PUBLISH): DISCOVERABLE,
+        (PRIVATE, ENABLE): AVAILABLE,
+        (DISCOVERABLE, ENABLE): AVAILABLE,
+        (AVAILABLE, DISABLE): DISCOVERABLE,
+        (PUBLIC, HIDE): PRIVATE,
         (REGISTERED, RETIRE): RETIRED,
     }
 

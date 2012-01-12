@@ -15,8 +15,8 @@ class TestResources(PyonTestCase):
     def test_resource_lcworkflow(self):
         default_workflow = lcs_workflows['Resource']
 
-        self.assertEquals(len(ResourceLifeCycleSM.BASE_STATES), 11)
-        self.assertEquals(len(default_workflow.BASE_STATES), 11)
+        self.assertEquals(len(ResourceLifeCycleSM.BASE_STATES), 8)
+        self.assertEquals(len(default_workflow.BASE_STATES), 8)
         self.assertEquals(len(LCS), len(ResourceLifeCycleSM.BASE_STATES) + len(ResourceLifeCycleSM.STATE_ALIASES))
 
         self.assert_(LCS.DRAFT in ResourceLifeCycleSM.BASE_STATES)
@@ -29,7 +29,7 @@ class TestResources(PyonTestCase):
         events = set(ev for (s0,ev) in ResourceLifeCycleSM.BASE_TRANSITIONS)
         self.assertFalse(set(ResourceLifeCycleSM.BASE_STATES) & events)
 
-        self.assertEquals(len(default_workflow.transitions), 24)
+        self.assertEquals(len(default_workflow.transitions), 20)
 
         self.assertEquals(default_workflow.get_successor(LCS.DRAFT, ResourceLifeCycleSM.REGISTER), LCS.PLANNED)
 
