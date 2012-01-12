@@ -92,19 +92,12 @@ function(doc) {
     emit([0, doc.lcstate, doc.type_, doc.name], null);
     if (doc.lcstate != undefined && doc.lcstate != "" && doc.lcstate != "DRAFT" && doc.lcstate != "RETIRED") {
       emit([1, "REGISTERED", doc.type_, doc.lcstate, doc.name], null);
-      if (doc.lcstate == "PLANNED" || doc.lcstate == "DEVELOPED" || doc.lcstate == "TESTED" || doc.lcstate == "INTEGRATED" || doc.lcstate == "COMMISSIONED") {
+      if (doc.lcstate == "PLANNED" || doc.lcstate == "DEVELOPED" || doc.lcstate == "INTEGRATED") {
         emit([1, "UNDEPLOYED", doc.type_, doc.lcstate, doc.name], null);
       } else {
         emit([1, "DEPLOYED", doc.type_, doc.lcstate, doc.name], null);
-        if (doc.lcstate == "OFFLINE" || doc.lcstate == "ONLINE") {
-          emit([1, "PRIVATE", doc.type_, doc.lcstate, doc.name], null);
-        } else {
+        if (doc.lcstate == "DISCOVERABLE" || doc.lcstate == "AVAILABLE") {
           emit([1, "PUBLIC", doc.type_, doc.lcstate, doc.name], null);
-        }
-        if (doc.lcstate == "OFFLINE" || doc.lcstate == "INACTIVE") {
-          emit([1, "OFF", doc.type_, doc.lcstate, doc.name], null);
-        } else {
-          emit([1, "ON", doc.type_, doc.lcstate, doc.name], null);
         }
       }
     }
