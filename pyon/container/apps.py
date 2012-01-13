@@ -57,6 +57,7 @@ class AppManager(object):
             log.warning("Could not find container deploy file '%s'" % rel_url)
         except Exception as ex:
             log.exception("Could not start container deploy file '%s'" % rel_url)
+            raise ContainerAppError(ex.message)
 
         return False
 
@@ -107,6 +108,7 @@ class AppManager(object):
             log.warning("Could not find container app file '%s'" % app_url)
         except Exception as ex:
             log.exception("Could not start app file %s" % app_url)
+            raise ContainerAppError(ex.message)
 
         return False
 

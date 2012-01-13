@@ -105,7 +105,7 @@ class ProcManager(object):
         except Exception:
             errcause = service_instance.errcause if service_instance else "instantiating service"
             log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
-            return ""
+            raise
 
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
