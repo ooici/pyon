@@ -694,6 +694,14 @@ def main():
     # ok, check for any remaining deps that we never found - indicates a cycle
     remaining_deps = set([k for k,v in service_dep_graph.iteritems() if len(v) > 0])
     if len(remaining_deps):
+        print >> sys.stderr, "**********************************************************************"
+        print >> sys.stderr, "Error in dependency resolution: either a cycle or a missing dependency"
+        print >> sys.stderr, "Service -> Conflicting Dependency table:"
+        for k, v in service_dep_graph.iteritems():
+            if len(v) == 0:
+                continue
+            print >> sys.stderr, "\t", k, "->", ",".join(v)
+        print >> sys.stderr, "**********************************************************************"
         raise StandardError("Cycle found in dependencies: could not resolve %s" % str(remaining_deps))
 
     for svc in sorted_services:
