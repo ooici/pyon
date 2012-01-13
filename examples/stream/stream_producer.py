@@ -7,6 +7,9 @@ import threading
 
 from pyon.public import log, BaseService, ProcessPublisher
 
+# To start the producer:
+#id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"stream_process"},'stream_producer':{'interval':2000,'stream_route':'foobar'}})
+
 class StreamProducer(BaseService):
 
     def on_init(self):
@@ -22,8 +25,9 @@ class StreamProducer(BaseService):
         log.debug("StreamProducer quit")
 
     def _trigger_func(self):
-        interval = self.CFG.stream_producer.interval
-        stream_route = self.CFG.stream_producer.stream_route
+        interval = self.CFG.get('stream_producer').get('interval')
+        stream_route = self.CFG.get('stream_producer').get('stream_route')
+
         pub = ProcessPublisher(node=self.container.node, name=stream_route, process=self)
         num = 1
         while True:
