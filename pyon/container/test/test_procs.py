@@ -43,8 +43,10 @@ class TestProcManager(IonIntegrationTestCase):
 
         self._spawnproc(pm, 'immediate')
 
-        success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, 'BAMM')
-        self.assertTrue(not success)
+        with self.assertRaises(Exception) as ex:
+            success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, 'BAMM')
+
+            self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
     def _spawnproc(self, pm, ptype):
         success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', None, ptype)
