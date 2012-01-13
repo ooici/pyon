@@ -2,6 +2,10 @@
 
 __author__ = 'Michael Meisinger'
 
+# To start the consumer!
+# id = cc.spawn_process('myconsumer', 'examples.stream.stream_consumer', 'StreamConsumer', {'process':{'type':"stream_process",'listen_name':'foobar'}})
+
+
 from pyon.public import log, StreamProcess
 
 class StreamConsumer(StreamProcess):

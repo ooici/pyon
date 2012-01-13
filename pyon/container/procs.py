@@ -100,12 +100,12 @@ class ProcManager(object):
 
             service_instance.errcause = "OK"
             log.info("AppManager.spawn_process: %s.%s -> pid=%s OK" % (module, cls, process_id))
-            return True
+            return process_id
 
         except Exception:
             errcause = service_instance.errcause if service_instance else "instantiating service"
             log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
-            return False
+            return ""
 
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
