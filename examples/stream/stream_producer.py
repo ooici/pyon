@@ -8,7 +8,7 @@ import threading
 from pyon.public import log, BaseService, ProcessPublisher
 
 # To start the producer:
-#id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"stream_process"},'stream_producer':{'interval':2000,'stream_route':'foobar'}})
+#id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"agent"},'stream_producer':{'interval':4000,'stream_route':'daves_special_sauce'}})
 
 class StreamProducer(BaseService):
 

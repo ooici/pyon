@@ -8,6 +8,7 @@ from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
+from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService, get_service_by_name
@@ -127,7 +128,7 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process", {}).get("listen_name", name)
+        listen_name = config.get("process", {}).get("listen_name", None)
         self._set_subscription_endpoint(service_instance, listen_name)
         self._service_start(service_instance)
         return service_instance
@@ -219,14 +220,21 @@ class ProcManager(object):
     def _set_subscription_endpoint(self, service_instance, listen_name):
         service_instance.errcause = "setting process subscription endpoint"
 
+        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
+
+        sub = service_instance.stream_subscriber_registrar.subscribe(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
+        #sub.start()
         # Start pubsub listener
         # TODO: Use Refactored ION endpoint for streams once ready.
-        sub = ProcessSubscriber(node=self.container.node,
-                         name=listen_name,
-                         process=service_instance,
-                         callback=lambda m,h: service_instance.process(m))
+        #sub = ProcessSubscriber(node=self.container.node,
+        #                 name=listen_name,
+        #                 process=service_instance,
+        #                 callback=lambda m,h: service_instance.process(m))
+
+
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
         sub.get_ready_event().wait(timeout=10)
+
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
     def _register_process(self, service_instance, name):

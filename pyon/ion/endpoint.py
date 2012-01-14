@@ -9,7 +9,7 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Subscriber
 from pyon.public import CFG, IonObject
 from pyon.util.log import log
-from pyon.net.channel import PubChannel, SubscriberChannel, ChannelError
+from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
 from pyon.util.async import  spawn
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 
@@ -30,7 +30,7 @@ class StreamPublisher(ProcessPublisher):
     Data management abstraction of EndPoint layer for publishing messages to a stream
     """
 
-    class NoDeclarePublisherChannel(PubChannel):
+    class NoDeclarePublisherChannel(PublisherChannel):
 
         """
         # Once EMS exists - remove the declare!
@@ -123,7 +123,8 @@ class StreamSubscriber(ProcessSubscriber):
 
     def __init__(self, subscription_id=None, **kwargs):
         """
-        @param stream_route is a stream_route object
+        @param name is a tuple (xp, exchange_name)
+        @param callback is a call back function
         @param Process is the subscribing process
         @param node is cc.node
         """
@@ -156,8 +157,14 @@ class StreamSubscriber(ProcessSubscriber):
             raise SubscriberError('Can not stop the subscriber before it is started')
 
     def close(self):
-        self._chan.close()
-        self.gl.join()
+
+        self.stop()
+        if hasattr(self, '_chan'):
+            self._chan.close()
+
+        # This does not work - it hangs - why?
+        #if hasattr(self, 'gl'):
+        #    self.gl.join()
 
 class StreamSubscriberRegistrarError(StandardError):
     """
@@ -183,7 +190,7 @@ class StreamSubscriberRegistrar(object):
             raise PublisherError('Invalid CFG for core_xps.science_data: "%s"; must have "xs.xp" structure' % xs_dot_xp)
 
 
-    def subscribe(self, exchange_name='', callback=None, query=None):
+    def subscribe(self, exchange_name=None, callback=None, query=None):
         """
         This method creates a new subscriber, a new exchange_name if it does not already exist, and a new subscription
         if a query is provided.

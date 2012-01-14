@@ -468,9 +468,10 @@ class Subscriber(ListeningBaseEndpoint):
         """
         Override for setup_listener to make sure we are listening on an anonymous queue.
         @TODO: correct? XXX SEEMS WRONG
+        # It is wrong!!!
         """
         # we expect (xp, name) and binding=name
-        ListeningBaseEndpoint._setup_listener(self, (name[0], None), binding=binding)
+        ListeningBaseEndpoint._setup_listener(self, name, binding=binding)
 
     def __init__(self, callback=None, **kwargs):
         """
