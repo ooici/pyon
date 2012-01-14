@@ -12,60 +12,78 @@
 
 
 
-class Station(object):
+class StationDatasetDefinition(object):
     """
     A science object constructor for a station dataset.
     """
 
-    def __init__(self, datastructure=None):
+    def __init__(self,):
         """
         Instantiate a station dataset constructor. Create a new one or load an existing datastructure.
         """
+
+    @classmethod
+    def LoadStationDefinition(cls, StationDefMetadata):
+        pass
+
+
+    def define_variable(self, name, units, standard_name, dimensions):
+        """
+        @brief define a variable (quantity) present in the station dataset
+        @retval variable id
+        """
+        pass
+
+    def add_annotation(self, subject_id, name, ):
+        pass
+
+    def to_string(self, id):
+        """
+        return a string containing the metadata for the particular object id for debug purposes.
+        """
+        pass
+
+    def __str__(self):
+        """
+        Print the dataset metadata for debug purposes.
+        """
+        pass
+
+    def _encode_structure(self):
+        """
+        Method used to encode the station dataset metadata (structure)
+        """
+        pass
+
+
+class StationSupplement(object):
+
+    def __init__(self, station_definition=None):
+        pass
+
 
     def add_station(self, time=None, location=None):
         """
         Add a station to the dataset
         @retval station id
         """
-    def add_station_variable(self, variable=None, values=None, slice=None):
+
+    def add_station_variable(self, station_id, variable=None, values=None, slice=None):
         """
         Add data for a particular variable to a station. Slice represents the map to a know index structure for
         n-dimensional data.
         """
 
-    def add_annotation(self, subject=None, annotation=None):
+    def add_annotation(self, subject_id=None, annotation=None):
         """
         Add metadata to an object in the dataset
         @retval annotation_id
-        """
-
-    def define_variable(self):
-        """
-        @brief define a variable (quantity) present at a station
-        @retval variable id
-        """
-
-    def to_string(self, id):
-        """
-        return a string containing the metadata for the particular object id for debug purposes.
-        """
-
-    def __str__(self):
-        """
-        Print the dataset metadata for debug purposes.
         """
 
     def _encode_supplement(self):
         """
         Method used to encode the station dataset supplement
         """
-
-    def _encode_structure(self):
-        """
-        Method used to encode the station dataset metadata (structure)
-        """
-
-
 
 
 class StationTimeSeries(object):
