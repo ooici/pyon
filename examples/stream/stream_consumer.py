@@ -9,7 +9,7 @@ id = cc.spawn_process('myconsumer', 'examples.stream.stream_consumer', 'StreamCo
 from examples.stream.stream_consumer import BindingChannel
 channel = cc.node.channel(BindingChannel, BindingChannel)
 channel.setup_listener(('science_data', 'a_queue'), binding='daves_special_sauce')
-channel.start_consume()
+#channel.start_consume()
 """
 
 

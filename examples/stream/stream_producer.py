@@ -28,7 +28,7 @@ class StreamProducer(BaseService):
         interval = self.CFG.get('stream_producer').get('interval')
         stream_route = self.CFG.get('stream_producer').get('stream_route')
 
-        pub = ProcessPublisher(node=self.container.node, name=stream_route, process=self)
+        pub = ProcessPublisher(node=self.container.node, name=('science_data',stream_route), process=self)
         num = 1
         while True:
             msg = dict(num=str(num))
