@@ -238,9 +238,11 @@ class ProcManager(object):
 
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
-    def _set_publisher_endpoints(self, service_instance, publisher_streams):
+    def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
 
         service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, node=self.container.node)
+
+        publisher_streams = publisher_streams or {}
 
         for name, stream_id in publisher_streams.itervalues():
 
