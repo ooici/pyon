@@ -34,7 +34,7 @@ class StationDatasetDefinition(object):
         """
         pass
 
-    def add_annotation(self, subject_id, name, ):
+    def add_attribute(self, subject_id, name=None, attribute=None):
         pass
 
     def to_string(self, id):
@@ -74,7 +74,7 @@ class StationSupplement(object):
         n-dimensional data.
         """
 
-    def add_annotation(self, subject_id=None, annotation=None):
+    def add_attribute(self, subject_id=None, name=None, attribute=None):
         """
         Add metadata to an object in the dataset
         @retval annotation_id
@@ -96,7 +96,14 @@ class Trajectory(object):
     A science object constructor for trajectory data.
     """
 
-class Grid(object):
+class StructuredMeshDatasetDefinition(object):
     """
-    A science object constructor for grid data.
+    A science object constructor for mesh data.
     """
+
+    def define_mesh(self, name, x_coordinate=None, y_coordinate=None, z_coordinate=None ):
+        pass
+
+
+    def define_variable(self, name, units, standard_name, mesh_name, dimensions, location):
+        pass
