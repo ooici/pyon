@@ -244,9 +244,9 @@ class ProcManager(object):
 
         publisher_streams = publisher_streams or {}
 
-        for name, stream_id in publisher_streams.itervalues():
-
-            pub = service_instance.stream_subscriber_registrar.create_publisher(stream_id)
+        for name, stream_id in publisher_streams.iteritems():
+            # problem is here
+            pub = service_instance.stream_publisher_registrar.create_publisher(stream_id)
 
             setattr(service_instance, name, pub)
 

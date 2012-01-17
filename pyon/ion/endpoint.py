@@ -82,12 +82,13 @@ class StreamPublisherRegistrar(object):
         Call pubsub service to register this exchange name (endpoint) to publish on a particular stream
         Return a stream publisher object to publish (send) messages on a particular stream
         """
+        log.debug('Creating publisher...')
 
         # Call the pubsub service to register the exchange name as a publisher for this stream
         stream_route = self.pubsub_client.register_producer(self.exchange_name, stream_id)
 
         # Create the Stream publisher, ready to publish messages to the stream
-        return StreamPublisher(name=(self.XP, stream_route.exchange_name), process=self.process, node=self.node)
+        return StreamPublisher(name=(self.XP, stream_route.routing_key), process=self.process, node=self.node)
 
 
 
