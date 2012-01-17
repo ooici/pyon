@@ -278,6 +278,7 @@ class RecvChannel(BaseChannel):
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
+        log.warn('Setup_listener name: %s' % str(name))
         name = name or self._recv_name
         xp, queue = name
 
