@@ -8,6 +8,7 @@ from zope.interface import implementedBy
 
 from pyon.core.bootstrap import CFG
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
+from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService, get_service_by_name
@@ -127,9 +128,18 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process", {}).get("listen_name", name)
+
+        listen_name = config.get("process", {}).get("listen_name", None)
+        # Throws an exception if no listen name is given!
         self._set_subscription_endpoint(service_instance, listen_name)
+
+        # Spawn the greenlet
         self._service_start(service_instance)
+
+        publish_streams = config.get("process", {}).get("publish_streams", None)
+        # Add the publishers if any...
+        self._set_publisher_endpoints(service_instance, publish_streams)
+
         return service_instance
 
     def _spawn_agent_process(self, process_id, name, module, cls, config):
@@ -219,15 +229,28 @@ class ProcManager(object):
     def _set_subscription_endpoint(self, service_instance, listen_name):
         service_instance.errcause = "setting process subscription endpoint"
 
-        # Start pubsub listener
-        # TODO: Use Refactored ION endpoint for streams once ready.
-        sub = ProcessSubscriber(node=self.container.node,
-                         name=listen_name,
-                         process=service_instance,
-                         callback=lambda m,h: service_instance.process(m))
+        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
+
+        sub = service_instance.stream_subscriber_registrar.subscribe(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
+
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
         sub.get_ready_event().wait(timeout=10)
+
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
+
+    def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
+
+        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, node=self.container.node)
+
+        publisher_streams = publisher_streams or {}
+
+        for name, stream_id in publisher_streams.itervalues():
+
+            pub = service_instance.stream_subscriber_registrar.create_publisher(stream_id)
+
+            setattr(service_instance, name, pub)
+
+
 
     def _register_process(self, service_instance, name):
         # Add to local process dict
