@@ -25,14 +25,12 @@ class TestNodeB(PyonTestCase):
         self.assertEquals(self._node.running, 1)
         self.assertTrue(self._node.ready.is_set())
 
-    def test_on_channel_request_close(self):
+    def test_on_channel_request_close_not_in_map(self):
         chm = Mock(spec=BaseChannel)
-        chm.get_channel_id.return_value = 1
 
-        self._node.on_channel_request_close(chm)
-
-        chm.get_channel_id.assert_called_with()
-        chm.close_impl.assert_called_once_with()
+        # not in the pool, don't go to school
+        with patch('pyon.net.messaging.log'):
+            self.assertRaises(AssertionError, self._node.on_channel_request_close, chm)
 
     def test_on_channel_request_close_in_map(self):
         chm = Mock(spec=BidirClientChannel)
@@ -77,42 +75,47 @@ class TestNodeB(PyonTestCase):
         self.assertNotEquals(self._node._pool.get_id(), ourchid)       # should get a new number back from the pool as we killed the last pooled number
         self.assertNotIn(ourchid, self._node._bidir_pool)
 
-    @patch('pyon.net.messaging.blocking_cb', return_value=sentinel.amq_chan)
-    def test_channel_nonpooled(self, bcbmock):
+    @patch('pyon.net.messaging.blocking_cb')
+    def test__new_channel(self, bcbmock):
+        self._node.client = Mock()
+        ch = self._node._new_channel(BaseChannel)
+
+        self.assertIsInstance(ch, BaseChannel)
+        self.assertEquals(ch._amq_chan, bcbmock())
+
+    @patch('pyon.net.messaging.NodeB._new_channel', return_value=sentinel.new_chan)
+    def test_channel_nonpooled(self, ncmock):
         self._node.client = Mock(spec=Connection)
-        cccm = Mock()
-        cccm.return_value = Mock(spec=BaseChannel)
 
-        ch = self._node.channel(BaseChannel, cccm)
+        ch = self._node.channel(BaseChannel)
 
-        cccm.assert_called_once_with(close_callback=self._node.on_channel_request_close)
-        bcbmock.assert_called_once_with(self._node.client.channel, 'on_open_callback')
+        ncmock.assert_called_once_with(BaseChannel)
+        self.assertEquals(ch, sentinel.new_chan)
 
-        ch.on_channel_open.assert_called_once_with(sentinel.amq_chan)
+    def test_channel_pool(self):
+        ncm = Mock()
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid
 
-    @patch('pyon.net.messaging.blocking_cb', return_value=sentinel.amq_chan)
-    def test_channel_pool(self, bcbmock):
-        self._node.client = Mock(spec=Connection)
-        cccm = Mock()
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch = self._node.channel(BidirClientChannel)
 
-        ch = self._node.channel(BidirClientChannel, cccm)
-
-        # should expect to see this show up in the node's mappings
-        self.assertIn(ch, self._node._bidir_pool.itervalues())
-        self.assertIn(sentinel.chid, self._node._pool_map)
-        self.assertEquals(len(self._node._pool_map), 1)
-        self.assertEquals(len(self._node._pool_map), len(self._node._bidir_pool))
+            # should expect to see this show up in the node's mappings
+            self.assertIn(ch, self._node._bidir_pool.itervalues())
+            self.assertIn(sentinel.chid, self._node._pool_map)
+            self.assertEquals(len(self._node._pool_map), 1)
+            self.assertEquals(len(self._node._pool_map), len(self._node._bidir_pool))
 
         # let's grab another one to watch our pool grow
         # return value is not a mock factory - it returns the same mock instance as we declared above
         # so redeclare it so they get unique chids
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid2
-        ch2 = self._node.channel(BidirClientChannel, cccm)
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid2
+
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch2 = self._node.channel(BidirClientChannel)
 
         self.assertEquals(ch.get_channel_id(), sentinel.chid)
         self.assertEquals(ch2.get_channel_id(), sentinel.chid2)
@@ -122,22 +125,22 @@ class TestNodeB(PyonTestCase):
         self.assertEquals(len(self._node._pool_map), 2)
         self.assertEquals(len(self._node._pool_map), len(self._node._bidir_pool))
 
-    @patch('pyon.net.messaging.blocking_cb', return_value=sentinel.amq_chan)
-    def test_channel_pool_release(self, bcbmock):
-        self._node.client = Mock(spec=Connection)
-        cccm = Mock()
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid
+    def test_channel_pool_release(self):
+        ncm = Mock()
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid
 
-        ch = self._node.channel(BidirClientChannel, cccm)
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch = self._node.channel(BidirClientChannel)
 
         # return value is not a mock factory - it returns the same mock instance as we declared above
         # so redeclare it so they get unique chids
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid2
-        ch2 = self._node.channel(BidirClientChannel, cccm)
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid2
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch2 = self._node.channel(BidirClientChannel)
 
         self.assertEquals(ch.get_channel_id(), sentinel.chid)
         self.assertEquals(ch2.get_channel_id(), sentinel.chid2)
@@ -155,20 +158,21 @@ class TestNodeB(PyonTestCase):
 
     @patch('pyon.net.messaging.blocking_cb', return_value=sentinel.amq_chan)
     def test_channel_pool_release_reacquire(self, bcbmock):
-        self._node.client = Mock(spec=Connection)
-        cccm = Mock()
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid
+        ncm = Mock()
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid
 
-        ch = self._node.channel(BidirClientChannel, cccm)
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch = self._node.channel(BidirClientChannel)
 
         # return value is not a mock factory - it returns the same mock instance as we declared above
         # so redeclare it so they get unique chids
-        cccm.return_value = Mock(spec=BidirClientChannel)
-        cccm.return_value._queue_auto_delete = False
-        cccm.return_value.get_channel_id.return_value = sentinel.chid2
-        ch2 = self._node.channel(BidirClientChannel, cccm)
+        ncm.return_value = Mock(spec=BidirClientChannel)
+        ncm.return_value._queue_auto_delete = False
+        ncm.return_value.get_channel_id.return_value = sentinel.chid2
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch2 = self._node.channel(BidirClientChannel)
 
         self.assertEquals(ch.get_channel_id(), sentinel.chid)
         self.assertEquals(ch2.get_channel_id(), sentinel.chid2)
@@ -178,11 +182,11 @@ class TestNodeB(PyonTestCase):
             self._node.on_channel_request_close(ch)
 
         # reacquire ch
-        cur_call_count = cccm.call_count
-        ch3 = self._node.channel(BidirClientChannel, cccm)
-
-        # no new calls to the create callback have been made
-        self.assertEquals(cccm.call_count, cur_call_count)
+        call_count = ncm.call_count
+        with patch('pyon.net.messaging.NodeB._new_channel', ncm):
+            ch3 = self._node.channel(BidirClientChannel)
+            # no new calls to the create method have been made
+            self.assertEquals(ncm.call_count, call_count)
 
         # we got the first mocked channel back
         self.assertEquals(ch3.get_channel_id(), sentinel.chid)

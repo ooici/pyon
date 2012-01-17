@@ -153,16 +153,6 @@ class TestBaseEndpoint(PyonTestCase):
         self.assertTrue(hasattr(e, "_opt"))
         self.assertEquals(e._opt, "stringer")
 
-    def test_create_channel(self):
-        ctmock = Mock()
-        self._ef.channel_type = ctmock
-
-        self._ef.create_channel()
-        ctmock.assert_called_once_with()
-
-        self._ef.create_channel(zep=sentinel.zep)
-        ctmock.assert_called_with(zep=sentinel.zep)
-
     def test__ensure_node_errors(self):
         bep = BaseEndpoint(name=sentinel.name)
         gcimock = Mock()
@@ -197,11 +187,11 @@ class TestPublisher(PyonTestCase):
 
         self._pub.publish("pub")
 
-        self._node.channel.assert_called_once_with(self._pub.channel_type, self._pub.create_channel)
+        self._node.channel.assert_called_once_with(self._pub.channel_type)
         self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self._node.channel.assert_called_once_with(self._pub.channel_type, self._pub.create_channel)
+        self._node.channel.assert_called_once_with(self._pub.channel_type)
         self.assertEquals(self._ch.send.call_count, 2)
 
 class RecvMockMixin(object):

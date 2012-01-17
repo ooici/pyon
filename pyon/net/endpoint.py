@@ -250,14 +250,6 @@ class BaseEndpoint(object):
         else:
             self.endpoint_by_name[name] = [self]
 
-    def create_channel(self, **kwargs):
-        """
-        Creates a channel object based on the channel_type specified as a class attribute.
-
-        Can pass through any kwargs.
-        """
-        return self.channel_type(**kwargs)
-
     def _get_container_instance(self):
         """
         Helper method to return the singleton Container.instance.
@@ -297,7 +289,7 @@ class BaseEndpoint(object):
                 name = (bootstrap.sys_name, name)
 
             self._ensure_node()
-            ch = self.node.channel(self.channel_type, self.create_channel)
+            ch = self.node.channel(self.channel_type)
 
             # @TODO: bla
             if hasattr(ch, 'connect'):
@@ -363,7 +355,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         binding = binding or self._binding or self.name[1]
 
         self._ensure_node()
-        self._chan = self.node.channel(self.channel_type, self.create_channel)
+        self._chan = self.node.channel(self.channel_type)
         self._setup_listener(self.name, binding=binding)
         self._chan.start_consume()
 

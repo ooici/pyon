@@ -44,7 +44,16 @@ class NodeB(amqp.Node):
         self.running = 1
         self.ready.set()
 
-    def channel(self, ch_type, channel_create_callback):
+    def _new_channel(self, ch_type):
+        """
+        Creates a pyon Channel based on the passed in type, and activates it for use.
+        """
+        chan = ch_type()
+        amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
+        chan.on_channel_open(amq_chan)
+        return chan
+
+    def channel(self, ch_type):
         """
         Creates a Channel object with an underlying transport callback and returns it.
 
@@ -52,13 +61,6 @@ class NodeB(amqp.Node):
         """
         log.debug("NodeB.channel")
         with self._lock:
-            def new_channel():
-                chan = channel_create_callback(close_callback=self.on_channel_request_close)
-                amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
-                chan.on_channel_open(amq_chan)
-
-                return chan
-
             # having _queue_auto_delete on is a pre-req to being able to pool.
             if ch_type == channel.BidirClientChannel and not ch_type._queue_auto_delete:
                 chid = self._pool.get_id()
@@ -69,34 +71,38 @@ class NodeB(amqp.Node):
                     self._pool_map[ch.get_channel_id()] = chid
                 else:
                     log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
-                    ch = new_channel()
+                    ch = self._new_channel(ch_type)
+                    ch.set_close_callback(self.on_channel_request_close)
                     self._bidir_pool[chid] = ch
                     self._pool_map[ch.get_channel_id()] = chid
             else:
-                ch = new_channel()
+                ch = self._new_channel(ch_type)
             assert ch
 
         return ch
 
     def on_channel_request_close(self, ch):
+        """
+        Close callback for pooled Channels.
+
+        When a new, pooled Channel is created that this Node manages, it will specify this as the
+        close callback in order to prevent that Channel from actually closing.
+        """
         log.debug("NodeB: on_channel_request_close\n\tChType %s, Ch#: %d", ch.__class__, ch.get_channel_id())
 
-        if ch.get_channel_id() in self._pool_map:
-            with self._lock:
-                ch.stop_consume()
-                chid = self._pool_map.pop(ch.get_channel_id())
-                log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
-                self._pool.release_id(chid)
+        assert ch.get_channel_id() in self._pool_map
+        with self._lock:
+            ch.stop_consume()
+            chid = self._pool_map.pop(ch.get_channel_id())
+            log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
+            self._pool.release_id(chid)
 
-                # sanity check: if auto delete got turned on, we must remove this channel from the pool
-                if ch._queue_auto_delete:
-                    log.warn("A pooled channel now has _queue_auto_delete set true, we must remove it: check what caused this as it's likely a timing error")
+            # sanity check: if auto delete got turned on, we must remove this channel from the pool
+            if ch._queue_auto_delete:
+                log.warn("A pooled channel now has _queue_auto_delete set true, we must remove it: check what caused this as it's likely a timing error")
 
-                    self._bidir_pool.pop(chid)
-                    self._pool._ids_free.remove(chid)
-
-        else:
-            ch.close_impl()
+                self._bidir_pool.pop(chid)
+                self._pool._ids_free.remove(chid)
 
 def ioloop(connection):
     # Loop until CTRL-C
