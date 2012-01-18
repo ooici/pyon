@@ -475,7 +475,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e._recv_greenlet.join()
 
         e.send.assert_called_once_with(None, {'status_code': 401,
-                                              'error_message': sentinel.unauth,
+                                              'error_message': str(sentinel.unauth),
                                               'conv-id': '',
                                               'conv-seq': 2,
                                               'protocol':''})
