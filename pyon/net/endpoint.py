@@ -460,9 +460,10 @@ class Subscriber(ListeningBaseEndpoint):
         """
         Override for setup_listener to make sure we are listening on an anonymous queue.
         @TODO: correct? XXX SEEMS WRONG
+        # It is wrong!!!
         """
         # we expect (xp, name) and binding=name
-        ListeningBaseEndpoint._setup_listener(self, (name[0], None), binding=binding)
+        ListeningBaseEndpoint._setup_listener(self, name, binding=binding)
 
     def __init__(self, callback=None, **kwargs):
         """
@@ -820,7 +821,7 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
         # must set here: sender-name, conv-id, conv-seq, performative
         header = RPCRequestEndpointUnit._build_header(self, raw_msg)
 
-        header.update({'sender-name'  : self._process.name,     # @TODO
+        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
                        'sender'       : 'todo',#self.channel._chan_name,
                        'conv-id'      : 'none',                   # @TODO
                        'conv-seq'     : 1,
@@ -838,7 +839,7 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             if role_id:             header['role-id'] = role_id
 
         return header
-    
+
 class ProcessRPCClient(RPCClient):
     endpoint_unit_type = ProcessRPCRequestEndpointUnit
 
