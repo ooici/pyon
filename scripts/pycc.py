@@ -100,7 +100,6 @@ def main(opts, *args, **kwargs):
     # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container
     from pyon.container.shell_api import get_shell_api
-    from interface.services.icontainer_agent import ContainerAgentClient
 
     container = Container(*args, **kwargs)
 
@@ -119,10 +118,8 @@ def main(opts, *args, **kwargs):
         return
 
     if opts.rel:
-        client = ContainerAgentClient(node=container.node, name=container.name)
-        start_ok = client.start_rel_from_url(opts.rel)
+        start_ok = container.start_rel_from_url(opts.rel)
         if not start_ok: error_msg = "Cannot start deploy file '%s'" % opts.rel
-
 
     if start_ok:
         if not opts.noshell and not opts.daemon:
