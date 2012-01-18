@@ -7,7 +7,7 @@ __author__ = 'Michael Meisinger'
 id = cc.spawn_process('myconsumer', 'examples.stream.stream_consumer', 'StreamConsumer', {'process':{'type':"stream_process",'listen_name':'a_queue'}})
 
 from examples.stream.stream_consumer import BindingChannel
-channel = cc.node.channel(BindingChannel, BindingChannel)
+channel = cc.node.channel(BindingChannel)
 channel.setup_listener(('science_data', 'a_queue'), binding='daves_special_sauce')
 #channel.start_consume()
 """
