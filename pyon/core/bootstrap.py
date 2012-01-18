@@ -4,7 +4,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.config import Config
-from pyon.core.object import IonServiceRegistry
+from pyon.core.registry import IonObjectRegistry
 
 import logging.config
 import os
@@ -62,12 +62,8 @@ sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
 # OBJECTS. Object and service definitions.
 # Make a default factory for IonObjects
-obj_registry = IonServiceRegistry()
+obj_registry = IonObjectRegistry()
 IonObject = obj_registry.new
-
-def populate_registry():
-    obj_registry.register_obj_dir('obj/data', do_first=['ion.yml', 'resource.yml'])
-    obj_registry.register_svc_dir('obj/services')
 
 def bootstrap_pyon():
     """
@@ -86,9 +82,6 @@ def bootstrap_pyon():
     from pyon.util.yaml_ordered_dict import apply_yaml_patch
     # OK the following does not work (early enough??)!!!!
     #apply_yaml_patch()
-
-    # Objects
-    populate_registry()
 
     # Resource definitions
     from pyon.ion import resource

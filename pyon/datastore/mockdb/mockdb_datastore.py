@@ -5,9 +5,9 @@ __license__ = 'Apache 2.0'
 
 from uuid import uuid4
 
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
-from pyon.core.object import IonObjectBase
+from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
 from pyon.ion.resource import ResourceLifeCycleSM
 from pyon.util.log import log
@@ -22,6 +22,10 @@ class MockDB_DataStore(DataStore):
         self.datastore_name = datastore_name
         log.debug('Creating in-memory dict of dicts that will simulate data stores')
         self.root = {}
+
+        # serializers
+        self._io_serializer     = IonObjectSerializer()
+        self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
 
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:
@@ -188,7 +192,6 @@ class MockDB_DataStore(DataStore):
         return obj_list
 
     def read_doc_mult(self, object_ids, datastore_name=""):
-        print "object_ids: " + str(object_ids)
         if not datastore_name:
             datastore_name = self.datastore_name
         try:
@@ -760,13 +763,12 @@ class MockDB_DataStore(DataStore):
 
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
-        obj_dict = ion_object.__dict__.copy()
-        obj_dict["type_"] = ion_object._def.type.name
+
+        obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
         if obj_dict is None: return None
-        init_dict = obj_dict.copy()
-        type = init_dict.pop("type_")
-        ion_object = IonObject(type, init_dict)
+
+        ion_object = self._io_deserializer.deserialize(obj_dict)
         return ion_object
