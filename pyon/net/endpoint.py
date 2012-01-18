@@ -757,7 +757,8 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         return result, response_headers
 
     def _create_error_response(self, ex):
-        return {'status_code': ex.get_status_code(), 'error_message': ex.get_error_message()}
+        # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
+        return {'status_code': ex.get_status_code(), 'error_message': str(ex.get_error_message())}
 
 class RPCServer(RequestResponseServer):
     endpoint_unit_type = RPCResponseEndpointUnit
