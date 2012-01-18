@@ -5,7 +5,10 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.public import CFG, IonObject, log, RT, AT, iex
+from pyon.core.bootstrap import CFG, IonObject
+from pyon.util.log import log
+from pyon.ion.resource import RT, AT
+from pyon.core import exception as iex
 from pyon.util.containers import get_ion_ts
 
 from interface.services.iresource_agent import BaseResourceAgent
