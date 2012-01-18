@@ -31,9 +31,15 @@ class StreamConsumer(StreamProcess):
 
     def on_start(self):
         log.debug("StreamConsumer start")
+        self.name = self.CFG.get('process',{}).get('name','consumer')
+        stream_route = self.CFG.get('process',{}).get('listen_name',None)
+        if stream_route:
+            self.channel = self.container.node.channel(BindingChannel)
+            self.channel.setup_listener(('science_data',stream_route),binding='stream_example')
 
     def on_quit(self):
         log.debug("StreamConsumer quit")
 
     def process(self, packet):
-        log.debug("Processing: %s", packet)
+        log.debug('(%s): Received Packet' % self.name )
+        log.debug('(%s):   - Processing: %s' % (self.name,packet))
