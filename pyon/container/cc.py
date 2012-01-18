@@ -18,9 +18,10 @@ from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
 from interface.services.icontainer_agent import BaseContainerAgent
+import os
 
 import string
-import os
+
 import msgpack
 import atexit
 import signal
