@@ -5,9 +5,11 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
+import ast
 import datetime
 import fnmatch
 import inspect
+import pkgutil
 import os
 import re
 import sys
@@ -17,18 +19,19 @@ import yaml
 import hashlib
 import argparse
 
+from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
 from pyon.util.containers import named_any
 
 # Do not remove any of the imports below this comment!!!!!!
-from pyon.core.object import IonYamlLoader, service_name_from_file_name
 from pyon.util import yaml_ordered_dict
 
 class IonServiceDefinitionError(Exception):
     pass
 
 object_references = {}
+enums_by_name = {}
 
 currtime = str(datetime.datetime.today())
 
@@ -43,6 +46,7 @@ from zope.interface import Interface, implements
 
 from collections import OrderedDict, defaultdict
 
+import interface.objects
 from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient, ProcessRPCClient
@@ -145,9 +149,9 @@ ${methods}
 '''
     def ${name}(${args}, headers=None):
         ${methoddocstring}
-        return self.request(IonObject('${req_in_obj_name}', $req_in_obj_args), op='${name}', headers=headers)
+        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers)
 ''',
-    'obj_arg': "${name}=${name} or ${default}",
+    'obj_arg': "'${name}': ${name} or ${default}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
     def __init__(self, name=None, node=None, **kwargs):
@@ -207,6 +211,18 @@ templates           = dict(((k, string.Template(v)) for k, v in templates.iterit
 client_templates    = dict(((k, string.Template(v)) for k, v in client_templates.iteritems()))
 html_doc_templates    = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
 
+class IonYamlLoader(yaml.Loader):
+    """ For ION-specific overrides of YAML loading behavior. """
+    pass
+
+class IonYamlDumper(yaml.Dumper):
+    """ For ION-specific overrides of YAML dumping behavior. """
+    pass
+
+def service_name_from_file_name(file_name):
+    file_name = os.path.basename(file_name).split('.', 1)[0]
+    return file_name.title().replace('_', '').replace('-', '')
+
 def build_args_str(_def, include_self=True):
     # Handle case where method has no parameters
     args = []
@@ -214,7 +230,16 @@ def build_args_str(_def, include_self=True):
 
     for key,val in (_def or {}).iteritems():
         if isinstance(val, basestring):
-            val = "'%s'" % (val)
+            if val.startswith("!"):
+                val = val.strip("!")
+                if val in enums_by_name:
+                    # Get default enum value
+                    enum_def = enums_by_name[val]
+                    val = "interface.objects." + val + "." + enum_def["default"]
+                else:
+                    val = "None"
+            else:
+                val = "'%s'" % (val)
         elif isinstance(val, datetime.datetime):
             # TODO: generate the datetime code
             val = "'%s'" % (val)
@@ -261,7 +286,12 @@ def build_args_doc_string(base_doc_str, _def_spec, _def_in, _def_out, _def_throw
 
     first_time = True
     for key,val in (_def_in or {}).iteritems():
-        if isinstance(val, datetime.datetime):
+        if isinstance(val, basestring):
+            if val.startswith("!"):
+                val = val.strip("!")
+            else:
+                val = 'str'
+        elif isinstance(val, datetime.datetime):
             val="datetime"
         elif isinstance(val,dict):
             val=find_object_reference(key)
@@ -275,7 +305,12 @@ def build_args_doc_string(base_doc_str, _def_spec, _def_in, _def_out, _def_throw
         doc_str += templates['at_param'].substitute(in_name=key, in_type=val)
 
     for key,val in (_def_out or {}).iteritems():
-        if isinstance(val, datetime.datetime):
+        if isinstance(val, basestring):
+            if val.startswith("!"):
+                val = val.strip("!")
+            else:
+                val = 'str'
+        elif isinstance(val, datetime.datetime):
             val="datetime"
         elif isinstance(val,dict):
             val=find_object_reference(key)
@@ -341,7 +376,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
     class_name      = service_name_from_file_name(interface_name)
 
     if service_name is None:
-        raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % yaml_file)
+        raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % interface_file)
 
     print 'Generating %40s -> %s' % (interface_name, interface_file)
 
@@ -388,7 +423,16 @@ def generate_service(interface_file, svc_def, client_defs, opts):
 
         def _get_default(v):
             if type(v) is str:
-                return "'%s'" % v
+                if v.startswith("!"):
+                    v = v.strip("!")
+                    if v in enums_by_name:
+                        # Get default enum value
+                        enum_def = enums_by_name[v]
+                        v = "interface.objects." + v + "." + enum_def["default"]
+                    else:
+                        v = "None"
+                else:
+                    v = "'%s'" % (v)
             elif type(v) in (int, long, float):
                 return str(v)
             elif type(v) is bool:
@@ -402,7 +446,7 @@ def generate_service(interface_file, svc_def, client_defs, opts):
             clientobjargs       = ",".join(all_client_obj_args)
 
         # determine object in name: follows <ServiceName>_<MethodName>_in
-        req_in_obj_name = "%s_%s_in" % (class_name, op_name)
+        req_in_obj_name = "%s_%s_in" % (service_name, op_name)
 
         client_methods.append(client_templates['method'].substitute(name=op_name,
                                                                     args=class_args_str,
@@ -484,7 +528,552 @@ def doc_tag_constructor(loader, node):
         print key_node," = ", value_node
 
     object_references[str(node.tag[1:])]=str(node.start_mark)
-    return {}
+    return str(node.tag)
+
+def load_mods(path, interfaces):
+    mod_prefix = string.replace(path, "/", ".")
+
+    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
+        if is_pkg:
+            load_mods(path+"/"+mod_name, interfaces)
+        else:
+            mod_qual = "%s.%s" % (mod_prefix, mod_name)
+            try:
+                named_any(mod_qual)
+            except Exception, ex:
+                print "Import module '%s' failed: %s" % (mod_qual, ex)
+                if not interfaces:
+                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
+
+def find_subtypes(clz):
+    res = []
+    for cls in clz.__subclasses__():
+        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
+        res.append(cls)
+    return res
+
+# Super hacky method that walks the yaml text and utilizes the yaml load method
+# to simplify determining the right data types to spit out.  Net result
+# are two files:  interfaces/objects.py and interfaces/messages.py
+# TODO make this method legit by utilizing a parser to handle walking
+# the tokens.    
+def generate_model_objects():
+    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+    data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
+
+    service_yaml_files = list_files_recursive('obj/services', '*.yml')
+    service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
+
+    combined_yaml_text = data_yaml_text + "\n" + service_yaml_text
+
+    # Parse once looking for enum types.  These classes will go at
+    # the top of the objects.py.  Defs are also put into a dict
+    # so we can easily reference their values later in the parsing
+    # logic.
+    dataobject_output_text = "#!/usr/bin/env python\n\nfrom pyon.core.object import IonObjectBase\n\nfrom collections import OrderedDict\n\n# Enums\n"
+
+    for line in combined_yaml_text.split('\n'):
+        if '!enum ' in line:
+            # If stand alone enum type definition
+            tokens = line.split(':')
+            classname = tokens[0].strip()
+                    
+            enum_def = tokens[1].strip(' )').replace('!enum (', '')
+            if 'name' in enum_def:
+                name_str = enum_def.split(',', 1)[0]
+                name_val = name_str.split('=')[1].strip()
+                if line[0].isalpha():
+                    assert line.startswith(name_val + ':'), "enum name/class name mismatch %s/%s" % (classname, name_val)
+            else:
+                name_str = ''
+                name_val = classname
+            default_str = enum_def.rsplit(',', 1)[1]
+            default_val = default_str.split('=')[1].strip()
+            value_str = enum_def.replace(name_str, '').replace(default_str, '').strip(', ')
+            value_val = value_str.split('=')[1].replace(' ', '').strip('()').split(',')
+            assert name_val not in enums_by_name, "enum with type name %s redefined" % name_val
+            enums_by_name[name_val] = {"values": value_val, "default": default_val}
+
+            dataobject_output_text += "\nclass " + name_val + "():\n"
+            i = 1
+            for val in value_val:
+                dataobject_output_text += "    " + val + " = " + str(i) + "\n"
+                i += 1
+
+    enum_tag = u'!enum'
+    def enum_constructor(loader, node):
+        val_str = str(node.value)
+        val_str = val_str[1:-1].strip()
+        if 'name' in val_str:
+            name_str = val_str.split(',', 1)[0]
+            name_val = name_str.split('=')[1].strip()
+            return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"]}
+
+        else:
+            return {"__IsEnum": True, "_NameNotProvided": True}
+
+    yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
+
+    # Now walk the data model definition yaml files adding the
+    # necessary yaml constructors.
+    defs = yaml.load_all(data_yaml_text, Loader=IonYamlLoader)
+    def_dict = {}
+    for def_set in defs:
+        for name,_def in def_set.iteritems():
+            if isinstance(_def, OrderedDict):
+                def_dict[name] = _def
+            tag = u'!%s' % (name)
+            def constructor(loader, node):
+                value = node.tag.strip('!')
+                # See if this is an enum ref
+                if value in enums_by_name:
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                else:
+                    return str(value) + "()"
+            yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+            xtag = u'!Extends_%s' % (name)
+            def extends_constructor(loader, node):
+                if isinstance(node, yaml.MappingNode):
+                    value = loader.construct_mapping(node)
+                else:
+                    value = {}
+                return value
+            yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+    # Do the same for any data model objects in the service
+    # definition files.
+    defs = yaml.load_all(service_yaml_text, Loader=IonYamlLoader)
+    for def_set in defs:
+        for name,_def in def_set.get('obj', {}).iteritems():
+            if isinstance(_def, OrderedDict):
+                def_dict[name] = _def
+            tag = u'!%s' % (name)
+            def constructor(loader, node):
+                value = node.tag.strip('!')
+                # See if this is an enum ref
+                if value in enums_by_name:
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                else:
+                    return str(value) + "()"
+            yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+            xtag = u'!Extends_%s' % (name)
+            def extends_constructor(loader, node):
+                if isinstance(node, yaml.MappingNode):
+                    value = loader.construct_mapping(node)
+                else:
+                    value = {}
+                return value
+            yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+    # Delimit the break between the enum classes and
+    # and the data model classes
+    dataobject_output_text += "\n\n# Data Objects\n"
+
+    # function that recursively generates right hand value
+    # for a class attribute.
+    def convert_val(value):
+        if isinstance(value, list):
+            outline = '['
+            first_time = True
+            for val in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += convert_val(val)
+            outline += ']'
+        elif isinstance(value, dict) and "__IsEnum" in value:
+            outline = value["value"]
+        elif isinstance(value, OrderedDict):
+            outline = '{'
+            first_time = True
+            for key in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += "'" + key + "': " + convert_val(value[key])
+            outline +=  '}'
+        elif isinstance(value, str):
+            outline = "'" + value + "'"
+        else:
+            outline = str(value)
+        return outline
+            
+    # Now walk the data model definition yaml files.  Generate
+    # corresponding classes in the objects.py file.
+    current_class_def_dict = None
+    schema_extended = False
+    current_class_schema = ""
+    current_class = ""
+    for line in data_yaml_text.split('\n'):
+        if line.isspace():
+            continue
+        elif line.startswith('  #'):
+            dataobject_output_text += '      ' + line + '\n'
+        elif line.startswith('  '):
+            if current_class_def_dict:
+                field = line.split(":")[0].strip()
+                try:
+                    value = current_class_def_dict[field]
+                except KeyError:
+                    # Ignore key error because value is nested
+                    continue
+                if isinstance(value, str) and '()' in value:
+                    value_type = value.strip('()')
+                    converted_value = 'None'
+                else:
+                    value_type = type(value).__name__
+                    if value_type == 'dict' and "__IsEnum" in value:
+                        value_type = 'int'
+                    converted_value = convert_val(value)
+                dataobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + converted_value + ")\n"
+                current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+        elif line and line[0].isalpha():
+            if '!enum' in line:
+                continue
+            if len(current_class_schema) > 0:
+                if schema_extended:
+                    dataobject_output_text += current_class_schema + "\n              }.items())\n"
+                else:
+                    dataobject_output_text += current_class_schema + "\n              }\n"
+            dataobject_output_text += '\n'
+            current_class = line.split(":")[0]
+            try:
+                current_class_def_dict = def_dict[current_class]           
+            except KeyError:
+                current_class_def_dict = None
+            super_class = "IonObjectBase"
+            if ': !Extends_' in line:
+                super_class = line.split("!Extends_")[1]
+                schema_extended = True
+                current_class_schema = "\n    _schema = dict(" + super_class + "._schema.items() + {"
+                line = line.replace(': !Extends_','(')
+            else:
+                schema_extended = False
+                current_class_schema = "\n    _schema = {"
+                line = line.replace(':','(IonObjectBase')
+            dataobject_output_text += 'class ' + line + '):\n    def __init__(self, **kwargs):\n'
+            if super_class != "IonObjectBase":
+                dataobject_output_text += '        ' + super_class + ".__init__(self, **kwargs)\n"
+
+    # Find any data model definitions lurking in the service interface
+    # definition yaml files and generate classes for them.
+    lines = service_yaml_text.split('\n')
+    for index in range(1,len(lines)):
+        if lines[index].startswith('obj:'):
+            index += 1
+            while index in range(1,len(lines)) and not lines[index].startswith('---'):
+                line = lines[index]
+                if line.isspace():
+                    index += 1
+                    continue
+                line = line.replace('  ', '', 1)
+                if line.startswith('  #'):
+                    dataobject_output_text += '  ' + line + '\n'
+                elif line.startswith('  '):
+                    if current_class_def_dict:
+                        field = line.split(":")[0].strip()
+                        try:
+                            value = current_class_def_dict[field]
+                        except KeyError:
+                            # Ignore key error because value is nested
+                            index += 1
+                            continue
+                    
+                        if isinstance(value, str) and '()' in value:
+                            value_type = value.strip('()')
+                            converted_value = 'None'
+                        else:
+                            value_type = type(value).__name__
+                            
+                            if value_type == 'dict' and "__IsEnum" in value:
+                                value_type = 'int'
+                            converted_value = convert_val(value)
+                        dataobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + converted_value + ")\n"
+                        current_class_schema += " '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+                elif line and line[0].isalpha():
+                    if '!enum' in line:
+                        index += 1
+                        continue
+                    if len(current_class_schema) > 0:
+                        if schema_extended:
+                            dataobject_output_text += current_class_schema + "\n              }.items())\n"
+                        else:
+                            dataobject_output_text += current_class_schema + "\n              }\n"
+                    dataobject_output_text += '\n'
+                    current_class = line.split(":")[0]
+                    try:
+                        current_class_def_dict = def_dict[current_class]
+                    except KeyError:
+                        current_class_def_dict = None
+                    super_class = "IonObjectBase"
+                    if ': !Extends_' in line:
+                        super_class = line.split("!Extends_")[1]
+                        schema_extended = True
+                        current_class_schema = "\n    _schema = dict(" + super_class + "._schema.items() + {"
+                        line = line.replace(': !Extends_','(')
+                    else:
+                        schema_extended = False
+                        current_class_schema = "\n    _schema = {"
+                        line = line.replace(':','(IonObjectBase')
+                    dataobject_output_text += 'class ' + line + '):\n    def __init__(self, **kwargs):\n'
+                    if super_class != "IonObjectBase":
+                        dataobject_output_text += '        ' + super_class + ".__init__(self, **kwargs)\n"
+                    
+                index += 1
+
+    if len(current_class_schema) > 0:
+        if schema_extended:
+            dataobject_output_text += current_class_schema + "\n              }.items())\n"
+        else:
+            dataobject_output_text += current_class_schema + "\n              }\n"
+ 
+    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
+    current_class_schema = ""
+
+    # Now process the service definition yaml files to
+    # generate message classes for input and return messages.
+    # Do this on a per file basis to simplify figuring out
+    # when we've reached the end of a service's ops.
+    for yaml_file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path)):
+        index = 0
+        
+        yaml_text = yaml_file.read() 
+        lines = yaml_text.split('\n')
+
+        # Find service name
+        while index < len(lines):
+            if lines[index].startswith('name:'):
+                break
+            index += 1
+
+        if index >= len(lines):
+            continue
+
+        current_service_name = lines[index].split(':')[1].strip()
+        index += 1
+
+        # Find op definitions
+        while index < len(lines):
+            if lines[index].startswith('methods:'):
+                break
+            index += 1
+        index += 1
+
+        if index >= len(lines):
+            continue
+
+        # Find op name
+        while index < len(lines):
+            if lines[index].startswith('  ') and lines[index][2].isalpha():
+                break
+            index += 1
+
+        if index >= len(lines):
+            continue
+
+        while index < len(lines):
+            if len(lines[index]) == 0 or lines[index].isspace():
+                index += 1
+                continue
+
+            if not (lines[index].startswith('  ') and lines[index][2].isalpha()):
+                index += 1
+                continue
+
+            current_op_name = lines[index].strip(' :')
+            messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
+            messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
+            messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
+            messageobject_output_text += '    def __init__(self, **kwargs):\n'
+            current_class_schema = "\n    _schema = {"
+            index += 1
+
+            # Find in
+            while index < len(lines):
+                if lines[index].startswith('    in:'):
+                    break
+                index += 1
+            index += 1
+
+            found_param = False
+            while index < len(lines) and not lines[index].startswith('    out:'):
+                if lines[index].isspace():
+                    index += 1
+                    continue
+
+                line = lines[index].replace('    ', '', 1)
+                if line.startswith('  #'):
+                    messageobject_output_text += '  ' + line + '\n'
+                    index += 1
+                    continue
+                elif line.startswith('  '):
+                    found_param = True
+                    field = line.split(":", 1)[0].strip()
+                    try:
+                        value = line.split(":", 1)[1].strip()
+                        if '#' in value:
+                            value = value.split('#')[0].strip()
+                    except KeyError:
+                        # Ignore key error because value is nested
+                        index += 1
+                        continue
+                    if len(value) == 0:
+                        value = "None"
+                        value_type = "str"
+                        default = "None"
+                    elif value.startswith('!'):
+                        value = value.strip("!")
+                        if value in enums_by_name:
+                            value_type = 'int'
+                            # Get default enum value
+                            enum_def = enums_by_name[value]
+                            value = "interface.objects." + value + "." + enum_def["default"]
+                            default = value
+                        else:
+                            value_type = value
+                            value = "None"
+                            default = "None"
+                    # Hacks, find a better way in the future
+                    elif "'" in value or '"' in value:
+                        value_type = "str"
+                        default = value
+                    # Hack
+                    else:
+                        try:
+                            eval_value = ast.literal_eval(value)
+                            value_type = type(eval_value).__name__
+                        except ValueError:
+                            value_type = "str"
+                            value = "'" + value + "'"
+                        except SyntaxError:
+                            value_type = "str"
+                            value = "'" + value + "'"
+                        default = value
+
+                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
+                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
+                index += 1
+
+            if not found_param:
+                messageobject_output_text += '        pass\n'
+            messageobject_output_text += current_class_schema + "\n              }\n"
+
+            found_param = False
+
+            if index < len(lines) and lines[index].startswith('    out:'):
+                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
+                messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
+                messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
+                messageobject_output_text += '    def __init__(self, **kwargs):\n'
+                current_class_schema = "\n    _schema = {"
+                index += 1
+                while index < len(lines):
+
+                    line = lines[index]
+
+                    if line.isspace() or len(line) == 0:
+                        index += 1
+                        continue
+
+                    # Ignore
+                    if not line.startswith('  '):
+                        index += 1
+                        continue
+
+                    # Found next op
+                    if line.startswith('  ') and line[2].isalpha():
+                        break
+
+                    if line.startswith('    throws:'):
+                        index += 1
+                        while index < len(lines):
+                            if not lines[index].startswith('    '):
+                                break
+                            index += 1
+                        break
+
+                    line = line.replace('    ', '', 1)
+                    if line.startswith('  #'):
+                        index += 1
+                        continue
+                    found_param = True
+                    field = line.split(":", 1)[0].strip()
+                    try:
+                        value = line.split(":", 1)[1].strip()
+                        if '#' in value:
+                            value = value.split('#')[0].strip()
+                    except KeyError:
+                        # Ignore key error because value is nested
+                        index += 1
+                        continue
+#                    except IndexError:
+#                        print "HERE"
+                    if len(value) == 0:
+                        value = "None"
+                        value_type = "str"
+                        default = "None"
+                    elif value.startswith('!'):
+                        value = value.strip('!')
+                        if value in enums_by_name:
+                            value_type = 'int'
+                            # Get default enum value
+                            enum_def = enums_by_name[value]
+                            value = "interface.objects." + value + "." + enum_def["default"]
+                            default = value
+                        else:
+                            value_type = value
+                            value = "None"
+                            default = "None"
+                    # Hacks, find a better way in the future
+                    elif "'" in value or '"' in value:
+                        value_type = "str"
+                        default = value
+                    # Hack
+                    else:
+                        try:
+                            eval_value = ast.literal_eval(value)
+                            value_type = type(eval_value).__name__
+                        except ValueError:
+                            value_type = "str"
+                            value = "'" + value + "'"
+                        except SyntaxError:
+                            value_type = "str"
+                            value = "'" + value + "'"
+                        default = value
+
+                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
+                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
+                    index += 1
+
+                if not found_param:
+                    messageobject_output_text += '        pass\n'
+                messageobject_output_text += current_class_schema + "\n              }\n"
+            
+    datadir = 'interface'
+    if not os.path.exists(datadir):
+        os.makedirs(datadir)
+        open(os.path.join(datadir, '__init__.py'), 'w').close()
+    datamodelfile = os.path.join(datadir, 'objects.py')
+    try:
+        os.unlink(datamodelfile)
+    except:
+        pass
+    print "Writing data model to '" + datamodelfile + "'"
+    with open(datamodelfile, 'w') as f:
+        f.write(dataobject_output_text)
+    messagemodelfile = os.path.join(datadir, 'messages.py')
+    try:
+        os.unlink(messagemodelfile)
+    except:
+        pass
+    print "Writing message model to '" + messagemodelfile + "'"
+    with open(messagemodelfile, 'w') as f:
+        f.write(messageobject_output_text)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -514,7 +1103,20 @@ def main():
         
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
-    yaml.add_constructor(u'!enum', lambda loader, node: {})
+    # Generate data object definitions into python classes
+    generate_model_objects()
+
+    enum_tag = u'!enum'
+    def enum_constructor(loader, node):
+        val_str = str(node.value)
+        val_str = val_str[1:-1].strip()
+        if 'name' in val_str:
+            name_str = val_str.split(',', 1)[0].split('=')[1].strip()
+            return "!" + str(name_str)
+        else:
+            return "Enum Name Not Provided"
+
+    yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
 
     yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
     yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
@@ -807,30 +1409,6 @@ def main():
         exitcode = 1
 
     sys.exit(exitcode)
-
-def load_mods(path, interfaces):
-    import pkgutil
-    import string
-    mod_prefix = string.replace(path, "/", ".")
-
-    for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
-        if is_pkg:
-            load_mods(path+"/"+mod_name, interfaces)
-        else:
-            mod_qual = "%s.%s" % (mod_prefix, mod_name)
-            try:
-                named_any(mod_qual)
-            except Exception, ex:
-                print "Import module '%s' failed: %s" % (mod_qual, ex)
-                if not interfaces:
-                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
-
-def find_subtypes(clz):
-    res = []
-    for cls in clz.__subclasses__():
-        assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
-        res.append(cls)
-    return res
 
 if __name__ == '__main__':
     main()

@@ -9,9 +9,8 @@ import couchdb
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
 from pyon.core.bootstrap import obj_registry
-from pyon.core.object import IonObjectSerializer, IonObjectDeserializer
 from pyon.core.exception import BadRequest, Conflict, NotFound
-from pyon.core.object import IonObjectBase
+from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.ion.resource import ResourceLifeCycleSM

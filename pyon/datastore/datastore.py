@@ -288,7 +288,7 @@ class DataStore(object):
             subject_id = subject._id
         if "_rev" not in subject or not subject_id:
             raise BadRequest("Subject rev or id not available")
-        st = subject._def.type.name
+        st = type(subject).__name__
 
         if type(obj) is str:
             object_id = obj
@@ -297,7 +297,7 @@ class DataStore(object):
             object_id = obj._id
         if "_rev" not in obj or not object_id:
             raise BadRequest("Object rev or id not available")
-        ot = obj._def.type.name
+        ot = type(obj).__name__
 
         assoc_type = assoc_type or 'H2H'
         if not assoc_type in ('H2H', 'R2R', 'H2R', 'R2H', 'R2R'):
@@ -305,7 +305,7 @@ class DataStore(object):
 
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
-        from pyon.core.object import IonObjectRegistry
+        from pyon.core.registry import getextends
         from pyon.ion.resource import AssociationTypes
         from pyon.core.bootstrap import IonObject
 
@@ -315,7 +315,7 @@ class DataStore(object):
         if not st in at['domain']:
             found_st = False
             for domt in at['domain']:
-                if st in IonObjectRegistry.allextends[domt]:
+                if st in getextends(domt):
                     found_st = True
                     break
             if not found_st:
@@ -323,7 +323,7 @@ class DataStore(object):
         if not ot in at['range']:
             found_ot = False
             for rant in at['range']:
-                if ot in IonObjectRegistry.allextends[rant]:
+                if ot in getextends(rant):
                     found_ot = True
                     break
             if not found_ot:

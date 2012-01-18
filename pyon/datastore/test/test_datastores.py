@@ -14,6 +14,8 @@ from nose.plugins.attrib import attr
 from unittest import SkipTest
 import socket
 
+import interface.objects
+
 OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
@@ -242,6 +244,7 @@ class Test_DataStores(IonIntegrationTestCase):
         marine_operator_role_ooi_id = marine_operator_role_tuple[0]
 
         role_objs = data_store.read_mult([admin_role_ooi_id, data_provider_role_ooi_id, marine_operator_role_ooi_id])
+            
         self.assertTrue(len(role_objs) == 3)
         self.assertTrue(role_objs[0]._id == admin_role_ooi_id)
         self.assertTrue(role_objs[1]._id == data_provider_role_ooi_id)
@@ -250,11 +253,11 @@ class Test_DataStores(IonIntegrationTestCase):
         # Construct three user info objects and assign them roles
         hvl_user_info = {
             "name": "Heitor Villa-Lobos",
+            "email": "prelude1@heitor.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Legendary Brazilian composer"
             }
         }
-        hvl_user_info["roles"] = [admin_role_ooi_id]
         hvl_user_info_obj = IonObject('UserInfo', hvl_user_info)
         hvl_user_info_tuple = data_store.create(hvl_user_info_obj)
         self.assertTrue(len(hvl_user_info_tuple) == 2)
@@ -263,22 +266,22 @@ class Test_DataStores(IonIntegrationTestCase):
 
         ats_user_info = {
             "name": "Andres Torres Segovia",
+            "email": "asturas@andres.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Legendary Concert Guitarist"
             }
         }
-        ats_user_info["roles"] = [data_provider_role_ooi_id]
         ats_user_info_obj = IonObject('UserInfo', ats_user_info)
         ats_user_info_tuple = data_store.create(ats_user_info_obj)
         self.assertTrue(len(ats_user_info_tuple) == 2)
 
         pok_user_info = {
             "name": "Per-Olov Kindgren",
+            "email": "etude6@per.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Composer and YouTube star"
             }
         }
-        pok_user_info["roles"] = [marine_operator_role_ooi_id]
         pok_user_info_obj = IonObject('UserInfo', pok_user_info)
         pok_user_info_tuple = data_store.create(pok_user_info_obj)
         self.assertTrue(len(pok_user_info_tuple) == 2)
@@ -298,47 +301,9 @@ class Test_DataStores(IonIntegrationTestCase):
         user_info_obj = res[0]
         self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
 
-        # Find role(s) for user Heitor Villa-Lobos
-        res = data_store.find_by_idref([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]], "roles")
-        self.assertTrue(len(res) == 1)
-        user_role_obj = res[0]
-        self.assertTrue(user_role_obj.name == "Admin")
-
-        # Find role association(s) for user Heitor Villa-Lobos
-        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, 'roles', "")
-        self.assertTrue(len(res) == 1)
-        user_role_obj = res[0][2]
-        self.assertTrue(user_role_obj.name == "Admin")
-
-        # Assert Admin role association exists for user Heitor Villa-Lobos
-        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, 'roles', admin_role_ooi_id)
-        self.assertTrue(len(res) == 1)
-        user_role_obj = res[0][2]
-        self.assertTrue(user_role_obj.name == "Admin")
-
-        # Find every subject with an association to the Admin role
-        res = data_store.resolve_idref("", 'roles', admin_role_ooi_id)
-        self.assertTrue(len(res) == 1)
-        user_info_obj = res[0][0]
-        self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
-
-        # Find every association involving object
-        res = data_store.resolve_idref("", "", admin_role_ooi_id)
-        self.assertTrue(len(res) == 1)
-        user_info_obj = res[0][0]
-        self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
-        predicate = res[0][1]
-        self.assertTrue(predicate == "roles")
-
-        # Find every association between the subject and object
-        res = data_store.resolve_idref(heitor_villa_lobos_ooi_id, "", admin_role_ooi_id)
-        self.assertTrue(len(res) == 1)
-        predicate = res[0][1]
-        self.assertTrue(predicate == "roles")
-
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')
-        self.assertTrue(data_set._def.type.name == 'DataSet')
+        self.assertTrue(isinstance(data_set, interface.objects.DataSet))
 
         # Assign values to object fields
         data_set.Description = "Real-time water data for Choptank River near Greensboro, MD"
@@ -372,7 +337,7 @@ class Test_DataStores(IonIntegrationTestCase):
         # Read back the HEAD version of the object and validate fields
         data_set_read_obj = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
-        self.assertTrue(data_set_read_obj._def.type.name == "DataSet")
+        self.assertTrue(isinstance(data_set_read_obj, interface.objects.DataSet))
         self.assertTrue(data_set_read_obj.Description == "Real-time water data for Choptank River near Greensboro, MD")
         self.assertTrue(not 'type_' in data_set_read_obj)
 
@@ -518,11 +483,10 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(obj_assocs1n), 0)
 
         obj_ids1a, obj_assocs1a = data_store.find_objects(admin_user_id, id_only=False)
-        self.assertTrue(obj_ids1a[0]._def)
         self.assertEquals(len(obj_ids1a), 3)
         self.assertEquals(len(obj_assocs1a), 3)
         self.assertEquals(set([o._id for o in obj_ids1a]), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
-        self.assertEquals(set([o._def.type.name for o in obj_ids1a]), set([RT.UserInfo, RT.InstrumentDevice, RT.DataSet]))
+        self.assertEquals(set([type(o).__name__ for o in obj_ids1a]), set([RT.UserInfo, RT.InstrumentDevice, RT.DataSet]))
 
         obj_ids1an, obj_assocs1an = data_store.find_objects("Non_Existent", id_only=False)
         self.assertEquals(len(obj_ids1an), 0)
@@ -544,7 +508,6 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set(sub_ids1), set([admin_user_id, plat1_obj_id]))
 
         sub_ids1a, sub_assoc1a = data_store.find_subjects(None, None, inst1_obj_id, id_only=False)
-        self.assertTrue(sub_ids1a[0]._def)
         self.assertEquals(len(sub_ids1a), 2)
         self.assertEquals(len(sub_assoc1a), 2)
         self.assertEquals(set([o._id for o in sub_ids1a]), set([admin_user_id, plat1_obj_id]))
@@ -577,7 +540,6 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, other_user_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_type(RT.UserIdentity, id_only=False)
-        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
@@ -599,11 +561,10 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.AVAILABLE, id_only=False)
-        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
-        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
+        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.AVAILABLE, RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
@@ -636,11 +597,10 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set(res_ids1), set([inst1_obj_id]))
 
         res_ids1a, res_assoc1a = data_store.find_res_by_name('CTD2', id_only=False)
-        self.assertTrue(res_ids1a[0]._def)
         self.assertEquals(len(res_ids1a), 1)
         self.assertEquals(len(res_assoc1a), 1)
         self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
-        self.assertEquals(set([o._def.type.name for o in res_ids1a]), set([RT.InstrumentDevice]))
+        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.InstrumentDevice]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_name( 'John Doe', RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
@@ -658,7 +618,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         assocs = data_store.find_associations(admin_user_id, OWNER_OF, inst1_obj_id, id_only=False)
         self.assertEquals(len(assocs), 1)
-        self.assertEquals(assocs[0]._def.type.name, "Association")
+        self.assertEquals(type(assocs[0]).__name__, "Association")
 
         assocs = data_store.find_associations(admin_user_id, None, inst1_obj_id, id_only=True)
         self.assertEquals(len(assocs), 1)
