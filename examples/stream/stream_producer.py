@@ -16,6 +16,7 @@ class StreamProducer(BaseService):
         log.debug("StreamProducer init. Self.id=%s" % self.id)
 
     def on_start(self):
+
         log.debug("StreamProducer start")
         # Threads become efficent Greenlets with gevent
         self.producer_proc = threading.Thread(target=self._trigger_func)

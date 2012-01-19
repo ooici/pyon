@@ -4,7 +4,8 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.public import CFG, log
+from pyon.util.log import log
+from pyon.core.bootstrap import CFG
 from pyon.service.service import BaseService
 
 class StreamProcess(BaseService):

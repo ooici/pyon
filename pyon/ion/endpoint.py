@@ -7,7 +7,7 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.net.endpoint import ProcessRPCClient, ProcessRPCServer, Publisher, Subscriber
-from pyon.public import CFG, IonObject
+from pyon.core.bootstrap import CFG, IonObject
 from pyon.util.log import log
 from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
 from pyon.util.async import  spawn

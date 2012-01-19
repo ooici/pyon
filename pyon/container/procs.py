@@ -64,7 +64,7 @@ class ProcManager(object):
         # Generate a new process id
         # TODO: Ensure it is system-wide unique
         process_id = str(self.proc_id_pool.get_id())
-        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s" % (name, module, cls, process_id))
+        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s, proc_type=%s) as pid=%s", name, module, cls, process_type, process_id)
 
         if config is None:
             config = DictModifier(CFG)
@@ -129,7 +129,7 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
-        listen_name = config.get("process", {}).get("listen_name", None)
+        listen_name = config.get("process", {}).get("listen_name", name)
         # Throws an exception if no listen name is given!
         self._set_subscription_endpoint(service_instance, listen_name)
 
