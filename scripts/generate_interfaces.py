@@ -570,7 +570,7 @@ def generate_model_objects():
     # the top of the objects.py.  Defs are also put into a dict
     # so we can easily reference their values later in the parsing
     # logic.
-    dataobject_output_text = "#!/usr/bin/env python\n\nfrom pyon.core.object import IonObjectBase\n\nfrom collections import OrderedDict\n\n# Enums\n"
+    dataobject_output_text = "#!/usr/bin/env python\n\nfrom pyon.core.object import IonObjectBase\n\n# Enums\n"
 
     for line in combined_yaml_text.split('\n'):
         if '!enum ' in line:
@@ -708,11 +708,17 @@ def generate_model_objects():
     schema_extended = False
     current_class_schema = ""
     current_class = ""
+    super_class = "IonObjectBase"
+    class_args_dict = {}
+    args = []
+    fields = []
+    init_lines = []
+    first_time = True
     for line in data_yaml_text.split('\n'):
         if line.isspace():
             continue
         elif line.startswith('  #'):
-            dataobject_output_text += '      ' + line + '\n'
+            init_lines.append('      ' + line + '\n')
         elif line.startswith('  '):
             if current_class_def_dict:
                 field = line.split(":")[0].strip()
@@ -729,25 +735,46 @@ def generate_model_objects():
                     if value_type == 'dict' and "__IsEnum" in value:
                         value_type = 'int'
                     converted_value = convert_val(value)
-                dataobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + converted_value + ")\n"
+                args.append(", ")
+                args.append(field + "=" + converted_value)
+                fields.append(field)
+                init_lines.append('        self.' + field + " = " + field + "\n")
                 current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
         elif line and line[0].isalpha():
             if '!enum' in line:
                 continue
+            if first_time:
+                first_time = False
+            else:
+                class_args_dict[current_class] = {'args': args, 'fields': fields}
+                for arg in args:
+                    dataobject_output_text += arg
+                dataobject_output_text += "):\n"
+                for init_line in init_lines:
+                    dataobject_output_text += init_line
             if len(current_class_schema) > 0:
                 if schema_extended:
                     dataobject_output_text += current_class_schema + "\n              }.items())\n"
                 else:
                     dataobject_output_text += current_class_schema + "\n              }\n"
             dataobject_output_text += '\n'
+            args = []
+            fields = []
+            init_lines = []
             current_class = line.split(":")[0]
             try:
                 current_class_def_dict = def_dict[current_class]           
             except KeyError:
-                current_class_def_dict = None
+                current_class_def_dict = {}
             super_class = "IonObjectBase"
             if ': !Extends_' in line:
                 super_class = line.split("!Extends_")[1]
+                args = args + class_args_dict[super_class]["args"]
+                init_lines.append('        ' + super_class + ".__init__(self")
+                fields = fields + class_args_dict[super_class]["fields"]
+                for super_field in fields:
+                    init_lines.append(", " + super_field)
+                init_lines.append(")\n")
                 schema_extended = True
                 current_class_schema = "\n    _schema = dict(" + super_class + "._schema.items() + {"
                 line = line.replace(': !Extends_','(')
@@ -755,9 +782,7 @@ def generate_model_objects():
                 schema_extended = False
                 current_class_schema = "\n    _schema = {"
                 line = line.replace(':','(IonObjectBase')
-            dataobject_output_text += 'class ' + line + '):\n    def __init__(self, **kwargs):\n'
-            if super_class != "IonObjectBase":
-                dataobject_output_text += '        ' + super_class + ".__init__(self, **kwargs)\n"
+            dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
 
     # Find any data model definitions lurking in the service interface
     # definition yaml files and generate classes for them.
@@ -772,7 +797,7 @@ def generate_model_objects():
                     continue
                 line = line.replace('  ', '', 1)
                 if line.startswith('  #'):
-                    dataobject_output_text += '  ' + line + '\n'
+                    init_lines.append('  ' + line + '\n')
                 elif line.startswith('  '):
                     if current_class_def_dict:
                         field = line.split(":")[0].strip()
@@ -792,18 +817,31 @@ def generate_model_objects():
                             if value_type == 'dict' and "__IsEnum" in value:
                                 value_type = 'int'
                             converted_value = convert_val(value)
-                        dataobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + converted_value + ")\n"
+                        args.append(", ")
+                        args.append(field + "=" + converted_value)
+                        fields.append(field)
+                        init_lines.append('        self.' + field + " = " + field + "\n")
                         current_class_schema += " '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
                 elif line and line[0].isalpha():
                     if '!enum' in line:
                         index += 1
                         continue
+                    class_args_dict[current_class] = {'args': args, 'fields': fields}
+                    for arg in args:
+                        dataobject_output_text += arg
+                    dataobject_output_text += "):\n"
+                    for init_line in init_lines:
+                        dataobject_output_text += init_line
                     if len(current_class_schema) > 0:
                         if schema_extended:
                             dataobject_output_text += current_class_schema + "\n              }.items())\n"
                         else:
                             dataobject_output_text += current_class_schema + "\n              }\n"
                     dataobject_output_text += '\n'
+                    dataobject_output_text += '\n'
+                    args = []
+                    fields = []
+                    init_lines = []
                     current_class = line.split(":")[0]
                     try:
                         current_class_def_dict = def_dict[current_class]
@@ -812,6 +850,12 @@ def generate_model_objects():
                     super_class = "IonObjectBase"
                     if ': !Extends_' in line:
                         super_class = line.split("!Extends_")[1]
+                        args = args + class_args_dict[super_class]["args"]
+                        init_lines.append('        ' + super_class + ".__init__(self")
+                        fields = fields + class_args_dict[super_class]["fields"]
+                        for super_field in fields:
+                            init_lines.append(", " + super_field)
+                        init_lines.append(")\n")
                         schema_extended = True
                         current_class_schema = "\n    _schema = dict(" + super_class + "._schema.items() + {"
                         line = line.replace(': !Extends_','(')
@@ -819,12 +863,16 @@ def generate_model_objects():
                         schema_extended = False
                         current_class_schema = "\n    _schema = {"
                         line = line.replace(':','(IonObjectBase')
-                    dataobject_output_text += 'class ' + line + '):\n    def __init__(self, **kwargs):\n'
-                    if super_class != "IonObjectBase":
-                        dataobject_output_text += '        ' + super_class + ".__init__(self, **kwargs)\n"
+                    dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
                     
                 index += 1
 
+    if len(args) > 0:
+        for arg in args:
+            dataobject_output_text += arg
+        dataobject_output_text += "):\n"
+        for init_line in init_lines:
+            dataobject_output_text += init_line
     if len(current_class_schema) > 0:
         if schema_extended:
             dataobject_output_text += current_class_schema + "\n              }.items())\n"
@@ -838,6 +886,8 @@ def generate_model_objects():
     # generate message classes for input and return messages.
     # Do this on a per file basis to simplify figuring out
     # when we've reached the end of a service's ops.
+    args = []
+    init_lines = []
     for yaml_file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path)):
         index = 0
         
@@ -884,11 +934,13 @@ def generate_model_objects():
                 index += 1
                 continue
 
+            args = []
+            init_lines = []
             current_op_name = lines[index].strip(' :')
             messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
             messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
             messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
-            messageobject_output_text += '    def __init__(self, **kwargs):\n'
+            messageobject_output_text += '    def __init__(self'
             current_class_schema = "\n    _schema = {"
             index += 1
 
@@ -899,7 +951,6 @@ def generate_model_objects():
                 index += 1
             index += 1
 
-            found_param = False
             while index < len(lines) and not lines[index].startswith('    out:'):
                 if lines[index].isspace():
                     index += 1
@@ -907,11 +958,10 @@ def generate_model_objects():
 
                 line = lines[index].replace('    ', '', 1)
                 if line.startswith('  #'):
-                    messageobject_output_text += '  ' + line + '\n'
+                    init_lines.append('  ' + line + '\n')
                     index += 1
                     continue
                 elif line.startswith('  '):
-                    found_param = True
                     field = line.split(":", 1)[0].strip()
                     try:
                         value = line.split(":", 1)[1].strip()
@@ -954,21 +1004,30 @@ def generate_model_objects():
                             value = "'" + value + "'"
                         default = value
 
-                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
+                    args.append(", ")
+                    args.append(field + "=" + default)
+                    init_lines.append('        self.' + field + " = " + field + "\n")
                     current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
                 index += 1
 
-            if not found_param:
+            if len(args) > 0:
+                for arg in args:
+                    messageobject_output_text += arg
+                messageobject_output_text += "):\n"
+                for init_line in init_lines:
+                    messageobject_output_text += init_line
+            else:
+                messageobject_output_text += "):\n"
                 messageobject_output_text += '        pass\n'
             messageobject_output_text += current_class_schema + "\n              }\n"
 
-            found_param = False
-
             if index < len(lines) and lines[index].startswith('    out:'):
+                args = []
+                init_lines = []
                 messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
-                messageobject_output_text += '    def __init__(self, **kwargs):\n'
+                messageobject_output_text += '    def __init__(self'
                 current_class_schema = "\n    _schema = {"
                 index += 1
                 while index < len(lines):
@@ -1000,7 +1059,6 @@ def generate_model_objects():
                     if line.startswith('  #'):
                         index += 1
                         continue
-                    found_param = True
                     field = line.split(":", 1)[0].strip()
                     try:
                         value = line.split(":", 1)[1].strip()
@@ -1045,11 +1103,21 @@ def generate_model_objects():
                             value = "'" + value + "'"
                         default = value
 
-                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
+                    args.append(", ")
+                    args.append(field + "=" + default)
+                    init_lines.append('        self.' + field + " = " + field + "\n")
+#                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
                     current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
                     index += 1
 
-                if not found_param:
+                if len(args) > 0:
+                    for arg in args:
+                        messageobject_output_text += arg
+                    messageobject_output_text += "):\n"
+                    for init_line in init_lines:
+                        messageobject_output_text += init_line
+                else:
+                    messageobject_output_text += "):\n"
                     messageobject_output_text += '        pass\n'
                 messageobject_output_text += current_class_schema + "\n              }\n"
             

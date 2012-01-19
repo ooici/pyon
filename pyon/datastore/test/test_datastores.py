@@ -251,12 +251,17 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(role_objs[2]._id == marine_operator_role_ooi_id)
 
         # Construct three user info objects and assign them roles
-        hvl_user_info = {
+        hvl_contact_info = {
             "name": "Heitor Villa-Lobos",
             "email": "prelude1@heitor.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Legendary Brazilian composer"
             }
+        }
+        hvl_contact_info_obj = IonObject('ContactInformation', hvl_contact_info)
+        hvl_user_info = {
+            "name": "Heitor Villa-Lobos",
+            "contact": hvl_contact_info_obj
         }
         hvl_user_info_obj = IonObject('UserInfo', hvl_user_info)
         hvl_user_info_tuple = data_store.create(hvl_user_info_obj)
@@ -264,23 +269,33 @@ class Test_DataStores(IonIntegrationTestCase):
 
         heitor_villa_lobos_ooi_id = hvl_user_info_tuple[0]
 
-        ats_user_info = {
+        ats_contact_info = {
             "name": "Andres Torres Segovia",
             "email": "asturas@andres.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Legendary Concert Guitarist"
             }
         }
+        ats_contact_info_obj = IonObject('ContactInformation', ats_contact_info)
+        ats_user_info = {
+            "name": "Andres Torres Segovia",
+            "contact": ats_contact_info_obj
+        }
         ats_user_info_obj = IonObject('UserInfo', ats_user_info)
         ats_user_info_tuple = data_store.create(ats_user_info_obj)
         self.assertTrue(len(ats_user_info_tuple) == 2)
 
-        pok_user_info = {
+        pok_contact_info = {
             "name": "Per-Olov Kindgren",
             "email": "etude6@per.com",
             "variables": {
                 "name": "Claim To Fame", "value": "Composer and YouTube star"
             }
+        }
+        pok_contact_info_obj = IonObject('ContactInformation', pok_contact_info)
+        pok_user_info = {
+            "name": "Per-Olov Kindgren",
+            "contact": pok_contact_info_obj
         }
         pok_user_info_obj = IonObject('UserInfo', pok_user_info)
         pok_user_info_tuple = data_store.create(pok_user_info_obj)
@@ -299,7 +314,7 @@ class Test_DataStores(IonIntegrationTestCase):
         res = data_store.find([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]])
         self.assertTrue(len(res) == 1)
         user_info_obj = res[0]
-        self.assertTrue(user_info_obj.name == "Heitor Villa-Lobos")
+        self.assertTrue(user_info_obj.contact.name == "Heitor Villa-Lobos")
 
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')
