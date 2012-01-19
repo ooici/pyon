@@ -6,7 +6,7 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.util.containers import DotDict
-from pyon.core.object import IonObjectRegistry
+from pyon.core.registry import IonObjectRegistry, getextends
 from pyon.util.config import Config
 
 # Resource Types
@@ -47,7 +47,7 @@ def load_definitions():
     imported them (BAD).
     """
     # Resource Types
-    rt_list = list(IonObjectRegistry.allextends.get('Resource', []))
+    rt_list = getextends('Resource')
     rt_list.append('Resource')
     ResourceTypes.clear()
     ResourceTypes.update(zip(rt_list, rt_list))

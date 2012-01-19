@@ -36,13 +36,13 @@ class ResourceAgent(BaseResourceAgent):
     def _on_quit(self):
         self.clients.directory.unregister("/Agents", self.id)
 
-    def negotiate(self, sap_in={}):
+    def negotiate(self, sap_in=None):
         pass
 
-    def execute(self, command={}):
+    def execute(self, command=None):
         return self._execute("rcmd_", command)
 
-    def execute_agent(self, command={}):
+    def execute_agent(self, command=None):
         return self._execute("acmd_", command)
 
     def _execute(self, cprefix, command):
