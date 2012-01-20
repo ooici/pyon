@@ -154,7 +154,7 @@ class BaseChannel(object):
         """
         Closes the AMQP connection.
         """
-        log.debug("BaseChannel.close_impl")
+        log.debug("BaseChannel.close_impl (%d)", self.get_channel_id())
         if self._amq_chan:
             self._amq_chan.close()
 
@@ -363,7 +363,7 @@ class RecvChannel(BaseChannel):
             raise ChannelError("Not consuming")
 
         if self._queue_auto_delete:
-            log.debug("Autodelete is on, this will destroy this queue")
+            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name[1])
 
         self._ensure_amq_chan()
 
@@ -391,7 +391,8 @@ class RecvChannel(BaseChannel):
         Also put a ChannelShutdownMessage in the recv queue so anything blocking on reading it will get notified via ChannelClosedError.
         """
         # stop consuming if we are consuming
-        log.debug("BaseChannel.close_impl: consuming %s", self._consuming)
+        log.debug("RecvChannel.close_impl (%d): consuming %s", self.get_channel_id(), self._consuming)
+
         if self._consuming:
             self.stop_consume()
 

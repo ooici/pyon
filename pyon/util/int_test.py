@@ -2,14 +2,14 @@
 
 """Integration test base class and utils"""
 
-from contextlib import contextmanager
-import unittest
-import re
-
 from pyon.container.cc import Container
 from pyon.core.bootstrap import bootstrap_pyon
 from pyon.service.service import services_by_name, load_service_mods
 from mock import patch
+
+from contextlib import contextmanager
+import unittest
+import re
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
