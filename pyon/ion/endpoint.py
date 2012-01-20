@@ -122,7 +122,7 @@ class StreamSubscriber(ProcessSubscriber):
     channel_type = NoBindSubscriberChannel
 
 
-    def __init__(self, subscription_id=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         @param name is a tuple (xp, exchange_name)
         @param callback is a call back function
@@ -130,7 +130,6 @@ class StreamSubscriber(ProcessSubscriber):
         @param node is cc.node
         """
         ProcessSubscriber.__init__(self, **kwargs)
-        self.subscription_id = subscription_id
 
     def start(self):
         """
@@ -191,7 +190,7 @@ class StreamSubscriberRegistrar(object):
             raise PublisherError('Invalid CFG for core_xps.science_data: "%s"; must have "xs.xp" structure' % xs_dot_xp)
 
 
-    def subscribe(self, exchange_name=None, callback=None, query=None):
+    def create_subscriber(self, exchange_name=None, callback=None):
         """
         This method creates a new subscriber, a new exchange_name if it does not already exist, and a new subscription
         if a query is provided.
@@ -202,33 +201,6 @@ class StreamSubscriberRegistrar(object):
             exchange_name =  '%s_subscriber_%d' % (self.process.id, self._subscriber_cnt)
             self._subscriber_cnt += 1
 
-            if query is None:
-                # one or the other must be provided
-                raise StreamSubscriberRegistrarError('You can not register a new subscriber without a name or a query!')
-
-        sub_id = None
-        if query is not None:
-            # Call the pubsub service to create a subscription if a query is provided
-            subscription = IonObject("Subscription", {'exchange_name':exchange_name,'query':query})
-            sub_id = self.pubsub_client.create_subscription(subscription)
-
-        return StreamSubscriber(subscription_id=sub_id, name=(self.XP, exchange_name), process=self.process, callback=callback, node=self.node)
-
-    def activate_subscription(self, stream_subscriber):
-        """
-        Call the pubsub service to activate the subscription
-        """
-        if stream_subscriber._subscription_id is None:
-            raise StreamSubscriberRegistrarError('You can not activate a subscription if you do not own the subscription')
-        self.pubsub_client.activate_subscription(stream_subscriber._subscription_id)
-
-    def deactivate_subscription(self, stream_subscriber):
-        """
-        Call the pubsub service to deactivate the subscription
-        """
-        if stream_subscriber._subscription_id is None:
-            raise StreamSubscriberRegistrarError('You can not deactivate a subscription if you do not own the subscription')
-        self.pubsub_client.deactivate_subscription(stream_subscriber._subscription_id)
-
+        return StreamSubscriber(name=(self.XP, exchange_name), process=self.process, callback=callback, node=self.node)
 
 
