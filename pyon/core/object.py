@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
 __license__ = 'Apache 2.0'
 
 from collections import OrderedDict, Mapping, Iterable

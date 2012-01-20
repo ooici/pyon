@@ -594,7 +594,7 @@ def generate_model_objects():
             assert name_val not in enums_by_name, "enum with type name %s redefined" % name_val
             enums_by_name[name_val] = {"values": value_val, "default": default_val}
 
-            dataobject_output_text += "\nclass " + name_val + "():\n"
+            dataobject_output_text += "\nclass " + name_val + "(object):\n"
             i = 1
             for val in value_val:
                 dataobject_output_text += "    " + val + " = " + str(i) + "\n"

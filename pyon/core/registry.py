@@ -15,6 +15,11 @@ model_classes = {}
 message_classes = {}
 
 def getextends(type):
+    """
+    Returns a list of classes that the object with the given type extends.
+    @param type (str) Object type
+    @retval List of object types that are extended by given type
+    """
     ret = []
     base_clzz = model_classes[type]
     for name in model_classes:
