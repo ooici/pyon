@@ -7,10 +7,26 @@ import threading
 
 from pyon.public import log, BaseService, ProcessPublisher
 
-# To start the producer:
-#id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"agent"},'stream_producer':{'interval':4000,'stream_route':'daves_special_sauce'}})
+"""
+@author Micahel Meisinger
+@author David Stuebe
+@author Luke Campbell
+
+
+@brief Run using:
+bin/pycc --rel res/deploy/examples/stream.yml
+
+To start the producer in the pycc shell:
+id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"agent"},'stream_producer':{'interval':4000,'routing_key':'glider_data'}})
+"""
 
 class StreamProducer(BaseService):
+    """
+    StreamProducer is not a stream process. A stream process is defined by a having an input stream which is processed.
+    The Stream Producer takes the part of an agent pushing data into the system.
+
+    """
+
 
     def on_init(self):
         log.debug("StreamProducer init. Self.id=%s" % self.id)
@@ -27,9 +43,9 @@ class StreamProducer(BaseService):
 
     def _trigger_func(self):
         interval = self.CFG.get('stream_producer').get('interval')
-        stream_route = self.CFG.get('stream_producer').get('stream_route')
+        routing_key = self.CFG.get('stream_producer').get('routing_key')
 
-        pub = ProcessPublisher(node=self.container.node, name=('science_data',stream_route), process=self)
+        pub = ProcessPublisher(node=self.container.node, name=('science_data',routing_key), process=self)
         num = 1
         while True:
             msg = dict(num=str(num))
