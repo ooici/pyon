@@ -231,7 +231,7 @@ class ProcManager(object):
 
         service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
 
-        sub = service_instance.stream_subscriber_registrar.subscribe(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
+        sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
         sub.get_ready_event().wait(timeout=10)
