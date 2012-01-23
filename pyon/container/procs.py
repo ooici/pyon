@@ -115,7 +115,10 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process", {}).get("listen_name", name)
+
+        listen_name = config.get("process", {}).get("listen_name", service_instance.name)
+        log.debug("Service Process (%s) listen_name: %s", name, listen_name)
+
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
