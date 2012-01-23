@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """Part of the container that manages ION processes etc."""
+from pyon.core import exception
 
 __author__ = 'Michael Meisinger'
 
@@ -226,7 +227,9 @@ class ProcManager(object):
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
-        rsvc.get_ready_event().wait(timeout=10)
+        if not rsvc.get_ready_event().wait(timeout=10):
+            raise exception.ContainerError('_set_service_endpoint for listen_name: %s did not report ok' % listen_name)
+
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
     def _set_subscription_endpoint(self, service_instance, listen_name):
@@ -237,7 +240,8 @@ class ProcManager(object):
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
-        sub.get_ready_event().wait(timeout=10)
+        if not sub.get_ready_event().wait(timeout=10):
+            raise exception.ContainerError('_set_subscription_endpoint for listen_name: %s did not report ok' % listen_name)
 
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
