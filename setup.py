@@ -28,7 +28,8 @@ setup(  name = 'pyon',
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
                 'control_cc=scripts.control_cc:main',
-                'generate_interfaces=scripts.generate_interfaces:main'
+                'generate_interfaces=scripts.generate_interfaces:main',
+                'json_report=scripts.json_report:main',
                 ]
             },
         dependency_links = [

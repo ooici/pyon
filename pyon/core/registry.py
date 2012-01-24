@@ -29,6 +29,39 @@ def getextends(type):
             ret.append(name)
     return ret
 
+def get_message_class_parm_type(service_name, service_operation, parameter, in_out):
+    """
+    Utility function to return the type for the specified parameters
+    """
+
+    class_name = service_name + '_' + service_operation + '_' + in_out
+    if class_name in message_classes:
+        cls = message_classes[class_name]
+    else:
+        raise NotFound("Message class $%s is not found in the ION registry." % class_name)
+
+    if parameter in cls._schema:
+        parm_type = cls._schema[parameter]['type']
+    else:
+        raise NotFound("Parameter %s not found in class %s" % (parameter, class_name))
+
+    return parm_type
+
+def get_message_class_in_parm_type(service_name, service_operation, parameter):
+    """
+    Helper function for get_message_class_parm_type
+    """
+    return  get_message_class_parm_type(service_name, service_operation, parameter, 'in')
+
+
+def get_message_class_out_parm_type(service_name, service_operation, parameter):
+    """
+    Helper function for get_message_class_parm_type
+    """
+    return  get_message_class_parm_type(service_name, service_operation, parameter, 'out')
+
+
+
 class IonObjectRegistry(object):
     """
     A simple key-value store that stores by name and by definition hash for versioning.

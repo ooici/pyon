@@ -276,6 +276,14 @@ class ProcManager(object):
         if not service_instance: return
 
         service_instance.quit()
-        # TODO: Cleanup messaging attachments
+
+        # find the proc
+        lp = list(self.proc_sup.children)
+        lps = [p for p in lp if p.listener._process == service_instance]
+        assert len(lps) > 0
+
+        for p in lps:
+            p.notify_stop()
+            p.stop()
 
         del self.procs[process_id]
