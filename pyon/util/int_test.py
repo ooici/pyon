@@ -73,11 +73,17 @@ class IonIntegrationTestCase(unittest.TestCase):
         if not svc_deps:
             return
         for svc in svc_deps:
+            config = None
+            if type(svc) in (tuple, list):
+                config = svc[1]
+                svc = svc[0]
+
             # Start the service
-            self._start_service(svc)
+            self._start_service(svc, config=config)
 
             # Create a client
-            self.clients[svc] = None
+            clcls = service_registry.services[svc].simple_client
+            self.clients[svc] = clcls(name=svc, node=self.container.node)
 
         log.debug("Service dependencies started")
 
@@ -85,11 +91,13 @@ class IonIntegrationTestCase(unittest.TestCase):
         if servicename and not servicecls:
             service_registry.discover_service_classes()
             assert servicename in service_registry.services, "Service %s unknown" % servicename
-            servicecls = service_registry.services[servicename].get('impl', None)
+            servicecls = service_registry.services[servicename].impl[0]
 
         assert servicecls, "Cannot start service %s" % servicename
 
-        if servicecls:
+        if type(servicecls) is str:
             mod, cls = servicecls.rsplit('.', 1)
-            self.container.spawn_process(servicename, mod, cls, config)
-
+        else:
+            mod = servicecls.__module__
+            cls = servicecls.__name__
+        self.container.spawn_process(servicename, mod, cls, config)

@@ -12,8 +12,6 @@ from pyon.util.log import log
 from pyon.util.containers import named_any, itersubclasses
 from pyon.util.context import LocalContextMixin
 
-from interface import messages
-
 class BaseClients(object):
     """
     Basic object to hold clients for a service. Derived in implementations.
@@ -31,6 +29,7 @@ class BaseService(LocalContextMixin):
     name = None
     running = 0
     dependencies = []
+    process_type = "service"
 
     def __init__(self, *args, **kwargs):
         self.id = None
@@ -133,6 +132,9 @@ class IonServiceDefinition(object):
         # Points to process client class
         self.client = None
 
+        # Points to non-process client class
+        self.simple_client = None
+
     def __str__(self):
         return "IonServiceDefinition(name=%s):%s" % (self.name, self.__dict__)
 
@@ -223,8 +225,10 @@ class IonServiceRegistry(object):
                     try:
                         client = "%s.%sProcessClient" % (cls.__module__, cls.__name__[4:])
                         self.add_servicedef_entry(cls.name, "client", named_any(client))
+                        sclient = "%s.%sClient" % (cls.__module__, cls.__name__[4:])
+                        self.add_servicedef_entry(cls.name, "simple_client", named_any(sclient))
                     except Exception, ex:
-                        log.warning("Cannot find process client for service %s" % (cls.name))
+                        log.warning("Cannot find client for service %s" % (cls.name))
 
     def discover_service_classes(self):
         """

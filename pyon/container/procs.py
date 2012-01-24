@@ -13,7 +13,7 @@ from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistr
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
-from pyon.util.containers import DictModifier, DotDict, for_name
+from pyon.util.containers import DictModifier, DotDict, for_name, named_any
 from pyon.util.log import log
 
 
@@ -74,7 +74,9 @@ class ProcManager(object):
 
         # PROCESS TYPE.
         # One of: service, stream_process, agent, simple, immediate
-        process_type = process_type or config.get("process", {}).get("type", "service")
+
+        service_cls = named_any("%s.%s" % (module, cls))
+        process_type = process_type or getattr(service_cls, "process_type", "service")
 
         service_instance = None
         try:

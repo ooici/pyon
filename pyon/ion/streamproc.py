@@ -21,6 +21,7 @@ class StreamProcess(BaseService):
         self.<name>.publish(msg)
     """
 
+    process_type = "stream_process"
 
 
 
