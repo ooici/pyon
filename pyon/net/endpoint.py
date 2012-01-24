@@ -816,27 +816,23 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
         """
 
         context = self._process.get_context()
-        log.debug('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
+        log.debug('ProcessRPCRequestEndpointUnit._build_header has context of: %s', context)
 
-        # must set here: sender-name, conv-id, conv-seq, performative
+        # conv-id/seq/protocol are set in the base class
         header = RPCRequestEndpointUnit._build_header(self, raw_msg)
 
+        # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : 'todo',#self.channel._chan_name,
-                       'conv-id'      : 'none',                   # @TODO
-                       'conv-seq'     : 1,
-                       'performative' : 'request'})
+                       'sender'       : 'todo'})
         
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # @TODO: these names, get them right
-            user_id             = context.get('user-id', None)
-            container_signature = context.get('signature', None)
-            role_id             = context.get('role-id', None)
+            # fwd on ion-user-id and expiry, according to common message format spec
+            user_id             = context.get('ion-user-id', None)
+            expiry              = context.get('expiry', None)
 
-            if user_id:             header['user-id'] = user_id
-            if container_signature: header['signature'] = signature
-            if role_id:             header['role-id'] = role_id
+            if user_id:             header['user-id']   = user_id
+            if expiry:              header['signature'] = expiry
 
         return header
 
