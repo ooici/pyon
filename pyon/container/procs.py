@@ -12,7 +12,7 @@ from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscri
 from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
-from pyon.service.service import BaseService, get_service_by_name
+from pyon.service.service import BaseService
 from pyon.util.containers import DictModifier, DotDict, for_name
 from pyon.util.log import log
 

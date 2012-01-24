@@ -47,10 +47,10 @@ class IonObjectRegistry(object):
 
     def new(self, _def, _dict=None, **kwargs):
         """ See get_def() for definition lookup options. """
-        log.debug("In IonObjectRegistry.new")
-        log.debug("name: %s" % _def)
-        log.debug("_dict: %s" % str(_dict))
-        log.debug("kwargs: %s" % str(kwargs))
+        #log.debug("In IonObjectRegistry.new")
+        #log.debug("name: %s" % _def)
+        #log.debug("_dict: %s" % str(_dict))
+        #log.debug("kwargs: %s" % str(kwargs))
         if _def in model_classes:
             clzz = model_classes[_def]
         elif _def in message_classes:
@@ -66,3 +66,4 @@ class IonObjectRegistry(object):
             obj = clzz(**kwargs)
             
         return obj
+

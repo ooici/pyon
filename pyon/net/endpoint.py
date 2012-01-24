@@ -5,7 +5,6 @@
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core import exception
-from pyon.core.object import IonServiceDefinition, IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -631,22 +630,22 @@ class RPCClient(RequestResponseClient):
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
             self._define_interface(iface)
-        elif isinstance(iface, IonServiceDefinition):
-            self._define_svcdef(iface)
+#        elif isinstance(iface, IonServiceDefinition):
+#            self._define_svcdef(iface)
 
         RequestResponseClient.__init__(self, **kwargs)
 
-    def _define_svcdef(self, svc_def):
-        """
-        Defines an RPCClient's attributes from an IonServiceDefinition.
-        """
-        for meth in svc_def.methods:
-            name        = meth.op_name
-            in_obj      = meth.def_in
-            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
-            doc         = meth.__doc__
-
-            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
+#    def _define_svcdef(self, svc_def):
+#        """
+#        Defines an RPCClient's attributes from an IonServiceDefinition.
+#        """
+#        for meth in svc_def.operations:
+#            name        = meth.op_name
+#            in_obj      = meth.def_in
+#            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
+#            doc         = meth.__doc__
+#
+#            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
 
     def _define_interface(self, iface):
         """

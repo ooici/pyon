@@ -86,15 +86,6 @@ class IonObjectBase(object):
         return hasattr(self, item)
 
 
-class IonServiceDefinition(object):
-    """ Provides a walkable structure for ION service metadata and object definitions. """
-
-    def __init__(self, name, dependencies=[], version=''):
-        self.name = name
-        self.dependencies = list(dependencies)
-        self.version = version
-        self.methods = []
-
 
 def walk(o, cb):
     """

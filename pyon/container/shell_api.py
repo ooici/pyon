@@ -84,8 +84,6 @@ def pprint_list(l, c, pad=1, indent=0):
 def ps(ret=False):
     print "List of ION processes"
     print "---------------------"
-    from pyon.service.service import services_by_name
-    #print "\n".join(("%s: %s"%(sn, sd.__class__) for (sn,sd) in services_by_name.iteritems()))
     print "\n".join(("%s: %s"%(name, p) for (name,p) in container.proc_manager.procs.iteritems()))
     if ret:
         return container.proc_manager.procs
@@ -126,20 +124,20 @@ def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
     @param svcs name or list of names of service
     """
-    from pyon.core.bootstrap import obj_registry
+    from pyon.service.service import service_registry
 
     if not getattr(svcs, '__iter__', False) and op is not None:
-        svcdef = obj_registry.services_by_name[svcs]
+        svcdef = service_registry.services[svcs]
         print "Service definition for: %s (version %s) operation %s" % (svcs, svcdef.version or 'ND', op)
-        print "".join([str(m) for m in svcdef.methods if m.op_name == op])
+        print "".join([str(o) for o in svcdef.operations if o.name == op])
         return svcdef
 
     elif svcs is not None:
         if not getattr(svcs, '__iter__', False):
             svcs = (svcs,)
         for svcname in svcs:
-            svcdef = obj_registry.services_by_name[svcname]
-            svcops = "\n     ".join(sorted([smd.op_name for smd in svcdef.methods]))
+            svcdef = service_registry.services[svcname]
+            svcops = "\n     ".join(sorted([o.name for o in svcdef.operations]))
             print "Service definition for: %s (version %s)" % (svcname, svcdef.version or 'ND')
             print "ops: %s" % (svcops)
             return svcdef
@@ -149,8 +147,8 @@ def svc_defs(svcs=None, op=None):
         print "------------------------"
         from pyon.core.bootstrap import obj_registry
 
-        for svcname in sorted(obj_registry.services_by_name.keys()):
-            svcdef = obj_registry.services_by_name[svcname]
+        for svcname in sorted(service_registry.services.keys()):
+            svcdef = service_registry.services[svcname]
             print "%s %s" % (svcname, svcdef.version)
 
         print "\nType svc_defs('name') or svc_defs(['name1','name2']) for definition"
