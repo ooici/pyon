@@ -278,11 +278,11 @@ class RecvChannel(BaseChannel):
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
-        log.warn('Setup_listener name: %s' % str(name))
+        log.debug('Setup_listener name: %s', name)
         name = name or self._recv_name
         xp, queue = name
 
-        log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s" % (xp, queue, binding))
+        log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s", xp, queue, binding)
         if self._setup_listener_called:
             log.debug("setup_listener already called for this channel")
             return

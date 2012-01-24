@@ -51,6 +51,7 @@ class TestBaseChannel(PyonTestCase):
 
         self.assertEquals(ch._amq_chan, sentinel.amq_chan)
 
+    @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
     def test_close(self):
         # with close callback
         cbmock = Mock()
@@ -351,6 +352,7 @@ class TestRecvChannel(PyonTestCase):
 
     @patch('pyon.net.channel.BaseChannel')
     @patch('pyon.net.channel.ChannelShutdownMessage')
+    @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
     def test_close_impl(self, mockshutdown, mockbasechannel):
 
         # no auto stop consuming, no auto delete of queue without recv_name set
@@ -369,6 +371,7 @@ class TestRecvChannel(PyonTestCase):
         mockbasechannel.close_impl.assert_called_once_with(self.ch)
 
     @patch('pyon.net.channel.BaseChannel')
+    @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
     def test_close_impl_stops_consuming(self, mockbasechannel):
         self.ch._consuming = True
         scmock = Mock()

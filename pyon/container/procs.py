@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """Part of the container that manages ION processes etc."""
+from pyon.core import exception
 
 __author__ = 'Michael Meisinger'
 
@@ -115,7 +116,10 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-        listen_name = config.get("process", {}).get("listen_name", name)
+
+        listen_name = config.get("process", {}).get("listen_name", service_instance.name)
+        log.debug("Service Process (%s) listen_name: %s", name, listen_name)
+
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
@@ -223,7 +227,9 @@ class ProcManager(object):
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
-        rsvc.get_ready_event().wait(timeout=10)
+        if not rsvc.get_ready_event().wait(timeout=10):
+            raise exception.ContainerError('_set_service_endpoint for listen_name: %s did not report ok' % listen_name)
+
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
     def _set_subscription_endpoint(self, service_instance, listen_name):
@@ -234,7 +240,8 @@ class ProcManager(object):
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
         self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
-        sub.get_ready_event().wait(timeout=10)
+        if not sub.get_ready_event().wait(timeout=10):
+            raise exception.ContainerError('_set_subscription_endpoint for listen_name: %s did not report ok' % listen_name)
 
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
@@ -267,6 +274,14 @@ class ProcManager(object):
         if not service_instance: return
 
         service_instance.quit()
-        # TODO: Cleanup messaging attachments
+
+        # find the proc
+        lp = list(self.proc_sup.children)
+        lps = [p for p in lp if p.listener._process == service_instance]
+        assert len(lps) > 0
+
+        for p in lps:
+            p.notify_stop()
+            p.stop()
 
         del self.procs[process_id]
