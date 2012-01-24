@@ -82,7 +82,7 @@ class TransformDataProcess(TransformBase):
 
 
 
-class TranformFunction(TransformDataProcess):
+class TransformFunction(TransformDataProcess):
     """ Represents a transform function
     Input is given to the transform, it runs until the transform is complete
     and the output is returned.
@@ -94,4 +94,10 @@ class TranformFunction(TransformDataProcess):
     """
     def execute(self, input):
         pass
+
+    def process(self, packet):
+        ret = self.execute(packet)
+        if len(self.streams)>0:
+            self.publish(ret)
+
 
