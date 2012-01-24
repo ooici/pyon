@@ -831,8 +831,8 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             user_id             = context.get('ion-user-id', None)
             expiry              = context.get('expiry', None)
 
-            if user_id:             header['user-id']   = user_id
-            if expiry:              header['signature'] = expiry
+            if user_id:         header['ion-user-id']   = user_id
+            if expiry:          header['expiry']        = expiry
 
         return header
 
