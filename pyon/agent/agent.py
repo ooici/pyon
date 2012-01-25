@@ -7,7 +7,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.util.log import log
-from pyon.ion.resource import RT, AT
+from pyon.ion.resource import RT, PRED
 from pyon.core import exception as iex
 from pyon.util.containers import get_ion_ts
 

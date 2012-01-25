@@ -9,7 +9,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.resource import RT, AT, LCS
+from pyon.ion.resource import RT, PRED, LCS
 from nose.plugins.attrib import attr
 from unittest import SkipTest
 import socket
@@ -451,11 +451,11 @@ class Test_DataStores(IonIntegrationTestCase):
             self.assertTrue(numcoredocs > 1)
             data_store._update_views()
 
-        # HACK: Both AssociationTypes so that this test works
-        from pyon.ion.resource import AssociationTypes
-        AssociationTypes[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.InstrumentDevice, RT.DataSet])
-        AssociationTypes[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
-        AssociationTypes[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
+        # HACK: Both Predicates so that this test works
+        from pyon.ion.resource import Predicates
+        Predicates[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.InstrumentDevice, RT.DataSet])
+        Predicates[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
+        Predicates[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
 
         admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.AVAILABLE)
 

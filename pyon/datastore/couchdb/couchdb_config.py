@@ -21,6 +21,14 @@ COUCHDB_CONFIGS = {
 COUCHDB_VIEWS = {
     # Association (triple) related views
     'association':{
+        'all':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit(doc._id, doc);
+  }
+}""",
+        },
         'by_sub':{
             'map':"""
 function(doc) {

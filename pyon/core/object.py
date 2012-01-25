@@ -85,6 +85,10 @@ class IonObjectBase(object):
     def __contains__(self, item):
         return hasattr(self, item)
 
+    def __setattr__(self, name, value):
+        if name not in self._schema and name != "_id" and name != "_rev":
+            raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
+        self.__dict__[name] = value
 
 
 def walk(o, cb):
