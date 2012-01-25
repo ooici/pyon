@@ -33,9 +33,12 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertRaises(AttributeError, obj._validate)
 
         obj.name = 'monkey'
-        obj.extra_field = 5
-        
-        self.assertRaises(AttributeError, obj._validate)
+        assignment_failed = False
+        try:
+            obj.extra_field = 5
+        except AttributeError:
+            assignment_failed = True
+        self.assertTrue(assignment_failed)
 
     def test_bootstrap(self):
         """ Use the factory and singleton from bootstrap.py/public.py """

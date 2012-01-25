@@ -321,26 +321,16 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(isinstance(data_set, interface.objects.DataSet))
 
         # Assign values to object fields
-        data_set.Description = "Real-time water data for Choptank River near Greensboro, MD"
-        data_set.ContactInstitution = "USGS NWIS"
-        data_set.ContactName = "Heitor Villa-Lobos"
-        data_set.ContactEmail = "HeitorVillaLobos@composers.org"
-        data_set.Title = "CHOPTANK RIVER NEAR GREENSBORO MD (01491000) - Instantaneous Value"
-        data_set.MinLatitude = 38.9971961
-        data_set.MaxLatitude = 38.9971961
-        data_set.MinLongitude = -75.785804
-        data_set.MaxLongitude = -75.785804
-        data_set.UpperBound = 0
-        data_set.LowerBound = 0
-        data_set.VerticalPositive = "down"
-        data_set.MinDatetime = "2011-08-04T13:15:00Z"
-        data_set.MaxDatetime = "2011-08-09T19:15:00Z"
-        data_set.Variables = {
-                "Name":"water_height",
-                "Value":"ft"
+        data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
+        data_set.min_datetime = "2011-08-04T13:15:00Z"
+        data_set.max_datetime = "2011-08-09T19:15:00Z"
+        data_set.variables = {
+                "name":"water_height",
+                "value":"ft"
         }
-        data_set.owner_ = heitor_villa_lobos_ooi_id
-        data_set.lastmodified_ = heitor_villa_lobos_ooi_id
+        contact = IonObject('ContactInformation', name="Heitor Villa-Lobos")
+        data_set.contact = contact
+        data_set.last_modified = "Heitor Villa-Lobos"
 
         # Write DataSet object"
         write_tuple_1 = data_store.create(data_set)
@@ -353,25 +343,25 @@ class Test_DataStores(IonIntegrationTestCase):
         data_set_read_obj = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
         self.assertTrue(isinstance(data_set_read_obj, interface.objects.DataSet))
-        self.assertTrue(data_set_read_obj.Description == "Real-time water data for Choptank River near Greensboro, MD")
+        self.assertTrue(data_set_read_obj.description == "Real-time water data for Choptank River near Greensboro, MD")
         self.assertTrue(not 'type_' in data_set_read_obj)
 
         # Update DataSet's Description field and write
-        data_set_read_obj.Description = "Updated Description"
+        data_set_read_obj.description = "Updated Description"
         write_tuple_2 = data_store.update(data_set_read_obj)
         self.assertTrue(len(write_tuple_2) == 2)
 
         # Retrieve the updated DataSet
         data_set_read_obj_2 = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj_2._id == data_set_uuid)
-        self.assertTrue(data_set_read_obj_2.Description == "Updated Description")
+        self.assertTrue(data_set_read_obj_2.description == "Updated Description")
 
         # List all the revisions of DataSet in data store, should be two
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 2)
 
         # Do another update to the object
-        data_set_read_obj_2.Description = "USGS instantaneous value data for station 01491000"
+        data_set_read_obj_2.description = "USGS instantaneous value data for station 01491000"
         write_tuple_3 = data_store.update(data_set_read_obj_2)
 
         # List revisions of DataSet in data store, should now be three
@@ -381,22 +371,22 @@ class Test_DataStores(IonIntegrationTestCase):
         # Retrieve original version of DataSet
         obj1 = data_store.read(data_set_uuid, rev_id=write_tuple_1[1])
         self.assertTrue(obj1._id == data_set_uuid)
-        self.assertTrue(obj1.Description == "Real-time water data for Choptank River near Greensboro, MD")
+        self.assertTrue(obj1.description == "Real-time water data for Choptank River near Greensboro, MD")
 
         # Retrieve second version of DataSet
         obj2 = data_store.read(data_set_uuid, rev_id=write_tuple_2[1])
         self.assertTrue(obj2._id == data_set_uuid)
-        self.assertTrue(obj2.Description == "Updated Description")
+        self.assertTrue(obj2.description == "Updated Description")
 
         # Retrieve third version of DataSet
         obj3 = data_store.read(data_set_uuid, rev_id=write_tuple_3[1])
         self.assertTrue(obj3._id == data_set_uuid)
-        self.assertTrue(obj3.Description == "USGS instantaneous value data for station 01491000")
+        self.assertTrue(obj3.description == "USGS instantaneous value data for station 01491000")
 
         # Retrieve HEAD version of DataSet
         head = data_store.read(data_set_uuid)
         self.assertTrue(head._id == data_set_uuid)
-        self.assertTrue(head.Description == "USGS instantaneous value data for station 01491000")
+        self.assertTrue(head.description == "USGS instantaneous value data for station 01491000")
 
         # Delete DataSet by object id
         data_store.delete(head)
