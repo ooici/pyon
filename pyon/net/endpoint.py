@@ -4,7 +4,8 @@
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
-from pyon.core import exception
+from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
+from pyon.core.object import IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -593,27 +594,11 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         return headers
 
     def _raise_exception(self, code, message):
-        if code == exception.BAD_REQUEST:
-            log.debug("Raising BadRequest")
-            raise exception.BadRequest(message)
-        elif code == exception.UNAUTHORIZED:
-            log.debug("Raising Unauthorized")
-            raise exception.Unauthorized(message)
-        if code == exception.NOT_FOUND:
-            log.debug("Raising NotFound: %s" % str(message))
-            raise exception.NotFound(message)
-        if code == exception.TIMEOUT:
-            log.debug("Raising Timeout")
-            raise exception.Timeout(message)
-        if code == exception.CONFLICT:
-            log.debug("Raising Conflict")
-            raise exception.Conflict(message)
-        if code == exception.SERVICE_UNAVAILABLE:
-            log.debug("Raising ServiceUnavailable")
-            raise exception.ServiceUnavailable(message)
+        if str(code) in exception_map:
+            raise exception_map[str(code)](message)
         else:
             log.debug("Raising ServerError")
-            raise exception.ServerError(message)
+            raise ServerError(message)
 
 class RPCClient(RequestResponseClient):
     """
@@ -710,7 +695,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
-        except exception.IonException as ex:
+        except IonException as ex:
             log.debug("Got error response")
             response_headers = self._create_error_response(ex)
 
@@ -735,11 +720,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         elif isinstance(cmd_arg_obj, dict):
             pass
         else:
-            raise exception.BadRequest("Unknown message type, cannot convert into kwarg dict: %s" % str(type(cmd_arg_obj)))
+            raise BadRequest("Unknown message type, cannot convert into kwarg dict: %s" % str(type(cmd_arg_obj)))
 
         # op name must exist!
         if not hasattr(self._routing_obj, cmd_op):
-            raise exception.BadRequest("Unknown op name: %s" % cmd_op)
+            raise BadRequest("Unknown op name: %s" % cmd_op)
 
         ro_meth     = getattr(self._routing_obj, cmd_op)
 
@@ -751,7 +736,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             response_headers = { 'status_code': 200, 'error_message': '' }
         except TypeError as ex:
             log.exception("TypeError while attempting to call routing object's method")
-            response_headers = self._create_error_response(exception.ServerError(ex.message))
+            response_headers = self._create_error_response(ServerError(ex.message))
 
         return result, response_headers
 

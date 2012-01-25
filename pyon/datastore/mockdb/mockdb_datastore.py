@@ -32,7 +32,7 @@ class MockDB_DataStore(DataStore):
             datastore_name = self.datastore_name
         log.info('Creating data store %s' % datastore_name)
         if self.datastore_exists(datastore_name):
-            raise BadRequest("Data store create failed.  Data store with name %s already exists" % datastore_name)
+            raise BadRequest("Data store with name %s already exists" % datastore_name)
         if datastore_name not in self.root:
             self.root[datastore_name] = {}
 
@@ -43,7 +43,7 @@ class MockDB_DataStore(DataStore):
         if datastore_name in self.root:
             del self.root[datastore_name]
         else:
-            log.info('Data store delete failed.  Data store %s does not exist' % datastore_name)
+            log.info('Data store %s does not exist' % datastore_name)
 
     def list_datastores(self):
         log.debug('Listing all data stores')
@@ -58,7 +58,7 @@ class MockDB_DataStore(DataStore):
         if datastore_name in self.root:
             info = 'Data store exists'
         else:
-            raise BadRequest("Data store info lookup failed.  Data store with name %s does not exist" % datastore_name)
+            raise BadRequest("Data store with name %s does not exist" % datastore_name)
         log.debug('Data store info: %s' % str(info))
         return info
 
@@ -90,7 +90,7 @@ class MockDB_DataStore(DataStore):
 
     def create(self, obj, object_id=None, datastore_name=""):
         if not isinstance(obj, IonObjectBase):
-            raise BadRequest("Data store create object failed.  Obj param is not object type")
+            raise BadRequest("Obj param is not instance of IonObjectBase")
         return self.create_doc(self._ion_object_to_persistence_dict(obj),
                                object_id=object_id, datastore_name=datastore_name)
 
@@ -98,9 +98,9 @@ class MockDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         if '_id' in doc:
-            raise BadRequest("Create cannot create document with ID: %s" % doc)
+            raise BadRequest("Doc must not have '_id'")
         if '_rev' in doc:
-            raise BadRequest("Create cannot create document with Rev: %s" % doc)
+            raise BadRequest("Doc must not have '_rev'")
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
@@ -109,6 +109,10 @@ class MockDB_DataStore(DataStore):
         # Assign an id to doc
         doc["_id"] = object_id or uuid4().hex
         object_id = doc["_id"]
+
+        if object_id in datastore_dict:
+            raise BadRequest("Object with id %s already exist" % object_id)
+
         log.debug('Creating new object %s/%s' % (datastore_name, object_id))
 
         # Create key for version counter entry.  Will be used
@@ -131,7 +135,7 @@ class MockDB_DataStore(DataStore):
 
     def create_mult(self, objects, object_ids=None):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
-            raise BadRequest("Data store create object failed.  Object param wrong type")
+            raise BadRequest("Obj param is not instance of IonObjectBase")
         return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
                                     object_ids)
 
@@ -154,7 +158,7 @@ class MockDB_DataStore(DataStore):
 
     def read(self, object_id, rev_id="", datastore_name=""):
         if not isinstance(object_id, str):
-            raise BadRequest("Data store read object failed.  Object id param is not string")
+            raise BadRequest("Object id param is not string")
         doc = self.read_doc(object_id, rev_id, datastore_name)
 
         # Convert doc into Ion object
@@ -185,7 +189,7 @@ class MockDB_DataStore(DataStore):
 
     def read_mult(self, object_ids, datastore_name=""):
         if any([not isinstance(object_id, str) for object_id in object_ids]):
-            raise BadRequest("Data store read object mult failed.  Object id param is not string")
+            raise BadRequest("Object id param is not string")
         docs = self.read_doc_mult(object_ids, datastore_name)
         # Convert docs into Ion objects
         obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
@@ -212,16 +216,16 @@ class MockDB_DataStore(DataStore):
 
     def update(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase):
-            raise BadRequest("Data store update object failed.  Obj param is not object type")
+            raise BadRequest("Obj param is not instance of IonObjectBase")
         return self.update_doc(self._ion_object_to_persistence_dict(obj))
 
     def update_doc(self, doc, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
         if '_id' not in doc:
-            raise BadRequest("Update failed: Document has no ID: %s" % doc)
+            raise BadRequest("Doc must have '_id'")
         if '_rev' not in doc:
-            raise BadRequest("Update failed: Document has no Rev: %s" % doc)
+            raise BadRequest("Doc must have '_rev'")
         try:
             datastore_dict = self.root[datastore_name]
         except KeyError:
@@ -252,7 +256,7 @@ class MockDB_DataStore(DataStore):
 
     def delete(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
-            raise BadRequest("Data store delete object failed.  Obj param is not object type or string id")
+            raise BadRequest("Obj param is not instance of IonObjectBase or string id")
         if type(obj) is str:
             return self.delete_doc(obj, datastore_name=datastore_name)
         return self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name)
@@ -319,6 +323,11 @@ class MockDB_DataStore(DataStore):
                     criteria_satisfied = False
                     for criterion in criteria:
                         if isinstance(criterion, list):
+                            if len(criterion) != 3:
+                                raise BadRequest("Insufficient criterion values specified.  Much match [<field>, <logical constant>, <value>]")
+                            for item in criterion:
+                                if not isinstance(item, str):
+                                    raise BadRequest("All criterion values must be strings")
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
@@ -584,12 +593,20 @@ class MockDB_DataStore(DataStore):
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
+        if not subject:
+            raise BadRequest("Must provide subject")
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        subject_id = subject if type(subject) is str else subject._id
+        if type(subject) is str:
+            subject_id = subject
+        else:
+            if "_id" not in subject:
+                raise BadRequest("Object id not available in subject")
+            else:
+                subject_id = subject._id
         assoc_list = []
         target_id_list = []
         target_list = []
@@ -622,7 +639,13 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        object_id = obj if type(obj) is str else obj._id
+        if type(obj) is str:
+            object_id = obj
+        else:
+            if "_id" not in obj:
+                raise BadRequest("Object id not available in object")
+            else:
+                object_id = obj._id
         assoc_list = []
         target_id_list = []
         target_list = []
@@ -648,7 +671,9 @@ class MockDB_DataStore(DataStore):
 
     def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
-        if not ((subject and obj) or predicate):
+        if subject and obj or predicate:
+            pass
+        else:
             raise BadRequest("Illegal parameters")
         try:
             datastore_dict = self.root[self.datastore_name]
@@ -656,8 +681,20 @@ class MockDB_DataStore(DataStore):
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
         if subject and obj:
-            subject_id = subject if type(subject) is str else subject._id
-            object_id = obj if type(obj) is str else obj._id
+            if type(subject) is str:
+                subject_id = subject
+            else:
+                if "_id" not in subject:
+                    raise BadRequest("Object id not available")
+                else:
+                    subject_id = subject._id
+            if type(obj) is str:
+                object_id = obj
+            else:
+                if "_id" not in obj:
+                    raise BadRequest("Object id not available in object")
+                else:
+                    object_id = obj._id
             target_list = []
             for objname,obj in datastore_dict.iteritems():
                 if (objname.find('_version_')>0) or (not type(obj) is dict): continue
