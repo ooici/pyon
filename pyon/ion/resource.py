@@ -13,10 +13,10 @@ from pyon.util.config import Config
 ResourceTypes = DotDict()
 RT = ResourceTypes
 
-# Association Types
-AssociationTypes = DotDict()
-AssocTypes = DotDict()
-AT = AssocTypes
+# Predicate Types
+Predicates = DotDict()
+PredicateType = DotDict()
+PRED = PredicateType
 
 # Life cycle states
 LifeCycleStates = DotDict()
@@ -27,10 +27,10 @@ LCE = DotDict()
 
 lcs_workflows = {}
 
-def get_association_type_list():
-    AssociationTypes.clear()
-    AssociationTypes.update(Config(["res/config/associations.yml"]).data['AssociationTypes'])
-    return AssociationTypes.keys()
+def get_predicate_type_list():
+    Predicates.clear()
+    Predicates.update(Config(["res/config/predicates.yml"]).data['PredicateTypes'])
+    return Predicates.keys()
 
 def initialize_res_lcsms():
     """
@@ -53,9 +53,9 @@ def load_definitions():
     ResourceTypes.update(zip(rt_list, rt_list))
 
     # Association Types
-    at_list = get_association_type_list()
-    AssocTypes.clear()
-    AssocTypes.update(zip(at_list, at_list))
+    at_list = get_predicate_type_list()
+    PredicateType.clear()
+    PredicateType.update(zip(at_list, at_list))
 
     # Life cycle states
     initialize_res_lcsms()

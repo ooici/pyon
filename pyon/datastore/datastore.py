@@ -279,24 +279,24 @@ class DataStore(object):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if not subject and not predicate and not obj:
+        if not subject or not predicate or not obj:
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
             subject = self.read(subject_id)
         else:
+            if "_id" not in subject or "_rev" not in subject:
+                raise BadRequest("Subject id or rev not available")
             subject_id = subject._id
-        if "_rev" not in subject or not subject_id:
-            raise BadRequest("Subject rev or id not available")
         st = type(subject).__name__
 
         if type(obj) is str:
             object_id = obj
             obj = self.read(object_id)
         else:
+            if "_id" not in obj or "_rev" not in obj:
+                raise BadRequest("Object id or rev not available")
             object_id = obj._id
-        if "_rev" not in obj or not object_id:
-            raise BadRequest("Object rev or id not available")
         ot = type(obj).__name__
 
         assoc_type = assoc_type or 'H2H'
@@ -306,11 +306,12 @@ class DataStore(object):
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
         from pyon.core.registry import getextends
-        from pyon.ion.resource import AssociationTypes
+        from pyon.ion.resource import Predicates
         from pyon.core.bootstrap import IonObject
 
-        at = AssociationTypes.get(predicate, None)
-        if not at:
+        try:
+            at = Predicates.get(predicate)
+        except AttributeError:
             raise BadRequest("Predicate unknown %s" % predicate)
         if not st in at['domain']:
             found_st = False

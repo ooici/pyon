@@ -100,3 +100,11 @@ class ContainerAppError(ContainerError):
     '''
     '''
     status_code = 554
+
+exception_map = {}
+import inspect
+import sys
+for name, obj in inspect.getmembers(sys.modules[__name__]):
+    if inspect.isclass(obj):
+        if hasattr(obj, "status_code"):
+            exception_map[str(obj.status_code)] = obj

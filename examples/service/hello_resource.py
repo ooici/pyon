@@ -2,7 +2,7 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.public import log, RT, AT, LCS
+from pyon.public import log, RT, PRED, LCS
 
 from interface.services.examples.hello.ihello_resource_service import BaseHelloResourceService
 
