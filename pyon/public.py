@@ -44,8 +44,8 @@ from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublishe
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
             'ProcessSubscriber', 'ProcessPublisher']
 
-from pyon.ion.resource import ResourceTypes, RT, PredicateType, PRED, LifeCycleStates, LCS, LCE
-__all__ += ['RT', 'PRED', 'LCS', 'LCE']
+from pyon.ion.resource import ResourceTypes, RT, PredicateType, PRED, AT, LifeCycleStates, LCS, LCE
+__all__ += ['RT', 'PRED', 'AT', 'LCS', 'LCE']
 __all__ += ['ResourceTypes', 'PredicateType', 'LifeCycleStates']
 
 from pyon.ion.streamproc import StreamProcess

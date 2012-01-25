@@ -17,6 +17,7 @@ RT = ResourceTypes
 Predicates = DotDict()
 PredicateType = DotDict()
 PRED = PredicateType
+AT = PRED
 
 # Life cycle states
 LifeCycleStates = DotDict()
