@@ -90,15 +90,6 @@ class IonObjectBase(object):
             raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
         self.__dict__[name] = value
 
-class IonServiceDefinition(object):
-    """ Provides a walkable structure for ION service metadata and object definitions. """
-
-    def __init__(self, name, dependencies=[], version=''):
-        self.name = name
-        self.dependencies = list(dependencies)
-        self.version = version
-        self.methods = []
-
 
 def walk(o, cb):
     """

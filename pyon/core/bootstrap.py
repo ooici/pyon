@@ -3,8 +3,9 @@
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.util.config import Config
 from pyon.core.registry import IonObjectRegistry
+from pyon.util.config import Config
+from pyon.service.service import IonServiceRegistry
 
 import logging.config
 import os
@@ -60,10 +61,13 @@ conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
 CFG = Config(conf_paths, ignore_not_found=True).data
 sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
-# OBJECTS. Object and service definitions.
+# OBJECTS. Object and message definitions.
 # Make a default factory for IonObjects
 obj_registry = IonObjectRegistry()
 IonObject = obj_registry.new
+
+# SERVICES. Service definitions
+service_registry = IonServiceRegistry()
 
 def bootstrap_pyon():
     """
@@ -91,10 +95,9 @@ def bootstrap_pyon():
     from pyon.net.endpoint import instantiate_interceptors
     instantiate_interceptors(CFG.interceptor)
 
-    # Services.
-    from pyon.service import service
-    service.load_service_mods('interface/services')
-    service.build_service_map()
+    # Services
+    service_registry.load_service_mods('interface/services')
+    service_registry.build_service_map()
 
     # Set initialized flag
     pyon_initialized = True

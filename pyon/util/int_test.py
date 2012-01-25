@@ -2,14 +2,14 @@
 
 """Integration test base class and utils"""
 
+from pyon.container.cc import Container
+from pyon.core.bootstrap import bootstrap_pyon, service_registry
+from pyon.util.containers import DotDict
+from pyon.util.log import log
+from mock import patch
+
 from contextlib import contextmanager
 import unittest
-import re
-
-from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon
-from pyon.service.service import services_by_name, load_service_mods
-from mock import patch
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
@@ -48,6 +48,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         self.container = Container()
         self.container.start()
 
+        # For integration tests, if class variable "service_dependencies" exists
+        self._start_dependencies()
+
     def _stop_container(self):
         if self.container:
             self.container.stop()
@@ -58,19 +61,44 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def _start_dependencies(self):
+        """
+        Starts the services declared in the class or instance variable "service_dependencies"
+        """
+        self.clients = DotDict()
+        svc_deps = getattr(self, "service_dependencies", {})
+        log.debug("Starting service dependencies. Number=%s" % len(svc_deps))
+        if not svc_deps:
+            return
+        for svc in svc_deps:
+            config = None
+            if type(svc) in (tuple, list):
+                config = svc[1]
+                svc = svc[0]
+
+            # Start the service
+            self._start_service(svc, config=config)
+
+            # Create a client
+            clcls = service_registry.services[svc].simple_client
+            self.clients[svc] = clcls(name=svc, node=self.container.node)
+
+        log.debug("Service dependencies started")
+
     def _start_service(self, servicename, servicecls=None, config=None):
-        #svc_interface = services_by_name[servicename]
-        #global scanned_services
-        #if not scanned_services:
-        #    load_service_mods("ion")
-        #    scanned_services = True
-        #match = re.match(r'interface\.(.+)\.i(\w+)', m)
-        #if match:
-        #    svc_mod = "ion.%s.%s" % (match.group(1), match.group(2))
-        if servicecls:
+        if servicename and not servicecls:
+            global scanned_services
+            if not scanned_services:
+                service_registry.discover_service_classes()
+                scanned_services = True
+            assert servicename in service_registry.services, "Service %s unknown" % servicename
+            servicecls = service_registry.services[servicename].impl[0]
+
+        assert servicecls, "Cannot start service %s" % servicename
+
+        if type(servicecls) is str:
             mod, cls = servicecls.rsplit('.', 1)
-            self.container.spawn_process(servicename, mod, cls, config)
-
-
-    def _spawn_process(self, procname, proctype=None, config=None):
-        pass
+        else:
+            mod = servicecls.__module__
+            cls = servicecls.__name__
+        self.container.spawn_process(servicename, mod, cls, config)

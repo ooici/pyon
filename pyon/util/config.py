@@ -37,7 +37,8 @@ class Config(object):
             try:
                 with open(path, 'r') as file:
                     path_data = yaml.load(file.read())
-                    data = dict_merge(data, path_data)
+                    if path_data is not None:
+                        data = dict_merge(data, path_data)
                 self.paths_loaded.add(path)
             except IOError:
                 if not ignore_not_found:

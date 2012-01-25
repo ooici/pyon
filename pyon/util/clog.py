@@ -47,6 +47,8 @@ class ColoredFormatter(logging.Formatter):
                 record.levelname    = self.NOOP_SEQ + record.levelname + self.RESET_SEQ
             else:
                 record.levelname    = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.levelname + self.RESET_SEQ
+                if not isinstance(record.msg, str):
+                    record.msg = str(record.msg)
                 record.msg          = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.msg + self.RESET_SEQ
 
         return logging.Formatter.format(self, record)

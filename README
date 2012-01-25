@@ -67,6 +67,14 @@ Link git submodule ion-definitions, containing object and service definitions an
 
 Note: This git-submodule always references a specific commit of ion-definitions used by pyon.
 
+Hint: The .gitmodules file  declares the submodule as read only GIT reference (https: instead of git@).
+    If you have problems with a read only (anonymous) clone because of a missing public key,
+    edit .git/config and change the last url to git://github.com/ooici/ion-definitions.git
+
+    If you want to avoid entering your password for every push to the submodule,
+    edit extern/ion-definitions/.git/config and change the remote reference to:
+    git@github.com:ooici/ion-definitions.git
+
 To update the code in pyon and the specific commit in the submodule:
     > git pull
     > git submodule update

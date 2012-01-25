@@ -5,7 +5,7 @@
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
-from pyon.core.object import IonServiceDefinition, IonObjectBase
+from pyon.core.object import IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -615,22 +615,22 @@ class RPCClient(RequestResponseClient):
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
             self._define_interface(iface)
-        elif isinstance(iface, IonServiceDefinition):
-            self._define_svcdef(iface)
+#        elif isinstance(iface, IonServiceDefinition):
+#            self._define_svcdef(iface)
 
         RequestResponseClient.__init__(self, **kwargs)
 
-    def _define_svcdef(self, svc_def):
-        """
-        Defines an RPCClient's attributes from an IonServiceDefinition.
-        """
-        for meth in svc_def.methods:
-            name        = meth.op_name
-            in_obj      = meth.def_in
-            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
-            doc         = meth.__doc__
-
-            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
+#    def _define_svcdef(self, svc_def):
+#        """
+#        Defines an RPCClient's attributes from an IonServiceDefinition.
+#        """
+#        for meth in svc_def.operations:
+#            name        = meth.op_name
+#            in_obj      = meth.def_in
+#            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
+#            doc         = meth.__doc__
+#
+#            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
 
     def _define_interface(self, iface):
         """
@@ -801,27 +801,23 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
         """
 
         context = self._process.get_context()
-        log.debug('TODO: PROCESS RPC REQUEST ENDPOINT HAS CONTEXT OF %s', context)
+        log.debug('ProcessRPCRequestEndpointUnit._build_header has context of: %s', context)
 
-        # must set here: sender-name, conv-id, conv-seq, performative
+        # conv-id/seq/protocol are set in the base class
         header = RPCRequestEndpointUnit._build_header(self, raw_msg)
 
+        # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : 'todo',#self.channel._chan_name,
-                       'conv-id'      : 'none',                   # @TODO
-                       'conv-seq'     : 1,
-                       'performative' : 'request'})
+                       'sender'       : 'todo'})
         
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # @TODO: these names, get them right
-            user_id             = context.get('user-id', None)
-            container_signature = context.get('signature', None)
-            role_id             = context.get('role-id', None)
+            # fwd on ion-user-id and expiry, according to common message format spec
+            user_id             = context.get('ion-user-id', None)
+            expiry              = context.get('expiry', None)
 
-            if user_id:             header['user-id'] = user_id
-            if container_signature: header['signature'] = signature
-            if role_id:             header['role-id'] = role_id
+            if user_id:         header['ion-user-id']   = user_id
+            if expiry:          header['expiry']        = expiry
 
         return header
 
