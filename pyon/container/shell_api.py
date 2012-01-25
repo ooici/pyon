@@ -124,7 +124,7 @@ def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
     @param svcs name or list of names of service
     """
-    from pyon.service.service import service_registry
+    from pyon.core.bootstrap import service_registry
 
     if not getattr(svcs, '__iter__', False) and op is not None:
         svcdef = service_registry.services[svcs]

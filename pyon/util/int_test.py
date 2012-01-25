@@ -3,8 +3,7 @@
 """Integration test base class and utils"""
 
 from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon
-from pyon.service.service import service_registry
+from pyon.core.bootstrap import bootstrap_pyon, service_registry
 from pyon.util.containers import DotDict
 from pyon.util.log import log
 from mock import patch
@@ -16,7 +15,6 @@ import unittest
 bootstrap_pyon()
 
 scanned_services = False
-service_classes = {}
 
 class IonIntegrationTestCase(unittest.TestCase):
     """
@@ -89,7 +87,10 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _start_service(self, servicename, servicecls=None, config=None):
         if servicename and not servicecls:
-            service_registry.discover_service_classes()
+            global scanned_services
+            if not scanned_services:
+                service_registry.discover_service_classes()
+                scanned_services = True
             assert servicename in service_registry.services, "Service %s unknown" % servicename
             servicecls = service_registry.services[servicename].impl[0]
 

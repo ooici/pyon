@@ -108,8 +108,6 @@ class BaseService(LocalContextMixin):
 # -----------------------------------------------------------------------------------------------
 # Service management infrastructure
 
-service_registry = None
-
 class IonServiceDefinition(object):
     """
     Provides a walkable structure for ION service metadata and object definitions.
@@ -157,16 +155,10 @@ class IonServiceOperation(object):
 
 class IonServiceRegistry(object):
     def __init__(self):
-        global service_registry
-        assert not service_registry, "Trying to create another IonServiceRegistry"
-
         self.services = {}
         self.services_by_name = {}
         self.classes_loaded = False
         self.operations = None
-
-        # Set the singleton instance
-        service_registry = self
 
     def add_servicedef_entry(self, name, key, value, append=False):
         if not name:

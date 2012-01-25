@@ -6,8 +6,7 @@ from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
 from zope.interface import implementedBy
-from pyon.service.service import service_registry
-from pyon.core.bootstrap import IonObject, bootstrap_pyon
+from pyon.core.bootstrap import IonObject, bootstrap_pyon, service_registry
 
 bootstrap_pyon()
 
