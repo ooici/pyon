@@ -34,9 +34,6 @@ class TransformProcessAdaptor(TransformBase):
         super(TransformProcessAdaptor, self).__init__()
         #@todo: Initialize IO, pipes or some variant of IPC
 
-    def on_start(self):
-        pass
-
     def callback(self):
         pass
 
