@@ -311,28 +311,6 @@ class BaseEndpoint(object):
         """
         pass
 
-class ExchangeManagementEndpointUnit(EndpointUnit):
-    def create_xs(self, name):
-        pass
-
-class ExchangeManagement(BaseEndpoint):
-    endpoint_unit_type = ExchangeManagementEndpointUnit
-    channel_type = BaseChannel
-
-    def __init__(self, **kwargs):
-        self._pub_ep = None
-        BaseEndpoint.__init__(self, **kwargs)
-
-    def create_xs(self, name):
-        if not self._exchange_ep:
-            self._exchange_ep = self.create_endpoint(self.name)
-
-        self._exchange_ep.create_xs(name)
-
-    def close(self):
-        if self._exchange_ep:
-            self._exchange_ep.close()
-
 def log_message(recv, msg, headers, delivery_tag=None):
     """
     Utility function to print an legible comprehensive summary of a received message.

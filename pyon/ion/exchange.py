@@ -7,6 +7,8 @@ __license__ = 'Apache 2.0'
 
 from pyon.net import messaging
 from pyon.util.log import log
+from pyon.core import bootstrap
+from pyon.util.async import blocking_cb
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -35,24 +37,53 @@ class ExchangeManager(object):
         self.xs_by_name = {}
         self.default_xs = ExchangeSpace(ION_ROOT_XS)
 
+        self._chan = None
+
         # TODO: Do more initializing here, not in container
 
     def start(self):
-        # Establish connection to broker
-        #self.container.node, self.container.ioloop = messaging.make_node() # TODO: shortcut hack
-
-        # Declare root exchange
-        #self.default_xs.ensure_exists(self.container.node)
         log.debug("ExchangeManager starting ...")
 
+        # Establish connection to broker
+        # @TODO: raise error if sux
+        node, ioloop = messaging.make_node()
+
+        # Declare root exchange
+        #self.default_xs.ensure_exists(self._get_channel())
+        return node, ioloop
+
+    def _get_channel(self):
+        """
+        Get a raw channel to be used by all the ensure_exists methods.
+        """
+        assert self.container and self.container.node
+
+        # @TODO: needs lock, but so do all these methods
+        if not self._chan:
+            self._chan = blocking_cb(self.container.node.client.channel, 'on_open_callback')
+
+        return self._chan
+
     def create_xs(self, name):
-        pass
+        log.debug("ExchangeManager.create_xs: %s", name)
+        xs = ExchangeSpace(name)
+        xs.ensure_exists(self._get_channel())
+
+        return xs
 
     def create_xp(self, xs, name, xptype):
-        pass
+        log.debug("ExchangeManager.create_xp: name=%s, xptype=%s", name, xptype)
+        xp = ExchangePoint(name, xs=xs, xptype=xptype)
+        xp.ensure_exists(self._get_channel())
+
+        return xp
 
     def create_xn(self, xs, name):
-        pass
+        log.debug("ExchangeManager.create_xn: name=%s, xs=%s", name, xs)
+        xn = ExchangeName(name, xs)
+        #xn.ensure_exists(self._get_channel())
+
+        return xn
 
     def stop(self, *args, **kwargs):
         log.debug("ExchangeManager stopping ...")
@@ -71,19 +102,23 @@ class ExchangeSpace(object):
         self.qname = self.build_qname()
 
     def build_qname(self):
-        qname = "%s:%s" % (ION_URN_PREFIX, self.name)
+        qname = "%s:%s:%s" % (ION_URN_PREFIX, bootstrap.sys_name, self.name)
         return qname
 
     def build_xname(self):
-        xname = "ion.xs.%s" % (self.name)
+        xname = "%s.ion.xs.%s" % (bootstrap.sys_name, self.name)
         return xname
 
-    def ensure_exists(self, node):
+    def ensure_exists(self, chan):
         xname = self.build_xname()
-        log.debug("ExchangeSpace.ensure_exists() xname=%" % xname)
-        #ch = node.basic_channel()
-        #log.debug("ExchangeSpace.ensure_exists. Got basic channel %s" % ch)
+        log.debug("ExchangeSpace.ensure_exists() xname=%s", xname)
 
+        blocking_cb(chan.exchange_declare, 'callback', exchange=xname,
+                                                       type='topic',
+                                                       durable=False,
+                                                       auto_delete=True)
+
+        log.debug("ExchangeSpace (%s) created", xname)
 
     def __str__(self):
         return self.name
@@ -109,11 +144,11 @@ class ExchangeName(object):
         self.qname = self.build_qname()
 
     def build_qname(self):
-        qname = "%s:%s:%s" % (ION_URN_PREFIX, str(self.xs), self.name)
+        qname = "%s:%s:%s:%s" % (ION_URN_PREFIX, bootstrap.sys_name, str(self.xs), self.name)
         return qname
 
     def build_xlname(self):
-        xname = "ion.xs.%s" % (self.name)
+        xname = "%s.ion.xs.%s" % (bootstrap.sys_name, self.name)
         return xname
 
     def __str__(self):
@@ -132,6 +167,18 @@ class ExchangePoint(ExchangeName):
         self.xptype = xptype or 'basic'
 
     def build_xname(self):
-        xname = "ion.xs.%s.xp.%s" % (self.xs, self.name)
+        xname = "%s.xp.%s" % (self.xs.build_xname(), self.name)
         return xname
+
+    def ensure_exists(self, chan):
+
+        xname = self.build_xname()
+        log.debug("ExchangePoint.ensure_exists, xname=%s", xname)
+
+        blocking_cb(chan.exchange_declare, 'callback', exchange=xname,
+                                                       type='topic',
+                                                       durable=False,
+                                                       auto_delete=True)
+
+        log.debug("ExchangePoint (%s) created", xname)
 
