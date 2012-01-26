@@ -328,8 +328,7 @@ class Test_DataStores(IonIntegrationTestCase):
                 "name":"water_height",
                 "value":"ft"
         }
-        contact = IonObject('ContactInformation', name="Heitor Villa-Lobos")
-        data_set.contact = contact
+        data_set.contact.name = "Heitor Villa-Lobos"
         data_set.last_modified = "Heitor Villa-Lobos"
 
         # Write DataSet object"

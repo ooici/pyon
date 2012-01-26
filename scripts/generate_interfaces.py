@@ -729,7 +729,8 @@ def generate_model_objects():
                     continue
                 if isinstance(value, str) and '()' in value:
                     value_type = value.strip('()')
-                    converted_value = 'None'
+                    converted_value = value
+#                    converted_value = 'None'
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
@@ -810,7 +811,8 @@ def generate_model_objects():
                     
                         if isinstance(value, str) and '()' in value:
                             value_type = value.strip('()')
-                            converted_value = 'None'
+                            converted_value = value
+#                            converted_value = 'None'
                         else:
                             value_type = type(value).__name__
                             
