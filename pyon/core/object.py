@@ -8,7 +8,11 @@ from collections import OrderedDict, Mapping, Iterable
 import yaml
 
 from pyon.util.log import log
-
+try:
+    import numpy as np
+    _have_numpy = True
+except ImportError as e:
+    _have_numpy = False
 
 class IonObjectBase(object):
 
@@ -104,11 +108,15 @@ def walk(o, cb):
     newo = cb(o)
 
     # is now or is still an iterable? iterate it.
+    if _have_numpy:
+        if isinstance(newo,np.ndarray):
+            return newo
     if hasattr(newo, '__iter__'):
         if isinstance(newo, dict):
             return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
         else:
             return [walk(x, cb) for x in newo]
+
     elif isinstance(newo, IonObjectBase):
         # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
         # @TODO consolidate with _validate method in IonObjectBase
@@ -124,6 +132,10 @@ def walk(o, cb):
 
     else:
         return newo
+
+
+
+
 
 
 class IonObjectSerializationBase(object):
@@ -144,6 +156,8 @@ class IonObjectSerializationBase(object):
 
     def _transform(self, obj):
         raise NotImplementedError("Implement _transform in a derived class")
+
+
     
 class IonObjectSerializer(IonObjectSerializationBase):
     """
@@ -162,6 +176,16 @@ class IonObjectSerializer(IonObjectSerializationBase):
             res = obj.__dict__
             res["type_"] = obj.__class__.__name__
             return res
+        if _have_numpy:
+            if isinstance(obj,np.ndarray):
+                log.debug('got numpy: %s', type(obj))
+                res = {'numpy': {
+                    'type':str(obj.dtype),
+                    'shape':obj.shape,
+                    'body':obj.tostring()
+                }}
+                log.debug('res: %s', res)
+                return res
 
         return obj
 
@@ -193,6 +217,18 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 setattr(ion_obj, k, v)
 
             return ion_obj
+        if _have_numpy:
+            if isinstance(obj, dict):
+                msg = obj.get('numpy',False)
+                log.debug('message = %s', msg)
+                if msg:
+                    shape = msg.get('shape')
+                    type = msg.get('type')
+                    data = msg.get('body')
+                    log.debug('Numpy Array Detected:\n  type: %s\n  shape: %s\n  body: %s',type,shape,data)
+                    ret = np.fromstring(string=data,dtype=type).reshape(shape)
+                    return np.array(ret)
+
 
         return obj
 
