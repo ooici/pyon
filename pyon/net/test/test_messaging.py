@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from pyon.core.interceptor.codec import CodecInterceptor
+from pyon.core.interceptor.interceptor import Invocation
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -14,6 +16,12 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.async import spawn
 from gevent import event, queue
 import time
+
+try:
+    import numpy as np
+    _have_numpy = True
+except ImportError as e:
+    _have_numpy = False
 
 @attr('UNIT')
 class TestNodeB(PyonTestCase):
@@ -227,6 +235,22 @@ class TestMessaging(PyonTestCase):
 
         self.assertEquals(ilp, sentinel.ioloop_process)
         gevmock.assert_called_once_with(ioloop, sentinel.connection)
+
+    def test_numpy_codec(self):
+        if not _have_numpy:
+            return
+        a = np.array([(90,8010,3,14112,3.14159265358979323846264)],dtype='float32')
+        invoke = Invocation()
+        invoke.message = a
+        codec = CodecInterceptor()
+
+        mangled = codec.outgoing(invoke)
+
+        received = codec.incoming(mangled)
+
+        b = received.message
+        comp = (a==b)
+        self.assertTrue(comp.all())
 
 
 
