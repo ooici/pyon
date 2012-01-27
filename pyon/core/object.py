@@ -108,11 +108,15 @@ def walk(o, cb):
     newo = cb(o)
 
     # is now or is still an iterable? iterate it.
+    if _have_numpy:
+        if isinstance(newo,np.ndarray):
+            return newo
     if hasattr(newo, '__iter__'):
         if isinstance(newo, dict):
             return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
         else:
             return [walk(x, cb) for x in newo]
+
     elif isinstance(newo, IonObjectBase):
         # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
         # @TODO consolidate with _validate method in IonObjectBase
@@ -128,32 +132,8 @@ def walk(o, cb):
 
     else:
         return newo
-if _have_numpy:
-    class NumpyObjectSerialization(object):
-        ''' Used to serialize a numpy array
-        '''
-        def transform(self, obj):
-            if isinstance(obj,np.ndarray):
-                msg = {'numpy': {
-                    'type':str(obj.dtype),
-                    'shape':obj.shape,
-                    'body':obj.tostring()
-                }}
 
-                return msg
-            return obj
 
-    class NumpyObjectDeserialization(object):
-        ''' Used to deserialize a numpy array
-        '''
-        def transform(self, obj):
-            shape = obj.get('shape')
-            type = obj.get('type')
-            data = obj.get('body')
-            log.debug('Numpy Array Detected:\n  type: %s\n  shape: %s\n  body: %s',type,shape,data)
-            ret = np.fromstring(string=data,dtype=type).reshape(shape)
-
-            return np.array(ret)
 
 
 
@@ -196,6 +176,16 @@ class IonObjectSerializer(IonObjectSerializationBase):
             res = obj.__dict__
             res["type_"] = obj.__class__.__name__
             return res
+        if _have_numpy:
+            if isinstance(obj,np.ndarray):
+                log.debug('got numpy: %s', type(obj))
+                res = {'numpy': {
+                    'type':str(obj.dtype),
+                    'shape':obj.shape,
+                    'body':obj.tostring()
+                }}
+                log.debug('res: %s', res)
+                return res
 
         return obj
 
@@ -227,6 +217,18 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 setattr(ion_obj, k, v)
 
             return ion_obj
+        if _have_numpy:
+            if isinstance(obj, dict):
+                msg = obj.get('numpy',False)
+                log.debug('message = %s', msg)
+                if msg:
+                    shape = msg.get('shape')
+                    type = msg.get('type')
+                    data = msg.get('body')
+                    log.debug('Numpy Array Detected:\n  type: %s\n  shape: %s\n  body: %s',type,shape,data)
+                    ret = np.fromstring(string=data,dtype=type).reshape(shape)
+                    return np.array(ret)
+
 
         return obj
 

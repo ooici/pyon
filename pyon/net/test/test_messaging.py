@@ -236,21 +236,7 @@ class TestMessaging(PyonTestCase):
         self.assertEquals(ilp, sentinel.ioloop_process)
         gevmock.assert_called_once_with(ioloop, sentinel.connection)
 
-    def test_numpy_codec(self):
-        if not _have_numpy:
-            return
-        a = np.array([(90,8010,3,14112,3.14159265358979323846264)],dtype='float32')
-        invoke = Invocation()
-        invoke.message = a
-        codec = CodecInterceptor()
 
-        mangled = codec.outgoing(invoke)
-
-        received = codec.incoming(mangled)
-
-        b = received.message
-        comp = (a==b)
-        self.assertTrue(comp.all())
 
 
 
