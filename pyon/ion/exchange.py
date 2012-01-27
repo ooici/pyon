@@ -71,6 +71,10 @@ class ExchangeManager(object):
 
         return xs
 
+    def delete_xs(self, xs):
+        log.debug("ExchangeManager.delete_xs: %s", xs.build_xname())
+        xs.delete(self._get_channel())
+
     def create_xp(self, xs, name, xptype):
         log.debug("ExchangeManager.create_xp: name=%s, xptype=%s", name, xptype)
         xp = ExchangePoint(name, xs=xs, xptype=xptype)
@@ -78,12 +82,21 @@ class ExchangeManager(object):
 
         return xp
 
+    def delete_xp(self, xp):
+        log.debug("ExchangeManager.delete_xp: name=%s", xp.build_xname())
+        xp.delete(self._get_channel())
+
     def create_xn(self, xs, name):
         log.debug("ExchangeManager.create_xn: name=%s, xs=%s", name, xs)
         xn = ExchangeName(name, xs)
         #xn.ensure_exists(self._get_channel())
 
         return xn
+
+    def delete_xn(self, xn):
+        log.debug("ExchangeManager.delete_xn: name=%s", xn.build_xlname())
+        # @TODO: noop?
+        pass
 
     def stop(self, *args, **kwargs):
         log.debug("ExchangeManager stopping ...")
@@ -119,6 +132,14 @@ class ExchangeSpace(object):
                                                        auto_delete=True)
 
         log.debug("ExchangeSpace (%s) created", xname)
+
+    def delete(self, chan):
+        xname = self.build_xname()
+        log.debug("ExchangeSpace.delete, xname: %s", xname)
+
+        blocking_cb(chan.exchange_delete, 'callback', exchange=xname)
+
+        log.debug("ExchangeSpace (%s) deleted", xname)
 
     def __str__(self):
         return self.name
@@ -182,3 +203,10 @@ class ExchangePoint(ExchangeName):
 
         log.debug("ExchangePoint (%s) created", xname)
 
+    def delete(self, chan):
+        xname = self.build_xname()
+        log.debug("ExchangePoint.delete, xname: %s", xname)
+
+        blocking_cb(chan.exchange_delete, 'callback', exchange=xname)
+
+        log.debug("ExchangePoint (%s) deleted", xname)
