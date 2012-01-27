@@ -139,7 +139,7 @@ if _have_numpy:
                     'shape':obj.shape,
                     'body':obj.tostring()
                 }}
-                
+
                 return msg
             return obj
 
