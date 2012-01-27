@@ -27,11 +27,7 @@ class CodecInterceptor(Interceptor):
         if _have_numpy:
             if isinstance(invocation.message,np.ndarray):
                 serializer = NumpyObjectSerialization()
-                np_object = invocation.message
-                invocation.message = {'numpy': {
-                    'type':str(np_object.dtype),
-                    'shape':np_object.shape,
-                    'body':serializer.transform(np_object)}}
+                invocation.message = serializer.transform(invocation.message)
                 log.debug('Numpy:\n  Message: %s', invocation.message)
 
 

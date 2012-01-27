@@ -134,7 +134,12 @@ if _have_numpy:
         '''
         def transform(self, obj):
             if isinstance(obj,np.ndarray):
-                msg = obj.tostring()
+                msg = {'numpy': {
+                    'type':str(obj.dtype),
+                    'shape':obj.shape,
+                    'body':obj.tostring()
+                }}
+                
                 return msg
             return obj
 
