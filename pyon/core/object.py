@@ -8,7 +8,11 @@ from collections import OrderedDict, Mapping, Iterable
 import yaml
 
 from pyon.util.log import log
-
+try:
+    import numpy as np
+    _have_numpy = True
+except ImportError as e:
+    _have_numpy = False
 
 class IonObjectBase(object):
 
@@ -124,6 +128,29 @@ def walk(o, cb):
 
     else:
         return newo
+if _have_numpy:
+    class NumpyObjectSerialization(object):
+        ''' Used to serialize a numpy array
+        '''
+        def transform(self, obj):
+            if isinstance(obj,np.ndarray):
+                msg = obj.tostring()
+                return msg
+            return obj
+
+    class NumpyObjectDeserialization(object):
+        ''' Used to deserialize a numpy array
+        '''
+        def transform(self, obj):
+            shape = obj.get('shape')
+            type = obj.get('type')
+            data = obj.get('body')
+            log.debug('Numpy Array Detected:\n  type: %s\n  shape: %s\n  body: %s',type,shape,data)
+            ret = np.fromstring(string=data,dtype=type).reshape(shape)
+
+            return np.array(ret)
+
+
 
 
 class IonObjectSerializationBase(object):
@@ -144,6 +171,8 @@ class IonObjectSerializationBase(object):
 
     def _transform(self, obj):
         raise NotImplementedError("Implement _transform in a derived class")
+
+
     
 class IonObjectSerializer(IonObjectSerializationBase):
     """
