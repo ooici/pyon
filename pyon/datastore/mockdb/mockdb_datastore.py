@@ -121,7 +121,7 @@ class MockDB_DataStore(DataStore):
         versionCounter = 1
 
         # Assign initial version to doc
-        doc["_rev"] = versionCounter
+        doc["_rev"] = str(versionCounter)
 
         # Write HEAD, version and version counter dicts
         datastore_dict[object_id] = doc
@@ -238,13 +238,13 @@ class MockDB_DataStore(DataStore):
             versionCounterKey = '__' + object_id + '_version_counter'
             baseVersion = doc["_rev"]
             versionCounter = datastore_dict[versionCounterKey] + 1
-            if baseVersion != versionCounter - 1:
+            if baseVersion != str(versionCounter - 1):
                 raise Conflict('Object not based on most current version')
         except KeyError:
             raise BadRequest("Object missing required _id and/or _rev values")
 
         log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
-        doc["_rev"] = versionCounter
+        doc["_rev"] = str(versionCounter)
 
         # Overwrite HEAD and version counter dicts, add new version dict
         datastore_dict[object_id] = doc
