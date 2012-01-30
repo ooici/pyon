@@ -19,7 +19,10 @@ class Directory(object):
         def __init__(self):
             persistent = False
             force_clean = False
-            datastore_name = bootstrap.sys_name + "_directory"
+
+            # couchdb cannot handle capital letters, apparently
+            datastore_name = bootstrap.sys_name.lower() + "_directory"
+
             if 'directory' in CFG:
                 directory_cfg = CFG['directory']
                 if 'persistent' in directory_cfg:
