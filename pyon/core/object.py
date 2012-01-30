@@ -23,7 +23,7 @@ class IonObjectBase(object):
         Compare fields to the schema and raise AttributeError if mismatched.
         Named _validate instead of validate because the data may have a field named "validate".
         """
-        id_and_rev_set = set(['_id','_rev'])
+        id_and_rev_set = set(['_id','_rev', 'type_'])
         fields, schema = self.__dict__, self._schema
         extra_fields = fields.viewkeys() - schema.viewkeys() - id_and_rev_set
         if len(extra_fields) > 0:
@@ -33,6 +33,9 @@ class IonObjectBase(object):
                 continue
             field_val, schema_val = fields[key], schema[key]
             if type(field_val).__name__ != schema_val['type']:
+
+                if field_val is None and schema_val['required'] == True:
+                    raise AttributeError('Required parameter "%s" not set' % key)
 
                 # if the schema doesn't define a type, we can't very well validate it
                 if schema_val['type'] == 'NoneType':
@@ -84,11 +87,6 @@ class IonObjectBase(object):
 
     def __contains__(self, item):
         return hasattr(self, item)
-
-    def __setattr__(self, name, value):
-        if name not in self._schema and name != "_id" and name != "_rev":
-            raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
-        self.__dict__[name] = value
 
 
 def walk(o, cb):
