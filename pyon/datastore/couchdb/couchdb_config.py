@@ -157,7 +157,7 @@ function(doc) {
 	if(doc.type_=="BlogPost") {
 		emit([doc._id,0],doc)
 	} else if (doc.type_ == "BlogComment") {
-		emit([doc.post, 1], doc)
+		emit([doc.ref_id, 1], doc)
 	}
 }"""
         }
