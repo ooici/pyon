@@ -4,10 +4,9 @@ __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.registry import IonObjectRegistry
-from pyon.util.config import Config
+from pyon.util.config import CFG
 from pyon.service.service import IonServiceRegistry
 
-import logging.config
 import os
 
 # THE CODE BELOW EXECUTES ON IMPORT OF THIS MODULE
@@ -34,31 +33,6 @@ assert_environment()
 
 pyon_initialized = False
 
-# LOGGING. Read the logging config files
-logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
-
-LOGGING_CFG = None
-
-def initialize_logging():
-    global LOGGING_CFG
-    LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
-
-    # Ensure the logging directories exist
-    for handler in LOGGING_CFG.get('handlers', {}).itervalues():
-        if 'filename' in handler:
-            log_dir = os.path.dirname(handler['filename'])
-            if not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-
-    # if there's no logging config, we can't configure it: the call requires version at a minimum
-    if LOGGING_CFG:
-        logging.config.dictConfig(LOGGING_CFG)
-
-initialize_logging()
-
-# CONFIG. Read global configuration
-conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
-CFG = Config(conf_paths, ignore_not_found=True).data
 sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
 
 # OBJECTS. Object and message definitions.

@@ -15,8 +15,11 @@ import_paths.append(__name__)
 from pyon.util.log import log
 __all__ += ['log']
 
-from pyon.core.bootstrap import CFG, obj_registry, IonObject, sys_name
-__all__ += ['CFG', 'obj_registry', 'IonObject', 'sys_name']
+from pyon.util.config import CFG
+__all__ += ['CFG']
+
+from pyon.core.bootstrap import obj_registry, IonObject, sys_name
+__all__ += ['obj_registry', 'IonObject', 'sys_name']
 
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']

@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 import inspect
 
 from pyon.core.exception import NotFound
+from pyon.util.config import CFG
 from pyon.util.log import log
 
 import interface.objects
@@ -68,7 +69,10 @@ class IonObjectRegistry(object):
     Also includes optional persistence to a document database.
     """
 
-    do_validate = True
+    try:
+        validate_setattr = CFG.validate.setattr
+    except AttributeError:
+        validate_setattr = False
 
     def __init__(self):
         classes = inspect.getmembers(interface.objects, inspect.isclass)
@@ -90,6 +94,18 @@ class IonObjectRegistry(object):
             clzz = message_classes[_def]
         else:
             raise NotFound("No matching class found for name %s" % _def)
+
+        # Conditionally override the __setattr__ method to
+        # include additional client side validation
+        if self.validate_setattr:
+            def validating_setattr(self, name, value):
+                if name not in self._schema and name != "_id" and name != "_rev":
+                    raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
+                self.__dict__[name] = value
+
+            setattrmethod = validating_setattr
+            setattr(clzz, "__setattr__", setattrmethod)
+            
         if _dict:
             # Apply dict values, then override with kwargs
             keywordargs = _dict
