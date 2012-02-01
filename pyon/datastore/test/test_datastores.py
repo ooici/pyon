@@ -254,9 +254,9 @@ class Test_DataStores(IonIntegrationTestCase):
         hvl_contact_info = {
             "name": "Heitor Villa-Lobos",
             "email": "prelude1@heitor.com",
-            "variables": {
-                "name": "Claim To Fame", "value": "Legendary Brazilian composer"
-            }
+            "variables": [
+                {"name": "Claim To Fame", "value": "Legendary Brazilian composer"}
+            ]
         }
         hvl_contact_info_obj = IonObject('ContactInformation', hvl_contact_info)
         hvl_user_info = {
@@ -272,9 +272,9 @@ class Test_DataStores(IonIntegrationTestCase):
         ats_contact_info = {
             "name": "Andres Torres Segovia",
             "email": "asturas@andres.com",
-            "variables": {
-                "name": "Claim To Fame", "value": "Legendary Concert Guitarist"
-            }
+            "variables": [
+                {"name": "Claim To Fame", "value": "Legendary Concert Guitarist"}
+            ]
         }
         ats_contact_info_obj = IonObject('ContactInformation', ats_contact_info)
         ats_user_info = {
@@ -288,9 +288,9 @@ class Test_DataStores(IonIntegrationTestCase):
         pok_contact_info = {
             "name": "Per-Olov Kindgren",
             "email": "etude6@per.com",
-            "variables": {
-                "name": "Claim To Fame", "value": "Composer and YouTube star"
-            }
+            "variables": [
+                {"name": "Claim To Fame", "value": "Composer and YouTube star"}
+            ]
         }
         pok_contact_info_obj = IonObject('ContactInformation', pok_contact_info)
         pok_user_info = {
@@ -324,10 +324,9 @@ class Test_DataStores(IonIntegrationTestCase):
         data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
         data_set.min_datetime = "2011-08-04T13:15:00Z"
         data_set.max_datetime = "2011-08-09T19:15:00Z"
-        data_set.variables = {
-                "name":"water_height",
-                "value":"ft"
-        }
+        data_set.variables = [
+                {"name":"water_height", "value":"ft"}
+        ]
         data_set.contact.name = "Heitor Villa-Lobos"
         data_set.last_modified = "Heitor Villa-Lobos"
 
