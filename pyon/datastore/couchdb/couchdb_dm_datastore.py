@@ -59,21 +59,43 @@ function(doc) {
         return obj
 
     def _parse_results(self, doc):
+        ''' Parses a complex object and organizes it into basic types
+        '''
         ret = {}
+
+        #-------------------------------
+        # Handle ViewResults type (CouchDB type)
+        #-------------------------------
+        # \_ Ignore the meta data and parse the rows only
         if type(doc) == ViewResults:
             ret = self._parse_results(doc.rows)
             return ret
 
+        #-------------------------------
+        # Handle A Row (CouchDB type)
+        #-------------------------------
+        # \_ Split it into a dict with a key and a value
+        #    Recursively parse down through the structure.
         if type(doc) == Row:
             ret['key'] = self._parse_results(doc['key'])
             ret['value'] = self._parse_results(doc['value'])
             return ret
+
+        #-------------------------------
+        # Handling a list
+        #-------------------------------
+        # \_ Break it apart and parse each element in the list
+
         if type(doc) == list:
             ret = []
             for element in doc:
                 ret.append(self._parse_results(element))
             return ret
-
+        #-------------------------------
+        # Handle a dic
+        #-------------------------------
+        # \_ Check to make sure it's not an IonObject
+        # \_ Parse the key value structure for other objects
         if type(doc) == dict:
             if '_id' in doc:
                 # IonObject
@@ -82,6 +104,10 @@ function(doc) {
             for key,value in doc:
                 ret[key] = self._parse_results(value)
             return ret
+
+        #-------------------------------
+        # Primitive type
+        #-------------------------------
         return doc
 
 
