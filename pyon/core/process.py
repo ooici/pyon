@@ -175,13 +175,23 @@ class ProcessSupervisor(object):
         , 'python': PythonProcess
     }
 
-    def __init__(self, heartbeat_secs=10.0):
+    def __init__(self, heartbeat_secs=10.0, failure_notify_callback=None):
+        """
+        Creates a ProcessSupervisor.
+
+        @param  heartbeat_secs              Seconds between heartbeats.
+        @param  failure_notify_callback     Callback to execute when a child fails unexpectedly. Should be
+                                            a callable taking two params: this process supervisor, and the
+                                            proc (Green/Python) that failed.
+        """
         super(ProcessSupervisor, self).__init__()
 
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
         self.heartbeat_secs = heartbeat_secs
         self._shutting_down = False
+        self._failure_notify_callback = failure_notify_callback
+
 
     def spawn(self, type_and_target, *args, **kwargs):
         """
@@ -202,7 +212,16 @@ class ProcessSupervisor(object):
 
         proc.start()
         self.children.add(proc)
+
+        # install failure monitor
+        proc.proc.link_exception(self._child_failed)
+
         return proc
+
+    def _child_failed(self, gproc):
+        log.error("Child failed with an exception: %s", gproc.exception)
+        if self._failure_notify_callback:
+            self._failure_notify_callback(self, gproc)
 
     def ensure_ready(self, proc, errmsg=None, timeout=10):
         """
@@ -249,7 +268,11 @@ class ProcessSupervisor(object):
             raise ContainerError("%s (failed): %s" % (errmsg, proc.proc.exception))
 
     def child_stopped(self, proc):
-        if proc in self.children: self.children.remove(proc)
+        if proc in self.children:
+            self.children.remove(proc)
+
+            # no longer need to listen for exceptions
+            proc.proc.unlink(self._child_failed)
 
     def join_children(self, timeout=None):
         """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """

@@ -4,7 +4,7 @@
 Capability Container base class
 """
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import CFG, bootstrap_pyon
@@ -198,3 +198,10 @@ class Container(BaseContainerAgent):
         log.debug("Container stopped, OK.")
 
         Container.instance = None
+
+    def fail_fast(self, err_msg=""):
+        """
+        Container needs to shut down and NOW.
+        """
+        log.error("Fail Fast: %s", err_msg)
+        os.kill(os.getpid(), signal.SIGTERM)
