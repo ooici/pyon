@@ -881,6 +881,7 @@ def generate_model_objects():
         else:
             dataobject_output_text += current_class_schema + "\n              }\n"
  
+#    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.exception import BadRequest\nfrom pyon.core.object import IonObjectBase\n"
     messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
     current_class_schema = ""
 
@@ -964,10 +965,13 @@ def generate_model_objects():
                     index += 1
                     continue
                 elif line.startswith('  '):
+                    is_required = False
                     field = line.split(":", 1)[0].strip()
                     try:
                         value = line.split(":", 1)[1].strip()
                         if '#' in value:
+                            if '# _required' in value:
+                                is_required = True
                             value = value.split('#')[0].strip()
                     except KeyError:
                         # Ignore key error because value is nested
@@ -1008,8 +1012,11 @@ def generate_model_objects():
 
                     args.append(", ")
                     args.append(field + "=" + default)
+#                    if is_required:
+#                        init_lines.append("        if " + field + " is None:\n")
+#                        init_lines.append("            raise BadRequest('Required parameter " + field + " was not provided')\n")
                     init_lines.append('        self.' + field + " = " + field + "\n")
-                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
+                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'required': " + str(is_required) + "},"
                 index += 1
 
             if len(args) > 0:
