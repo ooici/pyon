@@ -106,12 +106,13 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
+        if object_id:
+            if object_id in datastore_dict:
+                raise BadRequest("Object with id %s already exist" % object_id)
+
         # Assign an id to doc
         doc["_id"] = object_id or uuid4().hex
         object_id = doc["_id"]
-
-        if object_id in datastore_dict:
-            raise BadRequest("Object with id %s already exist" % object_id)
 
         log.debug('Creating new object %s/%s' % (datastore_name, object_id))
 
@@ -273,8 +274,15 @@ class MockDB_DataStore(DataStore):
             object_id = doc
         else:
             object_id = doc["_id"]
+        
         log.info('Deleting object %s/%s' % (datastore_name, object_id))
         if object_id in datastore_dict.keys():
+
+            if self._is_in_association(object_id, datastore_name):
+                obj = self.read(object_id, datastore_name)
+                log.warn("XXXXXXX Attempt to delete object %s that still has associations" % str(obj))
+#                raise BadRequest("Object cannot be deleted until associations are broken")
+
             # Find all version dicts and delete them
             for key in datastore_dict.keys():
                 if key.find(object_id + '_version_') == 0:
@@ -590,6 +598,27 @@ class MockDB_DataStore(DataStore):
                         if obj in subject_doc[predicate]:
                             return [[subject_doc, predicate, object_doc]]
                     raise NotFound("Data store query for association %s/%s/%s failed" % (subject, predicate, obj))
+
+    def _is_in_association(self, obj_id, datastore_name=""):
+        log.debug("_is_in_association(%s)" % obj_id)
+        if not obj_id:
+            raise BadRequest("Must provide object id")
+
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        try:
+            datastore_dict = self.root[datastore_name]
+        except KeyError:
+            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+
+        for objname,obj in datastore_dict.iteritems():
+            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            if 'type_' in obj and obj['type_'] == "Association":
+                association = obj
+                if association["s"] == obj_id or association["o"] == obj_id:
+                    log.debug("association found(%s)" % association)
+                    return True
+        return False
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))

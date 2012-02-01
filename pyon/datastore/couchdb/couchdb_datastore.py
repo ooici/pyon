@@ -142,6 +142,13 @@ class CouchDB_DataStore(DataStore):
         if '_rev' in doc:
             raise BadRequest("Doc must not have '_rev'")
 
+        if object_id:
+            try:
+                self.read(object_id, '', datastore_name)
+                raise BadRequest("Object with id %s already exist" % object_id)
+            except NotFound:
+                pass
+
         # Assign an id to doc (recommended in CouchDB documentation)
         doc["_id"] = object_id or uuid4().hex
         log.info('Creating new object %s/%s' % (datastore_name, doc["_id"]))
@@ -278,8 +285,13 @@ class CouchDB_DataStore(DataStore):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
             raise BadRequest("Obj param is not instance of IonObjectBase or string id")
         if type(obj) is str:
-            return self.delete_doc(obj, datastore_name=datastore_name)
-        return self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name)
+            self.delete_doc(obj, datastore_name=datastore_name)
+        else:
+            if '_id' not in obj:
+                raise BadRequest("Doc must have '_id'")
+            if '_rev' not in obj:
+                raise BadRequest("Doc must have '_rev'")
+            self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name)
 
     def delete_doc(self, doc, datastore_name=""):
         if not datastore_name:
@@ -290,12 +302,19 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Data store name %s is invalid" % datastore_name)
         if type(doc) is str:
             log.info('Deleting object %s/%s' % (datastore_name, doc))
+            if self._is_in_association(doc, datastore_name):
+                obj = self.read(doc, datastore_name)
+                log.warn("XXXXXXX Attempt to delete object %s that still has associations" % str(obj))
+#                raise BadRequest("Object cannot be deleted until associations are broken")
             try:
                 del db[doc]
             except ResourceNotFound:
                 raise NotFound('Object with id %s does not exist.' % str(doc))
         else:
             log.info('Deleting object %s/%s' % (datastore_name, doc["_id"]))
+            if self._is_in_association(doc["_id"], datastore_name):
+                log.warn("XXXXXXX Attempt to delete object %s that still has associations" % str(doc))
+#                raise BadRequest("Object cannot be deleted until associations are broken")
             try:
                 res = db.delete(doc)
             except ResourceNotFound:
@@ -611,6 +630,23 @@ class CouchDB_DataStore(DataStore):
                 del db["_design/%s" % design]
             except ResourceNotFound:
                 pass
+
+    def _is_in_association(self, obj_id, datastore_name=""):
+        log.debug("_is_in_association(%s)" % obj_id)
+        if not obj_id:
+            raise BadRequest("Must provide object id")
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+
+        view = db.view(self._get_viewname("association","all"))
+        associations = [row.value for row in view]
+
+        for association in associations:
+            if association["s"] == obj_id or association["o"] == obj_id:
+                log.debug("association found(%s)" % association)
+                return True
+        return False
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
