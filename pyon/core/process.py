@@ -193,7 +193,7 @@ class ProcessSupervisor(object):
             proc_type, proc_target = type_and_target
             proc_callable = self.type_callables[proc_type]
             proc = proc_callable(proc_target, *args, **kwargs)
-        elif isinstance(type_and_target, PyonProcess) and hasattr(type_and_target, 'target'):
+        elif issubclass(type_and_target, PyonProcess) and hasattr(type_and_target, 'target'):
             proc = type_and_target(*args, **kwargs)
         else:
             raise PyonProcessError('Invalid proc_type (must be tuple or PyonProcess subclass with a target method)')
@@ -204,7 +204,7 @@ class ProcessSupervisor(object):
         self.children.add(proc)
         return proc
 
-    def ensure_ready(self, proc, errmsg=None):
+    def ensure_ready(self, proc, errmsg=None, timeout=10):
         """
         Waits until either the process dies or reports it is ready, whichever comes first.
 
@@ -214,6 +214,7 @@ class ProcessSupervisor(object):
 
         @param  proc        The process to wait on.
         @param  errmsg      A custom error message to put in the ContainerError's message. May be blank.
+        @param  timeout     Amount of time (in seconds) to wait for the ready, default 10 seconds.
         @throws ContainerError  If the process dies or if we get a timeout before the process signals ready.
         """
 
@@ -233,7 +234,7 @@ class ProcessSupervisor(object):
         proc.proc.link_exception(cb)
         proc.get_ready_event().rawlink(cb)
 
-        retval = ev.wait(timeout=10)
+        retval = ev.wait(timeout=timeout)
 
         # unlink the events: ready event is probably harmless but the exception one, we want to install our own later
         proc.get_ready_event().unlink(cb)
