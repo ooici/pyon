@@ -32,14 +32,27 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         super(CouchDB_DM_DataStore, self).__init__(*args, **kwargs)
         
         COUCHDB_CONFIGS['dm_datastore'] = {'views': ['posts']}
-        COUCHDB_VIEWS['posts'] = {'post_comment':{'map':"""
+        COUCHDB_VIEWS['posts'] = {'index':{'map':"""
 function(doc) {
     if(doc.type_=="BlogPost") {
         emit([doc._id,0], doc);
     } else if (doc.type_ == "BlogComment") {
         emit([doc.ref_id, 1], doc);
     }
-}"""}
+}"""}, 'posts_by_author':{'map':"""
+function(doc) {
+    if(doc.type_=="BlogPost") {
+        emit(doc.author.name);
+    }
+}
+"""}, 'comments_by_author':{'map':"""
+function(doc) {
+    if(doc.type_ == "BlogComment") {
+        emit(doc.author.name);
+    }
+}
+"""}
+
 }
 
     def query_view(self, view_name='', key='', datastore_name=''):
@@ -50,8 +63,10 @@ function(doc) {
             db = self.server[datastore_name]
         except ResourceNotFound as e:
             raise BadRequest('No datastore with name: %s' % datastore_name)
-
-        rows = db.view(view_name, key)
+        if key:
+            rows = db.view(view_name, key=key)
+        else:
+            rows = db.view(view_name)
         return self._parse_results(rows)
 
     def doc_to_object(self, doc):
@@ -67,7 +82,7 @@ function(doc) {
         # Handle ViewResults type (CouchDB type)
         #-------------------------------
         # \_ Ignore the meta data and parse the rows only
-        if type(doc) == ViewResults:
+        if isinstance(doc,ViewResults):
             ret = self._parse_results(doc.rows)
             return ret
 
@@ -76,7 +91,8 @@ function(doc) {
         #-------------------------------
         # \_ Split it into a dict with a key and a value
         #    Recursively parse down through the structure.
-        if type(doc) == Row:
+        if isinstance(doc,Row):
+            ret['id'] = doc['id']
             ret['key'] = self._parse_results(doc['key'])
             ret['value'] = self._parse_results(doc['value'])
             return ret
@@ -86,7 +102,7 @@ function(doc) {
         #-------------------------------
         # \_ Break it apart and parse each element in the list
 
-        if type(doc) == list:
+        if isinstance(doc,list):
             ret = []
             for element in doc:
                 ret.append(self._parse_results(element))
@@ -96,7 +112,7 @@ function(doc) {
         #-------------------------------
         # \_ Check to make sure it's not an IonObject
         # \_ Parse the key value structure for other objects
-        if type(doc) == dict:
+        if isinstance(doc,dict):
             if '_id' in doc:
                 # IonObject
                 return self.doc_to_object(doc)
@@ -109,6 +125,15 @@ function(doc) {
         # Primitive type
         #-------------------------------
         return doc
+
+    def custom_query(self, map_fun, reduce_fun=None, datastore_name='', **options):
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        res = db.query(map_fun,reduce_fun,**options)
+
+        return self._parse_results(res)
+
 
 
     def _define_views(self, datastore_name=""):
