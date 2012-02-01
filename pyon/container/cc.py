@@ -120,8 +120,9 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
-        rsvc.get_ready_event().wait(timeout=10)   # @TODO: no hardcode
+        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        self.proc_manager.proc_sup.ensure_ready(proc)
+
         log.info("Container started, OK.")
 
     def serve_forever(self):

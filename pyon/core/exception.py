@@ -14,9 +14,6 @@ SERVICE_UNAVAILABLE = 503
 class IonException(Exception):
     status_code = -1
 
-    def __init__(self, message=''):
-        self.message = message
-
     def get_status_code(self):
         return self.status_code
 

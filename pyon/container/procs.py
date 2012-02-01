@@ -228,9 +228,8 @@ class ProcManager(object):
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
-        if not rsvc.get_ready_event().wait(timeout=10):
-            raise exception.ContainerError('_set_service_endpoint for listen_name: %s did not report ok' % listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
+        self.proc_sup.ensure_ready(proc, "_set_service_endpoint for listen_name: %s" % listen_name)
 
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
@@ -241,9 +240,8 @@ class ProcManager(object):
 
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
-        if not sub.get_ready_event().wait(timeout=10):
-            raise exception.ContainerError('_set_subscription_endpoint for listen_name: %s did not report ok' % listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
+        self.proc_sup.ensure_ready(proc, '_set_subscription_endpoint for listen_name: %s' % listen_name)
 
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
