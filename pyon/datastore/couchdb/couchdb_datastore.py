@@ -161,6 +161,8 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Data store %s does not exist" % datastore_name)
         except ResourceConflict:
             raise BadRequest("Object with id %s already exist" % doc["_id"])
+        except ValueError:
+            raise BadRequest("Data store name %s invalid" % datastore_name)
         log.debug('Create result: %s' % str(res))
         id, version = res
         return (id, version)

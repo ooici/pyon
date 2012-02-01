@@ -72,17 +72,10 @@ class Test_DataStores(IonIntegrationTestCase):
 
             create_failed = False
             try:
-                ds.create_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
+                ds.create_doc({"foo": "bar"}, "", "BadDataStoreNamePerCouchDB")
             except BadRequest:
                 create_failed = True
             self.assertTrue(create_failed)
-
-            create_mult_failed = False
-            try:
-                ds.create_doc_mult([{"foo": "bar"}], "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                create_mult_failed = True
-            self.assertTrue(create_mult_failed)
 
             read_failed = False
             try:
