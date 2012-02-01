@@ -35,7 +35,7 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         COUCHDB_VIEWS['posts'] = {'index':{'map':"""
 function(doc) {
     if(doc.type_=="BlogPost") {
-        emit([doc._id,0], doc);
+        emit([doc.post_id,0], doc);
     } else if (doc.type_ == "BlogComment") {
         emit([doc.ref_id, 1], doc);
     }
