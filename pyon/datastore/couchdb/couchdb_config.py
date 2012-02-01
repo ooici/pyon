@@ -2,7 +2,6 @@
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
-
 COUCHDB_CONFIGS = {
     'object_store':{
         'views': ['object','association']
@@ -12,6 +11,9 @@ COUCHDB_CONFIGS = {
     },
     'directory_store':{
         'views': ['directory']
+    },
+    'dm_datastore':{
+        'views': ['posts']
     },
     'all':{
         'views': ['object', 'resource', 'association', 'directory']
@@ -148,10 +150,25 @@ function(doc) {
 }""",
         },
     },
+    'posts':{
+        'index':{
+            'map':"""
+function(doc) {
+	if(doc.type_=="BlogPost") {
+		emit([doc._id,0],doc)
+	} else if (doc.type_ == "BlogComment") {
+		emit([doc.ref_id, 1], doc)
+	}
+}"""
+        }
+    }
 }
 
 def get_couchdb_views(config):
-    store_config = COUCHDB_CONFIGS[config]
+    if config in COUCHDB_CONFIGS:
+        store_config = COUCHDB_CONFIGS[config]
+    else:
+        store_config = COUCHDB_CONFIGS['all']
     views = store_config['views']
     res_views = {}
     for view in views:

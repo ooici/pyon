@@ -595,7 +595,9 @@ class CouchDB_DataStore(DataStore):
     def _define_views(self, datastore_name=""):
         if not datastore_name:
             datastore_name = self.datastore_name
-        for design, viewdef in self.couchdb_views.iteritems():
+
+        views = get_couchdb_views(datastore_name)
+        for design, viewdef in views.iteritems():
             self._define_view(design, viewdef, datastore_name=datastore_name)
 
     def _define_view(self, design, viewdef, datastore_name=""):
@@ -612,8 +614,8 @@ class CouchDB_DataStore(DataStore):
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-
-        for design, viewdef in self.couchdb_views.iteritems():
+        views = get_couchdb_views(datastore_name)
+        for design, viewdef in views.iteritems():
             for viewname in viewdef:
                 try:
                     rows = db.view("_design/%s/_view/%s" % (design, viewname))
