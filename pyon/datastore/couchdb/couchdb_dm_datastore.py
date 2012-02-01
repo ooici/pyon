@@ -4,6 +4,9 @@
 @file pyon/datastore/couchdb/couchdb_dm_datastore.py
 @description An extension to the existing couchdb_datastore to support more dynamic mapping and view access.
 '''
+from couchdb.http import ResourceNotFound
+from couchdb.client import ViewResults, Row
+from pyon.core.exception import BadRequest
 from pyon.util.log import log
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 import pyon.datastore.couchdb.couchdb_config as couch_config
@@ -38,6 +41,49 @@ function(doc) {
     }
 }"""}
 }
+
+    def query_view(self, view_name='', key='', datastore_name=''):
+        if not datastore_name:
+            datastore_name = self.datastore_name
+
+        try:
+            db = self.server[datastore_name]
+        except ResourceNotFound as e:
+            raise BadRequest('No datastore with name: %s' % datastore_name)
+
+        rows = db.view(view_name, key)
+        return self._parse_results(rows)
+
+    def doc_to_object(self, doc):
+        obj = self._persistence_dict_to_ion_object(doc)
+        return obj
+
+    def _parse_results(self, doc):
+        ret = {}
+        if type(doc) == ViewResults:
+            ret = self._parse_results(doc.rows)
+            return ret
+
+        if type(doc) == Row:
+            ret['key'] = self._parse_results(doc['key'])
+            ret['value'] = self._parse_results(doc['value'])
+            return ret
+        if type(doc) == list:
+            ret = []
+            for element in doc:
+                ret.append(self._parse_results(element))
+            return ret
+
+        if type(doc) == dict:
+            if '_id' in doc:
+                # IonObject
+                return self.doc_to_object(doc)
+
+            for key,value in doc:
+                ret[key] = self._parse_results(value)
+            return ret
+        return doc
+
 
     def _define_views(self, datastore_name=""):
         if not datastore_name:
