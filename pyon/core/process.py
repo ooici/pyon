@@ -86,7 +86,7 @@ class PyonProcess(object):
         self.proc = None
 
         if self.supervisor is not None:
-                self.supervisor.child_stopped(self)
+            self.supervisor.child_stopped(self)
 
         return self
 
@@ -257,14 +257,17 @@ class ProcessSupervisor(object):
 
         # unlink the events: ready event is probably harmless but the exception one, we want to install our own later
         proc.get_ready_event().unlink(cb)
-        proc.proc.unlink(cb)
+
+        # if the process is stopped while we are waiting, proc.proc is set to None
+        if proc.proc is not None:
+            proc.proc.unlink(cb)
 
         # raise an exception if:
         # - we timed out
         # - we caught an exception
         if not retval:
             raise ContainerError("%s (timed out)" % errmsg)
-        elif proc.proc.dead and not proc.proc.successful():
+        elif proc.proc is not None and proc.proc.dead and not proc.proc.successful():
             raise ContainerError("%s (failed): %s" % (errmsg, proc.proc.exception))
 
     def child_stopped(self, proc):

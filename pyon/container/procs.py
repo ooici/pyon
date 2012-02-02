@@ -117,19 +117,22 @@ class ProcManager(object):
     def _spawned_proc_failed(self, proc_sup, gproc):
         log.error("ProcManager._spawned_proc_failed: %s", gproc)
 
-        # look it up in mapping
-        if not gproc in self._spawned_proc_to_process:
-            log.warn("No record of gproc %s in our map (%s)", gproc, self._spawned_proc_to_process)
-            return
+        # for now - don't worry about the mapping, if we get a failure, just kill the container.
+        # leave the mapping in place for potential expansion later.
 
-        svc = self._spawned_proc_to_process[gproc]
+#        # look it up in mapping
+#        if not gproc in self._spawned_proc_to_process:
+#            log.warn("No record of gproc %s in our map (%s)", gproc, self._spawned_proc_to_process)
+#            return
+#
+        svc = self._spawned_proc_to_process.get(gproc, "Unknown")
+#
+#        # make sure svc is in our list
+#        if not svc in self.procs.values():
+#            log.warn("svc %s not found in procs list", svc)
+#            return
 
-        # make sure svc is in our list
-        if not svc in self.procs.values():
-            log.warn("svc %s not found in procs list", svc)
-            return
-
-        self.container.fail_fast("Container's only process (%s) failed: %s" % (svc, gproc.exception))
+        self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
