@@ -56,6 +56,11 @@ class CouchDB_DataStore(DataStore):
         self._io_serializer     = IonObjectSerializer()
         self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
 
+    def close(self):
+        log.info("Closing connection to CouchDB")
+        map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
+        self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
+
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:
             datastore_name = self.datastore_name
