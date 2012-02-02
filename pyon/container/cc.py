@@ -162,6 +162,11 @@ class Container(BaseContainerAgent):
         # Unregister from directory
         self.directory.unregister("/Container", self.id)
 
+        # destroy AMQP connection
+        self.node.client.close()
+        self.ioloop.kill()
+        self.node.client.ioloop.start()     # loop until connection closes
+
         self._cleanup_pid()
         log.debug("Container stopped, OK.")
 
