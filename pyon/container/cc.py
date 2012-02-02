@@ -204,4 +204,6 @@ class Container(BaseContainerAgent):
         Container needs to shut down and NOW.
         """
         log.error("Fail Fast: %s", err_msg)
+        self.stop()
+        log.error("Fail Fast: killing container")
         os.kill(os.getpid(), signal.SIGTERM)
