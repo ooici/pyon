@@ -32,28 +32,33 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         super(CouchDB_DM_DataStore, self).__init__(*args, **kwargs)
         
         COUCHDB_CONFIGS['dm_datastore'] = {'views': ['posts']}
-        COUCHDB_VIEWS['posts'] = {'index':{'map':"""
-function(doc) {
-    if(doc.type_=="BlogPost") {
-        emit([doc.post_id,0], doc);
-    } else if (doc.type_ == "BlogComment") {
-        emit([doc.ref_id, 1], doc);
-    }
-}"""}, 'posts_by_author':{'map':"""
-function(doc) {
-    if(doc.type_=="BlogPost") {
-        emit(doc.author.name);
-    }
-}
-"""}, 'comments_by_author':{'map':"""
-function(doc) {
-    if(doc.type_ == "BlogComment") {
-        emit(doc.author.name);
-    }
-}
-"""}
+        COUCHDB_VIEWS['posts'] = {
+                "posts_by_id": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.post_id,doc);}}"
+                },
+                "posts_by_title": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.title,doc);}}"
+                },
+                "posts_by_updated": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.updated,doc);}}"
+                },
+                "posts_by_author": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.author.name,doc);}}"
+                },
+                "comments_by_post_id": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.ref_id,doc);}}"
+                },
+                "comments_by_author": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.author.name,doc);}}"
+                },
+                "comments_by_updated": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.updated,doc);}}"
+                },
+                "posts_join_comments": {
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc);}\n}"
+                }
 
-}
+        }
 
     def query_view(self, view_name='', key='', datastore_name=''):
         if not datastore_name:
