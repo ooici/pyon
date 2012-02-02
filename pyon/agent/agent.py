@@ -36,13 +36,13 @@ class ResourceAgent(BaseResourceAgent):
     def _on_quit(self):
         self.clients.directory.unregister("/Agents", self.id)
 
-    def negotiate(self, sap_in=None):
+    def negotiate(self, resource_id="", sap_in=None):
         pass
 
-    def execute(self, command=None):
+    def execute(self, resource_id="", command=None):
         return self._execute("rcmd_", command)
 
-    def execute_agent(self, command=None):
+    def execute_agent(self, resource_id="", command=None):
         return self._execute("acmd_", command)
 
     def _execute(self, cprefix, command):
@@ -68,7 +68,7 @@ class ResourceAgent(BaseResourceAgent):
             cmd_res.result = str(ex)
         return cmd_res
 
-    def get_capabilities(self, capability_types=[]):
+    def get_capabilities(self, resource_id="", capability_types=[]):
         capability_types = capability_types or ["CONV_TYPE", "AGT_CMD", "AGT_PAR", "RES_CMD", "RES_PAR"]
         cap_list = []
         if "CONV_TYPE" in capability_types:
@@ -83,27 +83,27 @@ class ResourceAgent(BaseResourceAgent):
             cap_list.extend([("RES_PAR", cap) for cap in self._get_resource_params()])
         return cap_list
 
-    def set_param(self, name='', value=''):
+    def set_param(self, resource_id="", name='', value=''):
         if not hasattr(self, "rpar_%s" % name):
             raise iex.NotFound('Resource parameter not existing: %s' % name)
         pvalue = getattr(self, "rpar_%s" % name)
         setattr(self, "rpar_%s" % name, value)
         return pvalue
 
-    def get_param(self, name=''):
+    def get_param(self, resource_id="", name=''):
         try:
             return getattr(self, "rpar_%s" % name)
         except AttributeError:
             raise iex.NotFound('Resource parameter not found: %s' % name)
 
-    def set_agent_param(self, name='', value=''):
+    def set_agent_param(self, resource_id="", name='', value=''):
         if not hasattr(self, "apar_%s" % name):
             raise iex.NotFound('Agent parameter not existing: %s' % name)
         pvalue = getattr(self, "apar_%s" % name)
         setattr(self, "apar_%s" % name, value)
         return pvalue
 
-    def get_agent_param(self, name=''):
+    def get_agent_param(self, resource_id="", name=''):
         try:
             return getattr(self, "apar_%s" % name)
         except AttributeError:
