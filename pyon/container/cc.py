@@ -32,6 +32,7 @@ class Container(BaseContainerAgent):
     that do the bulk of the work in the ION system.
     """
 
+    # Singleton static variables
     node        = None
     id          = None
     name        = None
@@ -56,7 +57,7 @@ class Container(BaseContainerAgent):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
-        # Load object and service registry
+        # Load object and service registry etc.
         bootstrap_pyon()
 
         # Create this Container's specific ExchangeManager instance
@@ -153,24 +154,46 @@ class Container(BaseContainerAgent):
     def stop(self):
         log.debug("Container stopping...")
 
-        self.app_manager.stop()
+        try:
+            self.app_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop AppManager")
 
-        self.proc_manager.stop()
+        try:
+            self.proc_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop ProcManager")
 
-        self.ex_manager.stop()
+        try:
+            self.ex_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop ExchangeManager")
 
-        # Unregister from directory
-        self.directory.unregister("/Container", self.id)
+        try:
+            # Unregister from directory
+            self.directory.unregister("/Container", self.id)
+        except Exception, ex:
+            log.exception("Container stop(): Error unregistering container in directory")
 
-        # close directory (possible CouchDB connection)
-        self.directory.close()
+        try:
+            # close directory (possible CouchDB connection)
+            self.directory.close()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing directory")
 
-        # destroy AMQP connection
-        self.node.client.close()
-        self.ioloop.kill()
-        self.node.client.ioloop.start()     # loop until connection closes
+        try:
+            self.node.client.close()
+            self.ioloop.kill()
+            self.node.client.ioloop.start()     # loop until connection closes
+            # destroy AMQP connection
+        except Exception, ex:
+            log.exception("Container stop(): Error closing broker connection")
 
-        self._cleanup_pid()
+        try:
+            self._cleanup_pid()
+        except Exception, ex:
+            log.exception("Container stop(): Error cleaning up PID file")
+
         log.debug("Container stopped, OK.")
 
         Container.instance = None
