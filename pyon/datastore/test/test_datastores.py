@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import obj_registry, IonObject
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
@@ -468,6 +468,8 @@ class Test_DataStores(IonIntegrationTestCase):
 
         data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
+        data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
+
         # Subject -> Object direction
         obj_ids1, obj_assocs1 = data_store.find_objects(admin_user_id, id_only=True)
         self.assertEquals(len(obj_ids1), 3)
@@ -622,6 +624,14 @@ class Test_DataStores(IonIntegrationTestCase):
 
         assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
+
+        # Test regression bug: Inherited resources in associations
+        idev1_obj_id = self._create_resource(RT.InstrumentDevice, 'id1', description='')
+
+        iag1_obj_id = self._create_resource(RT.InstrumentAgentInstance, 'ia1', description='')
+
+        data_store.create_association(idev1_obj_id, PRED.hasAgentInstance, iag1_obj_id)
+
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))
