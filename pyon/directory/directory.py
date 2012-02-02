@@ -41,6 +41,12 @@ class Directory(object):
                 self._create()
             self._init()
 
+        def close(self):
+            """
+            Pass-through method to close the underlying datastore.
+            """
+            self.datastore.close()
+
         def _delete(self):
             """
             Method to delete directory.  Delete occurs as side effect
