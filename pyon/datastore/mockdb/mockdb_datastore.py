@@ -118,19 +118,19 @@ class MockDB_DataStore(DataStore):
 
         # Create key for version counter entry.  Will be used
         # on update to increment version number easily.
-        versionCounterKey = '__' + object_id + '_version_counter'
-        versionCounter = 1
+        version_counter_key = '__' + object_id + '_version_counter'
+        version_counter = 1
 
         # Assign initial version to doc
-        doc["_rev"] = str(versionCounter)
+        doc["_rev"] = str(version_counter)
 
         # Write HEAD, version and version counter dicts
         datastore_dict[object_id] = doc
-        datastore_dict[versionCounterKey] = versionCounter
-        datastore_dict[object_id + '_version_' + str(versionCounter)] = doc
+        datastore_dict[version_counter_key] = version_counter
+        datastore_dict[object_id + '_version_' + str(version_counter)] = doc
 
         # Return list that identifies the id of the new doc and its version
-        res = [object_id, str(versionCounter)]
+        res = [object_id, str(version_counter)]
         log.debug('Create result: %s' % str(res))
         return res
 
@@ -177,11 +177,11 @@ class MockDB_DataStore(DataStore):
 
         try:
             key = object_id
-            if rev_id == "":
-                log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
-            else:
+            if rev_id != None and rev_id != "":
                 log.debug('Reading version %s of object %s/%s' % (str(rev_id), datastore_name, str(object_id)))
                 key += '_version_' + str(rev_id)
+            else:
+                log.debug('Reading head version of object %s/%s' % (datastore_name, str(object_id)))
             doc = datastore_dict[key]
         except KeyError:
             raise NotFound('Object with id %s does not exist.' % str(object_id))
@@ -236,22 +236,22 @@ class MockDB_DataStore(DataStore):
             object_id = doc["_id"]
 
             # Find the next doc version
-            versionCounterKey = '__' + object_id + '_version_counter'
+            version_counter_key = '__' + object_id + '_version_counter'
             baseVersion = doc["_rev"]
-            versionCounter = datastore_dict[versionCounterKey] + 1
-            if baseVersion != str(versionCounter - 1):
+            version_counter = datastore_dict[version_counter_key] + 1
+            if baseVersion != str(version_counter - 1):
                 raise Conflict('Object not based on most current version')
         except KeyError:
             raise BadRequest("Object missing required _id and/or _rev values")
 
         log.debug('Saving new version of object %s/%s' % (datastore_name, doc["_id"]))
-        doc["_rev"] = str(versionCounter)
+        doc["_rev"] = str(version_counter)
 
         # Overwrite HEAD and version counter dicts, add new version dict
         datastore_dict[object_id] = doc
-        datastore_dict[versionCounterKey] = versionCounter
-        datastore_dict[object_id + '_version_' + str(versionCounter)] = doc
-        res = [object_id, str(versionCounter)]
+        datastore_dict[version_counter_key] = version_counter
+        datastore_dict[object_id + '_version_' + str(version_counter)] = doc
+        res = [object_id, str(version_counter)]
         log.debug('Update result: %s' % str(res))
         return res
 
@@ -279,7 +279,7 @@ class MockDB_DataStore(DataStore):
         if object_id in datastore_dict.keys():
 
             if self._is_in_association(object_id, datastore_name):
-                obj = self.read(object_id, datastore_name)
+                obj = self.read(object_id, "", datastore_name)
                 log.warn("XXXXXXX Attempt to delete object %s that still has associations" % str(obj))
 #                raise BadRequest("Object cannot be deleted until associations are broken")
 
@@ -292,7 +292,7 @@ class MockDB_DataStore(DataStore):
             # Delete the version counter dict
             del datastore_dict['__' + object_id + '_version_counter']
         else:
-            raise NotFound('Object ' + object_id + ' does not exist.')
+            raise NotFound('Object with id ' + object_id + ' does not exist.')
         log.info('Delete result: True')
 
     def find(self, criteria=[], datastore_name=""):
@@ -333,9 +333,6 @@ class MockDB_DataStore(DataStore):
                         if isinstance(criterion, list):
                             if len(criterion) != 3:
                                 raise BadRequest("Insufficient criterion values specified.  Much match [<field>, <logical constant>, <value>]")
-                            for item in criterion:
-                                if not isinstance(item, str):
-                                    raise BadRequest("All criterion values must be strings")
                             key = criterion[0]
                             logical_operation = criterion[1]
                             value = criterion[2]
@@ -714,7 +711,7 @@ class MockDB_DataStore(DataStore):
                 subject_id = subject
             else:
                 if "_id" not in subject:
-                    raise BadRequest("Object id not available")
+                    raise BadRequest("Object id not available in subject")
                 else:
                     subject_id = subject._id
             if type(obj) is str:

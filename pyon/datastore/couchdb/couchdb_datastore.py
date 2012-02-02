@@ -355,12 +355,9 @@ class CouchDB_DataStore(DataStore):
                 if isinstance(criterion, list):
                     if len(criterion) != 3:
                         raise BadRequest("Insufficient criterion values specified.  Much match [<field>, <logical constant>, <value>]")
-                    for item in criterion:
-                        if not isinstance(item, str):
-                            raise BadRequest("All criterion values must be strings")
                     map_fun += "doc." + criterion[0]
                     map_fun += " " + criterion[1] + " "
-                    map_fun += "\"" + criterion[2] + "\""
+                    map_fun += "\"" + str(criterion[2]) + "\""
                 else:
                     if criterion == DataStore.AND:
                         map_fun += ' && '
