@@ -129,9 +129,7 @@ class ProcManager(object):
             log.warn("svc %s not found in procs list", svc)
             return
 
-        # if this the only proc, fail, and hard
-        if len(self.procs) == 1:
-            self.container.fail_fast("Container's only process (%s) failed: %s" % (svc, gproc.exception))
+        self.container.fail_fast("Container's only process (%s) failed: %s" % (svc, gproc.exception))
 
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
