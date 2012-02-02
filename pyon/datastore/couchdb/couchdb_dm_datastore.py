@@ -60,7 +60,7 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
 
         }
 
-    def query_view(self, view_name='', key='', datastore_name=''):
+    def query_view(self, view_name='', opts={}, datastore_name=''):
         if not datastore_name:
             datastore_name = self.datastore_name
 
@@ -68,8 +68,8 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
             db = self.server[datastore_name]
         except ResourceNotFound as e:
             raise BadRequest('No datastore with name: %s' % datastore_name)
-        if key:
-            rows = db.view(view_name, key=key)
+        if opts:
+            rows = db.view(view_name, **opts)
         else:
             rows = db.view(view_name)
         return self._parse_results(rows)
