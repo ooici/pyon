@@ -162,6 +162,9 @@ class Container(BaseContainerAgent):
         # Unregister from directory
         self.directory.unregister("/Container", self.id)
 
+        # close directory (possible CouchDB connection)
+        self.directory.close()
+
         # destroy AMQP connection
         self.node.client.close()
         self.ioloop.kill()

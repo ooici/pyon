@@ -26,6 +26,12 @@ class DataStore(object):
     AND = 0
     OR = 1
 
+    def close(self):
+        """
+        Close any connections required for this datastore.
+        """
+        pass
+
     def create_datastore(self, datastore_name="", create_indexes=True):
         """
         Create a data store with the given name.  This is
