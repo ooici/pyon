@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 
-from pyon.net.endpoint import Subscriber, BinderListener
-from pyon.net.channel import PubSub
+from pyon.net.endpoint import Subscriber
 from pyon.net.messaging import make_node
 import gevent
 import time
 
 node,iowat=make_node()
 
-def msg_recv(msg):
+def msg_recv(msg, h):
     global counter
     counter += 1
 
-sub=Subscriber(callback=msg_recv)
-bl=BinderListener(node=node, name="hassan", endpoint_factory=sub, listening_channel_type=PubSub, spawn_callable=None)
+sub=Subscriber(node=node, name="hassan", callback=msg_recv)
 
 counter = 0
 st = time.time()
@@ -31,7 +29,7 @@ def tick():
 
 
 _gt = gevent.spawn(tick)
-_gw = gevent.spawn(bl.listen)
+_gw = gevent.spawn(sub.listen)
 
 gevent.joinall([_gt, _gw])
 
