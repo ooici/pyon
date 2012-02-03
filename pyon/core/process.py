@@ -275,7 +275,8 @@ class ProcessSupervisor(object):
             self.children.remove(proc)
 
             # no longer need to listen for exceptions
-            proc.proc.unlink(self._child_failed)
+            if proc.proc is not None:
+                proc.proc.unlink(self._child_failed)
 
     def join_children(self, timeout=None):
         """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
