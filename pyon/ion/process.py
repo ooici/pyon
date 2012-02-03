@@ -14,13 +14,15 @@ class IonProcessBase(object):
     Form the base of an ION process.
     Just add greenlets or python processes to complete.
     """
-    
-    def target(self, listener=None, name=None, *args, **kwargs):
+
+    def __init__(self, listener=None, name=None):
+        self.listener   = listener
+        self.name       = name
+
+    def target(self, *args, **kwargs):
         """ Control entrypoint. Setup the base properties for this process (mainly a listener)."""
-        self.listener = listener
-        self.name = name
-        if name:
-            threading.current_thread().name = name
+        if self.name:
+            threading.current_thread().name = self.name
         self.listener.listen()
 
     def _notify_stop(self):
@@ -28,7 +30,14 @@ class IonProcessBase(object):
         super(IonProcessBase, self)._notify_stop()
 
 class GreenIonProcess(IonProcessBase, GreenProcess):
-    pass
+
+    def __init__(self, target=None, listener=None, name=None, *args, **kwargs):
+        IonProcessBase.__init__(self, listener=listener, name=name)
+        GreenProcess.__init__(self, target=target, *args, **kwargs)
+
+    def get_ready_event(self):
+        return self.listener.get_ready_event()
+
 class PythonIonProcess(IonProcessBase, PythonProcess):
     pass
 

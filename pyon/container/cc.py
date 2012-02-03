@@ -4,7 +4,7 @@
 Capability Container base class
 """
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import CFG, bootstrap_pyon
@@ -120,8 +120,9 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
-        rsvc.get_ready_event().wait(timeout=10)   # @TODO: no hardcode
+        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        self.proc_manager.proc_sup.ensure_ready(proc)
+
         log.info("Container started, OK.")
 
     def serve_forever(self):
@@ -197,3 +198,12 @@ class Container(BaseContainerAgent):
         log.debug("Container stopped, OK.")
 
         Container.instance = None
+
+    def fail_fast(self, err_msg=""):
+        """
+        Container needs to shut down and NOW.
+        """
+        log.error("Fail Fast: %s", err_msg)
+        self.stop()
+        log.error("Fail Fast: killing container")
+        os.kill(os.getpid(), signal.SIGTERM)

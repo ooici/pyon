@@ -17,7 +17,8 @@ The Channel Protocol mediates between the application using it and the amqp
 protocol underlying it...so the Channel Protocol is a transport protocol in
 the language of amqp methods and ooi exchange nomenclature.
 
-The Channel Protocol doesn't make a lot of sense for the 'interactive'
+The Channel Protocol doesn't
+make a lot of sense for the 'interactive'
 style client methods, like accept, or listen.
 Listen kind of does, it says go into listening mode.
 If the Channel Protocol is a state machine, then it's states are being
@@ -38,10 +39,11 @@ point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
 
-from pyon.util.async import blocking_cb
 from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
+from contextlib import contextmanager
+from gevent.event import AsyncResult
 
 class ChannelError(StandardError):
     """
@@ -61,6 +63,7 @@ class BaseChannel(object):
 
     _amq_chan                   = None      # underlying transport
     _close_callback             = None      # close callback to use when closing, not always set (used for pooling)
+    _closed_error_callback      = None      # callback which triggers when the underlying transport closes with error
     _exchange                   = None      # exchange (too AMQP specific)
 
     # exchange related settings @TODO: these should likely come from config instead
@@ -113,7 +116,8 @@ class BaseChannel(object):
         # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
         log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
                                                                  self._exchange_durable, self._exchange_auto_delete)
-        blocking_cb(self._amq_chan.exchange_declare, 'callback', exchange=self._exchange,
+
+        self._sync_call(self._amq_chan.exchange_declare, 'callback', exchange=self._exchange,
                                                                 type=self._exchange_type,
                                                                 durable=self._exchange_durable,
                                                                 auto_delete=self._exchange_auto_delete)
@@ -178,6 +182,33 @@ class BaseChannel(object):
         amq_chan.add_on_close_callback(self.on_channel_close)
         self.attach_underlying_channel(amq_chan)
 
+    def set_closed_error_callback(self, callback):
+        """
+        Sets the closed error callback.
+
+        This callback is called when the underlying transport closes early with an error.
+
+        This is typically used for internal operations with the broker and will likely not be
+        used by others.
+
+        @param callback     The callback to trigger. Should take three parameters, this channel, the error code, and the error text.
+        @returns            The former value of the closed error callback.
+        """
+        oldval = self._closed_error_callback
+        self._closed_error_callback = callback
+        return oldval
+
+    @contextmanager
+    def push_closed_error_callback(self, callback):
+        """
+        Context manager based approach to set_closed_error_callback.
+        """
+        cur_cb = self.set_closed_error_callback(callback)
+        try:
+            yield callback
+        finally:
+            self.set_closed_error_callback(cur_cb)
+
     def on_channel_close(self, code, text):
         """
         Callback for when the Pika channel is closed.
@@ -186,6 +217,42 @@ class BaseChannel(object):
         if not (code == 0 or code == 200):
             logmeth = log.error
         logmeth("BaseChannel.on_channel_close\n\tchannel number: %d\n\tcode: %d\n\ttext: %s", self._amq_chan.channel_number, code, text)
+
+        # make callback if it exists!
+        if not (code == 0 or code == 200) and self._closed_error_callback:
+            # run in try block because this can shutter the entire connection
+            try:
+                self._closed_error_callback(self, code, text)
+            except Exception, e:
+                log.warn("Closed error callback caught an exception: %s", str(e))
+
+    def _sync_call(self, func, cb_arg, *args, **kwargs):
+        """
+        Functionally similar to the generic blocking_cb but with error support that's Channel specific.
+        """
+        ar = AsyncResult()
+
+        def cb(*args, **kwargs):
+            ret = list(args)
+            if len(kwargs): ret.append(kwargs)
+            ar.set(ret)
+
+        def eb(ch, code, text):
+            ar.set(ChannelError("_sync_call could not complete due to an error (%d): %s" % (code, text)))
+
+        kwargs[cb_arg] = cb
+        with self.push_closed_error_callback(eb):
+            func(*args, **kwargs)
+            ret_vals = ar.get()
+
+        if isinstance(ret_vals, ChannelError):
+            raise ret_vals
+
+        if len(ret_vals) == 0:
+            return None
+        elif len(ret_vals) == 1:
+            return ret_vals[0]
+        return tuple(ret_vals)
 
 class SendChannel(BaseChannel):
     """
@@ -315,9 +382,9 @@ class RecvChannel(BaseChannel):
 
         self._ensure_amq_chan()
 
-        blocking_cb(self._amq_chan.queue_unbind, 'callback', queue=self._recv_name[1],
-                                                             exchange=self._recv_name[0],
-                                                             routing_key=self._recv_binding)
+        self._sync_call(self._amq_chan.queue_unbind, 'callback', queue=self._recv_name[1],
+                                                                 exchange=self._recv_name[0],
+                                                                 routing_key=self._recv_binding)
 
     def _destroy_queue(self):
         """
@@ -329,7 +396,7 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         log.info("Destroying listener for queue %s", self._recv_name)
-        blocking_cb(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
+        self._sync_call(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
 
     def start_consume(self):
         """
@@ -367,7 +434,7 @@ class RecvChannel(BaseChannel):
 
         self._ensure_amq_chan()
 
-        blocking_cb(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
+        self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
         self._consuming = False
 
     def recv(self):
@@ -410,10 +477,10 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         log.debug("RecvChannel._declare_queue: %s", queue)
-        frame = blocking_cb(self._amq_chan.queue_declare, 'callback',
-                            queue=queue or '',
-                            auto_delete=self._queue_auto_delete,
-                            durable=self._queue_durable)
+        frame = self._sync_call(self._amq_chan.queue_declare, 'callback',
+                                                              queue=queue or '',
+                                                              auto_delete=self._queue_auto_delete,
+                                                              durable=self._queue_durable)
 
         # if the queue was anon, save it
         #if queue is None:
@@ -429,10 +496,10 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
         
         queue = self._recv_name[1]
-        blocking_cb(self._amq_chan.queue_bind, 'callback',
-                    queue=queue,
-                    exchange=self._recv_name[0],
-                    routing_key=binding)
+        self._sync_call(self._amq_chan.queue_bind, 'callback',
+                                                   queue=queue,
+                                                   exchange=self._recv_name[0],
+                                                   routing_key=binding)
 
         self._recv_binding = binding
 
@@ -464,7 +531,7 @@ class RecvChannel(BaseChannel):
         """
         log.debug("RecvChannel.reject: %s", delivery_tag)
         self._ensure_amq_chan()
-        blocking_cb(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
+        self._sync_call(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
 
 class PublisherChannel(SendChannel):
     def __init__(self, close_callback=None):
