@@ -53,28 +53,28 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         COUCHDB_CONFIGS['dm_datastore'] = {'views': ['posts']}
         COUCHDB_VIEWS['posts'] = {
                 "posts_by_id": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.post_id,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.post_id,doc._id);}}"
                 },
                 "posts_by_title": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.title,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.title,doc._id);}}"
                 },
                 "posts_by_updated": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.updated,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.updated,doc._id);}}"
                 },
                 "posts_by_author": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.author.name,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.author.name,doc._id);}}"
                 },
                 "comments_by_post_id": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.ref_id,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.ref_id,doc._id);}}"
                 },
                 "comments_by_author": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.author.name,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.author.name,doc._id);}}"
                 },
                 "comments_by_updated": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.updated,doc);}}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.updated,doc._id);}}"
                 },
                 "posts_join_comments": {
-                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc);}\n}"
+                    "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
                 }
 
         }
@@ -87,12 +87,14 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
             db = self.server[datastore_name]
         except ResourceNotFound as e:
             raise BadRequest('No datastore with name: %s' % datastore_name)
-        if opts:
-            rows = db.view(view_name, **opts)
-        else:
-            rows = db.view(view_name)
-        return self._parse_results(rows)
 
+        #@todo: DELTE THIS BEFORE PUSHING
+        log.warn('CouchDB_DM_DATA: %s', opts)
+        rows = db.view(view_name, **opts)
+        result = self._parse_results(rows)
+        log.warn('CouchDB_DM_DATA: %s', result)
+
+        return result
     def doc_to_object(self, doc):
         obj = self._persistence_dict_to_ion_object(doc)
         return obj
@@ -119,6 +121,8 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
             ret['id'] = doc['id']
             ret['key'] = self._parse_results(doc['key'])
             ret['value'] = self._parse_results(doc['value'])
+            if 'doc' in doc:
+                ret['doc'] = self._parse_results(doc['doc'])
             return ret
 
         #-------------------------------
