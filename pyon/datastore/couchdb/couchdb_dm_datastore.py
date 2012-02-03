@@ -10,7 +10,7 @@ from pyon.core.exception import BadRequest
 from pyon.util.log import log
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 import pyon.datastore.couchdb.couchdb_config as couch_config
-
+import hashlib
 
 COUCHDB_CONFIGS = couch_config.COUCHDB_CONFIGS
 COUCHDB_VIEWS = couch_config.COUCHDB_VIEWS
@@ -25,6 +25,25 @@ def get_couchdb_views(config):
     for view in views:
         res_views[view] = COUCHDB_VIEWS[view]
     return res_views
+
+
+def sha1hex(doc):
+    """
+    Compare the content of the doc without its id or revision...
+    """
+    doc_id = doc.pop('_id',None)
+    doc_rev = doc.get('_rev',None)
+    doc_string = str(doc)
+
+    if doc_id is not None:
+        doc['_id'] = doc_id
+
+    if doc_rev is not None:
+        doc['_rev'] = doc_rev
+
+    return hashlib.sha1(doc_string).hexdigest().upper()
+
+
 
 
 class CouchDB_DM_DataStore(CouchDB_DataStore):
