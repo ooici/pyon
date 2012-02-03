@@ -4,7 +4,7 @@
 Capability Container base class
 """
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import CFG, bootstrap_pyon
@@ -32,6 +32,7 @@ class Container(BaseContainerAgent):
     that do the bulk of the work in the ION system.
     """
 
+    # Singleton static variables
     node        = None
     id          = None
     name        = None
@@ -56,7 +57,7 @@ class Container(BaseContainerAgent):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = DictModifier(CFG, kwargs)
 
-        # Load object and service registry
+        # Load object and service registry etc.
         bootstrap_pyon()
 
         # Create this Container's specific ExchangeManager instance
@@ -119,8 +120,9 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
-        rsvc.get_ready_event().wait(timeout=10)   # @TODO: no hardcode
+        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        self.proc_manager.proc_sup.ensure_ready(proc)
+
         log.info("Container started, OK.")
 
     def serve_forever(self):
@@ -153,24 +155,55 @@ class Container(BaseContainerAgent):
     def stop(self):
         log.debug("Container stopping...")
 
-        self.app_manager.stop()
+        try:
+            self.app_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop AppManager")
 
-        self.proc_manager.stop()
+        try:
+            self.proc_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop ProcManager")
 
-        self.ex_manager.stop()
+        try:
+            self.ex_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error stop ExchangeManager")
 
-        # Unregister from directory
-        self.directory.unregister("/Container", self.id)
+        try:
+            # Unregister from directory
+            self.directory.unregister("/Container", self.id)
+        except Exception, ex:
+            log.exception("Container stop(): Error unregistering container in directory")
 
-        # close directory (possible CouchDB connection)
-        self.directory.close()
+        try:
+            # close directory (possible CouchDB connection)
+            self.directory.close()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing directory")
 
-        # destroy AMQP connection
-        self.node.client.close()
-        self.ioloop.kill()
-        self.node.client.ioloop.start()     # loop until connection closes
+        try:
+            self.node.client.close()
+            self.ioloop.kill()
+            self.node.client.ioloop.start()     # loop until connection closes
+            # destroy AMQP connection
+        except Exception, ex:
+            log.exception("Container stop(): Error closing broker connection")
 
-        self._cleanup_pid()
+        try:
+            self._cleanup_pid()
+        except Exception, ex:
+            log.exception("Container stop(): Error cleaning up PID file")
+
         log.debug("Container stopped, OK.")
 
         Container.instance = None
+
+    def fail_fast(self, err_msg=""):
+        """
+        Container needs to shut down and NOW.
+        """
+        log.error("Fail Fast: %s", err_msg)
+        self.stop()
+        log.error("Fail Fast: killing container")
+        os.kill(os.getpid(), signal.SIGTERM)

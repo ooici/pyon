@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import obj_registry, IonObject
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
@@ -35,96 +35,44 @@ class Test_DataStores(IonIntegrationTestCase):
             self._do_test(ds)
 
             # CouchDB does not like upper case characters for database names
-            create_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.create_datastore("BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                create_failed = True
-            self.assertTrue(create_failed)
 
-            delete_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.delete_datastore("BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                delete_failed = True
-            self.assertTrue(delete_failed)
 
-            info_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.info_datastore("BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                info_failed = True
-            self.assertTrue(info_failed)
 
-            list_objects_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.list_objects("BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                list_objects_failed = True
-            self.assertTrue(list_objects_failed)
 
-            list_object_revisions_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.list_object_revisions("badid", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                list_object_revisions_failed = True
-            self.assertTrue(list_object_revisions_failed)
 
-            create_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.create_doc({"foo": "bar"}, "", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                create_failed = True
-            self.assertTrue(create_failed)
 
-            read_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.read_doc("badid", "3", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                read_failed = True
-            self.assertTrue(read_failed)
 
-            read_mult_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.read_doc_mult("badid", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                read_mult_failed = True
-            self.assertTrue(read_mult_failed)
 
-            update_failed = False
-            try:
-                ds.update_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                update_failed = True
-            self.assertTrue(update_failed)
+            with self.assertRaises(BadRequest):
+               ds.update_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
 
-            delete_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                delete_failed = True
-            self.assertTrue(delete_failed)
 
-            find_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.find_doc([['type_', DataStore.EQUAL, 'foo']], "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                find_failed = True
-            self.assertTrue(find_failed)
 
-            find__by_idref_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.find_by_idref_doc([['type_', DataStore.EQUAL, 'UserInfo'], DataStore.AND, ['name', DataStore.EQUAL, 'foo']], 'roles', "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                find__by_idref_failed = True
-            self.assertTrue(find__by_idref_failed)
 
-            resolve_idref_failed = False
-            try:
+            with self.assertRaises(BadRequest):
                 ds.resolve_idref_doc("Subject", "Predicate", "Object", "BadDataStoreNamePerCouchDB")
-            except BadRequest:
-                resolve_idref_failed = True
-            self.assertTrue(resolve_idref_failed)
 
             self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'), is_persistent=True)
         except socket.error:
@@ -135,66 +83,33 @@ class Test_DataStores(IonIntegrationTestCase):
         self.resources = {}
         # Just in case previous run failed without cleaning up,
         # delete data store
-        deleteFailed = False
-        try:
-            data_store.delete_datastore()
-        except NotFound:
-            deleteFailed = True
-        self.assertFalse(deleteFailed)
+        data_store.delete_datastore()
 
         # Create should succeed and not throw error
         data_store.create_datastore()
 
         # Create should throw exception the second time
-        createFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.create_datastore()
-        except BadRequest:
-            createFailed = True
-        self.assertTrue(createFailed)
 
         # Call ops with wrong object type and make sure exception is thrown
-        createFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.create({"foo": "bar"})
-        except BadRequest:
-            createFailed = True
-        self.assertTrue(createFailed)
 
-        createMultFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.create_mult([{"foo": "bar"}])
-        except BadRequest:
-            createMultFailed = True
-        self.assertTrue(createMultFailed)
 
-        readFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.read({"foo": "bar"})
-        except BadRequest:
-            readFailed = True
-        self.assertTrue(readFailed)
 
-        readMultFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.read_mult([{"foo": "bar"}])
-        except BadRequest:
-            readMultFailed = True
-        self.assertTrue(readMultFailed)
 
-        updateFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.update({"foo": "bar"})
-        except BadRequest:
-            updateFailed = True
-        self.assertTrue(updateFailed)
 
-        deleteFailed = False
-        try:
+        with self.assertRaises(BadRequest):
             data_store.delete({"foo": "bar"})
-        except BadRequest:
-            deleteFailed = True
-        self.assertTrue(deleteFailed)
 
         # Should see new data
         self.assertIn('my_ds', data_store.list_datastores())
@@ -383,12 +298,8 @@ class Test_DataStores(IonIntegrationTestCase):
         data_store.delete(head)
 
         # Try to re-delete DataSet by object id.  Should throw exception.
-        delete_failed = False
-        try:
+        with self.assertRaises(NotFound):
             data_store.delete(head._id)
-        except NotFound:
-            delete_failed = True
-        self.assertTrue(delete_failed == True)
 
         # List all objects in data store, should be back to six
         res = data_store.list_objects()
@@ -465,6 +376,8 @@ class Test_DataStores(IonIntegrationTestCase):
         data_store.create_association(plat1_obj_id, HAS_A, inst1_obj_id)
 
         data_store.create_association(inst1_obj_id, HAS_A, ds1_obj_id)
+
+        data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
         data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
@@ -622,6 +535,14 @@ class Test_DataStores(IonIntegrationTestCase):
 
         assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
+
+        # Test regression bug: Inherited resources in associations
+        idev1_obj_id = self._create_resource(RT.InstrumentDevice, 'id1', description='')
+
+        iag1_obj_id = self._create_resource(RT.InstrumentAgentInstance, 'ia1', description='')
+
+        data_store.create_association(idev1_obj_id, PRED.hasAgentInstance, iag1_obj_id)
+
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))

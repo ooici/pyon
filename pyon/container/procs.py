@@ -34,8 +34,11 @@ class ProcManager(object):
         self.procs_by_name = {}
         self.procs = {}
 
+        # mapping of greenlets we spawn to service_instances for error handling
+        self._spawned_proc_to_process = {}
+
         # The pyon worker process supervisor
-        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat)
+        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
 
     def start(self):
         log.debug("ProcManager starting ...")
@@ -110,6 +113,26 @@ class ProcManager(object):
             errcause = service_instance.errcause if service_instance else "instantiating service"
             log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
             raise
+
+    def _spawned_proc_failed(self, proc_sup, gproc):
+        log.error("ProcManager._spawned_proc_failed: %s", gproc)
+
+        # for now - don't worry about the mapping, if we get a failure, just kill the container.
+        # leave the mapping in place for potential expansion later.
+
+#        # look it up in mapping
+#        if not gproc in self._spawned_proc_to_process:
+#            log.warn("No record of gproc %s in our map (%s)", gproc, self._spawned_proc_to_process)
+#            return
+#
+        svc = self._spawned_proc_to_process.get(gproc, "Unknown")
+#
+#        # make sure svc is in our list
+#        if not svc in self.procs.values():
+#            log.warn("svc %s not found in procs list", svc)
+#            return
+
+        self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
@@ -228,9 +251,11 @@ class ProcManager(object):
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
-        if not rsvc.get_ready_event().wait(timeout=10):
-            raise exception.ContainerError('_set_service_endpoint for listen_name: %s did not report ok' % listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
+        self.proc_sup.ensure_ready(proc, "_set_service_endpoint for listen_name: %s" % listen_name)
+
+        # map gproc to service_instance
+        self._spawned_proc_to_process[proc.proc] = service_instance
 
         log.debug("Process %s service listener ready: %s", service_instance.id, listen_name)
 
@@ -241,9 +266,11 @@ class ProcManager(object):
 
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
-        self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
-        if not sub.get_ready_event().wait(timeout=10):
-            raise exception.ContainerError('_set_subscription_endpoint for listen_name: %s did not report ok' % listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
+        self.proc_sup.ensure_ready(proc, '_set_subscription_endpoint for listen_name: %s' % listen_name)
+
+        # map gproc to service_instance
+        self._spawned_proc_to_process[proc.proc] = service_instance
 
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
