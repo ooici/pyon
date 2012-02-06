@@ -43,6 +43,7 @@ class IonIntegrationTestCase(unittest.TestCase):
     def _start_container(self):
         # hack to force queue auto delete on for int tests
         self._turn_on_queue_auto_delete()
+        self._patch_out_diediedie()
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
@@ -58,6 +59,15 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _turn_on_queue_auto_delete(self):
         patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _patch_out_diediedie(self):
+        """
+        If things are running slowly, diediedie will send a kill -9 to the owning process,
+        which could be the test runner! Let the test runner decide if it's time to die.
+        """
+        patcher = patch('pyon.core.process.shutdown_or_die')
         patcher.start()
         self.addCleanup(patcher.stop)
 
