@@ -328,6 +328,14 @@ class ExchangeManagement(BaseEndpoint):
         if self._exchange_ep:
             self._exchange_ep.close()
 
+def log_message(recv, msg, headers, delivery_tag=None):
+    """
+    Utility function to print an legible comprehensive summary of a received message.
+    """
+    if getattr(recv, '__iter__', False):
+        recv = ".".join(str(item) for item in recv if item)
+    log.info("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
+
 class ListeningBaseEndpoint(BaseEndpoint):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
@@ -369,6 +377,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
                 msg, headers, delivery_tag = newchan.recv()
 
                 log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self.name, msg, headers, delivery_tag)
+                log_message(self.name, msg, headers, delivery_tag)
 
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
@@ -539,9 +548,11 @@ class RequestResponseServer(ListeningBaseEndpoint):
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None):
-        log.info("RPCRequestEndpointUnit.send (call_remote): %s" % str(msg))
+        log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
 
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers)
+
+        #log_message('?WHO AM I?', res, res_headers)
         log.debug("RPCRequestEndpointUnit got this response: %s, headers: %s" % (str(res), str(res_headers)))
 
         # Check response header

@@ -7,7 +7,9 @@ __author__ = 'Michael Meisinger'
 
 from zope.interface import implementedBy
 
+from pyon.agent.agent import ResourceAgent
 from pyon.core.bootstrap import CFG
+from pyon.core.exception import ContainerConfigError
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessSupervisor
@@ -61,25 +63,25 @@ class ProcManager(object):
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
         log.debug("ProcManager stopped, OK.")
 
-    def spawn_process(self, name=None, module=None, cls=None, config=None, process_type=None):
+    def spawn_process(self, name=None, module=None, cls=None, config=None):
         """
         Spawn a process within the container. Processes can be of different type.
         """
         # Generate a new process id
         # TODO: Ensure it is system-wide unique
         process_id = str(self.proc_id_pool.get_id())
-        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s, proc_type=%s) as pid=%s", name, module, cls, process_type, process_id)
+        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s", name, module, cls, process_id)
 
         if config is None:
             config = DictModifier(CFG)
 
         log.debug("spawn_process() pid=%s config=%s", process_id, config)
 
-        # PROCESS TYPE.
+        # PROCESS TYPE. Determines basic process context (messaging, service interface)
         # One of: service, stream_process, agent, simple, immediate
 
         service_cls = named_any("%s.%s" % (module, cls))
-        process_type = process_type or getattr(service_cls, "process_type", "service")
+        process_type = config.get("process", {}).get("type", None) or getattr(service_cls, "process_type", "service")
 
         service_instance = None
         try:
@@ -92,6 +94,9 @@ class ProcManager(object):
 
             elif process_type == "agent":
                 service_instance = self._spawn_agent_process(process_id, name, module, cls, config)
+
+            elif process_type == "standalone":
+                service_instance = self._spawn_standalone_process(process_id, name, module, cls, config)
 
             elif process_type == "immediate":
                 service_instance = self._spawn_immediate_process(process_id, name, module, cls, config)
@@ -177,6 +182,19 @@ class ProcManager(object):
         Attach to service pid.
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
+        if not isinstance(service_instance, ResourceAgent):
+            raise ContainerConfigError("Agent process must extend ResourceAgent")
+        self._service_init(service_instance)
+        self._set_service_endpoint(service_instance, service_instance.id)
+        self._service_start(service_instance)
+        return service_instance
+
+    def _spawn_standalone_process(self, process_id, name, module, cls, config):
+        """
+        Spawn a process acting as standalone process.
+        Attach to service pid.
+        """
+        service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
@@ -205,7 +223,8 @@ class ProcManager(object):
     def _create_service_instance(self, process_id, name, module, cls, config):
         # SERVICE INSTANCE.
         service_instance = for_name(module, cls)
-        assert isinstance(service_instance, BaseService), "Instantiated service not a BaseService %r" % service_instance
+        if not isinstance(service_instance, BaseService):
+            raise ContainerConfigError("Instantiated service not a BaseService %r" % service_instance)
 
         # Prepare service instance
         service_instance.errcause = ""
