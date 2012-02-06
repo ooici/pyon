@@ -4,9 +4,10 @@
 
 from pyon.container.cc import Container
 from pyon.core.bootstrap import bootstrap_pyon, service_registry
-from pyon.util.containers import DotDict
+from pyon.util.containers import DotDict, dict_merge, DictModifier
 from pyon.util.log import log
 from mock import patch
+from pyon.public import CFG
 
 from contextlib import contextmanager
 import unittest
@@ -44,6 +45,14 @@ class IonIntegrationTestCase(unittest.TestCase):
         # hack to force queue auto delete on for int tests
         self._turn_on_queue_auto_delete()
         self._patch_out_diediedie()
+        import os
+        db_type = os.environ.get('DB_TYPE', None)
+        if not db_type:
+            pass
+        elif db_type == 'MOCK':
+            self._turn_on_mockdb()
+        elif db_type == 'COUCH':
+            self._turn_on_couchdb()
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
@@ -112,3 +121,26 @@ class IonIntegrationTestCase(unittest.TestCase):
             mod = servicecls.__module__
             cls = servicecls.__name__
         self.container.spawn_process(servicename, mod, cls, config)
+
+    def _patch_config(self, config):
+        patcher = patch('pyon.container.apps.CFG', config)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher2 = patch('pyon.directory.directory.CFG', config)
+        patcher2.start()
+        self.addCleanup(patcher2.stop)
+
+    def _turn_on_couchdb(self):
+
+        override_cfg = {'directory':{'persistent':True, 'force_clean':True},
+                     'datastore':{'persistent':True, 'force_clean':True},
+                     'resource_registry':{'persistent':True, 'force_clean':True}}
+        cfg = DictModifier(CFG, override_cfg)
+        self._patch_config(cfg)
+
+    def _turn_on_mockdb(self):
+        override_cfg = {'directory':{'persistent':False, 'force_clean':True},
+                     'datastore':{'persistent':False, 'force_clean':True},
+                     'resource_registry':{'persistent':False, 'force_clean':True}}
+        cfg = DictModifier(CFG, override_cfg)
+        self._patch_config(cfg)
