@@ -53,6 +53,8 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._turn_on_mockdb()
         elif db_type == 'COUCH':
             self._turn_on_couchdb()
+        if os.environ.get('CEI_LAUNCH', None):
+            self._patch_out_start_rel()
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
@@ -144,3 +146,10 @@ class IonIntegrationTestCase(unittest.TestCase):
                      'resource_registry':{'persistent':False, 'force_clean':True}}
         cfg = DictModifier(CFG, override_cfg)
         self._patch_config(cfg)
+
+    def _patch_out_start_rel(self):
+        def start_rel_from_url(*args, **kwargs):
+            pass
+        patcher = patch('pyon.container.apps.AppManager.start_rel_from_url', start_rel_from_url)
+        patcher.start()
+        self.addCleanup(patcher.stop)
