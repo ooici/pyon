@@ -8,7 +8,7 @@ from pyon.util.containers import DotDict, dict_merge, DictModifier
 from pyon.util.log import log
 from mock import patch
 from pyon.public import CFG
-
+from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from contextlib import contextmanager
 import unittest
 
@@ -53,7 +53,7 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._turn_on_mockdb()
         elif db_type == 'COUCH':
             self._turn_on_couchdb()
-        if os.environ.get('CEI_LAUNCH', None):
+        if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
         self.container = None
         self.addCleanup(self._stop_container)
@@ -149,7 +149,19 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
-            pass
+            # Force clean Couch in between tests, which is taken care of normally during process_start.
+            from pyon.core.bootstrap import sys_name
+            things_to_clean = ["%s_%s" % (sys_name, thing_name) for thing_name in ('resources', 'scratch')]
+            couch_datastore = CouchDB_DataStore()
+            try:
+                for thing in things_to_clean:
+                    couch_datastore.delete_datastore(datastore_name=thing)
+                    couch_datastore.create_datastore(datastore_name=thing)
+            finally:
+                couch_datastore.close()
+
+            return True
+
         patcher = patch('pyon.container.apps.AppManager.start_rel_from_url', start_rel_from_url)
         patcher.start()
         self.addCleanup(patcher.stop)
