@@ -13,6 +13,8 @@ from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
 from pyon.util.async import  spawn
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 
+from pyon.core import bootstrap
+
 class ProcessPublisher(Publisher):
     def __init__(self, process=None, **kwargs):
         self._process = process
@@ -179,21 +181,20 @@ class StreamSubscriberRegistrar(object):
     def __init__(self, process=None, node=None):
         self.process = process
         self.node = node
-        self.pubsub_client = PubsubManagementServiceProcessClient(process=process, node=node)
-
         self._subscriber_cnt = 0
 
         xs_dot_xp = CFG.core_xps.science_data
         try:
-            self.XS, self.XP = xs_dot_xp.split('.')
+            self.XS, xp_base = xs_dot_xp.split('.')
+            self.XP = '.'.join([bootstrap.sys_name, xp_base])
+
         except ValueError:
             raise PublisherError('Invalid CFG for core_xps.science_data: "%s"; must have "xs.xp" structure' % xs_dot_xp)
 
 
     def create_subscriber(self, exchange_name=None, callback=None):
         """
-        This method creates a new subscriber, a new exchange_name if it does not already exist, and a new subscription
-        if a query is provided.
+        This method creates a new subscriber, a new exchange_name if it does not already exist.
         """
 
         if not exchange_name:
