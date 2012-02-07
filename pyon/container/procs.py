@@ -326,7 +326,7 @@ class ProcManager(object):
         # find the proc
         lp = list(self.proc_sup.children)
         lps = [p for p in lp if p.listener._process == service_instance]
-        assert len(lps) > 0
+
 
         for p in lps:
             p.notify_stop()
