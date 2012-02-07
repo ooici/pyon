@@ -461,18 +461,18 @@ class SubscriberEndpointUnit(EndpointUnit):
 
 
 class Subscriber(ListeningBaseEndpoint):
+    """
+    Subscribes to messages.
+
+    The Subscriber is flexible in that it lets you subscribe to a known queue, or an anonymous
+    queue with a binding, but you must make sure to use the correct calls to set that up.
+
+    Known queue:  name=(xp, thename), binding=None
+    New queue:    name=None or (xp, None), binding=your binding
+    """
 
     endpoint_unit_type = SubscriberEndpointUnit
     channel_type = SubscriberChannel
-
-    def _setup_listener(self, name, binding=None):
-        """
-        Override for setup_listener to make sure we are listening on an anonymous queue.
-        @TODO: correct? XXX SEEMS WRONG
-        # It is wrong!!!
-        """
-        # we expect (xp, name) and binding=name
-        ListeningBaseEndpoint._setup_listener(self, name, binding=binding)
 
     def __init__(self, callback=None, **kwargs):
         """

@@ -125,14 +125,6 @@ class EventSubscriber(Subscriber):
 
         Subscriber.__init__(self, name=name, binding=binding, callback=callback, **kwargs)
 
-    def _setup_listener(self, name, binding=None):
-        """
-        Override Subscriber - we may have specified a queue name.
-
-        XXX BASECLASS SEEMS WRONG
-        """
-        ListeningBaseEndpoint._setup_listener(self, name, binding=binding)
-
 #############################################################################
 #
 # Specific EventPublisher and EventSubscriber pairs
