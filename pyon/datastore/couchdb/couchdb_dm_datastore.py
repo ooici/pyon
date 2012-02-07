@@ -75,9 +75,13 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
                 },
                 "posts_join_comments": {
                     "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
+                },
+                "posts_by_author_date": {
+                    "map": "function(doc) {\n  if(doc.type_==\"BlogPost\")\n    emit([doc.author.name,doc.updated,doc.post_id], doc.post_id);\n  else if(doc.type==\"BlogComment\")\n    emit([doc.author.name,doc.updated,doc.ref_id], doc.ref_id);\n}"
                 }
-
         }
+
+                
 
     def query_view(self, view_name='', opts={}, datastore_name=''):
         if not datastore_name:
