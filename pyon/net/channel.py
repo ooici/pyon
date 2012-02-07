@@ -471,8 +471,8 @@ class RecvChannel(BaseChannel):
 
         # prepend xp name in the queue for anti-clobbering
         if queue:
-            log.debug('Auto-prepending sysname to queue name for anti-clobbering')
             queue = ".".join([self._recv_name[0], queue])
+            log.debug('Auto-prepending xp to queue name for anti-clobbering: %s', queue)
 
         self._ensure_amq_chan()
 
