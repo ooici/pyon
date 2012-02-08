@@ -886,17 +886,19 @@ class CouchDB_DataStore(DataStore):
         """
         @brief Generic find function using an defined index
         """
-        log.debug("find_by_view()")
+        log.debug("find_by_view(%s/%s)" % (design_name, view_name))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         db = self.server[self.datastore_name]
         kwargs = {}
+        kwargs['include_docs'] = (not id_only)
         if max_res > 0:
             kwargs['limit'] = max_res
         if reverse:
             kwargs['descending'] = True
         # TODO: Add more view params (see http://wiki.apache.org/couchdb/HTTP_view_API)
-        view = db.view(self._get_viewname(design_name, view_name), include_docs=(not id_only), **kwargs)
+        view_doc = design_name if design_name == "_all_docs" else self._get_viewname(design_name, view_name)
+        view = db.view(view_doc, **kwargs)
         key = start_key or []
         endkey = end_key or []
         endkey.append(END_MARKER)

@@ -270,7 +270,8 @@ class ProcManager(object):
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name,
+                                    proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_set_service_endpoint for listen_name: %s" % listen_name)
 
         # map gproc to service_instance
@@ -285,7 +286,8 @@ class ProcManager(object):
 
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name)
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name,
+                                    proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, '_set_subscription_endpoint for listen_name: %s' % listen_name)
 
         # map gproc to service_instance
@@ -294,7 +296,6 @@ class ProcManager(object):
         log.debug("Process %s stream listener ready: %s", service_instance.id, listen_name)
 
     def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
-
         service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, node=self.container.node)
 
         publisher_streams = publisher_streams or {}
@@ -304,8 +305,6 @@ class ProcManager(object):
             pub = service_instance.stream_publisher_registrar.create_publisher(stream_id)
 
             setattr(service_instance, name, pub)
-
-
 
     def _register_process(self, service_instance, name):
         # Add to local process dict
