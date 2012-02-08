@@ -13,8 +13,10 @@ from pyon.util.log import log
 from mock import patch
 from pyon.public import CFG
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from contextlib import contextmanager
 import unittest
+import os
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
@@ -49,7 +51,6 @@ class IonIntegrationTestCase(unittest.TestCase):
         # hack to force queue auto delete on for int tests
         self._turn_on_queue_auto_delete()
         self._patch_out_diediedie()
-        import os
         db_type = os.environ.get('DB_TYPE', None)
         if not db_type:
             pass
@@ -71,6 +72,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
+        self._force_clean()
+
 
     def _turn_on_queue_auto_delete(self):
         patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
@@ -150,19 +153,23 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
-            # Force clean Couch in between tests, which is taken care of normally during process_start.
-            from pyon.core.bootstrap import sys_name
-            things_to_clean = ["%s_%s" % (str(sys_name).lower(), thing_name) for thing_name in ('resources', 'objects')]
-            couch_datastore = CouchDB_DataStore()
-            try:
-                for thing in things_to_clean:
-                    couch_datastore.delete_datastore(datastore_name=thing)
-                    couch_datastore.create_datastore(datastore_name=thing)
-            finally:
-                couch_datastore.close()
-
             return True
 
         patcher = patch('pyon.container.apps.AppManager.start_rel_from_url', start_rel_from_url)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def _force_clean(self):
+    # Force clean Couch in between tests, which is taken care of normally during process_start.
+        from pyon.core.bootstrap import sys_name
+        things_to_clean = ["%s_%s" % (str(sys_name).lower(), thing_name) for thing_name in ('resources', 'objects', 'directory', 'events', 'state')]
+        if CFG.system.mockdb:
+            datastore = MockDB_DataStore()
+        else:
+            datastore = CouchDB_DataStore()
+        try:
+            for thing in things_to_clean:
+                datastore.delete_datastore(datastore_name=thing)
+                datastore.create_datastore(datastore_name=thing)
+        finally:
+            datastore.close()
