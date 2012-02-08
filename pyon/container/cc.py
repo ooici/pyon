@@ -113,9 +113,9 @@ class Container(BaseContainerAgent):
         self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
 
 
-        # Instantiate Directory singleton and self-register
+        # Instantiate Directory and self-register
         # TODO: At this point, there is no special config override
-        self.directory = Directory.get_instance(self.datastore_manager)
+        self.directory = Directory(self.datastore_manager)
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         self.proc_manager.start()
