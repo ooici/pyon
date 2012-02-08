@@ -43,9 +43,9 @@ from pyon.service.service import BaseService
 __all__ += ['BaseService']
 
 from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, \
-                                ProcessSubscriber, ProcessPublisher
+                                ProcessSubscriber, ProcessPublisher, StreamSubscriberRegistrar, StreamPublisherRegistrar
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
-            'ProcessSubscriber', 'ProcessPublisher']
+            'ProcessSubscriber', 'ProcessPublisher', StreamSubscriberRegistrar, StreamPublisherRegistrar]
 
 from pyon.ion.resource import ResourceTypes, RT, PredicateType, PRED, LifeCycleStates, LCS, LCE
 __all__ += ['RT', 'PRED', 'LCS', 'LCE']
