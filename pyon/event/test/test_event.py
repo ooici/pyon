@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.datastore.datastore import DatastoreManager
 
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -127,11 +128,18 @@ class TestEventPublisher(IonUnitTestCase):
 
     def test_publish_event(self):
         self._pub.publish = Mock()
-        self._pub.event_repo = Mock()
 
         self._pub.publish_event(sentinel.event_msg, origin=sentinel.origin)
         self._pub.publish.assert_called_once_with(sentinel.event_msg, to_name=(get_events_exchange_point(), self._pub._topic(sentinel.origin)))
         self._pub.publish().close.assert_called_once_with()
+
+    def test_publish_event_with_event_repo(self):
+        self._pub.publish = Mock()
+        self._pub.event_repo = Mock()
+
+        self._pub.publish_event(sentinel.event_msg, origin=sentinel.origin)
+
+        self._pub.event_repo.put_event.assert_called_once_with(sentinel.event_msg)
 
     def test_create_and_publish_event(self):
         self._pub.create_event = Mock()
@@ -140,7 +148,7 @@ class TestEventPublisher(IonUnitTestCase):
 
         self._pub.create_and_publish_event(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
 
-        self._pub.create_event.assert_called_once_with(field=sentinel.value, field2=sentinel.value2)
+        self._pub.create_event.assert_called_once_with(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
         self._pub.publish_event.assert_called_once_with(sentinel.event_msg, origin=sentinel.origin)
 
 @attr('UNIT')
@@ -232,6 +240,13 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(evmsg.description, "hello")
         self.assertAlmostEquals(evmsg.ts_created, time.time(), delta=5000)
 
+    def test_pub_with_event_repo(self):
+        pub = self.TestEventPublisher(node=self.container.node, event_repo=self.container.event_repository)
+        pub.create_and_publish_event(origin="specifics", description="hallo")
+
+        evs = self.container.event_repository.find_events(origin='specifics')
+        self.assertEquals(len(evs), 1)
+
     def test_pub_on_different_origins(self):
         ar = event.AsyncResult()
         gq = queue.Queue()
@@ -320,9 +335,10 @@ class TestEventRepository(IonUnitTestCase):
         if bootstrap.CFG.system.mockdb:
             raise SkipTest("only works with CouchDB views")
 
-        event_repo = EventRepository.get_instance()
-        event_repo1 = EventRepository.get_instance()
-        self.assertEquals(event_repo, event_repo1)
+        dsm = DatastoreManager()
+
+        event_repo = EventRepository(dsm)
+        event_repo1 = EventRepository(dsm)
 
         event1 = Event(origin="resource1")
         event_id, _ = event_repo.put_event(event1)

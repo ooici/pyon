@@ -15,7 +15,7 @@ class DataStore(object):
     Every instance is a different schema.
     Every type of ION object is a table
     """
-    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','SCIDATA','BASIC']
+    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     EQUAL = '=='
@@ -397,23 +397,25 @@ class DataStore(object):
 
 class DatastoreManager(object):
     """
-    Simple manager for datastore instances. Static use.
+    Container manager for datastore instances.
     """
 
-    datastores = {}
+    def __init__(self):
+        self._datastores = {}
 
-    @classmethod
-    def get_datastore(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
+    def get_datastore(self, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
         """
         Factory method to get a datastore instance from given name, profile and config.
         This is the central point to cache these instances, to decide persistent or mock
         and to force clean the store on first use.
+        @param ds_name  Logical name of datastore (will be scoped with sysname)
         @param profile  One of known constants determining the use of the store
+        @param config  Override config to use
         """
         assert ds_name, "Must provide ds_name"
-        if ds_name in DatastoreManager.datastores:
+        if ds_name in self._datastores:
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
-            return DatastoreManager.datastores[ds_name]
+            return self._datastores[ds_name]
 
         scoped_name = ("%s_%s" % (sys_name, ds_name)).lower()
 
@@ -451,6 +453,19 @@ class DatastoreManager(object):
         new_ds.local_name = ds_name
         new_ds.ds_profile = profile
 
-        DatastoreManager.datastores[ds_name] = new_ds
+        self._datastores[ds_name] = new_ds
 
         return new_ds
+
+    def start(self):
+        pass
+
+    def stop(self):
+        log.debug("DatastoreManager.stop() [%d datastores]", len(self._datastores))
+        for x in self._datastores.itervalues():
+            try:
+                x.close()
+            except Exception as ex:
+                log.exception("Error closing datastore")
+
+        self._datastores = {}
