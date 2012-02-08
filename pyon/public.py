@@ -33,8 +33,8 @@ __all__ += ['iex']
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessSupervisor
-__all__ += ['IonProcessSupervisor']
+from pyon.ion.process import IonProcessSupervisor, SimpleProcess, StandaloneProcess, ImmediateProcess
+__all__ += ['IonProcessSupervisor', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
 
 from pyon.container.cc import Container
 __all__ += ['Container']

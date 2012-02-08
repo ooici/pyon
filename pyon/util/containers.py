@@ -141,6 +141,20 @@ def dict_merge(a, b):
                     current_dst[key] = current_src[key]
     return dst
 
+def get_safe(dict_instance, keypath):
+    """
+    Returns a value with in a nested dict structure from a dot separated
+    path expression such as "system.server.host"
+    @retval Value if found or None
+    """
+    try:
+        obj = dict_instance
+        for key in keypath.split('.'):
+            obj = obj[key]
+        return obj
+    except Exception, ex:
+        return None
+
 def named_any(name):
     """
     Retrieve a Python object by its fully qualified name from the global Python

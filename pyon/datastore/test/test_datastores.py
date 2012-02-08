@@ -31,7 +31,7 @@ class Test_DataStores(IonIntegrationTestCase):
     def test_persistent(self):
         import socket
         try:
-            ds = CouchDB_DataStore(datastore_name='my_ds')
+            ds = CouchDB_DataStore(datastore_name='my_ds', profile=DataStore.DS_PROFILE.RESOURCES)
             self._do_test(ds)
 
             # CouchDB does not like upper case characters for database names
@@ -74,7 +74,7 @@ class Test_DataStores(IonIntegrationTestCase):
             with self.assertRaises(BadRequest):
                 ds.resolve_idref_doc("Subject", "Predicate", "Object", "BadDataStoreNamePerCouchDB")
 
-            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds'), is_persistent=True)
+            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
 

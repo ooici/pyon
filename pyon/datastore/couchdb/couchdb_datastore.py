@@ -25,18 +25,11 @@ class CouchDB_DataStore(DataStore):
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
-    couchdb_views = get_couchdb_views('all')
-
-    def __init__(self, host=None, port=None, datastore_name='prototype', options=""):
-        log.debug('host %s port %s data store name %s options %s' % (host, port, datastore_name, options))
-        try:
-            self.host = host or CFG.server.couchdb.host
-        except AttributeError:
-            self.host = 'localhost'
-        try:
-            self.port = port or CFG.server.couchdb.port
-        except AttributeError:
-            self.port = 5984
+    def __init__(self, host=None, port=None, datastore_name='prototype', options="", profile=DataStore.DS_PROFILE.BASIC):
+        log.debug('__init__(host=%s, port=%s, datastore_name=%s, options=%s' % (host, port, datastore_name, options))
+        self.host = host or CFG.server.couchdb.host
+        self.port = port or CFG.server.couchdb.port
+        # The scoped name of the datastore
         self.datastore_name = datastore_name
         self.auth_str = ""
         try:
@@ -52,6 +45,9 @@ class CouchDB_DataStore(DataStore):
         log.info('Connecting to CouchDB server: %s' % connection_str)
         self.server = couchdb.Server(connection_str)
 
+        # Datastore specialization
+        self.profile = profile
+
         # serializers
         self._io_serializer     = IonObjectSerializer()
         self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
@@ -61,10 +57,11 @@ class CouchDB_DataStore(DataStore):
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
 
-    def create_datastore(self, datastore_name="", create_indexes=True):
+    def create_datastore(self, datastore_name="", create_indexes=True, profile=None):
         if not datastore_name:
             datastore_name = self.datastore_name
-        log.info('Creating data store %s' % datastore_name)
+        profile = profile or self.profile
+        log.info('Creating data store %s with profile=%s' % (datastore_name, profile))
         if self.datastore_exists(datastore_name):
             raise BadRequest("Data store with name %s already exists" % datastore_name)
         try:
@@ -72,7 +69,7 @@ class CouchDB_DataStore(DataStore):
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
         if create_indexes:
-            self._define_views(datastore_name)
+            self._define_views(datastore_name, profile)
 
     def delete_datastore(self, datastore_name=""):
         if not datastore_name:
@@ -594,10 +591,12 @@ class CouchDB_DataStore(DataStore):
     def _get_viewname(self, design, name):
         return "_design/%s/_view/%s" % (design, name)
 
-    def _define_views(self, datastore_name=""):
+    def _define_views(self, datastore_name="", profile=None):
         if not datastore_name:
             datastore_name = self.datastore_name
-        for design, viewdef in self.couchdb_views.iteritems():
+
+        ds_views = get_couchdb_views(profile)
+        for design, viewdef in ds_views.iteritems():
             self._define_view(design, viewdef, datastore_name=datastore_name)
 
     def _define_view(self, design, viewdef, datastore_name=""):
@@ -610,12 +609,15 @@ class CouchDB_DataStore(DataStore):
             pass
         db["_design/%s" % design] = dict(views=viewdef)
 
-    def _update_views(self, datastore_name=""):
+    def _update_views(self, datastore_name="", profile=None):
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
 
-        for design, viewdef in self.couchdb_views.iteritems():
+        profile = profile or self.profile
+        ds_views = get_couchdb_views(profile)
+
+        for design, viewdef in ds_views.iteritems():
             for viewname in viewdef:
                 try:
                     rows = db.view("_design/%s/_view/%s" % (design, viewname))
@@ -625,11 +627,15 @@ class CouchDB_DataStore(DataStore):
 
     _refresh_views = _update_views
 
-    def _delete_views(self, datastore_name=""):
+    def _delete_views(self, datastore_name="", profile=None):
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
-        for design, viewdef in self.couchdb_views.iteritems():
+
+        profile = profile or self.profile
+        ds_views = get_couchdb_views(profile)
+
+        for design, viewdef in ds_views.iteritems():
             try:
                 del db["_design/%s" % design]
             except ResourceNotFound:
@@ -654,6 +660,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not subject:
             raise BadRequest("Must provide subject")
         db = self.server[self.datastore_name]
@@ -694,6 +702,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False):
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, obj, id_only))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not obj:
             raise BadRequest("Must provide object")
         db = self.server[self.datastore_name]
@@ -734,6 +744,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if subject and obj or predicate:
             pass
         else:
@@ -778,6 +790,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_res_by_type(self, restype, lcstate=None, id_only=False):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         db = self.server[self.datastore_name]
         view = db.view(self._get_viewname("resource","by_type"), include_docs=(not id_only))
         if restype:
@@ -801,6 +815,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
         log.debug("find_res_by_lcstate(lcstate=%s, restype=%s)" % (lcstate, restype))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         db = self.server[self.datastore_name]
         view = db.view(self._get_viewname("resource","by_lcstate"), include_docs=(not id_only))
         is_hierarchical = (lcstate in ResourceLifeCycleSM.STATE_ALIASES)
@@ -830,6 +846,8 @@ class CouchDB_DataStore(DataStore):
 
     def find_res_by_name(self, name, restype=None, id_only=False):
         log.debug("find_res_by_name(name=%s, restype=%s)" % (name, restype))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         db = self.server[self.datastore_name]
         view = db.view(self._get_viewname("resource","by_name"), include_docs=(not id_only))
         key = [name]

@@ -11,20 +11,20 @@ from pyon.core.bootstrap import CFG, bootstrap_pyon
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
-from pyon.directory.directory import Directory
+from pyon.ion.directory import Directory
 from pyon.net.endpoint import ProcessRPCServer
 from pyon.net import messaging
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
 from interface.services.icontainer_agent import BaseContainerAgent
-import os
 
+import atexit
+import msgpack
+import os
+import signal
 import string
 
-import msgpack
-import atexit
-import signal
 
 class Container(BaseContainerAgent):
     """
@@ -109,7 +109,7 @@ class Container(BaseContainerAgent):
 
         # Instantiate Directory singleton and self-register
         # TODO: At this point, there is no special config override
-        self.directory = Directory()
+        self.directory = Directory.get_instance()
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         self.proc_manager.start()

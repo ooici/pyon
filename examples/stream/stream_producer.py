@@ -5,10 +5,10 @@ __author__ = 'Michael Meisinger'
 import time
 import threading
 
-from pyon.public import log, BaseService, ProcessPublisher
+from pyon.public import log, ProcessPublisher, SimpleProcess
 
 """
-@author Micahel Meisinger
+@author Michael Meisinger
 @author David Stuebe
 @author Luke Campbell
 
@@ -20,7 +20,7 @@ To start the producer in the pycc shell:
 id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"agent"},'stream_producer':{'interval':4000,'routing_key':'glider_data'}})
 """
 
-class StreamProducer(BaseService):
+class StreamProducer(SimpleProcess):
     """
     StreamProducer is not a stream process. A stream process is defined by a having an input stream which is processed.
     The Stream Producer takes the part of an agent pushing data into the system.

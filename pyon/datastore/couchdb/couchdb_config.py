@@ -3,19 +3,31 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+
+from pyon.datastore.datastore import DataStore
+
 COUCHDB_CONFIGS = {
-    'object_store':{
+    DataStore.DS_PROFILE.OBJECTS:{
         'views': ['object','association']
     },
-    'resource_store':{
+    DataStore.DS_PROFILE.RESOURCES:{
         'views': ['resource','association']
     },
-    'directory_store':{
-        'views': ['directory']
+    DataStore.DS_PROFILE.DIRECTORY:{
+        'views': ['directory','association']
     },
-    'all':{
-        'views': ['object', 'resource', 'association', 'directory']
-    }
+    DataStore.DS_PROFILE.EVENTS:{
+        'views': []
+    },
+    DataStore.DS_PROFILE.STATE:{
+        'views': []
+    },
+    DataStore.DS_PROFILE.SCIDATA:{
+        'views': []
+    },
+    DataStore.DS_PROFILE.BASIC:{
+        'views': []
+    },
 }
 
 COUCHDB_VIEWS = {

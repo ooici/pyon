@@ -200,8 +200,8 @@ def lsdir(qname='/', truncate=True):
     """Prints all directory entries below the given node.
     @param qname the directory node (must start with '/')
     """
-    from pyon.directory.directory import Directory
-    ds = Directory()
+    from pyon.ion.directory import Directory
+    ds = Directory.get_instance()
     delist = ds.find_entries(qname)
     detable = [(str(de._id), str(de.attributes)) for de in delist]
 
@@ -236,7 +236,6 @@ def get_proc():
 
 def define_vars():
     if public_vars: return public_vars
-    from pyon.core.bootstrap import CFG, sys_name, obj_registry
     cc = container
     proc, pn = get_proc()
 

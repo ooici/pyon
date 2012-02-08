@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
-__author__ = 'Thomas R. Lennan'
+__author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from pyon.core.bootstrap import sys_name
+from pyon.core.exception import BadRequest, NotFound
+from pyon.util.containers import DotDict, get_ion_ts, get_safe
 from pyon.util.log import log
-from pyon.util.containers import DotDict, get_ion_ts
-from pyon.core.exception import BadRequest
+
 
 class DataStore(object):
     """
@@ -13,8 +15,8 @@ class DataStore(object):
     Every instance is a different schema.
     Every type of ION object is a table
     """
-    DS_CONFIG_LIST = ['object_store','resource_store','directory_store','all']
-    DATASTORE_CONFIG = DotDict(zip(DS_CONFIG_LIST,DS_CONFIG_LIST))
+    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','SCIDATA','BASIC']
+    DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     EQUAL = '=='
     NOT_EQUAL = '!='
@@ -391,3 +393,64 @@ class DataStore(object):
             return self.find_res_by_lcstate(lcstate, restype, id_only)
         elif not restype and not lcstate and not name:
             return self.find_res_by_type(None, None, id_only)
+
+
+class DatastoreManager(object):
+    """
+    Simple manager for datastore instances. Static use.
+    """
+
+    datastores = {}
+
+    @classmethod
+    def get_datastore(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
+        """
+        Factory method to get a datastore instance from given name, profile and config.
+        This is the central point to cache these instances, to decide persistent or mock
+        and to force clean the store on first use.
+        @param profile  One of known constants determining the use of the store
+        """
+        assert ds_name, "Must provide ds_name"
+        if ds_name in DatastoreManager.datastores:
+            log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
+            return DatastoreManager.datastores[ds_name]
+
+        scoped_name = ("%s_%s" % (sys_name, ds_name)).lower()
+
+        # Imports here to prevent cyclic module dependency
+        from pyon.core.bootstrap import CFG
+
+        config = config or CFG
+
+        persistent = not bool(get_safe(config, "system.mockdb"))
+        force_clean = bool(get_safe(config, "system.force_clean"))
+
+        log.info("get_datastore(): Create instance of store '%s' {persistent=%s, force_clean=%s, scoped_name=%s}" % (
+                ds_name, persistent, force_clean, scoped_name))
+
+        # Persistent (CouchDB) or MockDB?
+        if persistent:
+            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+            new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
+        else:
+            from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
+            new_ds = MockDB_DataStore(datastore_name=scoped_name, profile=profile)
+
+        # Clean the store instance
+        if force_clean:
+            try:
+                new_ds.delete_datastore(scoped_name)
+            except NotFound as nf:
+                pass
+
+        # Create store if not existing
+        if not new_ds.datastore_exists(scoped_name):
+            new_ds.create_datastore(scoped_name)
+
+        # Set a few standard datastore instance fields
+        new_ds.local_name = ds_name
+        new_ds.ds_profile = profile
+
+        DatastoreManager.datastores[ds_name] = new_ds
+
+        return new_ds

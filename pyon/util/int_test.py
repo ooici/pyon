@@ -128,7 +128,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher = patch('pyon.container.apps.CFG', config)
         patcher.start()
         self.addCleanup(patcher.stop)
-        patcher2 = patch('pyon.directory.directory.CFG', config)
+        patcher2 = patch('pyon.ion.directory.CFG', config)
         patcher2.start()
         self.addCleanup(patcher2.stop)
 
