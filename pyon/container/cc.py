@@ -20,6 +20,7 @@ from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
 from interface.services.icontainer_agent import BaseContainerAgent
+from pyon.datastore.datastore import DatastoreManager
 
 import atexit
 import msgpack
@@ -70,6 +71,9 @@ class Container(BaseContainerAgent):
 
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
+
+        # DatastoreManager - controls access to Datastores (both mock and couch backed)
+        self.datastore_manager = DatastoreManager()
         
         log.debug("Container initialized, OK.")
 
@@ -111,7 +115,7 @@ class Container(BaseContainerAgent):
 
         # Instantiate Directory singleton and self-register
         # TODO: At this point, there is no special config override
-        self.directory = Directory.get_instance()
+        self.directory = Directory.get_instance(self.datastore_manager)
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         self.proc_manager.start()
@@ -119,8 +123,8 @@ class Container(BaseContainerAgent):
         self.app_manager.start()
 
         # Create other repositories
-        self.state_repository = StateRepository.get_instance()
-        self.event_repository = EventRepository.get_instance()
+        self.state_repository = StateRepository.get_instance(self.datastore_manager)
+        self.event_repository = EventRepository.get_instance(self.datastore_manager)
 
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
@@ -199,6 +203,12 @@ class Container(BaseContainerAgent):
             self.state_repository.close()
         except Exception, ex:
             log.exception("Container stop(): Error closing state repository")
+
+        try:
+            # close any open connections to datastores
+            self.datastore_manager.close()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing datastore_manager")
 
         try:
             self.node.client.close()

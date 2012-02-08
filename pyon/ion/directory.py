@@ -19,7 +19,7 @@ class Directory(object):
     __instance = None
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, datastore_manager):
         """
         Create singleton instance
         """
@@ -30,16 +30,16 @@ class Directory(object):
         if Directory.__instance is None:
             Directory.__instance = "NEW"
             # Create and remember instance
-            Directory.__instance = Directory()
+            Directory.__instance = Directory(datastore_manager)
             assert Directory.__instance != "NEW", "Directory was not instantiated"
         return Directory.__instance
 
-    def __init__(self):
+    def __init__(self, datastore_manager):
         assert Directory.__instance == "NEW", "Cannot instantiate Directory multiple times"
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
-        self.dir_store = DatastoreManager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
+        self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
 
         self._init()
 

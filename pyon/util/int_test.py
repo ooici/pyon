@@ -70,14 +70,11 @@ class IonIntegrationTestCase(unittest.TestCase):
     def _stop_container(self):
         if self.container:
 
-            # clean up singletons, datastore connections
+            # clean up singletons
             # @TODO need to fix all of these
             Directory.__instance = None
             StateRepository.__instance = None
             EventRepository.__instance = None
-            for x in DatastoreManager.datastores.itervalues():
-                x.close()
-            DatastoreManager.datastores = {}
 
             self.container.stop()
             self.container = None

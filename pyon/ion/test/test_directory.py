@@ -6,13 +6,14 @@ __license__ = 'Apache 2.0'
 from pyon.ion.directory import Directory
 from pyon.util.unit_test import IonUnitTestCase
 from nose.plugins.attrib import attr
+from pyon.datastore.datastore import DatastoreManager
 
 
 @attr('UNIT',group='datastore')
 class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
-        directory_service = Directory.get_instance()
+        directory_service = Directory.get_instance(DatastoreManager())
 
         root = directory_service.lookup("/")
         self.assertEquals(root, None)

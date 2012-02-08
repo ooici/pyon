@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.datastore.datastore import DatastoreManager
 
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -320,8 +321,10 @@ class TestEventRepository(IonUnitTestCase):
         if bootstrap.CFG.system.mockdb:
             raise SkipTest("only works with CouchDB views")
 
-        event_repo = EventRepository.get_instance()
-        event_repo1 = EventRepository.get_instance()
+        dsm = DatastoreManager()
+
+        event_repo = EventRepository.get_instance(dsm)
+        event_repo1 = EventRepository.get_instance(dsm)
         self.assertEquals(event_repo, event_repo1)
 
         event1 = Event(origin="resource1")

@@ -397,13 +397,13 @@ class DataStore(object):
 
 class DatastoreManager(object):
     """
-    Simple manager for datastore instances. Static use.
+    Simple manager for datastore instances.
     """
 
-    datastores = {}
+    def __init__(self):
+        self._datastores = {}
 
-    @classmethod
-    def get_datastore(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
+    def get_datastore(self, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
         """
         Factory method to get a datastore instance from given name, profile and config.
         This is the central point to cache these instances, to decide persistent or mock
@@ -411,9 +411,9 @@ class DatastoreManager(object):
         @param profile  One of known constants determining the use of the store
         """
         assert ds_name, "Must provide ds_name"
-        if ds_name in DatastoreManager.datastores:
+        if ds_name in self._datastores:
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
-            return DatastoreManager.datastores[ds_name]
+            return self._datastores[ds_name]
 
         scoped_name = ("%s_%s" % (sys_name, ds_name)).lower()
 
@@ -451,6 +451,13 @@ class DatastoreManager(object):
         new_ds.local_name = ds_name
         new_ds.ds_profile = profile
 
-        DatastoreManager.datastores[ds_name] = new_ds
+        self._datastores[ds_name] = new_ds
 
         return new_ds
+
+    def close(self):
+        log.debug("DatastoreManager.close (%d datastores)", len(self._datastores))
+        for x in self._datastores.itervalues():
+            x.close()
+
+        self._datastores = {}

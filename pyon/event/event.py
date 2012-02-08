@@ -38,7 +38,9 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, name=name, **kwargs)
 
-        self.event_repo = EventRepository.get_instance()
+        # @TODO: not great at all
+        from pyon.container.cc import Container
+        self.event_repo = EventRepository.get_instance(Container.instance.datastore_manager)
 
     def _topic(self, origin):
         """
@@ -485,22 +487,22 @@ class EventRepository(object):
     __instance = None
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, datastore_manager):
         """
         Create singleton instance
         """
         if EventRepository.__instance is None:
             EventRepository.__instance = "NEW"
             # Create and remember instance
-            EventRepository.__instance = EventRepository()
+            EventRepository.__instance = EventRepository(datastore_manager)
         return EventRepository.__instance
 
-    def __init__(self):
+    def __init__(self, datastore_manager):
         assert EventRepository.__instance == "NEW", "Cannot instantiate EventRepository multiple times"
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
-        self.event_store = DatastoreManager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
+        self.event_store = datastore_manager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
 
     def close(self):
         """

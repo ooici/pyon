@@ -201,7 +201,7 @@ def lsdir(qname='/', truncate=True):
     @param qname the directory node (must start with '/')
     """
     from pyon.ion.directory import Directory
-    ds = Directory.get_instance()
+    ds = Directory.get_instance(container.datastore_manager)
     delist = ds.find_entries(qname)
     detable = [(str(de._id), str(de.attributes)) for de in delist]
 
