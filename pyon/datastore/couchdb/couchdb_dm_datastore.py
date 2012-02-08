@@ -9,7 +9,9 @@ from couchdb.client import ViewResults, Row
 from pyon.core.exception import BadRequest
 from pyon.util.log import log
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.datastore.datastore import DataStore
 import pyon.datastore.couchdb.couchdb_config as couch_config
+
 import hashlib
 
 COUCHDB_CONFIGS = couch_config.COUCHDB_CONFIGS
@@ -19,7 +21,7 @@ def get_couchdb_views(config):
     if config in COUCHDB_CONFIGS:
         store_config = COUCHDB_CONFIGS[config]
     else:
-        store_config = COUCHDB_CONFIGS['all']
+        store_config = COUCHDB_CONFIGS[DataStore.DS_PROFILE.BASIC]
     views = store_config['views']
     res_views = {}
     for view in views:
@@ -168,7 +170,7 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
 
 
 
-    def _define_views(self, datastore_name=""):
+    def _define_views(self, datastore_name="", profile=None):
         if not datastore_name:
             datastore_name = self.datastore_name
 
