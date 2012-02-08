@@ -25,9 +25,6 @@ COUCHDB_CONFIGS = {
     DataStore.DS_PROFILE.SCIDATA:{
         'views': []
     },
-    DataStore.DS_PROFILE.DM: {
-        'views':[]
-    },
     DataStore.DS_PROFILE.EXAMPLES:{
         'views':['posts']
     },
