@@ -881,6 +881,41 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_dir_entries() found %s objects" % (len(res_entries)))
         return res_entries
 
+    def find_by_view(self, design_name, view_name, start_key=None, end_key=None,
+                           max_res=0, reverse=False, id_only=True, convert_doc=True):
+        """
+        @brief Generic find function using an defined index
+        """
+        log.debug("find_by_view()")
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        db = self.server[self.datastore_name]
+        kwargs = {}
+        if max_res > 0:
+            kwargs['limit'] = max_res
+        if reverse:
+            kwargs['descending'] = True
+        # TODO: Add more view params (see http://wiki.apache.org/couchdb/HTTP_view_API)
+        view = db.view(self._get_viewname(design_name, view_name), include_docs=(not id_only), **kwargs)
+        key = start_key or []
+        endkey = end_key or []
+        endkey.append(END_MARKER)
+        if reverse:
+            rows = view[endkey:key]
+        else:
+            rows = view[key:endkey]
+
+        if id_only:
+            res_rows = [(row['id'],row['key'], None) for row in rows]
+        else:
+            if convert_doc:
+                res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['doc'])) for row in rows]
+            else:
+                res_rows = [(row['id'],row['key'],row['doc']) for row in rows]
+
+        log.debug("find_by_view() found %s objects" % (len(res_rows)))
+        return res_rows
+
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
 

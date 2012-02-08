@@ -17,7 +17,7 @@ COUCHDB_CONFIGS = {
         'views': ['directory','association']
     },
     DataStore.DS_PROFILE.EVENTS:{
-        'views': []
+        'views': ['event']
     },
     DataStore.DS_PROFILE.STATE:{
         'views': []
@@ -156,6 +156,42 @@ function(doc) {
   if (doc.type_ == "DirEntry") {
     if (doc.parent.indexOf('/') != 0) return;
     emit([doc.key, doc.parent], doc);
+  }
+}""",
+        },
+    },
+
+    # Event related objects
+    'event':{
+        'by_time':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.ts_created]);
+  }
+}""",
+            },
+        'by_type':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.type_, doc.ts_created]);
+  }
+}""",
+        },
+        'by_origin':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.origin, doc.ts_created]);
+  }
+}""",
+        },
+        'by_origintype':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.origin, doc.type_, doc.ts_created]);
   }
 }""",
         },

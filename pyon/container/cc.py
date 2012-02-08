@@ -11,7 +11,9 @@ from pyon.core.bootstrap import CFG, bootstrap_pyon
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
+from pyon.event.event import EventRepository
 from pyon.ion.directory import Directory
+from pyon.ion.state import StateRepository
 from pyon.net.endpoint import ProcessRPCServer
 from pyon.net import messaging
 from pyon.util.log import log
@@ -116,6 +118,10 @@ class Container(BaseContainerAgent):
 
         self.app_manager.start()
 
+        # Create other repositories
+        self.state_repository = StateRepository.get_instance()
+        self.event_repository = EventRepository.get_instance()
+
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
 
@@ -181,6 +187,18 @@ class Container(BaseContainerAgent):
             self.directory.close()
         except Exception, ex:
             log.exception("Container stop(): Error closing directory")
+
+        try:
+            # close event repository (possible CouchDB connection)
+            self.event_repository.close()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing event repository")
+
+        try:
+            # close state repository (possible CouchDB connection)
+            self.state_repository.close()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing state repository")
 
         try:
             self.node.client.close()

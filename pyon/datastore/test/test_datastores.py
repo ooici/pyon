@@ -24,14 +24,14 @@ BASED_ON = "XBASED_ON"
 class Test_DataStores(IonIntegrationTestCase):
 
     def test_non_persistent(self):
-        self._do_test(MockDB_DataStore(datastore_name='my_ds'))
+        self._do_test(MockDB_DataStore(datastore_name='ion_test_ds'))
         
-        self._do_test_views(MockDB_DataStore(datastore_name='my_ds'))
+        self._do_test_views(MockDB_DataStore(datastore_name='ion_test_ds'))
 
     def test_persistent(self):
         import socket
         try:
-            ds = CouchDB_DataStore(datastore_name='my_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+            ds = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
             self._do_test(ds)
 
             # CouchDB does not like upper case characters for database names
@@ -74,7 +74,7 @@ class Test_DataStores(IonIntegrationTestCase):
             with self.assertRaises(BadRequest):
                 ds.resolve_idref_doc("Subject", "Predicate", "Object", "BadDataStoreNamePerCouchDB")
 
-            self._do_test_views(CouchDB_DataStore(datastore_name='my_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
+            self._do_test_views(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
 
@@ -112,7 +112,7 @@ class Test_DataStores(IonIntegrationTestCase):
             data_store.delete({"foo": "bar"})
 
         # Should see new data
-        self.assertIn('my_ds', data_store.list_datastores())
+        self.assertIn('ion_test_ds', data_store.list_datastores())
 
         # Something should be returned
         self.assertTrue(data_store.info_datastore() is not None)
@@ -321,7 +321,7 @@ class Test_DataStores(IonIntegrationTestCase):
         data_store.delete_datastore()
 
         # Assert data store is now gone
-        self.assertNotIn('my_ds', data_store.list_datastores())
+        self.assertNotIn('ion_test_ds', data_store.list_datastores())
 
     def _do_test_views(self, data_store, is_persistent=False):
         self.data_store = data_store

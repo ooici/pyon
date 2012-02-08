@@ -38,6 +38,8 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, name=name, **kwargs)
 
+        self.event_repo = EventRepository.get_instance()
+
     def _topic(self, origin):
         """
         Builds the topic that this event should be published to.
@@ -85,6 +87,8 @@ class EventPublisher(Publisher):
 
         ep = self.publish(event_msg, to_name=to_name)
         ep.close()
+
+        self.event_repo.put_event(event_msg)
 
     def create_and_publish_event(self, origin=None, **kwargs):
         msg = self.create_event(**kwargs)
@@ -510,7 +514,45 @@ class EventRepository(object):
             raise BadRequest("event must be type Event, not %s" % type(event))
         return self.event_store.create(event)
 
-    def find_events(self, query):
-        log.debug("Retrieving persistent event for query=%s" % query)
-        event_obj = self.event_store.read(query)
+    def get_event(self, event_id):
+        log.debug("Retrieving persistent event for id=%s" % event_id)
+        event_obj = self.event_store.read(event_id)
         return event_obj
+
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, reverse_order=False, max_results=0):
+        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, reverse_order=%s, max_results=%s" % (
+                event_type,origin,start_ts,end_ts,reverse_order,max_results))
+        events = None
+
+        view_name = None
+        start_key = []
+        end_key = []
+        if origin and event_type:
+            view_name = "by_origintype"
+            start_key=[origin, event_type]
+            end_key=[origin, event_type]
+        elif origin:
+            view_name = "by_origin"
+            start_key=[origin]
+            end_key=[origin]
+        elif event_type:
+            view_name = "by_type"
+            start_key=[event_type]
+            end_key=[event_type]
+        elif start_ts or end_ts:
+            view_name = "by_time"
+            start_key=[]
+            end_key=[]
+        else:
+            raise BadRequest("Cannot query events")
+
+        if start_ts:
+            start_key.append(start_ts)
+        if end_ts:
+            end_key.append(end_ts)
+
+        events = self.event_store.find_by_view("event", view_name, start_key=start_key, end_key=end_key,
+                                                reverse=reverse_order, max_res=max_results, id_only=False)
+
+        #log.info("Events: %s" % events)
+        return events

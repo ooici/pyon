@@ -5,17 +5,20 @@ __license__ = 'Apache 2.0'
 
 import time
 
-from pyon.event.event import EventPublisher, EventError, get_events_exchange_point, EventSubscriber, EventRepository
-from pyon.net.messaging import NodeB
-from pyon.util.unit_test import IonUnitTestCase
 from mock import Mock, sentinel, patch
 from nose.plugins.attrib import attr
-from pyon.core import bootstrap
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.util.async import spawn
 from gevent import event, queue
+from unittest import SkipTest
 
-from interface.objects import Event
+from pyon.core import bootstrap
+from pyon.event.event import EventPublisher, EventError, get_events_exchange_point, EventSubscriber, EventRepository
+from pyon.net.messaging import NodeB
+from pyon.util.async import spawn
+from pyon.util.containers import get_ion_ts
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import IonUnitTestCase
+
+from interface.objects import Event, ResourceLifecycleEvent
 
 @attr('UNIT')
 class TestEventPublisher(IonUnitTestCase):
@@ -124,6 +127,7 @@ class TestEventPublisher(IonUnitTestCase):
 
     def test_publish_event(self):
         self._pub.publish = Mock()
+        self._pub.event_repo = Mock()
 
         self._pub.publish_event(sentinel.event_msg, origin=sentinel.origin)
         self._pub.publish.assert_called_once_with(sentinel.event_msg, to_name=(get_events_exchange_point(), self._pub._topic(sentinel.origin)))
@@ -310,9 +314,12 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(self.count, 1)
         self.assertEquals(evmsg.description, "3")
 
-@attr('UNIT',group='datastore')
+@attr('UNIT',group='datastore1')
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
+        if bootstrap.CFG.system.mockdb:
+            raise SkipTest("only works with CouchDB views")
+
         event_repo = EventRepository.get_instance()
         event_repo1 = EventRepository.get_instance()
         self.assertEquals(event_repo, event_repo1)
@@ -320,5 +327,40 @@ class TestEventRepository(IonUnitTestCase):
         event1 = Event(origin="resource1")
         event_id, _ = event_repo.put_event(event1)
 
-        event2 = event_repo.find_events(event_id)
-        self.assertEquals(event1.origin, event2.origin)
+        event1r = event_repo.get_event(event_id)
+        self.assertEquals(event1.origin, event1r.origin)
+
+        ts = 1328680477138
+        events2 = []
+        for i in xrange(5):
+            ev = Event(origin="resource2", ts_created=str(ts + i))
+            event_id, _ = event_repo.put_event(ev)
+            events2.append((ev,event_id))
+
+        events_r = event_repo.find_events(origin='resource2')
+        self.assertEquals(len(events_r), 5)
+
+        events_r = event_repo.find_events(origin='resource2', reverse_order=True)
+        self.assertEquals(len(events_r), 5)
+
+        events_r = event_repo.find_events(origin='resource2', max_results=3)
+        self.assertEquals(len(events_r), 3)
+
+        events_r = event_repo.find_events(origin='resource2', start_ts=str(ts+3))
+        self.assertEquals(len(events_r), 2)
+
+        events_r = event_repo.find_events(origin='resource2', end_ts=str(ts+2))
+        self.assertEquals(len(events_r), 3)
+
+        events_r = event_repo.find_events(origin='resource2', start_ts=str(ts+3), end_ts=str(ts+4))
+        self.assertEquals(len(events_r), 2)
+
+        events_r = event_repo.find_events(start_ts=str(ts+3), end_ts=str(ts+4))
+        self.assertEquals(len(events_r), 2)
+
+
+        event3 = ResourceLifecycleEvent(origin="resource3")
+        event_id, _ = event_repo.put_event(event3)
+
+        events_r = event_repo.find_events(event_type="ResourceLifecycleEvent")
+        self.assertEquals(len(events_r), 1)
