@@ -4,6 +4,10 @@
 
 from pyon.container.cc import Container
 from pyon.core.bootstrap import bootstrap_pyon, service_registry
+from pyon.datastore.datastore import DatastoreManager
+from pyon.event.event import EventRepository
+from pyon.ion.directory import Directory
+from pyon.ion.state import StateRepository
 from pyon.util.containers import DotDict, dict_merge, DictModifier
 from pyon.util.log import log
 from mock import patch
@@ -65,6 +69,16 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _stop_container(self):
         if self.container:
+
+            # clean up singletons, datastore connections
+            # @TODO need to fix all of these
+            Directory.__instance = None
+            StateRepository.__instance = None
+            EventRepository.__instance = None
+            for x in DatastoreManager.datastores.itervalues():
+                x.close()
+            DatastoreManager.datastores = {}
+
             self.container.stop()
             self.container = None
 
