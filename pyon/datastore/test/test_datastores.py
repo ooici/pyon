@@ -230,13 +230,12 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Assign values to object fields
         data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
-        data_set.min_datetime = "2011-08-04T13:15:00Z"
-        data_set.max_datetime = "2011-08-09T19:15:00Z"
-        data_set.variables = [
-                {"name":"water_height", "value":"ft"}
-        ]
+        #data_set.min_datetime = "2011-08-04T13:15:00Z"
+        #data_set.max_datetime = "2011-08-09T19:15:00Z"
+        #data_set.variables = [
+        #        {"name":"water_height", "value":"ft"}
+        #]
         data_set.contact.name = "Heitor Villa-Lobos"
-        data_set.last_modified = "Heitor Villa-Lobos"
 
         # Write DataSet object"
         write_tuple_1 = data_store.create(data_set)
