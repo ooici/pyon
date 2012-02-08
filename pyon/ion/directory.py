@@ -23,10 +23,15 @@ class Directory(object):
         """
         Create singleton instance
         """
+        if Directory.__instance == "NEW":
+            log.warn("Somehow __instance is 'NEW' outside of get_instance() singleton code")
+            Directory.__instance = None
+
         if Directory.__instance is None:
             Directory.__instance = "NEW"
             # Create and remember instance
             Directory.__instance = Directory()
+            assert Directory.__instance != "NEW", "Directory was not instantiated"
         return Directory.__instance
 
     def __init__(self):

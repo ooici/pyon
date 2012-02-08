@@ -434,7 +434,7 @@ class DatastoreManager(object):
             new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
         else:
             from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-            new_ds = MockDB_DataStore(datastore_name=scoped_name, profile=profile)
+            new_ds = MockDB_DataStore(datastore_name=scoped_name) #, profile=profile)
 
         # Clean the store instance
         if force_clean:
