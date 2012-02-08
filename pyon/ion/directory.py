@@ -12,34 +12,13 @@ from pyon.util.log import log
 
 class Directory(object):
     """
-    Singleton class that uses a data store to provide a directory lookup mechanism.
+    Class that uses a data store to provide a directory lookup mechanism.
     """
 
-    # Storage for the instance reference
-    __instance = None
-
-    @classmethod
-    def get_instance(cls):
-        """
-        Create singleton instance
-        """
-        if Directory.__instance == "NEW":
-            log.warn("Somehow __instance is 'NEW' outside of get_instance() singleton code")
-            Directory.__instance = None
-
-        if Directory.__instance is None:
-            Directory.__instance = "NEW"
-            # Create and remember instance
-            Directory.__instance = Directory()
-            assert Directory.__instance != "NEW", "Directory was not instantiated"
-        return Directory.__instance
-
-    def __init__(self):
-        assert Directory.__instance == "NEW", "Cannot instantiate Directory multiple times"
-
+    def __init__(self, datastore_manager):
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
-        self.dir_store = DatastoreManager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
+        self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
 
         self._init()
 

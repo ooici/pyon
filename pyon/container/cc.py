@@ -21,6 +21,7 @@ from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
 from interface.services.icontainer_agent import BaseContainerAgent
+from pyon.datastore.datastore import DatastoreManager
 
 import atexit
 import msgpack
@@ -71,6 +72,9 @@ class Container(BaseContainerAgent):
 
         # Create this Container's specific AppManager instance
         self.app_manager = AppManager(self)
+
+        # DatastoreManager - controls access to Datastores (both mock and couch backed)
+        self.datastore_manager = DatastoreManager()
         
         log.debug("Container initialized, OK.")
 
@@ -102,15 +106,17 @@ class Container(BaseContainerAgent):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
-        # Instantiate Directory singleton and self-register
-        self.directory = Directory.get_instance()
+        self.datastore_manager.start()
+
+        # Instantiate Directory and self-register
+        self.directory = Directory(self.datastore_manager)
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         # Create other repositories to make sure they are there and clean if needed
-        DatastoreManager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
-        DatastoreManager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
-        self.state_repository = StateRepository.get_instance()
-        self.event_repository = EventRepository.get_instance()
+        self.datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
+        self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
+        self.state_repository = StateRepository(self.datastore_manager)
+        self.event_repository = EventRepository(self.datastore_manager)
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
@@ -199,6 +205,12 @@ class Container(BaseContainerAgent):
             self.state_repository.close()
         except Exception, ex:
             log.exception("Container stop(): Error closing state repository")
+
+        try:
+            # close any open connections to datastores
+            self.datastore_manager.stop()
+        except Exception, ex:
+            log.exception("Container stop(): Error closing datastore_manager")
 
         try:
             self.node.client.close()

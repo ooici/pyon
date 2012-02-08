@@ -7,15 +7,16 @@ from pyon.ion.state import StateRepository
 from pyon.util.unit_test import IonUnitTestCase
 from unittest import SkipTest
 from nose.plugins.attrib import attr
+from pyon.datastore.datastore import DatastoreManager
 
 
 @attr('UNIT', group='datastore')
 class TestState(IonUnitTestCase):
 
     def test_state(self):
-        state_repo = StateRepository.get_instance()
-        state_repo1 = StateRepository.get_instance()
-        self.assertEquals(state_repo, state_repo1)
+        dsm = DatastoreManager()
+        state_repo = StateRepository(dsm)
+        state_repo1 = StateRepository(dsm)
 
         state1 = {'key':'value1'}
         state_repo.put_state("id1", state1)
