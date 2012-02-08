@@ -69,11 +69,6 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _stop_container(self):
         if self.container:
-
-            # clean up singletons
-            # @TODO need to fix all of these
-            EventRepository.__instance = None
-
             self.container.stop()
             self.container = None
 

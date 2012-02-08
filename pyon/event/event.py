@@ -30,17 +30,23 @@ class EventPublisher(Publisher):
     event_name  = "BASE_EVENT"      # override this in your derived publisher
     msg_type    = "Event"           # same
 
-    def __init__(self, xp=None, **kwargs):
+    def __init__(self, xp=None, event_repo=None, **kwargs):
+        """
+        Constructs a publisher of events.
+
+        @param  xp          Exchange (AMQP) name, can be none, will use events default.
+        @param  event_repo  An optional repository for published events. If None, will not store
+                            published events. Use the Container.event_repository for this
+                            parameter if you have one.
+        """
 
         # generate a name
         xp = xp or get_events_exchange_point()
         name = (xp, None)
 
-        Publisher.__init__(self, name=name, **kwargs)
+        self.event_repo = event_repo
 
-        # @TODO: not great at all
-        from pyon.container.cc import Container
-        self.event_repo = EventRepository.get_instance(Container.instance.datastore_manager)
+        Publisher.__init__(self, name=name, **kwargs)
 
     def _topic(self, origin):
         """
@@ -90,10 +96,12 @@ class EventPublisher(Publisher):
         ep = self.publish(event_msg, to_name=to_name)
         ep.close()
 
-        self.event_repo.put_event(event_msg)
+        # store published event but only if we specified an event_repo
+        if self.event_repo:
+            self.event_repo.put_event(event_msg)
 
     def create_and_publish_event(self, origin=None, **kwargs):
-        msg = self.create_event(**kwargs)
+        msg = self.create_event(origin=origin, **kwargs)
         self.publish_event(msg, origin=origin)
 
 
@@ -480,25 +488,10 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
 
 class EventRepository(object):
     """
-    Singleton class that uses a data store to provide a persistent repository for ION events.
+    Class that uses a data store to provide a persistent repository for ION events.
     """
 
-    # Storage for the instance reference
-    __instance = None
-
-    @classmethod
-    def get_instance(cls, datastore_manager):
-        """
-        Create singleton instance
-        """
-        if EventRepository.__instance is None:
-            EventRepository.__instance = "NEW"
-            # Create and remember instance
-            EventRepository.__instance = EventRepository(datastore_manager)
-        return EventRepository.__instance
-
     def __init__(self, datastore_manager):
-        assert EventRepository.__instance == "NEW", "Cannot instantiate EventRepository multiple times"
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes

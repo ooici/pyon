@@ -124,7 +124,7 @@ class Container(BaseContainerAgent):
 
         # Create other repositories
         self.state_repository = StateRepository(self.datastore_manager)
-        self.event_repository = EventRepository.get_instance(self.datastore_manager)
+        self.event_repository = EventRepository(self.datastore_manager)
 
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, name=self.name, service=self, process=self)
