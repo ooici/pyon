@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from couchdb.client import ViewResults, Row
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -19,6 +20,23 @@ from pyon.core.bootstrap import CFG
 
 # Marks key range upper bound
 END_MARKER = "ZZZZZ"
+
+def sha1hex(doc):
+    """
+    Compare the content of the doc without its id or revision...
+    """
+    doc_id = doc.pop('_id',None)
+    doc_rev = doc.get('_rev',None)
+    doc_string = str(doc)
+
+    if doc_id is not None:
+        doc['_id'] = doc_id
+
+    if doc_rev is not None:
+        doc['_rev'] = doc_rev
+
+    return hashlib.sha1(doc_string).hexdigest().upper()
+
 
 class CouchDB_DataStore(DataStore):
     """
@@ -923,6 +941,106 @@ class CouchDB_DataStore(DataStore):
 
         obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
+
+    def query_view(self, view_name='', opts={}, datastore_name=''):
+        '''
+        query_view is a straight through method for querying a view in CouchDB. query_view provides us the interface
+        to the view structure in couch, in lieu of implementing a method for every type of query we could want, we
+        now have the capability for clients to make queries to couch in a straight-through manner.
+        '''
+        if not datastore_name:
+            datastore_name = self.datastore_name
+
+        # Handle the possibility of the datastore not existing, convert the ResourceNotFound exception to a BadRequest
+        try:
+            db = self.server[datastore_name]
+        except ResourceNotFound as e:
+            raise BadRequest('No datastore with name: %s' % datastore_name)
+
+        # Actually obtain the results and place them in rows
+        rows = db.view(view_name, **opts)
+
+        # Parse the results and convert the results into ionobjects and python types.
+        result = self._parse_results(rows)
+
+        return result
+
+    def custom_query(self, map_fun, reduce_fun=None, datastore_name='', **options):
+        '''
+        custom_query sets up a temporary view in couchdb, the map_fun is a string consisting
+        of the javascript map function
+
+        Warning: Please note that temporary views are not suitable for use in production,
+        as they are really slow for any database with more than a few dozen documents.
+        You can use a temporary view to experiment with view functions, but switch to a
+        permanent view before using them in an application.
+        '''
+        if not datastore_name:
+            datastore_name = self.datastore_name
+        db = self.server[datastore_name]
+        res = db.query(map_fun,reduce_fun,**options)
+
+        return self._parse_results(res)
+
+
+    def _parse_results(self, doc):
+        ''' Parses a complex object and organizes it into basic types
+        '''
+        ret = {}
+
+        #-------------------------------
+        # Handle ViewResults type (CouchDB type)
+        #-------------------------------
+        # \_ Ignore the meta data and parse the rows only
+        if isinstance(doc,ViewResults):
+            try:
+                ret = self._parse_results(doc.rows)
+            except ResourceNotFound as e:
+                raise BadRequest('The desired resource does not exist.')
+
+            return ret
+
+        #-------------------------------
+        # Handle A Row (CouchDB type)
+        #-------------------------------
+        # \_ Split it into a dict with a key and a value
+        #    Recursively parse down through the structure.
+        if isinstance(doc,Row):
+            ret['id'] = doc['id']
+            ret['key'] = self._parse_results(doc['key'])
+            ret['value'] = self._parse_results(doc['value'])
+            if 'doc' in doc:
+                ret['doc'] = self._parse_results(doc['doc'])
+            return ret
+
+        #-------------------------------
+        # Handling a list
+        #-------------------------------
+        # \_ Break it apart and parse each element in the list
+
+        if isinstance(doc,list):
+            ret = []
+            for element in doc:
+                ret.append(self._parse_results(element))
+            return ret
+        #-------------------------------
+        # Handle a dic
+        #-------------------------------
+        # \_ Check to make sure it's not an IonObject
+        # \_ Parse the key value structure for other objects
+        if isinstance(doc,dict):
+            if '_id' in doc:
+                # IonObject
+                return self._persistence_dict_to_ion_object(doc)
+
+            for key,value in doc:
+                ret[key] = self._parse_results(value)
+            return ret
+
+        #-------------------------------
+        # Primitive type
+        #-------------------------------
+        return doc
 
     def _persistence_dict_to_ion_object(self, obj_dict):
         if obj_dict is None: return None
