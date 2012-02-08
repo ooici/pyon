@@ -49,7 +49,7 @@ class StateRepository(object):
     def put_state(self, key, state):
         log.debug("Store persistent state for key=%s" % key)
         if not isinstance(state, dict):
-            raise BadRequest("state must by type dict, not %s" % type(state))
+            raise BadRequest("state must be type dict, not %s" % type(state))
         try:
             state_obj = self.state_store.read(key)
             state_obj.state = state

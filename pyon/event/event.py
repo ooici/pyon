@@ -2,16 +2,19 @@
 
 """Events and Notification"""
 
-__author__ = 'Dave Foster <dfoster@asascience.com>'
+__author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-
-
-from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
-from pyon.core import bootstrap
-from pyon.net.channel import PublisherChannel, SubscriberChannel
-from pyon.util.log import log
 import time
+
+from pyon.core import bootstrap
+from pyon.core.exception import Conflict, NotFound, BadRequest
+from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
+from pyon.util.log import log
+
+from interface.objects import Event
+
 
 # @TODO: configurable
 EVENTS_XP = "pyon.events"
@@ -466,3 +469,48 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
     """
     pass
 
+
+
+
+class EventRepository(object):
+    """
+    Singleton class that uses a data store to provide a persistent repository for ION events.
+    """
+
+    # Storage for the instance reference
+    __instance = None
+
+    @classmethod
+    def get_instance(cls):
+        """
+        Create singleton instance
+        """
+        if EventRepository.__instance is None:
+            EventRepository.__instance = "NEW"
+            # Create and remember instance
+            EventRepository.__instance = EventRepository()
+        return EventRepository.__instance
+
+    def __init__(self):
+        assert EventRepository.__instance == "NEW", "Cannot instantiate EventRepository multiple times"
+
+        # Get an instance of datastore configured as directory.
+        # May be persistent or mock, forced clean, with indexes
+        self.event_store = DatastoreManager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
+
+    def close(self):
+        """
+        Pass-through method to close the underlying datastore.
+        """
+        self.event_store.close()
+
+    def put_event(self, event):
+        log.debug("Store event persistently %s" % event)
+        if not isinstance(event, Event):
+            raise BadRequest("event must be type Event, not %s" % type(event))
+        return self.event_store.create(event)
+
+    def find_events(self, query):
+        log.debug("Retrieving persistent event for query=%s" % query)
+        event_obj = self.event_store.read(query)
+        return event_obj

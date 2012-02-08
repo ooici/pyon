@@ -1,21 +1,24 @@
 #!/usr/bin/env python
 
-__author__ = 'Dave Foster <dfoster@asascience.com>'
+__author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.event.event import EventPublisher, EventError, get_events_exchange_point, EventSubscriber
+import time
+
+from pyon.event.event import EventPublisher, EventError, get_events_exchange_point, EventSubscriber, EventRepository
 from pyon.net.messaging import NodeB
-from pyon.util.unit_test import PyonTestCase
+from pyon.util.unit_test import IonUnitTestCase
 from mock import Mock, sentinel, patch
 from nose.plugins.attrib import attr
 from pyon.core import bootstrap
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.async import spawn
 from gevent import event, queue
-import time
+
+from interface.objects import Event
 
 @attr('UNIT')
-class TestEventPublisher(PyonTestCase):
+class TestEventPublisher(IonUnitTestCase):
 
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -137,7 +140,7 @@ class TestEventPublisher(PyonTestCase):
         self._pub.publish_event.assert_called_once_with(sentinel.event_msg, origin=sentinel.origin)
 
 @attr('UNIT')
-class TestEventSubscriber(PyonTestCase):
+class TestEventSubscriber(IonUnitTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
         self._cb = lambda *args, **kwargs: False
@@ -306,3 +309,16 @@ class TestEvents(IonIntegrationTestCase):
         evmsg = ar.get(timeout=5)
         self.assertEquals(self.count, 1)
         self.assertEquals(evmsg.description, "3")
+
+@attr('UNIT',group='datastore')
+class TestEventRepository(IonUnitTestCase):
+    def test_event_repo(self):
+        event_repo = EventRepository.get_instance()
+        event_repo1 = EventRepository.get_instance()
+        self.assertEquals(event_repo, event_repo1)
+
+        event1 = Event(origin="resource1")
+        event_id, _ = event_repo.put_event(event1)
+
+        event2 = event_repo.find_events(event_id)
+        self.assertEquals(event1.origin, event2.origin)
