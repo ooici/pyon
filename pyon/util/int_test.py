@@ -148,7 +148,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         def start_rel_from_url(*args, **kwargs):
             # Force clean Couch in between tests, which is taken care of normally during process_start.
             from pyon.core.bootstrap import sys_name
-            things_to_clean = ["%s_%s" % (sys_name, thing_name) for thing_name in ('resources', 'objects')]
+            things_to_clean = ["%s_%s" % (str(sys_name).lower(), thing_name) for thing_name in ('resources', 'objects')]
             couch_datastore = CouchDB_DataStore()
             try:
                 for thing in things_to_clean:
