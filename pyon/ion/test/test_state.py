@@ -15,9 +15,8 @@ class TestState(IonUnitTestCase):
 
     def test_state(self):
         dsm = DatastoreManager()
-        state_repo = StateRepository.get_instance(dsm)
-        state_repo1 = StateRepository.get_instance(dsm)
-        self.assertEquals(state_repo, state_repo1)
+        state_repo = StateRepository(dsm)
+        state_repo1 = StateRepository(dsm)
 
         state1 = {'key':'value1'}
         state_repo.put_state("id1", state1)

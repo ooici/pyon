@@ -72,7 +72,6 @@ class IonIntegrationTestCase(unittest.TestCase):
 
             # clean up singletons
             # @TODO need to fix all of these
-            StateRepository.__instance = None
             EventRepository.__instance = None
 
             self.container.stop()

@@ -16,25 +16,10 @@ from interface.objects import ProcessState
 
 class StateRepository(object):
     """
-    Singleton class that uses a data store to provide a persistent state repository for ION processes.
+    Class that uses a data store to provide a persistent state repository for ION processes.
     """
 
-    # Storage for the instance reference
-    __instance = None
-
-    @classmethod
-    def get_instance(cls, datastore_manager):
-        """
-        Create singleton instance
-        """
-        if StateRepository.__instance is None:
-            StateRepository.__instance = "NEW"
-            # Create and remember instance
-            StateRepository.__instance = StateRepository(datastore_manager)
-        return StateRepository.__instance
-
     def __init__(self, datastore_manager):
-        assert StateRepository.__instance == "NEW", "Cannot instantiate StateRepository multiple times"
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes

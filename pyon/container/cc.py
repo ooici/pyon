@@ -123,7 +123,7 @@ class Container(BaseContainerAgent):
         self.app_manager.start()
 
         # Create other repositories
-        self.state_repository = StateRepository.get_instance(self.datastore_manager)
+        self.state_repository = StateRepository(self.datastore_manager)
         self.event_repository = EventRepository.get_instance(self.datastore_manager)
 
         # Start the CC-Agent API
