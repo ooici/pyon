@@ -619,6 +619,8 @@ class MockDB_DataStore(DataStore):
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not subject:
             raise BadRequest("Must provide subject")
         try:
@@ -658,6 +660,8 @@ class MockDB_DataStore(DataStore):
 
     def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False):
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, obj, id_only))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not obj:
             raise BadRequest("Must provide object")
         try:
@@ -697,6 +701,8 @@ class MockDB_DataStore(DataStore):
 
     def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if subject and obj or predicate:
             pass
         else:
@@ -744,6 +750,8 @@ class MockDB_DataStore(DataStore):
         
     def find_res_by_type(self, restype, lcstate=None, id_only=False):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
@@ -768,6 +776,8 @@ class MockDB_DataStore(DataStore):
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
         log.debug("find_res_by_type(lcstate=%s, restype=%s)" % (lcstate, restype))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
@@ -799,6 +809,8 @@ class MockDB_DataStore(DataStore):
 
     def find_res_by_name(self, name, restype=None, id_only=False):
         log.debug("find_res_by_name(name=%s, restype=%s)" % (name, restype))
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:

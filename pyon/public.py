@@ -33,8 +33,8 @@ __all__ += ['iex']
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessSupervisor
-__all__ += ['IonProcessSupervisor']
+from pyon.ion.process import IonProcessSupervisor, SimpleProcess, StandaloneProcess, ImmediateProcess
+__all__ += ['IonProcessSupervisor', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
 
 from pyon.container.cc import Container
 __all__ += ['Container']
@@ -43,9 +43,9 @@ from pyon.service.service import BaseService
 __all__ += ['BaseService']
 
 from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, \
-                                ProcessSubscriber, ProcessPublisher
+                                ProcessSubscriber, ProcessPublisher, StreamSubscriberRegistrar, StreamPublisherRegistrar
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
-            'ProcessSubscriber', 'ProcessPublisher']
+            'ProcessSubscriber', 'ProcessPublisher', StreamSubscriberRegistrar, StreamPublisherRegistrar]
 
 from pyon.ion.resource import ResourceTypes, RT, PredicateType, PRED, LifeCycleStates, LCS, LCE
 __all__ += ['RT', 'PRED', 'LCS', 'LCE']

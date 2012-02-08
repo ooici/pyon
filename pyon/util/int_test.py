@@ -128,30 +128,27 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher = patch('pyon.container.apps.CFG', config)
         patcher.start()
         self.addCleanup(patcher.stop)
-        patcher2 = patch('pyon.directory.directory.CFG', config)
+        patcher2 = patch('pyon.ion.directory.CFG', config)
         patcher2.start()
         self.addCleanup(patcher2.stop)
 
     def _turn_on_couchdb(self):
-
-        override_cfg = {'directory':{'persistent':True, 'force_clean':True},
-                     'datastore':{'persistent':True, 'force_clean':True},
-                     'resource_registry':{'persistent':True, 'force_clean':True}}
-        cfg = DictModifier(CFG, override_cfg)
+        cfg = DictModifier(CFG)
+        cfg.system.mockdb = False
+        cfg.system.force_clean = True
         self._patch_config(cfg)
 
     def _turn_on_mockdb(self):
-        override_cfg = {'directory':{'persistent':False, 'force_clean':True},
-                     'datastore':{'persistent':False, 'force_clean':True},
-                     'resource_registry':{'persistent':False, 'force_clean':True}}
-        cfg = DictModifier(CFG, override_cfg)
+        cfg = DictModifier(CFG)
+        cfg.system.mockdb = True
+        cfg.system.force_clean = True
         self._patch_config(cfg)
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
             # Force clean Couch in between tests, which is taken care of normally during process_start.
             from pyon.core.bootstrap import sys_name
-            things_to_clean = ["%s_%s" % (sys_name, thing_name) for thing_name in ('resources', 'scratch')]
+            things_to_clean = ["%s_%s" % (str(sys_name).lower(), thing_name) for thing_name in ('resources', 'objects')]
             couch_datastore = CouchDB_DataStore()
             try:
                 for thing in things_to_clean:

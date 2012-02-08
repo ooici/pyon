@@ -33,7 +33,7 @@ assert_environment()
 
 pyon_initialized = False
 
-sys_name = CFG.system.name or 'pyon_%s' % os.uname()[1].replace('.', '_')
+sys_name = CFG.system.name or 'ion_%s' % os.uname()[1].replace('.', '_')
 
 # OBJECTS. Object and message definitions.
 # Make a default factory for IonObjects

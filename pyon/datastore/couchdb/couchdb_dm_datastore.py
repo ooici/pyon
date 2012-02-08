@@ -9,17 +9,23 @@ from couchdb.client import ViewResults, Row
 from pyon.core.exception import BadRequest
 from pyon.util.log import log
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.datastore.datastore import DataStore
 import pyon.datastore.couchdb.couchdb_config as couch_config
+
 import hashlib
 
 COUCHDB_CONFIGS = couch_config.COUCHDB_CONFIGS
 COUCHDB_VIEWS = couch_config.COUCHDB_VIEWS
+
 # Overriding an existing function
 def get_couchdb_views(config):
+    '''
+    Overrides the existing function to support design objects having the non-default view templates.
+    '''
     if config in COUCHDB_CONFIGS:
         store_config = COUCHDB_CONFIGS[config]
     else:
-        store_config = COUCHDB_CONFIGS['all']
+        store_config = COUCHDB_CONFIGS[DataStore.DS_PROFILE.BASIC]
     views = store_config['views']
     res_views = {}
     for view in views:
@@ -47,6 +53,12 @@ def sha1hex(doc):
 
 
 class CouchDB_DM_DataStore(CouchDB_DataStore):
+    '''
+    CouchDB_DM_DataStore is an extension of the CouchDB_DataStore to add functionality in support of DM,
+    the ability to query views is very important as well as improving performance in any manner we can.
+    Below, several views have been added for the type dm_datastore to support several view templates.
+
+    '''
     def __init__(self, *args, **kwargs):
         super(CouchDB_DM_DataStore, self).__init__(*args, **kwargs)
         
@@ -84,22 +96,33 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
                 
 
     def query_view(self, view_name='', opts={}, datastore_name=''):
+        '''
+        query_view is a straight through method for querying a view in CouchDB. query_view provides us the interface
+        to the view structure in couch, in lieu of implementing a method for every type of query we could want, we
+        now have the capability for clients to make queries to couch in a straight-through manner.
+        '''
         if not datastore_name:
             datastore_name = self.datastore_name
 
+        # Handle the possibility of the datastore not existing, convert the ResourceNotFound exception to a BadRequest
         try:
             db = self.server[datastore_name]
         except ResourceNotFound as e:
             raise BadRequest('No datastore with name: %s' % datastore_name)
 
-        #@todo: DELTE THIS BEFORE PUSHING
-        log.warn('CouchDB_DM_DATA: %s', opts)
+        # Actually obtain the results and place them in rows
         rows = db.view(view_name, **opts)
+
+        # Parse the results and convert the results into ionobjects and python types.
         result = self._parse_results(rows)
-        log.warn('CouchDB_DM_DATA: %s', result)
 
         return result
+
+
     def doc_to_object(self, doc):
+        '''
+        May add extended handling for data sets in the future, for now it's transient.
+        '''
         obj = self._persistence_dict_to_ion_object(doc)
         return obj
 
@@ -113,7 +136,11 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         #-------------------------------
         # \_ Ignore the meta data and parse the rows only
         if isinstance(doc,ViewResults):
-            ret = self._parse_results(doc.rows)
+            try:
+                ret = self._parse_results(doc.rows)
+            except ResourceNotFound as e:
+                raise BadRequest('The desired resource does not exist.')
+
             return ret
 
         #-------------------------------
@@ -159,6 +186,15 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
         return doc
 
     def custom_query(self, map_fun, reduce_fun=None, datastore_name='', **options):
+        '''
+        custom_query sets up a temporary view in couchdb, the map_fun is a string consisting
+        of the javascript map function
+
+        Warning: Please note that temporary views are not suitable for use in production,
+        as they are really slow for any database with more than a few dozen documents.
+        You can use a temporary view to experiment with view functions, but switch to a
+        permanent view before using them in an application.
+        '''
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]
@@ -168,7 +204,10 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
 
 
 
-    def _define_views(self, datastore_name=""):
+    def _define_views(self, datastore_name="", profile=None):
+        '''
+        Ensure that when the datastore is created that it uses the defined view templates not the default 'all'
+        '''
         if not datastore_name:
             datastore_name = self.datastore_name
 
@@ -178,6 +217,9 @@ class CouchDB_DM_DataStore(CouchDB_DataStore):
 
 
     def _update_views(self, datastore_name=""):
+        '''
+        Ensure that when the datastore is created that it uses the defined view templates not the default 'all'
+        '''
         if not datastore_name:
             datastore_name = self.datastore_name
         db = self.server[datastore_name]

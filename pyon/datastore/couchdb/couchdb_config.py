@@ -3,19 +3,31 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+
+from pyon.datastore.datastore import DataStore
+
 COUCHDB_CONFIGS = {
-    'object_store':{
+    DataStore.DS_PROFILE.OBJECTS:{
         'views': ['object','association']
     },
-    'resource_store':{
+    DataStore.DS_PROFILE.RESOURCES:{
         'views': ['resource','association']
     },
-    'directory_store':{
-        'views': ['directory']
+    DataStore.DS_PROFILE.DIRECTORY:{
+        'views': ['directory','association']
     },
-    'all':{
-        'views': ['object', 'resource', 'association', 'directory']
-    }
+    DataStore.DS_PROFILE.EVENTS:{
+        'views': ['event']
+    },
+    DataStore.DS_PROFILE.STATE:{
+        'views': []
+    },
+    DataStore.DS_PROFILE.SCIDATA:{
+        'views': []
+    },
+    DataStore.DS_PROFILE.BASIC:{
+        'views': []
+    },
 }
 
 COUCHDB_VIEWS = {
@@ -144,6 +156,42 @@ function(doc) {
   if (doc.type_ == "DirEntry") {
     if (doc.parent.indexOf('/') != 0) return;
     emit([doc.key, doc.parent], doc);
+  }
+}""",
+        },
+    },
+
+    # Event related objects
+    'event':{
+        'by_time':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.ts_created]);
+  }
+}""",
+            },
+        'by_type':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.type_, doc.ts_created]);
+  }
+}""",
+        },
+        'by_origin':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.origin, doc.ts_created]);
+  }
+}""",
+        },
+        'by_origintype':{
+            'map':"""
+function(doc) {
+  if (doc.origin) {
+    emit([doc.origin, doc.type_, doc.ts_created]);
   }
 }""",
         },

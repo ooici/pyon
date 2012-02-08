@@ -98,8 +98,10 @@ def main(opts, *args, **kwargs):
 
     # The import of pyon.public triggers many module initializers:
     # pyon.core.bootstrap (Config load, logging setup), etc.
-    from pyon.public import Container
+    from pyon.public import Container, CFG
     from pyon.container.shell_api import get_shell_api
+    # Set that system is not testing. We are running as standalone container
+    CFG.system.testing = False
 
     container = Container(*args, **kwargs)
 

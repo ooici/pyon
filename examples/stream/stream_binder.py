@@ -10,7 +10,7 @@ This is functionality is not to be touched, modified or (re)implemented as part 
 
 
 # To do the bind by starting an agent process
-id = cc.spawn_process('binder', 'examples.stream.stream_binder', 'StreamBinder', {'process':{'type':"agent"}, 'args':{'queue_name':'consumer_input_queue', 'binding':'glider_data'}})
+id = cc.spawn_process('binder', 'examples.stream.stream_binder', 'StreamBinder', {'args':{'queue_name':'consumer_input_queue', 'binding':'glider_data'}})
 
 
 # To do the bind using the pycc shell
@@ -20,7 +20,7 @@ channel.setup_listener(('science_data', 'consumer_input'), binding='glider_data'
 """
 
 
-from pyon.public import log, BaseService
+from pyon.public import log, SimpleProcess
 from pyon.net.channel import SubscriberChannel
 
 
@@ -35,7 +35,7 @@ class BindingChannel(SubscriberChannel):
         self._recv_name = (self._recv_name[0], '.'.join(self._recv_name))
 
 
-class StreamBinder(BaseService):
+class StreamBinder(SimpleProcess):
     """
     This is a special process designed to take the place of the pubsub service for the stream example
     """

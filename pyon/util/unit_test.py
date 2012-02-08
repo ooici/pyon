@@ -80,3 +80,6 @@ class PyonTestCase(unittest.TestCase):
             self.fail('Following function declarations in %s do not exist in %s : %s' %
                     (iface, implemented_service,
                         list(difference)))
+
+# Alias to make name less Pyon specific
+IonUnitTestCase = PyonTestCase

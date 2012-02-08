@@ -2,7 +2,7 @@
 
 # Ion utility for generating interfaces from object definitions (and vice versa).
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie'
 __license__ = 'Apache 2.0'
 
 import ast
@@ -1141,7 +1141,7 @@ def generate_model_objects():
         os.unlink(datamodelfile)
     except:
         pass
-    print "Writing data model to '" + datamodelfile + "'"
+    print "Writing object model to '" + datamodelfile + "'"
     with open(datamodelfile, 'w') as f:
         f.write(dataobject_output_text)
     messagemodelfile = os.path.join(datadir, 'messages.py')

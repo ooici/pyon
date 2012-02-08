@@ -2,16 +2,19 @@
 
 """Events and Notification"""
 
-__author__ = 'Dave Foster <dfoster@asascience.com>'
+__author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-
-
-from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
-from pyon.core import bootstrap
-from pyon.net.channel import PublisherChannel, SubscriberChannel
-from pyon.util.log import log
 import time
+
+from pyon.core import bootstrap
+from pyon.core.exception import Conflict, NotFound, BadRequest
+from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
+from pyon.util.log import log
+
+from interface.objects import Event
+
 
 # @TODO: configurable
 EVENTS_XP = "pyon.events"
@@ -34,6 +37,8 @@ class EventPublisher(Publisher):
         name = (xp, None)
 
         Publisher.__init__(self, name=name, **kwargs)
+
+        self.event_repo = EventRepository.get_instance()
 
     def _topic(self, origin):
         """
@@ -82,6 +87,8 @@ class EventPublisher(Publisher):
 
         ep = self.publish(event_msg, to_name=to_name)
         ep.close()
+
+        self.event_repo.put_event(event_msg)
 
     def create_and_publish_event(self, origin=None, **kwargs):
         msg = self.create_event(**kwargs)
@@ -466,3 +473,86 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
     """
     pass
 
+
+
+
+class EventRepository(object):
+    """
+    Singleton class that uses a data store to provide a persistent repository for ION events.
+    """
+
+    # Storage for the instance reference
+    __instance = None
+
+    @classmethod
+    def get_instance(cls):
+        """
+        Create singleton instance
+        """
+        if EventRepository.__instance is None:
+            EventRepository.__instance = "NEW"
+            # Create and remember instance
+            EventRepository.__instance = EventRepository()
+        return EventRepository.__instance
+
+    def __init__(self):
+        assert EventRepository.__instance == "NEW", "Cannot instantiate EventRepository multiple times"
+
+        # Get an instance of datastore configured as directory.
+        # May be persistent or mock, forced clean, with indexes
+        self.event_store = DatastoreManager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
+
+    def close(self):
+        """
+        Pass-through method to close the underlying datastore.
+        """
+        self.event_store.close()
+
+    def put_event(self, event):
+        log.debug("Store event persistently %s" % event)
+        if not isinstance(event, Event):
+            raise BadRequest("event must be type Event, not %s" % type(event))
+        return self.event_store.create(event)
+
+    def get_event(self, event_id):
+        log.debug("Retrieving persistent event for id=%s" % event_id)
+        event_obj = self.event_store.read(event_id)
+        return event_obj
+
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, reverse_order=False, max_results=0):
+        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, reverse_order=%s, max_results=%s" % (
+                event_type,origin,start_ts,end_ts,reverse_order,max_results))
+        events = None
+
+        view_name = None
+        start_key = []
+        end_key = []
+        if origin and event_type:
+            view_name = "by_origintype"
+            start_key=[origin, event_type]
+            end_key=[origin, event_type]
+        elif origin:
+            view_name = "by_origin"
+            start_key=[origin]
+            end_key=[origin]
+        elif event_type:
+            view_name = "by_type"
+            start_key=[event_type]
+            end_key=[event_type]
+        elif start_ts or end_ts:
+            view_name = "by_time"
+            start_key=[]
+            end_key=[]
+        else:
+            raise BadRequest("Cannot query events")
+
+        if start_ts:
+            start_key.append(start_ts)
+        if end_ts:
+            end_key.append(end_ts)
+
+        events = self.event_store.find_by_view("event", view_name, start_key=start_key, end_key=end_key,
+                                                reverse=reverse_order, max_res=max_results, id_only=False)
+
+        #log.info("Events: %s" % events)
+        return events
