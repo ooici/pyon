@@ -15,7 +15,7 @@ class DataStore(object):
     Every instance is a different schema.
     Every type of ION object is a table
     """
-    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','SCIDATA','BASIC']
+    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     EQUAL = '=='
