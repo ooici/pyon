@@ -432,9 +432,11 @@ class DatastoreManager(object):
 
         # Persistent (CouchDB) or MockDB?
         if persistent:
+            # Use inline import to prevent circular import dependency
             from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
             new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
         else:
+            # Use inline import to prevent circular import dependency
             from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
             new_ds = MockDB_DataStore(datastore_name=scoped_name) #, profile=profile)
 
