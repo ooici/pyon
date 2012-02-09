@@ -69,7 +69,7 @@ class ProcManager(object):
         """
         # Generate a new process id
         # TODO: Ensure it is system-wide unique
-        process_id = str(self.proc_id_pool.get_id())
+        process_id =  "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
         log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s", name, module, cls, process_id)
 
         if config is None:
@@ -112,7 +112,7 @@ class ProcManager(object):
 
             service_instance.errcause = "OK"
             log.info("AppManager.spawn_process: %s.%s -> pid=%s OK" % (module, cls, process_id))
-            return process_id
+            return service_instance.id
 
         except Exception:
             errcause = service_instance.errcause if service_instance else "instantiating service"
@@ -228,7 +228,7 @@ class ProcManager(object):
 
         # Prepare service instance
         service_instance.errcause = ""
-        service_instance.id = "%s.%s" % (self.container.id, process_id)
+        service_instance.id = process_id
         service_instance.container = self.container
         service_instance.CFG = config
         service_instance._proc_name = name
