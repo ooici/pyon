@@ -11,7 +11,7 @@ __author__ = 'Michael Meisinger'
 bin/pycc --rel res/deploy/examples/stream.yml
 
 To start the consumer in the pycc shell:
-id = cc.spawn_process('myconsumer', 'examples.stream.stream_consumer', 'StreamConsumer', {'process':{'type':"stream_process",'listen_name':'consumer_input_queue'}})
+id = cc.spawn_process('myconsumer', 'examples.stream.stream_consumer', 'StreamConsumer', {'process':{'listen_name':'consumer_input_queue'}})
 """
 
 

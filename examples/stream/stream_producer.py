@@ -7,6 +7,8 @@ import threading
 
 from pyon.public import log, ProcessPublisher, SimpleProcess
 
+from pyon.core import bootstrap
+
 """
 @author Michael Meisinger
 @author David Stuebe
@@ -17,7 +19,7 @@ from pyon.public import log, ProcessPublisher, SimpleProcess
 bin/pycc --rel res/deploy/examples/stream.yml
 
 To start the producer in the pycc shell:
-id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'process':{'type':"agent"},'stream_producer':{'interval':4000,'routing_key':'glider_data'}})
+id_p = cc.spawn_process('myproducer', 'examples.stream.stream_producer', 'StreamProducer', {'stream_producer':{'interval':4000,'routing_key':'glider_data'}})
 """
 
 class StreamProducer(SimpleProcess):
@@ -45,7 +47,10 @@ class StreamProducer(SimpleProcess):
         interval = self.CFG.get('stream_producer').get('interval')
         routing_key = self.CFG.get('stream_producer').get('routing_key')
 
-        pub = ProcessPublisher(node=self.container.node, name=('science_data',routing_key), process=self)
+        # Create scoped exchange name
+        XP = '.'.join([bootstrap.sys_name,'science_data'])
+
+        pub = ProcessPublisher(node=self.container.node, name=(XP,routing_key), process=self)
         num = 1
         while True:
             msg = dict(num=str(num))
