@@ -64,7 +64,7 @@ def main():
 
     for db_name in db_list:
 
-        if db_name.find(prefix) != -1:
+        if db_name.startswith(prefix):
 
             db_server.delete_datastore(db_name)
             print '$ Cleared couch db named: %s' % db_name
