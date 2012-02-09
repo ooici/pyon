@@ -17,6 +17,7 @@ from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.ion.resource import ResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.core.bootstrap import CFG
+import hashlib
 
 # Marks key range upper bound
 END_MARKER = "ZZZZZ"
