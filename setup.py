@@ -30,6 +30,7 @@ setup(  name = 'pyon',
                 'control_cc=scripts.control_cc:main',
                 'generate_interfaces=scripts.generate_interfaces:main',
                 'json_report=scripts.json_report:main',
+                'clear_couch=pyon.datastore.clear_couch_util:main',
                 ]
             },
         dependency_links = [
