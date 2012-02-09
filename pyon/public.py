@@ -21,6 +21,9 @@ __all__ += ['CFG']
 from pyon.core.bootstrap import obj_registry, IonObject, sys_name
 __all__ += ['obj_registry', 'IonObject', 'sys_name']
 
+from pyon.core.object import ionprint
+__all__ += ['ionprint']
+
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
