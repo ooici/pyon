@@ -102,9 +102,10 @@ def main(opts, *args, **kwargs):
 
     # Check if user opted to override logging config
     if opts.logcfg:
-        from pyon.util.config import initialize_logging
+        from pyon.util.config import logging_conf_paths, initialize_logging
         # Re-initialize logging
-        initialize_logging([opts.logcfg])
+        logging_conf_paths.append(opts.logcfg)
+        initialize_logging()
 
     from pyon.container.shell_api import get_shell_api
     # Set that system is not testing. We are running as standalone container

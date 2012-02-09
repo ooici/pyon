@@ -54,11 +54,11 @@ class Config(object):
         self.load()
 
 # LOGGING. Read the logging config files
-default_logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
+logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
 
 LOGGING_CFG = None
 
-def initialize_logging(logging_conf_paths):
+def initialize_logging():
     global LOGGING_CFG
     LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
 
@@ -73,7 +73,7 @@ def initialize_logging(logging_conf_paths):
     if LOGGING_CFG:
         logging.config.dictConfig(LOGGING_CFG)
 
-initialize_logging(default_logging_conf_paths)
+initialize_logging()
 
 # CONFIG. Read global configuration
 conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
