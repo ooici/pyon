@@ -15,14 +15,18 @@ id = cc.spawn_process('binder', 'examples.stream.stream_binder', 'StreamBinder',
 
 # To do the bind using the pycc shell
 from examples.stream.stream_binder import BindingChannel
+from pyon.core import bootstrap
+XP = '.'.join([bootstrap.sys_name,'science_data'])
+
 channel = cc.node.channel(BindingChannel)
-channel.setup_listener(('science_data', 'consumer_input'), binding='glider_data')
+channel.setup_listener((XP, 'consumer_input_queue'), binding='glider_data')
 """
 
 
 from pyon.public import log, SimpleProcess
 from pyon.net.channel import SubscriberChannel
 
+from pyon.core import bootstrap
 
 
 class BindingChannel(SubscriberChannel):
@@ -45,7 +49,10 @@ class StreamBinder(SimpleProcess):
         queue_name = self.CFG.get('args',{}).get('queue_name',None)
         binding = self.CFG.get('args',{}).get('binding',None)
 
+        # Create scoped exchange name
+        XP = '.'.join([bootstrap.sys_name,'science_data'])
+
         self.channel = self.container.node.channel(BindingChannel)
-        self.channel.setup_listener(('science_data',queue_name),binding=binding)
+        self.channel.setup_listener((XP,queue_name),binding=binding)
 
         # How do we make this process end now?

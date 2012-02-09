@@ -4,6 +4,7 @@ __author__ = 'Adam Smith, Tom Lennan'
 __license__ = 'Apache 2.0'
 
 import inspect
+from copy import deepcopy
 
 from pyon.core.exception import NotFound
 from pyon.util.config import CFG
@@ -107,8 +108,17 @@ class IonObjectRegistry(object):
             setattr(clzz, "__setattr__", setattrmethod)
             
         if _dict:
+            # Traverse input parameters looking for dict values being passed in as
+            # the init values of complex types.  Instantiate new object and substitute
+            # into the argument dict.
+            tmpdict = deepcopy(_dict)
+            for key in tmpdict:
+                if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
+                    obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
+                    tmpdict[key] = obj_param
+                    
             # Apply dict values, then override with kwargs
-            keywordargs = _dict
+            keywordargs = tmpdict
             keywordargs.update(kwargs)
             obj = clzz(**keywordargs)
         else:

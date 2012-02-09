@@ -543,7 +543,9 @@ def load_mods(path, interfaces):
             except Exception, ex:
                 print "Import module '%s' failed: %s" % (mod_qual, ex)
                 if not interfaces:
-                    print "Make sure that you have defined an __init__.py in your directory and that you have imported the correct base type"
+                    print "Make sure that you have defined an __init__.py in your directory, you have imported the correct service base type"
+                    print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"
+                    print "syntax errors in your code or in the modules your code imports.\n"
 
 def find_subtypes(clz):
     res = []

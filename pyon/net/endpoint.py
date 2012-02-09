@@ -15,6 +15,9 @@ from gevent import event, coros
 from zope import interface
 import uuid
 
+import traceback
+import sys
+
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
 # Note: This is now called from pyon.core.bootstrap
@@ -695,7 +698,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpointUnit.__init__(self)
         self._routing_obj = routing_obj
-
+        
     def _message_received(self, msg, headers):
         """
         Internal _message_received override.
@@ -707,7 +710,15 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
         except IonException as ex:
+            (exc_type, exc_value, exc_traceback) = sys.exc_info()
+            tb_list = traceback.extract_tb(sys.exc_info()[2])
+            tb_list = traceback.format_list(tb_list)
+            tb_output = ""
+            for elt in tb_list:
+                tb_output += elt
             log.debug("Got error response")
+            log.debug("Exception message: %s" % ex)
+            log.debug("Traceback:\n%s" % tb_output)
             response_headers = self._create_error_response(ex)
 
         # REPLIES: propogate protocol, conv-id, conv-seq
