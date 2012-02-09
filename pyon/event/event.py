@@ -20,7 +20,7 @@ from interface.objects import Event
 EVENTS_XP = "pyon.events"
 EVENTS_XP_TYPE = "topic"
 def get_events_exchange_point():
-    return "%s.%s" % (bootstrap.sys_name, EVENTS_XP)
+    return "%s.%s" % (bootstrap.get_sys_name(), EVENTS_XP)
 
 class EventError(StandardError):
     pass
@@ -134,8 +134,8 @@ class EventSubscriber(Subscriber):
         # prefix the queue_name, if specified, with the sysname
         # this is because queue names transcend xp boundaries (see R1 OOIION-477)
         if queue_name is not None:
-            if not queue_name.startswith(bootstrap.sys_name):
-                queue_name = "%s.%s" % (bootstrap.sys_name, queue_name)
+            if not queue_name.startswith(bootstrap.get_sys_name()):
+                queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
                 log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
 
         name = (xp_name, queue_name)

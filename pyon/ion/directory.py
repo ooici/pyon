@@ -70,12 +70,12 @@ class Directory(object):
         self.dir_store.create_datastore()
 
         # Persist empty Directory object under known name
-        self.dir_name = bootstrap.sys_name
+        self.dir_name = bootstrap.get_sys_name()
         directory_obj = IonObject('Directory', name=self.dir_name)
         dir_id,rev = self.dir_store.create(directory_obj, 'DIR')
 
         # Persist ROOT Directory object
-        root_obj = IonObject('DirEntry', parent='/', key="ROOT", attributes=dict(sys_name=bootstrap.sys_name))
+        root_obj = IonObject('DirEntry', parent='/', key="ROOT", attributes=dict(sys_name=bootstrap.get_sys_name()))
         root_id,rev = self.dir_store.create(root_obj, self._get_dn(root_obj.parent, root_obj.key))
 
     def register(self, parent, key, **kwargs):

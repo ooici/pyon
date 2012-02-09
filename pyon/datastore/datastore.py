@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import sys_name
+from pyon.core.bootstrap import get_sys_name
 from pyon.core.exception import BadRequest, NotFound
 from pyon.util.containers import DotDict, get_ion_ts, get_safe
 from pyon.util.log import log
@@ -417,7 +417,7 @@ class DatastoreManager(object):
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
             return self._datastores[ds_name]
 
-        scoped_name = ("%s_%s" % (sys_name, ds_name)).lower()
+        scoped_name = ("%s_%s" % (get_sys_name(), ds_name)).lower()
 
         # Imports here to prevent cyclic module dependency
         from pyon.core.bootstrap import CFG
