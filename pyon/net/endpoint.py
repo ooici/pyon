@@ -2,7 +2,7 @@
 
 """Provides the communication layer above channels."""
 
-from pyon.core import bootstrap
+from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
@@ -517,7 +517,11 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         EndpointUnit._send(self, msg, headers=headers)
 
-        result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
+        try:
+            result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
+        except Timeout:
+            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (CFG.endpoint.receive.timeout, str(self.channel._send_name)))
+
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
