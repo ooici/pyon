@@ -99,6 +99,13 @@ def main(opts, *args, **kwargs):
     # The import of pyon.public triggers many module initializers:
     # pyon.core.bootstrap (Config load, logging setup), etc.
     from pyon.public import Container, CFG
+
+    # Check if user opted to override logging config
+    if opts.logcfg:
+        from pyon.util.config import initialize_logging
+        # Re-initialize logging
+        initialize_logging([opts.logcfg])
+
     from pyon.container.shell_api import get_shell_api
     # Set that system is not testing. We are running as standalone container
     CFG.system.testing = False
@@ -157,6 +164,7 @@ def entry():
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
+    parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file.')
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
