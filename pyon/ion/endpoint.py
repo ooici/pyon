@@ -75,7 +75,7 @@ class StreamPublisherRegistrar(object):
         xs_dot_xp = CFG.core_xps.science_data
         try:
             self.XS, xp_base = xs_dot_xp.split('.')
-            self.XP = '.'.join([bootstrap.sys_name, xp_base])
+            self.XP = '.'.join([bootstrap.get_sys_name(), xp_base])
         except ValueError:
             raise PublisherError('Invalid CFG for core_xps.science_data: "%s"; must have "xs.xp" structure' % xs_dot_xp)
 
@@ -187,7 +187,7 @@ class StreamSubscriberRegistrar(object):
         xs_dot_xp = CFG.core_xps.science_data
         try:
             self.XS, xp_base = xs_dot_xp.split('.')
-            self.XP = '.'.join([bootstrap.sys_name, xp_base])
+            self.XP = '.'.join([bootstrap.get_sys_name(), xp_base])
 
         except ValueError:
             raise PublisherError('Invalid CFG for core_xps.science_data: "%s"; must have "xs.xp" structure' % xs_dot_xp)

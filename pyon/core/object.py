@@ -4,8 +4,8 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
 __license__ = 'Apache 2.0'
 
 from collections import OrderedDict, Mapping, Iterable
-
-import yaml
+import pprint
+import StringIO
 
 from pyon.util.log import log
 try:
@@ -17,9 +17,6 @@ except ImportError as e:
 class IonObjectBase(object):
 
     def __str__(self):
-        """ This method will probably be too expensive to use frequently due to object allocation and YAML. """
-        # TODO: Add a yaml representer for IonObjects to match their tag constructors
-        
         return str(self.__dict__)
 
     def _validate(self):
@@ -91,7 +88,6 @@ class IonObjectBase(object):
 
     def __contains__(self, item):
         return hasattr(self, item)
-
 
 def walk(o, cb):
     """
@@ -231,3 +227,16 @@ class IonObjectDeserializer(IonObjectSerializationBase):
         return obj
 
 
+ion_serializer = IonObjectSerializer()
+
+# Pretty print IonObjects
+def ionprint(obj):
+    d = ion_serializer.serialize(obj)
+
+    fstream = StringIO.StringIO()
+
+    pprint.pprint(d, stream=fstream)
+
+    result = fstream.getvalue()
+    fstream.close()
+    return result
