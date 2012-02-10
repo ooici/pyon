@@ -37,6 +37,7 @@ class DataStream(AbstractIdentifiable):
         AbstractIdentifiable.__init__(self,name, id=stream_id)
 
         self._element_type = None
+        self._element_count = -1 #no inf for integers
         self._encoding = None
         self._values = None
 
@@ -49,7 +50,7 @@ class ElementType(AbstractIdentifiable):
     def __init__(self, name, stream_id, record_name):
         AbstractIdentifiable.__init__(self,name, id=stream_id)
 
-        self.data_record = None
+        self._data_record = None
 
     @property
     def data_record(self):
@@ -73,7 +74,7 @@ class DataRecord(AbstractIdentifiable):
         self._coverages = {}
 
     def add_coverage(self, coverage):
-        assert isinstance(coverage,BaseCoverage), "Add coverage argument must be an instance of coverage"
+        assert isinstance(coverage,BaseCoverage), "Add coverage argument must be an instance of BaseCoverage"
 
         self._coverages[coverage._id] = coverage
         return coverage
@@ -88,43 +89,65 @@ class BaseCoverage(AbstractIdentifiable):
         self._meta_data = {}
 
     def add_attribute(self,attribute):
-        assert isinstance(attribute,BaseCoverage), "Add coverage argument must be an instance of coverage"
+        assert isinstance(attribute,Attribute), "Add attribute argument must be an instance of Attribute"
 
         self._meta_data[attribute._id] = attribute
 
 class Domain(AbstractIdentifiable):
 
-    def __init__(self):
-        AbstractIdentifiable.__init__(self)
+    def __init__(self, mesh=None, name=None, id=None):
+        AbstractIdentifiable.__init__(self, name, id)
+
+        self._mesh = mesh
+
+        self._coordiante_system = {}
+        self._coordinates = {}
+
+
+    def add_coordinate(self, coordinate_name, coordinate_array):
+        self._coordiante_system[coordinate_name] = coordinate_array
 
 class Range(AbstractIdentifiable):
-    def __init__(self):
-        AbstractIdentifiable.__init__(self)
+    def __init__(self, array=None, definition=None, uom=None, name=None, id=None):
+        AbstractIdentifiable.__init__(self, name, id)
+
+
+class NilValues(AbstractIdentifiable):
+    def __init__(self, name=None, id=None):
+        AbstractIdentifiable.__init__(self, name, id)
+
+        self._nils = {}
+
+    def add_nil_val(self, value, reason):
+        self._nils[reason] = value
 
 
 class BaseMesh(AbstractIdentifiable):
-    def __init__(self, topological_dimension, geometric_dimension, name='', id=None):
+    def __init__(self, topological_dimension, geometric_dimension, name=None, id=None):
         AbstractIdentifiable.__init__(self, name, id)
 
         self._topo_dim = topological_dimension
         self._geo_dim = geometric_dimension
 
+        self.n_elements = -1
+        self.n_verticies = -1
 
 
 class ExplicitMesh(BaseMesh):
-    pass
+
+    def set_topology(self, array):
+        pass
+
+
 
 class ImplicitMesh(BaseMesh):
     pass
 
 
-class DataArray(AbstractIdentifiable):
-
-    def __init__(self):
-        AbstractIdentifiable.__init__(self)
-
-
-
+#class DataArray(AbstractIdentifiable):
+#
+#    def __init__(self):
+#        AbstractIdentifiable.__init__(self)
 
 
 class RecordPacketBuilder(object):
@@ -137,6 +160,9 @@ class RecordPacketBuilder(object):
         self._stream_record = stream_record
 
 
-    def add_record_data(self, field, values, map=None):
+    def add_coverage_range_data(self, coverage, values, map=None):
         pass
+
+    def add_domain_coordinate_data(self, domain, coordinate_name, values, map=None):
+       pass
 

@@ -1,6 +1,6 @@
 import numpy, h5py
 
-from prototype.hdf.science_object_codec import HDFEncoder, HDFDecoder
+from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder
 
 array1 = numpy.ones((4,5))
 array2 = numpy.ones((2,3))
