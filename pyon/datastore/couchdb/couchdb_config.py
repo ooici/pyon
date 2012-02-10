@@ -230,16 +230,16 @@ function(doc) {
     },
     'datasets': {
         "dataset_by_latlong": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = {\"lat\":doc.lattitude, \"long\":doc.longitude, \"lat_h\":doc.lattitude_hemisphere, \"long_h\":doc.longitude_hemisphere};\n        emit(pack,doc._id);\n    }\n}"
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = {\"lat\":doc.latitude, \"long\":doc.longitude, \"lat_h\":doc.latitude_hemisphere, \"long_h\":doc.longitude_hemisphere};\n        emit(pack,doc._id);\n    }\n}"
         },
         "dataset_by_lat": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.lattitude_hemisphere,doc.lattitude];\n        emit(pack,doc._id);\n    }\n}"
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc._id);\n    }\n}"
         },
         "dataset_by_long": {
             "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.longitude_hemisphere,doc.longitude];\n        emit(pack,doc._id);\n    }\n}"
         },
         "lat_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.lattitude_hemisphere,doc.lattitude];\n        emit(pack,doc.lattitude);\n    }\n}",
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
             "reduce": "\nfunction (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}\n"
         },
         "longitude_max": {
@@ -250,12 +250,12 @@ function(doc) {
             "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.longitude_hemisphere,doc.longitude];\n        emit(pack,doc.longitude);\n    }\n}",
             "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i] < min)\n            min = values[i];\n    }\n    return min;\n    \n}\n"
         },
-        "lattitude_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.lattitude_hemisphere,doc.lattitude];\n        emit(pack,doc.lattitude);\n    }\n}",
+        "latitude_max": {
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
             "reduce": "\nfunction (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}\n"
         },
-        "lattitude_min": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.lattitude_hemisphere,doc.lattitude];\n        emit(pack,doc.lattitude);\n    }\n}",
+        "latitude_min": {
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
             "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i] < min)\n            min = values[i];\n    }\n    return min;\n    \n}\n"
         },
         "dataset_by_depth": {
@@ -281,7 +281,7 @@ function(doc) {
             "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i].localeCompare(min) < 0)\n            min = values[i];\n    }\n    return min;\n    \n}"
         },
         "bounds": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc._id, {\"lat\":doc.lattitude,\"lon\":doc.longitude,\"time\":doc.time,\"depth\":doc.depth});       \n    }\n}",
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc._id, {\"lat\":doc.latitude,\"lon\":doc.longitude,\"time\":doc.time,\"depth\":doc.depth});       \n    }\n}",
             "reduce": "function(keys, values, rereduce) {\n    var min_lat = 0.0;\n    var min_lon = 0.0;\n    var min_time = \"\";\n    var min_depth = 0.0;\n    var max_lat=0.0;\n    var max_lon=0.0;\n    var max_time=\"\";\n    var max_depth=0.0;\n    if(! rereduce)\n    {\n        for(var i in values) { \n        \n            if(values[i].lat > max_lat)\n                max_lat = values[i].lat;\n            if(values[i].lon > max_lon)\n                max_lon = values[i].lon;\n            if(values[i].time.localeCompare(max_time) > 0)\n                max_time = values[i].time;\n            if(values[i].depth > max_depth)\n                max_depth = values[i].depth;\n        \n            if(min_lat == 0.0)\n                min_lat = values[i].lat;\n            if(min_lon == 0.0)\n                min_lon = values[i].lon;\n            if(min_time.localeCompare(\"\")==0)\n                min_time = values[i].time;\n            if(min_depth==0.0) \n                min_depth = values[i].depth;\n            if(values[i].lat < min_lat)\n                min_lat = values[i].lat;\n            if(values[i].lon < min_lon)\n                min_lon = values[i].lon;\n            if(values[i].time.localeCompare(min_time) < 0)\n                min_time = values[i].time;\n            if(values[i].depth < min_depth)\n                min_depth = values[i].depth;\n        }\n        \n        return {\"min_lat\":min_lat, \"min_lon\":min_lon, \"min_time\":min_time, \"min_depth\":min_depth,\n            \"max_lat\":max_lat, \"max_lon\":max_lon, \"max_time\":max_time, \"max_depth\":max_depth};\n    }\n    for(var i in values) {\n        if(values[i].max_lat > max_lat)\n            max_lat = values[i].max_lat;\n        if(values[i].max_lon > max_lon)\n            max_lon = values[i].max_lon;\n        if(values[i].max_time.localeCompare(max_time) > 0)\n            max_time = values[i].max_time;\n        if(values[i].max_depth > max_depth)\n            max_depth = values[i].max_depth;\n        if(min_lat == 0.0)\n            min_lat = values[i].min_lat;\n        if(min_lon == 0.0)\n            min_lon = values[i].min_lon;\n        if(min_time.localeCompare(\"\")==0)\n            min_time = values[i].min_time;\n        if(min_depth==0.0) \n            min_depth = values[i].min_depth;\n        if(values[i].min_lat < min_lat)\n            min_lat = values[i].min_lat;\n        if(values[i].min_lon < min_lon)\n            min_lon = values[i].min_lon;\n        if(values[i].min_time.localeCompare(min_time) < 0)\n            min_time = values[i].min_time;\n        if(values[i].min_depth < min_depth)\n            min_depth = values[i].min_depth;\n    }\n    return {\"min_lat\":min_lat, \"min_lon\":min_lon, \"min_time\":min_time, \"min_depth\":min_depth,\n        \"max_lat\":max_lat, \"max_lon\":max_lon, \"max_time\":max_time, \"max_depth\":max_depth};\n}"
         }
     
