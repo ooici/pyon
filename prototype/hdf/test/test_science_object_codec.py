@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 '''
-@file ion/services/dm/distribution/test/test_pubsub.py
+@file prototype/hdf/test_science_object_codec.py
 @author Swarbhanu Chatterjee
-@test ion.services.dm.distribution.pubsub_management_service Unit test suite to cover all pub sub mgmt service code
 '''
 
 from mock import Mock, sentinel, patch
@@ -26,8 +25,8 @@ import uuid
 import hashlib
 import os, os.path, glob
 
-from prototype.hdf.science_object_codec import HDFEncoder, HDFDecoder
-from prototype.hdf.science_object_codec import HDFEncoderException, HDFDecoderException
+from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder
+from prototype.hdf.hdf_codec import HDFEncoderException, HDFDecoderException
 no_numpy_h5py = False
 
 @attr('UNIT', group='dm')
