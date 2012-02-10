@@ -89,10 +89,10 @@ class Container(BaseContainerAgent):
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:
-            from pyon.core.bootstrap import sys_name
+            from pyon.core.bootstrap import get_sys_name
             pid_contents = {'messaging': dict(CFG.server.amqp),
                             'container-agent': self.name,
-                            'container-xp': sys_name }
+                            'container-xp': get_sys_name() }
             f.write(msgpack.dumps(pid_contents))
             atexit.register(self._cleanup_pid)
 

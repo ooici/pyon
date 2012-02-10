@@ -243,7 +243,7 @@ class BaseEndpoint(object):
         """
 
         if not isinstance(name, tuple):
-            name = (bootstrap.sys_name, name)
+            name = (bootstrap.get_sys_name(), name)
 
         self.node = node
         self.name = name
@@ -289,7 +289,7 @@ class BaseEndpoint(object):
             name = to_name or self.name
             assert name
             if not isinstance(name, tuple):
-                name = (bootstrap.sys_name, name)
+                name = (bootstrap.get_sys_name(), name)
 
             self._ensure_node()
             ch = self.node.channel(self.channel_type)
