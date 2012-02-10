@@ -394,6 +394,11 @@ class DataStore(object):
         elif not restype and not lcstate and not name:
             return self.find_res_by_type(None, None, id_only)
 
+    def _preload_create_doc(self, doc):
+        """
+        Stealth method used to force pre-defined objects into the data store
+        """
+        pass
 
 class DatastoreManager(object):
     """
@@ -458,6 +463,9 @@ class DatastoreManager(object):
         self._datastores[ds_name] = new_ds
 
         return new_ds
+    
+    def exists(self, ds_name):
+        return ds_name in self._datastores
 
     def start(self):
         pass

@@ -188,6 +188,22 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
+
+    def _preload_create_doc(self, doc):
+        log.info('Preloading object %s/%s' % (self.datastore_name, doc["_id"]))
+        log.debug('create doc contents: %s', doc)
+
+        # Save doc.  CouchDB will assign version to doc.
+        try:
+            res = self.server[self.datastore_name].save(doc)
+        except ResourceNotFound:
+            raise BadRequest("Data store %s does not exist" % self.datastore_name)
+        except ResourceConflict:
+            raise BadRequest("Object with id %s already exist" % doc["_id"])
+        except ValueError:
+            raise BadRequest("Data store name %s invalid" % self.datastore_name)
+        log.debug('Create result: %s' % str(res))
+
     def create_mult(self, objects, object_ids=None):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
             raise BadRequest("Obj param is not instance of IonObjectBase")
