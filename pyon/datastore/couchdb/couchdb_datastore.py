@@ -1007,7 +1007,8 @@ class CouchDB_DataStore(DataStore):
         # \_ Split it into a dict with a key and a value
         #    Recursively parse down through the structure.
         if isinstance(doc,Row):
-            ret['id'] = doc['id']
+            if 'id' in doc:
+                ret['id'] = doc['id']
             ret['key'] = self._parse_results(doc['key'])
             ret['value'] = self._parse_results(doc['value'])
             if 'doc' in doc:
