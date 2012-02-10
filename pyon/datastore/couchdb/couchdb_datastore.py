@@ -1035,7 +1035,7 @@ class CouchDB_DataStore(DataStore):
                 # IonObject
                 return self._persistence_dict_to_ion_object(doc)
 
-            for key,value in doc:
+            for key,value in doc.iteritems():
                 ret[key] = self._parse_results(value)
             return ret
 

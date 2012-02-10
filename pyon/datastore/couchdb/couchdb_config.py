@@ -279,6 +279,14 @@ function(doc) {
         "time_min": {
             "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc.time, doc.time);       \n    }\n}",
             "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i].localeCompare(min) < 0)\n            min = values[i];\n    }\n    return min;\n    \n}"
+        },
+        "bulk_max": {
+            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc._id, {\"lat\":doc.lattitude,\"lon\":doc.longitude,\"time\":doc.time,\"depth\":doc.depth});       \n    }\n}",
+            "reduce": "function (keys,values,rereduce) {\n    var max_lat=0.0;\n    var max_lon=0.0;\n    var max_time=\"\";\n    var max_depth=0.0;\n    for(var i in values){\n        if(values[i].lat > max_lat)\n            max_lat = values[i].lat;\n        if(values[i].lon > max_lon)\n            max_lon = values[i].lon;\n        if(values[i].time.localeCompare(max_time) > 0)\n            max_time = values[i].time;\n        if(values[i].depth > max_depth)\n            max_depth = values[i].depth;\n    }\n    return {\"lat\":max_lat,\"lon\":max_lon,\"time\":max_time,\"depth\":max_depth};\n}"
+        },
+        "bulk_min": {
+            "map": "function(doc) {\n  emit(doc._id, {\"lat\":doc.lattitude, \"lon\":doc.longitude, \"time\":doc.time, \"depth\":doc.depth});\n}",
+            "reduce": "/* Bulk Min */\nfunction(keys, values, rereduce) {\n    var min_lat = 0.0;\n    var min_lon = 0.0;\n    var min_time = \"\";\n    var min_depth = 0.0;\n    for(var i in values) { \n        if(min_lat == 0.0)\n            min_lat = values[i].lat;\n        if(min_lon == 0.0)\n            min_lon = values[i].lon;\n        if(min_time.localeCompare(\"\")==0)\n            min_time = values[i].time;\n        if(min_depth==0.0) \n            min_depth = values[i].depth;\n        if(values[i].lat < min_lat)\n            min_lat = values[i].lat;\n        if(values[i].lon < min_lon)\n            min_lon = values[i].lon;\n        if(values[i].time.localeCompare(min_time) < 0)\n            min_time = values[i].time;\n        if(values[i].depth < min_depth)\n            min_depth = values[i].depth;\n    }\n    return {\"lat\":min_lat, \"lon\":min_lon, \"time\":min_time, \"depth\":min_depth};\n}"
         }
     
     }
