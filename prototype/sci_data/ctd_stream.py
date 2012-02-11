@@ -14,12 +14,16 @@ from interface.objects import QuantityElement, QuantityRangeElement, TimeElement
 from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
 from interface.objects import DataStream, ElementType, DataRecord, Vector, Coverage, RangeSet, Domain, Mesh, CoordinateAxis, Encoding
 
+from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
 
+from pyon.util.log import log
 
-
+import numpy as np
 
 def ctd_stream_definition(stream_id=None):
     """
+    This is a convenience method to construct a CTD data stream definition object. More generic stream definition
+     constructors will be added later.
     @brief creates an ion object containing the definition of a seabird ctd data stream
     @param stream_id is the resource id of the data stream for this definition
     @retval ctd_container is an ion object which contains the definition of the stream
@@ -190,6 +194,23 @@ def ctd_stream_definition(stream_id=None):
 
 
 def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None):
+    """
+    This is a simple interface for creating a packet of ctd data for a given stream defined by the method above.
+    The string names of content are tightly coupled to the method above.
+    To send actual data you must have hdf5, numpy and h5py installed.
+
+    @brief build a demo ctd data packet as an ion object. All values arguments are optional, but any argument provided
+    should have the same length. The length is not enforced at this time.
+    
+    @param stream_id should be the same as the stream_id for the definition
+    @param c is a list, tuple or ndarray of conductivity values
+    @param t is a list, tuple or ndarray of temperature values
+    @param p is a list, tuple or ndarray of presure values
+    @param lat is a list, tuple or ndarray of latitude values
+    @param lon is a list, tuple or ndarray of longitude values
+    @param time is a list, tuple or ndarray of time values
+
+    """
 
     c_range = []
     if c is not None:
@@ -215,6 +236,32 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     if time is not None:
         time_range = [min(time), max(time)]
 
+    hdf_string = ''
+    try:
+        encoder = HDFEncoder()
+        if t is not None:
+            encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))
+
+        if c is not None:
+            encoder.add_hdf_dataset('fields/cndr_data', np.asanyarray(c))
+
+        if p is not None:
+            encoder.add_hdf_dataset('fields/pressure_data',np.asanyarray(p))
+
+        if lat is not None:
+            encoder.add_hdf_dataset('coordinates/latitude', np.asanyarray(lat))
+
+        if lon is not None:
+            encoder.add_hdf_dataset('coordinates/longitude',np.asanyarray(lon))
+
+        if time is not None:
+            encoder.add_hdf_dataset('coordinates/time',np.asanyarray(time))
+
+        hdf_string = encoder.encoder_close()
+    except :
+        log.exception('HDF encoder failed. Please make sure you have it properly installed!')
+
+
 
     # build a hdf file here
 
@@ -224,7 +271,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
     ctd_container.identifiables['ctd_data'] = DataStream(
         id=stream_id,
-        values=None # put the hdf file here as bytes!
+        values=hdf_string # put the hdf file here as bytes!
     )
 
     ctd_container.identifiables['record_count'] = CountElement(

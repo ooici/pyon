@@ -41,7 +41,7 @@ import hashlib
 import os
 import os.path
 import sys
-from pyon.public import log
+from pyon.util.log import log
 from pyon.core.exception import IonException
 
 try:
@@ -251,7 +251,13 @@ class HDFEncoder(object):
             assert lowest_subgroup.get(name_of_dataset) is None, 'The dataset %s already exists in the file.' % name_of_dataset
 
             # create a dataset and hang it under the just created group...
-            dataset = lowest_subgroup.create_dataset(name_of_dataset, nparray.shape, nparray.dtype.str, maxshape=(None,None))
+            shape = nparray.shape
+            dataset = lowest_subgroup.create_dataset(name_of_dataset,
+                shape,
+                nparray.dtype.str,
+                maxshape=([None for rank in range(len(shape))])
+                )
+
             assert dataset, 'Unable to create dataset.'
             # write the array in the dataset
             dataset.write_direct(nparray)
