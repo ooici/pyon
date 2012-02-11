@@ -86,6 +86,9 @@ class IonObjectBase(object):
                     if isinstance(subval, IonObjectBase):
                         subval._validate()
 
+    def _get_type(self):
+        return self.__class__.__name__
+
     def __contains__(self, item):
         return hasattr(self, item)
 
