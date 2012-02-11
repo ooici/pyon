@@ -200,7 +200,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     To send actual data you must have hdf5, numpy and h5py installed.
 
     @brief build a demo ctd data packet as an ion object. All values arguments are optional, but any argument provided
-    should have the same length. The length is not enforced at this time.
+    should have the same length.
     
     @param stream_id should be the same as the stream_id for the definition
     @param c is a list, tuple or ndarray of conductivity values
@@ -211,36 +211,76 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     @param time is a list, tuple or ndarray of time values
 
     """
+    length = False
+
+    def listify(input):
+        if hasattr(input, '__iter__'):
+            return input
+        else:
+            return [input,]
+
 
     c_range = []
     if c is not None:
+        c = listify(c)
         c_range = [min(c), max(c)]
+        if length:
+            assert length == len(c), 'Conductivity input is the wrong length'
+        else:
+            length = len(c)
 
     t_range = []
     if t is not None:
+        t = listify(t)
         t_range = [min(t), max(t)]
+        if length:
+            assert length == len(t), 'Temperature input is the wrong length'
+        else:
+            length = len(t)
 
     p_range = []
     if p is not None:
+        p = listify(p)
         p_range = [min(p), max(p)]
+        if length:
+            assert length == len(p), 'Pressure input is the wrong length'
+        else:
+            length = len(p)
 
     lat_range = []
     if lat is not None:
+        lat = listify(lat)
         lat_range = [min(lat), max(lat)]
+        if length:
+            assert length == len(lat), 'Latitude input is the wrong length'
+        else:
+            length = len(lat)
 
     lon_range = []
     if lon is not None:
+        lon = listify(lon)
         lon_range = [min(lon), max(lon)]
+        if length:
+            assert length == len(lon), 'Longitude input is the wrong length'
+        else:
+            length = len(lon)
 
     time_range = []
     if time is not None:
+        time = listify(time)
         time_range = [min(time), max(time)]
+        if length:
+            assert length == len(time), 'Time input is the wrong length'
+        else:
+            length = len(time)
+
 
     hdf_string = ''
     try:
         encoder = HDFEncoder()
         if t is not None:
             encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))
+
 
         if c is not None:
             encoder.add_hdf_dataset('fields/cndr_data', np.asanyarray(c))
@@ -275,8 +315,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     )
 
     ctd_container.identifiables['record_count'] = CountElement(
-        value=1,
-        constraint=AllowedValues(intervals=[time_range,])
+        value= length or -1,
         )
 
     # Time
