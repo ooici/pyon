@@ -315,7 +315,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     # data stream id is the identifier for the DataStream object - the root of the data structure
     ctd_container = StreamGranuleContainer(
         stream_resource_id=stream_id,
-        data_stream_id= stream_id
+        data_stream_id= 'ctd_data'
     )
 
 
