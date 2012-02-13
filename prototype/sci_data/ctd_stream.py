@@ -309,7 +309,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     # build a hdf file here
 
 
-    ctd_container = DataContainer(stream_id='ctd_data')
+    ctd_container = DataContainer(stream_id=stream_id)
 
     if create_hdf:
         ctd_container.identifiables['ctd_data'] = DataStream(
