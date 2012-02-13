@@ -192,7 +192,7 @@ def ctd_stream_definition(stream_id=None):
     return ctd_container
 
 
-def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None):
+def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None, create_hdf=True):
     """
     This is a simple interface for creating a packet of ctd data for a given stream defined by the method above.
     The string names of content are tightly coupled to the method above.
@@ -275,33 +275,34 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
 
     hdf_string = ''
-    try:
-        # Use inline import to put off making numpy a requirement
-        import numpy as np
+    if create_hdf:
+        try:
+            # Use inline import to put off making numpy a requirement
+            import numpy as np
 
-        encoder = HDFEncoder()
-        if t is not None:
-            encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))
+            encoder = HDFEncoder()
+            if t is not None:
+                encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))
 
 
-        if c is not None:
-            encoder.add_hdf_dataset('fields/cndr_data', np.asanyarray(c))
+            if c is not None:
+                encoder.add_hdf_dataset('fields/cndr_data', np.asanyarray(c))
 
-        if p is not None:
-            encoder.add_hdf_dataset('fields/pressure_data',np.asanyarray(p))
+            if p is not None:
+                encoder.add_hdf_dataset('fields/pressure_data',np.asanyarray(p))
 
-        if lat is not None:
-            encoder.add_hdf_dataset('coordinates/latitude', np.asanyarray(lat))
+            if lat is not None:
+                encoder.add_hdf_dataset('coordinates/latitude', np.asanyarray(lat))
 
-        if lon is not None:
-            encoder.add_hdf_dataset('coordinates/longitude',np.asanyarray(lon))
+            if lon is not None:
+                encoder.add_hdf_dataset('coordinates/longitude',np.asanyarray(lon))
 
-        if time is not None:
-            encoder.add_hdf_dataset('coordinates/time',np.asanyarray(time))
+            if time is not None:
+                encoder.add_hdf_dataset('coordinates/time',np.asanyarray(time))
 
-        hdf_string = encoder.encoder_close()
-    except :
-        log.exception('HDF encoder failed. Please make sure you have it properly installed!')
+            hdf_string = encoder.encoder_close()
+        except :
+            log.exception('HDF encoder failed. Please make sure you have it properly installed!')
 
 
 
@@ -310,11 +311,15 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
     ctd_container = DataContainer(stream_id='ctd_data')
 
-
-    ctd_container.identifiables['ctd_data'] = DataStream(
-        id=stream_id,
-        values=hdf_string # put the hdf file here as bytes!
-    )
+    if create_hdf:
+        ctd_container.identifiables['ctd_data'] = DataStream(
+            id=stream_id,
+            values=hdf_string # put the hdf file here as bytes!
+        )
+    else:
+        ctd_container.identifiables['ctd_data'] = DataStream(
+            id=stream_id,
+        )
 
     ctd_container.identifiables['record_count'] = CountElement(
         value= length or -1,
