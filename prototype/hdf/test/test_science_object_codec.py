@@ -187,7 +187,7 @@ class TestScienceObjectCodec(PyonTestCase):
 
         # encode the array and get the binary string containing the encoded hdf file
         hdfencoder = HDFEncoder() # put the array in the encoder...
-        hdfencoder.add_hdf_dataset(self.path_to_dataset, self.known_array)
+        hdfencoder.add_hdf_dataset(self.path_to_dataset, nparray)
         hdf_string = hdfencoder.encoder_close() # get string out
 
         # compare the two strings
