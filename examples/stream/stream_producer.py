@@ -3,8 +3,7 @@
 __author__ = 'Michael Meisinger'
 
 import time
-import threading
-
+from gevent.greenlet import Greenlet
 from pyon.public import log, ProcessPublisher, SimpleProcess
 
 from pyon.core import bootstrap
@@ -34,14 +33,15 @@ class StreamProducer(SimpleProcess):
         log.debug("StreamProducer init. Self.id=%s" % self.id)
 
     def on_start(self):
-
         log.debug("StreamProducer start")
-        # Threads become efficent Greenlets with gevent
-        self.producer_proc = threading.Thread(target=self._trigger_func)
+        self.producer_proc = Greenlet(self._trigger_func)
         self.producer_proc.start()
+
 
     def on_quit(self):
         log.debug("StreamProducer quit")
+        self.process_proc.kill()
+        super(StreamProducer,self).on_quit()
 
     def _trigger_func(self):
         interval = self.CFG.get('stream_producer').get('interval')
