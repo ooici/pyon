@@ -839,11 +839,11 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
         
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # fwd on ion-user-id and expiry, according to common message format spec
-            user_id             = context.get('ion-user-id', None)
+            # fwd on ion-actor-id and expiry, according to common message format spec
+            actor_id             = context.get('ion-actor-id', None)
             expiry              = context.get('expiry', None)
 
-            if user_id:         header['ion-user-id']   = user_id
+            if user_id:         header['ion-actor-id']   = actor_id
             if expiry:          header['expiry']        = expiry
 
         return header

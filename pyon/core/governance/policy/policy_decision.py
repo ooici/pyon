@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+    #!/usr/bin/env python
 
 
 __author__ = 'Stephen P. Henrie'
@@ -63,15 +63,15 @@ class PolicyDecisionPoint(object):
     def create_request_from_message(self, invocation):
 
 
-        ion_user_id = invocation.headers['ion-user-id'] if invocation.headers.has_key('ion-user-id') and invocation.headers['ion-user-id'] != '' else 'anonymous'
+        ion_actor_id = invocation.headers['ion-actor-id'] if invocation.headers.has_key('ion-actor-id') and invocation.headers['ion-actor-id'] != '' else 'anonymous'
         ion_org_id = invocation.headers['ion-org-id'] if invocation.headers.has_key('ion-org-id') and  invocation.headers['ion-org-id'] != '' else 'no-ooi'
         receiver = invocation.headers['receiver'] if invocation.headers.has_key('receiver') and  invocation.headers['receiver']  != '' else 'Unknown'
         op = invocation.headers['op'] if invocation.headers.has_key('op') and  invocation.headers['op'] != '' else 'Unknown'
 
-        log.debug("XACML Request: ion-user-id:%s ion-org-id:%s receiver:%s op:%s " % (ion_user_id,ion_org_id, receiver, op))
+        log.debug("XACML Request: ion_actor_id:%s ion-org-id:%s receiver:%s op:%s " % (ion_actor_id,ion_org_id, receiver, op))
         request = Request()
         subject = Subject()
-        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_user_id))
+        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID_QUALIFIER, ion_org_id))
 
         #subject.attributes.append(createStringAttribute(ROLE_ATTRIBUTE_ID, 'researcher'))
