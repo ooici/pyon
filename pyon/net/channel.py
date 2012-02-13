@@ -38,12 +38,12 @@ TODO:
 point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
-
 from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
 from contextlib import contextmanager
 from gevent.event import AsyncResult
+from pyon.net.transport import BaseTransport, AMQPTransport
 
 class ChannelError(StandardError):
     """
@@ -71,15 +71,19 @@ class BaseChannel(object):
     _exchange_auto_delete       = True
     _exchange_durable           = False
 
-    def __init__(self, close_callback=None):
+    def __init__(self, transport=None, close_callback=None):
         """
         Initializes a BaseChannel instance.
 
+        @param  transport       Underlying transport used for broker communication. Can be None, if so, will
+                                use the AMQPTransport stateless singleton.
+        @type   transport       BaseTransport
         @param  close_callback  The method to invoke when close() is called on this BaseChannel. May be left as None,
                                 in which case close_impl() will be called. This expects to be a callable taking one
                                 param, this channel instance.
         """
         self.set_close_callback(close_callback)
+        self._transport = transport or AMQPTransport.get_instance()
 
     def set_close_callback(self, close_callback):
         """
@@ -112,15 +116,17 @@ class BaseChannel(object):
         assert self._exchange
 
         self._ensure_amq_chan()
+        assert self._transport
 
         # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
         log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
                                                                  self._exchange_durable, self._exchange_auto_delete)
 
-        self._sync_call(self._amq_chan.exchange_declare, 'callback', exchange=self._exchange,
-                                                                type=self._exchange_type,
-                                                                durable=self._exchange_durable,
-                                                                auto_delete=self._exchange_auto_delete)
+        self._transport.declare_exchange_impl(self._amq_chan,
+                                              self._exchange,
+                                              exchange_type=self._exchange_type,
+                                              durable=self._exchange_durable,
+                                              auto_delete=self._exchange_auto_delete)
 
     def attach_underlying_channel(self, amq_chan):
         """
@@ -381,10 +387,12 @@ class RecvChannel(BaseChannel):
         assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
 
         self._ensure_amq_chan()
+        assert self._transport
 
-        self._sync_call(self._amq_chan.queue_unbind, 'callback', queue=self._recv_name[1],
-                                                                 exchange=self._recv_name[0],
-                                                                 routing_key=self._recv_binding)
+        self._transport.unbind_impl(self._amq_chan,
+                                    exchange=self._recv_name[0],
+                                    queue=self._recv_name[1],
+                                    binding=self._recv_binding)
 
     def _destroy_queue(self):
         """
@@ -394,9 +402,11 @@ class RecvChannel(BaseChannel):
         assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1]
 
         self._ensure_amq_chan()
+        assert self._transport
 
         log.info("Destroying listener for queue %s", self._recv_name)
-        self._sync_call(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
+        self._transport.delete_queue_impl(self._amq_chan,
+                                          queue=self._recv_name[1])
 
     def start_consume(self):
         """
@@ -477,15 +487,13 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         log.debug("RecvChannel._declare_queue: %s", queue)
-        frame = self._sync_call(self._amq_chan.queue_declare, 'callback',
-                                                              queue=queue or '',
-                                                              auto_delete=self._queue_auto_delete,
-                                                              durable=self._queue_durable)
+        queue_name = self._transport.declare_queue_impl(self._amq_chan,
+                                                        queue=queue or '',
+                                                        auto_delete=self._queue_auto_delete,
+                                                        durable=self._queue_durable)
 
-        # if the queue was anon, save it
-        #if queue is None:
         # always save the new recv_name - we may have created a new one
-        self._recv_name = (self._recv_name[0], frame.method.queue)
+        self._recv_name = (self._recv_name[0], queue_name)
 
         return self._recv_name[1]
 
@@ -496,10 +504,10 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
         
         queue = self._recv_name[1]
-        self._sync_call(self._amq_chan.queue_bind, 'callback',
-                                                   queue=queue,
-                                                   exchange=self._recv_name[0],
-                                                   routing_key=binding)
+        self._transport.bind_impl(self._amq_chan,
+                                  exchange=self._recv_name[0],
+                                  queue=queue,
+                                  binding=binding)
 
         self._recv_binding = binding
 
