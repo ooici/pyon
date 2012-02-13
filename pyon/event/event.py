@@ -483,6 +483,22 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
     """
     pass
 
+class StreamIngestionPolicyEventPublisher(ResourceModifiedEventPublisher):
+    """
+    Event Notification Subscriber for Stream Ingestion Policy change Events
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    msg_type = "StreamIngestionPolicyEvent"
+    event_name  = "STREAM_INGESTION_POLICY_EVENT"
+
+class StreamIngestionPolicyEventSubscriber(ResourceModifiedEventSubscriber):
+    """
+    Event Notification Subscriber for Stream Ingestion Policy change Events
+
+    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
+    """
+    event_name  = "STREAM_INGESTION_POLICY_EVENT"
 
 
 
