@@ -161,12 +161,13 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _force_clean(self):
     # Force clean Couch in between tests, which is taken care of normally during process_start.
-        from pyon.core.bootstrap import get_sys_name
-        things_to_clean = ["%s_%s" % (str(get_sys_name()).lower(), thing_name) for thing_name in ('resources', 'objects', 'directory', 'events', 'state')]
+        from pyon.core.bootstrap import sys_name
         if CFG.system.mockdb:
             datastore = MockDB_DataStore()
         else:
             datastore = CouchDB_DataStore()
+        dbs = datastore.list_datastores()
+        things_to_clean = filter(lambda x: x.startswith('%s_' % sys_name), dbs)
         try:
             for thing in things_to_clean:
                 datastore.delete_datastore(datastore_name=thing)
