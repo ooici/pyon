@@ -18,7 +18,6 @@ from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder,
 
 from pyon.util.log import log
 
-import numpy as np
 
 def ctd_stream_definition(stream_id=None):
     """
@@ -277,6 +276,9 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
     hdf_string = ''
     try:
+        # Use inline import to put off making numpy a requirement
+        import numpy as np
+
         encoder = HDFEncoder()
         if t is not None:
             encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))

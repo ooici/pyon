@@ -44,11 +44,6 @@ import sys
 from pyon.util.log import log
 from pyon.core.exception import IonException
 
-try:
-    import h5py
-    import numpy
-except ImportError:
-    log.warn('h5py and numpy have not been installed. Some features of the science object transport framework will not work!')
 
 class ScienceObjectTransportException(IonException):
     """
@@ -84,6 +79,7 @@ class ScienceObjectTransport(object):
         """
         Can be a metadata packet or a supplement. Create or update the content of the science object.
         """
+        pass
 
 class HDFEncoderException(ScienceObjectTransportException):
     """
@@ -117,6 +113,9 @@ class HDFEncoder(object):
             self.filename = '/tmp/' + self.random_name() + 'encoder.hdf5'
         else:
             self.filename = name
+
+        # Using inline imports to put off making hdf/numpy required dependencies
+        import h5py
 
         # open an hdf file on disk - in /tmp to write data to since we can't yet do in memory
         try:
@@ -193,6 +192,8 @@ class HDFEncoder(object):
         # ------------
         # (lowest_subgroup: '', dataset: '')
         #
+        # Using inline imports to put off making hdf/numpy required dependencies
+
         try:
             name = self.assert_valid_name(name)
             tree_list, dataset = self.create_pathname(name)
@@ -235,6 +236,11 @@ class HDFEncoder(object):
         # ------------
         # {success: true}
         #
+
+        # Using inline imports to put off making hdf/numpy required dependencies
+        import numpy
+
+
         try:
             assert isinstance(nparray, numpy.ndarray), '2nd argument of method add_hdf_dataset() is not a numpy array!'
             # check that that the input arguments are of the type they are supposed to be
@@ -358,6 +364,11 @@ class HDFDecoder(object):
         # ------------
         # nparray: numpy.ndarray
         #
+
+        # Using inline imports to put off making hdf/numpy required dependencies
+        import h5py
+        import numpy
+
         try:
             # assert that the input field is a string
             assert isinstance(name, basestring),\
