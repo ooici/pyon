@@ -843,7 +843,7 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             actor_id             = context.get('ion-actor-id', None)
             expiry              = context.get('expiry', None)
 
-            if user_id:         header['ion-actor-id']   = actor_id
+            if actor_id:         header['ion-actor-id']   = actor_id
             if expiry:          header['expiry']        = expiry
 
         return header
