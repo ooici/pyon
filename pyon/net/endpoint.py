@@ -12,6 +12,7 @@ from pyon.util.async import spawn, switch
 from pyon.util.log import log
 
 from gevent import event, coros
+from gevent.timeout import Timeout
 from zope import interface
 import uuid
 
