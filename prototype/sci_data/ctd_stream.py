@@ -6,7 +6,7 @@
 @description An example process producing a ctd data stream
 '''
 
-from interface.objects import DataContainer
+from interface.objects import DataContainer, StreamDefinitionContainer, StreamGranuleContainer
 from interface.objects import UnitReferenceProperty, NilValue, ElapsedTime, AllowedTokens, AllowedValues, AllowedTimes
 from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
 from interface.objects import BooleanElement, TextElement, CategoryElement, CountElement, CountRangeElement
@@ -28,7 +28,11 @@ def ctd_stream_definition(stream_id=None):
     @retval ctd_container is an ion object which contains the definition of the stream
     """
 
-    ctd_container = DataContainer(stream_id='ctd_data')
+    # data stream id is the identifier for the DataStream object - the root of the data structure
+    ctd_container = StreamDefinitionContainer(
+        stream_resource_id=stream_id,
+        data_stream_id= 'ctd_data',
+        )
 
 
     ctd_container.identifiables['ctd_data'] = DataStream(
@@ -201,7 +205,7 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     @brief build a demo ctd data packet as an ion object. All values arguments are optional, but any argument provided
     should have the same length.
     
-    @param stream_id should be the same as the stream_id for the definition
+    @param stream_id should be the same as the stream_id for the definition - the stream resource ID
     @param c is a list, tuple or ndarray of conductivity values
     @param t is a list, tuple or ndarray of temperature values
     @param p is a list, tuple or ndarray of presure values
@@ -307,8 +311,11 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
     # build a hdf file here
 
-
-    ctd_container = DataContainer(stream_id='ctd_data')
+    # data stream id is the identifier for the DataStream object - the root of the data structure
+    ctd_container = StreamGranuleContainer(
+        stream_resource_id=stream_id,
+        data_stream_id= 'ctd_data'
+    )
 
 
     ctd_container.identifiables['ctd_data'] = DataStream(
