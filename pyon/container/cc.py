@@ -53,13 +53,13 @@ class Container(BaseContainerAgent):
         Container.instance = self
 
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
-        dict_merge(CFG, kwargs)
+        dict_merge(CFG, kwargs, inplace=True)
         from pyon.core import bootstrap
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
-        self.spawn_args = DictModifier(CFG, kwargs)
+        self.spawn_args = kwargs
 
         # Load object and service registry etc.
         bootstrap_pyon()

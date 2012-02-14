@@ -123,7 +123,7 @@ def main(opts, *args, **kwargs):
         # One off process
         mod, proc = opts.proc.rsplit('.', 1)
         print "Starting process %s" % opts.proc
-        container.spawn_process(proc, mod, proc, process_type='immediate')
+        container.spawn_process(proc, mod, proc, config={'process':{'type':'immediate'}})
         container.stop()
         return
 

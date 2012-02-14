@@ -138,21 +138,18 @@ def quacks_like_dict(object):
     """Check if object is dict-like"""
     return isinstance(object, collections.Mapping)
 
-def dict_merge(a, b):
-    """Merge two deep dicts non-destructively
-
-    Uses a stack to avoid maximum recursion depth exceptions
-
-    >>> a = {'a': 1, 'b': {1: 1, 2: 2}, 'd': 6}
-    >>> b = {'c': 3, 'b': {2: 7}, 'd': {'z': [1, 2, 3]}}
-    >>> c = merge(a, b)
-    >>> from pprint import pprint; pprint(c)
-    {'a': 1, 'b': {1: 1, 2: 7}, 'c': 3, 'd': {'z': [1, 2, 3]}}
+def dict_merge(base, upd, inplace=False):
+    """Merge two deep dicts non-destructively.
+    Uses a stack to avoid maximum recursion depth exceptions.
+    @param base the dict to merge into
+    @param upd the content to merge
+    @param inplace change base if True
+    @retval the merged dict (base of inplace else a merged copy)
     """
-    assert quacks_like_dict(a), quacks_like_dict(b)
-    dst = a.copy()
+    assert quacks_like_dict(base), quacks_like_dict(upd)
+    dst = base if inplace else base.copy()
 
-    stack = [(dst, b)]
+    stack = [(dst, upd)]
     while stack:
         current_dst, current_src = stack.pop()
         for key in current_src:

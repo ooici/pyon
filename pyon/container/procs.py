@@ -15,7 +15,7 @@ from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistr
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
-from pyon.util.containers import DictModifier, DotDict, for_name, named_any
+from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe
 from pyon.util.log import log
 
 
@@ -72,8 +72,17 @@ class ProcManager(object):
         process_id =  "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
         log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s", name, module, cls, process_id)
 
-        if config is None:
+        if not config:
+            # Use system CFG. It has the command line args in it
             config = DictModifier(CFG)
+        else:
+            # Use provided config. Must be dict or DotDict
+            if not isinstance(config, DotDict):
+                config = DotDict(config)
+            config = DictModifier(CFG, config)
+            if self.container.spawn_args:
+                # Override config with spawn args
+                dict_merge(config, self.container.spawn_args, inplace=True)
 
         log.debug("spawn_process() pid=%s config=%s", process_id, config)
 
@@ -81,7 +90,7 @@ class ProcManager(object):
         # One of: service, stream_process, agent, simple, immediate
 
         service_cls = named_any("%s.%s" % (module, cls))
-        process_type = config.get("process", {}).get("type", None) or getattr(service_cls, "process_type", "service")
+        process_type = get_safe(config, "process.type") or getattr(service_cls, "process_type", "service")
 
         service_instance = None
         try:
@@ -147,7 +156,7 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
-        listen_name = config.get("process", {}).get("listen_name", service_instance.name)
+        listen_name = get_safe(config, "process.listen_name") or service_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
 
         self._set_service_endpoint(service_instance, listen_name)
@@ -163,16 +172,16 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
-        listen_name = config.get("process", {}).get("listen_name", name)
+        listen_name = get_safe(config, "process.listen_name") or name
         # Throws an exception if no listen name is given!
         self._set_subscription_endpoint(service_instance, listen_name)
 
-        # Spawn the greenlet
-        self._service_start(service_instance)
-
-        publish_streams = config.get("process", {}).get("publish_streams", None)
-        # Add the publishers if any...
+        # Add publishers if any...
+        publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
+
+        # Start the service
+        self._service_start(service_instance)
 
         return service_instance
 
@@ -197,6 +206,11 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
         self._set_service_endpoint(service_instance, service_instance.id)
+
+        # Add publishers if any...
+        publish_streams = get_safe(config, "process.publish_streams")
+        self._set_publisher_endpoints(service_instance, publish_streams)
+
         self._service_start(service_instance)
         return service_instance
 
@@ -207,6 +221,11 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
+
+        # Add publishers if any...
+        publish_streams = get_safe(config, "process.publish_streams")
+        self._set_publisher_endpoints(service_instance, publish_streams)
+
         self._service_start(service_instance)
         return service_instance
 
