@@ -731,17 +731,19 @@ def generate_model_objects():
                     continue
                 if isinstance(value, str) and '()' in value:
                     value_type = value.strip('()')
-                    converted_value = value
-#                    converted_value = 'None'
+#                    converted_value = value
+                    converted_value = 'None'
+                    init_lines.append('        if not ' + field + ':\n')
+                    init_lines.append('            self.' + field + " = " + value_type + "()\n")
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
                         value_type = 'int'
                     converted_value = convert_val(value)
+                    init_lines.append('        self.' + field + " = " + field + "\n")
                 args.append(", ")
                 args.append(field + "=" + converted_value)
                 fields.append(field)
-                init_lines.append('        self.' + field + " = " + field + "\n")
                 current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
         elif line and line[0].isalpha():
             if '!enum' in line:
