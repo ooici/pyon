@@ -405,6 +405,9 @@ class DatastoreManager(object):
     Container manager for datastore instances.
     """
 
+    persistent = None
+    force_clean = None
+
     def __init__(self):
         self._datastores = {}
 
@@ -428,15 +431,16 @@ class DatastoreManager(object):
         from pyon.core.bootstrap import CFG
 
         config = config or CFG
-
-        persistent = not bool(get_safe(config, "system.mockdb"))
-        force_clean = bool(get_safe(config, "system.force_clean"))
+        if self.persistent is None:
+            self.persistent = not bool(get_safe(config, "system.mockdb"))
+        if self.force_clean is None:
+            self.force_clean = bool(get_safe(config, "system.force_clean"))
 
         log.info("get_datastore(): Create instance of store '%s' {persistent=%s, force_clean=%s, scoped_name=%s}" % (
-                ds_name, persistent, force_clean, scoped_name))
+                ds_name, self.persistent, self.force_clean, scoped_name))
 
         # Persistent (CouchDB) or MockDB?
-        if persistent:
+        if self.persistent:
             # Use inline import to prevent circular import dependency
             from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
             new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
@@ -446,7 +450,7 @@ class DatastoreManager(object):
             new_ds = MockDB_DataStore(datastore_name=scoped_name) #, profile=profile)
 
         # Clean the store instance
-        if force_clean:
+        if self.force_clean:
             try:
                 new_ds.delete_datastore(scoped_name)
             except NotFound as nf:
