@@ -3,11 +3,13 @@
 __author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
 __license__ = 'Apache 2.0'
 
+import inspect
 from collections import OrderedDict, Mapping, Iterable
 import pprint
 import StringIO
 
 from pyon.util.log import log
+from pyon.core.exception import BadRequest
 try:
     import numpy as np
     _have_numpy = True
@@ -18,6 +20,12 @@ class IonObjectBase(object):
 
     def __str__(self):
         return str(self.__dict__)
+    
+    def __eq__(self, other):
+        if type(other) == type(self):
+            if other.__dict__ == self.__dict__:
+                return True
+        return False
 
     def _validate(self):
         """
@@ -91,6 +99,18 @@ class IonObjectBase(object):
 
     def __contains__(self, item):
         return hasattr(self, item)
+    
+    def update(self, other):
+        """
+        Method that allows self object attributes to be updated with other object.
+        Other object must be of same type or super type.
+        """
+        if type(other) != type(self):
+            bases = inspect.getmro(self.__class__)
+            if other.__class__ not in bases:
+                raise BadRequest("Object %s and %s do not have compatible types for update" % (type(self).__name__, type(other).__name__))
+        for key in other.__dict__:
+            setattr(self, key, other.__dict__[key])
 
 def walk(o, cb):
     """
