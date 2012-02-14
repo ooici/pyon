@@ -60,6 +60,9 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._turn_on_couchdb()
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
+            self._turn_on_couchdb()
+            self._turn_off_force_clean()
+
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
@@ -131,25 +134,23 @@ class IonIntegrationTestCase(unittest.TestCase):
             cls = servicecls.__name__
         self.container.spawn_process(servicename, mod, cls, config)
 
-    def _patch_config(self, config):
-        patcher = patch('pyon.container.apps.CFG', config)
+    def _turn_on_couchdb(self):
+        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
+        patcher =patch('pyon.datastore.datastore.DatastoreManager.persistent', True)
         patcher.start()
         self.addCleanup(patcher.stop)
-        patcher2 = patch('pyon.ion.directory.CFG', config)
-        patcher2.start()
-        self.addCleanup(patcher2.stop)
-
-    def _turn_on_couchdb(self):
-        cfg = DictModifier(CFG)
-        cfg.system.mockdb = False
-        cfg.system.force_clean = True
-        self._patch_config(cfg)
 
     def _turn_on_mockdb(self):
-        cfg = DictModifier(CFG)
-        cfg.system.mockdb = True
-        cfg.system.force_clean = True
-        self._patch_config(cfg)
+        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
+        patcher =patch('pyon.datastore.datastore.DatastoreManager.persistent', False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _turn_off_force_clean(self):
+        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
+        patcher =patch('pyon.datastore.datastore.DatastoreManager.force_clean', False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
@@ -160,9 +161,11 @@ class IonIntegrationTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def _force_clean(self):
-    # Force clean Couch in between tests, which is taken care of normally during process_start.
         from pyon.core.bootstrap import sys_name
-        if CFG.system.mockdb:
+        from pyon.datastore.datastore import DatastoreManager
+        if DatastoreManager.persistent is None:
+            DatastoreManager.persistent = not CFG.system.mockdb
+        if not DatastoreManager.persistent:
             datastore = MockDB_DataStore()
         else:
             datastore = CouchDB_DataStore()
