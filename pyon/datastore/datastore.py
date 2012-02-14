@@ -411,6 +411,11 @@ class DatastoreManager(object):
     def __init__(self):
         self._datastores = {}
 
+    @classmethod
+    def get_scoped_name(cls, ds_name):
+        return ("%s_%s" % (get_sys_name(), ds_name)).lower()
+
+
     def get_datastore(self, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
         """
         Factory method to get a datastore instance from given name, profile and config.
@@ -425,35 +430,29 @@ class DatastoreManager(object):
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
             return self._datastores[ds_name]
 
-        scoped_name = ("%s_%s" % (get_sys_name(), ds_name)).lower()
+        scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
         # Imports here to prevent cyclic module dependency
         from pyon.core.bootstrap import CFG
-
         config = config or CFG
+
         if self.persistent is None:
             self.persistent = not bool(get_safe(config, "system.mockdb"))
         if self.force_clean is None:
             self.force_clean = bool(get_safe(config, "system.force_clean"))
 
-        log.info("get_datastore(): Create instance of store '%s' {persistent=%s, force_clean=%s, scoped_name=%s}" % (
-                ds_name, self.persistent, self.force_clean, scoped_name))
-
-        # Persistent (CouchDB) or MockDB?
-        if self.persistent:
-            # Use inline import to prevent circular import dependency
-            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-            new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
-        else:
-            # Use inline import to prevent circular import dependency
-            from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-            new_ds = MockDB_DataStore(datastore_name=scoped_name) #, profile=profile)
+        # Create a datastore instance
+        log.info("get_datastore(): Create instance of store '%s' {persistent=%s, scoped_name=%s}" % (
+            ds_name, self.persistent, scoped_name))
+        new_ds = DatastoreManager.get_datastore_instance(ds_name, self.persistent, profile)
 
         # Clean the store instance
+        # TBD: Do we really want to do it here? or make it more manual?
         if self.force_clean:
+            log.info("get_datastore(): Force clean store '%s'" % ds_name)
             try:
                 new_ds.delete_datastore(scoped_name)
-            except NotFound as nf:
+            except NotFound:
                 pass
 
         # Create store if not existing
@@ -467,9 +466,34 @@ class DatastoreManager(object):
         self._datastores[ds_name] = new_ds
 
         return new_ds
-    
-    def exists(self, ds_name):
-        return ds_name in self._datastores
+
+    @classmethod
+    def get_datastore_instance(cls, ds_name, persistent=None, profile=DataStore.DS_PROFILE.BASIC):
+        scoped_name = DatastoreManager.get_scoped_name(ds_name)
+
+        # Imports here to prevent cyclic module dependency
+        from pyon.core.bootstrap import CFG
+        if persistent is None:
+            persistent = not bool(get_safe(CFG, "system.mockdb"))
+
+        # Persistent (CouchDB) or MockDB?
+        if persistent:
+            # Use inline import to prevent circular import dependency
+            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+            new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
+        else:
+            # Use inline import to prevent circular import dependency
+            from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
+            new_ds = MockDB_DataStore(datastore_name=scoped_name)
+
+        return new_ds
+
+    @classmethod
+    def exists(cls, ds_name, scoped=True, config=None):
+        if scoped:
+            ds_name = DatastoreManager.get_scoped_name(ds_name)
+        generic_ds = cls.get_datastore_instance("")
+        return generic_ds.datastore_exists(ds_name)
 
     def start(self):
         pass
