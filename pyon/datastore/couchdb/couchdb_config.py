@@ -200,6 +200,9 @@ function(doc) {
         },
     },
     'posts' : {
+        "dataset_by_id": {
+            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
+        },
         "posts_by_id": {
             "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.post_id,doc._id);}}"
         },
@@ -229,63 +232,24 @@ function(doc) {
         }
     },
     'datasets': {
-        "dataset_by_latlong": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = {\"lat\":doc.latitude, \"long\":doc.longitude, \"lat_h\":doc.latitude_hemisphere, \"long_h\":doc.longitude_hemisphere};\n        emit(pack,doc._id);\n    }\n}"
-        },
-        "dataset_by_lat": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc._id);\n    }\n}"
-        },
-        "dataset_by_long": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.longitude_hemisphere,doc.longitude];\n        emit(pack,doc._id);\n    }\n}"
-        },
-        "lat_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
-            "reduce": "\nfunction (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}\n"
-        },
-        "longitude_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.longitude_hemisphere,doc.longitude];\n        emit(pack,doc.longitude);\n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}\n"
-        },
-        "longitude_min": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.longitude_hemisphere,doc.longitude];\n        emit(pack,doc.longitude);\n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i] < min)\n            min = values[i];\n    }\n    return min;\n    \n}\n"
-        },
-        "latitude_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
-            "reduce": "\nfunction (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}\n"
-        },
-        "latitude_min": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n        var pack = [doc.latitude_hemisphere,doc.latitude];\n        emit(pack,doc.latitude);\n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i] < min)\n            min = values[i];\n    }\n    return min;\n    \n}\n"
-        },
-        "dataset_by_depth": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc.depth, doc._id);       \n    }\n}"
-        },
-        "depth_min": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc._id, doc.depth);       \n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i] < min)\n            min = values[i];\n    }\n    return min;\n    \n}\n"
-        },
-        "depth_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc._id, doc.depth);       \n    }\n}",
-            "reduce": "\n\nfunction (keys,values,rereduce) {\n    var max = 0.0;\n    for(var i in values) {\n        if(values[i] > max)\n            max = values[i];\n    }\n    return max;\n    \n}"
-        },
-        "dataset_by_time": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc.time, doc._id);       \n    }\n}"
-        },
-        "time_max": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc.time, doc.time);       \n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var max = \"\";\n    for(var i in values) {\n        if(values[i].localeCompare(max)>0)\n            max = values[i];\n    }\n    return max;\n    \n}"
-        },
-        "time_min": {
-            "map": "function(doc) {\n    if(doc.type_ == \"SciData\") {\n\temit(doc.time, doc.time);       \n    }\n}",
-            "reduce": "function (keys,values,rereduce) {\n    var min = 0.0;\n    for(var i in values) {\n        if(min==0.0)\n            min = values[i];\n        else if(values[i].localeCompare(min) < 0)\n            min = values[i];\n    }\n    return min;\n    \n}"
-        },
+        # Bounds
         # Map: https://gist.github.com/1781675#file_maps.js
         # Reduce: https://gist.github.com/1781675#file_reduce_bounds.js
         "bounds": {
             "map": "\n/*\n * Author: Luke Campbell <lcampbell@asascience.com>\n * Description: Utility and map functions to map the DataContainer's bounding elements.\n */\n\n/*\n * Traverses an \"identifiable\" in a document to see if it contains a CoordinateAxis\n */\nfunction traverse(identifiable) {\n    if(identifiable.type_==\"CoordinateAxis\")\n    {\n        return identifiable.bounds_id;\n    }\n    else return null;\n}\n/*\n * Gets the CoordinateAxis objects and their bounds_ids\n */\nfunction get_bounds(doc)\n{\n    identifiables = doc.identifiables;\n    var bounds = [];\n    for(var i in identifiables)\n    {\n        var bounds_id = traverse(identifiables[i]);\n        if(bounds_id)\n            bounds.push(bounds_id);\n    }\n    return bounds;\n}\n\n/* Data map */\nfunction (doc) {\n    if(doc.type_ == \"StreamGranuleContainer\"){\n        var bounds = get_bounds(doc);\n        for(var b in bounds)\n        {\n            var key = bounds[b];\n            var s = String(key)\n            var pack = {};\n            pack[key] = doc.identifiables[key].value_pair;\n\n            emit([doc.stream_resource_id,1], pack);\n        }\n    }\n}\n\n",
             "reduce": "\n\nfunction value_in(value,ary) {\n    for(var i in ary)\n    {\n        if(value == ary[i])\n            return i;\n    }\n}\nfunction get_keys(obj){\n    var keys = [];\n    for(var key in obj)\n        keys.push(key);\n    return keys;\n}\nfunction print_dic(obj) {\n    for(var key in obj)\n    {\n        debug(key);\n        debug(obj[key]);\n    }\n}\n\nfunction(keys,values,rereduce) {\n    var keys = [];\n    var results = values[0];\n        \n    /* Not a rereduce so populate the results dictionary */\n\n\n    for(var i in values)\n    {\n        var key = get_keys(values[i])[0];\n        // The k,v pair is new, put it in results.\n        if(! value_in(key,keys))\n        {\n            keys.push(key);\n            results[key] = values[i][key];\n            continue;\n        }\n        var value = values[i][key];\n        /* minimum between the result and the new value */\n        if(value[0] < results[key][0])\n            results[key][0] = value[0];\n        if(value[1] > results[key][1])\n            results[key][1] = value[1];\n\n    }\n    return results;\n\n    \n    \n}"
         },
+        # Stream join granule
+        # Map: https://gist.github.com/1781675#file_map_stream_join_granule.js
+        "stream_join_granule": {
+            "map": "function (doc) {\n    if(doc.type_ == \"StreamDefinitionContainer\")\n        emit([doc.stream_resource_id,0],doc._id);\n    else if(doc.type_ == \"StreamGranuleContainer\")\n        emit([doc.stream_resource_id,1], doc._id);\n}\n"
+        },
+        # Cannonical reference to Stream join granule
+        "dataset_by_id": {
+            "map": "function (doc) {\n    if(doc.type_ == \"StreamDefinitionContainer\")\n        emit([doc.stream_resource_id,0],doc._id);\n    else if(doc.type_ == \"StreamGranuleContainer\")\n        emit([doc.stream_resource_id,1], doc._id);\n}\n"
+        }
+
+
     
     }
 }
