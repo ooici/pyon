@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 import collections
 import time
 
+
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
 
@@ -65,9 +66,15 @@ class DotDict(DotNotationGetItem, dict):
 
         return val
 
-
     def copy(self):
         return DotDict(dict.copy(self))
+
+    def get_safe(self, qual_key, default=None):
+        """
+        @brief Returns value of qualified key, such as "system.name" or None if not exists.
+                If default is given, returns the default. No exception thrown.
+        """
+        return get_safe(self, qual_key) or default
 
     @classmethod
     def fromkeys(cls, seq, value=None):
@@ -78,8 +85,10 @@ class DictModifier(DotDict):
     Subclass of DotDict that allows the sparse overriding of dict values.
     """
     def __init__(self, base, data=None):
-        # base should be a DotDict, raise TypeError exception if not
-        if not isinstance(base, DotDict):
+        # base should be a dict or DotDict, raise TypeError exception if not
+        if issubclass(data, dict):
+            data = DotDict(data)
+        elif not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
         self.base = base
 
@@ -107,7 +116,6 @@ class DictModifier(DotDict):
 
     def __repr__(self):
         return self.__str__()
-
 
 
 class DictDiffer(object):
@@ -165,12 +173,13 @@ def dict_merge(base, upd, inplace=False):
 def get_safe(dict_instance, keypath):
     """
     Returns a value with in a nested dict structure from a dot separated
-    path expression such as "system.server.host"
+    path expression such as "system.server.host" or a list of key entries
     @retval Value if found or None
     """
     try:
         obj = dict_instance
-        for key in keypath.split('.'):
+        keylist = keypath if type(keypath) is list else keypath.split('.')
+        for key in keylist:
             obj = obj[key]
         return obj
     except Exception, ex:
