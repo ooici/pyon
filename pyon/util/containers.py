@@ -86,7 +86,7 @@ class DictModifier(DotDict):
     """
     def __init__(self, base, data=None):
         # base should be a dict or DotDict, raise TypeError exception if not
-        if issubclass(data, dict):
+        if isinstance(data, dict):
             data = DotDict(data)
         elif not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
