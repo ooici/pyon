@@ -735,6 +735,8 @@ def generate_model_objects():
                     converted_value = 'None'
                     init_lines.append('        if not ' + field + ':\n')
                     init_lines.append('            self.' + field + " = " + value_type + "()\n")
+                    init_lines.append('        else:\n')
+                    init_lines.append('            self.' + field + " = " + field + "\n")
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
