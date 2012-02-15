@@ -3,11 +3,16 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+import inspect
+
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import Conflict, NotFound, BadRequest
-from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.core.object import IonObjectBase
+from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
+
+from interface.objects import DirEntry
 
 
 class Directory(object):
@@ -36,23 +41,29 @@ class Directory(object):
 
     def _init(self):
         self._assert_existence("/", "Agents")
-        self._assert_existence("/", "Config")
+        if not self._assert_existence("/", "Config"):
+            self._register_config()
         self._assert_existence("/", "Containers")
-        self._assert_existence("/", "ObjectTypes")
+        if not self._assert_existence("/", "ObjectTypes"):
+            self._register_object_types()
         self._assert_existence("/", "ResourceTypes")
-        self._assert_existence("/", "ServiceInterfaces")
+        if not self._assert_existence("/", "ServiceInterfaces"):
+            self._register_service_definitions()
         self._assert_existence("/", "Services")
 
     def _assert_existence(self, parent, key):
         """
-        Make sure an entry is in the directory
+        Make sure an entry is in the directory.
+        @retval True if entry existed
         """
         dn = self._get_dn(parent, key)
         direntry = self._safe_read(dn)
+        existed = bool(direntry)
         if not direntry:
-            direntry = IonObject("DirEntry", parent=parent, key=key, attributes={})
+            direntry = DirEntry(parent=parent, key=key, attributes={})
             # TODO: This may fail because of concurrent create
             self.dir_store.create(direntry, dn)
+        return existed
 
     def _safe_read(self, oid):
         try:
@@ -75,7 +86,7 @@ class Directory(object):
         dir_id,rev = self.dir_store.create(directory_obj, 'DIR')
 
         # Persist ROOT Directory object
-        root_obj = IonObject('DirEntry', parent='/', key="ROOT", attributes=dict(sys_name=bootstrap.get_sys_name()))
+        root_obj = DirEntry(parent='/', key="ROOT", attributes=dict(sys_name=bootstrap.get_sys_name()))
         root_id,rev = self.dir_store.create(root_obj, self._get_dn(root_obj.parent, root_obj.key))
 
     def register(self, parent, key, **kwargs):
@@ -95,11 +106,23 @@ class Directory(object):
             # TODO: This may fail because of concurrent update
             self.dir_store.update(direntry)
         else:
-            direntry = IonObject("DirEntry", parent=parent, key=key, attributes=kwargs)
+            direntry = DirEntry(parent=parent, key=key, attributes=kwargs)
             # TODO: This may fail because of concurrent create
             self.dir_store.create(direntry, dn)
 
         return entry_old
+
+    def register_mult(self, entries):
+        if type(entries) not in (list, tuple):
+            raise BadRequest("Bad type")
+        de_list = []
+        deid_list = []
+        for parent, key, attrs in entries:
+            de = DirEntry(parent=parent, key=key, attributes=attrs)
+            de_list.append(de)
+            dn = self._get_dn(parent, key)
+            deid_list.append(dn)
+        self.dir_store.create_mult(de_list, deid_list)
 
     def lookup(self, qualified_key='/'):
         """
@@ -130,3 +153,31 @@ class Directory(object):
         delist = self.dir_store.find_dir_entries(qname)
         return delist
 
+    # ------------------------------------------
+    # Specific methods
+
+    def _register_config(self):
+        self.register("/Config", "CFG", **CFG.copy())
+
+    def _register_service_definitions(self):
+        from pyon.core.bootstrap import service_registry
+        svc_list = []
+        for svcname, svc in service_registry.services.iteritems():
+            svc_list.append(("/ServiceInterfaces", svcname, {}))
+            #log.debug("Register service: %s" % svcname)
+        self.register_mult(svc_list)
+        log.info("Registered %d services in directory" % len(svc_list))
+
+    def _register_object_types(self):
+        from interface import objects
+        delist = []
+        for cname, cobj in inspect.getmembers(objects, inspect.isclass):
+            if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
+                parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
+                delist.append(("/ObjectTypes", cname, dict(schema=cobj._schema, extends=parentlist)))
+                #log.debug("Register object: %s" % cname)
+        self.register_mult(delist)
+        log.info("Registered %d objects in directory" % len(delist))
+
+    def load_definitions(self):
+        pass
