@@ -97,6 +97,105 @@ class StationSupplementConstructor(object):
         """
 
 
+class PointDataStreamDefinitionConstructor(object):
+    """
+    A science object constructor for a point data stream. This constructor is the canonical way to build the metadata
+    object that defines the supplements published to the stream.
+    """
+
+    def __init__(self,):
+        """
+        Instantiate a station dataset constructor.
+        """
+
+    @classmethod
+    def LoadStationDefinition(cls, metadata_object):
+        """
+        Load an existing data structure
+        """
+        pass
+
+    def define_reference_frame(self, temporal=None, geospatial=None):
+        """
+        define the reference frame for each and provide an absolute reference for each
+        """
+
+
+    def define_coverage(self, id=None, units=None, standard_name=None, coverage_dimensions=None):
+        """
+        @brief define a coverage (observed quantity) present in the station dataset
+        """
+
+    def add_nil_values(self, coverage_id=None, value=None, reason=None):
+        """
+        Add nil values to a particular coverage
+        """
+
+
+    def add_attribute(self, subject_id, id=None, value=None):
+        """
+        Create a new attribute for the subject by passing a new id and value
+        Add an existing attribute to the subject by passing just the subject_id and the id
+        """
+
+    def __str__(self):
+        """
+        Print the dataset metadata for debug purposes.
+        """
+        pass
+
+    def _encode_structure(self):
+        """
+        Method used to encode the station dataset metadata (structure)
+        """
+        pass
+
+
+class PointSupplementConstructor(object):
+
+    def __init__(self, point_definition=None, number_of_packets_in_record=None, packet_number_in_record=None):
+        """
+        @param point_definition is the metadata object defining the station record for this stream
+        """
+
+        # do what ever you need to setup state based on the definition
+
+
+    def add_point(self, time=None, location=None):
+        """
+        Add a point to the dataset - one record
+
+        @retval point_id  is the record number of the point in this supplement
+        """
+
+        # calculate the bounds for time and location and create or update the bounds for the coordinate axis
+        # hold onto the values so you can put them in an hdf...
+
+
+    def add_point_coverage(self, point_id=None, coverage_id=None, values=None, slice=None):
+        """
+        Add data for a particular point coverage . Slice represents the map to a know index structure for
+        n-dimensional data that may exist at a point.
+        """
+        # calculate the bounds for the values and create or update the bounds for the coverage
+        # hold onto the values so you can put them in an hdf...
+
+    def add_attribute(self, subject_id, id=None, value=None):
+        """
+        Create a new attribute for the subject by passing a new id and value
+        Add an existing attribute to the subject by passing just the subject_id and the id
+        """
+        # ignore for now...
+
+    def _encode_supplement(self):
+        """
+        Method used to encode the station dataset supplement
+        """
+
+        # build the hdf and return the ion-object...
+
+
+
 class StationTimeSeries(object):
     """
     A science object constructor for time series dataset at a station.
