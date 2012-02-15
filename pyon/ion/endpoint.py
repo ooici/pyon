@@ -36,8 +36,8 @@ class StreamPublisher(ProcessPublisher):
 
         """
         # Once EMS exists - remove the declare!
-        def _declare_exchange_point(self, xp):
-            log.debug("StreamPublisher passing on _declare_exchange_point: %s", xp)
+        def _declare_exchange(self, xp):
+            log.debug("StreamPublisher passing on _declare_exchange: %s", xp)
         """
     channel_type = NoDeclarePublisherChannel
 
@@ -118,8 +118,8 @@ class StreamSubscriber(ProcessSubscriber):
 
         """
         # Once EMS exists - remove the declare!
-        def _declare_exchange_point(self, xp):
-            log.debug("StreamSubscriber passing on _declare_exchange_point: %s", xp)
+        def _declare_exchange(self, xp):
+            log.debug("StreamSubscriber passing on _declare_exchange: %s", xp)
         """
 
     channel_type = NoBindSubscriberChannel

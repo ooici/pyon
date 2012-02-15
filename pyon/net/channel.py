@@ -105,21 +105,20 @@ class BaseChannel(object):
         if not self._amq_chan:
             raise ChannelError("No amq_chan attached")
 
-    def _declare_exchange_point(self, xp):
+    def _declare_exchange(self, exchange):
         """
         Performs an AMQP exchange declare.
 
-        @param  xp      The name of the exchange to use.
+        @param  exchange      The name of the exchange to use.
         @TODO: this really shouldn't exist, messaging layer should not make this declaration.  it will be provided.
                perhaps push into an ion layer derivation to help bootstrapping / getting started fast.
         """
-        self._exchange = xp
+        self._exchange = exchange
         assert self._exchange
 
         self._ensure_amq_chan()
         assert self._transport
 
-        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
         log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
                                                                  self._exchange_durable, self._exchange_auto_delete)
 
@@ -340,7 +339,7 @@ class RecvChannel(BaseChannel):
         Prepares this receiving channel for listening for messages.
 
         Calls, in order:
-        - _declare_exchange_point
+        - _declare_exchange
         - _declare_queue
         - _bind
 
@@ -365,7 +364,7 @@ class RecvChannel(BaseChannel):
 
         self._recv_name = NamePair(exchange, queue)
 
-        self._declare_exchange_point(exchange)
+        self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)
         binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
 
@@ -551,7 +550,7 @@ class PublisherChannel(SendChannel):
     def send(self, data, headers=None):
         if not self._declared:
             assert self._send_name and self._send_name.exchange
-            self._declare_exchange_point(self._send_name.exchange)
+            self._declare_exchange(self._send_name.exchange)
             self._declared = True
         SendChannel.send(self, data, headers=headers)
 

@@ -26,12 +26,12 @@ class TestBaseChannel(PyonTestCase):
     def test_declare_exchange_point(self):
         # make sure no xp param results in assertion
         ch = BaseChannel()
-        self.assertRaises(AssertionError, ch._declare_exchange_point, None)
+        self.assertRaises(AssertionError, ch._declare_exchange, None)
 
         ch._transport = Mock()
         ch._amq_chan = Mock()
 
-        ch._declare_exchange_point('hello')
+        ch._declare_exchange('hello')
         self.assertTrue(ch._transport.declare_exchange_impl.called)
         self.assertIn(ch._amq_chan,     ch._transport.declare_exchange_impl.call_args[0])
         self.assertIn('hello',          ch._transport.declare_exchange_impl.call_args[0])
@@ -147,7 +147,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch = RecvChannel()
 
     def test_setup_listener(self):
-        # sub in mocks for _declare_exchange_point, _declare_queue, _bind
+        # sub in mocks for _declare_exchange, _declare_queue, _bind
         mxp = Mock()
         mdq = Mock()
         mdq.return_value = sentinel.anon_queue
@@ -155,7 +155,7 @@ class TestRecvChannel(PyonTestCase):
 
         def create_channel():
             ch = RecvChannel()
-            ch._declare_exchange_point = mxp
+            ch._declare_exchange = mxp
             ch._declare_queue = mdq
             ch._bind = mb
             return ch
@@ -489,7 +489,7 @@ class TestPublisherChannel(PyonTestCase):
     def test_send(self, mocksendchannel):
         depmock = Mock()
         pubchan = PublisherChannel()
-        pubchan._declare_exchange_point = depmock
+        pubchan._declare_exchange = depmock
 
         pubchan._send_name = NamePair(sentinel.xp, sentinel.routing_key)
 
