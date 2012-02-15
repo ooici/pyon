@@ -10,7 +10,7 @@ from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, Publ
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
-from pyon.net.transport import NamePair
+from pyon.net.transport import NamePair, BaseTransport
 
 from gevent import event, coros
 from gevent.timeout import Timeout
@@ -282,12 +282,20 @@ class BaseEndpoint(object):
             ch = existing_channel
         else:
             self._ensure_node()
-            ch = self.node.channel(self.channel_type)
+            ch = self._create_channel()
 
         e = self.endpoint_unit_type(**kwargs)
         e.attach_channel(ch)
 
         return e
+
+    def _create_channel(self, **kwargs):
+        """
+        Creates a channel, used by create_endpoint.
+
+        Can pass additional kwargs in to be passed through to the channel provider.
+        """
+        return self.node.channel(self.channel_type, **kwargs)
 
     def close(self):
         """
@@ -320,6 +328,16 @@ class SendingBaseEndpoint(BaseEndpoint):
         e.channel.connect(name)
         return e
 
+    def _create_channel(self, **kwargs):
+        """
+        Overrides the BaseEndpoint create channel to supply a transport if our send_name is one.
+        """
+        if isinstance(self._send_name, BaseTransport):
+            kwargs.update({'transport':self._send_name})
+
+        return BaseEndpoint._create_channel(self, **kwargs)
+
+
 def log_message(recv, msg, headers, delivery_tag=None):
     """
     Utility function to print an legible comprehensive summary of a received message.
@@ -347,6 +365,15 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         self._ready_event = event.Event()
         self._binding = binding
+
+    def _create_channel(self, **kwargs):
+        """
+        Overrides the BaseEndpoint create channel to supply a transport if our recv name is one.
+        """
+        if isinstance(self._recv_name, BaseTransport):
+            kwargs.update({'transport':self._recv_name})
+
+        return BaseEndpoint._create_channel(self, **kwargs)
 
     def get_ready_event(self):
         """
