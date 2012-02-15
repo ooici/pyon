@@ -43,7 +43,7 @@ from pika import BasicProperties
 from gevent import queue as gqueue
 from contextlib import contextmanager
 from gevent.event import AsyncResult
-from pyon.net.transport import BaseTransport, AMQPTransport
+from pyon.net.transport import AMQPTransport, NamePair
 
 class ChannelError(StandardError):
     """
@@ -58,6 +58,7 @@ class ChannelClosedError(StandardError):
 class ChannelShutdownMessage(object):
     """ Dummy object to unblock queues. """
     pass
+
 
 class BaseChannel(object):
 
@@ -269,12 +270,12 @@ class SendChannel(BaseChannel):
     def connect(self, name):
         """
         Sets up this channel to send to a name.
-        @param  name    The name this channel should send to. Should be a tuple (exchange, routing_key).
+        @param  name    The name this channel should send to. Should be a NamePair.
         """
         log.debug("SendChannel.connect: %s", name)
 
         self._send_name = name
-        self._exchange = name[0]
+        self._exchange = name.exchange
 
     def send(self, data, headers=None):
         log.debug("SendChannel.send")
@@ -282,7 +283,8 @@ class SendChannel(BaseChannel):
 
     def _send(self, name, data, headers=None):
         log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
-        exchange, routing_key = name
+        exchange    = name.exchange
+        routing_key = name.queue    # @TODO odd name
         headers = headers or {}
         props = BasicProperties(headers=headers)
 
@@ -352,17 +354,18 @@ class RecvChannel(BaseChannel):
         @param  binding     If not set, uses name.
         """
         log.debug('Setup_listener name: %s', name)
-        name = name or self._recv_name
-        xp, queue = name
+        name        = name or self._recv_name
+        exchange    = name.exchange
+        queue       = name.queue
 
-        log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s", xp, queue, binding)
+        log.debug("RecvChannel.setup_listener, exchange %s, queue %s, binding %s", exchange, queue, binding)
         if self._setup_listener_called:
             log.debug("setup_listener already called for this channel")
             return
 
-        self._recv_name = (xp, queue)
+        self._recv_name = NamePair(exchange, queue)
 
-        self._declare_exchange_point(xp)
+        self._declare_exchange_point(exchange)
         queue   = self._declare_queue(queue)
         binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
 
@@ -384,14 +387,14 @@ class RecvChannel(BaseChannel):
         """
         Deletes the binding from the listening queue.
         """
-        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
+        assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
 
         self._ensure_amq_chan()
         assert self._transport
 
         self._transport.unbind_impl(self._amq_chan,
-                                    exchange=self._recv_name[0],
-                                    queue=self._recv_name[1],
+                                    exchange=self._recv_name.exchange,
+                                    queue=self._recv_name.queue,
                                     binding=self._recv_binding)
 
     def _destroy_queue(self):
@@ -399,14 +402,14 @@ class RecvChannel(BaseChannel):
         You should only call this if you want to delete the queue. Even so, you must know you are
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
-        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1]
+        assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1]
 
         self._ensure_amq_chan()
         assert self._transport
 
         log.info("Destroying listener for queue %s", self._recv_name)
         self._transport.delete_queue_impl(self._amq_chan,
-                                          queue=self._recv_name[1])
+                                          queue=self._recv_name.queue)
 
     def start_consume(self):
         """
@@ -424,7 +427,7 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
-                                                          queue=self._recv_name[1],
+                                                          queue=self._recv_name.queue,
                                                           no_ack=self._consumer_no_ack,
                                                           exclusive=self._consumer_exclusive)
         self._consuming = True
@@ -440,7 +443,7 @@ class RecvChannel(BaseChannel):
             raise ChannelError("Not consuming")
 
         if self._queue_auto_delete:
-            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name[1])
+            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
         self._ensure_amq_chan()
 
@@ -481,8 +484,8 @@ class RecvChannel(BaseChannel):
 
         # prepend xp name in the queue for anti-clobbering
         if queue:
-            queue = ".".join([self._recv_name[0], queue])
-            log.debug('Auto-prepending xp to queue name for anti-clobbering: %s', queue)
+            queue = ".".join([self._recv_name.exchange, queue])
+            log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
         self._ensure_amq_chan()
 
@@ -493,20 +496,19 @@ class RecvChannel(BaseChannel):
                                                         durable=self._queue_durable)
 
         # always save the new recv_name - we may have created a new one
-        self._recv_name = (self._recv_name[0], queue_name)
+        self._recv_name = NamePair(self._recv_name.exchange, queue_name)
 
-        return self._recv_name[1]
+        return self._recv_name.queue
 
     def _bind(self, binding):
         log.debug("RecvChannel._bind: %s", binding)
-        assert self._recv_name and self._recv_name[1]
+        assert self._recv_name and self._recv_name.queue
 
         self._ensure_amq_chan()
-        
-        queue = self._recv_name[1]
+
         self._transport.bind_impl(self._amq_chan,
-                                  exchange=self._recv_name[0],
-                                  queue=queue,
+                                  exchange=self._recv_name.exchange,
+                                  queue=self._recv_name.queue,
                                   binding=binding)
 
         self._recv_binding = binding
@@ -548,8 +550,8 @@ class PublisherChannel(SendChannel):
 
     def send(self, data, headers=None):
         if not self._declared:
-            assert self._send_name and self._send_name[0]
-            self._declare_exchange_point(self._send_name[0])
+            assert self._send_name and self._send_name.exchange
+            self._declare_exchange_point(self._send_name.exchange)
             self._declared = True
         SendChannel.send(self, data, headers=headers)
 
@@ -573,7 +575,7 @@ class BidirClientChannel(SendChannel, RecvChannel):
             headers = {}
 
         if not 'reply-to' in headers:
-            headers['reply-to'] = "%s,%s" % self._recv_name
+            headers['reply-to'] = "%s,%s" % (self._recv_name.exchange, self._recv_name.queue)
 
         SendChannel._send(self, name, data, headers=headers)
 
@@ -626,8 +628,8 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = tuple(msg[1].get('reply-to').split(','))    # @TODO: stringify is not the best
+        send_name = NamePair(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel()
         ch.attach_underlying_channel(amq_chan)
-        ch._send_name = send_name
+        ch.connect(send_name)
         return ch

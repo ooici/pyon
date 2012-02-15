@@ -10,6 +10,7 @@ from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, Publ
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
+from pyon.net.transport import NamePair
 
 from gevent import event, coros
 from gevent.timeout import Timeout
@@ -231,29 +232,21 @@ class BaseEndpoint(object):
     """
     endpoint_unit_type = EndpointUnit
     channel_type = BidirClientChannel
-    name = None
     node = None     # connection to the broker, basically
 
     # Endpoints
     # TODO: Make weakref or replace entirely
     endpoint_by_name = {}
 
-    def __init__(self, node=None, name=None):
-        """
-        name can be a to address or a from address in the derived ListeningBaseEndpoint. Either a string
-        or a 2-tuple of (exchange, name).
-        """
-
-        if not isinstance(name, tuple):
-            name = (bootstrap.get_sys_name(), name)
+    def __init__(self, node=None):
 
         self.node = node
-        self.name = name
 
-        if name in self.endpoint_by_name:
-            self.endpoint_by_name[name].append(self)
-        else:
-            self.endpoint_by_name[name] = [self]
+#        # @TODO: MOVE THIS
+#        if name in self.endpoint_by_name:
+#            self.endpoint_by_name[name].append(self)
+#        else:
+#            self.endpoint_by_name[name] = [self]
 
     def _get_container_instance(self):
         """
@@ -288,17 +281,8 @@ class BaseEndpoint(object):
         if existing_channel:
             ch = existing_channel
         else:
-            name = to_name or self.name
-            assert name
-            if not isinstance(name, tuple):
-                name = (bootstrap.get_sys_name(), name)
-
             self._ensure_node()
             ch = self.node.channel(self.channel_type)
-
-            # @TODO: bla
-            if hasattr(ch, 'connect'):
-                ch.connect(name)
 
         e = self.endpoint_unit_type(**kwargs)
         e.attach_channel(ch)
@@ -310,6 +294,31 @@ class BaseEndpoint(object):
         To be defined by derived classes. Cleanup any resources here, such as channels being open.
         """
         pass
+
+class SendingBaseEndpoint(BaseEndpoint):
+    def __init__(self, node=None, to_name=None, name=None):
+        BaseEndpoint.__init__(self, node=node)
+
+        if name:
+            log.warn("SendingBaseEndpoint: name param is deprecated, please use to_name instead")
+        self._send_name = to_name or name
+
+        # ensure NamePair
+        if not isinstance(self._send_name, NamePair):
+            self._send_name = NamePair(bootstrap.get_sys_name(), self._send_name)   # if send_name is a tuple it takes precedence
+
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        e = BaseEndpoint.create_endpoint(self, to_name=to_name, existing_channel=existing_channel, **kwargs)
+
+        name = to_name or self._send_name
+        assert name
+
+        # ensure NamePair
+        if not isinstance(name, NamePair):
+            name = NamePair(bootstrap.get_sys_name(), name)     # if name is a tuple it takes precedence
+
+        e.channel.connect(name)
+        return e
 
 def log_message(recv, msg, headers, delivery_tag=None):
     """
@@ -325,8 +334,17 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     channel_type = ListenChannel
 
-    def __init__(self, node=None, name=None, binding=None):
-        BaseEndpoint.__init__(self, node=node, name=name)
+    def __init__(self, node=None, name=None, from_name=None, binding=None):
+        BaseEndpoint.__init__(self, node=node)
+
+        if name:
+            log.warn("ListeningBaseEndpoint: name param is deprecated, please use from_name instead")
+        self._recv_name = from_name or name
+
+        # ensure NamePair
+        if not isinstance(self._recv_name, NamePair):
+            self._recv_name = NamePair(bootstrap.get_sys_name(), self._recv_name)   # if _recv_name is tuple it takes precedence
+
         self._ready_event = event.Event()
         self._binding = binding
 
@@ -343,24 +361,24 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def listen(self, binding=None):
         log.debug("LEF.listen: binding %s", binding)
 
-        binding = binding or self._binding or self.name[1]
+        binding = binding or self._binding or self._recv_name.queue
 
         self._ensure_node()
         self._chan = self.node.channel(self.channel_type)
-        self._setup_listener(self.name, binding=binding)
+        self._setup_listener(self._recv_name, binding=binding)
         self._chan.start_consume()
 
         # notify any listeners of our readiness
         self._ready_event.set()
 
         while True:
-            log.debug("LEF: %s blocking, waiting for a message" % str(self.name))
+            log.debug("LEF: %s blocking, waiting for a message" % str(self._recv_name))
             try:
                 newchan = self._chan.accept()
                 msg, headers, delivery_tag = newchan.recv()
 
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self.name, msg, headers, delivery_tag)
-                log_message(self.name, msg, headers, delivery_tag)
+                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, msg, headers, delivery_tag)
+                log_message(self._recv_name, msg, headers, delivery_tag)
 
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
@@ -387,7 +405,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 class PublisherEndpointUnit(EndpointUnit):
     pass
 
-class Publisher(BaseEndpoint):
+class Publisher(SendingBaseEndpoint):
     """
     Simple publisher sends out broadcast messages.
     """
@@ -397,7 +415,7 @@ class Publisher(BaseEndpoint):
 
     def __init__(self, **kwargs):
         self._pub_ep = None
-        BaseEndpoint.__init__(self, **kwargs)
+        SendingBaseEndpoint.__init__(self, **kwargs)
 
     def publish(self, msg, to_name=None):
 
@@ -405,7 +423,7 @@ class Publisher(BaseEndpoint):
         if not to_name:
             # @TODO: needs thread safety
             if not self._pub_ep:
-                self._pub_ep = self.create_endpoint(self.name)
+                self._pub_ep = self.create_endpoint(self._send_name)
             ep = self._pub_ep
         else:
             ep = self.create_endpoint(to_name)
@@ -488,7 +506,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         log.debug("RequestEndpointUnit.send")
 
         if not self._recv_greenlet:
-            self.channel.setup_listener((self.channel._send_name[0], None)) # @TODO: not quite right..
+            self.channel.setup_listener(NamePair(self.channel._send_name.exchange)) # anon queue
             self.channel.start_consume()
             self.spawn_listener()
 
@@ -512,11 +530,11 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
         if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
-            headers['receiver'] = "%s,%s" % self.channel._send_name   # @TODO updated by XN work, should be FQ?
+            headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
 
         return headers
 
-class RequestResponseClient(BaseEndpoint):
+class RequestResponseClient(SendingBaseEndpoint):
     """
     Sends a request, waits for a response.
     """
@@ -524,7 +542,7 @@ class RequestResponseClient(BaseEndpoint):
 
     def request(self, msg, headers=None):
         log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
-        e = self.create_endpoint(self.name)
+        e = self.create_endpoint(self._send_name)
         try:
             retval, headers = e.send(msg, headers=headers)
         finally:
@@ -543,7 +561,7 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
         if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
-            headers['receiver'] = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+            headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
         headers['format']       = raw_msg.__class__.__name__    # hmm
@@ -851,8 +869,8 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
         if hasattr(self._process,'process_type' ):
             header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
-            if self._process.process_type == 'service':     # @TODO updated by XN work
-                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
+            if self._process.process_type == 'service':
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
 
         # use context to set security attributes forward
         if isinstance(context, dict):
@@ -941,8 +959,8 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
 
         if hasattr(self._process,'process_type' ):
             header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
-            if self._process.process_type == 'service':     # @TODO updated by XN work
-                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
+            if self._process.process_type == 'service':
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
 
         # use context to set security attributes forward
         if isinstance(context, dict):

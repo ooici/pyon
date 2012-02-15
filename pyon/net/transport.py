@@ -120,3 +120,36 @@ class AMQPTransport(BaseTransport):
                                                      exchange=exchange,
                                                      routing_key=binding)
 
+
+class NamePair(object):
+    """
+    Internal representation of a name/queue.
+    Created and used at the Endpoint layer and sometimes Channel layer.
+    """
+    def __init__(self, exchange=None, queue=None):
+        """
+        Creates a NamePair.
+
+        If either exchange or queue is a 2-tuple, it will use that as a (exchange, queue) pair.
+
+        @param  exchange    An exchange name. You would typically use the sysname for that.
+        @param  queue       Queue name.
+        """
+        if isinstance(exchange, tuple):
+            self._exchange, self._queue = exchange
+        elif isinstance(queue, tuple):
+            self._exchange, self._queue = queue
+        else:
+            self._exchange  = exchange
+            self._queue     = queue
+
+    @property
+    def exchange(self):
+        return self._exchange
+
+    @property
+    def queue(self):
+        return self._queue
+
+    def __str__(self):
+        return "NP (%s,%s)" % (self._exchange, self._queue)

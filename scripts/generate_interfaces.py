@@ -2,7 +2,7 @@
 
 # Ion utility for generating interfaces from object definitions (and vice versa).
 
-__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie'
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 import ast
@@ -155,16 +155,16 @@ ${methods}
     'obj_arg_no_def': "'${name}': ${name}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
-    def __init__(self, name=None, node=None, **kwargs):
-        name = name or '${targetname}'
-        RPCClient.__init__(self, name=name, node=node, **kwargs)
+    def __init__(self, to_name=None, node=None, **kwargs):
+        to_name = to_name or '${targetname}'
+        RPCClient.__init__(self, to_name=to_name, node=node, **kwargs)
         ${name}ClientMixin.__init__(self)
 ''',
     'processrpcclient':
 '''class ${name}ProcessClient(ProcessRPCClient, ${name}ClientMixin):
-    def __init__(self, process=None, name=None, node=None, **kwargs):
-        name = name or '${targetname}'
-        ProcessRPCClient.__init__(self, process=process, name=name, node=node, **kwargs)
+    def __init__(self, process=None, to_name=None, node=None, **kwargs):
+        to_name = to_name or '${targetname}'
+        ProcessRPCClient.__init__(self, process=process, to_name=to_name, node=node, **kwargs)
         ${name}ClientMixin.__init__(self)
 '''
 }

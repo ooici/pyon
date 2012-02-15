@@ -29,10 +29,12 @@ class TestEventPublisher(IonUnitTestCase):
         self._pub = EventPublisher(node=self._node)
 
     def test_init(self):
-        self.assertEquals(self._pub.name, ("%s.pyon.events" % bootstrap.sys_name, None))
+        self.assertEquals(self._pub._send_name.exchange, "%s.pyon.events" % bootstrap.sys_name)
+        self.assertEquals(self._pub._send_name.queue, None)
 
         pub = EventPublisher(node=self._node, xp=sentinel.xp)
-        self.assertEquals(pub.name, (sentinel.xp, None))
+        self.assertEquals(pub._send_name.exchange, sentinel.xp)
+        self.assertEquals(pub._send_name.queue, None)
 
     def test__topic_no_origin(self):
         self.assertRaises(AssertionError, self._pub._topic, None)
@@ -159,13 +161,15 @@ class TestEventSubscriber(IonUnitTestCase):
         self._sub = EventSubscriber(node=self._node, callback=self._cb)
 
     def test_init(self):
-        self.assertEquals(self._sub.name, ("%s.pyon.events" % bootstrap.sys_name, None))
+        self.assertEquals(self._sub._recv_name.exchange, "%s.pyon.events" % bootstrap.sys_name)
+        self.assertEquals(self._sub._recv_name.queue, None)
         self.assertEquals(self._sub._binding, "*.#")
         self.assertEquals(self._sub._callback, self._cb)
 
     def test_init_with_xp(self):
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp)
-        self.assertEquals(sub.name, (sentinel.xp, None))
+        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
+        self.assertEquals(sub._recv_name.queue, None)
 
     def test_init_with_event_name(self):
         sub = EventSubscriber(node=self._node, callback=self._cb, event_name=sentinel.event_name)
@@ -177,12 +181,14 @@ class TestEventSubscriber(IonUnitTestCase):
 
     def test_init_with_queue_name(self):
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=str(sentinel.queue))
-        self.assertEquals(sub.name, (sentinel.xp, "%s.%s" % (bootstrap.sys_name, str(sentinel.queue))))
+        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
+        self.assertEquals(sub._recv_name.queue, "%s.%s" % (bootstrap.sys_name, str(sentinel.queue)))
 
     def test_init_with_queue_name_with_sysname(self):
         queue_name = "%s-dacshund" % bootstrap.sys_name
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=queue_name)
-        self.assertEquals(sub.name, (sentinel.xp, queue_name))
+        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
+        self.assertEquals(sub._recv_name.queue, queue_name)
 
     def test__topic(self):
         self.assertEquals(self._sub._topic(None), "*.#")
