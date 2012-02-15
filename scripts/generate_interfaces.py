@@ -733,18 +733,23 @@ def generate_model_objects():
                     value_type = value.strip('()')
 #                    converted_value = value
                     converted_value = 'None'
-                    init_lines.append('        if not ' + field + ':\n')
-                    init_lines.append('            self.' + field + " = " + value_type + "()\n")
-                    init_lines.append('        else:\n')
-                    init_lines.append('            self.' + field + " = " + field + "\n")
+                    args.append(", ")
+                    args.append(field + "=" + converted_value)
+                    init_lines.append('        self.' + field + " = " + field + " or " + value_type + "()\n")
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
                         value_type = 'int'
                     converted_value = convert_val(value)
-                    init_lines.append('        self.' + field + " = " + field + "\n")
-                args.append(", ")
-                args.append(field + "=" + converted_value)
+                    if value_type in ['dict', 'OrderedDict', 'list']:
+                        args.append(", ")
+                        args.append(field + "=None")
+                        init_lines.append('        self.' + field + " = " + field + " or " + converted_value + "\n")
+                        converted_value = "None"
+                    else:
+                        args.append(", ")
+                        args.append(field + "=" + converted_value)
+                        init_lines.append('        self.' + field + " = " + field + "\n")
                 fields.append(field)
                 current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
         elif line and line[0].isalpha():
