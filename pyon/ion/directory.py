@@ -20,10 +20,12 @@ class Directory(object):
     Class that uses a data store to provide a directory lookup mechanism.
     """
 
-    def __init__(self, datastore_manager):
+    def __init__(self, datastore_manager, orgname=None):
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
         self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
+
+        self.orgname = orgname or CFG.system.root_org
 
         self._init()
 
@@ -154,10 +156,17 @@ class Directory(object):
         return delist
 
     # ------------------------------------------
-    # Specific methods
+    # Specific directory entry methods
+
+
+    # ------------------------------------------
+    # Internal methods
 
     def _register_config(self):
         self.register("/Config", "CFG", **CFG.copy())
+
+    def _load_config(self):
+        de = self.lookup("/Config/CFG")
 
     def _register_service_definitions(self):
         from pyon.core.bootstrap import service_registry

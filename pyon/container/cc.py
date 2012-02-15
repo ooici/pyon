@@ -55,6 +55,7 @@ class Container(BaseContainerAgent):
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs, inplace=True)
         from pyon.core import bootstrap
+        bootstrap.assert_configuration(CFG)
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
 
@@ -165,7 +166,7 @@ class Container(BaseContainerAgent):
             self.pidfile = None
 
     def stop(self):
-        log.debug("Container stopping...")
+        log.info("=============== Container stopping... ===============")
 
         try:
             self.app_manager.stop()
