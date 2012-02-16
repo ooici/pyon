@@ -126,22 +126,25 @@ class NamePair(object):
     Internal representation of a name/queue.
     Created and used at the Endpoint layer and sometimes Channel layer.
     """
-    def __init__(self, exchange=None, queue=None):
+    def __init__(self, exchange=None, queue=None, binding=None):
         """
         Creates a NamePair.
 
-        If either exchange or queue is a 2-tuple, it will use that as a (exchange, queue) pair.
+        If either exchange or queue is a tuple, it will use that as a (exchange, queue, binding (optional)) triple.
 
         @param  exchange    An exchange name. You would typically use the sysname for that.
         @param  queue       Queue name.
+        @param  binding     A binding/routing key (used for both recv and send sides). Optional,
+                            and if not specified, defaults to the *internal* queue name.
         """
         if isinstance(exchange, tuple):
-            self._exchange, self._queue = exchange
+            self._exchange, self._queue, self._binding = exchange + ([None] *(3-len(exchange)))
         elif isinstance(queue, tuple):
-            self._exchange, self._queue = queue
+            self._exchange, self._queue, self._binding = queue + ([None] *(3-len(queue)))
         else:
             self._exchange  = exchange
             self._queue     = queue
+            self._binding   = binding
 
     @property
     def exchange(self):
@@ -151,8 +154,12 @@ class NamePair(object):
     def queue(self):
         return self._queue
 
+    @property
+    def binding(self):
+        return self._binding or self._queue
+
     def __str__(self):
-        return "NP (%s,%s)" % (self._exchange, self._queue)
+        return "NP (%s,%s,B: %s)" % (self._exchange, self._queue, self._binding)
 
 class FakeTransport(AMQPTransport, NamePair):
     def __init__(self):

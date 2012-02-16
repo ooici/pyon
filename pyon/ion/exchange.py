@@ -311,7 +311,6 @@ class ExchangeName(XOTransport, NamePair):
         queue = self._queue
         if self._queue and not self.exchange in self._queue:
             queue = ".".join([self.exchange, self._queue])
-            log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
         return queue
 
