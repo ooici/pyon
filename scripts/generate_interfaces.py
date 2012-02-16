@@ -246,9 +246,11 @@ def build_args_str(_def, include_self=True):
             val = "'%s'" % (val)
         # For collections, default to an empty collection of the same base type
         elif isinstance(val, list):
-            val = []
+            val = "None"
         elif isinstance(val, dict):
-            val = {}
+            val = "None"
+        elif isinstance(val, tuple):
+            val = "None"
         args.append(templates['arg'].substitute(name=key, val=val))
 
     args_str = ', '.join(args)
@@ -260,7 +262,7 @@ def find_object_reference(arg):
         if node.find(arg) > -1:
             return obj
 
-    return "Unknown"
+    return "dict"
         
 def build_class_doc_string(base_doc_str, _def_spec):
     doc_str = base_doc_str
@@ -297,7 +299,7 @@ def build_args_doc_string(base_doc_str, _def_spec, _def_in, _def_out, _def_throw
         elif isinstance(val,dict):
             val=find_object_reference(key)
         elif isinstance(val,list):
-            val="[]"
+            val="list"
         else:
             val = str(type(val)).replace("<type '","").replace("'>","")
         if first_time:
@@ -316,7 +318,7 @@ def build_args_doc_string(base_doc_str, _def_spec, _def_in, _def_out, _def_throw
         elif isinstance(val,dict):
             val=find_object_reference(key)
         elif isinstance(val,list):
-            val="[]"
+            val="list"
         else:
             val = str(type(val)).replace("<type '","").replace("'>","")
         if first_time:
@@ -342,7 +344,7 @@ def build_args_doc_html(_def):
         elif isinstance(val,dict):
             val=find_object_reference(key)
         elif isinstance(val,list):
-            val="[]"
+            val="list"
         else:
             val = str(type(val)).replace("<type '","").replace("'>","")
         args.append(html_doc_templates['arg'].substitute(name=key, val=val))
@@ -1036,11 +1038,9 @@ def generate_model_objects():
                             value_type = "str"
                             value = "'" + value + "'"
                         if value_type in ['dict', 'list', 'tuple']:
-                            default = value
-                            value = "None"
+                            default = value = "None"
                         else:
                             default = value
-
                     args.append(", ")
                     args.append(field + "=" + value)
 #                    if is_required:
@@ -1138,16 +1138,14 @@ def generate_model_objects():
                         except SyntaxError:
                             value_type = "str"
                             value = "'" + value + "'"
-                        if value_type in ['dict', 'OrderedDict', 'list', 'tuple']:
-                            default = value
-                            value = "None"
+                        if value_type in ['dict', 'list', 'tuple']:
+                            default = value = "None"
                         else:
                             default = value
-
                     args.append(", ")
                     args.append(field + "=" + value)
-                    init_lines.append('        self.' + field + " = " + field + "\n")
 #                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
+                    init_lines.append('        self.' + field + " = " + field + "\n")
                     current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
                     index += 1
 
