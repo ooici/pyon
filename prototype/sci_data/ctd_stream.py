@@ -54,14 +54,8 @@ def ctd_stream_definition(stream_id=None):
         data_record_id='ctd_data')
 
 
-    ctd_container.identifiables['element_type'] = ElementType(
-        data_record_id='data_record',
-        definition='Defintion of CTD element?',
-        updatable=False
-        )
-
     ctd_container.identifiables['data_record'] = DataRecord(
-        field_ids=['temperature','conductivity','depth'],
+        field_ids=['temperature','conductivity','pressure'],
         domain_ids=['time_domain'],
         definition = "Definition of a data record for a CTD",
         updatable=False,
