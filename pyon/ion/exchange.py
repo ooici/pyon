@@ -68,17 +68,19 @@ class ExchangeManager(object):
 
         return self._chan
 
-    def create_xs(self, name):
+    def create_xs(self, name, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xs: %s", name)
-        xs = ExchangeSpace(self, name)
+        xs = ExchangeSpace(self, name, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
         xs.declare()
-        #xs.ensure_exists(self._get_channel())
 
         return xs
 
     def delete_xs(self, xs):
-        log.debug("ExchangeManager.delete_xs: %s", xs.build_xname())
-        #xs.delete(self._get_channel())
+        """
+        @type xs    ExchangeSpace
+        """
+        log.debug("ExchangeManager.delete_xs: %s", xs)
+        xs.delete()
 
     def create_xp(self, xs, name, xptype):
         log.debug("ExchangeManager.create_xp: name=%s, xptype=%s", name, xptype)
@@ -91,9 +93,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xp: name=%s", xp.build_xname())
         xp.delete()
 
-    def create_xn(self, xs, name):
+    def create_xn(self, xs, name, durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xn: name=%s, xs=%s", name, xs)
-        xn = ExchangeName(self, xs, name)
+        xn = ExchangeName(self, xs, name, durable=durable, auto_delete=auto_delete)
         xn.declare()
 
         return xn
@@ -269,25 +271,35 @@ class ExchangeSpace(XOTransport, NamePair):
 
     ION_DEFAULT_XS = "ioncore"
 
-    def __init__(self, exchange_manager, exchange):
+    def __init__(self, exchange_manager, exchange, exchange_type='topic', durable=False, auto_delete=True):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=exchange)
+
+        self._xs_exchange_type = exchange_type
+        self._xs_durable       = durable
+        self._xs_auto_delete   = auto_delete
 
     @property
     def exchange(self):
         return "%s.ion.xs.%s" % (bootstrap.get_sys_name(), self._exchange)
 
-    def declare(self, exchange_type='topic', durable=False, auto_delete=True):
-        self.declare_exchange_impl(None, self.exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
+    def declare(self):
+        self.declare_exchange_impl(None, self.exchange,
+                                         exchange_type=self._xs_exchange_type,
+                                         durable=self._xs_durable,
+                                         auto_delete=self._xs_auto_delete)
 
     def delete(self):
         self.delete_exchange_impl(None, self.exchange)
 
 class ExchangeName(XOTransport, NamePair):
-    def __init__(self, exchange_manager, xs, name):
+    def __init__(self, exchange_manager, xs, name, durable=False, auto_delete=True):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=None, queue=name)
         self._xs = xs
+
+        self._xn_durable        = durable
+        self._xn_auto_delete    = auto_delete
 
     @property
     def exchange(self):
@@ -303,8 +315,8 @@ class ExchangeName(XOTransport, NamePair):
 
         return queue
 
-    def declare(self, durable=False, auto_delete=True):
-        return self.declare_queue_impl(None, self.queue, durable=durable, auto_delete=auto_delete)
+    def declare(self):
+        return self.declare_queue_impl(None, self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
 
     def delete(self):
         self.delete_queue_impl(None, self.queue)
