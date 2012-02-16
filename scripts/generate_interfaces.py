@@ -424,15 +424,16 @@ def generate_service(interface_file, svc_def, client_defs, opts):
         def _get_default(v):
             if type(v) is str:
                 if v.startswith("!"):
-                    v = v.strip("!")
-                    if v in enums_by_name:
+                    val = v.strip("!")
+                    if val in enums_by_name:
                         # Get default enum value
-                        enum_def = enums_by_name[v]
-                        v = "interface.objects." + v + "." + enum_def["default"]
+                        enum_def = enums_by_name[val]
+                        val = "interface.objects." + val + "." + enum_def["default"]
                     else:
-                        v = "None"
+                        val = "None"
                 else:
-                    v = "'%s'" % (v)
+                    val = "'%s'" % (v)
+                return val
             elif type(v) in (int, long, float):
                 return str(v)
             elif type(v) is bool:
@@ -572,7 +573,9 @@ def generate_model_objects():
     # the top of the objects.py.  Defs are also put into a dict
     # so we can easily reference their values later in the parsing
     # logic.
-    dataobject_output_text = "#!/usr/bin/env python\n\nfrom pyon.core.object import IonObjectBase\n\n# Enums\n"
+    dataobject_output_text = "#!/usr/bin/env python\n\n"
+    dataobject_output_text += "from pyon.core.object import IonObjectBase\n"
+    dataobject_output_text += "# Enums\n"
 
     for line in combined_yaml_text.split('\n'):
         if '!enum ' in line:
@@ -731,21 +734,21 @@ def generate_model_objects():
                     continue
                 if isinstance(value, str) and '()' in value:
                     value_type = value.strip('()')
-#                    converted_value = value
-                    converted_value = 'None'
+                    converted_value = value
                     args.append(", ")
-                    args.append(field + "=" + converted_value)
+                    args.append(field + "=None")
                     init_lines.append('        self.' + field + " = " + field + " or " + value_type + "()\n")
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
                         value_type = 'int'
                     converted_value = convert_val(value)
-                    if value_type in ['dict', 'OrderedDict', 'list']:
+                    if value_type in ['OrderedDict', 'list', 'tuple']:
+                        if value_type == 'OrderedDict':
+                            value_type = 'dict'
                         args.append(", ")
                         args.append(field + "=None")
                         init_lines.append('        self.' + field + " = " + field + " or " + converted_value + "\n")
-                        converted_value = "None"
                     else:
                         args.append(", ")
                         args.append(field + "=" + converted_value)
@@ -819,22 +822,30 @@ def generate_model_objects():
                             # Ignore key error because value is nested
                             index += 1
                             continue
-                    
+
                         if isinstance(value, str) and '()' in value:
                             value_type = value.strip('()')
                             converted_value = value
-#                            converted_value = 'None'
+                            args.append(", ")
+                            args.append(field + "=" + converted_value)
+                            init_lines.append('        self.' + field + " = " + field + " or " + value_type + "()\n")
                         else:
                             value_type = type(value).__name__
-                            
                             if value_type == 'dict' and "__IsEnum" in value:
                                 value_type = 'int'
                             converted_value = convert_val(value)
-                        args.append(", ")
-                        args.append(field + "=" + converted_value)
+                            if value_type in ['OrderedDict', 'list', 'tuple']:
+                                if value_type == 'OrderedDict':
+                                    value_type = 'dict'
+                                args.append(", ")
+                                args.append(field + "=None")
+                                init_lines.append('        self.' + field + " = " + field + " or " + converted_value + "\n")
+                            else:
+                                args.append(", ")
+                                args.append(field + "=" + converted_value)
+                                init_lines.append('        self.' + field + " = " + field + "\n")
                         fields.append(field)
-                        init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += " '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
                 elif line and line[0].isalpha():
                     if '!enum' in line:
                         index += 1
@@ -988,6 +999,7 @@ def generate_model_objects():
                         # Ignore key error because value is nested
                         index += 1
                         continue
+
                     if len(value) == 0:
                         value = "None"
                         value_type = "str"
@@ -998,12 +1010,10 @@ def generate_model_objects():
                             value_type = 'int'
                             # Get default enum value
                             enum_def = enums_by_name[value]
-                            value = "interface.objects." + value + "." + enum_def["default"]
-                            default = value
+                            value = default = "interface.objects." + value + "." + enum_def["default"]
                         else:
                             value_type = value
-                            value = "None"
-                            default = "None"
+                            value = default = "None"
                     # Hacks, find a better way in the future
                     elif "'" in value or '"' in value:
                         value_type = "str"
@@ -1019,10 +1029,14 @@ def generate_model_objects():
                         except SyntaxError:
                             value_type = "str"
                             value = "'" + value + "'"
-                        default = value
+                        if value_type in ['dict', 'list', 'tuple']:
+                            default = value
+                            value = "None"
+                        else:
+                            default = value
 
                     args.append(", ")
-                    args.append(field + "=" + default)
+                    args.append(field + "=" + value)
 #                    if is_required:
 #                        init_lines.append("        if " + field + " is None:\n")
 #                        init_lines.append("            raise BadRequest('Required parameter " + field + " was not provided')\n")
@@ -1088,24 +1102,21 @@ def generate_model_objects():
                         # Ignore key error because value is nested
                         index += 1
                         continue
-#                    except IndexError:
-#                        print "HERE"
+
                     if len(value) == 0:
                         value = "None"
                         value_type = "str"
                         default = "None"
                     elif value.startswith('!'):
-                        value = value.strip('!')
+                        value = value.strip("!")
                         if value in enums_by_name:
                             value_type = 'int'
                             # Get default enum value
                             enum_def = enums_by_name[value]
-                            value = "interface.objects." + value + "." + enum_def["default"]
-                            default = value
+                            value = default = "interface.objects." + value + "." + enum_def["default"]
                         else:
                             value_type = value
-                            value = "None"
-                            default = "None"
+                            value = default = "None"
                     # Hacks, find a better way in the future
                     elif "'" in value or '"' in value:
                         value_type = "str"
@@ -1121,10 +1132,14 @@ def generate_model_objects():
                         except SyntaxError:
                             value_type = "str"
                             value = "'" + value + "'"
-                        default = value
+                        if value_type in ['dict', 'OrderedDict', 'list', 'tuple']:
+                            default = value
+                            value = "None"
+                        else:
+                            default = value
 
                     args.append(", ")
-                    args.append(field + "=" + default)
+                    args.append(field + "=" + value)
                     init_lines.append('        self.' + field + " = " + field + "\n")
 #                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
                     current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
