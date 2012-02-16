@@ -29,7 +29,7 @@ For Mac, use homebrew
     Use brew.
     Alternative: download generic Linux version and unpack into a suitable directory.
 - Install libevent, libyaml, couchdb, python, and rabbitmq with Homebrew
-    > brew install libevent libyaml couchdb python rabbitmq
+    > brew install libevent libyaml couchdb python rabbitmq hdf5
     You can even reinstall git using brew to clean up your /usr/local directory
     Linux: Note that many installs have much older versions installed by default.
       - libevent: Install with package manager
