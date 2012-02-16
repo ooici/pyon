@@ -304,11 +304,16 @@ class ExchangeName(XOTransport, NamePair):
         return queue
 
     def declare(self, durable=False, auto_delete=True):
-        self.declare_queue_impl(None, self.queue, durable=durable, auto_delete=auto_delete)
+        return self.declare_queue_impl(None, self.queue, durable=durable, auto_delete=auto_delete)
 
     def delete(self):
         self.delete_queue_impl(None, self.queue)
 
+    def bind(self, binding_key):
+        self.bind_impl(None, self.exchange, self.queue, binding_key)
+
+    def unbind(self, binding_key):
+        self.unbind_impl(None, self.exchange, self.queue, binding_key)
 
 class ExchangePoint(ExchangeName):
     """
