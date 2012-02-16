@@ -54,14 +54,8 @@ def ctd_stream_definition(stream_id=None):
         data_record_id='ctd_data')
 
 
-    ctd_container.identifiables['element_type'] = ElementType(
-        data_record_id='data_record',
-        definition='Defintion of CTD element?',
-        updatable=False
-        )
-
     ctd_container.identifiables['data_record'] = DataRecord(
-        field_ids=['temperature','conductivity','depth'],
+        field_ids=['temperature','conductivity','pressure'],
         domain_ids=['time_domain'],
         definition = "Definition of a data record for a CTD",
         updatable=False,
@@ -334,59 +328,65 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
         )
 
     # Time
-    ctd_container.identifiables['time'] = CoordinateAxis(
-        bounds_id='time_bounds'
-    )
+    if time is not None :
+        ctd_container.identifiables['time'] = CoordinateAxis(
+            bounds_id='time_bounds'
+        )
 
-    ctd_container.identifiables['time_bounds'] = QuantityRangeElement(
-        value_pair=time_range
-    )
+        ctd_container.identifiables['time_bounds'] = QuantityRangeElement(
+            value_pair=time_range
+        )
 
     # Latitude
-    ctd_container.identifiables['latitude'] = CoordinateAxis(
-        bounds_id='latitude_bounds'
-    )
+    if lat is not None:
+        ctd_container.identifiables['latitude'] = CoordinateAxis(
+            bounds_id='latitude_bounds'
+        )
 
-    ctd_container.identifiables['latitude_bounds'] = QuantityRangeElement(
-        value_pair=lat_range
-    )
+        ctd_container.identifiables['latitude_bounds'] = QuantityRangeElement(
+            value_pair=lat_range
+        )
 
     # Longitude
-    ctd_container.identifiables['longitude'] = CoordinateAxis(
-        bounds_id='longitude_bounds'
-    )
+    if lon is not None:
+        ctd_container.identifiables['longitude'] = CoordinateAxis(
+            bounds_id='longitude_bounds'
+        )
 
-    ctd_container.identifiables['longitude_bounds'] = QuantityRangeElement(
-        value_pair=lon_range
-    )
+        ctd_container.identifiables['longitude_bounds'] = QuantityRangeElement(
+            value_pair=lon_range
+        )
 
 
     # Pressure
-    ctd_container.identifiables['pressure_data'] = CoordinateAxis(
-        bounds_id='pressure_bounds'
-    )
+    if p is not None:
+        ctd_container.identifiables['pressure_data'] = CoordinateAxis(
+            bounds_id='pressure_bounds'
+        )
 
-    ctd_container.identifiables['pressure_bounds'] = QuantityRangeElement(
-        value_pair=p_range
-    )
+        ctd_container.identifiables['pressure_bounds'] = QuantityRangeElement(
+            value_pair=p_range
+        )
 
     # Temperature
-    ctd_container.identifiables['temp_data'] = RangeSet(
-        bounds_id=['temp_bounds']
-    )
+    if t is not None:
+        ctd_container.identifiables['temp_data'] = RangeSet(
+            bounds_id=['temp_bounds']
+        )
 
-    ctd_container.identifiables['temp_bounds'] = QuantityRangeElement(
-        value_pair=t_range
-    )
+        ctd_container.identifiables['temp_bounds'] = QuantityRangeElement(
+            value_pair=t_range
+        )
 
     # Conductivity
-    ctd_container.identifiables['cndr_data'] = RangeSet(
-        bounds_id='cndr_bounds'
-    )
+    if c is not None:
+        ctd_container.identifiables['cndr_data'] = RangeSet(
+            bounds_id='cndr_bounds'
+        )
 
-    ctd_container.identifiables['cndr_bounds'] = QuantityRangeElement(
-        value_pair=c_range
-    )
+        ctd_container.identifiables['cndr_bounds'] = QuantityRangeElement(
+            value_pair=c_range
+        )
 
 
     return ctd_container
