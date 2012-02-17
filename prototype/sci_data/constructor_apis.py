@@ -10,7 +10,15 @@
  implemented adhoc by the user.
 '''
 
+from interface.objects import CoordinateAxis
+from interface.objects import CountElement
+from interface.objects import Encoding
+from interface.objects import QuantityRangeElement
+from interface.objects import StreamGranuleContainer
+import pyon
 
+from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
+from pyon.util.log import log
 
 class StationDataStreamDefinitionConstructor(object):
     """
@@ -153,32 +161,93 @@ class PointDataStreamDefinitionConstructor(object):
 
 class PointSupplementConstructor(object):
 
-    def __init__(self, point_definition=None, number_of_packets_in_record=None, packet_number_in_record=None):
+    _record_count_index = 'record_count'
+    _time_index = 'time'
+    _time_bounds_index = 'time_bounds'
+    _longitude_index = 'longitude'
+    _longitude_bounds_index = 'longitude_bounds'
+    _latitude_index = 'latitude'
+    _latitude_bounds_index = 'latitude_bounds'
+
+    def __init__(self, stream_id='', point_definition=None, number_of_packets_in_record=None, packet_number_in_record=None):
         """
-        @param point_definition is the metadata object defining the station record for this stream
+        @param point_definition is the metadata object defining the point record for this stream
         """
 
         # do what ever you need to setup state based on the definition
 
+        self._times = []
+        self._longitudes = []
+        self._latitudes = []
+        self._values = {}
+
+        self._ctd_container = StreamGranuleContainer(
+            stream_resource_id=stream_id,
+            data_stream_id= 'ctd_data'
+        )
+
+        self._ctd_container.identifiables[self._record_count_index] = CountElement()
+        self._ctd_container.identifiables[self._time_index] = CoordinateAxis(bounds_id=self._time_bounds_index)
+        self._ctd_container.identifiables[self._longitude_index] = CoordinateAxis(bounds_id=self._longitude_bounds_index)
+        self._ctd_container.identifiables[self._latitude_index] = CoordinateAxis(bounds_id=self._latitude_bounds_index)
+
+        self._ctd_container.identifiables[self._time_bounds_index] = QuantityRangeElement()
+        self._ctd_container.identifiables[self._longitude_bounds_index] = QuantityRangeElement()
+        self._ctd_container.identifiables[self._latitude_bounds_index] = QuantityRangeElement()
 
     def add_point(self, time=None, location=None):
         """
         Add a point to the dataset - one record
 
+        @param time value of the current time step
+        @param location tuple of (lon, lat)
         @retval point_id  is the record number of the point in this supplement
         """
 
         # calculate the bounds for time and location and create or update the bounds for the coordinate axis
         # hold onto the values so you can put them in an hdf...
 
+        self._ctd_container.identifiables[self._record_count_index].value += 1
+
+        if not time is None:
+            # Time
+            self._times.extend(time)
+            time_range = []
+            time_range = [min(self._times), max(self._times)]
+            self._ctd_container.identifiables[self._time_bounds_index].value_pair = time_range
+
+        if not location is None:
+            for loc in location:
+                if len(loc) == 2:
+                    # Longitude
+                    self._longitudes.extend(loc[0])
+                    lons_range = [min(self._longitudes), max(self._longitudes)]
+                    self._ctd_container.identifiables[self._longitude_bounds_index].value_pair = lons_range
+
+                    # Latitude
+                    self._latitudes.extend(loc[1])
+                    lats_range = [min(self._latitudes), max(self._latitudes)]
+                    self._ctd_container.identifiables[self._latitude_bounds_index].value_pair = lats_range
+
+            return self._ctd_container.identifiables[self._record_count_index].value
 
     def add_point_coverage(self, point_id=None, coverage_id=None, values=None, slice=None):
         """
-        Add data for a particular point coverage . Slice represents the map to a know index structure for
+        Add data for a particular point coverage . Slice represents the map to a known index structure for
         n-dimensional data that may exist at a point.
         """
         # calculate the bounds for the values and create or update the bounds for the coverage
         # hold onto the values so you can put them in an hdf...
+        if not coverage_id in self._values:
+            self._values[coverage_id] = []
+
+        self._values[coverage_id].extend(values)
+
+        range = [min(self._values[coverage_id]), max(self._values[coverage_id])]
+
+        if not coverage_id in self._ctd_container.identifiables:
+            self._ctd_container.identifiables[coverage_id] = QuantityRangeElement()
+        self._ctd_container.identifiables[coverage_id].value_pair = range
 
     def add_attribute(self, subject_id, id=None, value=None):
         """
@@ -189,10 +258,34 @@ class PointSupplementConstructor(object):
 
     def _encode_supplement(self):
         """
-        Method used to encode the station dataset supplement
+        Method used to encode the point dataset supplement
         """
 
         # build the hdf and return the ion-object...
+        hdf_string = ''
+        try:
+            # Use inline import to put off making numpy a requirement
+            import numpy as np
+
+            encoder = HDFEncoder()
+            if self._times is not None:
+                encoder.add_hdf_dataset('coordinates/time', np.asanyarray(self._times))
+
+            if self._latitudes is not None:
+                encoder.add_hdf_dataset('coordinates/latitude', np.asanyarray(self._latitudes))
+
+            if self._longitudes is not None:
+                encoder.add_hdf_dataset('coordinates/longitude', np.asanyarray(self._longitudes))
+
+            for k, v in self._values.iteritems():
+                encoder.add_hdf_dataset('fields/' + k, np.asanyarray(v))
+
+            hdf_string = encoder.encoder_close()
+
+            sha1 = pyon.datastore.couchdb.couchdb_datastore.sha1hex(hdf_string)
+            return Encoding(sha1=sha1)
+        except :
+            log.exception('HDF encoder failed. Please make sure you have it properly installed!')
 
 
 
