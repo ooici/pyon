@@ -3,6 +3,7 @@
 """
 Capability Container base class
 """
+from pyon.util.file_sys import FileSystem
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -75,6 +76,9 @@ class Container(BaseContainerAgent):
 
         # DatastoreManager - controls access to Datastores (both mock and couch backed)
         self.datastore_manager = DatastoreManager()
+
+        # File System - Interface to the OS File System, using correct path names and setups
+        self.file_system = FileSystem()
         
         log.debug("Container initialized, OK.")
 

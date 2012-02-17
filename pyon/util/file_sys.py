@@ -16,7 +16,7 @@ class FileSystem(object):
     def __init__(self):
         for k,v in self.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
-            conf = CFG.get_safe('system.filesystem.%s' % v, None)
+            conf = CFG.get_safe('system.filesystem.%s' % s, None)
             if conf:
                 self.FS_DIRECTORY[k] = conf
             else:
