@@ -3,7 +3,7 @@
 """
 Capability Container base class
 """
-from pyon.util.file_sys import FileSystem
+
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -23,7 +23,7 @@ from pyon.util.containers import DictModifier, dict_merge
 from pyon.ion.exchange import ExchangeManager
 from interface.services.icontainer_agent import BaseContainerAgent
 from pyon.datastore.datastore import DatastoreManager
-
+from pyon.util.file_sys import FileSystem
 import atexit
 import msgpack
 import os
