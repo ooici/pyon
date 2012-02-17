@@ -361,7 +361,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         # ensure NamePair
         if not isinstance(self._recv_name, NamePair):
-            self._recv_name = NamePair(bootstrap.get_sys_name(), self._recv_name)   # if _recv_name is tuple it takes precedence
+            self._recv_name = NamePair(bootstrap.get_sys_name(), self._recv_name, binding)   # if _recv_name is tuple it takes precedence
 
         self._ready_event = event.Event()
         self._binding = binding
@@ -388,7 +388,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def listen(self, binding=None):
         log.debug("LEF.listen: binding %s", binding)
 
-        binding = binding or self._binding or self._recv_name.queue
+        binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
         kwargs = {}

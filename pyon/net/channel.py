@@ -283,7 +283,7 @@ class SendChannel(BaseChannel):
     def _send(self, name, data, headers=None):
         log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
         exchange    = name.exchange
-        routing_key = name.queue    # @TODO odd name
+        routing_key = name.binding    # uses "_queue" if binding not explictly defined
         headers = headers or {}
         props = BasicProperties(headers=headers)
 
@@ -362,11 +362,13 @@ class RecvChannel(BaseChannel):
             log.debug("setup_listener already called for this channel")
             return
 
-        self._recv_name = NamePair(exchange, queue)
+        # only reset the name if it was passed in
+        if name != self._recv_name:
+            self._recv_name = NamePair(exchange, queue, binding)
 
         self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)
-        binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
+        binding = binding or self._recv_binding or self._recv_name.binding or queue      # last option should only happen in the case of anon-queue
 
         self._bind(binding)
 
@@ -494,8 +496,9 @@ class RecvChannel(BaseChannel):
                                                         auto_delete=self._queue_auto_delete,
                                                         durable=self._queue_durable)
 
-        # always save the new recv_name - we may have created a new one
-        self._recv_name = NamePair(self._recv_name.exchange, queue_name)
+        # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
+        if queue_name != self._recv_name.queue:
+            self._recv_name = NamePair(self._recv_name.exchange, queue_name, self._recv_name.binding)
 
         return self._recv_name.queue
 

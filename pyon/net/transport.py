@@ -138,9 +138,9 @@ class NamePair(object):
                             and if not specified, defaults to the *internal* queue name.
         """
         if isinstance(exchange, tuple):
-            self._exchange, self._queue, self._binding = exchange + ([None] *(3-len(exchange)))
+            self._exchange, self._queue, self._binding = list(exchange) + ([None] *(3-len(exchange)))
         elif isinstance(queue, tuple):
-            self._exchange, self._queue, self._binding = queue + ([None] *(3-len(queue)))
+            self._exchange, self._queue, self._binding = list(queue) + ([None] *(3-len(queue)))
         else:
             self._exchange  = exchange
             self._queue     = queue
@@ -159,7 +159,7 @@ class NamePair(object):
         return self._binding or self._queue
 
     def __str__(self):
-        return "NP (%s,%s,B: %s)" % (self._exchange, self._queue, self._binding)
+        return "NP (%s,%s,B: %s)" % (self.exchange, self.queue, self.binding)
 
 class FakeTransport(AMQPTransport, NamePair):
     def __init__(self):

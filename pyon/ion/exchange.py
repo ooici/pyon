@@ -116,7 +116,7 @@ class ExchangeManager(object):
         self._transport.delete_exchange_impl(self._client, exchange, **kwargs)
     def declare_queue(self, queue, durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_queue")
-        self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
+        return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
     def delete_queue(self, queue, **kwargs):
         log.info("ExchangeManager.delete_queue")
         self._transport.delete_queue_impl(self._client, queue, **kwargs)
