@@ -526,6 +526,16 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
+    def _build_header(self, raw_msg):
+        """
+        Sets headers common to Request-Response patterns, non-ion-specific.
+        """
+        headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
+        headers['performative'] = 'request'
+        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+
+        return headers
+
 class RequestResponseClient(BaseEndpoint):
     """
     Sends a request, waits for a response.
@@ -546,7 +556,15 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
     """
     The listener side makes one of these.
     """
-    pass
+    def _build_header(self, raw_msg):
+        """
+        Sets headers common to Response side of Request-Response patterns, non-ion-specific.
+        """
+        headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
+        headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
+        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+
+        return headers
 
 class RequestResponseServer(ListeningBaseEndpoint):
     endpoint_unit_type = ResponseEndpointUnit
@@ -609,7 +627,12 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         headers = RequestEndpointUnit._build_header(self, raw_msg)
         headers['protocol'] = 'rpc'
         headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
-        headers['conv-id'] = self._build_conv_id()
+        headers['conv-id']  = self._build_conv_id()
+        headers['language'] = 'ion-r2'
+        headers['encoding'] = 'msgpack'
+        headers['format']   = raw_msg.__class__.__name__    # hmm
+        headers['reply-by'] = 'todo'                        # clock sync is a problem
+
         return headers
 
     def _raise_exception(self, code, message):
@@ -769,7 +792,9 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
     def _create_error_response(self, ex):
         # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
-        return {'status_code': ex.get_status_code(), 'error_message': str(ex.get_error_message())}
+        return {'status_code': ex.get_status_code(),
+                'error_message': str(ex.get_error_message()),
+                'performative':'failure'}
 
 class RPCServer(RequestResponseServer):
     endpoint_unit_type = RPCResponseEndpointUnit
@@ -835,15 +860,15 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
         # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : 'todo'})
+                       'sender'       : self._process.id})
         
         # use context to set security attributes forward
         if isinstance(context, dict):
             # fwd on ion-actor-id and expiry, according to common message format spec
-            actor_id             = context.get('ion-actor-id', None)
+            actor_id            = context.get('ion-actor-id', None)
             expiry              = context.get('expiry', None)
 
-            if actor_id:         header['ion-actor-id']   = actor_id
+            if actor_id:        header['ion-actor-id']  = actor_id
             if expiry:          header['expiry']        = expiry
 
         return header
