@@ -62,6 +62,8 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._patch_out_start_rel()
             self._turn_on_couchdb()
             self._turn_off_force_clean()
+            from ion.processes.bootstrap.datastore_loader import DatastoreLoader
+            DatastoreLoader.load_datastore('res/dd')
 
         self.container = None
         self.addCleanup(self._stop_container)
