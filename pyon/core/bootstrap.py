@@ -35,7 +35,6 @@ def assert_configuration(config):
     """
     Checks that configuration is OK
     """
-    print "HI", config.copy()
     if not is_basic_identifier(config.get_safe("system.name", "")):
         raise ContainerConfigError("Config entry 'system.name' has illegal value")
     if not is_basic_identifier(config.get_safe("system.root_org", "")):
