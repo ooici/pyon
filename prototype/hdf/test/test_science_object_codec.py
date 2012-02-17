@@ -12,14 +12,10 @@ from pyon.public import log
 from pyon.core.exception import NotFound
 import unittest
 
-try:
-    import h5py
-    import numpy
-except ImportError:
-    log.warn('h5py and numpy have not been installed. Some features of the science object transport framework will not work!')
-    no_numpy_h5py = True
-    from unittest import SkipTest
-    raise SkipTest('Numpy not installed')
+
+import h5py
+import numpy
+
 
 import uuid
 import hashlib
@@ -55,7 +51,6 @@ class TestScienceObjectCodec(PyonTestCase):
             os.remove(i)
         pass
 
-    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
     def create_known(self):
         """
         A known array to compare against during tests
@@ -113,7 +108,6 @@ class TestScienceObjectCodec(PyonTestCase):
         self.assertEqual(array2.tostring(), array_decoded_2.tostring())
 
 
-    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
     def test_decode_known_and_compare(self):
         """
         Create a decoder and read a numpy array from it
