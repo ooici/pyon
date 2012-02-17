@@ -638,7 +638,7 @@ class CouchDB_DataStore(DataStore):
         datastore_name = datastore_name or self.datastore_name
         db = self.server[datastore_name]
         viewname = "_design/%s" % design
-        if not keepviews and viewname in db:
+        if keepviews and viewname in db:
             return
         try:
             del db[viewname]
