@@ -59,14 +59,13 @@ setup(  name = 'pyon',
             'ipython==0.11',
             'readline==6.2.1',
             'mock',
-            'ndg-xacml==0.4.0'
+            'ndg-xacml==0.4.0',
+            'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
+
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
             # 'numexpr==1.4.2',
             # 'cython==0.14.1',
-# Uncomment only after manually installing HDF5 package
-# see: http://www.hdfgroup.org/HDF5/release/obtain5.html
-#            'h5py==2.0.1',
-#            'tables==2.3',
+            # 'tables==2.3',
         ],
      )
