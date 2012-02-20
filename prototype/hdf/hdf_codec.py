@@ -39,11 +39,9 @@ and...
 import uuid
 import hashlib
 import os
-import os.path
-import sys
 from pyon.util.log import log
 from pyon.core.exception import IonException
-from pyon.util.file_sys import FS_DIRECTORY
+from pyon.util.file_sys import FS, FileSystem
 
 class ScienceObjectTransportException(IonException):
     """
@@ -119,10 +117,7 @@ class HDFEncoder(object):
         @param name The name of the dataset
         """
         # generate a random name for the filename if it has not been provided.
-        if name is None:
-            self.filename = os.path.join(FS_DIRECTORY.TEMP,random_name() + 'encoder.hdf5')
-        else:
-            self.filename = name
+        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=name or random_name(), ext='encoder.hdf5')
 
         # Using inline imports to put off making hdf/numpy required dependencies
         import h5py
@@ -312,9 +307,8 @@ class HDFEncoder(object):
         except IOError:
             log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. ")
             raise HDFEncoderException("Error while trying to open file. ")
-#        finally:
-#            # cleaning up
-#            os.remove(self.filename)
+        finally:
+            FileSystem.unlink(self.filename)
         return hdf_string
 
 
@@ -336,8 +330,7 @@ class HDFDecoder(object):
         except AssertionError as err:
             raise HDFDecoderException(err.message)
 
-        self.filename = os.path.join(FS_DIRECTORY.TEMP , hashlib.sha1(hdf_string).hexdigest() + '_decoder.hdf5')
-
+        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
         try:
             # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
             f = open(self.filename, mode='wb')
