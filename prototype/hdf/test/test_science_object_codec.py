@@ -20,9 +20,7 @@ except ImportError:
     from unittest import SkipTest
     raise SkipTest('Numpy not installed')
 
-from pyon.util.file_sys import FS_DIRECTORY, FileSystem
-import uuid
-import hashlib
+from pyon.util.file_sys import FileSystem, FS, FS_DIRECTORY
 import os, os.path, glob
 
 from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder, random_name
@@ -54,7 +52,7 @@ class TestScienceObjectCodec(PyonTestCase):
 
             known_array = numpy.ones((10,20))
 
-            filename = os.path.join(FS_DIRECTORY.TEMP, '%s.%s' % (random_name(),'.hdf5'))
+            filename = FileSystem.get_url(FS.TEMP,random_name(), ".hdf5")
 
             # Write an hdf file with known values to compare against
             h5pyfile = h5py.File(filename, mode = 'w', driver='core')
@@ -70,7 +68,7 @@ class TestScienceObjectCodec(PyonTestCase):
             known_hdf_as_string = f.read() # this is a known string to compare against during tests
             f.close()
             # cleaning up
-            os.remove(filename)
+            FileSystem.unlink(f.name)
 
             return known_array, known_hdf_as_string
 
@@ -139,7 +137,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         Create an encoder and add some (one) dataset/array
         """
-        testfilename = os.path.join(FS_DIRECTORY.TEMP, 'testFile.hdf5')
+        testfilename = FileSystem.get_url(FS.TEMP, 'testFile.hdf5')
 
         hdfencoder = HDFEncoder(testfilename)
         hdfencoder.add_hdf_dataset(self.path_to_dataset, self.known_array)
@@ -225,7 +223,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         Test adding a branch to an existing group tree in a file
         """
-        filename = os.path.join(FS_DIRECTORY.TEMP, 'testHDFEncoder.hdf5')
+        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
 
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/data/subsubgroup/pressure'
@@ -237,7 +235,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding datasets to the same leaf in the group tree
         """
 
-        filename = os.path.join(FS_DIRECTORY.TEMP, 'testHDFEncoder.hdf5')
+        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/pressure'
 
@@ -248,7 +246,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding a dataset to a file when a dataset with the same name already exists in it
         """
 
-        filename = os.path.join(FS_DIRECTORY.TEMP, 'testHDFEncoder.hdf5')
+        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
 
