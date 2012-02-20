@@ -532,7 +532,8 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         """
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
-        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
+            headers['receiver'] = "%s,%s" % self.channel._send_name   # @TODO updated by XN work, should be FQ?
 
         return headers
 
@@ -562,7 +563,8 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
+            headers['receiver'] = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
         headers['format']       = raw_msg.__class__.__name__    # hmm
