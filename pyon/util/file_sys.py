@@ -5,8 +5,12 @@
 """
 
 
+import StringIO
 import os
 import re
+import time
+import hashlib
+from pyon.core.exception import NotFound, BadRequest
 from pyon.util.containers import DotDict
 from pyon.core.bootstrap import CFG
 
@@ -44,17 +48,54 @@ class FileSystem(object):
         # Remove non alphanumeric
         ret = re.sub(r'[~!@#$%^&*()-+,/\'\";:`<>?\\\]\[\}\{=]+', '', ret)
 
+        # Limit 64 chars
         return ret[:64]
 
     @staticmethod
-    def get_url(fs, file, ext=''):
+    def get_url(fs, filename, ext=''):
         """
         @param fs The file system enumeration for the resource where this file belongs. 'TEMP', 'LIBRARY' etc.
         @param file The filename to be used
         @param ext Optional: guarantees the file will have the extension specified
         @return The full path to the desired resource on the file system
         """
-        return os.path.join(FS_DIRECTORY[fs], '%s.%s' % (FileSystem._parse_filename(file), ext))
+        return os.path.join(FS_DIRECTORY[fs], '%s%s' % (FileSystem._parse_filename(filename), ext))
+
+    @staticmethod
+    def mktemp(filename='', ext=''):
+        """
+        @description Creates a temporary file that is safe to use
+        @param filename Desired filename to use, if empty a random name is generated
+        @param ext the optional file extension to use
+        @return an open file to the desired temporary file
+        """
+        if filename:
+            return open(FileSystem.get_url(fs=FS.TEMP,filename=filename,ext=ext),'w')
+        else:
+            rand_str = hashlib.sha1(time.ctime()).hexdigest()[:24]
+            return open(FileSystem.get_url(fs=FS.TEMP,filename=rand_str), 'w')
+
+    @staticmethod
+    def unlink(filepath):
+        """
+        @description Removes a specified file or symlink
+        @param filepath The absolute path to the file.
+        @throws NotFound, BadRequest
+        """
+        if os.path.split(filepath)[0] not in FileSystem.FS_DIRECTORY.values():
+            raise NotFound('Specified is not in an acceptable path.')
+        try:
+            os.unlink(filepath)
+        except OSError:
+            raise BadRequest('The specified could not be removed.')
+
+    @staticmethod
+    def memory_file():
+        """
+        Very fast file IO, great for temporary files and fast mechanisms, avoid arbitrarily large strings, will cause thrashing!
+        """
+        return StringIO.StringIO()
+
 
 
 
