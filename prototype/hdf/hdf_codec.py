@@ -39,11 +39,9 @@ and...
 import uuid
 import hashlib
 import os
-import os.path
-import sys
 from pyon.util.log import log
 from pyon.core.exception import IonException
-from pyon.util.file_sys import FS_DIRECTORY, FS, FileSystem
+from pyon.util.file_sys import FS, FileSystem
 
 class ScienceObjectTransportException(IonException):
     """
