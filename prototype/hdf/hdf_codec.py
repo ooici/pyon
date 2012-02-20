@@ -309,10 +309,8 @@ class HDFEncoder(object):
         except IOError:
             log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. ")
             raise HDFEncoderException("Error while trying to open file. ")
-#        finally:
-#            # cleaning up
-#            os.remove(self.filename)
-        FileSystem.unlink(self.filename)
+        finally:
+            FileSystem.unlink(self.filename)
         return hdf_string
 
 
@@ -334,8 +332,7 @@ class HDFDecoder(object):
         except AssertionError as err:
             raise HDFDecoderException(err.message)
 
-        self.filename = os.path.join(FS_DIRECTORY.TEMP , hashlib.sha1(hdf_string).hexdigest() + '_decoder.hdf5')
-
+        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
         try:
             # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
             f = open(self.filename, mode='wb')
