@@ -107,10 +107,24 @@ class FileSystem(object):
 
     @staticmethod
     def atomic_file(filename):
+        """
+        @description Create an atomic filename
+        @param filename The desired (destination) file
+        @return An AtomicFile
+        """
         return AtomicFile(fname=filename)
 
 
 class AtomicFile(object):
+    """
+    A write-only atomic file. Writing is performed to a temporary file and on close,
+    the file is moved to the desired destination.
+
+    This is an atomic action.
+
+    This is ideal for threads, concurrency, crashes and saving state.
+
+    """
     def __init__(self,fname):
         self.filename = fname
         self.file = FileSystem.mktemp()
