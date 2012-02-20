@@ -391,4 +391,6 @@ class HDFDecoder(object):
 
         return nparray
 
+    #@todo Do resource clean up on the file - in a close method or some other way?
+
 
