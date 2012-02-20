@@ -396,8 +396,12 @@ class ListeningBaseEndpoint(BaseEndpoint):
             kwargs.update({'transport':self._recv_name})
         self._chan = self.node.channel(self.channel_type, **kwargs)
 
-        # @TODO: this duplicates things a little that may be done by an ExchangeObject
-        self._setup_listener(self._recv_name, binding=binding)
+        # @TODO this does not feel right
+        if isinstance(self._recv_name, BaseTransport):
+            self._recv_name.setup_listener(binding, self._setup_listener)
+            self._chan._recv_name = self._recv_name
+        else:
+            self._setup_listener(self._recv_name, binding=binding)
         self._chan.start_consume()
 
         # notify any listeners of our readiness

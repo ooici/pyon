@@ -364,7 +364,10 @@ class RecvChannel(BaseChannel):
 
         # only reset the name if it was passed in
         if name != self._recv_name:
-            self._recv_name = NamePair(exchange, queue, binding)
+            if isinstance(name, NamePair):
+                self._recv_name = name
+            else:
+                self._recv_name = NamePair(exchange, queue, binding)
 
         self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)

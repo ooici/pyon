@@ -261,6 +261,10 @@ class XOTransport(BaseTransport):
     def unbind_impl(self, client, exchange, queue, binding):
         return self._exchange_manager.unbind(exchange, queue, binding)
 
+    def setup_listener(self, binding, default_cb):
+        log.debug("XOTransport passing on setup_listener")
+        pass
+
 #    # friendly versions?
 #    def declare_exchange(self, exchange, **kwargs):
 #        return self.declare_exchange_impl(None, exchange, **kwargs)
@@ -325,6 +329,13 @@ class ExchangeName(XOTransport, NamePair):
 
     def unbind(self, binding_key):
         self.unbind_impl(None, self.exchange, self.queue, binding_key)
+
+    def setup_listener(self, binding, default_cb):
+        log.debug("ExchangeName.setup_listener: B %s", binding)
+
+        # make sure we've bound (idempotent action)
+        self.bind(binding)
+
 
 class ExchangePoint(ExchangeName):
     """

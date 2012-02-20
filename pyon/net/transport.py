@@ -33,6 +33,9 @@ class BaseTransport(object):
     def unbind_impl(self, client, exchange, queue, binding):
         raise NotImplementedError()
 
+    def setup_listener(self, binding, default_cb):
+        raise NotImplementedError()
+
 class AMQPTransport(BaseTransport):
     """
     This is STATELESS. You can make instances of it, but no need to (true singleton).
@@ -119,6 +122,12 @@ class AMQPTransport(BaseTransport):
         self._sync_call(client, client.queue_unbind, 'callback', queue=queue,
                                                      exchange=exchange,
                                                      routing_key=binding)
+
+    def setup_listener(self, binding, default_cb):
+        """
+        Calls setup listener via the default callback passed in.
+        """
+        return default_cb(self, binding)
 
 
 class NamePair(object):
