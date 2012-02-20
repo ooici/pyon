@@ -96,7 +96,32 @@ class FileSystem(object):
         """
         return StringIO.StringIO()
 
+    @staticmethod
+    def secure_file():
+        """
+        A method for secure file I/O, the file is immediately unlinked after creation
+        """
+        f = FileSystem.mktemp()
+        FileSystem.unlink(f.name)
+        return f
 
+    @staticmethod
+    def atomic_file(filename):
+        return AtomicFile(fname=filename)
+
+
+class AtomicFile(object):
+    def __init__(self,fname):
+        self.filename = fname
+        self.file = FileSystem.mktemp()
+
+    def write(self, text):
+        self.file.write(text)
+
+    def close(self):
+        tmp_filename = self.file.name
+        self.file.close()
+        os.rename(tmp_filename, self.filename)
 
 
 # Clients should either import this directory
