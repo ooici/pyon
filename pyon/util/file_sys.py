@@ -28,4 +28,4 @@ class FileSystem(object):
     def get_url(self, directory=''):
         return self.FS_DIRECTORY.get_safe(directory)
 
-FS_DIRECTORY = FileSystem.FS_DIRECTORY
+FS_DIRECTORY = FileSystem().FS_DIRECTORY
