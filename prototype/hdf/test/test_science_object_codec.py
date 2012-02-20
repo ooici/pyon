@@ -9,7 +9,6 @@ from mock import Mock, sentinel, patch
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from pyon.public import log
-from pyon.core.exception import NotFound
 import unittest
 
 try:
@@ -21,12 +20,12 @@ except ImportError:
     from unittest import SkipTest
     raise SkipTest('Numpy not installed')
 
-from pyon.util.file_sys import FS_DIRECTORY
+from pyon.util.file_sys import FS_DIRECTORY, FileSystem
 import uuid
 import hashlib
 import os, os.path, glob
 
-from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder
+from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder, random_name
 from prototype.hdf.hdf_codec import HDFEncoderException, HDFDecoderException
 no_numpy_h5py = False
 
@@ -40,13 +39,44 @@ class TestScienceObjectCodec(PyonTestCase):
     grp_name = 'mygroup'
     path_to_dataset =rootgrp_name + '/' + grp_name + '/' + dataset_name
 
-    #filename = '/tmp/known_hdf.hdf5'
-    def __init__(self, *args, **kwargs):
-        self.create_known()
-        PyonTestCase.__init__(self,*args,**kwargs)
 
-    def setUp(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
+
+        # This test does not start a container so we have to hack creating a FileSystem singleton instance
+        FileSystem()
+
+        @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
+        def create_known(dataset_name, rootgrp_name, grp_name):
+            """
+            A known array to compare against during tests
+            """
+
+            known_array = numpy.ones((10,20))
+
+            filename = os.path.join(FS_DIRECTORY.TEMP, '%s.%s' % (random_name(),'.hdf5'))
+
+            # Write an hdf file with known values to compare against
+            h5pyfile = h5py.File(filename, mode = 'w', driver='core')
+            grp = h5pyfile.create_group(rootgrp_name)
+            subgrp = grp.create_group(grp_name)
+            dataset = subgrp.create_dataset(dataset_name, known_array.shape, known_array.dtype.str, maxshape=(None,None))
+            dataset.write_direct(known_array)
+            h5pyfile.close()
+
+            # convert the hdf file into a binary string
+            f = open(filename, mode='rb')
+            # read the binary string representation of the file
+            known_hdf_as_string = f.read() # this is a known string to compare against during tests
+            f.close()
+            # cleaning up
+            os.remove(filename)
+
+            return known_array, known_hdf_as_string
+
+        # Use the class method to patch these attributes onto the class.
+        TestScienceObjectCodec.known_array, TestScienceObjectCodec.known_hdf_as_string = create_known(TestScienceObjectCodec.dataset_name, TestScienceObjectCodec.rootgrp_name, TestScienceObjectCodec.grp_name)
+
 
 
     def tearDown(self):
@@ -55,40 +85,9 @@ class TestScienceObjectCodec(PyonTestCase):
         r = glob.glob(rm_filepath)
         for i in r:
             os.remove(i)
-        pass
 
-    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
-    def create_known(self):
-        """
-        A known array to compare against during tests
-        """
-        ##############################################################
-        # The contents for this method should not be changed because
-        # the known values should remain constant.
-        ############################################################
-        self.known_array = numpy.ones((10,20))
 
-        #self.filename = '/tmp/testHDFEncoderDecoder.hdf5'
-        self.filename = os.path.join(FS_DIRECTORY.TEMP, 'testHDFEncoderDecoder.hdf5')
 
-        # Write an hdf file with known values to compare against
-        h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
-        grp = h5pyfile.create_group(self.rootgrp_name)
-        subgrp = grp.create_group(self.grp_name)
-        dataset = subgrp.create_dataset(self.dataset_name, self.known_array.shape, self.known_array.dtype.str, maxshape=(None,None))
-        dataset.write_direct(self.known_array)
-        h5pyfile.close()
-
-        # convert the hdf file into a binary string
-        f = open(self.filename, mode='rb')
-        # read the binary string representation of the file
-        self.known_hdf_as_string = f.read() # this is a known string to compare against during tests
-        f.close()
-        # cleaning up
-        os.remove(self.filename)
-
-    def random_name(self):
-        return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
 
     def add_two_datasets_read_compare(self, filename, dataset_name1, dataset_name2):
         array1 = numpy.ones((4,5))
@@ -97,10 +96,7 @@ class TestScienceObjectCodec(PyonTestCase):
         # first create the file
         hdfencoder = HDFEncoder(filename)
         hdfencoder.add_hdf_dataset(dataset_name1, array1)
-        hdfstring = hdfencoder.encoder_close()
 
-        # now open the file and add another branch
-        hdfencoder = HDFEncoder(filename)
         hdfencoder.add_hdf_dataset(dataset_name2, array2)
         hdfstring = hdfencoder.encoder_close()
 
@@ -108,7 +104,6 @@ class TestScienceObjectCodec(PyonTestCase):
         # Read the first dataset
         array_decoded_1 =  hdfdecoder.read_hdf_dataset(dataset_name1)
 
-        hdfdecoder = HDFDecoder(hdfstring)
         # Read the second dataset
         array_decoded_2 = hdfdecoder.read_hdf_dataset(dataset_name2)
 
@@ -204,6 +199,7 @@ class TestScienceObjectCodec(PyonTestCase):
         testencoder = HDFEncoder()
         testencoder.add_hdf_dataset('test_dataset', self.known_array)
         testencoder.encoder_close()
+        #@todo Add some assertion here?
 
     def test_add_hdf_dataset_with_bad_name(self):
         """

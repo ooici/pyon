@@ -81,6 +81,16 @@ class ScienceObjectTransport(object):
         """
         pass
 
+def random_name():
+    """
+    Return a random name to be used for the hdf file that needs to be written to disk or virtual memory during the
+    encoding process.
+
+    @retval random string
+    """
+    return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
+
+
 class HDFEncoderException(ScienceObjectTransportException):
     """
     Exception class for HDFEncoder exceptions. This class inherits from ScienceObjectTransportException
@@ -110,7 +120,7 @@ class HDFEncoder(object):
         """
         # generate a random name for the filename if it has not been provided.
         if name is None:
-            self.filename = os.path.join(FS_DIRECTORY.TEMP,self.random_name() + 'encoder.hdf5')
+            self.filename = os.path.join(FS_DIRECTORY.TEMP,random_name() + 'encoder.hdf5')
         else:
             self.filename = name
 
@@ -134,18 +144,6 @@ class HDFEncoder(object):
             log.debug(err.message)
             raise HDFEncoderException(err.message)
 
-    def random_name(self):
-        """
-        Return a random name to be used for the hdf file that needs to be written to disk or virtual memory during the
-        encoding process.
-
-        @retval random string
-        """
-        # Return Value
-        # ------------
-        # random_name: ''
-        #
-        return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
 
     def assert_valid_name(self, name):
         """
@@ -388,8 +386,8 @@ class HDFDecoder(object):
 
         # hdf close
         h5pyfile.close()
-        # cleaning up
-        os.remove(self.filename)
+
+        # Do not remove the file here!
 
         return nparray
 
