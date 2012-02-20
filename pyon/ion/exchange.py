@@ -35,12 +35,30 @@ class ExchangeManager(object):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.xs_by_name = {}
         self.default_xs = ExchangeSpace(self, ION_ROOT_XS)
+
+        # mappings
+        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
+        self.xn_by_name = {}                                    # friendly named XN to XNO
+        # xn by xs is a property
 
         self._chan = None
 
         # TODO: Do more initializing here, not in container
+
+    @property
+    def xn_by_xs(self):
+        """
+        Get a list of XNs associated by XS (friendly name).
+        """
+        ret = {}
+        for xnname, xn in self.xn_by_name.iteritems():
+            xsn = xn._xs._exchange
+            if not xsn in ret:
+                ret[xsn] = []
+            ret[xsn].append(xn)
+
+        return ret
 
     def start(self):
         log.debug("ExchangeManager starting ...")
@@ -73,6 +91,8 @@ class ExchangeManager(object):
         xs = ExchangeSpace(self, name, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
         xs.declare()
 
+        self.xs_by_name[name] = xs
+
         return xs
 
     def delete_xs(self, xs):
@@ -81,6 +101,8 @@ class ExchangeManager(object):
         """
         log.debug("ExchangeManager.delete_xs: %s", xs)
         xs.delete()
+
+        del self.xs_by_name[xs._exchange]   # @ TODO feels wrong
 
     def create_xp(self, xs, name, xptype):
         log.debug("ExchangeManager.create_xp: name=%s, xptype=%s", name, xptype)
@@ -98,11 +120,15 @@ class ExchangeManager(object):
         xn = ExchangeName(self, xs, name, durable=durable, auto_delete=auto_delete)
         xn.declare()
 
+        self.xn_by_name[name] = xn
+
         return xn
 
     def delete_xn(self, xn):
         log.debug("ExchangeManager.delete_xn: name=%s", xn.build_xlname())
         xn.delete()
+
+        del self.xn_by_name[xn._queue]      # @TODO feels wrong
 
     def stop(self, *args, **kwargs):
         log.debug("ExchangeManager stopping ...")
