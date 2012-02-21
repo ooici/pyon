@@ -36,10 +36,22 @@ class FileSystem(object):
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
                 FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
+            FileSystem._walk(self.FS_DIRECTORY[k])
 
-            if not os.path.exists(self.FS_DIRECTORY[k]):
-                #@todo: Warning potential security problem if we use 777 for perms all the time
-                os.mkdir(FileSystem.FS_DIRECTORY[k], 0777)
+    @staticmethod
+    def _walk(path):
+        if path[0] != '/':
+            queue = path.split('/')
+            cwd = './'
+        else:
+            queue = path.split('/')[1:]
+            cwd = '/'
+        for dir in queue:
+            cwd = os.path.join(cwd,dir)
+            if not os.path.exists(cwd):
+                os.mkdir(cwd)
+
+
     @staticmethod
     def _parse_filename(file):
         # Remove whitespace
