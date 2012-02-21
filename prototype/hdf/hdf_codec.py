@@ -39,11 +39,9 @@ and...
 import uuid
 import hashlib
 import os
-import os.path
-import sys
 from pyon.util.log import log
 from pyon.core.exception import IonException
-
+from pyon.util.file_sys import FS, FileSystem
 
 class ScienceObjectTransportException(IonException):
     """
@@ -81,6 +79,16 @@ class ScienceObjectTransport(object):
         """
         pass
 
+def random_name():
+    """
+    Return a random name to be used for the hdf file that needs to be written to disk or virtual memory during the
+    encoding process.
+
+    @retval random string
+    """
+    return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
+
+
 class HDFEncoderException(ScienceObjectTransportException):
     """
     Exception class for HDFEncoder exceptions. This class inherits from ScienceObjectTransportException
@@ -109,10 +117,7 @@ class HDFEncoder(object):
         @param name The name of the dataset
         """
         # generate a random name for the filename if it has not been provided.
-        if name is None:
-            self.filename = '/tmp/' + self.random_name() + 'encoder.hdf5'
-        else:
-            self.filename = name
+        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=name or random_name(), ext='encoder.hdf5')
 
         # Using inline imports to put off making hdf/numpy required dependencies
         import h5py
@@ -128,24 +133,12 @@ class HDFEncoder(object):
                 self.h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
             assert self.h5pyfile, 'No h5py file object created.'
         except IOError:
-            log.debug("Error opening file for the HDFEncoder! Check if /tmp/ folder is available.")
-            raise HDFEncoderException("Error while trying to open file. Check if /tmp/ folder is available.")
+            log.debug("Error opening file for the HDFEncoder! ")
+            raise HDFEncoderException("Error while trying to open file. ")
         except AssertionError as err:
             log.debug(err.message)
             raise HDFEncoderException(err.message)
 
-    def random_name(self):
-        """
-        Return a random name to be used for the hdf file that needs to be written to disk or virtual memory during the
-        encoding process.
-
-        @retval random string
-        """
-        # Return Value
-        # ------------
-        # random_name: ''
-        #
-        return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
 
     def assert_valid_name(self, name):
         """
@@ -312,13 +305,10 @@ class HDFEncoder(object):
             hdf_string = f.read()
             f.close()
         except IOError:
-            log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. \
-            Check if /tmp/ folder is available.")
-            raise HDFEncoderException("Error while trying to open file. \
-            Check if /tmp/ folder is available.")
-#        finally:
-#            # cleaning up
-#            os.remove(self.filename)
+            log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. ")
+            raise HDFEncoderException("Error while trying to open file. ")
+        finally:
+            FileSystem.unlink(self.filename)
         return hdf_string
 
 
@@ -340,18 +330,15 @@ class HDFDecoder(object):
         except AssertionError as err:
             raise HDFDecoderException(err.message)
 
-        self.filename = '/tmp/' + hashlib.sha1(hdf_string).hexdigest() + '_decoder.hdf5'
-
+        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
         try:
             # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
             f = open(self.filename, mode='wb')
             f.write(hdf_string)
             f.close()
         except IOError:
-            log.debug("Error opening binary file for writing hdfstring in HDFDecoder. \
-            Check if /tmp/ folder is available.")
-            raise HDFDecoderException("Error while trying to open file. \
-            Check if /tmp/ folder is available.")
+            log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
+            raise HDFDecoderException("Error while trying to open file. ")
 
     def read_hdf_dataset(self, name):
         """
@@ -384,17 +371,19 @@ class HDFDecoder(object):
         try:
             h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
         except IOError:
-            log.debug("Error opening file for the HDFDecoder! Check if /tmp/ folder is available.")
-            raise HDFDecoderException("Error while trying to open file. Check if /tmp/ folder is available.")
+            log.debug("Error opening file for the HDFDecoder! ")
+            raise HDFDecoderException("Error while trying to open file. ")
 
         # read array from the hdf file
         nparray = numpy.array(h5pyfile['/' + name])
 
         # hdf close
         h5pyfile.close()
-        # cleaning up
-        os.remove(self.filename)
+
+        # Do not remove the file here!
 
         return nparray
+
+    #@todo Do resource clean up on the file - in a close method or some other way?
 
 
