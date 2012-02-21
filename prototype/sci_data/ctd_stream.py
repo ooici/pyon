@@ -6,15 +6,17 @@
 @description An example process producing a ctd data stream
 '''
 
-from interface.objects import DataContainer, StreamDefinitionContainer, StreamGranuleContainer
-from interface.objects import UnitReferenceProperty, NilValue, ElapsedTime, AllowedTokens, AllowedValues, AllowedTimes
-from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
-from interface.objects import BooleanElement, TextElement, CategoryElement, CountElement, CountRangeElement
-from interface.objects import QuantityElement, QuantityRangeElement, TimeElement, TimeRangeElement
-from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
+from interface.objects import StreamDefinitionContainer, StreamGranuleContainer #, DataContainer
 from interface.objects import DataStream, ElementType, DataRecord, Vector, Coverage, RangeSet, Domain, Mesh, CoordinateAxis, Encoding
+from interface.objects import UnitReferenceProperty, NilValue, AllowedValues #, ElapsedTime, AllowedTokens, AllowedTimes
+from interface.objects import CategoryElement, CountElement #, BooleanElement, TextElement, CountRangeElement
+from interface.objects import QuantityRangeElement #, QuantityElement, TimeElement, TimeRangeElement
+#from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
+#from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
 
-from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
+from prototype.hdf.hdf_codec import HDFEncoder #, HDFEncoderException, HDFDecoder, HDFDecoderException
+
+import hashlib
 
 from pyon.util.log import log
 
@@ -54,14 +56,8 @@ def ctd_stream_definition(stream_id=None):
         data_record_id='ctd_data')
 
 
-    ctd_container.identifiables['element_type'] = ElementType(
-        data_record_id='data_record',
-        definition='Defintion of CTD element?',
-        updatable=False
-        )
-
     ctd_container.identifiables['data_record'] = DataRecord(
-        field_ids=['temperature','conductivity','depth'],
+        field_ids=['temperature','conductivity','pressure'],
         domain_ids=['time_domain'],
         definition = "Definition of a data record for a CTD",
         updatable=False,
@@ -319,74 +315,84 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     )
 
 
-    if create_hdf:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-            values=hdf_string # put the hdf file here as bytes!
+    ctd_container.identifiables['ctd_data'] = DataStream(
+        id=stream_id,
+        values=hdf_string # put the hdf file here as bytes!
         )
-    else:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-        )
+
+    sha1 = hashlib.sha1(hdf_string).hexdigest().upper() if hdf_string else ''
+
+    ctd_container.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = sha1,
+    )
+
 
     ctd_container.identifiables['record_count'] = CountElement(
         value= length or -1,
         )
 
     # Time
-    ctd_container.identifiables['time'] = CoordinateAxis(
-        bounds_id='time_bounds'
-    )
+    if time is not None :
+        ctd_container.identifiables['time'] = CoordinateAxis(
+            bounds_id='time_bounds'
+        )
 
-    ctd_container.identifiables['time_bounds'] = QuantityRangeElement(
-        value_pair=time_range
-    )
+        ctd_container.identifiables['time_bounds'] = QuantityRangeElement(
+            value_pair=time_range
+        )
 
     # Latitude
-    ctd_container.identifiables['latitude'] = CoordinateAxis(
-        bounds_id='latitude_bounds'
-    )
+    if lat is not None:
+        ctd_container.identifiables['latitude'] = CoordinateAxis(
+            bounds_id='latitude_bounds'
+        )
 
-    ctd_container.identifiables['latitude_bounds'] = QuantityRangeElement(
-        value_pair=lat_range
-    )
+        ctd_container.identifiables['latitude_bounds'] = QuantityRangeElement(
+            value_pair=lat_range
+        )
 
     # Longitude
-    ctd_container.identifiables['longitude'] = CoordinateAxis(
-        bounds_id='longitude_bounds'
-    )
+    if lon is not None:
+        ctd_container.identifiables['longitude'] = CoordinateAxis(
+            bounds_id='longitude_bounds'
+        )
 
-    ctd_container.identifiables['longitude_bounds'] = QuantityRangeElement(
-        value_pair=lon_range
-    )
+        ctd_container.identifiables['longitude_bounds'] = QuantityRangeElement(
+            value_pair=lon_range
+        )
 
 
     # Pressure
-    ctd_container.identifiables['pressure_data'] = CoordinateAxis(
-        bounds_id='pressure_bounds'
-    )
+    if p is not None:
+        ctd_container.identifiables['pressure_data'] = CoordinateAxis(
+            bounds_id='pressure_bounds'
+        )
 
-    ctd_container.identifiables['pressure_bounds'] = QuantityRangeElement(
-        value_pair=p_range
-    )
+        ctd_container.identifiables['pressure_bounds'] = QuantityRangeElement(
+            value_pair=p_range
+        )
 
     # Temperature
-    ctd_container.identifiables['temp_data'] = RangeSet(
-        bounds_id=['temp_bounds']
-    )
+    if t is not None:
+        ctd_container.identifiables['temp_data'] = RangeSet(
+            bounds_id=['temp_bounds']
+        )
 
-    ctd_container.identifiables['temp_bounds'] = QuantityRangeElement(
-        value_pair=t_range
-    )
+        ctd_container.identifiables['temp_bounds'] = QuantityRangeElement(
+            value_pair=t_range
+        )
 
     # Conductivity
-    ctd_container.identifiables['cndr_data'] = RangeSet(
-        bounds_id='cndr_bounds'
-    )
+    if c is not None:
+        ctd_container.identifiables['cndr_data'] = RangeSet(
+            bounds_id='cndr_bounds'
+        )
 
-    ctd_container.identifiables['cndr_bounds'] = QuantityRangeElement(
-        value_pair=c_range
-    )
+        ctd_container.identifiables['cndr_bounds'] = QuantityRangeElement(
+            value_pair=c_range
+        )
 
 
     return ctd_container
