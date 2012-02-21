@@ -458,6 +458,11 @@ class DatastoreManager(object):
         # Create store if not existing
         if not new_ds.datastore_exists(scoped_name):
             new_ds.create_datastore(scoped_name)
+        else:
+            if self.persistent:
+                # NOTE: This may be expensive if called more than once per container
+                # If views exist and are dropped and recreated
+                new_ds._define_views(profile=profile, keepviews=True)
 
         # Set a few standard datastore instance fields
         new_ds.local_name = ds_name

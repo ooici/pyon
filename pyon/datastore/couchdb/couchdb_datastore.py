@@ -626,23 +626,25 @@ class CouchDB_DataStore(DataStore):
     def _get_viewname(self, design, name):
         return "_design/%s/_view/%s" % (design, name)
 
-    def _define_views(self, datastore_name="", profile=None):
-        if not datastore_name:
-            datastore_name = self.datastore_name
+    def _define_views(self, datastore_name=None, profile=None, keepviews=False):
+        datastore_name = datastore_name or self.datastore_name
+        profile = profile or self.profile
 
         ds_views = get_couchdb_views(profile)
         for design, viewdef in ds_views.iteritems():
-            self._define_view(design, viewdef, datastore_name=datastore_name)
+            self._define_view(design, viewdef, datastore_name=datastore_name, keepviews=keepviews)
 
-    def _define_view(self, design, viewdef, datastore_name=""):
-        if not datastore_name:
-            datastore_name = self.datastore_name
+    def _define_view(self, design, viewdef, datastore_name=None, keepviews=False):
+        datastore_name = datastore_name or self.datastore_name
         db = self.server[datastore_name]
+        viewname = "_design/%s" % design
+        if keepviews and viewname in db:
+            return
         try:
-            del db["_design/%s" % design]
+            del db[viewname]
         except ResourceNotFound:
             pass
-        db["_design/%s" % design] = dict(views=viewdef)
+        db[viewname] = dict(views=viewdef)
 
     def _update_views(self, datastore_name="", profile=None):
         if not datastore_name:

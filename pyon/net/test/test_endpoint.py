@@ -414,7 +414,13 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'error_message':'Unknown op name: no_exist',
                                                'conv-id': '',
                                                'conv-seq': 2,
-                                               'protocol':''})
+                                               'protocol':'',
+                                               'performative': 'failure',
+                                               'language':'ion-r2',
+                                               'encoding':'msgpack',
+                                               'format':'NoneType',
+                                               'receiver': ',',
+                                               'reply-by': 'todo'})
 
     def test_recv_bad_kwarg(self):
         # we try to call simple with the kwarg "not_named" instead of the correct one
@@ -435,7 +441,13 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'error_message':'simple() got an unexpected keyword argument \'not_named\'',
                                                'conv-id': '',
                                                'conv-seq': 2,
-                                               'protocol':''})
+                                               'protocol':'',
+                                               'performative': 'failure',
+                                               'language':'ion-r2',
+                                               'encoding':'msgpack',
+                                               'format':'NoneType',
+                                               'receiver': ',',
+                                               'reply-by': 'todo'})
 
     def test__message_received_interceptor_exception(self):
         e = RPCResponseEndpointUnit(routing_obj=self)
@@ -449,7 +461,8 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                   'error_message':'',
                                                   'conv-id': '',
                                                   'conv-seq': 2,
-                                                  'protocol':''})
+                                                  'protocol':'',
+                                                  'performative': 'failure'})
 
     def error_op(self):
         """
@@ -478,7 +491,8 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                               'error_message': str(sentinel.unauth),
                                               'conv-id': '',
                                               'conv-seq': 2,
-                                              'protocol':''})
+                                              'protocol':'',
+                                              'performative':'failure'})
 
 
 @attr('UNIT')
