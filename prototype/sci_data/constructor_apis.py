@@ -12,6 +12,7 @@
 
 from interface.objects import CoordinateAxis
 from interface.objects import CountElement
+from interface.objects import DataStream
 from interface.objects import Encoding
 from interface.objects import QuantityRangeElement
 from interface.objects import RangeSet
@@ -213,6 +214,7 @@ class PointSupplementConstructor(object):
             for coordinate_id in coordinate_ids:
                 if not coordinate_id in self._packet_container.identifiables:
                     coordinate_axis = point_definition.identifiables[coordinate_id]
+                    self._coordinate_axes.append(coordinate_axis)
                     self._packet_container.identifiables[coordinate_id] = CoordinateAxis(bounds_id=coordinate_id + '_bounds')
                     self._packet_container.identifiables[coordinate_id + '_bounds'] = QuantityRangeElement()
 
@@ -234,13 +236,15 @@ class PointSupplementConstructor(object):
         # calculate the bounds for time and location and create or update the bounds for the coordinate axis
         # hold onto the values so you can put them in an hdf...
 
-        self._record_count.value += 1
+        self._packet_container.identifiables[self._element_count_id].value += 1
 
         if not time is None:
             # Time
-            self._times.append(time)
+            self._times = time
             time_range = []
             time_range = [min(self._times), max(self._times)]
+
+        self._packet_container.identifiables[coverage_id + '_bounds'].value_pair = range
 
         if not location is None:
             for loc in location:
@@ -253,7 +257,7 @@ class PointSupplementConstructor(object):
                     self._latitudes.extend(loc[1])
                     lats_range = [min(self._latitudes), max(self._latitudes)]
 
-            return self._record_count.value
+            return self._packet_container.identifiables[self._element_count_id].value
 
     def add_point_coverage(self, point_id=None, coverage_id=None, values=None, slice=None):
         """
@@ -262,10 +266,8 @@ class PointSupplementConstructor(object):
         """
         # calculate the bounds for the values and create or update the bounds for the coverage
         # hold onto the values so you can put them in an hdf...
-        if not coverage_id in self._values:
-            self._values[coverage_id] = []
 
-        self._values[coverage_id].extend(values)
+        self._values[coverage_id] = values
 
         range = [min(self._values[coverage_id]), max(self._values[coverage_id])]
 
@@ -282,6 +284,12 @@ class PointSupplementConstructor(object):
         """
         # ignore for now...
 
+    def get_stream_granule(self):
+        self._packet_container.identifiables[self._packet_container.data_stream_id] = DataStream(
+            id=self._packet_container.stream_resource_id,
+            values=_encode_supplement() # put the hdf file here as bytes!
+        )
+
     def _encode_supplement(self):
         """
         Method used to encode the point dataset supplement
@@ -296,15 +304,22 @@ class PointSupplementConstructor(object):
             #will be for the coordinate axes.
             #This assumes the coordinate axis names as described below. Will probably need to be
             #changed to accommodate other labels.
-            for coordinate_axis in self._coordinate_axes.values():
+            for key, coordinate_axis in self._coordinate_axes.iteritems():
 
                 if self._times is not None and coordinate_axis.axis.lowercase() == 'time':
+                    time_range = [min(self._times), max(self._times)]
+                    self._packet_container.identifiables[key + '_bounds'].value_pair = time_range
+
                     encoder.add_hdf_dataset(coordinate_axis.values_path, self._times)
 
                 if self._latitudes is not None and coordinate_axis.axis.lowercase() == 'latitude':
+                    lats_range = [min(self._times), max(self._times)]
+                    self._packet_container.identifiables[key + '_bounds'].value_pair = lats_range
                     encoder.add_hdf_dataset(coordinate_axis.values_path, numpy.asanyarray(self._latitudes))
 
                 if self._longitudes is not None and coordinate_axis.axis.lowercase() == 'longitude':
+                    lons_range = [min(self._times), max(self._times)]
+                    self._packet_container.identifiables[key + '_bounds'].value_pair = lons_range
                     encoder.add_hdf_dataset(coordinate_axis.values_path, numpy.asanyarray(self._longitudes))
 
             #Loop through ranges, one for each coverage. Range objects contain the values_path variable,
@@ -317,7 +332,14 @@ class PointSupplementConstructor(object):
             hdf_string = encoder.encoder_close()
 
             sha1 = pyon.datastore.couchdb.couchdb_datastore.sha1hex(hdf_string)
-            return Encoding(sha1=sha1)
+            self._packet_container.identifiables['stream_encoding'] = Encoding(
+                encoding_type='hdf5',
+                compression=None,
+                sha1=sha1
+            )
+
+            return hdf_string
+
         except :
             log.exception('HDF encoder failed. Please make sure you have it properly installed!')
 
