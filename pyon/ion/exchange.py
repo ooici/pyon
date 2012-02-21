@@ -27,9 +27,12 @@ class ExchangeManager(object):
         self.container = container
 
         # Define the callables that can be added to Container public API
+        # @TODO: remove
         self.container_api = [self.create_xs,
                               self.create_xp,
-                              self.create_xn]
+                              self.create_xn_service,
+                              self.create_xn_process,
+                              self.create_xn_queue]
 
         # Add the public callables to Container
         for call in self.container_api:
@@ -104,10 +107,8 @@ class ExchangeManager(object):
 
         del self.xs_by_name[xs._exchange]   # @ TODO feels wrong
 
-    def create_xp(self, xs, name, xptype):
-        log.debug("ExchangeManager.create_xp: name=%s, xptype=%s", name, xptype)
-        xp = ExchangePoint(self, xs, name, xptype)
-        xp.declare()
+    def create_xp(self, name, xs=None, **kwargs):
+        xp = self._create_xn('xp', name, xs=xs, **kwargs)
 
         return xp
 
@@ -115,17 +116,36 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xp: name=%s", xp.build_xname())
         xp.delete()
 
-    def create_xn(self, xs, name, durable=False, auto_delete=True):
-        log.debug("ExchangeManager.create_xn: name=%s, xs=%s", name, xs)
-        xn = ExchangeName(self, xs, name, durable=durable, auto_delete=auto_delete)
+    def _create_xn(self, xn_type, name, xs=None, **kwargs):
+        xs = xs or self.default_xs
+        log.debug("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
+
+        if xn_type == "service":
+            xn = ExchangeNameService(self, name, xs, **kwargs)
+        elif xn_type == "process":
+            xn = ExchangeNameProcess(self, name, xs, **kwargs)
+        elif xn_type == "queue":
+            xn = ExchangeNameQueue(self, name, xs, **kwargs)
+        elif xn_type == "xp":
+            xn = ExchangePoint(self, name, xs, **kwargs)
+        else:
+            raise StandardError("Unknown XN type: %s" % xn_type)
+
         xn.declare()
-
         self.xn_by_name[name] = xn
-
         return xn
 
+    def create_xn_service(self, name, xs=None, **kwargs):
+        return self._create_xn('service', name, xs=xs, **kwargs)
+
+    def create_xn_process(self, name, xs=None, **kwargs):
+        return self._create_xn('process', name, xs=xs, **kwargs)
+
+    def create_xn_queue(self, name, xs=None, **kwargs):
+        return self._create_xn('queue', name, xs=xs, **kwargs)
+
     def delete_xn(self, xn):
-        log.debug("ExchangeManager.delete_xn: name=%s", xn.build_xlname())
+        log.debug("ExchangeManager.delete_xn: name=%s", "TODO") #xn.build_xlname())
         xn.delete()
 
         del self.xn_by_name[xn._queue]      # @TODO feels wrong
@@ -323,13 +343,19 @@ class ExchangeSpace(XOTransport, NamePair):
         self.delete_exchange_impl(None, self.exchange)
 
 class ExchangeName(XOTransport, NamePair):
-    def __init__(self, exchange_manager, xs, name, durable=False, auto_delete=True):
+
+    xn_type = "XN_BASE"
+
+    _xn_durable     = False
+    _xn_auto_delete = True
+
+    def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=None, queue=name)
         self._xs = xs
 
-        self._xn_durable        = durable
-        self._xn_auto_delete    = auto_delete
+        if durable:     self._xn_durable        = durable
+        if auto_delete: self._xn_auto_delete    = auto_delete
 
     @property
     def exchange(self):
@@ -374,7 +400,7 @@ class ExchangePoint(ExchangeName):
         'ttree':'ttree',
         }
 
-    def __init__(self, exchange_manager, xs, name, xptype):
+    def __init__(self, exchange_manager, name, xs, xptype=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=name)
 
@@ -397,18 +423,16 @@ class ExchangePoint(ExchangeName):
 
 
 
-
-
-
-# @TODO: these are first class objects yes?
-class ProcessExchangeName(ExchangeName):
+class ExchangeNameProcess(ExchangeName):
+    xn_type = "XN_PROCESS"
     pass
 
-class ServiceExchangeName(ExchangeName):
+class ExchangeNameService(ExchangeName):
+    xn_type = "XN_SERVICE"
+    _xn_auto_delete = False
     pass
 
-#class ExchangePoint(ExchangeName):
-#    pass
-
-class QueueExchangeName(ExchangeName):
-    pass
+class ExchangeNameQueue(ExchangeName):
+    xn_type = "XN_QUEUE"
+    def queue(self):
+        return None

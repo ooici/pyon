@@ -10,7 +10,7 @@ from interface.services.examples.hello.ihello_service import HelloServiceClient
 from pyon.net.endpoint import RPCServer
 from pyon.util.async import spawn
 import unittest
-from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS
+from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess
 from mock import Mock, sentinel
 from pyon.net.transport import BaseTransport
 
@@ -34,19 +34,22 @@ class TestExchangeObjects(IonUnitTestCase):
         self.assertEquals(len(self.ex_manager.xn_by_name), 0)
 
         # now create some XNs underneath default exchange
-        xn1 = self.ex_manager.create_xn(self.ex_manager.default_xs, 'xn1')
+        xn1 = self.ex_manager.create_xn_process('xn1')
+        self.assertEquals(xn1._xs, self.ex_manager.default_xs)
         self.assertIn('xn1', self.ex_manager.xn_by_name)
         self.assertIn(xn1, self.ex_manager.xn_by_name.values())
         self.assertEquals(xn1, self.ex_manager.xn_by_name['xn1'])
+        self.assertIsInstance(xn1, ExchangeNameProcess)
 
         self.assertEquals({ION_ROOT_XS:[xn1]}, self.ex_manager.xn_by_xs)
 
-        xn2 = self.ex_manager.create_xn(self.ex_manager.default_xs, 'xn2')
+        xn2 = self.ex_manager.create_xn_service('xn2')
         self.assertIn('xn2', self.ex_manager.xn_by_name)
         self.assertIn(xn2, self.ex_manager.xn_by_xs[ION_ROOT_XS])
+        self.assertEquals(xn2.xn_type, 'XN_SERVICE')
 
         # create one under our second xn3
-        xn3 = self.ex_manager.create_xn(xs, 'xn3')
+        xn3 = self.ex_manager.create_xn_queue('xn3', xs)
         self.assertIn('xn3', self.ex_manager.xn_by_name)
         self.assertIn(xn3, self.ex_manager.xn_by_xs['exchange'])
         self.assertNotIn(xn3, self.ex_manager.xn_by_xs[ION_ROOT_XS])
@@ -58,7 +61,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
     def test_rpc_with_xn(self):
         # get an xn to use for send/recv
-        xn = self.container.ex_manager.create_xn(self.container.ex_manager.default_xs, 'hello', auto_delete=False)
+        xn = self.container.ex_manager.create_xn_service('hello')
 
         # create an RPCServer for a hello service
         hs = HelloService()
