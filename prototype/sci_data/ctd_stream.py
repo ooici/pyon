@@ -6,15 +6,17 @@
 @description An example process producing a ctd data stream
 '''
 
-from interface.objects import DataContainer, StreamDefinitionContainer, StreamGranuleContainer
-from interface.objects import UnitReferenceProperty, NilValue, ElapsedTime, AllowedTokens, AllowedValues, AllowedTimes
-from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
-from interface.objects import BooleanElement, TextElement, CategoryElement, CountElement, CountRangeElement
-from interface.objects import QuantityElement, QuantityRangeElement, TimeElement, TimeRangeElement
-from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
+from interface.objects import StreamDefinitionContainer, StreamGranuleContainer #, DataContainer
 from interface.objects import DataStream, ElementType, DataRecord, Vector, Coverage, RangeSet, Domain, Mesh, CoordinateAxis, Encoding
+from interface.objects import UnitReferenceProperty, NilValue, AllowedValues #, ElapsedTime, AllowedTokens, AllowedTimes
+from interface.objects import CategoryElement, CountElement #, BooleanElement, TextElement, CountRangeElement
+from interface.objects import QuantityRangeElement #, QuantityElement, TimeElement, TimeRangeElement
+#from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
+#from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
 
-from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
+from prototype.hdf.hdf_codec import HDFEncoder #, HDFEncoderException, HDFDecoder, HDFDecoderException
+
+import hashlib
 
 from pyon.util.log import log
 
@@ -313,15 +315,19 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     )
 
 
-    if create_hdf:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-            values=hdf_string # put the hdf file here as bytes!
+    ctd_container.identifiables['ctd_data'] = DataStream(
+        id=stream_id,
+        values=hdf_string # put the hdf file here as bytes!
         )
-    else:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-        )
+
+    sha1 = hashlib.sha1(hdf_string).hexdigest().upper() if hdf_string else ''
+
+    ctd_container.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = sha1,
+    )
+
 
     ctd_container.identifiables['record_count'] = CountElement(
         value= length or -1,
