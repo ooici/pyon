@@ -190,7 +190,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
     def _transform(self, obj):
         if isinstance(obj, IonObjectBase):
-            res = obj.__dict__
+            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in ['_id', '_rev'])
             res["type_"] = obj.__class__.__name__
             return res
         if _have_numpy:
