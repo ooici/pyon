@@ -5,9 +5,9 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import IonObject, CFG
-from pyon.core.exception import Conflict, NotFound, BadRequest
-from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.core import bootstrap
+from pyon.core.exception import NotFound, BadRequest
+from pyon.datastore.datastore import DataStore
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -19,10 +19,11 @@ class StateRepository(object):
     Class that uses a data store to provide a persistent state repository for ION processes.
     """
 
-    def __init__(self, datastore_manager):
+    def __init__(self, datastore_manager=None):
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
+        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.state_store = datastore_manager.get_datastore("state", DataStore.DS_PROFILE.STATE)
 
     def close(self):

@@ -8,8 +8,8 @@ Capability Container base class
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
+from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, bootstrap_pyon
-
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.datastore.datastore import DataStore
@@ -56,6 +56,7 @@ class Container(BaseContainerAgent):
         # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
         dict_merge(CFG, kwargs, inplace=True)
         from pyon.core import bootstrap
+        bootstrap.container_instance = self
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
 
@@ -113,14 +114,14 @@ class Container(BaseContainerAgent):
         self.datastore_manager.start()
 
         # Instantiate Directory and self-register
-        self.directory = Directory(self.datastore_manager)
+        self.directory = Directory()
         self.directory.register("/Containers", self.id, cc_agent=self.name)
 
         # Create other repositories to make sure they are there and clean if needed
         self.datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
         self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
-        self.state_repository = StateRepository(self.datastore_manager)
-        self.event_repository = EventRepository(self.datastore_manager)
+        self.state_repository = StateRepository()
+        self.event_repository = EventRepository()
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
@@ -232,6 +233,8 @@ class Container(BaseContainerAgent):
         log.debug("Container stopped, OK.")
 
         Container.instance = None
+        from pyon.core import bootstrap
+        bootstrap.container_instance = None
 
     def fail_fast(self, err_msg=""):
         """

@@ -20,9 +20,10 @@ class Directory(object):
     Class that uses a data store to provide a directory lookup mechanism.
     """
 
-    def __init__(self, datastore_manager):
+    def __init__(self, datastore_manager=None, orgname=None):
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
+        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
 
         self._init()

@@ -13,7 +13,8 @@ from pyon.datastore.datastore import DatastoreManager
 class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
-        directory_service = Directory(DatastoreManager())
+        dsm = DatastoreManager()
+        directory_service = Directory(dsm)
 
         root = directory_service.lookup("/")
         self.assertEquals(root, None)

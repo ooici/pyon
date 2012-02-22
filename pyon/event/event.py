@@ -8,8 +8,8 @@ __license__ = 'Apache 2.0'
 import time
 
 from pyon.core import bootstrap
-from pyon.core.exception import Conflict, NotFound, BadRequest
-from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.core.exception import BadRequest
+from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
 from pyon.util.log import log
 
@@ -507,10 +507,11 @@ class EventRepository(object):
     Class that uses a data store to provide a persistent repository for ION events.
     """
 
-    def __init__(self, datastore_manager):
+    def __init__(self, datastore_manager=None):
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
+        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.event_store = datastore_manager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
 
     def close(self):

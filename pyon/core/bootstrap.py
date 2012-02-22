@@ -49,6 +49,9 @@ IonObject = obj_registry.new
 # SERVICES. Service definitions
 service_registry = IonServiceRegistry()
 
+# Container instance here to avoid importing Container and cyclic reference
+container_instance = None
+
 def bootstrap_pyon():
     """
     This function initializes the Pyon framework in a controlled way.
