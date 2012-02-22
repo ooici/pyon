@@ -53,6 +53,18 @@ class FileSystem(object):
                 shutil.rmtree(FS_DIRECTORY[k])
                 os.makedirs(FileSystem.FS_DIRECTORY[k])
 
+    @staticmethod
+    def get(path):
+        if path.startswith('/'): # Like it should
+            path = path[1:] # Strip the begining /
+        # Determine root
+        tree = path.split('/')
+        if tree[0].upper() not in FS:
+            return None
+        root = FileSystem.FS_DIRECTORY[tree.pop(0).upper()]
+        fullpath = '/'.join([root] + tree)
+        return fullpath
+
 
     @staticmethod
     def is_safe(path):
