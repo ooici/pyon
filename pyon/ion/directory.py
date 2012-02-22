@@ -26,6 +26,8 @@ class Directory(object):
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
 
+        self.orgname = orgname or CFG.system.root_org
+
         self._init()
 
     def close(self):
@@ -155,10 +157,17 @@ class Directory(object):
         return delist
 
     # ------------------------------------------
-    # Specific methods
+    # Specific directory entry methods
+
+
+    # ------------------------------------------
+    # Internal methods
 
     def _register_config(self):
         self.register("/Config", "CFG", **CFG.copy())
+
+    def _load_config(self):
+        de = self.lookup("/Config/CFG")
 
     def _register_service_definitions(self):
         from pyon.core.bootstrap import service_registry

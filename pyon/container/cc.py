@@ -58,6 +58,7 @@ class Container(BaseContainerAgent):
         dict_merge(CFG, kwargs, inplace=True)
         from pyon.core import bootstrap
         bootstrap.container_instance = self
+        bootstrap.assert_configuration(CFG)
         bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
 
@@ -171,7 +172,7 @@ class Container(BaseContainerAgent):
             self.pidfile = None
 
     def stop(self):
-        log.debug("Container stopping...")
+        log.info("=============== Container stopping... ===============")
 
         try:
             self.app_manager.stop()

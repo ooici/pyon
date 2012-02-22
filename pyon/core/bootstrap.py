@@ -3,9 +3,11 @@
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from pyon.core.exception import ContainerConfigError, ContainerStartupError
 from pyon.core.registry import IonObjectRegistry
-from pyon.util.config import CFG
 from pyon.service.service import IonServiceRegistry
+from pyon.util.config import CFG
+from pyon.util.containers import is_basic_identifier
 
 import os
 
@@ -17,19 +19,29 @@ def assert_environment():
     """This asserts the mandatory (minimal) execution environment for pyon"""
     import os.path
     if not os.path.exists("res"):
-        raise Exception("pyon environment assertion failed: res/ directory not found")
+        raise ContainerStartupError("pyon environment assertion failed: res/ directory not found")
     if not os.path.exists("res/config"):
-        raise Exception("pyon environment assertion failed: res/config directory not found")
+        raise ContainerStartupError("pyon environment assertion failed: res/config directory not found")
     if not os.path.exists("res/config/pyon.yml"):
-        raise Exception("pyon environment assertion failed: pyon.yml config missing")
+        raise ContainerStartupError("pyon environment assertion failed: pyon.yml config missing")
     if not os.path.exists("obj"):
-        raise Exception("pyon environment assertion failed: obj/ directory not found")
+        raise ContainerStartupError("pyon environment assertion failed: obj/ directory not found")
     if not os.path.exists("obj/services"):
-        raise Exception("pyon environment assertion failed: obj/services directory not found")
+        raise ContainerStartupError("pyon environment assertion failed: obj/services directory not found")
     if not os.path.exists("obj/data"):
-        raise Exception("pyon environment assertion failed: obj/data directory not found")
+        raise ContainerStartupError("pyon environment assertion failed: obj/data directory not found")
+
+def assert_configuration(config):
+    """
+    Checks that configuration is OK
+    """
+    if not is_basic_identifier(config.get_safe("system.name", "")):
+        raise ContainerConfigError("Config entry 'system.name' has illegal value")
+    if not is_basic_identifier(config.get_safe("system.root_org", "")):
+        raise ContainerConfigError("Config entry 'system.root_org' has illegal value")
 
 assert_environment()
+assert_configuration(CFG)
 
 pyon_initialized = False
 
