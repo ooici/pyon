@@ -137,7 +137,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         Create an encoder and add some (one) dataset/array
         """
-        testfilename = FileSystem.get_url(FS.TEMP, 'testFile.hdf5')
+        testfilename = 'test_encode_with_filename_and_compare'
 
         hdfencoder = HDFEncoder(testfilename)
         hdfencoder.add_hdf_dataset(self.path_to_dataset, self.known_array)
@@ -223,7 +223,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         Test adding a branch to an existing group tree in a file
         """
-        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
+        filename = 'test_add_branch_to_existing'
 
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/data/subsubgroup/pressure'
@@ -235,7 +235,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding datasets to the same leaf in the group tree
         """
 
-        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
+        filename = 'test_add_datasets_to_same_group'
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/pressure'
 
@@ -246,7 +246,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding a dataset to a file when a dataset with the same name already exists in it
         """
 
-        filename = FileSystem.get_url(FS.TEMP, 'testHDFEncoder')
+        filename = 'test_add_hdf_dataset_to_file_having_one_already'
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
 

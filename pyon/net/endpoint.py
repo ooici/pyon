@@ -532,7 +532,8 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         """
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
-        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
+            headers['receiver'] = "%s,%s" % self.channel._send_name   # @TODO updated by XN work, should be FQ?
 
         return headers
 
@@ -562,7 +563,12 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        headers['receiver']     = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, tuple):
+            headers['receiver'] = "%s,%s" % self.channel._send_name     # @TODO updated by XN work, should be FQ?
+        headers['language']     = 'ion-r2'
+        headers['encoding']     = 'msgpack'
+        headers['format']       = raw_msg.__class__.__name__    # hmm
+        headers['reply-by']     = 'todo'                        # clock sync is a problem
 
         return headers
 
@@ -930,6 +936,33 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
         inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
         inv_two = RPCResponseEndpointUnit._intercept_msg_out(self, inv_one)
         return inv_two
+
+    def _build_header(self, raw_msg):
+        """
+        Builds the header for this Process-level RPC conversation.
+        https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
+        """
+
+        context = self._process.get_context()
+        log.debug('ProcessRPCResponseEndpointUnit._build_header has context of: %s', context)
+
+        # conv-id/seq/protocol are set in the base class
+        header = RPCResponseEndpointUnit._build_header(self, raw_msg)
+
+        # add our process identity to the headers
+        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
+                       'sender'       : self._process.id})
+
+        # use context to set security attributes forward
+        if isinstance(context, dict):
+            # fwd on ion-actor-id and expiry, according to common message format spec
+            actor_id            = context.get('ion-actor-id', None)
+            expiry              = context.get('expiry', None)
+
+            if actor_id:        header['ion-actor-id']  = actor_id
+            if expiry:          header['expiry']        = expiry
+
+        return header
 
 class ProcessRPCServer(RPCServer):
     endpoint_unit_type = ProcessRPCResponseEndpointUnit

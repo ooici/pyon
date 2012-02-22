@@ -10,6 +10,7 @@ from interface.services.examples.hello.ihello_service  import HelloServiceProces
 
 class FakeProcess(LocalContextMixin):
     name = ''
+    id = ''
 
 def hello_client(container, actor_id='anonymous', org_id='no-ooi', text='mytext 123'):
 
