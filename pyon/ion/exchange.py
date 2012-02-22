@@ -10,6 +10,13 @@ from pyon.util.log import log
 from pyon.core import bootstrap
 from pyon.util.async import blocking_cb
 from pyon.net.transport import BaseTransport, NamePair, AMQPTransport
+from interface.objects import ExchangeName as ResExchangeName
+from interface.objects import ExchangeSpace as ResExchangeSpace
+from interface.objects import ExchangePoint as ResExchangePoint
+from interface.services.coi.iexchange_management_service import ExchangeManagementServiceClient
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceClient
+from pyon.util.config import CFG
+from pyon.ion.resource import RT
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -38,7 +45,10 @@ class ExchangeManager(object):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.default_xs = ExchangeSpace(self, ION_ROOT_XS)
+        self.default_xs         = ExchangeSpace(self, ION_ROOT_XS)
+        self._xs_cache          = {}        # caching of xs names to RR objects
+        self._default_xs_obj    = None      # default XS registry object
+        self.org_id             = None
 
         # mappings
         self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
@@ -46,6 +56,9 @@ class ExchangeManager(object):
         # xn by xs is a property
 
         self._chan = None
+
+        self._ems_client    = ExchangeManagementServiceClient()
+        self._rr_client     = ResourceRegistryServiceClient()
 
         # TODO: Do more initializing here, not in container
 
@@ -63,6 +76,21 @@ class ExchangeManager(object):
 
         return ret
 
+    def _get_xs_obj(self, name=ION_ROOT_XS):
+        """
+        Gets a resource-registry represented XS, either via cache or RR request.
+        """
+        if name in self._xs_cache:
+            return self._xs_cache[name]
+
+        xs_objs, _ = self._rr_client.find_resources(RT.ExchangeSpace, name=name)
+        if not len(xs_objs) == 1:
+            log.warn("Could not find RR XS object with name: %s", name)
+            return None
+
+        self._xs_cache[name] = xs_objs[0]
+        return xs_objs[0]
+
     def start(self):
         log.debug("ExchangeManager starting ...")
 
@@ -76,6 +104,32 @@ class ExchangeManager(object):
         # Declare root exchange
         #self.default_xs.ensure_exists(self._get_channel())
         return node, ioloop
+
+    def _ems_available(self):
+        """
+        Returns True if the EMS is (likely) available and the auto_register CFG entry is True.
+
+        Has the side effect of bootstrapping the org_id and default_xs's id/rev from the RR.
+        Therefore, cannot be a property.
+        """
+        if CFG.container.exchange.auto_register:
+            # ok now make sure it's in the directory
+            des = self.container.directory.find_entries('/Containers')
+            for de in des:
+                if de.attributes.get('name', '') == "exchange_management":
+
+                    if not self.org_id:
+                        # find the default Org
+                        org_ids = self._rr_client.find_resources(RT.Org, id_only=True)
+                        if not (len(org_ids) and len(org_ids[0]) == 1):
+                            log.warn("EMS available but could not find Org")
+                            return False
+
+                        self.org_id = org_ids[0][0]
+                        log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
+                    return True
+
+        return False
 
     def _get_channel(self, node):
         """
@@ -96,6 +150,13 @@ class ExchangeManager(object):
 
         self.xs_by_name[name] = xs
 
+        if self._ems_available():
+            # create a RR object
+            xso = ResExchangeSpace(name=name)
+            xso_id = self._ems_client.create_exchange_space(xso, self.org_id)
+
+            log.debug("Created RR XS object, id: %s", xso_id)
+
         return xs
 
     def delete_xs(self, xs):
@@ -105,16 +166,45 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xs: %s", xs)
         xs.delete()
 
-        del self.xs_by_name[xs._exchange]   # @ TODO feels wrong
+        name = xs._exchange     # @TODO this feels wrong
+        del self.xs_by_name[name]
+
+        if self._ems_available():
+            xso = self._get_xs_obj(name)
+            self._ems_client.delete_exchange_space(xso._id)
+            del self._xs_cache[name]
 
     def create_xp(self, name, xs=None, **kwargs):
-        xp = self._create_xn('xp', name, xs=xs, **kwargs)
+        log.debug("ExchangeManager.create_xp: %s", name)
+        xs = xs or self.default_xs
+        xp = ExchangePoint(self, name, xs, **kwargs)
+        xp.declare()
+
+        # put in xn_by_name anyway
+        self.xn_by_name[name] = xp
+
+        if self._ems_available():
+            # create an RR object
+            xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
+            xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id)        # @TODO: _exchange is wrong
 
         return xp
 
     def delete_xp(self, xp):
-        log.debug("ExchangeManager.delete_xp: name=%s", xp.build_xname())
+        log.debug("ExchangeManager.delete_xp: name=%s", 'TODO') #xp.build_xname())
         xp.delete()
+
+        name = xp._exchange # @TODO: not right
+        del self.xn_by_name[name]
+
+        if self._ems_available():
+            # find the XP object via RR
+            xpo_ids = self._rr_client.find_resources(RT.ExchangePoint, name=name, id_only=True)
+            if not (len(xpo_ids) and len(xpo_ids[0]) == 1):
+                log.warn("Could not find XP in RR with name of %s", name)
+
+            xpo_id = xpo_ids[0][0]
+            self._ems_client.delete_exchange_point(xpo_id)
 
     def _create_xn(self, xn_type, name, xs=None, **kwargs):
         xs = xs or self.default_xs
@@ -126,13 +216,16 @@ class ExchangeManager(object):
             xn = ExchangeNameProcess(self, name, xs, **kwargs)
         elif xn_type == "queue":
             xn = ExchangeNameQueue(self, name, xs, **kwargs)
-        elif xn_type == "xp":
-            xn = ExchangePoint(self, name, xs, **kwargs)
         else:
             raise StandardError("Unknown XN type: %s" % xn_type)
 
         xn.declare()
         self.xn_by_name[name] = xn
+
+        if self._ems_available():
+            xno = ResExchangeName(name=name, xn_type=xn.xn_type)
+            self._ems_client.declare_exchange_name(xno, self._get_xs_obj(xs._exchange)._id)     # @TODO: exchange is wrong
+
         return xn
 
     def create_xn_service(self, name, xs=None, **kwargs):
@@ -148,7 +241,18 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xn: name=%s", "TODO") #xn.build_xlname())
         xn.delete()
 
-        del self.xn_by_name[xn._queue]      # @TODO feels wrong
+        name = xn._queue                # @TODO feels wrong
+        del self.xn_by_name[name]
+
+        if self._ems_available():
+            # find the XN object via RR?
+            xno_ids = self._rr_client.find_resources(RT.ExchangeName, name=name, id_only=True)
+            if not (len(xno_ids) and len(xno_ids[0]) == 1):
+                log.warn("Could not find XN in RR with name of %s", name)
+
+            xno_id = xno_ids[0][0]
+
+            self._ems_client.undeclare_exchange_name(xno_id)        # "canonical name" currently understood to be RR id
 
     def stop(self, *args, **kwargs):
         log.debug("ExchangeManager stopping ...")
@@ -352,6 +456,7 @@ class ExchangeName(XOTransport, NamePair):
     def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=None, queue=name)
+
         self._xs = xs
 
         if durable:     self._xn_durable        = durable
@@ -400,12 +505,16 @@ class ExchangePoint(ExchangeName):
         'ttree':'ttree',
         }
 
+    xn_type = "XN_XP"
+
     def __init__(self, exchange_manager, name, xs, xptype=None):
+        xptype = xptype or 'ttree'
+
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NamePair.__init__(self, exchange=name)
 
-        self._xs = xs
-        self._xptype = xptype or 'ttree'
+        self._xs        = xs
+        self._xptype    = xptype
 
     @property
     def exchange(self):
