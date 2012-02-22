@@ -8,27 +8,28 @@ Capability Container base class
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.core import bootstrap
-from pyon.core.bootstrap import CFG, bootstrap_pyon
-from pyon.container.apps import AppManager
-from pyon.container.procs import ProcManager
-from pyon.datastore.datastore import DataStore
-from pyon.event.event import EventRepository
-from pyon.ion.directory import Directory
-from pyon.ion.state import StateRepository
-from pyon.net.endpoint import ProcessRPCServer
-from pyon.net import messaging
-from pyon.util.log import log
-from pyon.util.containers import DictModifier, dict_merge
-from pyon.ion.exchange import ExchangeManager
-from interface.services.icontainer_agent import BaseContainerAgent
-from pyon.datastore.datastore import DatastoreManager
-from pyon.util.file_sys import FileSystem
 import atexit
 import msgpack
 import os
 import signal
 import string
+
+from pyon.container.apps import AppManager
+from pyon.container.procs import ProcManager
+from pyon.core import bootstrap
+from pyon.core.bootstrap import CFG, bootstrap_pyon
+from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.event.event import EventRepository
+from pyon.ion.directory import Directory
+from pyon.ion.exchange import ExchangeManager
+from pyon.ion.state import StateRepository
+from pyon.net.endpoint import ProcessRPCServer
+from pyon.net import messaging
+from pyon.util.file_sys import FileSystem
+from pyon.util.log import log
+from pyon.util.containers import DictModifier, dict_merge
+
+from interface.services.icontainer_agent import BaseContainerAgent
 
 
 class Container(BaseContainerAgent):
