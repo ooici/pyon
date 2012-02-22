@@ -6,11 +6,14 @@
 
 
 import StringIO
+import tempfile
+import shutil
 import os
 import re
-import time
-import hashlib
-from pyon.core.exception import NotFound, BadRequest
+import random
+import string
+from pyon.core.exception import FileSystemError
+from pyon.util.log import log
 from pyon.util.containers import DotDict
 from pyon.core.bootstrap import CFG
 
@@ -19,8 +22,10 @@ class FileSystem(object):
     # These are static, and shared throughout the container, do not operate on a per-instance basis.
     FS_DIRECTORY_LIST = ['RESOURCE','TEMP','LIBRARY','CACHE','RUN','USERS','LOG']
     FS_DIRECTORY = DotDict(zip(FS_DIRECTORY_LIST,FS_DIRECTORY_LIST))
+
     FS = DotDict(zip(FS_DIRECTORY_LIST, FS_DIRECTORY_LIST))
     _instance = None
+
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
@@ -28,6 +33,7 @@ class FileSystem(object):
         return cls._instance
 
     def __init__(self):
+        FileSystem._force_clean = CFG.get_safe('system.filesystem.force_clean',False)
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
@@ -36,20 +42,47 @@ class FileSystem(object):
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
                 FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
-            FileSystem._walk(self.FS_DIRECTORY[k])
+            # Check to make sure you're within your rights to access this
+            if not FileSystem._sandbox(FileSystem.FS_DIRECTORY[k]):
+                raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
+            if not os.path.exists(FS_DIRECTORY[k]):
+                log.debug('Making path: %s', FS_DIRECTORY[k])
+                os.makedirs(FileSystem.FS_DIRECTORY[k])
+            elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
+                log.debug('Removing %s' % FS_DIRECTORY[k])
+                shutil.rmtree(FS_DIRECTORY[k])
+                os.makedirs(FileSystem.FS_DIRECTORY[k])
+
 
     @staticmethod
-    def _walk(path):
-        if path[0] != '/':
-            queue = path.split('/')
-            cwd = './'
-        else:
-            queue = path.split('/')[1:]
-            cwd = '/'
-        for dir in queue:
-            cwd = os.path.join(cwd,dir)
-            if not os.path.exists(cwd):
-                os.mkdir(cwd)
+    def is_safe(path):
+        """
+        Ensure that the path is within the sandbox roots.
+        """
+        for root in FileSystem.FS_DIRECTORY.itervalues():
+            if path.startswith(root):
+                return True
+        return False
+
+    @staticmethod
+    def _sandbox(path):
+        """
+        If the path is in a bad place return false.
+        """
+        # List of bad places
+        black_list = [
+            '/',
+            '/bin',
+            '/sbin',
+            '/usr/bin',
+            '/usr/sbin'
+            '/usr/local/sbin'
+        ]
+        if path in black_list:
+            return False
+
+
+        return True
 
 
     @staticmethod
@@ -76,16 +109,25 @@ class FileSystem(object):
     @staticmethod
     def mktemp(filename='', ext=''):
         """
-        @description Creates a temporary file that is safe to use
+        @description Creates a temporary file that is semi-persistent
         @param filename Desired filename to use, if empty a random name is generated
         @param ext the optional file extension to use
         @return an open file to the desired temporary file
         """
         if filename:
-            return open(FileSystem.get_url(fs=FS.TEMP,filename=filename,ext=ext),'w')
+            return open(FileSystem.get_url(fs=FS.TEMP,filename=filename,ext=ext),'w+b')
         else:
-            rand_str = hashlib.sha1(time.ctime()).hexdigest()[:24]
-            return open(FileSystem.get_url(fs=FS.TEMP,filename=rand_str), 'w')
+            rand_str = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(24))
+            return open(FileSystem.get_url(fs=FS.TEMP,filename=rand_str), 'w+b')
+
+    # This needs some work getting this right in the mean-time use mktemp its ok....
+
+    @staticmethod
+    def mkstemp():
+        """
+        Obtain a secure file
+        """
+        return tempfile.TemporaryFile(mode='w+b', dir=FS_DIRECTORY[FS.TEMP])
 
     @staticmethod
     def unlink(filepath):
@@ -94,12 +136,15 @@ class FileSystem(object):
         @param filepath The absolute path to the file.
         @throws NotFound, BadRequest
         """
-        if os.path.split(filepath)[0] not in FileSystem.FS_DIRECTORY.values():
-            raise NotFound('Specified is not in an acceptable path.')
+        if not FileSystem.is_safe(filepath):
+            raise FileSystemError('It is not safe to remove %s, it is outside the scope of your permission.' % filepath)
+        if not os.path.exists(filepath):
+            raise FileSystemError('%s does not exist.' % filepath)
         try:
             os.unlink(filepath)
-        except OSError:
-            raise BadRequest('The specified could not be removed.')
+        except OSError as e:
+            raise OSError('%s: %s' % (filepath, e.message))
+
 
     @staticmethod
     def memory_file():
