@@ -6,6 +6,7 @@
 '''
 
 from mock import Mock, sentinel, patch
+from pyon.util.containers import DotDict
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from pyon.public import log
@@ -42,7 +43,7 @@ class TestScienceObjectCodec(PyonTestCase):
     def setUpClass(cls):
 
         # This test does not start a container so we have to hack creating a FileSystem singleton instance
-        FileSystem()
+        FileSystem(DotDict())
 
         @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
         def create_known(dataset_name, rootgrp_name, grp_name):
