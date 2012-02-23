@@ -123,6 +123,8 @@ class Container(BaseContainerAgent):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
+        self._capabilities.append("EXCHANGE_CONNECTION")
+
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
@@ -144,11 +146,10 @@ class Container(BaseContainerAgent):
 
         # Start ExchangeManager. In particular establish broker connection
         self.ex_manager.start()
-        self._capabilities.append("EXCHANGE_MANAGER")
 
         # TODO: Move this in ExchangeManager - but there is an error
         self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
-        self._capabilities.append("EXCHANGE_CONNECTION")
+        self._capabilities.append("EXCHANGE_MANAGER")
 
         self.proc_manager.start()
         self._capabilities.append("PROC_MANAGER")
@@ -215,7 +216,10 @@ class Container(BaseContainerAgent):
         log.debug("Container stopped, OK.")
 
     def _stop_capability(self, capability):
-        if capability == "APP_MANAGER":
+        if capability == "CONTAINER_AGENT":
+            pass
+
+        elif capability == "APP_MANAGER":
             self.app_manager.stop()
 
         elif capability == "PROC_MANAGER":
@@ -223,6 +227,7 @@ class Container(BaseContainerAgent):
 
         elif capability == "EXCHANGE_MANAGER":
             self.ex_manager.stop()
+
 
         elif capability == "DIRECTORY":
             # Unregister from directory
@@ -252,8 +257,6 @@ class Container(BaseContainerAgent):
         elif capability == "PID_FILE":
             self._cleanup_pid()
 
-        elif capability == "CONTAINER_AGENT":
-            pass
 
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
