@@ -225,14 +225,6 @@ class Container(BaseContainerAgent):
         elif capability == "EXCHANGE_MANAGER":
             self.ex_manager.stop()
 
-
-        elif capability == "DIRECTORY":
-            # Unregister from directory
-            self.directory.unregister_safe("/Container", self.id)
-
-            # Close directory (possible CouchDB connection)
-            self.directory.close()
-
         elif capability == "EVENT_REPOSITORY":
             # close event repository (possible CouchDB connection)
             self.event_repository.close()
@@ -240,6 +232,13 @@ class Container(BaseContainerAgent):
         elif capability == "STATE_REPOSITORY":
             # close state repository (possible CouchDB connection)
             self.state_repository.close()
+
+        elif capability == "DIRECTORY":
+            # Unregister from directory
+            self.directory.unregister_safe("/Container", self.id)
+
+            # Close directory (possible CouchDB connection)
+            self.directory.close()
 
         elif capability == "DATASTORE_MANAGER":
             # close any open connections to datastores
@@ -254,10 +253,8 @@ class Container(BaseContainerAgent):
         elif capability == "PID_FILE":
             self._cleanup_pid()
 
-
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
-
 
     def fail_fast(self, err_msg=""):
         """
