@@ -13,8 +13,8 @@ from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
 from interface.objects import ExchangePoint as ResExchangePoint
-from interface.services.coi.iexchange_management_service import ExchangeManagementServiceClient
-from interface.services.coi.iresource_registry_service import ResourceRegistryServiceClient
+from interface.services.coi.iexchange_management_service import ExchangeManagementServiceProcessClient
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.util.config import CFG
 from pyon.ion.resource import RT
 
@@ -57,8 +57,8 @@ class ExchangeManager(object):
 
         self._chan = None
 
-        self._ems_client    = ExchangeManagementServiceClient()
-        self._rr_client     = ResourceRegistryServiceClient()
+        self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
+        self._rr_client     = ResourceRegistryServiceProcessClient(process=self.container)
 
         # TODO: Do more initializing here, not in container
 
