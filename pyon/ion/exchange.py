@@ -9,7 +9,7 @@ from pyon.net import messaging
 from pyon.util.log import log
 from pyon.core import bootstrap
 from pyon.util.async import blocking_cb
-from pyon.net.transport import BaseTransport, NamePair, AMQPTransport
+from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
 from interface.objects import ExchangePoint as ResExchangePoint
@@ -423,13 +423,13 @@ class XOTransport(BaseTransport):
 #
 #        # etc etc
 
-class ExchangeSpace(XOTransport, NamePair):
+class ExchangeSpace(XOTransport, NameTrio):
 
     ION_DEFAULT_XS = "ioncore"
 
     def __init__(self, exchange_manager, exchange, exchange_type='topic', durable=False, auto_delete=True):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
-        NamePair.__init__(self, exchange=exchange)
+        NameTrio.__init__(self, exchange=exchange)
 
         self._xs_exchange_type = exchange_type
         self._xs_durable       = durable
@@ -448,7 +448,7 @@ class ExchangeSpace(XOTransport, NamePair):
     def delete(self):
         self.delete_exchange_impl(None, self.exchange)
 
-class ExchangeName(XOTransport, NamePair):
+class ExchangeName(XOTransport, NameTrio):
 
     xn_type = "XN_BASE"
 
@@ -457,7 +457,7 @@ class ExchangeName(XOTransport, NamePair):
 
     def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
-        NamePair.__init__(self, exchange=None, queue=name)
+        NameTrio.__init__(self, exchange=None, queue=name)
 
         self._xs = xs
 
@@ -513,7 +513,7 @@ class ExchangePoint(ExchangeName):
         xptype = xptype or 'ttree'
 
         XOTransport.__init__(self, exchange_manager=exchange_manager)
-        NamePair.__init__(self, exchange=name)
+        NameTrio.__init__(self, exchange=name)
 
         self._xs        = xs
         self._xptype    = xptype

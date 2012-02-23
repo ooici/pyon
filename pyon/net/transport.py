@@ -130,14 +130,14 @@ class AMQPTransport(BaseTransport):
         return default_cb(self, binding)
 
 
-class NamePair(object):
+class NameTrio(object):
     """
-    Internal representation of a name/queue.
+    Internal representation of a name/queue/binding (optional).
     Created and used at the Endpoint layer and sometimes Channel layer.
     """
     def __init__(self, exchange=None, queue=None, binding=None):
         """
-        Creates a NamePair.
+        Creates a NameTrio.
 
         If either exchange or queue is a tuple, it will use that as a (exchange, queue, binding (optional)) triple.
 
@@ -170,7 +170,7 @@ class NamePair(object):
     def __str__(self):
         return "NP (%s,%s,B: %s)" % (self.exchange, self.queue, self.binding)
 
-class FakeTransport(AMQPTransport, NamePair):
+class FakeTransport(AMQPTransport, NameTrio):
     def __init__(self):
         self._exchange = "wizzzard"
         self._queue = "hello"

@@ -10,7 +10,7 @@ from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, Publ
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
-from pyon.net.transport import NamePair, BaseTransport
+from pyon.net.transport import NameTrio, BaseTransport
 
 from gevent import event, coros
 from gevent.timeout import Timeout
@@ -311,9 +311,9 @@ class SendingBaseEndpoint(BaseEndpoint):
             log.warn("SendingBaseEndpoint: name param is deprecated, please use to_name instead")
         self._send_name = to_name or name
 
-        # ensure NamePair
-        if not isinstance(self._send_name, NamePair):
-            self._send_name = NamePair(bootstrap.get_sys_name(), self._send_name)   # if send_name is a tuple it takes precedence
+        # ensure NameTrio
+        if not isinstance(self._send_name, NameTrio):
+            self._send_name = NameTrio(bootstrap.get_sys_name(), self._send_name)   # if send_name is a tuple it takes precedence
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         e = BaseEndpoint.create_endpoint(self, to_name=to_name, existing_channel=existing_channel, **kwargs)
@@ -321,9 +321,9 @@ class SendingBaseEndpoint(BaseEndpoint):
         name = to_name or self._send_name
         assert name
 
-        # ensure NamePair
-        if not isinstance(name, NamePair):
-            name = NamePair(bootstrap.get_sys_name(), name)     # if name is a tuple it takes precedence
+        # ensure NameTrio
+        if not isinstance(name, NameTrio):
+            name = NameTrio(bootstrap.get_sys_name(), name)     # if name is a tuple it takes precedence
 
         e.channel.connect(name)
         return e
@@ -359,9 +359,9 @@ class ListeningBaseEndpoint(BaseEndpoint):
             log.warn("ListeningBaseEndpoint: name param is deprecated, please use from_name instead")
         self._recv_name = from_name or name
 
-        # ensure NamePair
-        if not isinstance(self._recv_name, NamePair):
-            self._recv_name = NamePair(bootstrap.get_sys_name(), self._recv_name, binding)   # if _recv_name is tuple it takes precedence
+        # ensure NameTrio
+        if not isinstance(self._recv_name, NameTrio):
+            self._recv_name = NameTrio(bootstrap.get_sys_name(), self._recv_name, binding)   # if _recv_name is tuple it takes precedence
 
         self._ready_event = event.Event()
         self._binding = binding
@@ -542,7 +542,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         log.debug("RequestEndpointUnit.send")
 
         if not self._recv_greenlet:
-            self.channel.setup_listener(NamePair(self.channel._send_name.exchange)) # anon queue
+            self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
             self.channel.start_consume()
             self.spawn_listener()
 

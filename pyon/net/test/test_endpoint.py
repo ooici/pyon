@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from pyon.core.interceptor.interceptor import Invocation
-from pyon.net.transport import NamePair
+from pyon.net.transport import NameTrio
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -173,7 +173,7 @@ class TestSendingBaseEndpoint(PyonTestCase):
     def test_init(self):
         ep = SendingBaseEndpoint(node=sentinel.node)
         self.assertEquals(ep.node, sentinel.node)
-        self.assertIsInstance(ep._send_name, NamePair)
+        self.assertIsInstance(ep._send_name, NameTrio)
 
     def test_init_with_to_name(self):
         ep = SendingBaseEndpoint(to_name=(sentinel.xp, sentinel.rkey))
@@ -188,17 +188,17 @@ class TestSendingBaseEndpoint(PyonTestCase):
         self.assertTrue(mocklog.warn.called)
 
     def test_init_with_to_name_namepair(self):
-        class MyNamePair(NamePair):
+        class MyNameTrio(NameTrio):
             def __init__(self):
                 self._exchange = sentinel.my_exchange
                 self._queue = sentinel.my_queue
 
-        ep = SendingBaseEndpoint(to_name=MyNamePair())
+        ep = SendingBaseEndpoint(to_name=MyNameTrio())
         self.assertEquals(ep._send_name.exchange, sentinel.my_exchange)
         self.assertEquals(ep._send_name.queue, sentinel.my_queue)
 
     def test_create_endpoint_calls_connect(self):
-        np = NamePair(sentinel.xp, sentinel.queue)
+        np = NameTrio(sentinel.xp, sentinel.queue)
         ep = SendingBaseEndpoint(node=Mock(spec=NodeB), to_name=np)
         e = ep.create_endpoint()
         e.channel.connect.assert_called_once_with(np)
@@ -248,7 +248,7 @@ class RecvMockMixin(object):
         ch.recv.side_effect = _ret
 
         # need to set a send_name for now
-        ch._send_name = NamePair('', '')
+        ch._send_name = NameTrio('', '')
 
         return ch
 

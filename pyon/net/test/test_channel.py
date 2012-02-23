@@ -11,7 +11,7 @@ from mock import Mock, sentinel, patch
 from pika import channel as pchannel
 from pika import BasicProperties
 from nose.plugins.attrib import attr
-from pyon.net.transport import NamePair, BaseTransport
+from pyon.net.transport import NameTrio, BaseTransport
 
 @attr('UNIT')
 class TestBaseChannel(PyonTestCase):
@@ -96,7 +96,7 @@ class TestSendChannel(PyonTestCase):
         self.ch = SendChannel()
 
     def test_connect(self):
-        self.ch.connect(NamePair('xp', 'key'))
+        self.ch.connect(NameTrio('xp', 'key'))
         self.assertTrue(hasattr(self.ch._send_name, 'exchange'))
         self.assertTrue(hasattr(self.ch._send_name, 'queue'))
         self.assertEquals(self.ch._send_name.exchange, 'xp')
@@ -106,7 +106,7 @@ class TestSendChannel(PyonTestCase):
     def test_send(self):
         _sendmock = Mock()
         self.ch._send = _sendmock
-        np = NamePair('xp', 'key')
+        np = NameTrio('xp', 'key')
         self.ch.connect(np)
 
         self.ch.send('data', {'header':sentinel.headervalue})
@@ -117,7 +117,7 @@ class TestSendChannel(PyonTestCase):
         self.ch._amq_chan = ac
 
         # test sending in params
-        self.ch._send(NamePair('xp', 'namen'), 'daten')
+        self.ch._send(NameTrio('xp', 'namen'), 'daten')
 
         # get our props
         self.assertTrue(ac.basic_publish.called)
@@ -134,7 +134,7 @@ class TestSendChannel(PyonTestCase):
         self.assertEquals(props.headers, {})
 
         # try another call to _send with a header
-        self.ch._send(NamePair('xp', 'namen'), 'daten', headers={'custom':'val'})
+        self.ch._send(NameTrio('xp', 'namen'), 'daten', headers={'custom':'val'})
 
         # make sure our property showed up
         props = ac.basic_publish.call_args[1].get('properties')
@@ -165,7 +165,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertFalse(ch._setup_listener_called)
 
         # call setup listener, defining xp, queue, default binding (will get our return value above) becuase there's no meat to _declare_queue
-        ch.setup_listener(NamePair(sentinel.xp, sentinel.queue))
+        ch.setup_listener(NameTrio(sentinel.xp, sentinel.queue))
 
         self.assertTrue(hasattr(ch, '_recv_name'))
         self.assertTrue(hasattr(ch._recv_name, 'exchange'))
@@ -181,7 +181,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertTrue(ch._setup_listener_called)
         
         # calling it again does nothing, does not touch anything
-        ch.setup_listener(NamePair(sentinel.xp2, sentinel.queue2))
+        ch.setup_listener(NameTrio(sentinel.xp2, sentinel.queue2))
 
         self.assertTrue(hasattr(ch._recv_name, 'exchange'))
         self.assertTrue(hasattr(ch._recv_name, 'queue'))
@@ -193,7 +193,7 @@ class TestRecvChannel(PyonTestCase):
 
         # call setup listener, passing a custom bind this time
         ch = create_channel()
-        ch.setup_listener(NamePair(sentinel.xp2, sentinel.queue2), binding=sentinel.binding)
+        ch.setup_listener(NameTrio(sentinel.xp2, sentinel.queue2), binding=sentinel.binding)
 
         mxp.assert_called_with(sentinel.xp2)
         mdq.assert_called_with(sentinel.queue2)
@@ -201,7 +201,7 @@ class TestRecvChannel(PyonTestCase):
 
         # call setup_listener, use anonymous queue name and no binding (will get return value we set above)
         ch = create_channel()
-        ch.setup_listener(NamePair(sentinel.xp3))
+        ch.setup_listener(NameTrio(sentinel.xp3))
 
         mxp.assert_called_with(sentinel.xp3)
         mdq.assert_called_with(None)
@@ -209,7 +209,7 @@ class TestRecvChannel(PyonTestCase):
 
         # call setup_listener with anon queue name but with binding
         ch = create_channel()
-        ch.setup_listener(NamePair(sentinel.xp4), binding=sentinel.binding2)
+        ch.setup_listener(NameTrio(sentinel.xp4), binding=sentinel.binding2)
 
         mxp.assert_called_with(sentinel.xp4)
         mdq.assert_called_with(None)
@@ -219,7 +219,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertRaises(AssertionError, self.ch.destroy_listener)
 
     def test__destroy_queue(self):
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._transport = Mock(BaseTransport)
         self.ch._amq_chan = sentinel.amq_chan
@@ -241,7 +241,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertRaises(AssertionError, self.ch._destroy_binding)
 
     def test__destroy_binding(self):
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
         self.ch._recv_binding = sentinel.binding
 
         self.ch._transport = Mock(BaseTransport)
@@ -265,7 +265,7 @@ class TestRecvChannel(PyonTestCase):
         ac.basic_consume.return_value = sentinel.consumer_tag
 
         # set up recv name for queue
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch.start_consume()
 
@@ -284,7 +284,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._amq_chan = ac
 
         # set up recv name for queue
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._queue_auto_delete = True
@@ -378,7 +378,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._amq_chan = sentinel.amq_chan
 
         # needs a recv name
-        self.ch._recv_name = (NamePair(str(sentinel.xp)))
+        self.ch._recv_name = (NameTrio(str(sentinel.xp)))
 
         qd = self.ch._declare_queue(str(sentinel.queue))    # can't join a sentinel
 
@@ -403,7 +403,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertRaises(AssertionError, self.ch._bind, sentinel.binding)
 
     def test__bind(self):
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._amq_chan = Mock()
         self.ch._transport = Mock()
@@ -491,7 +491,7 @@ class TestPublisherChannel(PyonTestCase):
         pubchan = PublisherChannel()
         pubchan._declare_exchange = depmock
 
-        pubchan._send_name = NamePair(sentinel.xp, sentinel.routing_key)
+        pubchan._send_name = NameTrio(sentinel.xp, sentinel.routing_key)
 
         pubchan.send(sentinel.data)
 
@@ -518,7 +518,7 @@ class TestBidirClientChannel(PyonTestCase):
 
     def test__send_with_reply_to(self, mocksendchannel):
 
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._send(sentinel.name, sentinel.data, headers={sentinel.header_key: sentinel.header_value})
 
@@ -531,7 +531,7 @@ class TestBidirClientChannel(PyonTestCase):
     def test__send_with_no_reply_to(self, mocksendchannel):
 
         # must set recv_name
-        self.ch._recv_name = NamePair(sentinel.xp, sentinel.queue)
+        self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._send(sentinel.name, sentinel.data)
 

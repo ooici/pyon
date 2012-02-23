@@ -43,7 +43,7 @@ from pika import BasicProperties
 from gevent import queue as gqueue
 from contextlib import contextmanager
 from gevent.event import AsyncResult
-from pyon.net.transport import AMQPTransport, NamePair
+from pyon.net.transport import AMQPTransport, NameTrio
 
 class ChannelError(StandardError):
     """
@@ -269,7 +269,7 @@ class SendChannel(BaseChannel):
     def connect(self, name):
         """
         Sets up this channel to send to a name.
-        @param  name    The name this channel should send to. Should be a NamePair.
+        @param  name    The name this channel should send to. Should be a NameTrio.
         """
         log.debug("SendChannel.connect: %s", name)
 
@@ -364,10 +364,10 @@ class RecvChannel(BaseChannel):
 
         # only reset the name if it was passed in
         if name != self._recv_name:
-            if isinstance(name, NamePair):
+            if isinstance(name, NameTrio):
                 self._recv_name = name
             else:
-                self._recv_name = NamePair(exchange, queue, binding)
+                self._recv_name = NameTrio(exchange, queue, binding)
 
         self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)
@@ -501,7 +501,7 @@ class RecvChannel(BaseChannel):
 
         # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
         if queue_name != self._recv_name.queue:
-            self._recv_name = NamePair(self._recv_name.exchange, queue_name, self._recv_name.binding)
+            self._recv_name = NameTrio(self._recv_name.exchange, queue_name, self._recv_name.binding)
 
         return self._recv_name.queue
 
@@ -633,7 +633,7 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = NamePair(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
+        send_name = NameTrio(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel()
         ch.attach_underlying_channel(amq_chan)
         ch.connect(send_name)
