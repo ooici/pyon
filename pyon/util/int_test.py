@@ -65,7 +65,11 @@ class IonIntegrationTestCase(unittest.TestCase):
             from ion.processes.bootstrap.datastore_loader import DatastoreLoader
             DatastoreLoader.load_datastore('res/dd')
         # hack to force_clean on filesystem
-        CFG['system']['filesystem']['force_clean']=True
+        try:
+            CFG['system']['filesystem']['force_clean']=True
+        except KeyError:
+            CFG['system']['filesystem'] = {}
+            CFG['system']['filesystem']['force_clean'] = True
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
