@@ -59,6 +59,12 @@ class Inconsistent(IonException):
     '''
     status_code = 410
 
+class FileSystemError(IonException):
+    '''
+    Client filesystem request failed
+    '''
+    status_code = 411
+
 class ServerError(IonException):
     '''
     For reporting generic service failure
