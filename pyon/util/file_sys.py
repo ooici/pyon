@@ -83,12 +83,42 @@ class FileSystem(object):
         """
         # List of bad places
         black_list = [
+            # Standard Unix
             '/',
             '/bin',
             '/sbin',
             '/usr/bin',
             '/usr/sbin'
-            '/usr/local/sbin'
+            '/usr/local/sbin',
+            '/etc',
+            '/usr/etc',
+            '/home',
+            '/var',
+            '/lib',
+            '/usr/lib',
+            # Linux
+            '/lost+found',
+            '/boot',
+            '/dev',
+            '/media',
+            '/proc',
+            '/sys',
+            '/root',
+            '/selinux',
+            '/srv',
+            '/mnt'
+            # Darwin
+            '/Application',
+            '/Developer',
+            '/Library',
+            '/Network',
+            '/System',
+            '/Users',
+            '/Volumes',
+            '/include'
+            '/private',
+            '/cores'
+
         ]
         if path in black_list:
             return False
