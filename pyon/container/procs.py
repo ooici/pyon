@@ -9,7 +9,7 @@ from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerConfigError
+from pyon.core.exception import ContainerConfigError, BadRequest
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessSupervisor
@@ -24,7 +24,7 @@ class ProcManager(object):
         self.container = container
 
         # Define the callables that can be added to Container public API
-        self.container_api = [self.spawn_process]
+        self.container_api = [self.spawn_process, self.terminate_process]
 
         # Add the public callables to Container
         for call in self.container_api:
@@ -114,7 +114,7 @@ class ProcManager(object):
                 service_instance = self._spawn_simple_process(process_id, name, module, cls, config)
 
             else:
-                raise Exception("Unknown process type: %s" % process_type)
+                raise BadRequest("Unknown process type: %s" % process_type)
 
             service_instance._proc_type = process_type
             self._register_process(service_instance, name)
@@ -162,6 +162,11 @@ class ProcManager(object):
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
+
+        # Directory registration
+        self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
+        self.container.directory.register_safe("/Services/%s" % listen_name, service_instance.id)
+
         return service_instance
 
     def _spawn_stream_process(self, process_id, name, module, cls, config):
@@ -332,12 +337,14 @@ class ProcManager(object):
 
         # Add to directory
         service_instance.errcause = "registering"
-        self.container.directory.register("/Containers/%s/Processes" % self.container.id,
-                                          service_instance.id, name=name)
+        self.container.directory.register_safe("/Containers/%s/Processes" % self.container.id,
+                                               service_instance.id, name=name)
 
     def terminate_process(self, process_id):
         service_instance = self.procs.get(process_id, None)
-        if not service_instance: return
+        if not service_instance:
+            raise BadRequest("Cannot terminate. Process id='%s' unknown on container id='%s'" % (
+                                        process_id, self.container.id))
 
         service_instance.quit()
 
@@ -351,3 +358,14 @@ class ProcManager(object):
             p.stop()
 
         del self.procs[process_id]
+
+        self.container.directory.unregister_safe("/Containers/%s/Processes" % self.container.id,
+                service_instance.id)
+
+        # For service workers
+        if service_instance._proc_type == "service":
+            listen_name = get_safe(service_instance.CFG, "process.listen_name", service_instance.name)
+            self.container.directory.unregister_safe("/Services/%s" % listen_name, service_instance.id)
+            remaining_workers = self.container.directory.find_entries("/Services/%s" % listen_name)
+            if remaining_workers and len(remaining_workers) == 2:
+                self.container.directory.unregister_safe("/Services", listen_name)

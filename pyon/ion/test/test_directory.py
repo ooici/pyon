@@ -14,29 +14,29 @@ class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
         dsm = DatastoreManager()
-        directory_service = Directory(dsm)
+        directory = Directory(dsm)
 
-        root = directory_service.lookup("/")
+        root = directory.lookup("/")
         self.assertEquals(root, None)
 
-        self.assertEquals(directory_service.register("/","temp"), None)
+        self.assertEquals(directory.register("/","temp"), None)
 
         # Create a node
-        root = directory_service.lookup("/temp")
+        root = directory.lookup("/temp")
         self.assertEquals(root, {} )
 
         # The create case
-        entry_old = directory_service.register("/temp", "entry1", foo="awesome")
+        entry_old = directory.register("/temp", "entry1", foo="awesome")
         self.assertEquals(entry_old, None)
-        entry_new = directory_service.lookup("/temp/entry1")
+        entry_new = directory.lookup("/temp/entry1")
         self.assertEquals(entry_new, {"foo":"awesome"})
 
         # The update case
-        entry_old = directory_service.register("/temp", "entry1", foo="ingenious")
+        entry_old = directory.register("/temp", "entry1", foo="ingenious")
         self.assertEquals(entry_old, {"foo":"awesome"})
 
         # The delete case
-        entry_old = directory_service.unregister("/temp", "entry1")
+        entry_old = directory.unregister("/temp", "entry1")
         self.assertEquals(entry_old, {"foo":"ingenious"})
-        entry_new = directory_service.lookup("/temp/entry1")
+        entry_new = directory.lookup("/temp/entry1")
         self.assertEquals(entry_new, None)

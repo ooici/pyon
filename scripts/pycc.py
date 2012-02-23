@@ -8,6 +8,7 @@ __license__ = 'Apache 2.0'
 import argparse
 import yaml
 import sys
+import traceback
 from uuid import uuid4
 
 #
@@ -102,7 +103,7 @@ def main(opts, *args, **kwargs):
         import threading
         threading.current_thread().name = "CC-Main"
 
-        # The import of pyon.public triggers many module initializers:
+        # SIDE EFFECT: The import of pyon.public triggers many module initializers:
         # pyon.core.bootstrap (Config load, logging setup), etc.
         from pyon.public import Container, CFG
 
@@ -113,25 +114,33 @@ def main(opts, *args, **kwargs):
             logging_conf_paths.append(opts.logcfg)
             initialize_logging()
 
-
         # Set that system is not testing. We are running as standalone container
         CFG.system.testing = False
 
+        # Create the container instance
         container = Container(*args, **kwargs)
 
         return container
 
     def start_container(container):
-        # start container and all internal managers. returns when ready
+        """
+        Start container and all internal managers. Returns when ready.
+        """
         container.start()
 
 
     def do_work(container):
+        """
+        Performs initial startup actions with the container as requested in arguments.
+        Then remains in container shell or infinite wait until container stops.
+        Returns when container should stop. Raises an exception if anything failed.
+        """
         if opts.proc:
             # Run a one-off process (with the -x argument)
             mod, proc = opts.proc.rsplit('.', 1)
             print "Starting process %s" % opts.proc
             container.spawn_process(proc, mod, proc, config={'process':{'type':'immediate'}})
+            # And end
             return
 
         if opts.rel:
@@ -140,9 +149,9 @@ def main(opts, *args, **kwargs):
             if not start_ok:
                 raise Exception("Cannot start deploy file '%s'" % opts.rel)
 
-        from pyon.container.shell_api import get_shell_api
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
+            from pyon.container.shell_api import get_shell_api
             setup_ipython(get_shell_api(container))
         else:
             # Keep container running until process terminated
@@ -154,19 +163,22 @@ def main(opts, *args, **kwargs):
                 container.stop()
             return True
         except Exception as ex:
+            # We want to make sure to get out here alive
             print "CONTAINER STOP ERROR"
-            print ex
+            traceback.print_exc()
             return False
 
     # ----------------------------------------------------------------------------------
+    # Container life cycle
 
     container = None
     try:
         container = prepare_container()
+
         start_container(container)
     except Exception as ex:
-        print "CONTAINER START ERROR -- FAIL"
-        print ex
+        print "===== CONTAINER START ERROR -- FAIL ====="
+        traceback.print_exc()
         stop_container(container)
         sys.exit(1)
 
@@ -174,7 +186,7 @@ def main(opts, *args, **kwargs):
         do_work(container)
     except Exception as ex:
         stop_container(container)
-        print "CONTAINER PROCESS START ERROR -- ABORTING"
+        print "===== CONTAINER PROCESS START ERROR -- ABORTING ====="
         print ex
         sys.exit(1)
 

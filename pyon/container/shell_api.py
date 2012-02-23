@@ -24,6 +24,8 @@ def pprint_table(table, pad=1, indent=0, trunc=None):
     Each row must have the same number of columns.
     From:http://ginstrom.com/scribbles/2007/09/04/pretty-printing-a-table-in-python/
     """
+    if len(table) == 0:
+        return ""
     strl = []
 
     col_paddings = []
@@ -204,6 +206,9 @@ def lsdir(qname='/', truncate=True):
     delist = ds.find_entries(qname)
     detable = [(str(de._id), str(de.attributes)) for de in delist]
 
+    if len(detable) == 0:
+        print
+        return
     if truncate:
         rows, columns = get_console_dimensions()
         col1wid = get_max_width(detable, 0)

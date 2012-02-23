@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Directory is a frontend to a system-wide directory datastore, where system config and definitions live."""
+
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
@@ -27,6 +29,7 @@ class Directory(object):
         self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
 
         self.orgname = orgname or CFG.system.root_org
+        self.is_root = (self.orgname == CFG.system.root_org)
 
         self._init()
 
@@ -36,25 +39,51 @@ class Directory(object):
         """
         self.dir_store.close()
 
-    def _get_dn(self, parent, key):
+    def _get_dn(self, parent, key=None, org=None):
+        org = org or self.orgname
         if parent == '/':
-            return "/%s" % (key)
+            return "%s/%s" % (org, key) if key is not None else org
+        elif parent.startswith("/"):
+            return "%s%s/%s" % (org, parent,key) if key is not None else "%s%s" % (org, parent)
         else:
-            return "%s/%s" % (parent,key)
+            raise BadRequest("Illegal directory parent: %s" % parent)
 
     def _init(self):
-        self._assert_existence("/", "Agents")
-        if not self._assert_existence("/", "Config"):
-            self._register_config()
-        self._assert_existence("/", "Containers")
-        if not self._assert_existence("/", "ObjectTypes"):
-            self._register_object_types()
-        self._assert_existence("/", "ResourceTypes")
-        if not self._assert_existence("/", "ServiceInterfaces"):
-            self._register_service_definitions()
-        self._assert_existence("/", "Services")
+        self._assert_existence("/", "Agents",
+                description="Running agents are registered here")
 
-    def _assert_existence(self, parent, key):
+        if not self._assert_existence("/", "Config",
+                description="System configuration is registered here"):
+            if self.is_root:
+                self._register_config()
+
+        self._assert_existence("/", "Containers",
+                description="Running containers are registered here")
+
+        if not self._assert_existence("/", "ObjectTypes",
+                description="ObjectTypes are registered here"):
+            if self.is_root:
+                self._register_object_types()
+
+        self._assert_existence("/", "Org",
+                description="Org specifics are registered here",
+                is_root=self.is_root)
+
+        self._assert_existence("/Org", "Resources",
+                description="Shared Org resources are registered here")
+
+        self._assert_existence("/", "ResourceTypes",
+                description="Resource types are registered here")
+
+        if not self._assert_existence("/", "ServiceInterfaces",
+                description="Service interface definitions are registered here"):
+            if self.is_root:
+                self._register_service_definitions()
+
+        self._assert_existence("/", "Services",
+                description="Service instances are registered here")
+
+    def _assert_existence(self, parent, key, **kwargs):
         """
         Make sure an entry is in the directory.
         @retval True if entry existed
@@ -63,14 +92,14 @@ class Directory(object):
         direntry = self._safe_read(dn)
         existed = bool(direntry)
         if not direntry:
-            direntry = DirEntry(parent=parent, key=key, attributes={})
+            direntry = DirEntry(parent=parent, key=key, attributes=kwargs)
             # TODO: This may fail because of concurrent create
             self.dir_store.create(direntry, dn)
         return existed
 
-    def _safe_read(self, oid):
+    def _safe_read(self, key):
         try:
-            res = self.dir_store.read(oid)
+            res = self.dir_store.read(key)
             return res
         except NotFound:
             return None
@@ -117,6 +146,12 @@ class Directory(object):
 
         return entry_old
 
+    def register_safe(self, parent, key, **kwargs):
+        try:
+            return self.register(parent, key, **kwargs)
+        except Exception as ex:
+            log.exception("Error registering key=%s/%s, args=%s" % (parent, key, kwargs))
+
     def register_mult(self, entries):
         if type(entries) not in (list, tuple):
             raise BadRequest("Bad type")
@@ -134,7 +169,8 @@ class Directory(object):
         Read entry residing in directory at parent node level.
         """
         log.debug("Reading content at path %s" % qualified_key)
-        direntry = self._safe_read(qualified_key)
+        dn = self._get_dn(qualified_key)
+        direntry = self._safe_read(dn)
         return direntry.attributes if direntry else None
 
     def unregister(self, parent, key):
@@ -151,6 +187,12 @@ class Directory(object):
             self.dir_store.delete(direntry)
 
         return entry_old
+
+    def unregister_safe(self, parent, key):
+        try:
+            return self.unregister(parent, key)
+        except Exception as ex:
+            log.exception("Error unregistering key=%s/%s" % (parent, key))
 
     def find_entries(self, qname='/'):
         if not str(qname).startswith('/'):
@@ -170,6 +212,8 @@ class Directory(object):
 
     def _load_config(self):
         de = self.lookup("/Config/CFG")
+        if not de:
+            raise Conflict("Expected /Config/CFG in directory. Correct Org??")
 
     def _register_service_definitions(self):
         from pyon.core.bootstrap import service_registry
