@@ -12,10 +12,23 @@ import os
 import re
 import random
 import string
-from pyon.core.exception import FileSystemError
 from pyon.util.log import log
 from pyon.util.containers import DotDict
-from pyon.core.bootstrap import CFG
+
+class FileSystemError(Exception):
+    '''
+    Client filesystem request failed
+    Does this seem wrong to anyone else?!
+    '''
+    status_code = 411
+    def get_status_code(self):
+        return self.status_code
+
+    def get_error_message(self):
+        return self.message
+
+    def __str__(self):
+        return str(self.get_status_code()) + " - " + str(self.get_error_message())
 
 
 class FileSystem(object):
@@ -32,7 +45,7 @@ class FileSystem(object):
             cls._instance = super(FileSystem, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, CFG):
         FileSystem._force_clean = CFG.get_safe('system.filesystem.force_clean',False)
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():

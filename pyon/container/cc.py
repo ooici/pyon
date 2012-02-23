@@ -78,7 +78,7 @@ class Container(BaseContainerAgent):
         self.datastore_manager = DatastoreManager()
 
         # File System - Interface to the OS File System, using correct path names and setups
-        self.file_system = FileSystem()
+        self.file_system = FileSystem(CFG)
         
         log.debug("Container initialized, OK.")
 
