@@ -74,6 +74,8 @@ class Directory(object):
             return res
         except NotFound:
             return None
+        except BadRequest:
+            return None
 
     def _create(self):
         """
