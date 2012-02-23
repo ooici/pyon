@@ -483,22 +483,20 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
     """
     pass
 
-class StreamIngestionPolicyEventPublisher(ResourceModifiedEventPublisher):
+class DatasetIngestionConfigurationEventPublisher(ResourceModifiedEventPublisher):
     """
-    Event Notification Subscriber for Stream Ingestion Policy change Events
+    Event Notification Subscriber for Dataset Ingestion Configuration change Events
 
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
-    msg_type = "StreamIngestionPolicyEvent"
-    event_name  = "STREAM_INGESTION_POLICY_EVENT"
+    msg_type = "DatasetIngestionConfigurationEvent"
+    event_name  = "DATASET_INGESTION_CONFIGURATION_EVENT"
 
-class StreamIngestionPolicyEventSubscriber(ResourceModifiedEventSubscriber):
+class DatasetIngestionConfigurationEventSubscriber(ResourceModifiedEventSubscriber):
     """
-    Event Notification Subscriber for Stream Ingestion Policy change Events
+    Event Notification Subscriber for Dataset Ingestion Configuration change Events
 
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
-    event_name  = "STREAM_INGESTION_POLICY_EVENT"
+    event_name  = "DATASET_INGESTION_CONFIGURATION_EVENT"
 
 
 
