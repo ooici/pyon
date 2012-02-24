@@ -626,7 +626,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         if type(subject) is str:
             subject_id = subject
@@ -667,7 +667,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         if type(obj) is str:
             object_id = obj
@@ -699,8 +699,8 @@ class MockDB_DataStore(DataStore):
         else:
             return (target_list, assoc_list)
 
-    def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
-        log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
+    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True):
+        log.debug("find_associations(subject=%s, predicate=%s, object=%s, assoc_type=%s)" % (subject, predicate, obj, assoc_type))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if subject and obj or predicate:
@@ -710,7 +710,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         if subject and obj:
             if type(subject) is str:
@@ -732,7 +732,11 @@ class MockDB_DataStore(DataStore):
                 if (objname.find('_version_')>0) or (not type(obj) is dict): continue
                 if 'type_' in obj and obj['type_'] == "Association":
                     if obj['s'] == subject_id and obj['o'] == object_id:
-                        target_list.append(obj)
+                        if assoc_type:
+                            if obj['at'] == assoc_type:
+                                target_list.append(obj)
+                        else:
+                            target_list.append(obj)
         else:
             target_list = []
             for objname,obj in datastore_dict.iteritems():
@@ -755,7 +759,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         assoc_list = []
         target_id_list = []
@@ -781,7 +785,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         if lcstate in ResourceLifeCycleSM.STATE_ALIASES:
             lcstate_match = ResourceLifeCycleSM.STATE_ALIASES[lcstate]
@@ -814,7 +818,7 @@ class MockDB_DataStore(DataStore):
         try:
             datastore_dict = self.root[self.datastore_name]
         except KeyError:
-            raise BadRequest('Data store ' + datastore_name + ' does not exist.')
+            raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
         assoc_list = []
         target_id_list = []

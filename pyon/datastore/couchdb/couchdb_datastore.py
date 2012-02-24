@@ -779,7 +779,7 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
-    def find_associations(self, subject=None, predicate=None, obj=None, id_only=True):
+    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
@@ -808,6 +808,8 @@ class CouchDB_DataStore(DataStore):
             key = [subject_id, object_id]
             if predicate:
                 key.append(predicate)
+            if assoc_type:
+                key.append(assoc_type)
             endkey = list(key)
             endkey.append(END_MARKER)
             rows = view[key:endkey]
