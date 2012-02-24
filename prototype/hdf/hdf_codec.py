@@ -169,7 +169,11 @@ class HDFEncoder(object):
         # ------------
         # (tree_list: [], dataset: '')
         #
+        def filter_blanks(n):
+            return n != ''
+
         tree_list =  name.split('/') # return a list of datagroup, datasubgroups and the dataset
+        filter(filter_blanks, tree_list)
         dataset = tree_list.pop()
         return tree_list, dataset
 
@@ -339,6 +343,21 @@ class HDFDecoder(object):
         except IOError:
             log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
             raise HDFDecoderException("Error while trying to open file. ")
+
+    def get_hdf_groups(self):
+        try:
+            h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
+        except IOError:
+            log.debug("Error opening file for the HDFDecoder")
+            raise HDFDecoderException("Error while trying to open file.")
+
+        root_group = h5pyfile[h5pyfile.name]
+        list_of_groups = []
+        root_group.visit(list_of_groups.append)
+
+        h5pyfile.close()
+
+        return list_of_groups
 
     def read_hdf_dataset(self, name):
         """
