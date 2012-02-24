@@ -6,10 +6,10 @@
 '''
 
 from mock import Mock, sentinel, patch
+from pyon.util.containers import DotDict
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from pyon.public import log
-from pyon.core.exception import NotFound
 import unittest
 
 try:
@@ -21,13 +21,18 @@ except ImportError:
     from unittest import SkipTest
     raise SkipTest('Numpy not installed')
 
-import uuid
-import hashlib
+from pyon.util.file_sys import FileSystem, FS, FS_DIRECTORY
 import os, os.path, glob
 
-from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder
+import hashlib
+
+from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder, random_name
 from prototype.hdf.hdf_codec import HDFEncoderException, HDFDecoderException
 no_numpy_h5py = False
+
+def sha1(bytes):
+    return hashlib.sha1(bytes).hexdigest().upper()
+
 
 @attr('UNIT', group='dm')
 class TestScienceObjectCodec(PyonTestCase):
@@ -39,53 +44,55 @@ class TestScienceObjectCodec(PyonTestCase):
     grp_name = 'mygroup'
     path_to_dataset =rootgrp_name + '/' + grp_name + '/' + dataset_name
 
-    #filename = '/tmp/known_hdf.hdf5'
-    def __init__(self, *args, **kwargs):
-        self.create_known()
-        PyonTestCase.__init__(self,*args,**kwargs)
 
-    def setUp(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
 
+        # This test does not start a container so we have to hack creating a FileSystem singleton instance
+        FileSystem(DotDict())
+
+        @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
+        def create_known(dataset_name, rootgrp_name, grp_name):
+            """
+            A known array to compare against during tests
+            """
+
+            known_array = numpy.ones((10,20))
+
+            filename = FileSystem.get_url(FS.TEMP,random_name(), ".hdf5")
+
+            # Write an hdf file with known values to compare against
+            h5pyfile = h5py.File(filename, mode = 'w', driver='core')
+            grp = h5pyfile.create_group(rootgrp_name)
+            subgrp = grp.create_group(grp_name)
+            dataset = subgrp.create_dataset(dataset_name, known_array.shape, known_array.dtype.str, maxshape=(None,None))
+            dataset.write_direct(known_array)
+            h5pyfile.close()
+
+            # convert the hdf file into a binary string
+            f = open(filename, mode='rb')
+            # read the binary string representation of the file
+            known_hdf_as_string = f.read() # this is a known string to compare against during tests
+            f.close()
+            # cleaning up
+            FileSystem.unlink(f.name)
+
+            return known_array, known_hdf_as_string
+
+        # Use the class method to patch these attributes onto the class.
+        TestScienceObjectCodec.known_array, TestScienceObjectCodec.known_hdf_as_string = create_known(TestScienceObjectCodec.dataset_name, TestScienceObjectCodec.rootgrp_name, TestScienceObjectCodec.grp_name)
+
+        TestScienceObjectCodec.known_hdf_as_sha1 = sha1(TestScienceObjectCodec.known_hdf_as_string)
 
     def tearDown(self):
-        rm_filepath = '/tmp/*hdf5'
+
+        rm_filepath = os.path.join(FS_DIRECTORY.TEMP, '*hdf5')
         r = glob.glob(rm_filepath)
         for i in r:
             os.remove(i)
-        pass
 
-    @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
-    def create_known(self):
-        """
-        A known array to compare against during tests
-        """
-        ##############################################################
-        # The contents for this method should not be changed because
-        # the known values should remain constant.
-        ############################################################
-        self.known_array = numpy.ones((10,20))
 
-        self.filename = '/tmp/testHDFEncoderDecoder.hdf5'
 
-        # Write an hdf file with known values to compare against
-        h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
-        grp = h5pyfile.create_group(self.rootgrp_name)
-        subgrp = grp.create_group(self.grp_name)
-        dataset = subgrp.create_dataset(self.dataset_name, self.known_array.shape, self.known_array.dtype.str, maxshape=(None,None))
-        dataset.write_direct(self.known_array)
-        h5pyfile.close()
-
-        # convert the hdf file into a binary string
-        f = open(self.filename, mode='rb')
-        # read the binary string representation of the file
-        self.known_hdf_as_string = f.read() # this is a known string to compare against during tests
-        f.close()
-        # cleaning up
-        os.remove(self.filename)
-
-    def random_name(self):
-        return hashlib.sha1(str(uuid.uuid4())).hexdigest().upper()[:8]
 
     def add_two_datasets_read_compare(self, filename, dataset_name1, dataset_name2):
         array1 = numpy.ones((4,5))
@@ -94,10 +101,7 @@ class TestScienceObjectCodec(PyonTestCase):
         # first create the file
         hdfencoder = HDFEncoder(filename)
         hdfencoder.add_hdf_dataset(dataset_name1, array1)
-        hdfstring = hdfencoder.encoder_close()
 
-        # now open the file and add another branch
-        hdfencoder = HDFEncoder(filename)
         hdfencoder.add_hdf_dataset(dataset_name2, array2)
         hdfstring = hdfencoder.encoder_close()
 
@@ -105,12 +109,11 @@ class TestScienceObjectCodec(PyonTestCase):
         # Read the first dataset
         array_decoded_1 =  hdfdecoder.read_hdf_dataset(dataset_name1)
 
-        hdfdecoder = HDFDecoder(hdfstring)
         # Read the second dataset
         array_decoded_2 = hdfdecoder.read_hdf_dataset(dataset_name2)
 
-        self.assertEqual(array1.tostring(), array_decoded_1.tostring())
-        self.assertEqual(array2.tostring(), array_decoded_2.tostring())
+        self.assertEqual(sha1(array1.tostring()), sha1(array_decoded_1.tostring()) )
+        self.assertEqual(sha1(array2.tostring()), sha1(array_decoded_2.tostring()) )
 
 
     @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
@@ -123,7 +126,7 @@ class TestScienceObjectCodec(PyonTestCase):
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset)
 
         # compare the read numpy array to a known value from the stringed input
-        self.assertEqual(nparray.tostring(),self.known_array.tostring())
+        self.assertEqual(sha1(nparray.tostring()) ,sha1(self.known_array.tostring()) )
 
     def test_encode_known_and_compare(self):
         """
@@ -135,25 +138,25 @@ class TestScienceObjectCodec(PyonTestCase):
         # Serialize to string and compare to a know value
         hdf_string = hdfencoder.encoder_close()
 
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
     def test_encode_with_filename_and_compare(self):
         """
         Create an encoder and add some (one) dataset/array
         """
+        testfilename = 'test_encode_with_filename_and_compare'
 
-        testfilename = '/tmp/testFile.hdf5'
         hdfencoder = HDFEncoder(testfilename)
         hdfencoder.add_hdf_dataset(self.path_to_dataset, self.known_array)
         # get the string out from encoder
         hdf_string = hdfencoder.encoder_close()
 
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
         hdfdecoder = HDFDecoder(self.known_hdf_as_string)
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset)
 
-        self.assertEqual(nparray.tostring(), self.known_array.tostring())
+        self.assertEqual(sha1(nparray.tostring()), sha1(self.known_array.tostring()) )
 
     def test_decode_bad_string(self):
         # assert raises a known error if the string fed in is not that of an hdf file
@@ -174,7 +177,7 @@ class TestScienceObjectCodec(PyonTestCase):
         hdfdecoder = HDFDecoder(hdf_string)  # put string in decoder...
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset) # get array out
 
-        self.assertEqual(nparray.tostring(), self.known_array.tostring()) # works for arbitrarily shaped arrays
+        self.assertEqual(sha1(nparray.tostring()), sha1(self.known_array.tostring()) ) # works for arbitrarily shaped arrays
 
     def test_decode_encode(self):
         """
@@ -191,7 +194,7 @@ class TestScienceObjectCodec(PyonTestCase):
         hdf_string = hdfencoder.encoder_close() # get string out
 
         # compare the two strings
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
     def test_add_hdf_dataset(self):
         """
@@ -201,6 +204,7 @@ class TestScienceObjectCodec(PyonTestCase):
         testencoder = HDFEncoder()
         testencoder.add_hdf_dataset('test_dataset', self.known_array)
         testencoder.encoder_close()
+        #@todo Add some assertion here?
 
     def test_add_hdf_dataset_with_bad_name(self):
         """
@@ -226,8 +230,8 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         Test adding a branch to an existing group tree in a file
         """
+        filename = 'test_add_branch_to_existing'
 
-        filename = '/tmp/testHDFEncoder.hdf5'
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/data/subsubgroup/pressure'
 
@@ -238,7 +242,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding datasets to the same leaf in the group tree
         """
 
-        filename = '/tmp/testHDFEncoder.hdf5'
+        filename = 'test_add_datasets_to_same_group'
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/pressure'
 
@@ -249,7 +253,7 @@ class TestScienceObjectCodec(PyonTestCase):
         Test adding a dataset to a file when a dataset with the same name already exists in it
         """
 
-        filename = '/tmp/testHDFEncoder.hdf5'
+        filename = 'test_add_hdf_dataset_to_file_having_one_already'
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
 

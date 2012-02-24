@@ -65,15 +65,6 @@ class Test_DataStores(IonIntegrationTestCase):
             with self.assertRaises(BadRequest):
                 ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.find_doc([['type_', DataStore.EQUAL, 'foo']], "BadDataStoreNamePerCouchDB")
-
-            with self.assertRaises(BadRequest):
-                ds.find_by_idref_doc([['type_', DataStore.EQUAL, 'UserInfo'], DataStore.AND, ['name', DataStore.EQUAL, 'foo']], 'roles', "BadDataStoreNamePerCouchDB")
-
-            with self.assertRaises(BadRequest):
-                ds.resolve_idref_doc("Subject", "Predicate", "Object", "BadDataStoreNamePerCouchDB")
-
             self._do_test_views(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
@@ -213,16 +204,6 @@ class Test_DataStores(IonIntegrationTestCase):
         res = data_store.list_objects()
         # There are indices. Therefore can't could all docs
         self.assertTrue(len(res) == 6 + numcoredocs)
-
-        # Find all the UserInfo records
-        res = data_store.find([["type_", "==", "UserInfo"]])
-        self.assertTrue(len(res) == 3)
-
-        # Find only the UserInfo record for user Heitor Villa-Lobos
-        res = data_store.find([["type_", DataStore.EQUAL, "UserInfo"], DataStore.AND, ["name", DataStore.EQUAL, "Heitor Villa-Lobos"]])
-        self.assertTrue(len(res) == 1)
-        user_info_obj = res[0]
-        self.assertTrue(user_info_obj.contact.name == "Heitor Villa-Lobos")
 
         # Create an Ion object with default values set (if any)
         data_set = IonObject('DataSet')

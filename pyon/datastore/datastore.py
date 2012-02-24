@@ -19,16 +19,6 @@ class DataStore(object):
     DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
-    EQUAL = '=='
-    NOT_EQUAL = '!='
-    GREATER_THAN = '>'
-    GREATER_THAN_OR_EQUAL = '>='
-    LESS_THAN = '<'
-    LESS_THAN_OR_EQUAL = '<='
-
-    AND = 0
-    OR = 1
-
     def close(self):
         """
         Close any connections required for this datastore.
@@ -175,114 +165,6 @@ class DataStore(object):
         """
         pass
 
-    def find(self, criteria=[], datastore_name=""):
-        """
-        Generic query function that allows searching on zero
-        or more criteria represented in the following format:
-            [[<field>, <logical constant>, <value>], <and>|<or>, ...]
-
-        For example, to find all objects of type 'foo':
-            [['type_', DataStore.EQUAL, 'foo']]
-
-        Think of this as equivalent to:
-            select * from datastore_name where type = 'foo'
-
-        Possible logical values to apply are:
-            EQUAL
-            NOT_EQUAL
-            GREATER_THAN
-            GREATER_THAN_OR_EQUAL
-            LESS_THAN
-            LESS_THAN_OR_EQUAL
-
-        If you specify two or more criterion, each criterion can
-        be ANDed or ORed with the other criterion.  For example, to find
-        objects of type 'foo' with name value 'bar', pass the
-        following:
-            [['type_', DataStore.EQUAL, 'foo'], DataStore.AND, ['name', DataStore.EQUAL, 'bar']]
-
-        In SQL, this is equivalent to:
-            select * from datastore_name where type = 'foo' and name = 'bar'
-
-        This function returns IonObjects
-        """
-        pass
-
-    def find_doc(self, criteria=[], datastore_name=""):
-        """
-        Same as the find method except that this function returns raw doc dicts
-        """
-        pass
-
-    def find_by_idref(self, criteria=[], association="", datastore_name=""):
-        """
-        Generic query function that allows searching on zero
-        or more criteria represented in the following format:
-            [(<field>, <logical constant>, <value>), ...]
-        to derive a list of associated objects.  The association
-        of interest is passed in the association attribute
-        and should be the name of an object field.
-
-        For example to find the roles of user 'foo' specify the following
-        criteria and association:
-            [['type_', DataStore.EQUAL, 'UserInfo'], DataStore.AND, ['name', DataStore.EQUAL, 'foo']], 'roles'
-
-        Think of this as equivalent to:
-            select * from datastore_name where id_ in (
-                select roles from datastore_name where type = 'UserInfo' and name = 'foo'
-            )
-
-        Possible logical values to apply are:
-            EQUAL
-            NOT_EQUAL
-            GREATER_THAN
-            GREATER_THAN_OR_EQUAL
-            LESS_THAN
-            LESS_THAN_OR_EQUAL
-
-        If you specify two or more criterion, each criterion can
-        be ANDed or ORed with the other criterion.  For example, to find
-        objects of type 'foo' with name value 'bar', pass the
-        following:
-            [['type_', DataStore.EQUAL, 'foo'], DataStore.AND, ['name', DataStore.EQUAL, 'bar']]
-
-        This function returns IonObjects
-        """
-        pass
-
-    def find_by_idref_doc(self, criteria=[], association="", datastore_name=""):
-        """
-        Same as the find_by_association method except that this function returns raw doc dicts
-        """
-        pass
-
-    def resolve_idref(self, subject="", predicate="", obj="", datastore_name=""):
-        """
-        Generic association query function that allows queries for associations
-        by subject, predicate and/or object.  Examples:
-
-        (<subject>, <predicate>, None) - returns all objects associated with
-            the subject via the specified predicate
-        (<subject>, None, <object>) - returns all associations between subject
-            and object
-        (None, <predicate>, <object>) - returns all subjects that have association
-            with object via predicate
-        (<subject>, <predicate>, <object>) - returns true if association exists
-        (None, <predicate>, None) - returns all subjects and objects associated
-            via predicate
-
-        This function returns a set of tuples in the form
-            [(IonObject, <predicate>, IonObject), ...]
-        """
-        pass
-
-    def resolve_idref_doc(self, subject="", predicate="", obj="", datastore_name=""):
-        """
-        Same as the resolve_association_tuple method except that this function returns
-        a set of tuples in the form
-            [({}, <predicate>, {}), ...]
-        """
-        pass
 
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type=AT.H2H):
         """

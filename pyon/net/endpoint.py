@@ -170,6 +170,7 @@ class EndpointUnit(object):
                     log.debug("client_recv waiting for a message")
                     msg, headers, delivery_tag = self.channel.recv()
                     log.debug("client_recv got a message")
+                    log_message(self.channel._send_name , msg, headers, delivery_tag)
                     try:
                         self._message_received(msg, headers)
                     finally:
@@ -760,6 +761,8 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         response_headers['conv-id']     = headers.get('conv-id', '')
         response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
+        log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
+
         return self.send(result, response_headers)
 
     def message_received(self, msg, headers):
@@ -866,8 +869,12 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
         # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id})
-        
+                       'sender'       : self._process.id,
+                       'sender-type'  : self._process.process_type })
+
+        if self._process.process_type == 'service':     # @TODO updated by XN work
+            header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
+
         # use context to set security attributes forward
         if isinstance(context, dict):
             # fwd on ion-actor-id and expiry, according to common message format spec
@@ -951,7 +958,11 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
 
         # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id})
+                       'sender'       : self._process.id,
+                       'sender-type'  : self._process.process_type })
+
+        if self._process.process_type == 'service':     # @TODO updated by XN work
+            header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
 
         # use context to set security attributes forward
         if isinstance(context, dict):

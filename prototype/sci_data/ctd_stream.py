@@ -6,15 +6,17 @@
 @description An example process producing a ctd data stream
 '''
 
-from interface.objects import DataContainer, StreamDefinitionContainer, StreamGranuleContainer
-from interface.objects import UnitReferenceProperty, NilValue, ElapsedTime, AllowedTokens, AllowedValues, AllowedTimes
-from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
-from interface.objects import BooleanElement, TextElement, CategoryElement, CountElement, CountRangeElement
-from interface.objects import QuantityElement, QuantityRangeElement, TimeElement, TimeRangeElement
-from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
+from interface.objects import StreamDefinitionContainer, StreamGranuleContainer #, DataContainer
 from interface.objects import DataStream, ElementType, DataRecord, Vector, Coverage, RangeSet, Domain, Mesh, CoordinateAxis, Encoding
+from interface.objects import UnitReferenceProperty, NilValue, AllowedValues #, ElapsedTime, AllowedTokens, AllowedTimes
+from interface.objects import CategoryElement, CountElement #, BooleanElement, TextElement, CountRangeElement
+from interface.objects import QuantityRangeElement #, QuantityElement, TimeElement, TimeRangeElement
+#from interface.objects import AbstractIdentifiable, AbstractDataComponent, AbstractSimpleComponent
+#from interface.objects import QualityQuantityProperty, QualityQuantityRangeProperty, QualityCatagoryProperty, QualityTextProperty
 
-from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
+from prototype.hdf.hdf_codec import HDFEncoder #, HDFEncoderException, HDFDecoder, HDFDecoderException
+
+import hashlib
 
 from pyon.util.log import log
 
@@ -51,7 +53,7 @@ def ctd_stream_definition(stream_id=None):
         definition="Ref to SeaBird data?",
         updatable=False,
         optional=False,
-        data_record_id='ctd_data')
+        data_record_id='data_record')
 
 
     ctd_container.identifiables['data_record'] = DataRecord(
@@ -83,7 +85,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[-10.0, 50.0],]),
         unit_of_measure= UnitReferenceProperty(code='Cel'),
-        values_path="/fields/temp_data",
+        values_path="fields/temp_data",
     )
 
 
@@ -102,7 +104,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0.0, 85.0],]), # Normal range for ocean
         unit_of_measure= UnitReferenceProperty(code='mS/cm'), # milli Siemens per centimeter
-        values_path="/fields/cndr_data",
+        values_path="fields/cndr_data",
     )
 
     ctd_container.identifiables['pressure'] = Coverage(
@@ -121,7 +123,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
         unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
-        values_path="/fields/pressure_data",
+        values_path="fields/pressure_data",
         reference_frame='Atmospheric pressure ?'
     )
 
@@ -130,7 +132,7 @@ def ctd_stream_definition(stream_id=None):
         definition='Spec for ctd data time domain',
         updatable='False',
         optional='False',
-        coordinate_vector_id='coordiante_vector',
+        coordinate_vector_id='coordinate_vector',
         mesh_id='point_timeseries'
         )
 
@@ -147,7 +149,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[-90.0, 90.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordinates/latitude',
+        values_path= 'coordinates/latitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -157,7 +159,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[0.0, 360.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordinates/longitude',
+        values_path= 'coordinates/longitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -166,14 +168,14 @@ def ctd_stream_definition(stream_id=None):
         axis = "time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordiantes/time',
+        values_path= 'coordinates/time',
         unit_of_measure = UnitReferenceProperty(code='s'),
         reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
     )
     
     ctd_container.identifiables['point_timeseries'] = Mesh(
         mesh_type = CategoryElement(value="Point Time Series"),
-        values_path = "/topology/mesh",
+        values_path = "topology/mesh",
         index_offset = 0,
         number_of_elements = 1,
         number_of_verticies = 1,
@@ -313,15 +315,19 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     )
 
 
-    if create_hdf:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-            values=hdf_string # put the hdf file here as bytes!
+    ctd_container.identifiables['ctd_data'] = DataStream(
+        id=stream_id,
+        values=hdf_string # put the hdf file here as bytes!
         )
-    else:
-        ctd_container.identifiables['ctd_data'] = DataStream(
-            id=stream_id,
-        )
+
+    sha1 = hashlib.sha1(hdf_string).hexdigest().upper() if hdf_string else ''
+
+    ctd_container.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = sha1,
+    )
+
 
     ctd_container.identifiables['record_count'] = CountElement(
         value= length or -1,

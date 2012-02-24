@@ -8,8 +8,8 @@ __license__ = 'Apache 2.0'
 import time
 
 from pyon.core import bootstrap
-from pyon.core.exception import Conflict, NotFound, BadRequest
-from pyon.datastore.datastore import DataStore, DatastoreManager
+from pyon.core.exception import BadRequest
+from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import Publisher, Subscriber, PublisherEndpointUnit, SubscriberEndpointUnit, ListeningBaseEndpoint
 from pyon.util.log import log
 
@@ -483,22 +483,20 @@ class InstrumentSampleDataEventSubscriber(DataBlockEventSubscriber):
     """
     pass
 
-class StreamIngestionPolicyEventPublisher(ResourceModifiedEventPublisher):
+class DatasetIngestionConfigurationEventPublisher(ResourceModifiedEventPublisher):
     """
-    Event Notification Subscriber for Stream Ingestion Policy change Events
+    Event Notification Subscriber for Dataset Ingestion Configuration change Events
 
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
-    msg_type = "StreamIngestionPolicyEvent"
-    event_name  = "STREAM_INGESTION_POLICY_EVENT"
+    msg_type = "DatasetIngestionConfigurationEvent"
+    event_name  = "DATASET_INGESTION_CONFIGURATION_EVENT"
 
-class StreamIngestionPolicyEventSubscriber(ResourceModifiedEventSubscriber):
+class DatasetIngestionConfigurationEventSubscriber(ResourceModifiedEventSubscriber):
     """
-    Event Notification Subscriber for Stream Ingestion Policy change Events
+    Event Notification Subscriber for Dataset Ingestion Configuration change Events
 
-    The "origin" parameter in this class' initializer should be the process' exchagne name (TODO: correct?)
     """
-    event_name  = "STREAM_INGESTION_POLICY_EVENT"
+    event_name  = "DATASET_INGESTION_CONFIGURATION_EVENT"
 
 
 
@@ -507,10 +505,11 @@ class EventRepository(object):
     Class that uses a data store to provide a persistent repository for ION events.
     """
 
-    def __init__(self, datastore_manager):
+    def __init__(self, datastore_manager=None):
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
+        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.event_store = datastore_manager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
 
     def close(self):

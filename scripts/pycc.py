@@ -2,11 +2,13 @@
 
 """Python Capability Container start script"""
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 import argparse
 import yaml
+import sys
+import traceback
 from uuid import uuid4
 
 #
@@ -91,55 +93,115 @@ def unflatten(dictionary):
             d = d[part]
         d[parts[-1]] = value
     return resultDict
-    
+
 def main(opts, *args, **kwargs):
-    import threading
-    threading.current_thread().name = "CC-Main"
+    """
+    Starts the capability container and processes arguments
+    """
 
-    # The import of pyon.public triggers many module initializers:
-    # pyon.core.bootstrap (Config load, logging setup), etc.
-    from pyon.public import Container, CFG
+    def prepare_container():
+        import threading
+        threading.current_thread().name = "CC-Main"
 
-    # Check if user opted to override logging config
-    if opts.logcfg:
-        from pyon.util.config import logging_conf_paths, initialize_logging
-        # Re-initialize logging
-        logging_conf_paths.append(opts.logcfg)
-        initialize_logging()
+        # SIDE EFFECT: The import of pyon.public triggers many module initializers:
+        # pyon.core.bootstrap (Config load, logging setup), etc.
+        from pyon.public import Container, CFG
+        from pyon.util.containers import dict_merge
+        from pyon.util.config import Config
 
-    from pyon.container.shell_api import get_shell_api
-    # Set that system is not testing. We are running as standalone container
-    CFG.system.testing = False
+        # Check if user opted to override logging config
+        if opts.logcfg:
+            from pyon.util.config import logging_conf_paths, initialize_logging
+            # Re-initialize logging
+            logging_conf_paths.append(opts.logcfg)
+            initialize_logging()
 
-    container = Container(*args, **kwargs)
+        # Set that system is not testing. We are running as standalone container
+        CFG.system.testing = False
 
-    # start and wait for container to signal ready
-    ready = container.start()
+        # Load any additional config paths and merge them into main config
+        if len(opts.config):
+            cfg = Config(opts.config)
+            dict_merge(CFG, cfg.data, True)
 
-    start_ok = True
-    error_msg = None
+        # Create the container instance
+        container = Container(*args, **kwargs)
 
-    if opts.proc:
-        # One off process
-        mod, proc = opts.proc.rsplit('.', 1)
-        print "Starting process %s" % opts.proc
-        container.spawn_process(proc, mod, proc, config={'process':{'type':'immediate'}})
-        container.stop()
-        return
+        return container
 
-    if opts.rel:
-        start_ok = container.start_rel_from_url(opts.rel)
-        if not start_ok: error_msg = "Cannot start deploy file '%s'" % opts.rel
+    def start_container(container):
+        """
+        Start container and all internal managers. Returns when ready.
+        """
+        container.start()
 
-    if start_ok:
+
+    def do_work(container):
+        """
+        Performs initial startup actions with the container as requested in arguments.
+        Then remains in container shell or infinite wait until container stops.
+        Returns when container should stop. Raises an exception if anything failed.
+        """
+        if opts.proc:
+            # Run a one-off process (with the -x argument)
+            mod, proc = opts.proc.rsplit('.', 1)
+            print "Starting process %s" % opts.proc
+            container.spawn_process(proc, mod, proc, config={'process':{'type':'immediate'}})
+            # And end
+            return
+
+        if opts.rel:
+            # Start a rel file
+            start_ok = container.start_rel_from_url(opts.rel)
+            if not start_ok:
+                raise Exception("Cannot start deploy file '%s'" % opts.rel)
+
         if not opts.noshell and not opts.daemon:
+            # Keep container running while there is an interactive shell
+            from pyon.container.shell_api import get_shell_api
             setup_ipython(get_shell_api(container))
         else:
+            # Keep container running until process terminated
             container.serve_forever()
-    else:
-        print "ABORTING CONTAINER START - ERROR: %s" % error_msg
 
-    container.stop()
+    def stop_container(container):
+        try:
+            if container:
+                container.stop()
+            return True
+        except Exception as ex:
+            # We want to make sure to get out here alive
+            print "CONTAINER STOP ERROR"
+            traceback.print_exc()
+            return False
+
+    # ----------------------------------------------------------------------------------
+    # Container life cycle
+
+    container = None
+    try:
+        container = prepare_container()
+
+        start_container(container)
+    except Exception as ex:
+        print "===== CONTAINER START ERROR -- FAIL ====="
+        traceback.print_exc()
+        stop_container(container)
+        sys.exit(1)
+
+    try:
+        do_work(container)
+    except Exception as ex:
+        stop_container(container)
+        print "===== CONTAINER PROCESS START ERROR -- ABORTING ====="
+        print ex
+        sys.exit(1)
+
+    # Assumption: stop is so robust, it does not fail even if it was only partially started
+    stop_ok = stop_container(container)
+    if not stop_ok:
+        sys.exit(1)
+
 
 def parse_args(tokens):
     """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """
@@ -168,6 +230,7 @@ def entry():
     parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file.')
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
+    parser.add_argument('-c', '--config', action='append', type=str, help='Additional config files to load.', default=[])
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)

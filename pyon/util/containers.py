@@ -4,6 +4,7 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import collections
+import string
 import time
 
 
@@ -282,4 +283,20 @@ def getleafsubclasses(cls):
     scls = itersubclasses(cls)
     return [s for s in scls if not s.__subclasses__()]
 
+# -_.() abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+BASIC_VALID = "_%s%s" % (string.ascii_letters, string.digits)
+# -_.()abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+NORMAL_VALID = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
+def create_valid_identifier(name, valid_chars=BASIC_VALID, dot_sub=None, ws_sub=None):
+    if dot_sub:
+        name = name.replace('.', dot_sub)
+    if ws_sub:
+        name = name.replace(' ', ws_sub)
+    return ''.join(c for c in name if c in valid_chars)
+
+def create_basic_identifier(name):
+    return create_valid_identifier(name, dot_sub='_', ws_sub='_')
+
+def is_basic_identifier(name):
+    return name == create_basic_identifier(name)
