@@ -85,7 +85,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[-10.0, 50.0],]),
         unit_of_measure= UnitReferenceProperty(code='Cel'),
-        values_path="fields/temp_data",
+        values_path="/fields/temp_data",
     )
 
 
@@ -104,7 +104,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0.0, 85.0],]), # Normal range for ocean
         unit_of_measure= UnitReferenceProperty(code='mS/cm'), # milli Siemens per centimeter
-        values_path="fields/cndr_data",
+        values_path="/fields/cndr_data",
     )
 
     ctd_container.identifiables['pressure'] = Coverage(
@@ -123,7 +123,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
         unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
-        values_path="fields/pressure_data",
+        values_path="/fields/pressure_data",
         reference_frame='Atmospheric pressure ?'
     )
 
@@ -149,7 +149,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[-90.0, 90.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/latitude',
+        values_path= '/coordinates/latitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -159,7 +159,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[0.0, 360.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/longitude',
+        values_path= '/coordinates/longitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -168,14 +168,14 @@ def ctd_stream_definition(stream_id=None):
         axis = "time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/time',
+        values_path= '/coordinates/time',
         unit_of_measure = UnitReferenceProperty(code='s'),
         reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
     )
     
     ctd_container.identifiables['point_timeseries'] = Mesh(
         mesh_type = CategoryElement(value="Point Time Series"),
-        values_path = "topology/mesh",
+        values_path = "/topology/mesh",
         index_offset = 0,
         number_of_elements = 1,
         number_of_verticies = 1,
