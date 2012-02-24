@@ -6,6 +6,7 @@
 '''
 
 from mock import Mock, sentinel, patch
+from pyon.util.containers import DotDict
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from pyon.public import log
@@ -23,9 +24,15 @@ except ImportError:
 from pyon.util.file_sys import FileSystem, FS, FS_DIRECTORY
 import os, os.path, glob
 
+import hashlib
+
 from prototype.hdf.hdf_codec import HDFEncoder, HDFDecoder, random_name
 from prototype.hdf.hdf_codec import HDFEncoderException, HDFDecoderException
 no_numpy_h5py = False
+
+def sha1(bytes):
+    return hashlib.sha1(bytes).hexdigest().upper()
+
 
 @attr('UNIT', group='dm')
 class TestScienceObjectCodec(PyonTestCase):
@@ -42,7 +49,7 @@ class TestScienceObjectCodec(PyonTestCase):
     def setUpClass(cls):
 
         # This test does not start a container so we have to hack creating a FileSystem singleton instance
-        FileSystem()
+        FileSystem(DotDict())
 
         @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
         def create_known(dataset_name, rootgrp_name, grp_name):
@@ -75,7 +82,7 @@ class TestScienceObjectCodec(PyonTestCase):
         # Use the class method to patch these attributes onto the class.
         TestScienceObjectCodec.known_array, TestScienceObjectCodec.known_hdf_as_string = create_known(TestScienceObjectCodec.dataset_name, TestScienceObjectCodec.rootgrp_name, TestScienceObjectCodec.grp_name)
 
-
+        TestScienceObjectCodec.known_hdf_as_sha1 = sha1(TestScienceObjectCodec.known_hdf_as_string)
 
     def tearDown(self):
 
@@ -105,8 +112,8 @@ class TestScienceObjectCodec(PyonTestCase):
         # Read the second dataset
         array_decoded_2 = hdfdecoder.read_hdf_dataset(dataset_name2)
 
-        self.assertEqual(array1.tostring(), array_decoded_1.tostring())
-        self.assertEqual(array2.tostring(), array_decoded_2.tostring())
+        self.assertEqual(sha1(array1.tostring()), sha1(array_decoded_1.tostring()) )
+        self.assertEqual(sha1(array2.tostring()), sha1(array_decoded_2.tostring()) )
 
 
     @unittest.skipIf(no_numpy_h5py,'numpy and/or h5py not imported')
@@ -119,7 +126,7 @@ class TestScienceObjectCodec(PyonTestCase):
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset)
 
         # compare the read numpy array to a known value from the stringed input
-        self.assertEqual(nparray.tostring(),self.known_array.tostring())
+        self.assertEqual(sha1(nparray.tostring()) ,sha1(self.known_array.tostring()) )
 
     def test_encode_known_and_compare(self):
         """
@@ -131,7 +138,7 @@ class TestScienceObjectCodec(PyonTestCase):
         # Serialize to string and compare to a know value
         hdf_string = hdfencoder.encoder_close()
 
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
     def test_encode_with_filename_and_compare(self):
         """
@@ -144,12 +151,12 @@ class TestScienceObjectCodec(PyonTestCase):
         # get the string out from encoder
         hdf_string = hdfencoder.encoder_close()
 
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
         hdfdecoder = HDFDecoder(self.known_hdf_as_string)
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset)
 
-        self.assertEqual(nparray.tostring(), self.known_array.tostring())
+        self.assertEqual(sha1(nparray.tostring()), sha1(self.known_array.tostring()) )
 
     def test_decode_bad_string(self):
         # assert raises a known error if the string fed in is not that of an hdf file
@@ -170,7 +177,7 @@ class TestScienceObjectCodec(PyonTestCase):
         hdfdecoder = HDFDecoder(hdf_string)  # put string in decoder...
         nparray = hdfdecoder.read_hdf_dataset(self.path_to_dataset) # get array out
 
-        self.assertEqual(nparray.tostring(), self.known_array.tostring()) # works for arbitrarily shaped arrays
+        self.assertEqual(sha1(nparray.tostring()), sha1(self.known_array.tostring()) ) # works for arbitrarily shaped arrays
 
     def test_decode_encode(self):
         """
@@ -187,7 +194,7 @@ class TestScienceObjectCodec(PyonTestCase):
         hdf_string = hdfencoder.encoder_close() # get string out
 
         # compare the two strings
-        self.assertEqual(hdf_string,self.known_hdf_as_string)
+        self.assertEqual(sha1(hdf_string),self.known_hdf_as_sha1)
 
     def test_add_hdf_dataset(self):
         """

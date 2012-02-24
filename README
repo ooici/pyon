@@ -31,6 +31,8 @@ For Mac, use homebrew
 - Install libevent, libyaml, couchdb, python, and rabbitmq with Homebrew
     > brew install libevent libyaml couchdb python rabbitmq hdf5
     You can even reinstall git using brew to clean up your /usr/local directory
+    (If you have trouble with brew 'MD5 mismatch' errors, try running 'brew update' 
+    and try the install again)
     Linux: Note that many installs have much older versions installed by default.
       - libevent: Install with package manager
       - libyaml: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh
