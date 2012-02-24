@@ -383,7 +383,7 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     def test_delete_xn(self):
         # same as the other deletes except with queues instead
 
-        xn = self.container.ex_manager.create_service_xn('test_service')
+        xn = self.container.ex_manager.create_xn_service('test_service')
 
         # prove queue is declared already (can't declare the same named one with diff params)
         ch = self.container.node.channel(RecvChannel)
@@ -398,10 +398,12 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
 
         # grab another channel and declare (should work fine this time)
         ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xp._xs._xs_auto_delete
+        ch._exchange_auto_delete = not xn._xs._xs_auto_delete
 
-        ch._declare_exchange(xp.exchange)
+        # must set recv_name
+        ch._recv_name = xn
+        ch._declare_queue(xn.queue)
 
         # cool, now cleanup (we don't expose this via Channel)
         at = AMQPTransport.get_instance()
-        at.delete_exchange_impl(ch._amq_chan, xp.exchange)
+        at.delete_queue_impl(ch._amq_chan, xn.queue)
