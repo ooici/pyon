@@ -149,7 +149,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[-90.0, 90.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordinates/latitude',
+        values_path= '/fields/latitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -159,7 +159,7 @@ def ctd_stream_definition(stream_id=None):
         constraint= AllowedValues(values=[[0.0, 360.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordinates/longitude',
+        values_path= '/fields/longitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
@@ -168,7 +168,7 @@ def ctd_stream_definition(stream_id=None):
         axis = "time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= '/coordinates/time',
+        values_path= '/fields/time',
         unit_of_measure = UnitReferenceProperty(code='s'),
         reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
     )
@@ -190,6 +190,154 @@ def ctd_stream_definition(stream_id=None):
     
 
     return ctd_container
+
+
+def scalar_point_stream_definition(description='', field_name='', field_definition='', field_units_code='', field_range=[]):
+    """
+    This is a convenience method to construct a scalar point stream definition object for a single signal.
+    More generic stream definition constructors will be added later.
+
+    Does this really make sense? Can we have an interface like this to build a stream def? I don't think so. I think
+    Steam defs must be highly specialized to the data they contain.
+
+    @brief creates an ion object containing the definition of a scalar value stream
+    @param description is a top level human readable description of the stream content
+    @retval stream_def is an ion object which contains the definition of the stream
+    """
+
+    # data stream id is the identifier for the DataStream object - the root of the data structure
+    stream_def = StreamDefinitionContainer(
+        data_stream_id= 'scalar_stream',
+    )
+
+
+    stream_def.identifiables['scalar_stream'] = DataStream(
+        description=description,
+        element_count_id='record_count',
+        element_type_id='element_type',
+        encoding_id='stream_encoding',
+        values=None
+    )
+
+    stream_def.identifiables['record_count'] = CountElement(value=0)
+
+    stream_def.identifiables['element_type'] = ElementType(
+        updatable=False,
+        optional=False,
+        data_record_id='data_record')
+
+
+    stream_def.identifiables['data_record'] = DataRecord(
+        field_ids=[field_name,],
+        domain_ids=['time_domain'],
+        updatable=False,
+        optional=False,
+    )
+
+
+    stream_def.identifiables['nan_value'] = NilValue(
+        reason= "No value recorded",
+        value= -999.99
+    )
+
+    field_range_name ='%s_data' % field_name
+
+    stream_def.identifiables[field_name] = Coverage(
+        definition= field_definition,
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id=field_range_name
+    )
+
+    stream_def.identifiables[field_range_name] = RangeSet(
+        definition= field_definition,
+        nil_values_ids = ['nan_value',],
+        mesh_location= CategoryElement(value='vertex'),
+        constraint= AllowedValues(values=[field_range,]),
+        unit_of_measure= UnitReferenceProperty(code=field_units_code),
+        values_path="/fields/%s" % field_range_name,
+    )
+
+
+    stream_def.identifiables['time_domain'] = Domain(
+        definition='Spec for ctd data time domain',
+        updatable='False',
+        optional='False',
+        coordinate_vector_id='coordinate_vector',
+        mesh_id='point_timeseries'
+    )
+
+    stream_def.identifiables['coordinate_vector']= Vector(
+        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
+        # need a definition that includes pressure as a coordinate???
+        coordinate_ids=['longitude','latitude','pressure_data','time'],
+        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+    )
+
+    stream_def.identifiables['latitude'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        axis = "Latitude",
+        constraint= AllowedValues(values=[[-90.0, 90.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/latitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    stream_def.identifiables['longitude'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
+        axis = "Longitude",
+        constraint= AllowedValues(values=[[0.0, 360.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/longitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+
+    stream_def.identifiables['pressure'] = CoordinateAxis(
+        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
+        nil_values_ids = ['nan_value',],
+        axis = "Pressure",
+        mesh_location= CategoryElement(value='vertex'),
+        constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
+        unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
+        values_path="/fields/pressure",
+        reference_frame='Atmospheric pressure ?'
+    )
+
+
+    stream_def.identifiables['time'] = CoordinateAxis(
+        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        axis = "time",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/time',
+        unit_of_measure = UnitReferenceProperty(code='s'),
+        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    )
+
+    stream_def.identifiables['point_timeseries'] = Mesh(
+        mesh_type = CategoryElement(value="Point Time Series"),
+        values_path = "/topology/mesh",
+        index_offset = 0,
+        number_of_elements = 1,
+        number_of_verticies = 1,
+    )
+
+    stream_def.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = None
+    )
+
+
+
+    return stream_def
+
+
 
 
 def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None, create_hdf=True):
