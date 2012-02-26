@@ -57,7 +57,7 @@ class TestScienceObjectCodec(PyonTestCase):
             A known array to compare against during tests
             """
 
-            known_array = numpy.ones((10,20))
+            known_array = numpy.random.rand(10,20)
 
             filename = FileSystem.get_url(FS.TEMP,random_name(), ".hdf5")
 
@@ -212,7 +212,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
 
         testencoder = HDFEncoder()
-        with self.assertRaises(HDFEncoderException):
+        with self.assertRaises(AssertionError):
             self.dataset = testencoder.add_hdf_dataset('bad name', self.known_array)
         testencoder.encoder_close()
 
@@ -222,7 +222,7 @@ class TestScienceObjectCodec(PyonTestCase):
         """
 
         testencoder = HDFEncoder()
-        with self.assertRaises(HDFEncoderException):
+        with self.assertRaises(AssertionError):
             testencoder.add_hdf_dataset(self.dataset_name,'bad array')
         testencoder.encoder_close()
 
@@ -232,8 +232,8 @@ class TestScienceObjectCodec(PyonTestCase):
         """
         filename = 'test_add_branch_to_existing'
 
-        dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
-        dataset_name2 = 'rootgroup/mygroup/data/subsubgroup/pressure'
+        dataset_name1 = '/rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
+        dataset_name2 = '/rootgroup/mygroup/data/subsubgroup/pressure'
 
         self.add_two_datasets_read_compare(filename, dataset_name1, dataset_name2)
 
@@ -257,7 +257,7 @@ class TestScienceObjectCodec(PyonTestCase):
         dataset_name1 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
         dataset_name2 = 'rootgroup/mygroup/mysubgroup/subsubgroup/data/temperature'
 
-        with self.assertRaises(HDFEncoderException):
+        with self.assertRaises(AssertionError):
             self.add_two_datasets_read_compare(filename, dataset_name1, dataset_name2)
 
 
