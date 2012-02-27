@@ -57,6 +57,7 @@ class ExchangeManager(object):
 
         self._chan = None
 
+        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
         self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
         self._rr_client     = ResourceRegistryServiceProcessClient(process=self.container)
 
@@ -105,16 +106,14 @@ class ExchangeManager(object):
         #self.default_xs.ensure_exists(self._get_channel())
         return node, ioloop
 
-    def _ems_available(self, use_ems=False):
+    def _ems_available(self):
         """
         Returns True if the EMS is (likely) available and the auto_register CFG entry is True.
 
         Has the side effect of bootstrapping the org_id and default_xs's id/rev from the RR.
         Therefore, cannot be a property.
-
-        @param  use_ems     If True, don't bother checking Config for auto_register key.
         """
-        if use_ems or CFG.container.get('exchange', {}).get('auto_register', False):
+        if CFG.container.get('exchange', {}).get('auto_register', False):
             # ok now make sure it's in the directory
             des = self.container.directory.find_entries('/Containers')
             for de in des:
@@ -145,61 +144,67 @@ class ExchangeManager(object):
 
         return self._chan
 
-    def create_xs(self, name, use_ems=False, exchange_type='topic', durable=False, auto_delete=True):
+    def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xs: %s", name)
         xs = ExchangeSpace(self, name, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
-        xs.declare()
 
         self.xs_by_name[name] = xs
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to create_xs")
             # create a RR object
             xso = ResExchangeSpace(name=name)
             xso_id = self._ems_client.create_exchange_space(xso, self.org_id)
 
             log.debug("Created RR XS object, id: %s", xso_id)
+        else:
+            xs.declare()
 
         return xs
 
-    def delete_xs(self, xs, use_ems=False):
+    def delete_xs(self, xs, use_ems=True):
         """
         @type xs    ExchangeSpace
         """
         log.debug("ExchangeManager.delete_xs: %s", xs)
-        xs.delete()
 
         name = xs._exchange     # @TODO this feels wrong
         del self.xs_by_name[name]
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to delete_xs")
             xso = self._get_xs_obj(name)
             self._ems_client.delete_exchange_space(xso._id)
             del self._xs_cache[name]
+        else:
+            xs.delete()
 
-    def create_xp(self, name, xs=None, use_ems=False, **kwargs):
+    def create_xp(self, name, xs=None, use_ems=True, **kwargs):
         log.debug("ExchangeManager.create_xp: %s", name)
         xs = xs or self.default_xs
         xp = ExchangePoint(self, name, xs, **kwargs)
-        xp.declare()
 
         # put in xn_by_name anyway
         self.xn_by_name[name] = xp
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to create_xp")
             # create an RR object
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
             xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id)        # @TODO: _exchange is wrong
+        else:
+            xp.declare()
 
         return xp
 
-    def delete_xp(self, xp, use_ems=False):
+    def delete_xp(self, xp, use_ems=True):
         log.debug("ExchangeManager.delete_xp: name=%s", 'TODO') #xp.build_xname())
-        xp.delete()
 
         name = xp._exchange # @TODO: not right
         del self.xn_by_name[name]
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to delete_xp")
             # find the XP object via RR
             xpo_ids = self._rr_client.find_resources(RT.ExchangePoint, name=name, id_only=True)
             if not (len(xpo_ids) and len(xpo_ids[0]) == 1):
@@ -207,8 +212,10 @@ class ExchangeManager(object):
 
             xpo_id = xpo_ids[0][0]
             self._ems_client.delete_exchange_point(xpo_id)
+        else:
+            xp.delete()
 
-    def _create_xn(self, xn_type, name, xs=None, use_ems=False, **kwargs):
+    def _create_xn(self, xn_type, name, xs=None, use_ems=True, **kwargs):
         xs = xs or self.default_xs
         log.debug("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
 
@@ -221,12 +228,14 @@ class ExchangeManager(object):
         else:
             raise StandardError("Unknown XN type: %s" % xn_type)
 
-        xn.declare()
         self.xn_by_name[name] = xn
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to create_xn")
             xno = ResExchangeName(name=name, xn_type=xn.xn_type)
             self._ems_client.declare_exchange_name(xno, self._get_xs_obj(xs._exchange)._id)     # @TODO: exchange is wrong
+        else:
+            xn.declare()
 
         return xn
 
@@ -241,12 +250,12 @@ class ExchangeManager(object):
 
     def delete_xn(self, xn, use_ems=False):
         log.debug("ExchangeManager.delete_xn: name=%s", "TODO") #xn.build_xlname())
-        xn.delete()
 
         name = xn._queue                # @TODO feels wrong
         del self.xn_by_name[name]
 
-        if self._ems_available(use_ems):
+        if use_ems and self._ems_available():
+            log.debug("Using EMS to delete_xn")
             # find the XN object via RR?
             xno_ids = self._rr_client.find_resources(RT.ExchangeName, name=name, id_only=True)
             if not (len(xno_ids) and len(xno_ids[0]) == 1):
@@ -255,6 +264,8 @@ class ExchangeManager(object):
             xno_id = xno_ids[0][0]
 
             self._ems_client.undeclare_exchange_name(xno_id)        # "canonical name" currently understood to be RR id
+        else:
+            xn.delete()
 
     def stop(self, *args, **kwargs):
         log.debug("ExchangeManager stopping ...")
