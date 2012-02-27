@@ -176,8 +176,6 @@ class HDFEncoder(object):
 
         tree_list =  name.split('/') # return a list of datagroup, datasubgroups and the dataset
         tree_list = filter(filter_blanks, tree_list)
-
-        log.warn('TREE LIST: "%s"' % tree_list)
         dataset = tree_list.pop()
         return tree_list, dataset
 
@@ -313,7 +311,7 @@ class HDFEncoder(object):
             hdf_string = f.read()
             f.close()
         except IOError:
-            log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. ")
+            log.exception("Error opening binary file for reading out hdfstring in HDFEncoder. ")
             raise HDFEncoderException("Error while trying to open file. ")
         finally:
             FileSystem.unlink(self.filename)

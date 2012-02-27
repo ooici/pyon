@@ -37,7 +37,6 @@ class PointSupplementDeconstructor(object):
 
         hdf_path = self._get_hdf_path(field_name)
 
-        log.warn('Reading from hdf path: %s' % hdf_path)
         return self._decoder.read_hdf_dataset(hdf_path)
 
     def _get_hdf_path(self, field_name):

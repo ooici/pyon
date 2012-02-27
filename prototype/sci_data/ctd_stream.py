@@ -43,7 +43,6 @@ def ctd_stream_definition(stream_id=None):
 
 
     ctd_container.identifiables['ctd_data'] = DataStream(
-        id=stream_id,
         label='Seabird CTD Data',
         description='Conductivity temperature and depth observations from a Seabird CTD',
         element_count_id='record_count',
@@ -200,7 +199,7 @@ def ctd_stream_definition(stream_id=None):
 
     ctd_container.identifiables['time_data'] = CoordinateAxis(
         definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        axis = "time",
+        axis = "Time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
         values_path= '/fields/time',
@@ -268,7 +267,7 @@ def scalar_point_stream_definition(description='', field_name='', field_definiti
 
 
     stream_def.identifiables['data_record'] = DataRecord(
-        field_ids=[field_name,'latitude','longitude','time'],
+        field_ids=[field_name,'pressure','latitude','longitude','time'],
         domain_ids=['time_domain'],
         updatable=False,
         optional=False,
@@ -388,7 +387,7 @@ def scalar_point_stream_definition(description='', field_name='', field_definiti
 
     stream_def.identifiables['time_data'] = CoordinateAxis(
         definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        axis = "time",
+        axis = "Time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
         values_path= '/fields/time',
