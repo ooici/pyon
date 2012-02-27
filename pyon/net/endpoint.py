@@ -869,11 +869,12 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
         # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id,
-                       'sender-type'  : self._process.process_type })
+                       'sender'       : self._process.id })
 
-        if self._process.process_type == 'service':     # @TODO updated by XN work
-            header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
+        if hasattr(self._process,'process_type' ):
+            header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
+            if self._process.process_type == 'service':     # @TODO updated by XN work
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
 
         # use context to set security attributes forward
         if isinstance(context, dict):
@@ -958,11 +959,12 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
 
         # add our process identity to the headers
         header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id,
-                       'sender-type'  : self._process.process_type })
+                       'sender'       : self._process.id })
 
-        if self._process.process_type == 'service':     # @TODO updated by XN work
-            header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
+        if hasattr(self._process,'process_type' ):
+            header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
+            if self._process.process_type == 'service':     # @TODO updated by XN work
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name[0],self._process.name) })
 
         # use context to set security attributes forward
         if isinstance(context, dict):
