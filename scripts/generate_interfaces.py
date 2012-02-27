@@ -50,6 +50,7 @@ import interface.objects
 from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient, ProcessRPCClient
+from pyon.util.log import log
 ${dep_client_imports}
 
 ${clientsholder}
@@ -155,15 +156,19 @@ ${methods}
     'obj_arg_no_def': "'${name}': ${name}",
     'rpcclient':
 '''class ${name}Client(RPCClient, ${name}ClientMixin):
-    def __init__(self, to_name=None, node=None, **kwargs):
-        to_name = to_name or '${targetname}'
+    def __init__(self, to_name=None, name=None, node=None, **kwargs):
+        if name is not None:
+            log.warn("${name}Client: 'name' parameter is deprecated, please use to_name")
+        to_name = to_name or name or '${targetname}'
         RPCClient.__init__(self, to_name=to_name, node=node, **kwargs)
         ${name}ClientMixin.__init__(self)
 ''',
     'processrpcclient':
 '''class ${name}ProcessClient(ProcessRPCClient, ${name}ClientMixin):
-    def __init__(self, process=None, to_name=None, node=None, **kwargs):
-        to_name = to_name or '${targetname}'
+    def __init__(self, process=None, to_name=None, name=None, node=None, **kwargs):
+        if name is not None:
+            log.warn("${name}Client: 'name' parameter is deprecated, please use to_name")
+        to_name = to_name or name or '${targetname}'
         ProcessRPCClient.__init__(self, process=process, to_name=to_name, node=node, **kwargs)
         ${name}ClientMixin.__init__(self)
 '''
