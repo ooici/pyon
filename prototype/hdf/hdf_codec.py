@@ -123,21 +123,22 @@ class HDFEncoder(object):
         import h5py
 
         # open an hdf file on disk - in /tmp to write data to since we can't yet do in memory
-        try:
-            log.debug("Creating h5py file object for the encoder at %s" % self.filename)
-            if os.path.isfile(self.filename):
-                # if file exists, then append to it
-                self.h5pyfile = h5py.File(self.filename, mode = 'r+', driver='core')
-            else:
-                # if file does not already exist, write a new one
-                self.h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
-            assert self.h5pyfile, 'No h5py file object created.'
-        except IOError:
-            log.debug("Error opening file for the HDFEncoder! ")
-            raise HDFEncoderException("Error while trying to open file. ")
-        except AssertionError as err:
-            log.debug(err.message)
-            raise HDFEncoderException(err.message)
+        log.debug("Creating h5py file object for the encoder at %s" % self.filename)
+        if os.path.isfile(self.filename):
+            # if file exists, then append to it
+            self.h5pyfile = h5py.File(self.filename, mode = 'r+', driver='core')
+        else:
+            # if file does not already exist, write a new one
+            self.h5pyfile = h5py.File(self.filename, mode = 'w', driver='core')
+        assert self.h5pyfile, 'No h5py file object created.'
+
+        ### Remove exception handeling for now...
+#        except IOError:
+#            log.exception("Error opening file for the HDFEncoder! ")
+#            raise HDFEncoderException("Error while trying to open file. ")
+#        except AssertionError as err:
+#            log.exception(err.message)
+#            raise HDFEncoderException(err.message)
 
 
     def assert_valid_name(self, name):
@@ -152,9 +153,10 @@ class HDFEncoder(object):
         # ------------
         # name: ''
         #
+
         assert name, 'No name provided for group or dataset!'
         name = name.strip() # remove leading and trailing white spaces
-        assert ' ' not in name, 'Whitespace not allowed within group or dataset names!'
+        assert ' ' not in name, 'Whitespace not allowed within group or dataset names! Got name: "%s"' % name
         return name
 
     def create_pathname(self, name):
@@ -169,7 +171,11 @@ class HDFEncoder(object):
         # ------------
         # (tree_list: [], dataset: '')
         #
+        def filter_blanks(n):
+            return n is not ''
+
         tree_list =  name.split('/') # return a list of datagroup, datasubgroups and the dataset
+        tree_list = filter(filter_blanks, tree_list)
         dataset = tree_list.pop()
         return tree_list, dataset
 
@@ -187,29 +193,29 @@ class HDFEncoder(object):
         #
         # Using inline imports to put off making hdf/numpy required dependencies
 
-        try:
-            name = self.assert_valid_name(name)
-            tree_list, dataset = self.create_pathname(name)
-        except AssertionError as err:
-            log.debug("The group/subgroup/dataset could not be created because of invalid name.")
-            raise HDFEncoderException(err.message)
+        #try:
+        name = self.assert_valid_name(name)
+        tree_list, dataset = self.create_pathname(name)
+        #except AssertionError as err:
+        #    log.debug("The group/subgroup/dataset could not be created because of invalid name.")
+        #    raise HDFEncoderException(err.message)
 
         # if list is empty, hang the array in a group called data directly underneath '/',
         # otherwise, keep popping group names from the list of names and create them using h5py
-        try:
-            lowest_subgroup = self.h5pyfile.get('/')
-            group = lowest_subgroup
+        #try:
+        lowest_subgroup = self.h5pyfile.get('/')
+        group = lowest_subgroup
 
-            for group_name in tree_list:
-                g = group.get(group_name) # if the group doesnt already exist in the file
-                if g is None:
-                    group = group.create_group(group_name) # use group methods for creating a new subgroup
-                else:
-                    group = g
-            lowest_subgroup = group
-        except Exception as exc:
-            log.debug('Error while creating group/subgroup/dataset using h5py.')
-            raise HDFEncoderException(exc.message)
+        for group_name in tree_list:
+            g = group.get(group_name) # if the group doesnt already exist in the file
+            if g is None:
+                group = group.create_group(group_name) # use group methods for creating a new subgroup
+            else:
+                group = g
+        lowest_subgroup = group
+        #except Exception as exc:
+        #    log.debug('Error while creating group/subgroup/dataset using h5py.')
+        #    raise HDFEncoderException(exc.message)
 
         return lowest_subgroup, dataset
 
@@ -234,38 +240,38 @@ class HDFEncoder(object):
         import numpy
 
 
-        try:
-            assert isinstance(nparray, numpy.ndarray), '2nd argument of method add_hdf_dataset() is not a numpy array!'
-            # check that that the input arguments are of the type they are supposed to be
-            assert isinstance(name, basestring), '1st argument of method add_hdf_dataset() is not a string!'
-        except AssertionError as err:
-            log.debug('Name and array assertion failed in add_hdf_dataset method.')
-            raise HDFEncoderException(err.message)
+        #try:
+        assert isinstance(nparray, numpy.ndarray), '2nd argument of method add_hdf_dataset() is not a numpy array!'
+        # check that that the input arguments are of the type they are supposed to be
+        assert isinstance(name, basestring), '1st argument of method add_hdf_dataset() is not a string!'
+        #except AssertionError as err:
+        #    log.debug('Name and array assertion failed in add_hdf_dataset method.')
+        #    raise HDFEncoderException(err.message)
         lowest_subgroup, name_of_dataset = self.create_group_tree(name)
 
-        try:
-            assert lowest_subgroup, 'No datagroup.'
-            assert name_of_dataset, 'No dataset name. provided.'
+        #try:
+        assert lowest_subgroup, 'No datagroup.'
+        assert name_of_dataset, 'No dataset name. provided.'
 
-            assert lowest_subgroup.get(name_of_dataset) is None, 'The dataset %s already exists in the file.' % name_of_dataset
+        assert lowest_subgroup.get(name_of_dataset) is None, 'The dataset %s already exists in the file.' % name_of_dataset
 
-            # create a dataset and hang it under the just created group...
-            shape = nparray.shape
-            dataset = lowest_subgroup.create_dataset(name_of_dataset,
-                shape,
-                nparray.dtype.str,
-                maxshape=([None for rank in range(len(shape))])
-                )
+        # create a dataset and hang it under the just created group...
+        shape = nparray.shape
+        dataset = lowest_subgroup.create_dataset(name_of_dataset,
+            shape,
+            nparray.dtype.str,
+            maxshape=([None for rank in range(len(shape))])
+            )
 
-            assert dataset, 'Unable to create dataset.'
-            # write the array in the dataset
-            dataset.write_direct(nparray)
-        except AssertionError as err:
-            log.debug(err.message)
-            raise HDFEncoderException(err.message)
-        except Exception as exc:
-            log.debug('Error writing dataset to HDFFile during encoding.')
-            raise HDFEncoderException(exc.message)
+        assert dataset, 'Unable to create dataset.'
+        # write the array in the dataset
+        dataset.write_direct(nparray)
+        #except AssertionError as err:
+        #    log.debug(err.message)
+        #    raise HDFEncoderException(err.message)
+        #except Exception as exc:
+        #    log.debug('Error writing dataset to HDFFile during encoding.')
+        #    raise HDFEncoderException(exc.message)
 
         return True
 
@@ -280,11 +286,11 @@ class HDFEncoder(object):
         # ------------
         # hdf_string: ''
         #
-        try:
-            self.h5pyfile.close()
-        except IOError:
-            log.debug('Error closing hdf file.')
-            raise HDFEncoderException("Error closing file.")
+        #try:
+        self.h5pyfile.close()
+        #except IOError:
+        #    log.debug('Error closing hdf file.')
+        #    raise HDFEncoderException("Error closing file.")
         return self.hdf_to_string()
 
     def hdf_to_string(self):
@@ -305,7 +311,7 @@ class HDFEncoder(object):
             hdf_string = f.read()
             f.close()
         except IOError:
-            log.debug("Error opening binary file for reading out hdfstring in HDFEncoder. ")
+            log.exception("Error opening binary file for reading out hdfstring in HDFEncoder. ")
             raise HDFEncoderException("Error while trying to open file. ")
         finally:
             FileSystem.unlink(self.filename)
@@ -325,20 +331,36 @@ class HDFDecoder(object):
         """
         @param hdf_string
         """
-        try:
-            assert isinstance(hdf_string, basestring), 'The input for instantiating the HDFDecoder object is not a string'
-        except AssertionError as err:
-            raise HDFDecoderException(err.message)
+        #try:
+        assert isinstance(hdf_string, basestring), 'The input for instantiating the HDFDecoder object is not a string'
+        #except AssertionError as err:
+        #    raise HDFDecoderException(err.message)
 
         self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
-        try:
-            # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
-            f = open(self.filename, mode='wb')
-            f.write(hdf_string)
-            f.close()
-        except IOError:
-            log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
-            raise HDFDecoderException("Error while trying to open file. ")
+        #try:
+        # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
+        f = open(self.filename, mode='wb')
+        f.write(hdf_string)
+        f.close()
+        #except IOError:
+        #    log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
+        #    raise HDFDecoderException("Error while trying to open file. ")
+
+    def get_hdf_groups(self):
+        #try:
+        import h5py
+        h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
+        #except IOError:
+        #    log.debug("Error opening file for the HDFDecoder")
+        #   raise HDFDecoderException("Error while trying to open file.")
+
+        root_group = h5pyfile[h5pyfile.name]
+        list_of_groups = []
+        root_group.visit(list_of_groups.append)
+
+        h5pyfile.close()
+
+        return list_of_groups
 
     def read_hdf_dataset(self, name):
         """
@@ -356,23 +378,23 @@ class HDFDecoder(object):
         import h5py
         import numpy
 
-        try:
-            # assert that the input field is a string
-            assert isinstance(name, basestring),\
-            'HDFDecoder read error: The name provided for the group tree and dataset is not a string!'
-        except AssertionError as err:
-            raise HDFDecoderException(err.message)
+        #try:
+        # assert that the input field is a string
+        assert isinstance(name, basestring),\
+        'HDFDecoder read error: The name provided for the group tree and dataset is not a string!'
+        #except AssertionError as err:
+        #    raise HDFDecoderException(err.message)
 
         # if a data group name is not provided, use the default data group name, 'data'
         if name.find('/')==-1:
             name = 'data/' + name
 
         # open hdf file using h5py
-        try:
-            h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
-        except IOError:
-            log.debug("Error opening file for the HDFDecoder! ")
-            raise HDFDecoderException("Error while trying to open file. ")
+        #try:
+        h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
+        #except IOError:
+        #    log.debug("Error opening file for the HDFDecoder! ")
+        #   raise HDFDecoderException("Error while trying to open file. ")
 
         # read array from the hdf file
         nparray = numpy.array(h5pyfile['/' + name])

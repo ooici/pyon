@@ -23,6 +23,11 @@ from pyon.util.log import log
 
 def ctd_stream_definition(stream_id=None):
     """
+    ###
+    ### This method is highly suspect and subject to revision. Do not lien heavily on it or you will suffer refactoring
+    ###
+
+
     This is a convenience method to construct a CTD data stream definition object. More generic stream definition
      constructors will be added later.
     @brief creates an ion object containing the definition of a seabird ctd data stream
@@ -38,7 +43,6 @@ def ctd_stream_definition(stream_id=None):
 
 
     ctd_container.identifiables['ctd_data'] = DataStream(
-        id=stream_id,
         label='Seabird CTD Data',
         description='Conductivity temperature and depth observations from a Seabird CTD',
         element_count_id='record_count',
@@ -57,7 +61,7 @@ def ctd_stream_definition(stream_id=None):
 
 
     ctd_container.identifiables['data_record'] = DataRecord(
-        field_ids=['temperature','conductivity','pressure'],
+        field_ids=['temperature','conductivity','pressure','latitude','longitude','time'],
         domain_ids=['time_domain'],
         definition = "Definition of a data record for a CTD",
         updatable=False,
@@ -85,7 +89,7 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[-10.0, 50.0],]),
         unit_of_measure= UnitReferenceProperty(code='Cel'),
-        values_path="fields/temp_data",
+        values_path="/fields/temp_data",
     )
 
 
@@ -104,7 +108,23 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0.0, 85.0],]), # Normal range for ocean
         unit_of_measure= UnitReferenceProperty(code='mS/cm'), # milli Siemens per centimeter
-        values_path="fields/cndr_data",
+        values_path="/fields/cndr_data",
+    )
+
+
+    ctd_container.identifiables['time_domain'] = Domain(
+        definition='Spec for ctd data time domain',
+        updatable='False',
+        optional='False',
+        coordinate_vector_id='coordinate_vector',
+        mesh_id='point_timeseries'
+        )
+
+    ctd_container.identifiables['coordinate_vector']= Vector(
+        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
+        # need a definition that includes pressure as a coordinate???
+        coordinate_ids=['longitude_data','latitude_data','pressure_data','time_data'],
+        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
     )
 
     ctd_container.identifiables['pressure'] = Coverage(
@@ -123,59 +143,73 @@ def ctd_stream_definition(stream_id=None):
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
         unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
-        values_path="fields/pressure_data",
+        values_path="/fields/pressure_data",
         reference_frame='Atmospheric pressure ?'
     )
 
+    ctd_container.identifiables['latitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        updatable=False,
+        optional=True,
 
-    ctd_container.identifiables['time_domain'] = Domain(
-        definition='Spec for ctd data time domain',
-        updatable='False',
-        optional='False',
-        coordinate_vector_id='coordinate_vector',
-        mesh_id='point_timeseries'
-        )
-
-    ctd_container.identifiables['coordinate_vector']= Vector(
-        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
-        # need a definition that includes pressure as a coordinate???
-        coordinate_ids=['longitude','latitude','pressure_data','time'],
-        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+        domain_id='time_domain',
+        range_id='latitude_data'
     )
-    
-    ctd_container.identifiables['latitude'] = CoordinateAxis(
+
+
+    ctd_container.identifiables['latitude_data'] = CoordinateAxis(
         definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
         axis = "Latitude",
         constraint= AllowedValues(values=[[-90.0, 90.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/latitude',
+        values_path= '/fields/latitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
-    ctd_container.identifiables['longitude'] = CoordinateAxis(
+
+    ctd_container.identifiables['longitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='longitude_data'
+    )
+
+    ctd_container.identifiables['longitude_data'] = CoordinateAxis(
         definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
         axis = "Longitude",
         constraint= AllowedValues(values=[[0.0, 360.0],]),
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/longitude',
+        values_path= '/fields/longitude',
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
-    ctd_container.identifiables['time'] = CoordinateAxis(
+
+    ctd_container.identifiables['time'] = Coverage(
+        definition= "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='time_data'
+    )
+
+    ctd_container.identifiables['time_data'] = CoordinateAxis(
         definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        axis = "time",
+        axis = "Time",
         nil_values_ids = ['nan_value'],
         mesh_location = CategoryElement(value='vertex'),
-        values_path= 'coordinates/time',
+        values_path= '/fields/time',
         unit_of_measure = UnitReferenceProperty(code='s'),
         reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
     )
     
     ctd_container.identifiables['point_timeseries'] = Mesh(
         mesh_type = CategoryElement(value="Point Time Series"),
-        values_path = "topology/mesh",
+        values_path = "/topology/mesh",
         index_offset = 0,
         number_of_elements = 1,
         number_of_verticies = 1,
@@ -192,8 +226,204 @@ def ctd_stream_definition(stream_id=None):
     return ctd_container
 
 
+def scalar_point_stream_definition(description='', field_name='', field_definition='', field_units_code='', field_range=[]):
+    """
+    ###
+    ### This method is highly suspect and subject to revision. Do not lien heavily on it or you will suffer refactoring
+    ###
+
+
+    This is a convenience method to construct a scalar point stream definition object for a single signal.
+    More generic stream definition constructors will be added later.
+
+    Does this really make sense? Can we have an interface like this to build a stream def? I don't think so. I think
+    Steam defs must be highly specialized to the data they contain.
+
+    @brief creates an ion object containing the definition of a scalar value stream
+    @param description is a top level human readable description of the stream content
+    @retval stream_def is an ion object which contains the definition of the stream
+    """
+
+    # data stream id is the identifier for the DataStream object - the root of the data structure
+    stream_def = StreamDefinitionContainer(
+        data_stream_id= 'scalar_stream',
+    )
+
+
+    stream_def.identifiables['scalar_stream'] = DataStream(
+        description=description,
+        element_count_id='record_count',
+        element_type_id='element_type',
+        encoding_id='stream_encoding',
+        values=None
+    )
+
+    stream_def.identifiables['record_count'] = CountElement(value=0)
+
+    stream_def.identifiables['element_type'] = ElementType(
+        updatable=False,
+        optional=False,
+        data_record_id='data_record')
+
+
+    stream_def.identifiables['data_record'] = DataRecord(
+        field_ids=[field_name,'pressure','latitude','longitude','time'],
+        domain_ids=['time_domain'],
+        updatable=False,
+        optional=False,
+    )
+
+
+    stream_def.identifiables['nan_value'] = NilValue(
+        reason= "No value recorded",
+        value= -999.99
+    )
+
+    # appending _data is a handycap not a convention!
+    field_range_name ='%s_data' % field_name
+
+    stream_def.identifiables[field_name] = Coverage(
+        definition= field_definition,
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id=field_range_name
+    )
+
+    stream_def.identifiables[field_range_name] = RangeSet(
+        definition= field_definition,
+        nil_values_ids = ['nan_value',],
+        mesh_location= CategoryElement(value='vertex'),
+        constraint= AllowedValues(values=[field_range,]),
+        unit_of_measure= UnitReferenceProperty(code=field_units_code),
+        values_path="/fields/%s" % field_range_name,
+    )
+
+
+    stream_def.identifiables['time_domain'] = Domain(
+        definition='Spec for ctd data time domain',
+        updatable='False',
+        optional='False',
+        coordinate_vector_id='coordinate_vector',
+        mesh_id='point_timeseries'
+    )
+
+    stream_def.identifiables['coordinate_vector']= Vector(
+        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
+        # need a definition that includes pressure as a coordinate???
+        coordinate_ids=['longitude','latitude','pressure_data','time'],
+        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+    )
+
+    stream_def.identifiables['pressure'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='pressure_data'
+    )
+
+    stream_def.identifiables['pressure_data'] = CoordinateAxis(
+        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
+        nil_values_ids = ['nan_value',],
+        axis = "Pressure",
+        mesh_location= CategoryElement(value='vertex'),
+        constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
+        unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
+        values_path="/fields/pressure_data",
+        reference_frame='Atmospheric pressure ?'
+    )
+
+    stream_def.identifiables['latitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='latitude_data'
+    )
+
+
+    stream_def.identifiables['latitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        axis = "Latitude",
+        constraint= AllowedValues(values=[[-90.0, 90.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/latitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+
+    stream_def.identifiables['longitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='longitude_data'
+    )
+
+    stream_def.identifiables['longitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
+        axis = "Longitude",
+        constraint= AllowedValues(values=[[0.0, 360.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/longitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    stream_def.identifiables['time'] = Coverage(
+        definition= "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='time_data'
+    )
+
+    stream_def.identifiables['time_data'] = CoordinateAxis(
+        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        axis = "Time",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/time',
+        unit_of_measure = UnitReferenceProperty(code='s'),
+        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    )
+
+
+    stream_def.identifiables['point_timeseries'] = Mesh(
+        mesh_type = CategoryElement(value="Point Time Series"),
+        values_path = "/topology/mesh",
+        index_offset = 0,
+        number_of_elements = 1,
+        number_of_verticies = 1,
+    )
+
+    stream_def.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = None
+    )
+
+
+
+    return stream_def
+
+
+
+
 def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None, create_hdf=True):
     """
+    ###
+    ### This method is highly suspect and likely to be completely removed. It is only for early experimentation
+    ###
+
+
     This is a simple interface for creating a packet of ctd data for a given stream defined by the method above.
     The string names of content are tightly coupled to the method above.
     To send actual data you must have hdf5, numpy and h5py installed.
@@ -282,23 +512,23 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
             encoder = HDFEncoder()
             if t is not None:
-                encoder.add_hdf_dataset('fields/temp_data', np.asanyarray(t))
+                encoder.add_hdf_dataset('/fields/temp_data', np.asanyarray(t))
 
 
             if c is not None:
-                encoder.add_hdf_dataset('fields/cndr_data', np.asanyarray(c))
+                encoder.add_hdf_dataset('/fields/cndr_data', np.asanyarray(c))
 
             if p is not None:
-                encoder.add_hdf_dataset('fields/pressure_data',np.asanyarray(p))
+                encoder.add_hdf_dataset('/fields/pressure_data',np.asanyarray(p))
 
             if lat is not None:
-                encoder.add_hdf_dataset('coordinates/latitude', np.asanyarray(lat))
+                encoder.add_hdf_dataset('/fields/latitude', np.asanyarray(lat))
 
             if lon is not None:
-                encoder.add_hdf_dataset('coordinates/longitude',np.asanyarray(lon))
+                encoder.add_hdf_dataset('/fields/longitude',np.asanyarray(lon))
 
             if time is not None:
-                encoder.add_hdf_dataset('coordinates/time',np.asanyarray(time))
+                encoder.add_hdf_dataset('/fields/time',np.asanyarray(time))
 
             hdf_string = encoder.encoder_close()
         except :

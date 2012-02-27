@@ -46,11 +46,11 @@ class FileSystem(object):
         return cls._instance
 
     def __init__(self, CFG):
-        FileSystem._force_clean = CFG.get_safe('system.filesystem.force_clean',False)
+        FileSystem._force_clean = CFG.get_safe('container.filesystem.force_clean',False)
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
-            conf = CFG.get_safe('system.filesystem.%s' % s, None)
+            conf = CFG.get_safe('container.filesystem.%s' % s, None)
             if conf:
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
