@@ -10,7 +10,7 @@
  implemented adhoc by the user.
 '''
 
-from interface.objects import CoordinateAxis
+from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues
 from interface.objects import CountElement
 from interface.objects import DataStream
 from interface.objects import Encoding
@@ -23,16 +23,106 @@ import pyon
 from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
 from pyon.util.log import log
 
+class DefinitionTree(dict):
+    def __init__(self, **kwargs):
+        for k,v in kwargs.iteritems():
+            if isinstance(v, dict):
+                self[k] = DefinitionTree(**v)
+            else:
+                self[k] = v
+    def __getattr__(self, key):
+        if not hasattr(self, key):
+            return None
+        return self[key]
+    def __setattr__(self, key,val):
+        self[key] = val
+    def __dir__(self):
+        v = dir(super(DefinitionTree,self))
+        return v + self.keys()
+
+    @staticmethod
+    def key(definition, key):
+        try:
+            retval = definition['identifiables'][key]
+        except TypeError:
+            print definition['identifiables']
+            print key
+
+        return definition['identifiables'][key]
+
+
+    @staticmethod
+    def traverse(definition, node_id):
+        tmp = DefinitionTree.key(definition,node_id)
+        root = DefinitionTree(**tmp)
+        for k,v in tmp.iteritems():
+            if k.endswith('_id'):
+                if v:
+                    root[k] = DefinitionTree.traverse(definition,v)
+                    root[k].id = v
+            elif k.endswith('_ids'):
+                for value in v:
+                    if value:
+                        root[value] = DefinitionTree.traverse(definition,value)
+                        root[value].id = value
+        return root
+
+    @staticmethod
+    def obj_to_tree(definition):
+        from pyon.core.object import IonObjectSerializer
+        if not isinstance(definition,StreamDefinitionContainer):
+            return
+        serializer = IonObjectSerializer()
+        definition = serializer.serialize(definition)
+        tree = DefinitionTree.traverse(definition,definition['data_stream_id'])
+        return tree
+
 class StationDataStreamDefinitionConstructor(object):
     """
     A science object constructor for a station data stream. This constructor is the canonical way to build the metadata
     object that defines the supplements published to the stream.
     """
 
-    def __init__(self,):
+    def __init__(self,stream_id='',description=''):
         """
         Instantiate a station dataset constructor.
         """
+        self.stream_definition = StreamDefinitionContainer(
+            data_stream_id='data_stream'
+        )
+
+        ident = self.stream_definition.identifiables
+
+        ident['data_stream'] = DataStream(
+            description=description,
+            element_count_id='record_count',
+            element_type_id='element_type',
+            encoding_id='stream_encoding',
+            values=None
+        )
+
+        ident['stream_encoding'] = Encoding(
+            encoding_type='hdf5',
+            compression=None,
+            sha1=None
+        )
+
+        ident['record_count'] = CountElement(value=0)
+
+        ident['element_type'] = ElementType(
+            updatable=False,
+            optional=False,
+            data_record_id='data_record'
+        )
+
+        ident['data_record'] = DataRecord()
+
+        ident['nan_value'] = NilValue(
+            reason='No value recorded.',
+            value=-999.99
+        )
+
+
 
     @classmethod
     def LoadStationDefinition(cls, metadata_object):
@@ -46,11 +136,78 @@ class StationDataStreamDefinitionConstructor(object):
         define the reference frame for each and provide an absolute reference for each
         """
 
-
-    def define_coverage(self, id=None, units=None, standard_name=None, coverage_dimensions=None):
+    def define_coverage(self, field_name='', field_definition='', field_units_code='', field_range=[]):
         """
         @brief define a coverage (observed quantity) present in the station dataset
         """
+        self.add_coverage(
+            name=field_name,
+            definition=field_definition,
+            updatable=False,
+            optional=True
+        )
+        self.add_range(
+            coverage_id=field_name,
+            definition=field_definition,
+            name='%s_data' % field_name,
+            constraint=AllowedValues(values=[field_range,]),
+            values_path='/fields/%s' % field_name,
+            unit_of_measure_code=field_units_code,
+
+        )
+
+
+    def add_coverage(self, name=None, definition=None, updatable=False, optional=True):
+        if name in self.stream_definition.identifiables:
+            return 0
+        coverage = Coverage(
+            definition=definition,
+            updatable=updatable,
+            optional=optional,
+            domain_id='',
+            range_id=''
+        )
+        tree = DefinitionTree.obj_to_tree(self.stream_definition)
+
+        record = self.stream_definition.identifiables[tree.element_type_id.data_record_id.id]
+        record.field_ids.append(name)
+        self.stream_definition.identifiables[name] = coverage
+
+
+    def add_range(self, coverage_id=None,
+                  name=None,
+                  definition=None,
+                  axis=None,
+                  constraint=None,
+                  mesh_location='vertex',
+                  values_path=None,
+                  unit_of_measure_code=None,
+                  ):
+        """
+        @brief Adds a coordinate axis range set to a coverage
+        @param name The name of this range, i.e. temp_data
+        @param definition URL to definition
+        @param axis Name of physical Axis, i.e. Temperature, Time etc.
+        @param constraint A constraint object
+        @param mesh_location
+        @param values_path Location of data points in HDF e.g. /fields/temp
+        @param unit_of_measure_code Code for unit of measure
+        """
+        if name in self.stream_definition.identifiables:
+            return
+        axis = CoordinateAxis(
+            definition=definition,
+            axis=axis,
+            constraint=constraint,
+            nil_values_ids=['nan_value'],
+            mesh_location=CategoryElement(value=mesh_location),
+            values_path=values_path,
+            unit_of_measure=UnitReferenceProperty(code=unit_of_measure_code)
+        )
+        self.stream_definition.identifiables[name] = axis
+        coverage = self.stream_definition.identifiables[coverage_id]
+        coverage.range_id = name
+
 
     def add_nil_values(self, coverage_id=None, value=None, reason=None):
         """
