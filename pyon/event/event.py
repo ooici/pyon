@@ -46,7 +46,7 @@ class EventPublisher(Publisher):
 
         self.event_repo = event_repo
 
-        Publisher.__init__(self, name=name, **kwargs)
+        Publisher.__init__(self, to_name=name, **kwargs)
 
     def _topic(self, origin):
         """
@@ -90,7 +90,7 @@ class EventPublisher(Publisher):
     def publish_event(self, event_msg, origin=None, **kwargs):
         assert origin
 
-        to_name = (self.name[0], self._topic(origin))
+        to_name = (self._send_name.exchange, self._topic(origin))
         log.debug("Publishing message to %s", to_name)
 
         ep = self.publish(event_msg, to_name=to_name)
@@ -140,7 +140,7 @@ class EventSubscriber(Subscriber):
 
         name = (xp_name, queue_name)
 
-        Subscriber.__init__(self, name=name, binding=binding, callback=callback, **kwargs)
+        Subscriber.__init__(self, from_name=name, binding=binding, callback=callback, **kwargs)
 
 #############################################################################
 #
