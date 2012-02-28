@@ -343,7 +343,7 @@ class RecvChannel(BaseChannel):
         - _declare_queue
         - _bind
 
-        Name must be a tuple of (xp, queue). If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
+        Name must be a NameTrio. If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
         Binding may be left none and will use the queue name by default.
 
         Sets the _setup_listener_called internal flag, so if this method is called multiple times, such as in the case
