@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 '''
-@file ion/services/dm/ingestion/test/test_ingestion.py
+@file prototype/hdf/test/test_hdf_array_iterator.py
 @author Swarbhanu Chatterjee
-@test ion.services.dm.ingestion.ingestion_management_service test suite to cover all ingestion mgmt service code
+@test prototype.hdf.test.test_hdf_array_iterator.py test suite for hdf_array_iterator.py
 '''
 
 from prototype.hdf.hdf_array_iterator import acquire_data
@@ -111,6 +111,12 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertEquals(arr.size, buffer_size)
 
+    def test_very_large_buffer_size(self):
+        """
+        Test that providing a very large buffer size is okay
+        """
+
+        pass
 
     def test_concatenate_block_size(self):
         """
@@ -120,4 +126,23 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         pass
 
 
+    def test_very_large_concatenate_block_size(self):
+        """
+        Test that using a very large concatenate_block_size is okay
+        """
 
+        pass
+
+    def test_slice(self):
+        """
+        Test that providing an arbitrary slice works
+        """
+
+        pass
+
+    def test_very_large_slice(self):
+        """
+        Test that providing a very large slice is okay
+        """
+
+        pass
