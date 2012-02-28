@@ -448,7 +448,6 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'language':'ion-r2',
                                                'encoding':'msgpack',
                                                'format':'NoneType',
-                                               'receiver': ',',
                                                'reply-by': 'todo'})
 
     def test_recv_bad_kwarg(self):
@@ -475,7 +474,6 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'language':'ion-r2',
                                                'encoding':'msgpack',
                                                'format':'NoneType',
-                                               'receiver': ',',
                                                'reply-by': 'todo'})
 
     def test__message_received_interceptor_exception(self):
