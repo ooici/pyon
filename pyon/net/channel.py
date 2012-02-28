@@ -38,12 +38,12 @@ TODO:
 point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
-
 from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
 from contextlib import contextmanager
 from gevent.event import AsyncResult
+from pyon.net.transport import AMQPTransport, NameTrio
 
 class ChannelError(StandardError):
     """
@@ -59,6 +59,7 @@ class ChannelShutdownMessage(object):
     """ Dummy object to unblock queues. """
     pass
 
+
 class BaseChannel(object):
 
     _amq_chan                   = None      # underlying transport
@@ -71,15 +72,19 @@ class BaseChannel(object):
     _exchange_auto_delete       = True
     _exchange_durable           = False
 
-    def __init__(self, close_callback=None):
+    def __init__(self, transport=None, close_callback=None):
         """
         Initializes a BaseChannel instance.
 
+        @param  transport       Underlying transport used for broker communication. Can be None, if so, will
+                                use the AMQPTransport stateless singleton.
+        @type   transport       BaseTransport
         @param  close_callback  The method to invoke when close() is called on this BaseChannel. May be left as None,
                                 in which case close_impl() will be called. This expects to be a callable taking one
                                 param, this channel instance.
         """
         self.set_close_callback(close_callback)
+        self._transport = transport or AMQPTransport.get_instance()
 
     def set_close_callback(self, close_callback):
         """
@@ -100,27 +105,28 @@ class BaseChannel(object):
         if not self._amq_chan:
             raise ChannelError("No amq_chan attached")
 
-    def _declare_exchange_point(self, xp):
+    def _declare_exchange(self, exchange):
         """
         Performs an AMQP exchange declare.
 
-        @param  xp      The name of the exchange to use.
+        @param  exchange      The name of the exchange to use.
         @TODO: this really shouldn't exist, messaging layer should not make this declaration.  it will be provided.
                perhaps push into an ion layer derivation to help bootstrapping / getting started fast.
         """
-        self._exchange = xp
+        self._exchange = exchange
         assert self._exchange
 
         self._ensure_amq_chan()
+        assert self._transport
 
-        # EXCHANGE INTERACTION HERE - use async method to wait for it to finish
         log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
                                                                  self._exchange_durable, self._exchange_auto_delete)
 
-        self._sync_call(self._amq_chan.exchange_declare, 'callback', exchange=self._exchange,
-                                                                type=self._exchange_type,
-                                                                durable=self._exchange_durable,
-                                                                auto_delete=self._exchange_auto_delete)
+        self._transport.declare_exchange_impl(self._amq_chan,
+                                              self._exchange,
+                                              exchange_type=self._exchange_type,
+                                              durable=self._exchange_durable,
+                                              auto_delete=self._exchange_auto_delete)
 
     def attach_underlying_channel(self, amq_chan):
         """
@@ -263,12 +269,12 @@ class SendChannel(BaseChannel):
     def connect(self, name):
         """
         Sets up this channel to send to a name.
-        @param  name    The name this channel should send to. Should be a tuple (exchange, routing_key).
+        @param  name    The name this channel should send to. Should be a NameTrio.
         """
         log.debug("SendChannel.connect: %s", name)
 
         self._send_name = name
-        self._exchange = name[0]
+        self._exchange = name.exchange
 
     def send(self, data, headers=None):
         log.debug("SendChannel.send")
@@ -276,7 +282,8 @@ class SendChannel(BaseChannel):
 
     def _send(self, name, data, headers=None):
         log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
-        exchange, routing_key = name
+        exchange    = name.exchange
+        routing_key = name.binding    # uses "_queue" if binding not explictly defined
         headers = headers or {}
         props = BasicProperties(headers=headers)
 
@@ -332,11 +339,11 @@ class RecvChannel(BaseChannel):
         Prepares this receiving channel for listening for messages.
 
         Calls, in order:
-        - _declare_exchange_point
+        - _declare_exchange
         - _declare_queue
         - _bind
 
-        Name must be a tuple of (xp, queue). If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
+        Name must be a NameTrio. If queue is None, the broker will generate a name e.g. "amq-RANDOMSTUFF".
         Binding may be left none and will use the queue name by default.
 
         Sets the _setup_listener_called internal flag, so if this method is called multiple times, such as in the case
@@ -346,19 +353,25 @@ class RecvChannel(BaseChannel):
         @param  binding     If not set, uses name.
         """
         log.debug('Setup_listener name: %s', name)
-        name = name or self._recv_name
-        xp, queue = name
+        name        = name or self._recv_name
+        exchange    = name.exchange
+        queue       = name.queue
 
-        log.debug("RecvChannel.setup_listener, xp %s, queue %s, binding %s", xp, queue, binding)
+        log.debug("RecvChannel.setup_listener, exchange %s, queue %s, binding %s", exchange, queue, binding)
         if self._setup_listener_called:
             log.debug("setup_listener already called for this channel")
             return
 
-        self._recv_name = (xp, queue)
+        # only reset the name if it was passed in
+        if name != self._recv_name:
+            if isinstance(name, NameTrio):
+                self._recv_name = name
+            else:
+                self._recv_name = NameTrio(exchange, queue, binding)
 
-        self._declare_exchange_point(xp)
+        self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)
-        binding = binding or self._recv_binding or queue      # last option should only happen in the case of anon-queue
+        binding = binding or self._recv_binding or self._recv_name.binding or queue      # last option should only happen in the case of anon-queue
 
         self._bind(binding)
 
@@ -378,25 +391,29 @@ class RecvChannel(BaseChannel):
         """
         Deletes the binding from the listening queue.
         """
-        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
+        assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
 
         self._ensure_amq_chan()
+        assert self._transport
 
-        self._sync_call(self._amq_chan.queue_unbind, 'callback', queue=self._recv_name[1],
-                                                                 exchange=self._recv_name[0],
-                                                                 routing_key=self._recv_binding)
+        self._transport.unbind_impl(self._amq_chan,
+                                    exchange=self._recv_name.exchange,
+                                    queue=self._recv_name.queue,
+                                    binding=self._recv_binding)
 
     def _destroy_queue(self):
         """
         You should only call this if you want to delete the queue. Even so, you must know you are
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
-        assert self._recv_name and isinstance(self._recv_name, tuple) and self._recv_name[1]
+        assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1]
 
         self._ensure_amq_chan()
+        assert self._transport
 
         log.info("Destroying listener for queue %s", self._recv_name)
-        self._sync_call(self._amq_chan.queue_delete, 'callback', queue=self._recv_name[1])
+        self._transport.delete_queue_impl(self._amq_chan,
+                                          queue=self._recv_name.queue)
 
     def start_consume(self):
         """
@@ -414,7 +431,7 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
-                                                          queue=self._recv_name[1],
+                                                          queue=self._recv_name.queue,
                                                           no_ack=self._consumer_no_ack,
                                                           exclusive=self._consumer_exclusive)
         self._consuming = True
@@ -430,7 +447,7 @@ class RecvChannel(BaseChannel):
             raise ChannelError("Not consuming")
 
         if self._queue_auto_delete:
-            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name[1])
+            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
         self._ensure_amq_chan()
 
@@ -470,36 +487,34 @@ class RecvChannel(BaseChannel):
     def _declare_queue(self, queue):
 
         # prepend xp name in the queue for anti-clobbering
-        if queue:
-            queue = ".".join([self._recv_name[0], queue])
-            log.debug('Auto-prepending xp to queue name for anti-clobbering: %s', queue)
+        if queue and not self._recv_name.exchange in queue:
+            queue = ".".join([self._recv_name.exchange, queue])
+            log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
         self._ensure_amq_chan()
 
         log.debug("RecvChannel._declare_queue: %s", queue)
-        frame = self._sync_call(self._amq_chan.queue_declare, 'callback',
-                                                              queue=queue or '',
-                                                              auto_delete=self._queue_auto_delete,
-                                                              durable=self._queue_durable)
+        queue_name = self._transport.declare_queue_impl(self._amq_chan,
+                                                        queue=queue or '',
+                                                        auto_delete=self._queue_auto_delete,
+                                                        durable=self._queue_durable)
 
-        # if the queue was anon, save it
-        #if queue is None:
-        # always save the new recv_name - we may have created a new one
-        self._recv_name = (self._recv_name[0], frame.method.queue)
+        # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
+        if queue_name != self._recv_name.queue:
+            self._recv_name = NameTrio(self._recv_name.exchange, queue_name, self._recv_name.binding)
 
-        return self._recv_name[1]
+        return self._recv_name.queue
 
     def _bind(self, binding):
         log.debug("RecvChannel._bind: %s", binding)
-        assert self._recv_name and self._recv_name[1]
+        assert self._recv_name and self._recv_name.queue
 
         self._ensure_amq_chan()
-        
-        queue = self._recv_name[1]
-        self._sync_call(self._amq_chan.queue_bind, 'callback',
-                                                   queue=queue,
-                                                   exchange=self._recv_name[0],
-                                                   routing_key=binding)
+
+        self._transport.bind_impl(self._amq_chan,
+                                  exchange=self._recv_name.exchange,
+                                  queue=self._recv_name.queue,
+                                  binding=binding)
 
         self._recv_binding = binding
 
@@ -540,8 +555,8 @@ class PublisherChannel(SendChannel):
 
     def send(self, data, headers=None):
         if not self._declared:
-            assert self._send_name and self._send_name[0]
-            self._declare_exchange_point(self._send_name[0])
+            assert self._send_name and self._send_name.exchange
+            self._declare_exchange(self._send_name.exchange)
             self._declared = True
         SendChannel.send(self, data, headers=headers)
 
@@ -565,7 +580,7 @@ class BidirClientChannel(SendChannel, RecvChannel):
             headers = {}
 
         if not 'reply-to' in headers:
-            headers['reply-to'] = "%s,%s" % self._recv_name
+            headers['reply-to'] = "%s,%s" % (self._recv_name.exchange, self._recv_name.queue)
 
         SendChannel._send(self, name, data, headers=headers)
 
@@ -618,8 +633,8 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = tuple(msg[1].get('reply-to').split(','))    # @TODO: stringify is not the best
+        send_name = NameTrio(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel()
         ch.attach_underlying_channel(amq_chan)
-        ch._send_name = send_name
+        ch.connect(send_name)
         return ch

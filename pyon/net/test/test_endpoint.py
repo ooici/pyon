@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from pyon.core.interceptor.interceptor import Invocation
+from pyon.net.transport import NameTrio
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -10,7 +11,7 @@ from zope.interface.interface import Interface
 from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel
-from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError
+from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint
 from gevent import event, sleep
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
@@ -104,7 +105,7 @@ class TestEndpointUnit(PyonTestCase):
 class TestBaseEndpoint(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
-        self._ef = BaseEndpoint(node=self._node, name="EFTest")
+        self._ef = BaseEndpoint(node=self._node)
         self._ch = Mock(spec=SendChannel)
         self._node.channel.return_value = self._ch
 
@@ -113,18 +114,10 @@ class TestBaseEndpoint(PyonTestCase):
 
         # check attrs
         self.assertTrue(hasattr(e, 'channel'))
-        self.assertEquals(self._ch.connect.call_count, 1)
-        self.assertTrue(self._ef.name in self._ch.connect.call_args[0])
 
         # make sure we can shut it down
         e.close()
         self._ch.close.assert_any_call()
-
-    def test_create_endpoint_new_name(self):
-        e = self._ef.create_endpoint(to_name="reroute")
-        self.assertEquals(self._ch.connect.call_count, 1)
-        self.assertTrue("reroute" in self._ch.connect.call_args[0][0])        # @TODO: this is obtuse
-        e.close()
 
     def test_create_endpoint_existing_channel(self):
         ch = Mock(spec=SendChannel)
@@ -154,7 +147,7 @@ class TestBaseEndpoint(PyonTestCase):
         self.assertEquals(e._opt, "stringer")
 
     def test__ensure_node_errors(self):
-        bep = BaseEndpoint(name=sentinel.name)
+        bep = BaseEndpoint()
         gcimock = Mock()
         gcimock.return_value = None
         with patch('pyon.net.endpoint.BaseEndpoint._get_container_instance', gcimock):
@@ -167,18 +160,54 @@ class TestBaseEndpoint(PyonTestCase):
 
     @patch('pyon.net.endpoint.BaseEndpoint._get_container_instance')
     def test__ensure_node(self, gcimock):
-        bep = BaseEndpoint(name=sentinel.name)
+        bep = BaseEndpoint()
         self.assertIsNone(bep.node)
 
         bep._ensure_node()
 
         self.assertEquals(bep.node, gcimock().node)
 
+@attr('UNIT')
+@patch.dict(endpoint.interceptors, no_interceptors, clear=True)
+class TestSendingBaseEndpoint(PyonTestCase):
+    def test_init(self):
+        ep = SendingBaseEndpoint(node=sentinel.node)
+        self.assertEquals(ep.node, sentinel.node)
+        self.assertIsInstance(ep._send_name, NameTrio)
+
+    def test_init_with_to_name(self):
+        ep = SendingBaseEndpoint(to_name=(sentinel.xp, sentinel.rkey))
+        self.assertEquals(ep._send_name.exchange, sentinel.xp)
+        self.assertEquals(ep._send_name.queue, sentinel.rkey)
+
+    @patch('pyon.net.endpoint.log')
+    def test_init_with_old_name_gives_warn(self, mocklog):
+        ep = SendingBaseEndpoint(name=(sentinel.xp, sentinel.rkey))
+        self.assertEquals(ep._send_name.exchange, sentinel.xp)
+        self.assertEquals(ep._send_name.queue, sentinel.rkey)
+        self.assertTrue(mocklog.warn.called)
+
+    def test_init_with_to_name_namepair(self):
+        class MyNameTrio(NameTrio):
+            def __init__(self):
+                self._exchange = sentinel.my_exchange
+                self._queue = sentinel.my_queue
+
+        ep = SendingBaseEndpoint(to_name=MyNameTrio())
+        self.assertEquals(ep._send_name.exchange, sentinel.my_exchange)
+        self.assertEquals(ep._send_name.queue, sentinel.my_queue)
+
+    def test_create_endpoint_calls_connect(self):
+        np = NameTrio(sentinel.xp, sentinel.queue)
+        ep = SendingBaseEndpoint(node=Mock(spec=NodeB), to_name=np)
+        e = ep.create_endpoint()
+        e.channel.connect.assert_called_once_with(np)
+
 @patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 class TestPublisher(PyonTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
-        self._pub = Publisher(node=self._node, name="testpub")
+        self._pub = Publisher(node=self._node, to_name="testpub")
         self._ch = Mock(spec=SendChannel)
         self._node.channel.return_value = self._ch
 
@@ -219,7 +248,7 @@ class RecvMockMixin(object):
         ch.recv.side_effect = _ret
 
         # need to set a send_name for now
-        ch._send_name = ('', '')
+        ch._send_name = NameTrio('', '')
 
         return ch
 
@@ -231,13 +260,13 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         self._node = Mock(spec=NodeB)
 
     def test_create_sub_without_callback(self):
-        self.assertRaises(AssertionError, Subscriber, node=self._node, name="testsub")
+        self.assertRaises(AssertionError, Subscriber, node=self._node, from_name="testsub")
 
     def test_create_endpoint(self):
         def mycb(msg, headers):
             return "test"
 
-        sub = Subscriber(node=self._node, name="testsub", callback=mycb)
+        sub = Subscriber(node=self._node, from_name="testsub", callback=mycb)
         e = sub.create_endpoint()
 
         self.assertEquals(e._callback, mycb)
@@ -248,7 +277,7 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         The goal of this test is to get messages routed to the callback mock.
         """
         cbmock = Mock()
-        sub = Subscriber(node=self._node, name="testsub", callback=cbmock)
+        sub = Subscriber(node=self._node, from_name="testsub", callback=cbmock)
 
         # tell the subscriber to create this as the main listening channel
         listen_channel_mock = self._setup_mock_channel(ch_type=SubscriberChannel, value="subbed", error_message="")
@@ -283,7 +312,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
     def test_rr_client(self):
         """
         """
-        rr = RequestResponseClient(node=self._node, name="rr")
+        rr = RequestResponseClient(node=self._node, to_name="rr")
         rr.node.channel.return_value = self._setup_mock_channel()
 
         ret = rr.request("request")
@@ -353,7 +382,7 @@ class TestRPCClient(PyonTestCase, RecvMockMixin):
     def test_rpc_client(self, iomock):
         node = Mock(spec=NodeB)
 
-        rpcc = RPCClient(node=node, name="simply", iface=ISimpleInterface)
+        rpcc = RPCClient(node=node, to_name="simply", iface=ISimpleInterface)
         rpcc.node.channel.return_value = self._setup_mock_channel()
 
         self.assertTrue(hasattr(rpcc, 'simple'))
@@ -364,7 +393,7 @@ class TestRPCClient(PyonTestCase, RecvMockMixin):
         self.assertEquals(ret, "bidirmsg")
 
     def test_rpc_client_with_unnamed_args(self):
-        rpcc = RPCClient(name="simply", iface=ISimpleInterface)
+        rpcc = RPCClient(to_name="simply", iface=ISimpleInterface)
         self.assertRaises(AssertionError, rpcc.simple, "zap", "zip")
 
 @attr('UNIT')
@@ -502,7 +531,7 @@ class TestRPCServer(PyonTestCase, RecvMockMixin):
     def test_rpc_server(self):
         node = Mock(spec=NodeB)
         svc = SimpleService()
-        rpcs = RPCServer(node=node, name="testrpc", service=svc)
+        rpcs = RPCServer(node=node, from_name="testrpc", service=svc)
 
         # build a command object to be returned by the mocked channel
         class FakeMsg(object):
