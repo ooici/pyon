@@ -61,10 +61,13 @@ class DefinitionTree(dict):
                     root[k] = DefinitionTree.traverse(definition,v)
                     root[k].id = v
             elif k.endswith('_ids'):
+                tmp = []
                 for value in v:
                     if value:
-                        root[value] = DefinitionTree.traverse(definition,value)
-                        root[value].id = value
+                        t = DefinitionTree.traverse(definition,value)
+                        t.id = value
+                        tmp.append(t)
+                root[k] = tmp
         return root
 
     @staticmethod
@@ -170,6 +173,7 @@ class StationDataStreamDefinitionConstructor(object):
         tree = DefinitionTree.obj_to_tree(self.stream_definition)
 
         record = self.stream_definition.identifiables[tree.element_type_id.data_record_id.id]
+
         record.field_ids.append(name)
         self.stream_definition.identifiables[name] = coverage
 
