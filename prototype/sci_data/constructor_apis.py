@@ -71,6 +71,29 @@ class DefinitionTree(dict):
         return root
 
     @staticmethod
+    def get(definition, key_path, node=None):
+        '''
+        Reduce for getting a specific value from a stream definition
+        '''
+        keys = key_path.split('.')
+        if not node:
+            key = keys.pop(0)
+            node = definition.identifiables[key]
+            return DefinitionTree.get(definition=definition,key_path='.'.join(keys),node=node)
+        if len(keys) == 1:
+            # Last key, this is the desired value
+            key = keys.pop(0)
+            return getattr(node,key)
+        else:
+            key = keys.pop(0)
+            node = definition.identifiables[getattr(node,key)]
+            return DefinitionTree.get(definition=definition,key_path='.'.join(keys),node=node)
+
+
+
+
+
+    @staticmethod
     def obj_to_tree(definition):
         from pyon.core.object import IonObjectSerializer
         if not isinstance(definition,StreamDefinitionContainer):
@@ -110,6 +133,8 @@ class StationDataStreamDefinitionConstructor(object):
             sha1=None
         )
 
+        ident['data_record'] = DataRecord()
+
         ident['record_count'] = CountElement(value=0)
 
         ident['element_type'] = ElementType(
@@ -118,7 +143,6 @@ class StationDataStreamDefinitionConstructor(object):
             data_record_id='data_record'
         )
 
-        ident['data_record'] = DataRecord()
 
         ident['nan_value'] = NilValue(
             reason='No value recorded.',
@@ -170,9 +194,15 @@ class StationDataStreamDefinitionConstructor(object):
             domain_id='',
             range_id=''
         )
-        tree = DefinitionTree.obj_to_tree(self.stream_definition)
 
-        record = self.stream_definition.identifiables[tree.element_type_id.data_record_id.id]
+
+        record = self.stream_definition.identifiables[
+                    DefinitionTree.get(
+                        self.stream_definition,
+                        '%s.element_type_id.data_record_id' % self.stream_definition.data_stream_id
+                    )
+        ]
+
 
         record.field_ids.append(name)
         self.stream_definition.identifiables[name] = coverage
