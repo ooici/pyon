@@ -164,8 +164,8 @@ class TestRecvChannel(PyonTestCase):
 
         self.assertFalse(ch._setup_listener_called)
 
-        # call setup listener, defining xp, queue, default binding (will get our return value above) becuase there's no meat to _declare_queue
-        ch.setup_listener(NameTrio(sentinel.xp, sentinel.queue))
+        # call setup listener, defining xp, queue, binding
+        ch.setup_listener(NameTrio(sentinel.xp, sentinel.queue, sentinel.binding))
 
         self.assertTrue(hasattr(ch, '_recv_name'))
         self.assertTrue(hasattr(ch._recv_name, 'exchange'))
@@ -175,7 +175,7 @@ class TestRecvChannel(PyonTestCase):
 
         mxp.assert_called_once_with(sentinel.xp)
         mdq.assert_called_once_with(sentinel.queue)
-        mb.assert_called_once_with(sentinel.anon_queue)
+        mb.assert_called_once_with(sentinel.binding)
         
         # you can only call setup_listener once
         self.assertTrue(ch._setup_listener_called)
@@ -189,7 +189,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertEquals(ch._recv_name.queue, sentinel.queue)
         mxp.assert_called_once_with(sentinel.xp)
         mdq.assert_called_once_with(sentinel.queue)
-        mb.assert_called_once_with(sentinel.anon_queue)
+        mb.assert_called_once_with(sentinel.binding)
 
         # call setup listener, passing a custom bind this time
         ch = create_channel()

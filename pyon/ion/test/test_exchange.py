@@ -11,12 +11,14 @@ from pyon.net.endpoint import RPCServer
 from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue
-from mock import Mock, sentinel
+from mock import Mock, sentinel, patch
 from pyon.net.transport import BaseTransport, TransportError, AMQPTransport
 from pyon.core.bootstrap import get_sys_name
 from pyon.net.channel import RecvChannel
+from pyon.util.config import CFG
 
 @attr('UNIT', group='exchange')
+@patch.dict(CFG, {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjects(IonUnitTestCase):
     def setUp(self):
         self.ex_manager = ExchangeManager(Mock())
@@ -253,6 +255,7 @@ class TestExchangeObjects(IonUnitTestCase):
 
 
 @attr('INT', group='exchange')
+@patch.dict(CFG, {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
@@ -282,6 +285,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         raise unittest.SkipTest("not done yet")
 
 @attr('INT', group='exchange')
+@patch.dict(CFG, {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
     Tests creation and deletion of things on the broker.
