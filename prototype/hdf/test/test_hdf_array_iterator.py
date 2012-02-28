@@ -115,7 +115,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         buffer_size = 3
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'conductivity', buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = None, buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         out = generator.next()
 
@@ -123,38 +123,77 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertEquals(arr.size, buffer_size)
 
-    def test_very_large_buffer_size(self):
+    def test_too_large_buffer_size(self):
         """
         Test that providing a very large buffer size is okay
         """
 
-        pass
+        buffer_size = 1000
+
+        generator = acquire_data(hdf_files = ['data.hdf5'], var_name = 'conductivity', buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+
+        with self.assertRaises(StopIteration):
+            out = generator.next()
 
     def test_concatenate_block_size(self):
         """
         Test that the concatenated arrays are of size concatenate_block_size
         """
 
-        pass
+        buffer_size = 10
+        concatenate_block_size = 20
 
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'temperature', buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = concatenate_block_size  )
 
-    def test_very_large_concatenate_block_size(self):
-        """
-        Test that using a very large concatenate_block_size is okay
-        """
+        #------------------------------------------------------------------------------------------------
+        # call next() once.....
+        #------------------------------------------------------------------------------------------------
 
-        pass
+        out = generator.next()
+
+        arrays_out = out[4]
+        self.assertTrue(arrays_out['temperature'].size < concatenate_block_size)
+
+        #------------------------------------------------------------------------------------------------
+        # call next() for the second time.....
+        #------------------------------------------------------------------------------------------------
+
+        out = generator.next()
+
+        arrays_out = out[4]
+
+        # Assert that the arrays_out has now been clipped to the concatenate_block_size
+        self.assertEquals(arrays_out['temperature'].size, concatenate_block_size)
+
+        #------------------------------------------------------------------------------------------------
+        # call next() for the third time..... Now, since the array_out['temperature'] array gets more data
+        # it should get refreshed
+        #------------------------------------------------------------------------------------------------
+
+        out = generator.next()
+
+        arrays_out = out[4]
+        self.assertTrue(arrays_out['temperature'].size < buffer_size)
+
 
     def test_slice(self):
         """
         Test that providing an arbitrary slice works
         """
 
-        pass
+        buffer_size = 10
+        concatenate_block_size = 20
+        slice_size = 3
 
-    def test_very_large_slice(self):
-        """
-        Test that providing a very large slice is okay
-        """
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'temperature', buffer_size = buffer_size, slice_= (slice(1, slice_size+1)), concatenate_block_size = concatenate_block_size  )
 
-        pass
+        #------------------------------------------------------------------------------------------------
+        # call next() once.....
+        #------------------------------------------------------------------------------------------------
+
+        out = generator.next()
+
+        arrays_out = out[4]
+
+        self.assertEquals(arrays_out['temperature'].size, slice_size)
+
