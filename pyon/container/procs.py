@@ -290,7 +290,7 @@ class ProcManager(object):
 
         # Service RPC endpoint
         rsvc = ProcessRPCServer(node=self.container.node,
-                                name=listen_name,
+                                from_name=listen_name,
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory

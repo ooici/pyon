@@ -144,11 +144,8 @@ class Container(BaseContainerAgent):
         self.event_repository = EventRepository()
         self._capabilities.append("EVENT_REPOSITORY")
 
-        # Start ExchangeManager. In particular establish broker connection
-        self.ex_manager.start()
-
-        # TODO: Move this in ExchangeManager - but there is an error
-        self.node, self.ioloop = messaging.make_node() # TODO: shortcut hack
+        # Start ExchangeManager, which starts the node (broker connection)
+        self.node, self.ioloop = self.ex_manager.start()
         self._capabilities.append("EXCHANGE_MANAGER")
 
         self.proc_manager.start()
@@ -269,5 +266,6 @@ class Container(BaseContainerAgent):
         log.error("Fail Fast: %s", err_msg)
         self.stop()
         log.error("Fail Fast: killing container")
+
         # The exit code of the terminated process is set to non-zero
         os.kill(os.getpid(), signal.SIGTERM)

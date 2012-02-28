@@ -44,16 +44,16 @@ class NodeB(amqp.Node):
         self.running = 1
         self.ready.set()
 
-    def _new_channel(self, ch_type):
+    def _new_channel(self, ch_type, **kwargs):
         """
         Creates a pyon Channel based on the passed in type, and activates it for use.
         """
-        chan = ch_type()
+        chan = ch_type(**kwargs)
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
         chan.on_channel_open(amq_chan)
         return chan
 
-    def channel(self, ch_type):
+    def channel(self, ch_type, **kwargs):
         """
         Creates a Channel object with an underlying transport callback and returns it.
 
@@ -71,12 +71,12 @@ class NodeB(amqp.Node):
                     self._pool_map[ch.get_channel_id()] = chid
                 else:
                     log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
-                    ch = self._new_channel(ch_type)
+                    ch = self._new_channel(ch_type, **kwargs)
                     ch.set_close_callback(self.on_channel_request_close)
                     self._bidir_pool[chid] = ch
                     self._pool_map[ch.get_channel_id()] = chid
             else:
-                ch = self._new_channel(ch_type)
+                ch = self._new_channel(ch_type, **kwargs)
             assert ch
 
         return ch
