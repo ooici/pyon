@@ -359,7 +359,9 @@ class Test_DataStores(IonIntegrationTestCase):
 
         data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
-        data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
+        with self.assertRaises(BadRequest) as cm:
+            data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
+        self.assertTrue(cm.exception.message.startswith("Association between"))
 
         # Subject -> Object direction
         obj_ids1, obj_assocs1 = data_store.find_objects(admin_user_id, id_only=True)

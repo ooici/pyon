@@ -18,6 +18,12 @@ Predicates = DotDict()
 PredicateType = DotDict()
 PRED = PredicateType
 
+# Association Types, don't confuse with predicate type!
+AssociationTypes = ['H2H', 'R2R', 'H2R', 'R2H']
+AssociationType = DotDict()
+AssociationType.update(zip(AssociationTypes, AssociationTypes))
+AT = AssociationType
+
 # Life cycle states
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
@@ -29,7 +35,7 @@ lcs_workflows = {}
 
 def get_predicate_type_list():
     Predicates.clear()
-    Predicates.update(Config(["res/config/predicates.yml"]).data['PredicateTypes'])
+    Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
     return Predicates.keys()
 
 def initialize_res_lcsms():
@@ -52,10 +58,10 @@ def load_definitions():
     ResourceTypes.clear()
     ResourceTypes.update(zip(rt_list, rt_list))
 
-    # Association Types
-    at_list = get_predicate_type_list()
+    # Predicate Types
+    pt_list = get_predicate_type_list()
     PredicateType.clear()
-    PredicateType.update(zip(at_list, at_list))
+    PredicateType.update(zip(pt_list, pt_list))
 
     # Life cycle states
     initialize_res_lcsms()

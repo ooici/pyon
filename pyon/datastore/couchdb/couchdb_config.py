@@ -64,7 +64,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.s, doc.o, doc.p], null);
+    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], null);
   }
 }""",
         },
@@ -72,7 +72,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.p, doc.s, doc.o], null);
+    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], null);
   }
 }""",
         }
