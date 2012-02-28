@@ -165,7 +165,7 @@ class PointDataStreamDefinitionConstructor(object):
 class PointSupplementConstructor(object):
 
 
-    def __init__(self, point_definition=None, number_of_packets_in_record=None, packet_number_in_record=None):
+    def __init__(self, point_definition=None, stream_id=None, number_of_packets_in_record=None, packet_number_in_record=None):
         """
         @param point_definition is the metadata object defining the point record for this stream
         @todo implement number_of_packets_in_record and packet_number_in_record
@@ -179,9 +179,10 @@ class PointSupplementConstructor(object):
         self._coordinates = {}
 
         self._granule = StreamGranuleContainer(
-            stream_resource_id=point_definition.stream_resource_id,
+            stream_resource_id=point_definition.stream_resource_id or stream_id,
             data_stream_id=point_definition.data_stream_id
         )
+
 
         #Get the point definition's DataStream object
         data_stream = point_definition.identifiables[point_definition.data_stream_id]
