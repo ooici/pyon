@@ -482,6 +482,9 @@ class CouchDB_DataStore(DataStore):
             pass
         else:
             raise BadRequest("Illegal parameters")
+        if assoc_type and not predicate:
+            raise BadRequest("Illegal parameters")
+
         ds, datastore_name = self._get_datastore()
 
         if subject and obj:
