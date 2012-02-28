@@ -6,8 +6,12 @@
 @test prototype.hdf.test.test_hdf_array_iterator.py test suite for hdf_array_iterator.py
 '''
 
+import os
 from prototype.hdf.hdf_array_iterator import acquire_data
 
+from nose.plugins.attrib import attr
+from pyon.util.int_test import IonIntegrationTestCase
+import unittest
 
 @attr('INT', group='dm')
 class HDFArrayIteratorTest(IonIntegrationTestCase):
@@ -47,7 +51,9 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         """
         Cleanup. Delete Subscription, Stream, Process Definition
         """
-        self._stop_container()
+
+        os.remove('measurements.hdf5')
+        os.remove('data.hdf5')
 
     def test_acquire_data_from_multiple_files(self):
         """
@@ -75,9 +81,15 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = None, buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
+        out = generator.next() # the first time next() is called loads up the temperature data.
+
+        # now that the temperature data has been exhausted since we chose a very large buffer_size,
+        # calling generator.next() will load up the conductivity data
         out = generator.next()
 
         # assert that the dataset 'salinity' in the first hdf5 file has been opened
+
+        print ("arrays_out: %s" % out[4])
 
         self.assertTrue(('temperature' in out[4]) and ('conductivity' in out[4]))
 
