@@ -17,7 +17,6 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
     arrays_out = {}
 
     # the numpy arrays will be stored here as a list to begin with
-    list_of_h5py_datasets = []
 
     # the default dataset names that are going to be used for input...
     default_var_names = ['temperature', 'conductivity', 'salinity']
@@ -38,6 +37,9 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
 
 
     for hdf_file in hdf_files:
+
+        # refresh the h5py dataset list
+        list_of_h5py_datasets = []
 
         log.debug('Reading file: %s' % hdf_file)
 
@@ -99,6 +101,7 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
                                 if arrays_out[vn].size < concatenate_block_size:
                                     arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
                                 else:
+                                    # refresh the arrays_out dict for that variable name
                                     arrays_out[vn] = d
                             else:
                                 arrays_out[vn] = d
