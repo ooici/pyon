@@ -62,8 +62,7 @@ class Container(BaseContainerAgent):
         from pyon.core import bootstrap
         bootstrap.container_instance = self
         bootstrap.assert_configuration(CFG)
-        bootstrap.sys_name = CFG.system.name or bootstrap.sys_name
-        log.debug("Container (sysname=%s) initializing ..." % bootstrap.sys_name)
+        log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = kwargs
@@ -105,10 +104,9 @@ class Container(BaseContainerAgent):
 
         # write out a PID file containing our agent messaging name
         with open(self.pidfile, 'w') as f:
-            from pyon.core.bootstrap import get_sys_name
             pid_contents = {'messaging': dict(CFG.server.amqp),
                             'container-agent': self.name,
-                            'container-xp': get_sys_name() }
+                            'container-xp': bootstrap.get_sys_name() }
             f.write(msgpack.dumps(pid_contents))
             atexit.register(self._cleanup_pid)
             self._capabilities.append("PID_FILE")

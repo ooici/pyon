@@ -49,13 +49,17 @@ pyon_initialized = False
 # This sets the sys_name.
 # DANGER: Don't import sys_name from here, use get_sys_name() instead.
 # NOTE: This sys_name may be changed by the container later if command line args override
-sys_name = CFG.system.name or 'ion_%s' % os.uname()[1].replace('.', '_')
+default_sys_name = 'ion_%s' % os.uname()[1].replace('.', '_')
 testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
 
 def get_sys_name():
+    if CFG.system.name:
+        return CFG.system.name
+
     if CFG.system.testing:
         return testing_sys_name
-    return sys_name
+
+    return default_sys_name
 
 # OBJECTS. Object and message definitions.
 # Make a default factory for IonObjects

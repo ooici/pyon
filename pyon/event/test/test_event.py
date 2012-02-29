@@ -29,7 +29,7 @@ class TestEventPublisher(IonUnitTestCase):
         self._pub = EventPublisher(node=self._node)
 
     def test_init(self):
-        self.assertEquals(self._pub._send_name.exchange, "%s.pyon.events" % bootstrap.sys_name)
+        self.assertEquals(self._pub._send_name.exchange, "%s.pyon.events" % bootstrap.get_sys_name())
         self.assertEquals(self._pub._send_name.queue, None)
 
         pub = EventPublisher(node=self._node, xp=sentinel.xp)
@@ -161,7 +161,7 @@ class TestEventSubscriber(IonUnitTestCase):
         self._sub = EventSubscriber(node=self._node, callback=self._cb)
 
     def test_init(self):
-        self.assertEquals(self._sub._recv_name.exchange, "%s.pyon.events" % bootstrap.sys_name)
+        self.assertEquals(self._sub._recv_name.exchange, "%s.pyon.events" % bootstrap.get_sys_name())
         self.assertEquals(self._sub._recv_name.queue, None)
         self.assertEquals(self._sub._binding, "*.#")
         self.assertEquals(self._sub._callback, self._cb)
@@ -182,10 +182,10 @@ class TestEventSubscriber(IonUnitTestCase):
     def test_init_with_queue_name(self):
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=str(sentinel.queue))
         self.assertEquals(sub._recv_name.exchange, sentinel.xp)
-        self.assertEquals(sub._recv_name.queue, "%s.%s" % (bootstrap.sys_name, str(sentinel.queue)))
+        self.assertEquals(sub._recv_name.queue, "%s.%s" % (bootstrap.get_sys_name(), str(sentinel.queue)))
 
     def test_init_with_queue_name_with_sysname(self):
-        queue_name = "%s-dacshund" % bootstrap.sys_name
+        queue_name = "%s-dacshund" % bootstrap.get_sys_name()
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=queue_name)
         self.assertEquals(sub._recv_name.exchange, sentinel.xp)
         self.assertEquals(sub._recv_name.queue, queue_name)
