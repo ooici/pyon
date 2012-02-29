@@ -478,8 +478,8 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
         res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.PRIVATE, id_only=True)
-        self.assertEquals(len(res_ids1), 0)
-        self.assertEquals(len(res_assoc1), 0)
+        self.assertEquals(len(res_ids1), 6)
+        self.assertEquals(len(res_assoc1), 6)
 
         # Find resources by name
         res_ids1, res_assoc1 = data_store.find_res_by_name('CTD1', id_only=True)

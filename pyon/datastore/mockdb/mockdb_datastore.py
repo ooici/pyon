@@ -9,7 +9,7 @@ from pyon.core.bootstrap import obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
-from pyon.ion.resource import ResourceLifeCycleSM
+from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 
 class MockDB_DataStore(DataStore):
@@ -486,8 +486,8 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + self.datastore_name + ' does not exist.')
 
-        if lcstate in ResourceLifeCycleSM.STATE_ALIASES:
-            lcstate_match = ResourceLifeCycleSM.STATE_ALIASES[lcstate]
+        if lcstate in CommonResourceLifeCycleSM.STATE_ALIASES:
+            lcstate_match = CommonResourceLifeCycleSM.STATE_ALIASES[lcstate]
         else:
             lcstate_match = [lcstate]
         assoc_list = []

@@ -15,7 +15,7 @@ from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
-from pyon.ion.resource import ResourceLifeCycleSM
+from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.core.bootstrap import CFG
 
@@ -556,7 +556,7 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
         view = ds.view(self._get_viewname("resource","by_lcstate"), include_docs=(not id_only))
-        is_hierarchical = (lcstate in ResourceLifeCycleSM.STATE_ALIASES)
+        is_hierarchical = (lcstate in CommonResourceLifeCycleSM.STATE_ALIASES)
         # lcstate is a hiearachical state and we need to treat the view differently
         if is_hierarchical:
             key = [1, lcstate]

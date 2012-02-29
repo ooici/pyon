@@ -31,6 +31,15 @@ def getextends(type):
             ret.append(name)
     return ret
 
+def issubtype(obj_type, base_type):
+    obj_cls = model_classes.get(obj_type, None)
+    base_cls = model_classes.get(base_type, None)
+
+    if obj_cls and base_cls:
+        return base_cls in obj_cls.__mro__
+
+    return False
+
 def get_message_class_parm_type(service_name, service_operation, parameter, in_out):
     """
     Utility function to return the type for the specified parameters

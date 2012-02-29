@@ -5,7 +5,7 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.registry import IonObjectRegistry, getextends
+from pyon.core.registry import IonObjectRegistry, getextends, issubtype
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any
 
@@ -56,7 +56,7 @@ def initialize_res_lcsms():
         clsname = wf.get('lcsm_class', None)
         if clsname:
             wf_cls = named_any(clsname)
-            lcs_workflow_defs[wfname] = wf_cls()
+            lcs_workflow_defs[wfname] = wf_cls(**wf)
         else:
             based_on = wf.get('based_on', None)
             wf_base = lcs_workflow_defs[based_on]
@@ -101,6 +101,9 @@ def get_maturity_visibility(lcstate):
     if lcstate == 'RETIRED':
         return (None, None)
     return lcstate.split('_')
+
+def is_resource(object):
+    return issubtype(object._get_type(), "Resource")
 
 class ResourceLifeCycleSM(object):
     """
@@ -250,7 +253,7 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
                     self.transitions[(state,ev)] = s1
             else:
                 self.transitions[(s0,ev)] = s1
-        import pprint; pprint.pprint(self.transitions)
+        #import pprint; pprint.pprint(self.transitions)
 
     def _create_basic_transitions(self):
         pass

@@ -104,7 +104,7 @@ function(doc) {
         # The following is a more sophisticated index. It does two things for each Resource object:
         # 1: It emits an index value prefixed by 0 for the actual lcstate
         # 2: It emits an index value prefixed by 1,parent_state for all parent states
-        # Thereby it is possible to search for resources by hieararchical state and still be able
+        # Thereby it is possible to search for resources by hierarchical state and still be able
         # to return result sets that objects once only.
         # Note: the order of the type_ in the key is important for case 2, so that range queries are possible
         # with both type_ without.
@@ -113,15 +113,14 @@ function(doc) {
 function(doc) {
   if (doc.type_ && doc.type_!="Association") {
     emit([0, doc.lcstate, doc.type_, doc.name], null);
-    if (doc.lcstate != undefined && doc.lcstate != "" && doc.lcstate != "DRAFT" && doc.lcstate != "RETIRED") {
-      emit([1, "REGISTERED", doc.type_, doc.lcstate, doc.name], null);
-      if (doc.lcstate == "PLANNED" || doc.lcstate == "DEVELOPED" || doc.lcstate == "INTEGRATED") {
-        emit([1, "UNDEPLOYED", doc.type_, doc.lcstate, doc.name], null);
-      } else {
-        emit([1, "DEPLOYED", doc.type_, doc.lcstate, doc.name], null);
-        if (doc.lcstate == "DISCOVERABLE" || doc.lcstate == "AVAILABLE") {
-          emit([1, "PUBLIC", doc.type_, doc.lcstate, doc.name], null);
-        }
+    if (doc.lcstate != undefined && doc.lcstate != "") {
+      if (doc.lcstate.lastIndexOf("DRAFT",0)!=0 && doc.lcstate != "RETIRED") {
+        emit([1, "REGISTERED", doc.type_, doc.lcstate, doc.name], null);
+      }
+      comps = doc.lcstate.split("_")
+      if (comps.length == 2) {
+        emit([1, comps[0], doc.type_, doc.lcstate, doc.name], null);
+        emit([1, comps[1], doc.type_, doc.lcstate, doc.name], null);
       }
     }
   }
