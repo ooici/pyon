@@ -910,13 +910,19 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
 
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # fwd on ion-actor-id and expiry, according to common message format spec
+            # fwd on actor specific information, according to common message format spec
             actor_id            = context.get('ion-actor-id', None)
+            actor_roles         = context.get('ion-actor-roles', None)
+            actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
 
-            if actor_id:        header['ion-actor-id']  = actor_id
-            if expiry:          header['expiry']        = expiry
+            #If an actor-id is specified then there may be other associated data that needs to be passed on
+            if actor_id:
+                header['ion-actor-id']  = actor_id
+                if actor_roles:     header['ion-actor-roles']  = actor_roles
+                if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
 
+            if expiry:          header['expiry']        = expiry
         return header
 
 class ProcessRPCClient(RPCClient):
@@ -1000,11 +1006,18 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
 
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # fwd on ion-actor-id and expiry, according to common message format spec
+            # fwd on actor specific information, according to common message format spec
             actor_id            = context.get('ion-actor-id', None)
+            actor_roles         = context.get('ion-actor-roles', None)
+            actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
 
-            if actor_id:        header['ion-actor-id']  = actor_id
+            #If an actor-id is specified then there may be other associated data that needs to be passed on
+            if actor_id:
+                header['ion-actor-id']  = actor_id
+                if actor_roles:     header['ion-actor-roles']  = actor_roles
+                if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+
             if expiry:          header['expiry']        = expiry
 
         return header
