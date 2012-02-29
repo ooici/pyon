@@ -110,15 +110,20 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
                                 if arrays_out[vn].size < concatenate_block_size:
                                     arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
                                 else:
-                                    # refresh the arrays_out dict for that variable name
-                                    arrays_out[vn] = d
-                            else:
-                                arrays_out[vn] = d
+                                    indices_left = concatenate_block_size - arrays_out[vn].size
 
-                        # yields variable_name, the current slice, range, the sliced data,
-                        # the dictionary holding the concatenated arrays by variable name
-                        log.warn('arrays_out: %s' % arrays_out)
-                        yield vn, arri.curr_slice, rng, d, arrays_out
+                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
+
+                                    temp_array = d[indices_left:]
+
+                                    # yields variable_name, the current slice, range, the sliced data,
+                                    # the dictionary holding the concatenated arrays by variable name
+                                    log.warn('arrays_out: %s' % arrays_out)
+                                    yield vn, arri.curr_slice, rng, d, arrays_out
+
+                                    arrays_out[vn] = temp_array
+                        else:
+                            arrays_out[vn] = d
 
 
 #----------------------------------------------------------------------------------------------------------------------------
