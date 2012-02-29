@@ -19,17 +19,6 @@ START_PERMANENT = "permanent"
 class AppManager(object):
     def __init__(self, container):
         self.container = container
-
-        # Define the callables that can be added to Container public API
-        self.container_api = [self.start_app,
-                              self.start_app_from_url,
-                              self.start_rel,
-                              self.start_rel_from_url]
-
-        # Add the public callables to Container
-        for call in self.container_api:
-            setattr(self.container, call.__name__, call)
-
         self.apps = []
 
     def start(self):

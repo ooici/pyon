@@ -31,6 +31,7 @@ from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 
 from interface.services.icontainer_agent import BaseContainerAgent
+from contextlib import contextmanager
 
 
 class Container(BaseContainerAgent):
@@ -88,6 +89,7 @@ class Container(BaseContainerAgent):
         # Coordinates the container start
         self._is_started = False
         self._capabilities = []
+        self._status = "INIT"
 
         log.debug("Container initialized, OK.")
 
@@ -160,9 +162,24 @@ class Container(BaseContainerAgent):
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
 
-        self._is_started = True
+        self._is_started    = True
+        self._status        = "RUNNING"
 
         log.info("Container started, OK.")
+
+    @contextmanager
+    def _push_status(self, new_status):
+        """
+        Temporarily sets the internal status flag.
+        Use this as a decorator or in a with-statement before calling a temporary status changing
+        method, like start_rel_from_url.
+        """
+        curstatus = self._status
+        self._status = new_status
+        try:
+            yield
+        finally:
+            self._status = curstatus
 
     def serve_forever(self):
         """ Run the container until killed. """
@@ -181,6 +198,12 @@ class Container(BaseContainerAgent):
             log.exception('Unhandled error! Forcing container shutdown')
 
         self.proc_manager.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+
+    def status(self):
+        """
+        Returns the internal status.
+        """
+        return self._status
             
     def _cleanup_pid(self):
         if self.pidfile:
@@ -209,6 +232,22 @@ class Container(BaseContainerAgent):
         self._is_started = False
 
         log.debug("Container stopped, OK.")
+
+    def start_app(self, appdef=None, config=None):
+        with self._push_status("START_APP"):
+            return self.app_manager.start_app(appdef=appdef, config=config)
+
+    def start_app_from_url(self, app_url=''):
+        with self._push_status("START_APP_FROM_URL"):
+            return self.app_manager.start_app_from_url(app_url=app_url)
+
+    def start_rel(self, rel=None):
+        with self._push_status("START_REL"):
+            return self.app_manager.start_rel(rel=rel)
+
+    def start_rel_from_url(self, rel_url=''):
+        with self._push_status("START_REL_FROM_URL"):
+            return self.app_manager.start_rel_from_url(rel_url=rel_url)
 
     def _stop_capability(self, capability):
         if capability == "CONTAINER_AGENT":
