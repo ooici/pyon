@@ -47,6 +47,26 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         file.close()
 
+        #--------------------------------------------------------------------
+        # Create a file for testing recursively searching down the group tree in hdf files
+        # seeking out the datasets
+        #--------------------------------------------------------------------
+
+        a = numpy.arange(30)
+
+        b = numpy.arange(100)
+
+        file = h5py.File('recursive_searching.hdf5', 'w')
+
+        grp1 = file.create_group('fields')
+        grp2 = file.create_group('other_fields')
+
+        dset3 = grp1.create_dataset("altitude", data=a)
+        dset4 = grp2.create_dataset("depth", data = b)
+
+        file.close()
+
+
     def tearDown(self):
         """
         Cleanup. Delete Subscription, Stream, Process Definition
@@ -54,6 +74,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         os.remove('measurements.hdf5')
         os.remove('data.hdf5')
+        os.remove('recursive_searching.hdf5')
 
     def test_acquire_data_from_multiple_files(self):
         """
@@ -196,4 +217,25 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         arrays_out = out[4]
 
         self.assertEquals(arrays_out['temperature'].size, slice_size)
+
+    def test_recursively_search_for_dataset(self):
+        """
+        Test that in a file with grps and sub grps, with the datasets attached as leaves in the end, those datasets can be reached
+        """
+
+        generator = acquire_data(hdf_files = ['recursive_searching.hdf5'], var_names = ['altitude', 'depth'], buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
+
+        out = generator.next() # the first time next() is called loads up the temperature data.
+
+        # now that the temperature data has been exhausted since we chose a very large buffer_size,
+        # calling generator.next() will load up the conductivity data
+        out = generator.next()
+
+        # assert that the dataset 'salinity' in the first hdf5 file has been opened
+
+        print ("arrays_out: %s" % out[4])
+
+        self.assertTrue(('altitude' in out[4]) and ('depth' in out[4]))
+
+
 
