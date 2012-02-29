@@ -34,3 +34,5 @@ unittest.out
 interface/*
 cc-pid*
 .coverage
+
+cover/
