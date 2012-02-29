@@ -283,7 +283,7 @@ def getleafsubclasses(cls):
     scls = itersubclasses(cls)
     return [s for s in scls if not s.__subclasses__()]
 
-# -_.() abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+# _abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 BASIC_VALID = "_%s%s" % (string.ascii_letters, string.digits)
 # -_.()abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 NORMAL_VALID = "-_.() %s%s" % (string.ascii_letters, string.digits)
