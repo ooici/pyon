@@ -329,7 +329,7 @@ class Test_DataStores(IonIntegrationTestCase):
         Predicates[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
         Predicates[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
 
-        admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.AVAILABLE)
+        admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
 
         admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Profile')
 
@@ -341,7 +341,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         inst2_obj_id = self._create_resource(RT.InstrumentDevice, 'CTD2', description='Other Instrument')
 
-        ds1_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.AVAILABLE)
+        ds1_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.DEPLOYED_AVAILABLE)
 
         ds2_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L1', description='My Dataset CTD L1')
 
@@ -434,30 +434,30 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
-        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.DRAFT, LCS.AVAILABLE]))
+        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.DRAFT_PRIVATE, LCS.DEPLOYED_AVAILABLE]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_type(RT.UserIdentity, LCS.AVAILABLE, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_type(RT.UserIdentity, LCS.DEPLOYED_AVAILABLE, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))
 
-        res_ids2n, res_assoc2n = data_store.find_res_by_type("NONE##", LCS.AVAILABLE, id_only=True)
+        res_ids2n, res_assoc2n = data_store.find_res_by_type("NONE##", LCS.DEPLOYED_AVAILABLE, id_only=True)
         self.assertEquals(len(res_ids2n), 0)
         self.assertEquals(len(res_assoc2n), 0)
 
         # Find resources by lcstate
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.AVAILABLE, id_only=True)
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.DEPLOYED_AVAILABLE, id_only=True)
         self.assertEquals(len(res_ids1), 2)
         self.assertEquals(len(res_assoc1), 2)
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
-        res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.AVAILABLE, id_only=False)
+        res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.DEPLOYED_AVAILABLE, id_only=False)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
         self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.AVAILABLE, RT.UserIdentity, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.DEPLOYED_AVAILABLE, RT.UserIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))
@@ -467,7 +467,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_assoc2n), 0)
 
         # Find resources by lcstate - hierarchical
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.PUBLIC, id_only=True)
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.AVAILABLE, id_only=True)
         self.assertEquals(len(res_ids1), 2)
         self.assertEquals(len(res_assoc1), 2)
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
@@ -477,7 +477,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_assoc1), 2)
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.UNDEPLOYED, id_only=True)
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.PRIVATE, id_only=True)
         self.assertEquals(len(res_ids1), 0)
         self.assertEquals(len(res_assoc1), 0)
 

@@ -32,21 +32,6 @@ class IonIntegrationTestCase(unittest.TestCase):
     def run(self, result=None):
         unittest.TestCase.run(self, result)
 
-    @contextmanager
-    def start_container(self):
-        """
-        Context Manager for container in tests.
-        To use:
-        with self.start_container() as cc:
-            # your tests in here
-        # container stopped here
-        """
-        self._start_container()
-        try:
-            yield self.container
-        finally:
-            self._stop_container()
-
     def _start_container(self):
         # hack to force queue auto delete on for int tests
         self._turn_on_queue_auto_delete()
