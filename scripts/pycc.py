@@ -117,7 +117,7 @@ def main(opts, *args, **kwargs):
             initialize_logging()
 
         # Set that system is not testing. We are running as standalone container
-        CFG.system.testing = False
+        dict_merge(CFG, {'system':{'testing':False}}, True)
 
         # Load any additional config paths and merge them into main config
         if len(opts.config):
