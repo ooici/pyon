@@ -60,7 +60,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         Test whether data can be acquired from multiple hdf5 files
         """
 
-        generator = acquire_data(hdf_files = ['data.hdf5','measurements.hdf5'], var_name = None, buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['data.hdf5','measurements.hdf5'], var_names = None, buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         out = generator.next()
 
@@ -79,7 +79,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         Test whether data can be acquired from multiple datasets from an hdf5 file
         """
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = None, buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = None, buffer_size = 50, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         out = generator.next() # the first time next() is called loads up the temperature data.
 
@@ -93,12 +93,12 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(('temperature' in out[4]) and ('conductivity' in out[4]))
 
-    def test_acquire_data_with_var_name(self):
+    def test_acquire_data_with_var_names(self):
         """
         Test whether supplying a var_name confines the selection to be of only that var_name
         """
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'conductivity', buffer_size = 3, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = ['conductivity'], buffer_size = 3, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         out = generator.next()
 
@@ -115,7 +115,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         buffer_size = 3
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = None, buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = None, buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         out = generator.next()
 
@@ -130,7 +130,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         buffer_size = 1000
 
-        generator = acquire_data(hdf_files = ['data.hdf5'], var_name = 'conductivity', buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['data.hdf5'], var_names = ['conductivity'], buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
 
         with self.assertRaises(StopIteration):
             out = generator.next()
@@ -143,7 +143,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         buffer_size = 10
         concatenate_block_size = 20
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'temperature', buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = concatenate_block_size  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = ['temperature'], buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = concatenate_block_size  )
 
         #------------------------------------------------------------------------------------------------
         # call next() once.....
@@ -185,7 +185,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         concatenate_block_size = 20
         slice_size = 3
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_name = 'temperature', buffer_size = buffer_size, slice_= (slice(1, slice_size+1)), concatenate_block_size = concatenate_block_size  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = ['temperature'], buffer_size = buffer_size, slice_= (slice(1, slice_size+1)), concatenate_block_size = concatenate_block_size  )
 
         #------------------------------------------------------------------------------------------------
         # call next() once.....

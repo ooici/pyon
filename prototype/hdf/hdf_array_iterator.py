@@ -12,7 +12,7 @@ from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
-def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=(), concatenate_block_size = None):
+def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(), concatenate_block_size = None):
 
     arrays_out = {}
 
@@ -57,10 +57,10 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
         #--------------------------------------------------------------------------------
 
         # var_name = 'conductivity'
-        if var_name is None:
+        if var_names is None:
             vars = default_var_names
         else:
-            vars = [var_name]
+            vars = [] + var_names
 
         if not isinstance(slice_, tuple): slice_ = (slice_,)
 
