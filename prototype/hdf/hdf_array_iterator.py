@@ -12,15 +12,14 @@ from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
-def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=(), concatenate_block_size = None):
+def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(), concatenate_block_size = None):
 
     arrays_out = {}
 
     # the numpy arrays will be stored here as a list to begin with
-    list_of_h5py_datasets = []
 
     # the default dataset names that are going to be used for input...
-    default_var_names = ['temperature', 'conductivity', 'salinity']
+    default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
 
     assert hdf_files, NotFound('No hdf_files provided to extract data from!')
     assert buffer_size, NotFound('No buffer_size provided.')
@@ -35,9 +34,14 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
         for node in nodes:
             if isinstance(node, h5py._hl.dataset.Dataset):
                 list_of_h5py_datasets.append(node)
+            elif isinstance( node , h5py._hl.group.Group):
+                check_for_dataset(node.values())
 
 
     for hdf_file in hdf_files:
+
+        # refresh the h5py dataset list
+        list_of_h5py_datasets = []
 
         log.debug('Reading file: %s' % hdf_file)
 
@@ -50,15 +54,16 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
         # checking for datasets in the hdf file
         check_for_dataset(values)
 
+        log.debug('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
         #--------------------------------------------------------------------------------
         # Use the ArrayIterator so that the arrays come in buffer sized chunks
         #--------------------------------------------------------------------------------
 
         # var_name = 'conductivity'
-        if var_name is None:
+        if var_names is None:
             vars = default_var_names
         else:
-            vars = [var_name]
+            vars = [] + var_names
 
         if not isinstance(slice_, tuple): slice_ = (slice_,)
 
@@ -66,7 +71,9 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
 
             for dataset in list_of_h5py_datasets:
 
-                if dataset.name == '/' + vn:
+                str = dataset.name # in general this dataset name will have the grp/subgrp names also in it
+
+                if str.rsplit('/', 1)[1] == vn: # strip off the grp and subgrp names
 
                     # the shape of the dataset is the same as the shape of the numpy array it contains
                     ndims = len(dataset.shape)
@@ -99,13 +106,20 @@ def acquire_data( hdf_files = None, var_name=None, buffer_size = None, slice_=()
                                 if arrays_out[vn].size < concatenate_block_size:
                                     arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
                                 else:
-                                    arrays_out[vn] = d
+                                    indices_left = concatenate_block_size - arrays_out[vn].size
+
+                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
+
+                                    temp_array = d[indices_left:]
+
+                                    # yields variable_name, the current slice, range, the sliced data,
+                                    # the dictionary holding the concatenated arrays by variable name
+                                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+                                    yield vn, arri.curr_slice, rng, d, arrays_out, arrays_out[vn]
+
+                                    arrays_out[vn] = temp_array
                             else:
                                 arrays_out[vn] = d
-
-                        # yields variable_name, the current slice, range, the sliced data,
-                        # the dictionary holding the concatenated arrays by variable name
-                        yield vn, arri.curr_slice, rng, d, arrays_out
 
 
 #----------------------------------------------------------------------------------------------------------------------------
@@ -196,7 +210,9 @@ class ArrayIterator(object):
 
     def __iter__(self):
         # Skip arrays with degenerate dimensions
-        if [dim for dim in self.shape if dim <= 0]: raise StopIteration
+        if [dim for dim in self.shape if dim <= 0]:
+            log.warn("StopIteration called because of degernate dimensions")
+            raise StopIteration
 
         start = self.start[:]
         stop = self.stop[:]
@@ -229,7 +245,9 @@ class ArrayIterator(object):
             yield self.var[slice_]
 
             # If this is a scalar variable, bail out
-            if ndims == 0: raise StopIteration
+            if ndims == 0:
+                log.warn("StopIteration called because ndims is 0")
+                raise StopIteration
 
             # Update start position, taking care of overflow to other dimensions
             start[rundim] = stop[rundim]  # start where we stopped
@@ -238,4 +256,5 @@ class ArrayIterator(object):
                     start[i] = self.start[i]
                     start[i-1] += self.step[i-1]
             if start[0] >= self.stop[0]:
+                log.warn("StopIteration called because array was exhausted")
                 raise StopIteration
