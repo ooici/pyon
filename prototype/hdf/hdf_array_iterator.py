@@ -54,7 +54,7 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
         # checking for datasets in the hdf file
         check_for_dataset(values)
 
-        log.warn('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
+        log.debug('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
         #--------------------------------------------------------------------------------
         # Use the ArrayIterator so that the arrays come in buffer sized chunks
         #--------------------------------------------------------------------------------
@@ -72,10 +72,6 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
             for dataset in list_of_h5py_datasets:
 
                 str = dataset.name # in general this dataset name will have the grp/subgrp names also in it
-
-                log.warn("str: %s" % str)
-                log.warn("vn: %s" % vn)
-
 
                 if str.rsplit('/', 1)[1] == vn: # strip off the grp and subgrp names
 
@@ -118,12 +114,12 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
 
                                     # yields variable_name, the current slice, range, the sliced data,
                                     # the dictionary holding the concatenated arrays by variable name
-                                    log.warn('arrays_out: %s' % arrays_out)
-                                    yield vn, arri.curr_slice, rng, d, arrays_out
+                                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+                                    yield vn, arri.curr_slice, rng, d, arrays_out, arrays_out[vn]
 
                                     arrays_out[vn] = temp_array
-                        else:
-                            arrays_out[vn] = d
+                            else:
+                                arrays_out[vn] = d
 
 
 #----------------------------------------------------------------------------------------------------------------------------
@@ -216,7 +212,6 @@ class ArrayIterator(object):
         # Skip arrays with degenerate dimensions
         if [dim for dim in self.shape if dim <= 0]:
             log.warn("StopIteration called because of degernate dimensions")
-            print("StopIteration called because of degernate dimensions")
             raise StopIteration
 
         start = self.start[:]
@@ -252,7 +247,6 @@ class ArrayIterator(object):
             # If this is a scalar variable, bail out
             if ndims == 0:
                 log.warn("StopIteration called because ndims is 0")
-                print("StopIteration called because ndims is 0")
                 raise StopIteration
 
             # Update start position, taking care of overflow to other dimensions
@@ -263,5 +257,4 @@ class ArrayIterator(object):
                     start[i-1] += self.step[i-1]
             if start[0] >= self.stop[0]:
                 log.warn("StopIteration called because array was exhausted")
-                print("StopIteration called because array was exhausted")
                 raise StopIteration
