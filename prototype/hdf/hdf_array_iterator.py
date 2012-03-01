@@ -23,7 +23,6 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
 
     assert hdf_files, NotFound('No hdf_files provided to extract data from!')
     assert buffer_size, NotFound('No buffer_size provided.')
-    assert concatenate_block_size, NotFound('No concatenated block size provided')
 
     import h5py, numpy
 
@@ -120,6 +119,19 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
                                     arrays_out[vn] = temp_array
                             else:
                                 arrays_out[vn] = d
+
+                        # if no concatenate_block_size is provided
+                        else:
+
+                            # to have the same yielded values as when the concatenate_block_size
+                            # is provided, we need to make sure that an empty dictionary goes out for arrays_out
+                            # and the arrays_out[vn] values are None
+
+                            # its good to keep the same interface and that is why we are yielding the same
+                            # number of output parameters for all cases of concatenate_block_size
+
+                            yield vn, arri.curr_slice, rng, d, None, None
+
 
 
 #----------------------------------------------------------------------------------------------------------------------------
