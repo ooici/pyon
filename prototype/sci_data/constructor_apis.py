@@ -215,6 +215,8 @@ class PointSupplementConstructor(object):
             #@todo deal with this is a better way! Add more definitions too!
             self.coordinate_axis = ('Time','Longitude','Latitude','Pressure') # Don't think pressure really even belongs here!
             # These are in order - we use the order when adding points
+        elif coordinate_vector.definition == "http://www.usgs.gov":
+            self.coordinate_axis = ('Time', 'Longitude','Latitude')
         else:
             raise RuntimeError('Unknown coordinate vector definition for this stream definition')
 

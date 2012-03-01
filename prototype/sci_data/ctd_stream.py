@@ -225,6 +225,188 @@ def ctd_stream_definition(stream_id=None):
 
     return ctd_container
 
+def usgs_stream_definition(stream_id=None):
+    """
+    ###
+    ### This method is highly suspect and subject to revision. Do not lien heavily on it or you will suffer refactoring
+    ###
+
+
+    This is a convenience method to construct a CTD data stream definition object. More generic stream definition
+     constructors will be added later.
+    @brief creates an ion object containing the definition of a seabird ctd data stream
+    @param stream_id is the resource id of the data stream for this definition
+    @retval ctd_container is an ion object which contains the definition of the stream
+    """
+
+    # data stream id is the identifier for the DataStream object - the root of the data structure
+    ctd_container = StreamDefinitionContainer(
+        stream_resource_id=stream_id,
+        data_stream_id= 'usgs_data',
+    )
+
+
+    ctd_container.identifiables['usgs_data'] = DataStream(
+        label='USGS water data',
+        description='Connecticut River at Thompsonville CT (01184000) - Daily Value',
+        element_count_id='record_count',
+        element_type_id='element_type',
+        encoding_id='stream_encoding',
+        values=None
+    )
+
+    ctd_container.identifiables['record_count'] = CountElement(value=0)
+
+    ctd_container.identifiables['element_type'] = ElementType(
+        definition="Ref to USGS data?",
+        updatable=False,
+        optional=False,
+        data_record_id='data_record')
+
+
+    ctd_container.identifiables['data_record'] = DataRecord(
+        #field_ids=['stnId','lon','lat','time','z','water_height','data_qualifier','water_temperature','streamflow','water_height_datum'],
+        field_ids=['lon','lat','time','water_height','water_temperature','streamflow'],
+        domain_ids=['time_domain'],
+        definition = "Definition of a data record for USGS",
+        updatable=False,
+        optional=False,
+    )
+
+
+    ctd_container.identifiables['nan_value'] = NilValue(
+        reason= "No value recorded",
+        value= -999.99
+    )
+
+    ctd_container.identifiables['lon'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='lon_data'
+    )
+
+    ctd_container.identifiables['lon_data'] = CoordinateAxis(
+        axis = "Longitude",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/longitude',
+        unit_of_measure = UnitReferenceProperty(code='deg'),
+        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    )
+
+
+    ctd_container.identifiables['lat'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='lat_data'
+    )
+
+    ctd_container.identifiables['lat_data'] = CoordinateAxis(
+        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        axis = "Latitude",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/latitude',
+        unit_of_measure = UnitReferenceProperty(code='deg'),
+        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    )
+
+    ctd_container.identifiables['time'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='time_data'
+    )
+
+    ctd_container.identifiables['time_data'] = CoordinateAxis(
+        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        axis = "Time",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/time',
+        unit_of_measure = UnitReferenceProperty(code='s'),
+        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    )
+
+    ctd_container.identifiables['water_height'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='water_height_data'
+    )
+
+    ctd_container.identifiables['water_height_data'] = RangeSet(
+        nil_values_ids = ['nan_value',],
+        unit_of_measure= UnitReferenceProperty(code='ft'),
+        values_path="/fields/water_height",
+    )
+
+    ctd_container.identifiables['water_temperature'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='water_temperature_data'
+    )
+
+    ctd_container.identifiables['water_temperature_data'] = RangeSet(
+        nil_values_ids = ['nan_value',],
+        unit_of_measure= UnitReferenceProperty(code='ft'),
+        values_path="/fields/water_temperature",
+    )
+
+    ctd_container.identifiables['streamflow'] = Coverage(
+        updatable=False,
+        optional=True,
+
+        domain_id='time_domain',
+        range_id='streamflow_data'
+    )
+
+    ctd_container.identifiables['streamflow_data'] = RangeSet(
+        nil_values_ids = ['nan_value',],
+        unit_of_measure= UnitReferenceProperty(code='ft3 s-1'),
+        values_path="/fields/streamflow",
+    )
+
+    ctd_container.identifiables['time_domain'] = Domain(
+        definition='Spec for ctd data time domain',
+        updatable='False',
+        optional='False',
+        coordinate_vector_id='coordinate_vector',
+        mesh_id='point_timeseries'
+    )
+
+    ctd_container.identifiables['coordinate_vector']= Vector(
+        definition="http://www.usgs.gov",
+        # need a definition that includes pressure as a coordinate???
+        coordinate_ids=['lon_data','lat_data','time_data'],
+        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+    )
+
+    ctd_container.identifiables['point_timeseries'] = Mesh(
+        mesh_type = CategoryElement(value="Point Time Series"),
+        values_path = "/topology/mesh",
+        index_offset = 0,
+        number_of_elements = 1,
+        number_of_verticies = 1,
+    )
+
+    ctd_container.identifiables['stream_encoding'] = Encoding(
+        encoding_type = 'hdf5',
+        compression = None,
+        sha1 = None
+    )
+
+
+
+    return ctd_container
 
 def scalar_point_stream_definition(description='', field_name='', field_definition='', field_units_code='', field_range=[]):
     """
