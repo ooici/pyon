@@ -127,20 +127,25 @@ class EndpointUnit(object):
         """
         log.debug("In EndpointUnit.message_received")
 
-    def send(self, msg, headers=None):
+    def send(self, msg, headers=None, **kwargs):
         """
         Public send method.
         Calls _build_msg (_build_header and _build_payload), then _send which puts it through the Interceptor stack(s).
 
         @param  msg         The message to send. Will be passed into _build_payload. You may modify the contents there.
         @param  headers     Optional headers to send. Will override anything produced by _build_header.
+        @param  kwargs      Passed through to _send.
         """
         _msg, _header = self._build_msg(msg)
         if headers: _header.update(headers)
-        return self._send(_msg, _header)
+        return self._send(_msg, _header, **kwargs)
 
-    def _send(self, msg, headers=None):
+    def _send(self, msg, headers=None, **kwargs):
         """
+        Handles the send interaction with the Channel.
+
+        Override this method to get custom behavior of how you want your endpoint unit to operate.
+        Kwargs passed into send will be forwarded here. They are not used in this base method.
         """
         log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
@@ -538,8 +543,15 @@ class BidirectionalListeningEndpointUnit(EndpointUnit):
 #
 
 class RequestEndpointUnit(BidirectionalEndpointUnit):
-    def _send(self, msg, headers=None):
-        log.debug("RequestEndpointUnit.send")
+    def _send(self, msg, headers=None, **kwargs):
+
+        # could have a specified timeout in kwargs
+        if 'timeout' in kwargs and kwargs['timeout'] is not None:
+            timeout = kwargs['timeout']
+        else:
+            timeout = CFG.endpoint.receive.timeout or 10
+
+        log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
         if not self._recv_greenlet:
             self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
@@ -552,9 +564,9 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         EndpointUnit._send(self, msg, headers=headers)
 
         try:
-            result_data, result_headers = self.response_queue.get(timeout=CFG.endpoint.receive.timeout)
+            result_data, result_headers = self.response_queue.get(timeout=timeout)
         except Timeout:
-            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (CFG.endpoint.receive.timeout, str(self.channel._send_name)))
+            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
 
         log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
@@ -576,11 +588,11 @@ class RequestResponseClient(SendingBaseEndpoint):
     """
     endpoint_unit_type = RequestEndpointUnit
 
-    def request(self, msg, headers=None):
+    def request(self, msg, headers=None, timeout=None):
         log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
         try:
-            retval, headers = e.send(msg, headers=headers)
+            retval, headers = e.send(msg, headers=headers, timeout=timeout)
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
@@ -612,10 +624,10 @@ class RequestResponseServer(ListeningBaseEndpoint):
 
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
-    def _send(self, msg, headers=None):
+    def _send(self, msg, headers=None, **kwargs):
         log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
 
-        res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers)
+        res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
 
         #log_message('?WHO AM I?', res, res_headers)
         log.debug("RPCRequestEndpointUnit got this response: %s, headers: %s" % (str(res), str(res_headers)))
@@ -747,7 +759,7 @@ class RPCClient(RequestResponseClient):
         newmethod.__doc__   = doc
         setattr(self.__class__, name, newmethod)
 
-    def request(self, msg, headers=None, op=None):
+    def request(self, msg, headers=None, op=None, timeout=None):
         """
         Request override for RPCClients.
 
@@ -758,7 +770,7 @@ class RPCClient(RequestResponseClient):
         headers = headers or {}
         headers['op'] = op
 
-        return RequestResponseClient.request(self, msg, headers=headers)
+        return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 
 class RPCResponseEndpointUnit(ResponseEndpointUnit):

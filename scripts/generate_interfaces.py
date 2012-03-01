@@ -148,9 +148,9 @@ ${methods}
 ''',
     'method':
 '''
-    def ${name}(${args}, headers=None):
+    def ${name}(${args}, headers=None, timeout=None):
         ${methoddocstring}
-        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers)
+        return self.request(IonObject('${req_in_obj_name}', **{$req_in_obj_args}), op='${name}', headers=headers, timeout=timeout)
 ''',
     'obj_arg': "'${name}': ${name} or ${default}",
     'obj_arg_no_def': "'${name}': ${name}",
