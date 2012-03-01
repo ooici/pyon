@@ -12,7 +12,9 @@ from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
-def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(), concatenate_block_size = None):
+def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = None):
+
+    import h5py, numpy
 
     arrays_out = {}
 
@@ -22,17 +24,17 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
     default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
 
     assert hdf_files, NotFound('No hdf_files provided to extract data from!')
-    assert buffer_size, NotFound('No buffer_size provided.')
-
-    import h5py, numpy
 
     def check_for_dataset(nodes):
         """
         A function to check for datasets in an hdf file and collect them
         """
         for node in nodes:
+
             if isinstance(node, h5py._hl.dataset.Dataset):
-                list_of_h5py_datasets.append(node)
+                # make a dict: key = dataset_name without the group/subgrp names, value = dataset
+                list_of_h5py_datasets[node.name.rsplit('/', 1)[1] : node]
+
             elif isinstance( node , h5py._hl.group.Group):
                 check_for_dataset(node.values())
 
@@ -40,18 +42,18 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
     for hdf_file in hdf_files:
 
         # refresh the h5py dataset list
-        list_of_h5py_datasets = []
+        list_of_h5py_datasets = {}
 
         log.debug('Reading file: %s' % hdf_file)
 
         # make a file object
-        f = h5py.File(hdf_file,'r')
+        file = h5py.File(hdf_file,'r')
 
         # get the list of groups or datasets if there are no groups in the file
-        values = f.values()
+        nodes = file.values()
 
         # checking for datasets in the hdf file
-        check_for_dataset(values)
+        check_for_dataset(nodes)
 
         log.debug('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
         #--------------------------------------------------------------------------------
@@ -68,69 +70,93 @@ def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(
 
         for vn in vars:
 
-            for dataset in list_of_h5py_datasets:
+            dataset = list_of_h5py_datasets.get(vn, None)
 
-                str = dataset.name # in general this dataset name will have the grp/subgrp names also in it
+            # the shape of the dataset is the same as the shape of the numpy array it contains
+            ndims = len(dataset.shape)
 
-                if str.rsplit('/', 1)[1] == vn: # strip off the grp and subgrp names
+            # Ensure the slice_ is the appropriate length
+            if len(slice_) < ndims:
+                slice_ += (slice(None),) * (ndims-len(slice_))
 
-                    # the shape of the dataset is the same as the shape of the numpy array it contains
-                    ndims = len(dataset.shape)
+            if dataset.values.size < concatenate_block_size:
 
-                    # Ensure the slice_ is the appropriate length
-                    if len(slice_) < ndims:
-                        slice_ += (slice(None),) * (ndims-len(slice_))
+                d = dataset.values
+                yield d
 
-                    arri = ArrayIterator(dataset, buffer_size)[slice_]
+            else: # use the ArrayIterator to slice the array held by the dataset and yield the bits
 
-                    for d in arri:
-                        if d.dtype.char is "S":
-                            # Obviously, we can't get the range of values for a string data type!
+                # feeding in the slice_ that is expected in ArrayIterator.
+                # This should read in all the values in the dataset
+                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(0,dataset.values.size))]
+
+                for d in arri:
+                    if d.dtype.char is "S":
+                        # Obviously, we can't get the range of values for a string data type!
+                        rng = None
+                    elif isinstance(d, numpy.ma.masked_array):
+                        # TODO: This is a temporary fix because numpy 'nanmin' and 'nanmax'
+                        # are currently broken for masked_arrays:
+                        # http://mail.scipy.org/pipermail/numpy-discussion/2011-July/057806.html
+                        dc=d.compressed()
+                        if dc.size == 0:
                             rng = None
-                        elif isinstance(d, numpy.ma.masked_array):
-                            # TODO: This is a temporary fix because numpy 'nanmin' and 'nanmax'
-                            # are currently broken for masked_arrays:
-                            # http://mail.scipy.org/pipermail/numpy-discussion/2011-July/057806.html
-                            dc=d.compressed()
-                            if dc.size == 0:
-                                rng = None
-                            else:
-                                rng = (numpy.nanmin(dc), numpy.nanmax(dc))
                         else:
-                            rng = (numpy.nanmin(d), numpy.nanmax(d))
+                            rng = (numpy.nanmin(dc), numpy.nanmax(dc))
+                    else:
+                        rng = (numpy.nanmin(d), numpy.nanmax(d))
 
-                        if concatenate_block_size:
+                    if concatenate_block_size:
 
-                            if vn in arrays_out:
-                                if arrays_out[vn].size < concatenate_block_size:
-                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
-                                else:
-                                    indices_left = concatenate_block_size - arrays_out[vn].size
-
-                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
-
-                                    temp_array = d[indices_left:]
-
-                                    # yields variable_name, the current slice, range, the sliced data,
-                                    # the dictionary holding the concatenated arrays by variable name
-                                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
-                                    yield vn, arri.curr_slice, rng, d, arrays_out, arrays_out[vn]
-
-                                    arrays_out[vn] = temp_array
+                        if vn in arrays_out:
+                            if arrays_out[vn].size < concatenate_block_size:
+                                arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
                             else:
-                                arrays_out[vn] = d
+                                indices_left = concatenate_block_size - arrays_out[vn].size
 
-                        # if no concatenate_block_size is provided
+                                arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
+
+                                flush_out_array = d[indices_left:]
+
+                                # yields variable_name, the current slice, range, the sliced data,
+                                # the dictionary holding the concatenated arrays by variable name
+                                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                                out_dict = {'variable_name' : vn,
+                                            'current_slice' : arri.curr_slice,
+                                            'range' : rng,
+                                            'current_array_chunk' : d,
+                                            'arrays_out_dict' : arrays_out,
+                                            'concatenated_array' : arrays_out[vn],
+                                            'flush_out_array' : flush_out_array
+                                }
+
+                                yield out_dict
+
+                                arrays_out[vn] = flush_out_array
                         else:
+                            arrays_out[vn] = d
 
-                            # to have the same yielded values as when the concatenate_block_size
-                            # is provided, we need to make sure that an empty dictionary goes out for arrays_out
-                            # and the arrays_out[vn] values are None
+                    # if no concatenate_block_size is provided
+                    else:
 
-                            # its good to keep the same interface and that is why we are yielding the same
-                            # number of output parameters for all cases of concatenate_block_size
+                        # to have the same yielded values as when the concatenate_block_size
+                        # is provided, we need to make sure that an empty dictionary goes out for arrays_out
+                        # and the arrays_out[vn] values are None
 
-                            yield vn, arri.curr_slice, rng, d, None, None
+                        # its good to keep the same interface and that is why we are yielding the same
+                        # number of output parameters for all cases of concatenate_block_size
+
+                        out_dict = {'variable_name' : vn,
+                                    'current_slice' : arri.curr_slice,
+                                    'range' : rng,
+                                    'current_array_chunk' : d,
+                                    'arrays_out_dict' : None,
+                                    'concatenated_array' : None,
+                                    'flush_out_array' : None
+                        }
+
+                        yield vn, arri.curr_slice, rng, d, None, None, None
 
 
 
