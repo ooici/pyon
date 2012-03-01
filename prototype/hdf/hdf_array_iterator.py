@@ -12,28 +12,39 @@ from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
+
 def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = None):
 
     import h5py, numpy
 
     arrays_out = {}
 
-    # the numpy arrays will be stored here as a list to begin with
-
     # the default dataset names that are going to be used for input...
     default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
 
     assert hdf_files, NotFound('No hdf_files provided to extract data from!')
 
-    def check_for_dataset(nodes):
+    def check_for_dataset(nodes, var_names):
         """
         A function to check for datasets in an hdf file and collect them
         """
+
+        import h5py
+
         for node in nodes:
 
             if isinstance(node, h5py._hl.dataset.Dataset):
-                # make a dict: key = dataset_name without the group/subgrp names, value = dataset
-                list_of_h5py_datasets[node.name.rsplit('/', 1)[1] : node]
+
+                #-------------------------------------------------------------------------------------------------------
+                # if the name of the dataset (without grp/subgrp name) is one of the supplied variable names of interest,
+                # update the dictionary for relevant datasets
+                #-------------------------------------------------------------------------------------------------------
+
+                dataset_name = node.name.rsplit('/', 1)[1]
+                dataset = node
+
+                if dataset_name in var_names:
+                    dict_of_h5py_datasets[dataset_name] = dataset
 
             elif isinstance( node , h5py._hl.group.Group):
                 check_for_dataset(node.values())
@@ -41,54 +52,95 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
     for hdf_file in hdf_files:
 
+        #-------------------------------------------------------------------------------------------------------
         # refresh the h5py dataset list
-        list_of_h5py_datasets = {}
+        #-------------------------------------------------------------------------------------------------------
+
+        dict_of_h5py_datasets = {}
 
         log.debug('Reading file: %s' % hdf_file)
 
+        #-------------------------------------------------------------------------------------------------------
         # make a file object
+        #-------------------------------------------------------------------------------------------------------
+
         file = h5py.File(hdf_file,'r')
 
+        #-------------------------------------------------------------------------------------------------------
         # get the list of groups or datasets if there are no groups in the file
+        #-------------------------------------------------------------------------------------------------------
+
         nodes = file.values()
 
-        # checking for datasets in the hdf file
-        check_for_dataset(nodes)
-
-        log.debug('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
-        #--------------------------------------------------------------------------------
-        # Use the ArrayIterator so that the arrays come in buffer sized chunks
-        #--------------------------------------------------------------------------------
-
-        # var_name = 'conductivity'
         if var_names is None:
-            vars = default_var_names
-        else:
-            vars = [] + var_names
+            var_names = default_var_names
 
-        if not isinstance(slice_, tuple): slice_ = (slice_,)
+        #-------------------------------------------------------------------------------------------------------
+        # checking for datasets in the hdf file whose names appear in the list of variable names supplied
+        #-------------------------------------------------------------------------------------------------------
 
-        for vn in vars:
+        check_for_dataset(nodes, var_names)
+        log.debug('dict_of_h5py_datasets: %s' % dict_of_h5py_datasets)
 
-            dataset = list_of_h5py_datasets.get(vn, None)
+        #-------------------------------------------------------------------------------------------------------
+        # if no relevant dataset was found in the hdf file, then skip that file
+        #-------------------------------------------------------------------------------------------------------
 
-            # the shape of the dataset is the same as the shape of the numpy array it contains
-            ndims = len(dataset.shape)
+        if not dict_of_h5py_datasets:
+            continue
 
-            # Ensure the slice_ is the appropriate length
-            if len(slice_) < ndims:
-                slice_ += (slice(None),) * (ndims-len(slice_))
 
-            if dataset.values.size < concatenate_block_size:
+        #-------------------------------------------------------------------------------------------------------
+        # Iterate over the supplied variable names
+        #-------------------------------------------------------------------------------------------------------
 
-                d = dataset.values
-                yield d
+        for vn in var_names:
 
-            else: # use the ArrayIterator to slice the array held by the dataset and yield the bits
+            #-------------------------------------------------------------------------------------------------------
+            # fetch the dataset
+            #-------------------------------------------------------------------------------------------------------
 
-                # feeding in the slice_ that is expected in ArrayIterator.
-                # This should read in all the values in the dataset
-                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(0,dataset.values.size))]
+            dataset = dict_of_h5py_datasets.get(vn, None)
+
+            #-------------------------------------------------------------------------------------------------------
+            # if this variable is not in a dataset in the hdf file, skip this variable name for this hdf file
+            #-------------------------------------------------------------------------------------------------------
+
+            if not dataset:
+                continue
+
+            #-------------------------------------------------------------------------------------------------------
+            # if the array in the dataset is too small, grab the whole array
+            #-------------------------------------------------------------------------------------------------------
+
+            if dataset.value.size < concatenate_block_size:
+
+                # grab the whole array in the dataset
+                d = dataset.value
+                # update the arrays_out dict
+                arrays_out[vn] = d
+
+                out_dict = {'variable_name' : vn,
+                            'current_slice' :  (slice(0,dataset.value.size)), # this is the whole array
+                            'range' : (numpy.nanmin(d), numpy.nanmax(d)),
+                            'current_array_chunk' : d,
+                            'arrays_out_dict' : arrays_out,
+                            'concatenated_array' : d,
+                            'flush_out_array' : None
+                }
+
+                yield out_dict
+
+            else:
+
+                #--------------------------------------------------------------------------------------------------------------
+                #
+                # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
+                #
+                # feeding in the slice_ that is expected in ArrayIterator....this should read in all the values in the dataset
+                #--------------------------------------------------------------------------------------------------------------
+
+                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(0,dataset.value.size))]
 
                 for d in arri:
                     if d.dtype.char is "S":
@@ -118,8 +170,11 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
                                 flush_out_array = d[indices_left:]
 
+                                #-----------------------------------------------------------------------------------------
                                 # yields variable_name, the current slice, range, the sliced data,
                                 # the dictionary holding the concatenated arrays by variable name
+                                #-----------------------------------------------------------------------------------------
+
                                 log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
                                 out_dict = {'variable_name' : vn,
@@ -140,12 +195,14 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                     # if no concatenate_block_size is provided
                     else:
 
+                        #-----------------------------------------------------------------------------------------
                         # to have the same yielded values as when the concatenate_block_size
                         # is provided, we need to make sure that an empty dictionary goes out for arrays_out
                         # and the arrays_out[vn] values are None
 
                         # its good to keep the same interface and that is why we are yielding the same
                         # number of output parameters for all cases of concatenate_block_size
+                        #-----------------------------------------------------------------------------------------
 
                         out_dict = {'variable_name' : vn,
                                     'current_slice' : arri.curr_slice,
