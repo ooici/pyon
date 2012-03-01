@@ -185,6 +185,8 @@ class ProcManager(object):
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
+        self._set_service_endpoint(service_instance, service_instance.id)
+
         # Start the service
         self._service_start(service_instance)
 
