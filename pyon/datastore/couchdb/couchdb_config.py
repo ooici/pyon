@@ -133,6 +133,14 @@ function(doc) {
     emit([doc.name, doc.type_, doc.lcstate], null);
   }
 }""",
+        },
+        'by_attachment':{
+            'map':"""
+function(doc) {
+  if (doc.type_ && doc.type_=="Attachment") {
+    emit([doc.resource_id, doc.ts_created], null);
+  }
+}""",
         }
     },
 
