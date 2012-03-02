@@ -226,13 +226,15 @@ class Directory(object):
             if subtree is not None:
                 start_key.append(subtree_dn)
             res = self.dir_store.find_by_view('directory', 'by_key',
-                            start_key=start_key, end_key=start_key, **kwargs)
+                            start_key=start_key, end_key=start_key, id_only=False, **kwargs)
         else:
             start_key = [attribute, value, subtree_dn]
             end_key = [attribute, value, subtree_dn+"ZZZZZZZZ"]
             res = self.dir_store.find_by_view('directory', 'by_attribute',
-                            start_key=start_key, end_key=end_key, **kwargs)
-        return res
+                            start_key=start_key, end_key=end_key, id_only=False, **kwargs)
+
+        match = [(qname, doc.attributes) for qname, index, doc in res]
+        return match
 
     # ------------------------------------------
     # Specific directory entry methods

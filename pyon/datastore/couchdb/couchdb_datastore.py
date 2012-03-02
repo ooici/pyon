@@ -308,7 +308,7 @@ class CouchDB_DataStore(DataStore):
         log.debug('Deleting object %s/%s' % (datastore_name, doc_id))
 
         if del_associations:
-            assoc_ids = self.find_associations(doc_id, None, id_only=True)
+            assoc_ids = self.find_associations(anyobj=doc_id, id_only=True)
             for aid in assoc_ids:
                 self.delete(aid, datastore_name=datastore_name)
             log.debug("Deleted %n associations for object %s" % (len(assoc_ids), doc_id))
@@ -392,7 +392,7 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Must provide object id")
         ds, datastore_name = self._get_datastore(datastore_name)
 
-        assoc_ids = self.find_associations(obj_id, None, id_only=True, limit=1)
+        assoc_ids = self.find_associations(anyobj=obj_id, id_only=True, limit=1)
         if assoc_ids:
             log.debug("Object found as object in associations: First is %s" % assoc_ids)
             return True
@@ -473,12 +473,18 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
-    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True, **kwargs):
+    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True, anyobj=None, **kwargs):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        if not (subject and obj or predicate or anyobj):
+            raise BadRequest("Illegal parameters")
         if assoc_type and not predicate:
             raise BadRequest("Illegal parameters")
+
+        # Support
+        if subject is None and obj is None and anyobj:
+            subject = anyobj
 
         if subject:
             if type(subject) is str:
@@ -526,6 +532,8 @@ class CouchDB_DataStore(DataStore):
             endkey = list(key)
             endkey.append(END_MARKER)
             rows = view[key:endkey]
+        else:
+            raise BadRequest("Illegal arguments")
 
         if id_only:
             assocs = [row.id for row in rows]
