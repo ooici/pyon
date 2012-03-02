@@ -667,7 +667,7 @@ class CouchDB_DataStore(DataStore):
             else:
                 rows = view[startkey:endkey]
         else:
-            raise BadRequest("Illegal key arguments")
+            rows = view
 
         if id_only:
             res_rows = [(row['id'],row['key'], None) for row in rows]
