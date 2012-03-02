@@ -645,12 +645,15 @@ class CouchDB_DataStore(DataStore):
         view = ds.view(view_doc, **view_args)
         if key is not None:
             rows = view[key]
+            log.info("find_by_view(): key=%s" % key)
         elif keys:
             rows = view
+            log.info("find_by_view(): keys=%s" % keys)
         elif start_key and end_key:
             startkey = start_key or []
-            endkey = end_key or []
+            endkey = list(end_key) or []
             endkey.append(END_MARKER)
+            log.info("find_by_view(): start_key=%s to end_key=%s" % (startkey, endkey))
             if view_args.get('descending', False):
                 rows = view[endkey:startkey]
             else:
@@ -666,7 +669,7 @@ class CouchDB_DataStore(DataStore):
             else:
                 res_rows = [(row['id'],row['key'],row['doc']) for row in rows]
 
-        log.debug("find_by_view() found %s objects" % (len(res_rows)))
+        log.info("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
 
     def _ion_object_to_persistence_dict(self, ion_object):

@@ -158,10 +158,8 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "DirEntry") {
-    if (doc.parent.indexOf('/') != 0) return;
     levels = doc.parent.split('/');
-    levels.splice(0,1);
-    if (doc.parent == "/") levels.pop();
+    if (doc.parent == "") levels.pop();
     levels.push(doc.key);
     emit(levels, doc);
   }
@@ -171,8 +169,17 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "DirEntry") {
-    if (doc.parent.indexOf('/') != 0) return;
     emit([doc.key, doc.parent], doc);
+  }
+}""",
+        },
+        'by_attribute':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "DirEntry") {
+    for (var attr in doc.attributes) {
+      emit([attr, doc.attributes[attr], doc.parent], doc);
+    }
   }
 }""",
         },

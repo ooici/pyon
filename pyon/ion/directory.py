@@ -39,23 +39,36 @@ class Directory(object):
         """
         self.dir_store.close()
 
-    def _get_dn(self, parent, key=None, org=None):
-        org = org or self.orgname
-        if parent == '/':
-            return "%s/%s" % (org, key) if key is not None else org
-        elif parent.startswith("/"):
-            return "%s%s/%s" % (org, parent,key) if key is not None else "%s%s" % (org, parent)
-        else:
-            raise BadRequest("Illegal directory parent: %s" % parent)
+    def _create(self):
+        """
+        Method which will create the underlying data store and
+        persist an empty Directory object.
+        """
+        # Persist empty Directory object under known name
+        #self.dir_name = bootstrap.get_sys_name()
+        #directory_obj = IonObject('Directory', name=self.dir_name)
+        #dir_id,rev = self.dir_store.create(directory_obj, 'DIR')
+
+        # Persist ROOT Directory object
+        root_obj = DirEntry(parent='', key=self.orgname, attributes=dict(sys_name=bootstrap.get_sys_name()))
+        root_id,rev = self.dir_store.create(root_obj, self.orgname)
+
 
     def _init(self):
+
+        try:
+            root_de = self.dir_store.read(self.orgname)
+        except NotFound as nf:
+            self._create()
+
         self._assert_existence("/", "Agents",
                 description="Running agents are registered here")
 
         if not self._assert_existence("/", "Config",
                 description="System configuration is registered here"):
             if self.is_root:
-                self._register_config()
+                pass
+                #self._register_config()
 
         self._assert_existence("/", "Containers",
                 description="Running containers are registered here")
@@ -63,7 +76,8 @@ class Directory(object):
         if not self._assert_existence("/", "ObjectTypes",
                 description="ObjectTypes are registered here"):
             if self.is_root:
-                self._register_object_types()
+                pass
+                #self._register_object_types()
 
         self._assert_existence("/", "Org",
                 description="Org specifics are registered here",
@@ -78,10 +92,20 @@ class Directory(object):
         if not self._assert_existence("/", "ServiceInterfaces",
                 description="Service interface definitions are registered here"):
             if self.is_root:
-                self._register_service_definitions()
+                pass
+                #self._register_service_definitions()
 
         self._assert_existence("/", "Services",
                 description="Service instances are registered here")
+
+    def _get_dn(self, parent, key=None, org=None):
+        org = org or self.orgname
+        if parent == '/':
+            return "%s/%s" % (org, key) if key is not None else org
+        elif parent.startswith("/"):
+            return "%s%s/%s" % (org, parent,key) if key is not None else "%s%s" % (org, parent)
+        else:
+            raise BadRequest("Illegal directory parent: %s" % parent)
 
     def _assert_existence(self, parent, key, **kwargs):
         """
@@ -92,7 +116,8 @@ class Directory(object):
         direntry = self._safe_read(dn)
         existed = bool(direntry)
         if not direntry:
-            direntry = DirEntry(parent=parent, key=key, attributes=kwargs)
+            parent_dn = self._get_dn(parent)
+            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs)
             # TODO: This may fail because of concurrent create
             self.dir_store.create(direntry, dn)
         return existed
@@ -106,29 +131,17 @@ class Directory(object):
         except BadRequest:
             return None
 
-    def _create(self):
-        """
-        Method which will create the underlying data store and
-        persist an empty Directory object.
-        """
-        log.debug("Creating data store and Directory")
-        self.dir_store.create_datastore()
-
-        # Persist empty Directory object under known name
-        self.dir_name = bootstrap.get_sys_name()
-        directory_obj = IonObject('Directory', name=self.dir_name)
-        dir_id,rev = self.dir_store.create(directory_obj, 'DIR')
-
-        # Persist ROOT Directory object
-        root_obj = DirEntry(parent='/', key="ROOT", attributes=dict(sys_name=bootstrap.get_sys_name()))
-        root_id,rev = self.dir_store.create(root_obj, self._get_dn(root_obj.parent, root_obj.key))
 
     def register(self, parent, key, **kwargs):
         """
         Add/replace an entry to directory below a parent node.
         Note: Does not merge the attribute values of the entry if existing
         """
-        assert parent and key, "Malformed Directory register"
+        if not (parent and key):
+            raise BadRequest("Illegal arguments")
+        if not type(parent) is str or not parent.startswith("/"):
+            raise BadRequest("Illegal arguments: parent")
+
         dn = self._get_dn(parent, key)
         log.debug("Directory.add(%s): %s" % (dn, kwargs))
 
@@ -140,8 +153,8 @@ class Directory(object):
             # TODO: This may fail because of concurrent update
             self.dir_store.update(direntry)
         else:
-            direntry = DirEntry(parent=parent, key=key, attributes=kwargs)
-            # TODO: This may fail because of concurrent create
+            parent_dn = self._get_dn(parent)
+            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs)
             self.dir_store.create(direntry, dn)
 
         return entry_old
@@ -154,11 +167,12 @@ class Directory(object):
 
     def register_mult(self, entries):
         if type(entries) not in (list, tuple):
-            raise BadRequest("Bad type")
+            raise BadRequest("Bad entries type")
         de_list = []
         deid_list = []
         for parent, key, attrs in entries:
-            de = DirEntry(parent=parent, key=key, attributes=attrs)
+            parent_dn = self._get_dn(parent)
+            de = DirEntry(parent=parent_dn, key=key, attributes=attrs)
             de_list.append(de)
             dn = self._get_dn(parent, key)
             deid_list.append(dn)
@@ -195,10 +209,30 @@ class Directory(object):
             log.exception("Error unregistering key=%s/%s" % (parent, key))
 
     def find_entries(self, qname='/'):
-        if not str(qname).startswith('/'):
-            raise BadRequest("Illegal directory node: qname=%s" % qname)
+        if not type(qname) is str or not qname.startswith("/"):
+            raise BadRequest("Illegal argument qname: qname=%s" % qname)
+
         delist = self.dir_store.find_dir_entries(qname)
         return delist
+
+    def find_by_value(self, subtree='/', key=None, attribute=None, value=None, **kwargs):
+        if key is None and attribute is None:
+            raise BadRequest("Illegal arguments")
+        if subtree is None:
+            raise BadRequest("Illegal arguments")
+        subtree_dn = self._get_dn(subtree)
+        if key:
+            start_key = [key]
+            if subtree is not None:
+                start_key.append(subtree_dn)
+            res = self.dir_store.find_by_view('directory', 'by_key',
+                            start_key=start_key, end_key=start_key, **kwargs)
+        else:
+            start_key = [attribute, value, subtree_dn]
+            end_key = [attribute, value, subtree_dn+"ZZZZZZZZ"]
+            res = self.dir_store.find_by_view('directory', 'by_attribute',
+                            start_key=start_key, end_key=end_key, **kwargs)
+        return res
 
     # ------------------------------------------
     # Specific directory entry methods
