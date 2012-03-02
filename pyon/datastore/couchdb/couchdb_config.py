@@ -98,7 +98,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ && doc.type_=="Attachment") {
-    emit([doc.resource_id, doc.ts_created], null);
+    emit([doc.object_id, doc.ts_created], null);
   }
 }""",
         }

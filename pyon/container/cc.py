@@ -23,6 +23,7 @@ from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository
 from pyon.ion.directory import Directory
 from pyon.ion.exchange import ExchangeManager
+from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
 from pyon.net.endpoint import ProcessRPCServer
 from pyon.net import messaging
@@ -133,8 +134,11 @@ class Container(BaseContainerAgent):
         self.directory.register("/Containers", self.id, cc_agent=self.name)
         self._capabilities.append("DIRECTORY")
 
+        # Local resource registry
+        self.resource_registry = ResourceRegistry()
+        self._capabilities.append("RESOURCE_REGISTRY")
+
         # Create other repositories to make sure they are there and clean if needed
-        self.datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
         self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
 
@@ -280,6 +284,10 @@ class Container(BaseContainerAgent):
         elif capability == "STATE_REPOSITORY":
             # close state repository (possible CouchDB connection)
             self.state_repository.close()
+
+        elif capability == "RESOURCE_REGISTRY":
+            # close state resource registry (possible CouchDB connection)
+            self.resource_registry.close()
 
         elif capability == "DIRECTORY":
             # Unregister from directory

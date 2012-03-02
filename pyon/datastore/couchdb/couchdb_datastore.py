@@ -639,6 +639,7 @@ class CouchDB_DataStore(DataStore):
                            id_only=True, convert_doc=True, **kwargs):
         """
         @brief Generic find function using an defined index
+        @retval Returns a list of triples: (att_id, index_row, Attachment object or none)
         """
         log.debug("find_by_view(%s/%s)" % (design_name, view_name))
         if type(id_only) is not bool:
