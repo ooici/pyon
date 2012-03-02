@@ -16,7 +16,7 @@ from interface.objects import QuantityRangeElement #, QuantityElement, TimeEleme
 
 from prototype.hdf.hdf_codec import HDFEncoder #, HDFEncoderException, HDFDecoder, HDFDecoderException
 
-from prototype.sci_data.constructor_apis import StreamDefinitionConstructor
+from prototype.sci_data.constructor_apis import StreamDefinitionConstructor, PointSupplementConstructor
 import hashlib
 
 from pyon.util.log import log
@@ -382,7 +382,7 @@ def L2_density_stream_definition():
 
 
 
-def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None, create_hdf=True):
+def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, height=None, time=None, create_hdf=True):
     """
     ###
     ### This method is deprecated!
@@ -405,7 +405,15 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
     @param time is a list, tuple or ndarray of time values
 
     """
-    length = False
+
+    stream_def = ctd_stream_definition(stream_id=stream_id)
+
+    psc = PointSupplementConstructor(point_definition=stream_def, stream_id=stream_id)
+
+
+    assert time
+    assert lat
+    assert lon
 
     def listify(input):
         if hasattr(input, '__iter__'):
@@ -413,181 +421,85 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
         else:
             return [input,]
 
+    length = False
 
-    c_range = []
+
     if c is not None:
         c = listify(c)
-        c_range = [min(c), max(c)]
         if length:
             assert length == len(c), 'Conductivity input is the wrong length'
         else:
             length = len(c)
 
-    t_range = []
     if t is not None:
         t = listify(t)
-        t_range = [min(t), max(t)]
         if length:
             assert length == len(t), 'Temperature input is the wrong length'
         else:
             length = len(t)
 
-    p_range = []
     if p is not None:
         p = listify(p)
-        p_range = [min(p), max(p)]
         if length:
             assert length == len(p), 'Pressure input is the wrong length'
         else:
             length = len(p)
 
-    lat_range = []
     if lat is not None:
         lat = listify(lat)
-        lat_range = [min(lat), max(lat)]
         if length:
-            assert length == len(lat), 'Latitude input is the wrong length'
+            if 1 == len(lat):
+                lat = lat*length
         else:
             length = len(lat)
+    else:
+        raise RuntimeError('Did not specify longitude')
 
-    lon_range = []
     if lon is not None:
         lon = listify(lon)
-        lon_range = [min(lon), max(lon)]
         if length:
-            assert length == len(lon), 'Longitude input is the wrong length'
+            if 1 == len(lon):
+                lon = lon*length
         else:
             length = len(lon)
+    else:
+        raise RuntimeError('Did not specify longitude')
 
-    time_range = []
+    if height is not None:
+        height = listify(height)
+        if length:
+            if 1 == len(height):
+                height = height*length
+        else:
+            length = len(height)
+    else:
+        height = [0,]*length
+
     if time is not None:
         time = listify(time)
-        time_range = [min(time), max(time)]
         if length:
-            assert length == len(time), 'Time input is the wrong length'
+            if 1 == len(time):
+                time = time*length
         else:
             length = len(time)
+    else:
+        raise RuntimeError('Did not specify time')
 
 
-    hdf_string = ''
-    if create_hdf:
-        try:
-            # Use inline import to put off making numpy a requirement
-            import numpy as np
+    for idx, time_val in enumerate(time):
 
-            encoder = HDFEncoder()
-            if t is not None:
-                encoder.add_hdf_dataset('/fields/temp_data', np.asanyarray(t))
+        p_id = psc.add_point(time=time_val, location=(lon[idx], lat[idx], height[idx]))
 
-
-            if c is not None:
-                encoder.add_hdf_dataset('/fields/cndr_data', np.asanyarray(c))
-
-            if p is not None:
-                encoder.add_hdf_dataset('/fields/pressure_data',np.asanyarray(p))
-
-            if lat is not None:
-                encoder.add_hdf_dataset('/fields/latitude', np.asanyarray(lat))
-
-            if lon is not None:
-                encoder.add_hdf_dataset('/fields/longitude',np.asanyarray(lon))
-
-            if time is not None:
-                encoder.add_hdf_dataset('/fields/time',np.asanyarray(time))
-
-            hdf_string = encoder.encoder_close()
-        except :
-            log.exception('HDF encoder failed. Please make sure you have it properly installed!')
+        #putting the if inside the loop is slow - but this is a test method only!
+        if t:
+            psc.add_scalar_point_coverage(point_id=p_id, coverage_id='temperature', value=t[idx])
+        if p:
+            psc.add_scalar_point_coverage(point_id=p_id, coverage_id='pressure', value=p[idx])
+        if c:
+            psc.add_scalar_point_coverage(point_id=p_id, coverage_id='conductivity', value=c[idx])
 
 
 
-    # build a hdf file here
-
-    # data stream id is the identifier for the DataStream object - the root of the data structure
-    ctd_container = StreamGranuleContainer(
-        stream_resource_id=stream_id,
-        data_stream_id= 'ctd_data'
-    )
 
 
-    ctd_container.identifiables['ctd_data'] = DataStream(
-        id=stream_id,
-        values=hdf_string # put the hdf file here as bytes!
-        )
-
-    sha1 = hashlib.sha1(hdf_string).hexdigest().upper() if hdf_string else ''
-
-    ctd_container.identifiables['stream_encoding'] = Encoding(
-        encoding_type = 'hdf5',
-        compression = None,
-        sha1 = sha1,
-    )
-
-
-    ctd_container.identifiables['record_count'] = CountElement(
-        value= length or -1,
-        )
-
-    # Time
-    if time is not None :
-        ctd_container.identifiables['time'] = CoordinateAxis(
-            bounds_id='time_bounds'
-        )
-
-        ctd_container.identifiables['time_bounds'] = QuantityRangeElement(
-            value_pair=time_range
-        )
-
-    # Latitude
-    if lat is not None:
-        ctd_container.identifiables['latitude'] = CoordinateAxis(
-            bounds_id='latitude_bounds'
-        )
-
-        ctd_container.identifiables['latitude_bounds'] = QuantityRangeElement(
-            value_pair=lat_range
-        )
-
-    # Longitude
-    if lon is not None:
-        ctd_container.identifiables['longitude'] = CoordinateAxis(
-            bounds_id='longitude_bounds'
-        )
-
-        ctd_container.identifiables['longitude_bounds'] = QuantityRangeElement(
-            value_pair=lon_range
-        )
-
-
-    # Pressure
-    if p is not None:
-        ctd_container.identifiables['pressure_data'] = CoordinateAxis(
-            bounds_id='pressure_bounds'
-        )
-
-        ctd_container.identifiables['pressure_bounds'] = QuantityRangeElement(
-            value_pair=p_range
-        )
-
-    # Temperature
-    if t is not None:
-        ctd_container.identifiables['temp_data'] = RangeSet(
-            bounds_id=['temp_bounds']
-        )
-
-        ctd_container.identifiables['temp_bounds'] = QuantityRangeElement(
-            value_pair=t_range
-        )
-
-    # Conductivity
-    if c is not None:
-        ctd_container.identifiables['cndr_data'] = RangeSet(
-            bounds_id='cndr_bounds'
-        )
-
-        ctd_container.identifiables['cndr_bounds'] = QuantityRangeElement(
-            value_pair=c_range
-        )
-
-
-    return ctd_container
+    return psc.close_stream_granule()

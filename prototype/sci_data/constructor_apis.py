@@ -159,7 +159,9 @@ def insert_2d_geographic_coordinates(ident, vector, domain_name):
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
-    return
+    # return a list of the coverages
+    return ['latitude', 'longitude']
+
 
 
 def insert_3d_geographic_coordinates(ident, vector, domain_name):
@@ -168,9 +170,9 @@ def insert_3d_geographic_coordinates(ident, vector, domain_name):
     'http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic'
     """
 
-    insert_2d_geographic_coordinates(ident,vector,domain_name)
+    coverage_names = insert_2d_geographic_coordinates(ident,vector,domain_name)
 
-    vector.coordinate_ids.append('height')
+    vector.coordinate_ids.append('height_data')
 
 
 
@@ -192,7 +194,10 @@ def insert_3d_geographic_coordinates(ident, vector, domain_name):
         unit_of_measure = UnitReferenceProperty(code='deg')
     )
 
-    return
+    # return a list of the coverages
+    coverage_names.append('height')
+
+    return coverage_names
 
 
 
@@ -272,6 +277,7 @@ class StreamDefinitionConstructor(object):
                 optional='False',
             )
             self._ident[self._domain_name] = self.__domain
+            self._data_record.domain_ids = [self._domain_name,]
         return self.__domain
 
 
@@ -319,7 +325,7 @@ class StreamDefinitionConstructor(object):
             reference_value = reference_time
         )
 
-
+        self._data_record.field_ids.append('time')
 
     def define_geospatial_coordinates(self, definition='', reference_frame=''):
         """
@@ -338,16 +344,20 @@ class StreamDefinitionConstructor(object):
 
         #@todo Use an EPSG CRS library for this!
 
+        coverage_names = []
+
         if reference_frame == 'urn:ogc:def:crs:EPSG::4326':
 
-            insert_2d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
+            coverage_names = insert_2d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
 
         elif reference_frame == 'urn:ogc:def:crs:EPSG::4979':
 
-            insert_3d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
+            coverage_names = insert_3d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
 
         else:
             raise RuntimeError('Only two coordinate reference systems are supported at present: EPSG 4326 and 4979')
+
+        self._data_record.field_ids.extend(coverage_names)
 
 
     def define_coverage(self, field_name='', field_definition='', field_units_code='', field_range=[]):
@@ -580,14 +590,30 @@ class PointSupplementConstructor(object):
 
         domain = point_definition.identifiables[domain_ids[0]]
 
-        coordinate_vector_id = domain.coordinate_vector_id
-        coordinate_vector = point_definition.identifiables[coordinate_vector_id]
+        time_coordinate_vector_id = domain.temporal_coordinate_vector_id
+        time_coordinate_vector = point_definition.identifiables[time_coordinate_vector_id]
+
+        assert time_coordinate_vector.reference_frame == 'http://www.opengis.net/def/trs/OGC/0/GPS'
+        assert time_coordinate_vector.definition == 'http://www.opengis.net/def/property/OGC/0/SamplingTime'
+
+        time_coord_axis = point_definition.identifiables[time_coordinate_vector.coordinate_ids[0]]
+
+        time_axis = time_coord_axis.axis
+
+        geo_coordinate_vector_id = domain.geospatial_coordinate_vector_id
+        geo_coordinate_vector = point_definition.identifiables[geo_coordinate_vector_id]
 
         self.coordinate_axis = (None,)
-        if coordinate_vector.definition == "http://sweet.jpl.nasa.gov/2.0/space.owl#Location":
-            #@todo deal with this is a better way! Add more definitions too!
-            self.coordinate_axis = ('Time','Longitude','Latitude','Pressure') # Don't think pressure really even belongs here!
+        #@todo deal with this is a better way! Add more definitions too!
+        if geo_coordinate_vector.reference_frame == 'urn:ogc:def:crs:EPSG::4326':
+
+            # Use defined axis names from the CRS definition
+            self.coordinate_axis = (time_axis,'Longitude','Latitude')
             # These are in order - we use the order when adding points
+        elif geo_coordinate_vector.reference_frame == 'urn:ogc:def:crs:EPSG::4979':
+
+            # Use defined axis names from the CRS definition
+            self.coordinate_axis = (time_axis,'Longitude','Latitude','Height')
         else:
             raise RuntimeError('Unknown coordinate vector definition for this stream definition')
 
@@ -681,18 +707,40 @@ class PointSupplementConstructor(object):
 
         for coverage_info in self._coordinates.itervalues():
 
+            records = coverage_info['records'] # Turn the list into an array
+            if not records:
+                log.warn('Coverage name "%s" has no values!' % coverage_info['id'])
+                continue
+
+            array = numpy.asarray(records) # Turn the list into an array
+
+            # Add the coverage
             self._granule.identifiables[coverage_info['id']] = coverage_info['obj']
-            array = numpy.asarray(coverage_info['records']) # Turn the list into an array
+
+            # Add the range
             range = [float(numpy.nanmin(array)), float(numpy.nanmax(array))]
             self._granule.identifiables[coverage_info['obj'].bounds_id] = QuantityRangeElement(value_pair=range)
+
+            # Add the data
             encoder.add_hdf_dataset(name=coverage_info['values_path'],nparray=array)
 
         for range_info in self._ranges.itervalues():
 
+            records = range_info['records'] # Turn the list into an array
+            if not records:
+                log.warn('Range name "%s" has no values!' % range_info['id'])
+                continue
+
+            array = numpy.asarray(records) # Turn the list into an array
+
+            # Add the coverage
             self._granule.identifiables[range_info['id']] = range_info['obj']
-            array = numpy.asarray(range_info['records']) # Turn the list into an array
+
+            # Add the range
             range = [float(numpy.nanmin(array)), float(numpy.nanmax(array))]
             self._granule.identifiables[range_info['obj'].bounds_id] = QuantityRangeElement(value_pair=range)
+
+            # Add the data
             encoder.add_hdf_dataset(name=range_info['values_path'],nparray=array)
 
         hdf_string = encoder.encoder_close()
