@@ -115,20 +115,18 @@ class ExchangeManager(object):
         """
         if CFG.container.get('exchange', {}).get('auto_register', False):
             # ok now make sure it's in the directory
-            des = self.container.directory.find_entries('/Containers')
-            for de in des:
-                if de.attributes.get('name', '') == "exchange_management":
+            svc_de = self.container.directory.lookup('/Services/exchange_management')
+            if svc_de is not None:
+                if not self.org_id:
+                    # find the default Org
+                    org_ids = self._rr_client.find_resources(RT.Org, id_only=True)
+                    if not (len(org_ids) and len(org_ids[0]) == 1):
+                        log.warn("EMS available but could not find Org")
+                        return False
 
-                    if not self.org_id:
-                        # find the default Org
-                        org_ids = self._rr_client.find_resources(RT.Org, id_only=True)
-                        if not (len(org_ids) and len(org_ids[0]) == 1):
-                            log.warn("EMS available but could not find Org")
-                            return False
-
-                        self.org_id = org_ids[0][0]
-                        log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
-                    return True
+                    self.org_id = org_ids[0][0]
+                    log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
+                return True
 
         return False
 
