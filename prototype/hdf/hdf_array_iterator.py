@@ -134,18 +134,13 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                             'current_array_chunk' : d,
                             'arrays_out_dict' : arrays_out,
                             'concatenated_array' : d,
-                            'flush_out_array' : None
                 }
 
                 yield out_dict
 
             else:
-
                 #--------------------------------------------------------------------------------------------------------------
-                #
                 # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
-                #
-                # feeding in the slice_ that is expected in ArrayIterator....this should read in all the values in the dataset
                 #--------------------------------------------------------------------------------------------------------------
 
                 read_entries = 0
@@ -168,67 +163,35 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                     read_entries += d.size
                     log.warn("read_entries: %s" % read_entries)
 
-
                     if num_entries_to_read:
                         left_to_read_entries = max(num_entries_to_read - read_entries,0)
                         log.warn("left_to_read_entries: %s" % left_to_read_entries)
 
-
-
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
 
                     if concatenate_block_size:
-
                         log.warn("concatenate_block_size: %s" % concatenate_block_size)
 
                         if num_entries_to_read:
                             upper_bound = min(left_to_read_entries, concatenate_block_size)
 
-                        if d.size < concatenate_block_size:
-                            arrays_out[vn] = d
-                        else:
-                            arrays_out[vn] = d
+                        arrays_out[vn] = d
 
-                            #-----------------------------------------------------------------------------------------
-                            # yields variable_name, the current slice, range, the sliced data,
-                            # the dictionary holding the concatenated arrays by variable name
-                            #-----------------------------------------------------------------------------------------
+                    else: # if no concatenate_block_size is provided
+                        arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
 
-                            log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
-                            out_dict = {'variable_name' : vn,
-                                        'current_slice' : arri.curr_slice,
-                                        'range' : rng,
-                                        'current_array_chunk' : d,
-                                        'arrays_out_dict' : arrays_out,
-                                        'concatenated_array' : arrays_out[vn],
-                                        'flush_out_array' : None
-                            }
+                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
-                            yield out_dict
+                    out_dict = {'variable_name' : vn,
+                                'current_slice' : arri.curr_slice,
+                                'range' : rng,
+                                'current_array_chunk' : d,
+                                'arrays_out_dict' : arrays_out,
+                                'concatenated_array' : arrays_out[vn],
+                                }
 
-                    # if no concatenate_block_size is provided
-                    else:
-
-                        #-----------------------------------------------------------------------------------------
-                        # to have the same yielded values as when the concatenate_block_size
-                        # is provided, we need to make sure that an empty dictionary goes out for arrays_out
-                        # and the arrays_out[vn] values are None
-
-                        # its good to keep the same interface and that is why we are yielding the same
-                        # number of output parameters for all cases of concatenate_block_size
-                        #-----------------------------------------------------------------------------------------
-
-                        out_dict = {'variable_name' : vn,
-                                    'current_slice' : arri.curr_slice,
-                                    'range' : rng,
-                                    'current_array_chunk' : d,
-                                    'arrays_out_dict' : None,
-                                    'concatenated_array' : None,
-                                    'flush_out_array' : None
-                        }
-
-                        yield out_dict
+                    yield out_dict
 
 
 
