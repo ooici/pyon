@@ -13,11 +13,18 @@ from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
 
-def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = None):
+def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = None, bounds = None):
 
     import h5py, numpy
 
     arrays_out = {}
+
+    # Note: stop_index is exclusive
+    if bounds:
+        start_index, stop_index = bounds
+        entries_to_read = stop_index - start_index
+    else:
+        start_index = 0
 
     # the default dataset names that are going to be used for input...
     default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
@@ -140,7 +147,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                 # feeding in the slice_ that is expected in ArrayIterator....this should read in all the values in the dataset
                 #--------------------------------------------------------------------------------------------------------------
 
-                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(0,dataset.value.size))]
+                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index,dataset.value.size))]
 
                 for d in arri:
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
