@@ -148,54 +148,64 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                 # feeding in the slice_ that is expected in ArrayIterator....this should read in all the values in the dataset
                 #--------------------------------------------------------------------------------------------------------------
 
+                read_entries = 0
+                log.warn("read_entries: %s" % read_entries)
 
                 if num_entries_to_read:
                     log.warn("came here!")
                     arri = ArrayIterator(dataset, concatenate_block_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
                 else:
+                    log.warn("dataset.value.size: %s" % dataset.value.size)
                     arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index, dataset.value.size))]
+
+                count = 0
 
                 for d in arri:
 
-                    read_entries = d.size
+                    count += 1
+                    log.warn("iteration count: %s" % count)
+
+                    read_entries += d.size
+                    log.warn("read_entries: %s" % read_entries)
+
+
                     if num_entries_to_read:
-                        left_to_read_entries = num_entries_to_read - read_entries
+                        left_to_read_entries = max(num_entries_to_read - read_entries,0)
+                        log.warn("left_to_read_entries: %s" % left_to_read_entries)
+
+
 
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
 
                     if concatenate_block_size:
 
-                        if vn in arrays_out:
-                            if arrays_out[vn].size < concatenate_block_size:
-                                arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
-                            else:
-                                indices_left = concatenate_block_size - arrays_out[vn].size
+                        log.warn("concatenate_block_size: %s" % concatenate_block_size)
 
-                                arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
+                        if num_entries_to_read:
+                            upper_bound = min(left_to_read_entries, concatenate_block_size)
 
-                                flush_out_array = d[indices_left:]
-
-                                #-----------------------------------------------------------------------------------------
-                                # yields variable_name, the current slice, range, the sliced data,
-                                # the dictionary holding the concatenated arrays by variable name
-                                #-----------------------------------------------------------------------------------------
-
-                                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
-
-                                out_dict = {'variable_name' : vn,
-                                            'current_slice' : arri.curr_slice,
-                                            'range' : rng,
-                                            'current_array_chunk' : d,
-                                            'arrays_out_dict' : arrays_out,
-                                            'concatenated_array' : arrays_out[vn],
-                                            'flush_out_array' : flush_out_array
-                                }
-
-                                yield out_dict
-
-                                arrays_out[vn] = flush_out_array
+                        if d.size < concatenate_block_size:
+                            arrays_out[vn] = d
                         else:
                             arrays_out[vn] = d
+
+                            #-----------------------------------------------------------------------------------------
+                            # yields variable_name, the current slice, range, the sliced data,
+                            # the dictionary holding the concatenated arrays by variable name
+                            #-----------------------------------------------------------------------------------------
+
+                            log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                            out_dict = {'variable_name' : vn,
+                                        'current_slice' : arri.curr_slice,
+                                        'range' : rng,
+                                        'current_array_chunk' : d,
+                                        'arrays_out_dict' : arrays_out,
+                                        'concatenated_array' : arrays_out[vn],
+                                        'flush_out_array' : None
+                            }
+
+                            yield out_dict
 
                     # if no concatenate_block_size is provided
                     else:
