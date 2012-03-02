@@ -36,19 +36,11 @@ COUCHDB_CONFIGS = {
 COUCHDB_VIEWS = {
     # Association (triple) related views
     'association':{
-        'all':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit(doc._id, doc);
-  }
-}""",
-        },
         'by_sub':{
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.s, doc.p, doc.ot, doc.o], null);
+    emit([doc.s, doc.p, doc.ot, doc.o], doc);
   }
 }""",
         },
@@ -56,7 +48,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.o, doc.p, doc.st, doc.s], null);
+    emit([doc.o, doc.p, doc.st, doc.s], doc);
   }
 }""",
         },
@@ -64,7 +56,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], null);
+    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
         },
@@ -72,7 +64,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], null);
+    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
         }

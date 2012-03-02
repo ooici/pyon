@@ -381,13 +381,16 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Must provide object id")
         ds, datastore_name = self._get_datastore(datastore_name)
 
-        view = ds.view(self._get_viewname("association","all"))
-        associations = [row.value for row in view]
+        subs,_ = self.find_subjects(None, None, obj_id, id_only=True)
+        if subs:
+            log.debug("Object found as object in associations: %s" % subs)
+            return True
 
-        for association in associations:
-            if association["s"] == obj_id or association["o"] == obj_id:
-                log.debug("association found(%s)" % association)
-                return True
+        objs,_ = self.find_objects(obj_id, id_only=True)
+        if objs:
+            log.debug("Object found as subject in associations: %s" % objs)
+            return True
+
         return False
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
@@ -405,25 +408,19 @@ class CouchDB_DataStore(DataStore):
                 raise BadRequest("Object id not available in subject")
             else:
                 subject_id = subject._id
-        view = ds.view(self._get_viewname("association","all"))
-        associations = [row.value for row in view]
 
-        obj_assocs = []
-        obj_ids = []
-        for association in associations:
-            if association["s"] == subject_id:
-                if predicate:
-                    if association["p"] == predicate:
-                        if object_type:
-                            if association["ot"] == object_type:
-                                obj_assocs.append(self._persistence_dict_to_ion_object(association))
-                                obj_ids.append(association["o"])
-                        else:
-                            obj_assocs.append(self._persistence_dict_to_ion_object(association))
-                            obj_ids.append(association["o"])
-                else:
-                    obj_assocs.append(self._persistence_dict_to_ion_object(association))
-                    obj_ids.append(association["o"])
+        view = ds.view(self._get_viewname("association","by_sub"))
+        key = [subject_id]
+        if predicate:
+            key.append(predicate)
+            if object_type:
+                key.append(object_type)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        obj_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
+        obj_ids = [assoc.o for assoc in obj_assocs]
 
         log.debug("find_objects() found %s objects" % (len(obj_ids)))
         if id_only:
@@ -447,25 +444,19 @@ class CouchDB_DataStore(DataStore):
                 raise BadRequest("Object id not available in object")
             else:
                 object_id = obj._id
-        view = ds.view(self._get_viewname("association","all"))
-        associations = [row.value for row in view]
 
-        sub_assocs = []
-        sub_ids = []
-        for association in associations:
-            if association["o"] == object_id:
-                if predicate:
-                    if association["p"] == predicate:
-                        if subject_type:
-                            if association["st"] == subject_type:
-                                sub_assocs.append(self._persistence_dict_to_ion_object(association))
-                                sub_ids.append(association["s"])
-                        else:
-                            sub_assocs.append(self._persistence_dict_to_ion_object(association))
-                            sub_ids.append(association["s"])
-                else:
-                    sub_assocs.append(self._persistence_dict_to_ion_object(association))
-                    sub_ids.append(association["s"])
+        view = ds.view(self._get_viewname("association","by_obj"))
+        key = [object_id]
+        if predicate:
+            key.append(predicate)
+            if subject_type:
+                key.append(subject_type)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        sub_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
+        sub_ids = [assoc.s for assoc in sub_assocs]
 
         log.debug("find_subjects() found %s subjects" % (len(sub_ids)))
         if id_only:
@@ -502,7 +493,7 @@ class CouchDB_DataStore(DataStore):
                     raise BadRequest("Object id not available in object")
                 else:
                     object_id = obj._id
-            view = ds.view(self._get_viewname("association","by_ids"), include_docs=(not id_only))
+            view = ds.view(self._get_viewname("association","by_ids"))
             key = [subject_id, object_id]
             if predicate:
                 key.append(predicate)
@@ -512,7 +503,7 @@ class CouchDB_DataStore(DataStore):
             endkey.append(END_MARKER)
             rows = view[key:endkey]
         else:
-            view = ds.view(self._get_viewname("association","by_pred"), include_docs=(not id_only))
+            view = ds.view(self._get_viewname("association","by_pred"))
             key = [predicate]
             endkey = list(key)
             endkey.append(END_MARKER)
@@ -521,7 +512,7 @@ class CouchDB_DataStore(DataStore):
         if id_only:
             assocs = [row.id for row in rows]
         else:
-            assocs = [self._persistence_dict_to_ion_object(row.doc.copy()) for row in rows]
+            assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
         log.debug("find_associations() found %s associations" % (len(assocs)))
         return assocs
 
