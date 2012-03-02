@@ -16,6 +16,7 @@ from interface.objects import QuantityRangeElement #, QuantityElement, TimeEleme
 
 from prototype.hdf.hdf_codec import HDFEncoder #, HDFEncoderException, HDFDecoder, HDFDecoderException
 
+from prototype.sci_data.constructor_apis import StreamDefinitionConstructor
 import hashlib
 
 from pyon.util.log import log
@@ -27,398 +28,356 @@ http://marinemetadata.org/workshops/mmiworkshop06/materials/track1/sensorml/EXAM
 """
 
 
-def ctd_stream_definition(stream_id=None):
-    """
-    ###
-    ### This method is highly suspect and subject to revision. Do not lien heavily on it or you will suffer refactoring
-    ###
+def SBE37_CDM_stream_definition():
 
-
-    This is a convenience method to construct a CTD data stream definition object. More generic stream definition
-     constructors will be added later.
-    @brief creates an ion object containing the definition of a seabird ctd data stream
-    @param stream_id is the resource id of the data stream for this definition
-    @retval ctd_container is an ion object which contains the definition of the stream
-    """
-
-    # data stream id is the identifier for the DataStream object - the root of the data structure
-    ctd_container = StreamDefinitionContainer(
-        stream_resource_id=stream_id,
-        data_stream_id= 'ctd_data',
+    sdc = StreamDefinitionConstructor(
+        description='Parsed conductivity temperature and pressure observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
         )
 
 
-    ctd_container.identifiables['ctd_data'] = DataStream(
-        label='Seabird CTD Data',
-        description='Conductivity temperature and depth observations from a Seabird CTD',
-        element_count_id='record_count',
-        element_type_id='element_type',
-        encoding_id='stream_encoding',
-        values=None
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
         )
 
-    ctd_container.identifiables['record_count'] = CountElement(value=0)
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
 
-    ctd_container.identifiables['element_type'] = ElementType(
-        definition="Ref to SeaBird data?",
-        updatable=False,
-        optional=False,
-        data_record_id='data_record')
+    )
 
-
-    ctd_container.identifiables['data_record'] = DataRecord(
-        field_ids=['temperature','conductivity','pressure','latitude','longitude','time'],
-        domain_ids=['time_domain'],
-        definition = "Definition of a data record for a CTD",
-        updatable=False,
-        optional=False,
+    sdc.define_coverage(
+        field_name='temperature',
+        field_definition="urn:x-ogc:def:phenomenon:OGC:temperature", # Copied from SSDS
+        field_units_code='Cel',
+        field_range=[-10.0, 100.0]
         )
 
-
-    ctd_container.identifiables['nan_value'] = NilValue(
-        reason= "No value recorded",
-        value= -999.99
-    )
-
-    ctd_container.identifiables['temperature'] = Coverage(
-            definition= "urn:x-ogc:def:phenomenon:OGC:temperature",
-            updatable=False,
-            optional=True,
-
-            domain_id='time_domain',
-            range_id='temp_data'
-            )
-
-    ctd_container.identifiables['temp_data'] = RangeSet(
-        definition= "urn:x-ogc:def:phenomenon:OGC:temperature",
-        nil_values_ids = ['nan_value',],
-        mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[[-10.0, 100.0],]),
-        unit_of_measure= UnitReferenceProperty(code='Cel'),
-        values_path="/fields/temp_data",
+    sdc.define_coverage(
+        field_name = 'conductivity',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:conductivity", # Copied from SSDS
+        field_units_code = 'mS/cm', # Check these units!
+        field_range = [0.0, 100.0]
     )
 
 
-    ctd_container.identifiables['conductivity'] = Coverage(
-        definition= "urn:x-ogc:def:phenomenon:OGC:conductivity", # from ssds
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='cndr_data'
-    )
-
-    ctd_container.identifiables['cndr_data'] = RangeSet(
-        definition= "urn:x-ogc:def:phenomenon:OGC:conductivity",
-        nil_values_ids = ['nan_value',],
-        mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[[0.0, 85.0],]), # Normal range for ocean
-        unit_of_measure= UnitReferenceProperty(code='mS/cm'), # milli Siemens per centimeter
-        values_path="/fields/cndr_data",
+    sdc.define_coverage(
+        field_name = 'pressure',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:pressure", # Copied from SSDS
+        field_units_code = 'dBar',
+        field_range = [0.0, 1000.0]
     )
 
 
-    ctd_container.identifiables['time_domain'] = Domain(
-        definition='Spec for ctd data time domain',
-        updatable='False',
-        optional='False',
-        coordinate_vector_id='coordinate_vector',
-        mesh_id='point_timeseries'
-        )
+    return sdc.close_structure()
 
-    ctd_container.identifiables['coordinate_vector']= Vector(
-        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
-        # need a definition that includes pressure as a coordinate???
-        coordinate_ids=['longitude_data','latitude_data','pressure_data','time_data'],
-        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+# Keep the old method operational...
+def ctd_stream_definition(stream_id = None):
+
+    sd = SBE37_CDM_stream_definition()
+    sd.stream_resource_id = stream_id or ''
+    return sd
+
+
+def SBE37_RAW_stream_definition():
+
+    stream_definition = StreamDefinitionContainer(
+        data_stream_id='data_stream',
     )
 
-    ctd_container.identifiables['pressure'] = Coverage(
-        definition= "urn:x-ogc:def:phenomenon:OGC:pressure", # No idea if this is correct!
-        updatable=False,
-        optional=True,
+    ident = stream_definition.identifiables
 
-        domain_id='time_domain',
-        range_id='pressure_data'
-    )
-
-    ctd_container.identifiables['pressure_data'] = CoordinateAxis(
-        definition= "urn:x-ogc:def:phenomenon:OGC:pressure", # Copied from SSDS
-        nil_values_ids = ['nan_value',],
-        axis = "Pressure",
-        mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
-        unit_of_measure= UnitReferenceProperty(code='dBar'), # bar is a unit of pressure used in oceanography
-        values_path="/fields/pressure_data",
-        reference_frame='Atmospheric pressure ?'
-    )
-
-    ctd_container.identifiables['latitude'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='latitude_data'
-    )
-
-
-    ctd_container.identifiables['latitude_data'] = CoordinateAxis(
-        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
-        axis = "Latitude",
-        constraint= AllowedValues(values=[[-90.0, 90.0],]),
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/latitude',
-        unit_of_measure = UnitReferenceProperty(code='deg')
-    )
-
-
-    ctd_container.identifiables['longitude'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='longitude_data'
-    )
-
-    ctd_container.identifiables['longitude_data'] = CoordinateAxis(
-        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
-        axis = "Longitude",
-        constraint= AllowedValues(values=[[0.0, 360.0],]),
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/longitude',
-        unit_of_measure = UnitReferenceProperty(code='deg')
-    )
-
-
-    ctd_container.identifiables['time'] = Coverage(
-        definition= "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='time_data'
-    )
-
-    ctd_container.identifiables['time_data'] = CoordinateAxis(
-        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        axis = "Time",
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/time',
-        unit_of_measure = UnitReferenceProperty(code='s'),
-        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
-    )
-    
-    ctd_container.identifiables['point_timeseries'] = Mesh(
-        mesh_type = CategoryElement(value="Point Time Series"),
-        values_path = "/topology/mesh",
-        index_offset = 0,
-        number_of_elements = 1,
-        number_of_verticies = 1,
-    )
-    
-    ctd_container.identifiables['stream_encoding'] = Encoding(
-        encoding_type = 'hdf5',
-        compression = None,
-        sha1 = None
-    )
-    
-    
-
-    return ctd_container
-
-
-def scalar_point_stream_definition(description='', field_name='', field_definition='', field_units_code='', field_range=[]):
-    """
-    ###
-    ### This method is highly suspect and subject to revision. Do not lien heavily on it or you will suffer refactoring
-    ###
-
-
-    This is a convenience method to construct a scalar point stream definition object for a single signal.
-    More generic stream definition constructors will be added later.
-
-    Does this really make sense? Can we have an interface like this to build a stream def? I don't think so. I think
-    Steam defs must be highly specialized to the data they contain.
-
-    @brief creates an ion object containing the definition of a scalar value stream
-    @param description is a top level human readable description of the stream content
-    @retval stream_def is an ion object which contains the definition of the stream
-    """
-
-    # data stream id is the identifier for the DataStream object - the root of the data structure
-    stream_def = StreamDefinitionContainer(
-        data_stream_id= 'scalar_stream',
-    )
-
-
-    stream_def.identifiables['scalar_stream'] = DataStream(
-        description=description,
+    ident['data_stream'] = DataStream(
+        description='Raw data from an SBE 37',
         element_count_id='record_count',
         element_type_id='element_type',
         encoding_id='stream_encoding',
         values=None
     )
 
-    stream_def.identifiables['record_count'] = CountElement(value=0)
+    ident['stream_encoding'] = Encoding(
+        encoding_type='raw', # add something here about the record separator and value separator
+        compression=None,
+        sha1=None
+    )
 
-    stream_def.identifiables['element_type'] = ElementType(
+    ident['record_count'] = CountElement(
+        value=0,
+        optional=False,
+        updatable=True
+        )
+
+    ident['element_type'] = ElementType(
         updatable=False,
         optional=False,
-        data_record_id='data_record')
-
-
-    stream_def.identifiables['data_record'] = DataRecord(
-        field_ids=[field_name,'pressure','latitude','longitude','time'],
-        domain_ids=['time_domain'],
-        updatable=False,
-        optional=False,
+        definition='Raw SBE 37 data'
     )
 
 
-    stream_def.identifiables['nan_value'] = NilValue(
-        reason= "No value recorded",
-        value= -999.99
-    )
+    return stream_definition
 
-    # appending _data is a handycap not a convention!
-    field_range_name ='%s_data' % field_name
 
-    stream_def.identifiables[field_name] = Coverage(
-        definition= field_definition,
-        updatable=False,
-        optional=True,
+def L0_conductivity_stream_definition():
 
-        domain_id='time_domain',
-        range_id=field_range_name
-    )
-
-    stream_def.identifiables[field_range_name] = RangeSet(
-        definition= field_definition,
-        nil_values_ids = ['nan_value',],
-        mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[field_range,]),
-        unit_of_measure= UnitReferenceProperty(code=field_units_code),
-        values_path="/fields/%s" % field_range_name,
+    sdc = StreamDefinitionConstructor(
+        description='L0 Conductivity observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
     )
 
 
-    stream_def.identifiables['time_domain'] = Domain(
-        definition='Spec for ctd data time domain',
-        updatable='False',
-        optional='False',
-        coordinate_vector_id='coordinate_vector',
-        mesh_id='point_timeseries'
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
     )
 
-    stream_def.identifiables['coordinate_vector']= Vector(
-        definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
-        # need a definition that includes pressure as a coordinate???
-        coordinate_ids=['longitude','latitude','pressure_data','time'],
-        reference_frame="http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic" # Using coordinate system
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
     )
 
-    stream_def.identifiables['pressure'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='pressure_data'
-    )
-
-    stream_def.identifiables['pressure_data'] = CoordinateAxis(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
-        nil_values_ids = ['nan_value',],
-        axis = "Pressure",
-        mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
-        unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
-        values_path="/fields/pressure_data",
-        reference_frame='Atmospheric pressure ?'
-    )
-
-    stream_def.identifiables['latitude'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='latitude_data'
+    sdc.define_coverage(
+        field_name = 'conductivity',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:conductivity", # Copied from SSDS
+        field_units_code = 'mS/cm', # Check these units!
+        field_range = [0.0, 100.0]
     )
 
 
-    stream_def.identifiables['latitude_data'] = CoordinateAxis(
-        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
-        axis = "Latitude",
-        constraint= AllowedValues(values=[[-90.0, 90.0],]),
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/latitude',
-        unit_of_measure = UnitReferenceProperty(code='deg')
+    return sdc.close_structure()
+
+def L0_temperature_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L0 Temperature observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
     )
 
 
-    stream_def.identifiables['longitude'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='longitude_data'
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
     )
 
-    stream_def.identifiables['longitude_data'] = CoordinateAxis(
-        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
-        axis = "Longitude",
-        constraint= AllowedValues(values=[[0.0, 360.0],]),
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/longitude',
-        unit_of_measure = UnitReferenceProperty(code='deg')
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
     )
 
-    stream_def.identifiables['time'] = Coverage(
-        definition= "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        updatable=False,
-        optional=True,
-
-        domain_id='time_domain',
-        range_id='time_data'
+    sdc.define_coverage(
+        field_name='temperature',
+        field_definition="urn:x-ogc:def:phenomenon:OGC:temperature", # Copied from SSDS
+        field_units_code='Cel',
+        field_range=[-10.0, 100.0]
     )
 
-    stream_def.identifiables['time_data'] = CoordinateAxis(
-        definition = "http://www.opengis.net/def/property/OGC/0/SamplingTime",
-        axis = "Time",
-        nil_values_ids = ['nan_value'],
-        mesh_location = CategoryElement(value='vertex'),
-        values_path= '/fields/time',
-        unit_of_measure = UnitReferenceProperty(code='s'),
-        reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS"
+    return sdc.close_structure()
+
+def L0_pressure_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L0 Pressure observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
     )
 
 
-    stream_def.identifiables['point_timeseries'] = Mesh(
-        mesh_type = CategoryElement(value="Point Time Series"),
-        values_path = "/topology/mesh",
-        index_offset = 0,
-        number_of_elements = 1,
-        number_of_verticies = 1,
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
     )
 
-    stream_def.identifiables['stream_encoding'] = Encoding(
-        encoding_type = 'hdf5',
-        compression = None,
-        sha1 = None
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name = 'pressure',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:pressure", # Copied from SSDS
+        field_units_code = 'dBar',
+        field_range = [0.0, 1000.0]
     )
 
 
+    return sdc.close_structure()
 
-    return stream_def
+
+
+def L1_conductivity_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L1 Conductivity observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name = 'conductivity',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:conductivity", # Copied from SSDS
+        field_units_code = 'mS/cm', # Check these units!
+        field_range = [0.0, 100.0]
+    )
+
+
+    return sdc.close_structure()
+
+def L1_temperature_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L1 Temperature observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name='temperature',
+        field_definition="urn:x-ogc:def:phenomenon:OGC:temperature", # Copied from SSDS
+        field_units_code='Cel',
+        field_range=[-10.0, 100.0]
+    )
+
+    return sdc.close_structure()
+
+def L1_pressure_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L1 Pressure observations from a Seabird 37 CTD',
+        nil_value=-999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name = 'pressure',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:pressure", # Copied from SSDS
+        field_units_code = 'dBar',
+        field_range = [0.0, 1000.0]
+    )
+
+
+    return sdc.close_structure()
+
+
+def L2_practical_salinity_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L2 practical salinity observations',
+        nil_value=-999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name = 'salinity',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:practical_salinity", # Copied from SSDS
+        field_units_code = '', # practical salinity has no units
+        field_range = [0.1, 40.0]
+    )
+
+
+    return sdc.close_structure()
+
+
+def L2_density_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='L2 practical salinity observations',
+        nil_value=-999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4979'
+
+    )
+
+    sdc.define_coverage(
+        field_name = 'density',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:density", # Copied from SSDS
+        field_units_code = 'kg/m3', # practical salinity has no units
+        field_range = [1000.0, 1050.0]
+    )
+
+
+    return sdc.close_structure()
 
 
 
@@ -426,7 +385,7 @@ def scalar_point_stream_definition(description='', field_name='', field_definiti
 def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=None, time=None, create_hdf=True):
     """
     ###
-    ### This method is highly suspect and likely to be completely removed. It is only for early experimentation
+    ### This method is deprecated!
     ###
 
 

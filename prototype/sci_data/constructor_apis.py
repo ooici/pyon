@@ -203,15 +203,15 @@ class StreamDefinitionConstructor(object):
     object that defines the supplements published to the stream.
     """
 
-    def __init__(self,stream_id='',description='', nil_value=None):
+    def __init__(self, description='', nil_value=None, encoding='hdf5'):
         """
         Instantiate a station dataset constructor.
         """
-        self.stream_definition = StreamDefinitionContainer(
+        self._stream_definition = StreamDefinitionContainer(
             data_stream_id='data_stream'
         )
 
-        ident = self.stream_definition.identifiables
+        ident = self._stream_definition.identifiables
 
         ident['data_stream'] = DataStream(
             description=description,
@@ -222,14 +222,16 @@ class StreamDefinitionConstructor(object):
         )
 
         ident['stream_encoding'] = Encoding(
-            encoding_type='hdf5',
+            encoding_type=encoding,
             compression=None,
             sha1=None
         )
 
-        ident['data_record'] = DataRecord()
-
-        ident['record_count'] = CountElement(value=0)
+        ident['record_count'] = CountElement(
+            value=0,
+            optional=False,
+            updatable=True
+        )
 
         ident['element_type'] = ElementType(
             updatable=False,
@@ -237,11 +239,18 @@ class StreamDefinitionConstructor(object):
             data_record_id='data_record'
         )
 
+        self._data_record = DataRecord()
+        ident['data_record'] = self._data_record
+
+        self._nil_value_name = []
         if nil_value is not None:
+            self._nil_value_name = ['nan_value']
             ident['nan_value'] = NilValue(
                 reason='No value recorded.',
                 value=nil_value
             )
+
+
 
 
         # For ease of access in building data structure
@@ -249,6 +258,7 @@ class StreamDefinitionConstructor(object):
 
         # optional structure to use in building definition
         self.__domain =None
+        self._domain_name = 'domain'
 
     @property
     def _domain(self):
@@ -261,7 +271,7 @@ class StreamDefinitionConstructor(object):
                 updatable='False',
                 optional='False',
             )
-            self._ident['domain'] = self.__domain
+            self._ident[self._domain_name] = self.__domain
         return self.__domain
 
 
@@ -294,7 +304,7 @@ class StreamDefinitionConstructor(object):
             definition= definition,
             updatable=False,
             optional=False,
-            domain_id='domain', # declared in _domain property above...
+            domain_id=self._domain_name, # declared in _domain property above...
             range_id='time_data'
         )
 
@@ -328,13 +338,13 @@ class StreamDefinitionConstructor(object):
 
         #@todo Use an EPSG CRS library for this!
 
-        if reference_frame is 'urn:ogc:def:crs:EPSG::4326':
+        if reference_frame == 'urn:ogc:def:crs:EPSG::4326':
 
-            insert_2d_geographic_coordinates(self._ident, coord_vector, 'domain')
+            insert_2d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
 
-        elif reference_frame is 'urn:ogc:def:crs:EPSG::4979':
+        elif reference_frame == 'urn:ogc:def:crs:EPSG::4979':
 
-            insert_3d_geographic_coordinates(self._ident, coord_vector, 'domain')
+            insert_3d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
 
         else:
             raise RuntimeError('Only two coordinate reference systems are supported at present: EPSG 4326 and 4979')
@@ -362,28 +372,21 @@ class StreamDefinitionConstructor(object):
 
 
     def _add_coverage(self, name=None, definition=None, updatable=False, optional=True):
-        if name in self.stream_definition.identifiables:
+        if name in self._ident:
             log.warn('Field name "%s" already in identifiables!' % name)
             return 0
+
         coverage = Coverage(
             definition=definition,
             updatable=updatable,
             optional=optional,
-            domain_id='',
-            range_id=''
-        )
+            domain_id=self._domain_name,
+            )
 
 
-        record = self.stream_definition.identifiables[
-                    DefinitionTree.get(
-                        self.stream_definition,
-                        '%s.element_type_id.data_record_id' % self.stream_definition.data_stream_id
-                    )
-        ]
 
-
-        record.field_ids.append(name)
-        self.stream_definition.identifiables[name] = coverage
+        self._data_record.field_ids.append(name)
+        self._ident[name] = coverage
 
 
     def _add_range(self, coverage_id=None,
@@ -405,20 +408,19 @@ class StreamDefinitionConstructor(object):
         @param values_path Location of data points in HDF e.g. /fields/temp
         @param unit_of_measure_code Code for unit of measure
         """
-        if name in self.stream_definition.identifiables:
+        if name in self._ident:
             log.warn('Field name "%s" already in identifiables!' % name)
             return 0
-        axis = CoordinateAxis(
+        range = RangeSet(
             definition=definition,
-            axis=axis,
             constraint=constraint,
-            nil_values_ids=['nan_value'],
+            nil_values_ids= self._nil_value_name,
             mesh_location=CategoryElement(value=mesh_location),
             values_path=values_path,
             unit_of_measure=UnitReferenceProperty(code=unit_of_measure_code)
         )
-        self.stream_definition.identifiables[name] = axis
-        coverage = self.stream_definition.identifiables[coverage_id]
+        self._ident[name] = range
+        coverage = self._ident[coverage_id]
         coverage.range_id = name
 
 
@@ -438,13 +440,13 @@ class StreamDefinitionConstructor(object):
         """
         Print the dataset metadata for debug purposes.
         """
-        return ionprint(self.stream_definition)
+        return ionprint(self._stream_definition)
 
     def close_structure(self):
         """
         Method used to encode the station dataset metadata (structure)
         """
-        return self.stream_definition
+        return self._stream_definition
 
 
 class StationSupplementConstructor(object):
