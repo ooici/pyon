@@ -21,6 +21,12 @@ import hashlib
 from pyon.util.log import log
 
 
+"""
+SWE meta data copied from SSDS:
+http://marinemetadata.org/workshops/mmiworkshop06/materials/track1/sensorml/EXAMPLES/MBARI_CTD_SensorML
+"""
+
+
 def ctd_stream_definition(stream_id=None):
     """
     ###
@@ -75,7 +81,7 @@ def ctd_stream_definition(stream_id=None):
     )
 
     ctd_container.identifiables['temperature'] = Coverage(
-            definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Temperature",
+            definition= "urn:x-ogc:def:phenomenon:OGC:temperature",
             updatable=False,
             optional=True,
 
@@ -84,17 +90,17 @@ def ctd_stream_definition(stream_id=None):
             )
 
     ctd_container.identifiables['temp_data'] = RangeSet(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Temperature",
+        definition= "urn:x-ogc:def:phenomenon:OGC:temperature",
         nil_values_ids = ['nan_value',],
         mesh_location= CategoryElement(value='vertex'),
-        constraint= AllowedValues(values=[[-10.0, 50.0],]),
+        constraint= AllowedValues(values=[[-10.0, 100.0],]),
         unit_of_measure= UnitReferenceProperty(code='Cel'),
         values_path="/fields/temp_data",
     )
 
 
     ctd_container.identifiables['conductivity'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Conductivity", # No idea if this is the correct def to use!
+        definition= "urn:x-ogc:def:phenomenon:OGC:conductivity", # from ssds
         updatable=False,
         optional=True,
 
@@ -103,7 +109,7 @@ def ctd_stream_definition(stream_id=None):
     )
 
     ctd_container.identifiables['cndr_data'] = RangeSet(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Conductivity",
+        definition= "urn:x-ogc:def:phenomenon:OGC:conductivity",
         nil_values_ids = ['nan_value',],
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0.0, 85.0],]), # Normal range for ocean
@@ -128,7 +134,7 @@ def ctd_stream_definition(stream_id=None):
     )
 
     ctd_container.identifiables['pressure'] = Coverage(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
+        definition= "urn:x-ogc:def:phenomenon:OGC:pressure", # No idea if this is correct!
         updatable=False,
         optional=True,
 
@@ -137,12 +143,12 @@ def ctd_stream_definition(stream_id=None):
     )
 
     ctd_container.identifiables['pressure_data'] = CoordinateAxis(
-        definition= "http://sweet.jpl.nasa.gov/2.0/physThermo.owl#Pressure", # No idea if this is correct!
+        definition= "urn:x-ogc:def:phenomenon:OGC:pressure", # Copied from SSDS
         nil_values_ids = ['nan_value',],
         axis = "Pressure",
         mesh_location= CategoryElement(value='vertex'),
         constraint= AllowedValues(values=[[0, 10000.0],]), # rough range, approximately 0 to 10km
-        unit_of_measure= UnitReferenceProperty(code='dbar'), # bar is a unit of pressure used in oceanography
+        unit_of_measure= UnitReferenceProperty(code='dBar'), # bar is a unit of pressure used in oceanography
         values_path="/fields/pressure_data",
         reference_frame='Atmospheric pressure ?'
     )
@@ -313,7 +319,7 @@ def scalar_point_stream_definition(description='', field_name='', field_definiti
         definition = "http://sweet.jpl.nasa.gov/2.0/space.owl#Location",
         # need a definition that includes pressure as a coordinate???
         coordinate_ids=['longitude','latitude','pressure_data','time'],
-        reference_frame="http://www.opengis.net/def/crs/EPSG/0/4326"
+        reference_frame="http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic" # Using coordinate system
     )
 
     stream_def.identifiables['pressure'] = Coverage(

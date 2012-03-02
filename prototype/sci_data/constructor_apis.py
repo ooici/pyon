@@ -10,7 +10,7 @@
  implemented adhoc by the user.
 '''
 
-from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues
+from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues, Domain, Vector
 from interface.objects import CountElement
 from interface.objects import DataStream
 from interface.objects import Encoding
@@ -19,11 +19,18 @@ from interface.objects import RangeSet
 from interface.objects import StreamGranuleContainer
 import hashlib
 import pyon
+from pyon.core.object import ionprint
 
 from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
 from pyon.util.log import log
 
 class DefinitionTree(dict):
+    """
+    This is a utility class designed to allow easy access to the graph structure of the Stream IonObjects
+    It is experimental, to support the needs of the data retriever service which builds stream definitions and
+    stream granules on the fly.
+    """
+
     def __init__(self, **kwargs):
         for k,v in kwargs.iteritems():
             if isinstance(v, dict):
@@ -103,13 +110,100 @@ class DefinitionTree(dict):
         tree = DefinitionTree.traverse(definition,definition['data_stream_id'])
         return tree
 
-class StationDataStreamDefinitionConstructor(object):
+
+def insert_2d_geographic_coordinates(ident, vector, domain_name):
     """
-    A science object constructor for a station data stream. This constructor is the canonical way to build the metadata
+    Add the geographic coordinate axis objects to the definition
+    'http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic'
+    """
+
+    vector.coordinate_ids = ['longitude_data','latitude_data']
+
+    ident['latitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='latitude_data'
+    )
+
+
+    ident['latitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        axis = "Latitude",
+        constraint= AllowedValues(values=[[-90.0, 90.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/latitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+
+    ident['longitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='longitude_data'
+    )
+
+    ident['longitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
+        axis = "Longitude",
+        constraint= AllowedValues(values=[[0.0, 360.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/longitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    return
+
+
+def insert_3d_geographic_coordinates(ident, vector, domain_name):
+    """
+    Add the geographic coordinate axis objects to the definition
+    'http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic'
+    """
+
+    insert_2d_geographic_coordinates(ident,vector,domain_name)
+
+    vector.coordinate_ids.append('height')
+
+
+
+    ident['height'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceExtent.owl#Height",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='height_data'
+    )
+
+    ident['height_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceExtent.owl#Height",
+        axis = "Height",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/height',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    return
+
+
+
+
+class StreamDefinitionConstructor(object):
+    """
+    A science object constructor for a data stream definitions. This constructor is the canonical way to build the metadata
     object that defines the supplements published to the stream.
     """
 
-    def __init__(self,stream_id='',description=''):
+    def __init__(self,stream_id='',description='', nil_value=None):
         """
         Instantiate a station dataset constructor.
         """
@@ -143,37 +237,120 @@ class StationDataStreamDefinitionConstructor(object):
             data_record_id='data_record'
         )
 
+        if nil_value is not None:
+            ident['nan_value'] = NilValue(
+                reason='No value recorded.',
+                value=nil_value
+            )
 
-        ident['nan_value'] = NilValue(
-            reason='No value recorded.',
-            value=-999.99
-        )
 
+        # For ease of access in building data structure
+        self._ident = ident
+
+        # optional structure to use in building definition
+        self.__domain =None
+
+    @property
+    def _domain(self):
+        """
+        Lazy initialize this component and add it to the identifiables
+        """
+        if self.__domain is None:
+            self.__domain = Domain(
+                definition='Need domain definition?',
+                updatable='False',
+                optional='False',
+            )
+            self._ident['domain'] = self.__domain
+        return self.__domain
 
 
     @classmethod
-    def LoadStationDefinition(cls, metadata_object):
+    def LoadDefinition(cls, metadata_object):
         """
         Load an existing data structure
         """
         pass
 
-    def define_reference_frame(self, temporal=None, geospatial=None):
+    def define_temporal_coordinates(self, definition='', reference_frame='', reference_time=None, unit_code=''):
         """
-        define the reference frame for each and provide an absolute reference for each
+        Complete definition of the temporal coordinates for this stream including its reference frame.
         """
+
+        # Create the temporal coordinate vector
+        self._domain.temporal_coordinate_vector_id = 'time_coordinates'
+
+        self._ident['time_coordinates'] = Vector(
+            definition = definition,
+            coordinate_ids=['time_data',],
+            reference_frame=reference_frame # Using coordinate
+        )
+
+        #@todo add switch on reference frame and definition to handle special cases
+        #@todo check input values to make sure they are valid
+
+
+        self._ident['time'] = Coverage(
+            definition= definition,
+            updatable=False,
+            optional=False,
+            domain_id='domain', # declared in _domain property above...
+            range_id='time_data'
+        )
+
+        self._ident['time_data'] = CoordinateAxis(
+            definition = definition,
+            axis = "Time",
+            nil_values_ids = ['nan_value'],
+            mesh_location = CategoryElement(value='vertex'),
+            values_path= '/fields/time',
+            unit_of_measure = UnitReferenceProperty(code=unit_code),
+            reference_frame = reference_frame,
+            reference_value = reference_time
+        )
+
+
+
+    def define_geospatial_coordinates(self, definition='', reference_frame=''):
+        """
+        Complete definition of the geospatial coordinates of this dataset including its reference frame
+        """
+
+        self._domain.geospatial_coordinate_vector_id = 'geo_coordinates'
+
+        coord_vector = Vector(
+            definition = definition,
+            reference_frame = reference_frame, # Using coordinate
+            updatable=False,
+        )
+
+        self._ident['geo_coordinates'] = coord_vector
+
+        #@todo Use an EPSG CRS library for this!
+
+        if reference_frame is 'urn:ogc:def:crs:EPSG::4326':
+
+            insert_2d_geographic_coordinates(self._ident, coord_vector, 'domain')
+
+        elif reference_frame is 'urn:ogc:def:crs:EPSG::4979':
+
+            insert_3d_geographic_coordinates(self._ident, coord_vector, 'domain')
+
+        else:
+            raise RuntimeError('Only two coordinate reference systems are supported at present: EPSG 4326 and 4979')
+
 
     def define_coverage(self, field_name='', field_definition='', field_units_code='', field_range=[]):
         """
         @brief define a coverage (observed quantity) present in the station dataset
         """
-        self.add_coverage(
+        self._add_coverage(
             name=field_name,
             definition=field_definition,
             updatable=False,
             optional=True
         )
-        self.add_range(
+        self._add_range(
             coverage_id=field_name,
             definition=field_definition,
             name='%s_data' % field_name,
@@ -184,8 +361,9 @@ class StationDataStreamDefinitionConstructor(object):
         )
 
 
-    def add_coverage(self, name=None, definition=None, updatable=False, optional=True):
+    def _add_coverage(self, name=None, definition=None, updatable=False, optional=True):
         if name in self.stream_definition.identifiables:
+            log.warn('Field name "%s" already in identifiables!' % name)
             return 0
         coverage = Coverage(
             definition=definition,
@@ -208,7 +386,7 @@ class StationDataStreamDefinitionConstructor(object):
         self.stream_definition.identifiables[name] = coverage
 
 
-    def add_range(self, coverage_id=None,
+    def _add_range(self, coverage_id=None,
                   name=None,
                   definition=None,
                   axis=None,
@@ -228,7 +406,8 @@ class StationDataStreamDefinitionConstructor(object):
         @param unit_of_measure_code Code for unit of measure
         """
         if name in self.stream_definition.identifiables:
-            return
+            log.warn('Field name "%s" already in identifiables!' % name)
+            return 0
         axis = CoordinateAxis(
             definition=definition,
             axis=axis,
@@ -259,13 +438,13 @@ class StationDataStreamDefinitionConstructor(object):
         """
         Print the dataset metadata for debug purposes.
         """
-        pass
+        return ionprint(self.stream_definition)
 
-    def _encode_structure(self):
+    def close_structure(self):
         """
         Method used to encode the station dataset metadata (structure)
         """
-        pass
+        return self.stream_definition
 
 
 class StationSupplementConstructor(object):
