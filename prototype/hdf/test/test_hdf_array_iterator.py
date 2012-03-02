@@ -119,7 +119,6 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(('temperature' in out_dict['arrays_out_dict']) and ('conductivity' in out_dict['arrays_out_dict']))
 
-    @unittest.skip("todo")
     def test_acquire_data_with_var_names(self):
         """
         Test whether supplying a var_name confines the selection to be of only that var_name
@@ -131,8 +130,11 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
             bounds = None
         )
         out_dict = generator.next()
+        self.assertTrue('temperature' is out_dict['variable_name'])
 
-        # assert that the dataset 'salinity' in the first hdf5 file has been opened
+
+        out_dict = generator.next()
+        self.assertTrue('conductivity' is out_dict['variable_name'])
 
         self.assertTrue('conductivity' in out_dict['arrays_out_dict'])
         self.assertTrue('temperature' in out_dict['arrays_out_dict'])
