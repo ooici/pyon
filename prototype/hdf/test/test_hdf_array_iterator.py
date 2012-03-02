@@ -24,11 +24,11 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         # Create an hdf file for testing
         #--------------------------------------------------------------------
 
-        a = numpy.arange(50)
+        self.salinity = numpy.arange(50)
 
         file = h5py.File('data.hdf5', 'w')
 
-        dset = file.create_dataset("salinity", data=a)
+        dset = file.create_dataset("salinity", data=self.salinity)
 
         file.close()
 
@@ -36,14 +36,14 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         # Create another file for testing
         #--------------------------------------------------------------------
 
-        a = numpy.arange(30)
+        self.temp = numpy.arange(30)
 
-        b = numpy.arange(100)
+        self.cond = numpy.arange(100)
 
         file = h5py.File('measurements.hdf5', 'w')
 
-        dset = file.create_dataset("temperature", data=a)
-        dset2 = file.create_dataset("conductivity", data = b)
+        dset = file.create_dataset("temperature", data=self.temp)
+        dset2 = file.create_dataset("conductivity", data = self.cond)
 
         file.close()
 
@@ -52,17 +52,17 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         # seeking out_dict the datasets
         #--------------------------------------------------------------------
 
-        a = numpy.arange(30)
+        altitude = numpy.arange(30)
 
-        b = numpy.arange(100)
+        depth = numpy.arange(100)
 
         file = h5py.File('recursive_searching.hdf5', 'w')
 
         grp1 = file.create_group('fields')
         grp2 = file.create_group('other_fields')
 
-        dset3 = grp1.create_dataset("altitude", data=a)
-        dset4 = grp2.create_dataset("depth", data = b)
+        dset3 = grp1.create_dataset("altitude", data=altitude)
+        dset4 = grp2.create_dataset("depth", data = depth)
 
         file.close()
 
@@ -141,34 +141,42 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(not ('salinity' in out_dict['arrays_out_dict']))
 
-    @unittest.skip("todo")
-    def test_buffer_size(self):
+    def test_concatenate_block_size(self):
         """
         Test that the chunk of data that is read from the hdf file is of the size buffer_size
         """
 
-        buffer_size = 3
-
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = None, buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'],
+            var_names = ['temperature', 'conductivity'],
+            concatenate_block_size = 20,
+            bounds = None
+        )
 
         out_dict = generator.next()
 
-        arr = out_dict[3]
+        self.assertEquals( out_dict['temperature'].size, concatenate_block_size)
+        self.assertEquals( out_dict['conductivity'].size, concatenate_block_size)
 
-        self.assertEquals(arr.size, buffer_size)
-
-    @unittest.skip("todo")
-    def test_too_large_buffer_size(self):
+    def test_larger_than_normal_concatenate_block_size(self):
         """
         Test that providing a very large buffer size is okay
         """
 
-        buffer_size = 1000
+        generator = acquire_data(hdf_files = ['measurements.hdf5'],
+            var_names = ['temperature', 'conductivity'],
+            concatenate_block_size = 500,
+            bounds = None
+        )
 
-        generator = acquire_data(hdf_files = ['data.hdf5'], var_names = ['conductivity'], buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = 12  )
+        out_dict = generator.next()
+        self.assertTrue('temperature' is out_dict['variable_name'])
 
-        with self.assertRaises(StopIteration):
-            out_dict = generator.next()
+
+        out_dict = generator.next()
+        self.assertTrue('conductivity' is out_dict['variable_name'])
+
+        self.assertTrue('conductivity' in out_dict['arrays_out_dict'])
+        self.assertTrue('temperature' in out_dict['arrays_out_dict'])
 
     @unittest.skip("todo")
     def test_concatenate_block_size(self):
@@ -179,7 +187,11 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         buffer_size = 10
         concatenate_block_size = 20
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = ['temperature'], buffer_size = buffer_size, slice_= (slice(1,100)), concatenate_block_size = concatenate_block_size  )
+        generator = acquire_data(hdf_files = ['measurements.hdf5'],
+            var_names = ['temperature', 'conductivity'],
+            concatenate_block_size = 50,
+            bounds = None
+        )
 
         #------------------------------------------------------------------------------------------------
         # call next() once.....
@@ -212,26 +224,23 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         self.assertTrue(arrays_out['temperature'].size < buffer_size)
 
     @unittest.skip("todo")
-    def test_slice(self):
+    def test_bounds(self):
         """
         Test that providing an arbitrary slice works
         """
 
-        buffer_size = 10
-        concatenate_block_size = 20
-        slice_size = 3
-
-        generator = acquire_data(hdf_files = ['measurements.hdf5'], var_names = ['temperature'], buffer_size = buffer_size, slice_= (slice(1, slice_size+1)), concatenate_block_size = concatenate_block_size  )
-
+        generator = acquire_data(hdf_files = ['measurements.hdf5'],
+            var_names = ['temperature'],
+            concatenate_block_size = 50,
+            bounds = (3,10)
+        )
         #------------------------------------------------------------------------------------------------
         # call next() once.....
         #------------------------------------------------------------------------------------------------
 
         out_dict = generator.next()
 
-        arrays_out = out_dict['arrays_out_dict']
-
-        self.assertEquals(arrays_out['temperature'].size, slice_size)
+        self.assertEquals(out_dict['concatenated_array'], self.temp[3:10])
 
     @unittest.skip("todo")
     def test_recursively_search_for_dataset(self):
