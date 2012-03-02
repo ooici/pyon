@@ -375,25 +375,33 @@ class CouchDB_DataStore(DataStore):
             except ResourceNotFound:
                 pass
 
+    def _get_view_args(self, all_args):
+        """
+        @brief From given all_args dict, extract all entries that are valid CouchDB view options.
+        @see http://wiki.apache.org/couchdb/HTTP_view_API
+        """
+        view_args = dict((k, v) for k,v in all_args.iteritems() if k in ('limit', 'descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
+        return view_args
+
     def _is_in_association(self, obj_id, datastore_name=""):
         log.debug("_is_in_association(%s)" % obj_id)
         if not obj_id:
             raise BadRequest("Must provide object id")
         ds, datastore_name = self._get_datastore(datastore_name)
 
-        subs,_ = self.find_subjects(None, None, obj_id, id_only=True)
+        subs,_ = self.find_subjects(None, None, obj_id, id_only=True, limit=1)
         if subs:
             log.debug("Object found as object in associations: %s" % subs)
             return True
 
-        objs,_ = self.find_objects(obj_id, id_only=True)
+        objs,_ = self.find_objects(obj_id, id_only=True, limit=1)
         if objs:
             log.debug("Object found as subject in associations: %s" % objs)
             return True
 
         return False
 
-    def find_objects(self, subject, predicate=None, object_type=None, id_only=False):
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
@@ -409,7 +417,8 @@ class CouchDB_DataStore(DataStore):
             else:
                 subject_id = subject._id
 
-        view = ds.view(self._get_viewname("association","by_sub"))
+        view_args = self._get_view_args(kwargs)
+        view = ds.view(self._get_viewname("association","by_sub"), **view_args)
         key = [subject_id]
         if predicate:
             key.append(predicate)
@@ -429,7 +438,7 @@ class CouchDB_DataStore(DataStore):
         obj_list = self.read_mult(obj_ids)
         return (obj_list, obj_assocs)
 
-    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False):
+    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, **kwargs):
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s" % (subject_type, predicate, obj, id_only))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
@@ -445,7 +454,8 @@ class CouchDB_DataStore(DataStore):
             else:
                 object_id = obj._id
 
-        view = ds.view(self._get_viewname("association","by_obj"))
+        view_args = self._get_view_args(kwargs)
+        view = ds.view(self._get_viewname("association","by_obj"), **view_args)
         key = [object_id]
         if predicate:
             key.append(predicate)
@@ -469,9 +479,7 @@ class CouchDB_DataStore(DataStore):
         log.debug("find_associations(subject=%s, predicate=%s, object=%s)" % (subject, predicate, obj))
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
-        if subject and obj or predicate:
-            pass
-        else:
+        if not (subject and obj or predicate):
             raise BadRequest("Illegal parameters")
         if assoc_type and not predicate:
             raise BadRequest("Illegal parameters")
