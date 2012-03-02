@@ -13,7 +13,7 @@ from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
 import unittest
 
-@attr('INT', group='dm')
+@attr('UNIT', group='dm')
 class HDFArrayIteratorTest(IonIntegrationTestCase):
 
     def setUp(self):
@@ -76,6 +76,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         os.remove('data.hdf5')
         os.remove('recursive_searching.hdf5')
 
+    @unittest.skip("todo")
     def test_acquire_data_from_multiple_files(self):
         """
         Test whether data can be acquired from multiple hdf5 files
@@ -94,7 +95,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         # assert that the second hdf5 file has been opened and one of its datasets has been opened
         self.assertTrue(('temperature' in out[4]) or ('conductivity' in out[4]) )
 
-
+    @unittest.skip("todo")
     def test_acquire_data_from_multiple_datasets(self):
         """
         Test whether data can be acquired from multiple datasets from an hdf5 file
@@ -114,6 +115,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(('temperature' in out[4]) and ('conductivity' in out[4]))
 
+    @unittest.skip("todo")
     def test_acquire_data_with_var_names(self):
         """
         Test whether supplying a var_name confines the selection to be of only that var_name
@@ -129,6 +131,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(not ('temperature' in out[4]))
 
+    @unittest.skip("todo")
     def test_buffer_size(self):
         """
         Test that the chunk of data that is read from the hdf file is of the size buffer_size
@@ -144,6 +147,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertEquals(arr.size, buffer_size)
 
+    @unittest.skip("todo")
     def test_too_large_buffer_size(self):
         """
         Test that providing a very large buffer size is okay
@@ -156,6 +160,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         with self.assertRaises(StopIteration):
             out = generator.next()
 
+    @unittest.skip("todo")
     def test_concatenate_block_size(self):
         """
         Test that the concatenated arrays are of size concatenate_block_size
@@ -196,7 +201,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         arrays_out = out[4]
         self.assertTrue(arrays_out['temperature'].size < buffer_size)
 
-
+    @unittest.skip("todo")
     def test_slice(self):
         """
         Test that providing an arbitrary slice works
@@ -218,6 +223,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertEquals(arrays_out['temperature'].size, slice_size)
 
+    @unittest.skip("todo")
     def test_recursively_search_for_dataset(self):
         """
         Test that in a file with grps and sub grps, with the datasets attached as leaves in the end, those datasets can be reached
