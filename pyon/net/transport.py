@@ -169,31 +169,3 @@ class NameTrio(object):
 
     def __str__(self):
         return "NP (%s,%s,B: %s)" % (self.exchange, self.queue, self.binding)
-
-class FakeTransport(AMQPTransport, NameTrio):
-    def __init__(self):
-        self._exchange = "wizzzard"
-        self._queue = "hello"
-
-    def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        log.error("I AM THE WIZZZARD")
-        return AMQPTransport.declare_exchange_impl(self, client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
-
-
-
-
-
-
-
-
-class NewChannel(object):
-    def __init__(self, to_name=None, from_name=None, transport=None):
-        pass
-
-def sample():
-    from pyon.container.cc import Container
-    xn = Container.instance.ex_manager.create_xn()         # returns ExchangeName-derived item
-    ch = NewChannel(to_name=xn, transport=xn)              # uses exchange manager for broker interaction
-
-    ch = NewChannel(to_name=('ex', 'hello'))               # no transport given == use AMQP default, name specified in the old style
-
