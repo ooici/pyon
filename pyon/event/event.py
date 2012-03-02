@@ -562,7 +562,7 @@ class EventRepository(object):
             end_key.append(end_ts)
 
         events = self.event_store.find_by_view("event", view_name, start_key=start_key, end_key=end_key,
-                                                reverse=reverse_order, max_res=max_results, id_only=False)
+                                                descending=reverse_order, limit=max_results, id_only=False)
 
         #log.info("Events: %s" % events)
         return events

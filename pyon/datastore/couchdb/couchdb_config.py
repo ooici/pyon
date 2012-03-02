@@ -8,10 +8,10 @@ from pyon.datastore.datastore import DataStore
 
 COUCHDB_CONFIGS = {
     DataStore.DS_PROFILE.OBJECTS:{
-        'views': ['object','association']
+        'views': ['object','association','attachment']
     },
     DataStore.DS_PROFILE.RESOURCES:{
-        'views': ['resource','association']
+        'views': ['resource','association','attachment']
     },
     DataStore.DS_PROFILE.DIRECTORY:{
         'views': ['directory','association']
@@ -52,11 +52,22 @@ function(doc) {
   }
 }""",
         },
+        # For directed association lookup
         'by_ids':{
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
     emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
+  }
+}""",
+        },
+        # For undirected association lookup
+        'by_id':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
+    emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
         },
@@ -81,9 +92,21 @@ function(doc) {
         },
     },
 
+    # Attachment objects
+    'attachment':{
+        'by_resource':{
+            'map':"""
+function(doc) {
+  if (doc.type_ && doc.type_=="Attachment") {
+    emit([doc.resource_id, doc.ts_created], null);
+  }
+}""",
+        }
+    },
+
     # Resource ION object related views
     # Resources have a type, life cycle state and name
-    # Note: the name in  the indexes leads to a sort by name
+    # Note: the name in the indexes leads to a sort by name
     'resource':{
         'by_type':{
             'map':"""
@@ -126,14 +149,6 @@ function(doc) {
   }
 }""",
         },
-        'by_attachment':{
-            'map':"""
-function(doc) {
-  if (doc.type_ && doc.type_=="Attachment") {
-    emit([doc.resource_id, doc.ts_created], null);
-  }
-}""",
-        }
     },
 
     # Directory related objects

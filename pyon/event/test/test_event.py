@@ -335,7 +335,7 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(self.count, 1)
         self.assertEquals(evmsg.description, "3")
 
-@attr('UNIT',group='datastore1')
+@attr('UNIT',group='datastore')
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
         if bootstrap.CFG.system.mockdb:
