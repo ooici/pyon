@@ -10,7 +10,7 @@
  implemented adhoc by the user.
 '''
 
-from interface.objects import CoordinateAxis
+from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues, Domain, Vector
 from interface.objects import CountElement
 from interface.objects import DataStream
 from interface.objects import Encoding
@@ -19,38 +19,420 @@ from interface.objects import RangeSet
 from interface.objects import StreamGranuleContainer
 import hashlib
 import pyon
+from pyon.core.object import ionprint
 
 from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
 from pyon.util.log import log
 
-class StationDataStreamDefinitionConstructor(object):
+class DefinitionTree(dict):
     """
-    A science object constructor for a station data stream. This constructor is the canonical way to build the metadata
+    This is a utility class designed to allow easy access to the graph structure of the Stream IonObjects
+    It is experimental, to support the needs of the data retriever service which builds stream definitions and
+    stream granules on the fly.
+    """
+
+    def __init__(self, **kwargs):
+        for k,v in kwargs.iteritems():
+            if isinstance(v, dict):
+                self[k] = DefinitionTree(**v)
+            else:
+                self[k] = v
+    def __getattr__(self, key):
+        if not hasattr(self, key):
+            return None
+        return self[key]
+    def __setattr__(self, key,val):
+        self[key] = val
+    def __dir__(self):
+        v = dir(super(DefinitionTree,self))
+        return v + self.keys()
+
+    @staticmethod
+    def key(definition, key):
+        try:
+            retval = definition['identifiables'][key]
+        except TypeError:
+            print definition['identifiables']
+            print key
+
+        return definition['identifiables'][key]
+
+
+    @staticmethod
+    def traverse(definition, node_id):
+        tmp = DefinitionTree.key(definition,node_id)
+        root = DefinitionTree(**tmp)
+        for k,v in tmp.iteritems():
+            if k.endswith('_id'):
+                if v:
+                    root[k] = DefinitionTree.traverse(definition,v)
+                    root[k].id = v
+            elif k.endswith('_ids'):
+                tmp = []
+                for value in v:
+                    if value:
+                        t = DefinitionTree.traverse(definition,value)
+                        t.id = value
+                        tmp.append(t)
+                root[k] = tmp
+        return root
+
+    @staticmethod
+    def get(definition, key_path, node=None):
+        '''
+        Reduce for getting a specific value from a stream definition
+        '''
+        keys = key_path.split('.')
+        if not node:
+            key = keys.pop(0)
+            node = definition.identifiables[key]
+            return DefinitionTree.get(definition=definition,key_path='.'.join(keys),node=node)
+        if len(keys) == 1:
+            # Last key, this is the desired value
+            key = keys.pop(0)
+            return getattr(node,key)
+        else:
+            key = keys.pop(0)
+            node = definition.identifiables[getattr(node,key)]
+            return DefinitionTree.get(definition=definition,key_path='.'.join(keys),node=node)
+
+
+
+
+
+    @staticmethod
+    def obj_to_tree(definition):
+        from pyon.core.object import IonObjectSerializer
+        if not isinstance(definition,StreamDefinitionContainer):
+            return
+        serializer = IonObjectSerializer()
+        definition = serializer.serialize(definition)
+        tree = DefinitionTree.traverse(definition,definition['data_stream_id'])
+        return tree
+
+
+def insert_2d_geographic_coordinates(ident, vector, domain_name):
+    """
+    Add the geographic coordinate axis objects to the definition
+    'http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic'
+    """
+
+    vector.coordinate_ids = ['longitude_data','latitude_data']
+
+    ident['latitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='latitude_data'
+    )
+
+
+    ident['latitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Latitude",
+        axis = "Latitude",
+        constraint= AllowedValues(values=[[-90.0, 90.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/latitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+
+    ident['longitude'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#longitude",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='longitude_data'
+    )
+
+    ident['longitude_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Longitude",
+        axis = "Longitude",
+        constraint= AllowedValues(values=[[0.0, 360.0],]),
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/longitude',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    # return a list of the coverages
+    return ['latitude', 'longitude']
+
+
+
+def insert_3d_geographic_coordinates(ident, vector, domain_name):
+    """
+    Add the geographic coordinate axis objects to the definition
+    'http://sweet.jpl.nasa.gov/2.0/spaceCoordinates.owl#Geographic'
+    """
+
+    coverage_names = insert_2d_geographic_coordinates(ident,vector,domain_name)
+
+    vector.coordinate_ids.append('height_data')
+
+
+
+    ident['height'] = Coverage(
+        definition= "http://sweet.jpl.nasa.gov/2.0/spaceExtent.owl#Height",
+        updatable=False,
+        optional=True,
+
+        domain_id=domain_name,
+        range_id='height_data'
+    )
+
+    ident['height_data'] = CoordinateAxis(
+        definition = "http://sweet.jpl.nasa.gov/2.0/spaceExtent.owl#Height",
+        axis = "Height",
+        nil_values_ids = ['nan_value'],
+        mesh_location = CategoryElement(value='vertex'),
+        values_path= '/fields/height',
+        unit_of_measure = UnitReferenceProperty(code='deg')
+    )
+
+    # return a list of the coverages
+    coverage_names.append('height')
+
+    return coverage_names
+
+
+
+
+class StreamDefinitionConstructor(object):
+    """
+    A science object constructor for a data stream definitions. This constructor is the canonical way to build the metadata
     object that defines the supplements published to the stream.
     """
 
-    def __init__(self,):
+    def __init__(self, description='', nil_value=None, encoding='hdf5'):
         """
         Instantiate a station dataset constructor.
         """
+        self._stream_definition = StreamDefinitionContainer(
+            data_stream_id='data_stream'
+        )
+
+        ident = self._stream_definition.identifiables
+
+        ident['data_stream'] = DataStream(
+            description=description,
+            element_count_id='record_count',
+            element_type_id='element_type',
+            encoding_id='stream_encoding',
+            values=None
+        )
+
+        ident['stream_encoding'] = Encoding(
+            encoding_type=encoding,
+            compression=None,
+            sha1=None
+        )
+
+        ident['record_count'] = CountElement(
+            value=0,
+            optional=False,
+            updatable=True
+        )
+
+        ident['element_type'] = ElementType(
+            updatable=False,
+            optional=False,
+            data_record_id='data_record'
+        )
+
+        self._data_record = DataRecord()
+        ident['data_record'] = self._data_record
+
+        self._nil_value_name = []
+        if nil_value is not None:
+            self._nil_value_name = ['nan_value']
+            ident['nan_value'] = NilValue(
+                reason='No value recorded.',
+                value=nil_value
+            )
+
+
+
+
+        # For ease of access in building data structure
+        self._ident = ident
+
+        # optional structure to use in building definition
+        self.__domain =None
+        self._domain_name = 'domain'
+
+    @property
+    def _domain(self):
+        """
+        Lazy initialize this component and add it to the identifiables
+        """
+        if self.__domain is None:
+            self.__domain = Domain(
+                definition='Need domain definition?',
+                updatable='False',
+                optional='False',
+            )
+            self._ident[self._domain_name] = self.__domain
+            self._data_record.domain_ids = [self._domain_name,]
+        return self.__domain
+
 
     @classmethod
-    def LoadStationDefinition(cls, metadata_object):
+    def LoadDefinition(cls, metadata_object):
         """
         Load an existing data structure
         """
         pass
 
-    def define_reference_frame(self, temporal=None, geospatial=None):
+    def define_temporal_coordinates(self, definition='', reference_frame='', reference_time=None, unit_code=''):
         """
-        define the reference frame for each and provide an absolute reference for each
+        Complete definition of the temporal coordinates for this stream including its reference frame.
         """
 
+        # Create the temporal coordinate vector
+        self._domain.temporal_coordinate_vector_id = 'time_coordinates'
 
-    def define_coverage(self, id=None, units=None, standard_name=None, coverage_dimensions=None):
+        self._ident['time_coordinates'] = Vector(
+            definition = definition,
+            coordinate_ids=['time_data',],
+            reference_frame=reference_frame # Using coordinate
+        )
+
+        #@todo add switch on reference frame and definition to handle special cases
+        #@todo check input values to make sure they are valid
+
+
+        self._ident['time'] = Coverage(
+            definition= definition,
+            updatable=False,
+            optional=False,
+            domain_id=self._domain_name, # declared in _domain property above...
+            range_id='time_data'
+        )
+
+        self._ident['time_data'] = CoordinateAxis(
+            definition = definition,
+            axis = "Time",
+            nil_values_ids = ['nan_value'],
+            mesh_location = CategoryElement(value='vertex'),
+            values_path= '/fields/time',
+            unit_of_measure = UnitReferenceProperty(code=unit_code),
+            reference_frame = reference_frame,
+            reference_value = reference_time
+        )
+
+        self._data_record.field_ids.append('time')
+
+    def define_geospatial_coordinates(self, definition='', reference_frame=''):
+        """
+        Complete definition of the geospatial coordinates of this dataset including its reference frame
+        """
+
+        self._domain.geospatial_coordinate_vector_id = 'geo_coordinates'
+
+        coord_vector = Vector(
+            definition = definition,
+            reference_frame = reference_frame, # Using coordinate
+            updatable=False,
+        )
+
+        self._ident['geo_coordinates'] = coord_vector
+
+        #@todo Use an EPSG CRS library for this!
+
+        coverage_names = []
+
+        if reference_frame == 'urn:ogc:def:crs:EPSG::4326':
+
+            coverage_names = insert_2d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
+
+        elif reference_frame == 'urn:ogc:def:crs:EPSG::4979':
+
+            coverage_names = insert_3d_geographic_coordinates(self._ident, coord_vector, self._domain_name)
+
+        else:
+            raise RuntimeError('Only two coordinate reference systems are supported at present: EPSG 4326 and 4979')
+
+        self._data_record.field_ids.extend(coverage_names)
+
+
+    def define_coverage(self, field_name='', field_definition='', field_units_code='', field_range=[]):
         """
         @brief define a coverage (observed quantity) present in the station dataset
         """
+        self._add_coverage(
+            name=field_name,
+            definition=field_definition,
+            updatable=False,
+            optional=True
+        )
+        self._add_range(
+            coverage_id=field_name,
+            definition=field_definition,
+            name='%s_data' % field_name,
+            constraint=AllowedValues(values=[field_range,]),
+            values_path='/fields/%s' % field_name,
+            unit_of_measure_code=field_units_code,
+
+        )
+
+
+    def _add_coverage(self, name=None, definition=None, updatable=False, optional=True):
+        if name in self._ident:
+            log.warn('Field name "%s" already in identifiables!' % name)
+            return 0
+
+        coverage = Coverage(
+            definition=definition,
+            updatable=updatable,
+            optional=optional,
+            domain_id=self._domain_name,
+            )
+
+
+
+        self._data_record.field_ids.append(name)
+        self._ident[name] = coverage
+
+
+    def _add_range(self, coverage_id=None,
+                  name=None,
+                  definition=None,
+                  axis=None,
+                  constraint=None,
+                  mesh_location='vertex',
+                  values_path=None,
+                  unit_of_measure_code=None,
+                  ):
+        """
+        @brief Adds a coordinate axis range set to a coverage
+        @param name The name of this range, i.e. temp_data
+        @param definition URL to definition
+        @param axis Name of physical Axis, i.e. Temperature, Time etc.
+        @param constraint A constraint object
+        @param mesh_location
+        @param values_path Location of data points in HDF e.g. /fields/temp
+        @param unit_of_measure_code Code for unit of measure
+        """
+        if name in self._ident:
+            log.warn('Field name "%s" already in identifiables!' % name)
+            return 0
+        range = RangeSet(
+            definition=definition,
+            constraint=constraint,
+            nil_values_ids= self._nil_value_name,
+            mesh_location=CategoryElement(value=mesh_location),
+            values_path=values_path,
+            unit_of_measure=UnitReferenceProperty(code=unit_of_measure_code)
+        )
+        self._ident[name] = range
+        coverage = self._ident[coverage_id]
+        coverage.range_id = name
+
 
     def add_nil_values(self, coverage_id=None, value=None, reason=None):
         """
@@ -68,13 +450,13 @@ class StationDataStreamDefinitionConstructor(object):
         """
         Print the dataset metadata for debug purposes.
         """
-        pass
+        return ionprint(self._stream_definition)
 
-    def _encode_structure(self):
+    def close_structure(self):
         """
         Method used to encode the station dataset metadata (structure)
         """
-        pass
+        return self._stream_definition
 
 
 class StationSupplementConstructor(object):
@@ -208,14 +590,30 @@ class PointSupplementConstructor(object):
 
         domain = point_definition.identifiables[domain_ids[0]]
 
-        coordinate_vector_id = domain.coordinate_vector_id
-        coordinate_vector = point_definition.identifiables[coordinate_vector_id]
+        time_coordinate_vector_id = domain.temporal_coordinate_vector_id
+        time_coordinate_vector = point_definition.identifiables[time_coordinate_vector_id]
+
+        assert time_coordinate_vector.reference_frame == 'http://www.opengis.net/def/trs/OGC/0/GPS'
+        assert time_coordinate_vector.definition == 'http://www.opengis.net/def/property/OGC/0/SamplingTime'
+
+        time_coord_axis = point_definition.identifiables[time_coordinate_vector.coordinate_ids[0]]
+
+        time_axis = time_coord_axis.axis
+
+        geo_coordinate_vector_id = domain.geospatial_coordinate_vector_id
+        geo_coordinate_vector = point_definition.identifiables[geo_coordinate_vector_id]
 
         self.coordinate_axis = (None,)
-        if coordinate_vector.definition == "http://sweet.jpl.nasa.gov/2.0/space.owl#Location":
-            #@todo deal with this is a better way! Add more definitions too!
-            self.coordinate_axis = ('Time','Longitude','Latitude','Pressure') # Don't think pressure really even belongs here!
+        #@todo deal with this is a better way! Add more definitions too!
+        if geo_coordinate_vector.reference_frame == 'urn:ogc:def:crs:EPSG::4326':
+
+            # Use defined axis names from the CRS definition
+            self.coordinate_axis = (time_axis,'Longitude','Latitude')
             # These are in order - we use the order when adding points
+        elif geo_coordinate_vector.reference_frame == 'urn:ogc:def:crs:EPSG::4979':
+
+            # Use defined axis names from the CRS definition
+            self.coordinate_axis = (time_axis,'Longitude','Latitude','Height')
         else:
             raise RuntimeError('Unknown coordinate vector definition for this stream definition')
 
@@ -309,18 +707,40 @@ class PointSupplementConstructor(object):
 
         for coverage_info in self._coordinates.itervalues():
 
+            records = coverage_info['records'] # Turn the list into an array
+            if not records:
+                log.warn('Coverage name "%s" has no values!' % coverage_info['id'])
+                continue
+
+            array = numpy.asarray(records) # Turn the list into an array
+
+            # Add the coverage
             self._granule.identifiables[coverage_info['id']] = coverage_info['obj']
-            array = numpy.asarray(coverage_info['records']) # Turn the list into an array
+
+            # Add the range
             range = [float(numpy.nanmin(array)), float(numpy.nanmax(array))]
             self._granule.identifiables[coverage_info['obj'].bounds_id] = QuantityRangeElement(value_pair=range)
+
+            # Add the data
             encoder.add_hdf_dataset(name=coverage_info['values_path'],nparray=array)
 
         for range_info in self._ranges.itervalues():
 
+            records = range_info['records'] # Turn the list into an array
+            if not records:
+                log.warn('Range name "%s" has no values!' % range_info['id'])
+                continue
+
+            array = numpy.asarray(records) # Turn the list into an array
+
+            # Add the coverage
             self._granule.identifiables[range_info['id']] = range_info['obj']
-            array = numpy.asarray(range_info['records']) # Turn the list into an array
+
+            # Add the range
             range = [float(numpy.nanmin(array)), float(numpy.nanmax(array))]
             self._granule.identifiables[range_info['obj'].bounds_id] = QuantityRangeElement(value_pair=range)
+
+            # Add the data
             encoder.add_hdf_dataset(name=range_info['values_path'],nparray=array)
 
         hdf_string = encoder.encoder_close()
