@@ -213,7 +213,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                                     'flush_out_array' : None
                         }
 
-                        yield vn, arri.curr_slice, rng, d, None, None, None
+                        yield out_dict
 
 
 
