@@ -22,9 +22,10 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
     # Note: stop_index is exclusive
     if bounds:
         start_index, stop_index = bounds
-        entries_to_read = stop_index - start_index
+        num_entries_to_read = stop_index - start_index
     else:
         start_index = 0
+        num_entries_to_read = None
 
     # the default dataset names that are going to be used for input...
     default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
@@ -147,7 +148,12 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                 # feeding in the slice_ that is expected in ArrayIterator....this should read in all the values in the dataset
                 #--------------------------------------------------------------------------------------------------------------
 
-                arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index,dataset.value.size))]
+
+                if num_entries_to_read:
+                    log.warn("came here!")
+                    arri = ArrayIterator(dataset, concatenate_block_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
+                else:
+                    arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index, dataset.value.size))]
 
                 for d in arri:
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
