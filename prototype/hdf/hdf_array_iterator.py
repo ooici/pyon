@@ -19,10 +19,10 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
     arrays_out = {}
 
-    # Note: stop_index is exclusive
+    # Note: stop_index is inclusive
     if bounds:
         start_index, stop_index = bounds
-        num_entries_to_read = stop_index - start_index
+        num_entries_to_read = stop_index - start_index + 2
     else:
         start_index = 0
         num_entries_to_read = None
@@ -149,7 +149,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
                 if num_entries_to_read:
                     log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
-                    arri = ArrayIterator(dataset, concatenate_block_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
+                    arri = ArrayIterator(dataset, concatenate_block_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read) + 1) )]
                 else:
                     log.warn("dataset.value.size: %s" % dataset.value.size)
                     arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index, dataset.value.size))]
@@ -182,7 +182,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                         if num_entries_to_read:
                             upper_bound = left_to_read_entries
 
-                        arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[upper_bound]), axis = 0)
+                        arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:upper_bound]), axis = 0)
 
                     log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
