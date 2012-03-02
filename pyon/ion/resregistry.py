@@ -13,9 +13,11 @@ from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
+from pyon.util.config import CFG
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
-from interface.objects import Attachment, AttachmentType
+
+from interface.objects import Attachment, AttachmentType, ServiceDefinition
 
 
 class ResourceRegistry(object):
@@ -30,11 +32,28 @@ class ResourceRegistry(object):
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
+        self._init()
+
     def close(self):
         """
         Pass-through method to close the underlying datastore.
         """
         self.rr_store.close()
+
+    def _init(self):
+        res_list,_ = self.find_resources(RT.ServiceDefinition, id_only=True)
+        auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
+        if not res_list and auto_bootstrap:
+            self._register_service_definitions()
+
+    def _register_service_definitions(self):
+        from pyon.core.bootstrap import service_registry
+        svc_list = []
+        for svcname, svc in service_registry.services.iteritems():
+            svc_def = ServiceDefinition(name=svcname, definition="")
+            svc_list.append(svc_def)
+        self._create_mult(svc_list)
+        log.info("Created %d ServiceDefinition resources" % len(svc_list))
 
     def create(self, object=None, actor_id=None):
         if object is None:
@@ -57,6 +76,17 @@ class ResourceRegistry(object):
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
         return res
+
+    def _create_mult(self, res_list):
+        cur_time = get_ion_ts()
+        for resobj in res_list:
+            lcsm = get_restype_lcsm(resobj._get_type())
+            resobj.lcstate = lcsm.initial_state if lcsm else "DEPLOYED_AVAILABLE"
+            resobj.ts_created = cur_time
+            resobj.ts_updated = cur_time
+
+        res = self.rr_store.create_mult(res_list)
+        return [(rid,rrv) for success,rid,rrv in res]
 
     def read(self, object_id='', rev_id=''):
         if not object_id:

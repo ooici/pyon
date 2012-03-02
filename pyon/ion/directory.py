@@ -55,6 +55,9 @@ class Directory(object):
 
 
     def _init(self):
+        auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
+        if not auto_bootstrap:
+            return
 
         try:
             root_de = self.dir_store.read(self.orgname)
@@ -67,8 +70,8 @@ class Directory(object):
         if not self._assert_existence("/", "Config",
                 description="System configuration is registered here"):
             if self.is_root:
+                self._register_config()
                 pass
-                #self._register_config()
 
         self._assert_existence("/", "Containers",
                 description="Running containers are registered here")
@@ -76,8 +79,8 @@ class Directory(object):
         if not self._assert_existence("/", "ObjectTypes",
                 description="ObjectTypes are registered here"):
             if self.is_root:
+                self._register_object_types()
                 pass
-                #self._register_object_types()
 
         self._assert_existence("/", "Org",
                 description="Org specifics are registered here",
@@ -92,8 +95,8 @@ class Directory(object):
         if not self._assert_existence("/", "ServiceInterfaces",
                 description="Service interface definitions are registered here"):
             if self.is_root:
+                self._register_service_definitions()
                 pass
-                #self._register_service_definitions()
 
         self._assert_existence("/", "Services",
                 description="Service instances are registered here")
