@@ -253,12 +253,15 @@ class BaseEndpoint(object):
 #        else:
 #            self.endpoint_by_name[name] = [self]
 
-    def _get_container_instance(self):
+    @classmethod
+    def _get_container_instance(cls):
         """
         Helper method to return the singleton Container.instance.
         This method helps single responsibility of _ensure_node and makes testing much easier.
 
         We have to late import Container because Container depends on ProcessRPCServer in this file.
+
+        This is a classmethod so we can use it from other places.
         """
         from pyon.container.cc import Container
         return Container.instance
@@ -927,14 +930,21 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             actor_roles         = context.get('ion-actor-roles', None)
             actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
+            container_id        = context.get('origin-container-id', None)
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
                 header['ion-actor-id']  = actor_id
-                if actor_roles:     header['ion-actor-roles']  = actor_roles
+                if actor_roles:     header['ion-actor-roles']   = actor_roles
                 if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
 
-            if expiry:          header['expiry']        = expiry
+            if expiry:          header['expiry']                = expiry
+            if container_id:    header['origin-container-id']   = container_id
+        else:
+            # no context? we're the originator of the message then
+            container_id                    = BaseEndpoint._get_container_instance().id
+            header['origin-container-id']   = container_id
+
         return header
 
 class ProcessRPCClient(RPCClient):
@@ -1023,14 +1033,20 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
             actor_roles         = context.get('ion-actor-roles', None)
             actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
+            container_id        = context.get('origin-container-id', None)
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
                 header['ion-actor-id']  = actor_id
-                if actor_roles:     header['ion-actor-roles']  = actor_roles
+                if actor_roles:     header['ion-actor-roles']   = actor_roles
                 if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
 
-            if expiry:          header['expiry']        = expiry
+            if expiry:          header['expiry']                = expiry
+            if container_id:    header['origin-container-id']   = container_id
+        else:
+            # no context? we're the originator of the message then (in a response??)
+            container_id                    = BaseEndpoint._get_container_instance().id
+            header['origin-container-id']   = container_id
 
         return header
 
