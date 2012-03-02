@@ -156,6 +156,11 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                     arri = ArrayIterator(dataset, concatenate_block_size)[(slice(start_index, dataset.value.size))]
 
                 for d in arri:
+
+                    read_entries = d.size
+                    if num_entries_to_read:
+                        left_to_read_entries = num_entries_to_read - read_entries
+
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
 
                     if concatenate_block_size:
