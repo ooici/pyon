@@ -165,6 +165,8 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
                     rng = (numpy.nanmin(d), numpy.nanmax(d))
 
+                    upper_bound = concatenate_block_size
+
                     if concatenate_block_size:
                         log.warn("concatenate_block_size: %s" % concatenate_block_size)
 
