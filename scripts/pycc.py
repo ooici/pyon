@@ -119,6 +119,10 @@ def main(opts, *args, **kwargs):
         # Set that system is not testing. We are running as standalone container
         dict_merge(CFG, {'system':{'testing':False}}, True)
 
+        # Also set the immediate flag, but only if specified - it is an override
+        if opts.immediate:
+            dict_merge(CFG, {'system':{'immediate':True}}, True)
+
         # Load any additional config paths and merge them into main config
         if len(opts.config):
             cfg = Config(opts.config)
@@ -229,6 +233,7 @@ def entry():
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
     parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file.')
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
+    parser.add_argument('-i', '--immediate', action='store_true', help='Will exit the container if the only procs started are immediate proc types. Sets CFG system.immediate flag.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-c', '--config', action='append', type=str, help='Additional config files to load.', default=[])
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))

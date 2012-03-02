@@ -27,7 +27,7 @@ class BaseService(LocalContextMixin):
 
     # The following are set one per implementation (class)
     name = None
-    running = 0
+    running = False
     dependencies = []
     process_type = "service"
 
@@ -60,6 +60,7 @@ class BaseService(LocalContextMixin):
 
     def _on_start(self):
         """Framework hook to start"""
+        self.running = True
 
     def on_start(self):
         """
@@ -73,6 +74,7 @@ class BaseService(LocalContextMixin):
 
     def _on_stop(self):
         """Framework hook to stop"""
+        self.running = False
 
     def on_stop(self):
         """
@@ -86,6 +88,7 @@ class BaseService(LocalContextMixin):
 
     def _on_quit(self):
         """Framework hook to quit"""
+        self.running = False
 
     def on_quit(self):
         """

@@ -187,15 +187,26 @@ class Container(BaseContainerAgent):
         
         if not self.proc_manager.proc_sup.running:
             self.start()
-            
-        try:
-            # This just waits in this Greenlet for all child processes to complete,
-            # which is triggered somewhere else.
-            self.proc_manager.proc_sup.join_children()
-        except (KeyboardInterrupt, SystemExit) as ex:
-            log.info('Received a kill signal, shutting down the container.')
-        except:
-            log.exception('Unhandled error! Forcing container shutdown')
+
+        # serve forever short-circuits if immediate is on and children len is ok
+        num_procs = len(self.proc_manager.proc_sup.children)
+        immediate = CFG.system.get('immediate', False)
+        if not (immediate and num_procs == 1):  # only spawned greenlet is the CC-Agent
+
+            # print a warning just in case
+            if immediate and num_procs != 1:
+                log.warn("CFG.system.immediate=True but number of spawned processes is not 1 (%d)", num_procs)
+
+            try:
+                # This just waits in this Greenlet for all child processes to complete,
+                # which is triggered somewhere else.
+                self.proc_manager.proc_sup.join_children()
+            except (KeyboardInterrupt, SystemExit) as ex:
+                log.info('Received a kill signal, shutting down the container.')
+            except:
+                log.exception('Unhandled error! Forcing container shutdown')
+        else:
+            log.debug("Container.serve_forever short-circuiting due to CFG.system.immediate")
 
         self.proc_manager.proc_sup.shutdown(CFG.cc.timeout.shutdown)
 
