@@ -143,20 +143,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                 arri = ArrayIterator(dataset, concatenate_block_size)[(slice(0,dataset.value.size))]
 
                 for d in arri:
-                    if d.dtype.char is "S":
-                        # Obviously, we can't get the range of values for a string data type!
-                        rng = None
-                    elif isinstance(d, numpy.ma.masked_array):
-                        # TODO: This is a temporary fix because numpy 'nanmin' and 'nanmax'
-                        # are currently broken for masked_arrays:
-                        # http://mail.scipy.org/pipermail/numpy-discussion/2011-July/057806.html
-                        dc=d.compressed()
-                        if dc.size == 0:
-                            rng = None
-                        else:
-                            rng = (numpy.nanmin(dc), numpy.nanmax(dc))
-                    else:
-                        rng = (numpy.nanmin(d), numpy.nanmax(d))
+                    rng = (numpy.nanmin(d), numpy.nanmax(d))
 
                     if concatenate_block_size:
 
