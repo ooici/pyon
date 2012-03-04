@@ -97,7 +97,6 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
         if not dict_of_h5py_datasets:
             continue
 
-
         #-------------------------------------------------------------------------------------------------------
         # Iterate over the supplied variable names
         #-------------------------------------------------------------------------------------------------------
@@ -121,31 +120,52 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
             # if the array in the dataset is too small, grab the whole array
             #-------------------------------------------------------------------------------------------------------
 
-            if dataset.value.size < concatenate_block_size:
+            read_entries = 0
+            log.warn("read_entries: %s" % read_entries)
 
-                # grab the whole array in the dataset
-                d = dataset.value
+
+            if concatenate_block_size and dataset.value.size < concatenate_block_size:
+
+                # grab the whole array in the dataset upto the user specified bounds
+
+                if num_entries_to_read:
+                    d = dataset.value[ start_index : start_index + num_entries_to_read - 1]
+
+                    read_entries += d.size
+                    log.warn("read_entries: %s" % read_entries)
+
+                    left_to_read_entries = max(num_entries_to_read - read_entries,0)
+                    log.warn("left_to_read_entries: %s" % left_to_read_entries)
+
+                else:
+                    d = dataset.value
+
                 # update the arrays_out dict
                 arrays_out[vn] = d
 
+                current_slice = (slice(0,dataset.value.size))
+
+                rng = (numpy.nanmin(d), numpy.nanmax(d))
+
+                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
                 out_dict = {'variable_name' : vn,
-                            'current_slice' :  (slice(0,dataset.value.size)), # this is the whole array
-                            'range' : (numpy.nanmin(d), numpy.nanmax(d)),
+                            'current_slice' : current_slice,
+                            'range' : rng,
                             'current_array_chunk' : d,
                             'arrays_out_dict' : arrays_out,
-                            'concatenated_array' : d,
-                }
+                            'concatenated_array' : arrays_out[vn],
+                            }
 
                 yield out_dict
 
-            else:
+                read_entries += d.size
+                log.warn("read_entries: %s" % read_entries)
+
+            elif concatenate_block_size:
                 #--------------------------------------------------------------------------------------------------------------
                 # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
                 #--------------------------------------------------------------------------------------------------------------
-
-                read_entries = 0
-
-                log.warn("read_entries: %s" % read_entries)
 
                 if num_entries_to_read:
                     log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
@@ -163,8 +183,6 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                     count += 1
                     log.warn("iteration count: %s" % count)
 
-                    rng = (numpy.nanmin(d), numpy.nanmax(d))
-
                     upper_bound = concatenate_block_size
 
                     if concatenate_block_size:
@@ -174,22 +192,18 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
                             left_to_read_entries = max(num_entries_to_read - read_entries,0)
                             log.warn("left_to_read_entries: %s" % left_to_read_entries)
 
-                        if num_entries_to_read and left_to_read_entries:
                             upper_bound = min(left_to_read_entries, concatenate_block_size)
 
                         arrays_out[vn] = d[:upper_bound]
 
-                    else: # if no concatenate_block_size is provided
+                    current_slice = arri.curr_slice
 
-                        if num_entries_to_read:
-                            upper_bound = left_to_read_entries
-
-                        arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:upper_bound]), axis = 0)
+                    rng = (numpy.nanmin(d), numpy.nanmax(d))
 
                     log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
                     out_dict = {'variable_name' : vn,
-                                'current_slice' : arri.curr_slice,
+                                'current_slice' : current_slice,
                                 'range' : rng,
                                 'current_array_chunk' : d,
                                 'arrays_out_dict' : arrays_out,
@@ -200,6 +214,32 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_block_size = Non
 
                     read_entries += d.size
                     log.warn("read_entries: %s" % read_entries)
+
+
+            else: # no concatenate_block_size is provided
+
+                d = dataset.value[:num_entries_to_read]
+
+                arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
+
+                current_slice = d.size
+
+                rng = (numpy.nanmin(d), numpy.nanmax(d))
+
+                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                out_dict = {'variable_name' : vn,
+                            'current_slice' : current_slice,
+                            'range' : rng,
+                            'current_array_chunk' : d,
+                            'arrays_out_dict' : arrays_out,
+                            'concatenated_array' : arrays_out[vn],
+                            }
+
+                yield out_dict
+
+                read_entries += d.size
+                log.warn("read_entries: %s" % read_entries)
 
 
 
