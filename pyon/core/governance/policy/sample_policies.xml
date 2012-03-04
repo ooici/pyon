@@ -12,7 +12,7 @@
     </PolicyDefaults>
     
     <Target>
-        
+        <!--
         <Subjects>
             <Subject>
                 <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
@@ -30,52 +30,70 @@
                 </ResourceMatch>
             </Resource>
         </Resources>
-
+-->
     </Target>
 
-    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Deny">
         <Description>
-            Only all shenrie to access this resource
+            anonymous can access most services except create/update services - except when being called from the bootstrap service
         </Description>
-        <!--
 
         <Target>
             <Actions>
                 <Action>
-                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create*</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
-                </Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">update*</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+               </Action>
             </Actions>
 
         </Target>
--->
-        
+
         <Condition>
 
-
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
+            <Apply FunctionId="urn:oasis:names:tc:xacml:ooi:function:not">
                 <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
                     <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
                         <SubjectAttributeDesignator
+                                AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-sender"
+                                DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </Apply>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">bootstrap</AttributeValue>
+
+                </Apply>
+            </Apply>
+
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                    <SubjectAttributeDesignator
                             AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
                             DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                    </Apply>
-                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">shenrie</AttributeValue>
                 </Apply>
+                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+
+            </Apply>
+            </Apply>
+
 
         </Condition>
     </Rule>
 
-    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Deny">
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
         <Description>
-            anonymous cannot access this service
+            anonymous can access everything else
         </Description>
-<!--
+
+        <!--
         <Target>
             <Actions>
                 <Action>
-                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
                         <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>

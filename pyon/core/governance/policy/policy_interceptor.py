@@ -35,18 +35,24 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             log.debug("PolicyInterceptor.incoming: %s", invocation)
 
 
-        #checking policy
-        #Annotate the message has started policy checking
-        invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
+        #If missing default to request just to be safe
+        msg_performative = invocation.headers['performative'] if invocation.headers.has_key('performative') and invocation.headers['performative'] != '' else 'request'
 
-        ret = self.policy_decision_point.check_policies(invocation)
-        log.debug("Policy Decision: " + str(ret))
+        #No need to check policy for response or failure messages
+        if msg_performative != 'inform-result' and msg_performative != 'failure':
 
-        #Annonate the message has completed policy checking
-        invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
+            #checking policy
+            #Annotate the message has started policy checking
+            invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
-        if ret == Decision.DENY:
-            self.policy_denied_message(invocation)
+            ret = self.policy_decision_point.check_policies(invocation)
+            log.debug("Policy Decision: " + str(ret))
+
+            #Annonate the message has completed policy checking
+            invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
+
+            if ret == Decision.DENY_STR:
+                self.policy_denied_message(invocation)
 
         return invocation
 

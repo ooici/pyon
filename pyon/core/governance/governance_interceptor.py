@@ -62,7 +62,7 @@ class GovernanceInterceptor(Interceptor):
             log.debug("GovernanceInterceptor.incoming: %s", invocation)
 
         #TODO - Fudging some message headers until they are fixed in endpoint properly
-        invocation.headers['receiver'] = invocation.args['process'].name
+      #  invocation.headers['receiver'] = invocation.args['process'].name
 
         self.governance_controller.process_incoming_message(invocation)
 

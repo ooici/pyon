@@ -20,6 +20,8 @@ import uuid
 import traceback
 import sys
 
+
+
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
 # Note: This is now called from pyon.core.bootstrap

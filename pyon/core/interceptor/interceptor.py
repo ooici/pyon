@@ -23,6 +23,18 @@ class Invocation(object):
 
         self.message_annotations = {}
 
+
+    #Returns the value of of the specified header or the specified default value
+    def get_header_value(self, header_name, default_value):
+        value = self.headers[header_name] if self.headers.has_key(header_name) and self.headers[header_name] != '' else default_value
+        return value
+
+    #This function is used to parse the two value tuple of sysname,servicename
+    def get_service_name(self, header_value):
+        value_list = [x.strip() for x in header_value.split(',')]
+        value =  value_list[1] if len(value_list) > 1 else value_list[0]
+        return value
+
 class Interceptor(object):
     """
     Basic interceptor model.

@@ -38,10 +38,13 @@ class GovernanceDispatcher(object):
 
     def handle_incoming_message(self, invocation):
 
-        receiver = invocation.headers['receiver'] if invocation.headers.has_key('receiver') and  invocation.headers['receiver']  != '' else 'Unknown'
+        receiver = invocation.get_header_value('receiver', 'Unknown')
+        op = invocation.get_header_value('op', 'Unknown')
+        actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
+
         if invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_ANNOTATION) and \
            invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT:
-            raise Unauthorized("The request for service %s has been denied" % receiver )
+            raise Unauthorized("The request from user %s for operation %s(%s) has been denied" % (actor_id,receiver, op) )
 
         return invocation
 

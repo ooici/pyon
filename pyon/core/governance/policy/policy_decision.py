@@ -8,7 +8,7 @@ from os import path
 
 from ndg.xacml.parsers.etree.factory import ReaderFactory
 
-from ndg.xacml.core import Identifiers
+from ndg.xacml.core import Identifiers, XACML_1_0_PREFIX
 from ndg.xacml.core.attribute import Attribute
 from ndg.xacml.core.attributevalue import (AttributeValue,
                                            AttributeValueClassFactory)
@@ -27,8 +27,10 @@ from pyon.util.log import log
 THIS_DIR = path.dirname(__file__)
 XACML_ION_POLICY_FILENAME='sample_policies.xml'
 
-SERVICE_PROVIDER_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:resource:service-provider"
-ROLE_ATTRIBUTE_ID='urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role'
+SERVICE_PROVIDER_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'resource:service-provider'
+ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-id-role'
+SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-id-sender'
+
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
@@ -43,9 +45,9 @@ class PolicyDecisionPoint(object):
         """Create PDP from ion agents policy file"""
 
         log.debug("Creating a new PDP")
-        # TODO - May need to implement a not function here.
-        #from pyon.core.governance.ndg_xacml.ooi_and import And
-        #functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
+        #Adding an not function to XACML
+        from pyon.core.governance.policy.xacml.not_function import Not
+        functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
 
         self.policy_decision_point = PDP.fromPolicySource(path.join(THIS_DIR, XACML_ION_POLICY_FILENAME), ReaderFactory)
 
@@ -63,16 +65,29 @@ class PolicyDecisionPoint(object):
     def create_request_from_message(self, invocation):
 
 
-        ion_actor_id = invocation.headers['ion-actor-id'] if invocation.headers.has_key('ion-actor-id') and invocation.headers['ion-actor-id'] != '' else 'anonymous'
-        ion_org_id = invocation.headers['ion-org-id'] if invocation.headers.has_key('ion-org-id') and  invocation.headers['ion-org-id'] != '' else 'no-ooi'
-        receiver = invocation.headers['receiver'] if invocation.headers.has_key('receiver') and  invocation.headers['receiver']  != '' else 'Unknown'
-        op = invocation.headers['op'] if invocation.headers.has_key('op') and  invocation.headers['op'] != '' else 'Unknown'
+        sender_type = invocation.get_header_value('sender-type', 'Unknown')
+        if sender_type == 'service':
+            sender_header = invocation.get_header_value('sender-service', 'Unknown')
+            sender = invocation.get_service_name(sender_header)
+        else:
+            sender = invocation.get_header_value('sender', 'Unknown')
 
-        log.debug("XACML Request: ion_actor_id:%s ion-org-id:%s receiver:%s op:%s " % (ion_actor_id,ion_org_id, receiver, op))
+        receiver_header = invocation.get_header_value('receiver', 'Unknown')
+        receiver = invocation.get_service_name(receiver_header)
+
+        ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
+        op = invocation.get_header_value('op', 'Unknown')
+
+
+
+        log.info("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s" % (sender, receiver, op, ion_actor_id))
+
+
         request = Request()
         subject = Subject()
+        subject.attributes.append(self.create_string_attribute(SENDER_ID,sender))
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
-        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID_QUALIFIER, ion_org_id))
+       # subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID_QUALIFIER, ion_org_id))
 
         #subject.attributes.append(createStringAttribute(ROLE_ATTRIBUTE_ID, 'researcher'))
         request.subjects.append(subject)
@@ -87,6 +102,8 @@ class PolicyDecisionPoint(object):
 
 
     def check_policies(self, invocation):
+
+
         requestCtx = self.create_request_from_message(invocation)
 
         if self.policy_decision_point is None:
