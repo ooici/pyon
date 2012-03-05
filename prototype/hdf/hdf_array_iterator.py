@@ -23,10 +23,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
     arrays_out = {}
 
-    # Note: stop_index is inclusive
     if bounds:
         start_index, stop_index = bounds
-        num_entries_to_read = stop_index - start_index + 2
+        num_entries_to_read = stop_index - start_index + 1
     else:
         start_index = 0
         num_entries_to_read = None
@@ -163,8 +162,11 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
                 #--------------------------------------------------------------------------------------------------------------
 
+                # if no bounds is provided, num_entries_to_read is None and so the stop_index is determined only by
+                # hte size of the dataset
                 if num_entries_to_read:
                     log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
+                    log.warn("dataset.value.size: %s" % dataset.value.size)
                     arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read) + 1) )]
                 else:
                     log.warn("dataset.value.size: %s" % dataset.value.size)

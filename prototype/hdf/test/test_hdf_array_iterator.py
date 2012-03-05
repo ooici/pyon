@@ -179,6 +179,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         self.assertTrue('conductivity' in out_dict['arrays_out_dict'])
         self.assertTrue('temperature' in out_dict['arrays_out_dict'])
 
+
     def test_bounds(self):
         """
         Test that providing an arbitrary slice works
@@ -187,7 +188,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
             var_names = ['temperature'],
             concatenate_size = 50,
-            bounds = (3,10)
+            bounds = (0,10)
         )
         #------------------------------------------------------------------------------------------------
         # call next() once.....
@@ -197,9 +198,46 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         print out_dict
 
-        array1 = out_dict['concatenated_array']
-        array2 = self.temp [3:11]
+        arrayOut1 = out_dict['concatenated_array']
+        array2 = self.temp [0:10]
 
         # note that the bounds is inclusive, so the 10th element is meant to be read
-        self.assertEquals(str(array1), str(array2))
+        self.assertEquals(str(arrayOut1), str(array2))
+
+
+    def test_bounds_small_concatenate_size(self):
+        """
+        Test that providing an arbitrary slice works
+        """
+
+        generator = acquire_data(hdf_files = ['measurements.hdf5'],
+            var_names = ['temperature'],
+            concatenate_size = 5,
+            bounds = (0,10)
+        )
+        #------------------------------------------------------------------------------------------------
+        # call next() once.....
+        #------------------------------------------------------------------------------------------------
+
+        out_dict = generator.next()
+
+        print out_dict
+
+        arrayOut1 = out_dict['concatenated_array']
+        array2 = self.temp [0:5]
+
+        # note that the bounds is inclusive, so the 10th element is meant to be read
+        self.assertEquals(str(arrayOut1), str(array2))
+
+        #------------------------------------------------------
+
+        out_dict = generator.next()
+
+        print out_dict
+
+        arrayOut2 = out_dict['concatenated_array']
+        array2 = self.temp [5:10]
+
+        # note that the bounds is inclusive, so the 10th element is meant to be read
+        self.assertEquals(str(arrayOut2), str(array2))
 
