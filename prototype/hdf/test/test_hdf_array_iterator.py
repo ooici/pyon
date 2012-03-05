@@ -88,58 +88,36 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
                                 )
 
         out_dict = generator.next()
-
         # assert that the dataset 'salinity' in the first hdf5 file has been opened
-
-        self.assertTrue('salinity' in out_dict['arrays_out_dict'])
+        self.assertEquals( str(out_dict['concatenated_array']), str(self.salinity) )
 
         out_dict = generator.next()
-
-        # assert that the second hdf5 file has been opened and one of its datasets has been opened
-        self.assertTrue(('temperature' in out_dict['arrays_out_dict']) or ('conductivity' in out_dict['arrays_out_dict']) )
+        # assert that the second hdf5 file has been opened and its data read
+        self.assertEquals( str(out_dict['concatenated_array']), str(self.temp) )
 
     def test_acquire_data_from_multiple_datasets(self):
         """
         Test whether data can be acquired from multiple datasets from an hdf5 file
         """
 
+        concatenate_size = 50
+
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
                                      var_names = ['temperature', 'conductivity'],
-                                     concatenate_size = 50,
+                                     concatenate_size = concatenate_size,
                                      bounds = None
                                 )
 
-        out_dict = generator.next() # the first time next() is called loads up the temperature data.
-
-        # now that the temperature data has been exhausted since we chose a very large buffer_size,
-        # calling generator.next() will load up the conductivity data
-        out_dict = generator.next()
+        out_dict = generator.next() # the first time next() is called, it loads up the temperature data.
 
         # assert that the dataset 'salinity' in the first hdf5 file has been opened
+        self.assertEquals( str(out_dict['concatenated_array'][:self.temp.size]), str(self.temp) )
 
-        self.assertTrue(('temperature' in out_dict['arrays_out_dict']) and ('conductivity' in out_dict['arrays_out_dict']))
+        #---------------------------------------------------
 
-    def test_acquire_data_with_var_names(self):
-        """
-        Test whether supplying a var_name confines the selection to be of only that var_name
-        """
+        out_dict = generator.next() # this time, the second dataset, conductivity, should get read
 
-        generator = acquire_data(hdf_files = ['measurements.hdf5'],
-            var_names = ['temperature', 'conductivity'],
-            concatenate_size = 50,
-            bounds = None
-        )
-        out_dict = generator.next()
-        self.assertTrue('temperature' is out_dict['variable_name'])
-
-
-        out_dict = generator.next()
-        self.assertTrue('conductivity' is out_dict['variable_name'])
-
-        self.assertTrue('conductivity' in out_dict['arrays_out_dict'])
-        self.assertTrue('temperature' in out_dict['arrays_out_dict'])
-
-        self.assertTrue(not ('salinity' in out_dict['arrays_out_dict']))
+        self.assertEquals( str(out_dict['concatenated_array']), str(self.cond[ : concatenate_size]) )
 
     def test_concatenate_size(self):
         """
@@ -170,15 +148,12 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         )
 
         out_dict = generator.next()
-        self.assertTrue('temperature' is out_dict['variable_name'])
+        self.assertEquals( str(out_dict['concatenated_array']), str(self.temp) )
 
+        #-----------------------------------------
 
         out_dict = generator.next()
-        self.assertTrue('conductivity' is out_dict['variable_name'])
-
-        self.assertTrue('conductivity' in out_dict['arrays_out_dict'])
-        self.assertTrue('temperature' in out_dict['arrays_out_dict'])
-
+        self.assertEquals( str(out_dict['concatenated_array']), str(self.cond) )
 
     def test_bounds(self):
         """
