@@ -167,10 +167,10 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 if num_entries_to_read:
                     log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
                     log.warn("dataset.value.size: %s" % dataset.value.size)
-                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read) + 1) )]
+                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
                 else:
                     log.warn("dataset.value.size: %s" % dataset.value.size)
-                    arri = ArrayIterator(dataset, concatenate_size)[(slice(start_index, dataset.value.size + 1))]
+                    arri = ArrayIterator(dataset, concatenate_size)[(slice(start_index, dataset.value.size))]
 
                 count = 0
 
