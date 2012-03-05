@@ -82,8 +82,8 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         """
 
         generator = acquire_data(hdf_files = ['data.hdf5','measurements.hdf5'],
-                                var_names = None,
-                                concatenate_block_size = 50,
+                                var_names = ['salinity', 'temperature'],
+                                concatenate_size = 50,
                                 bounds = None
                                 )
 
@@ -104,8 +104,8 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
         """
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
-                                     var_names = None,
-                                     concatenate_block_size = 50,
+                                     var_names = ['temperature', 'conductivity'],
+                                     concatenate_size = 50,
                                      bounds = None
                                 )
 
@@ -126,7 +126,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
             var_names = ['temperature', 'conductivity'],
-            concatenate_block_size = 50,
+            concatenate_size = 50,
             bounds = None
         )
         out_dict = generator.next()
@@ -141,31 +141,31 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.assertTrue(not ('salinity' in out_dict['arrays_out_dict']))
 
-    def test_concatenate_block_size(self):
+    def test_concatenate_size(self):
         """
         Test that the chunk of data that is read from the hdf file is of the size buffer_size
         """
 
-        concatenate_block_size = 20
+        concatenate_size = 20
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
             var_names = ['temperature', 'conductivity'],
-            concatenate_block_size = concatenate_block_size,
+            concatenate_size = concatenate_size,
             bounds = None
         )
 
         out_dict = generator.next()
 
-        self.assertEquals( out_dict['concatenated_array'].size, concatenate_block_size)
+        self.assertEquals( out_dict['concatenated_array'].size, concatenate_size)
 
-    def test_larger_than_normal_concatenate_block_size(self):
+    def test_larger_than_normal_concatenate_size(self):
         """
         Test that providing a very large buffer size is okay
         """
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
             var_names = ['temperature', 'conductivity'],
-            concatenate_block_size = 500,
+            concatenate_size = 500,
             bounds = None
         )
 
@@ -186,7 +186,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         generator = acquire_data(hdf_files = ['measurements.hdf5'],
             var_names = ['temperature'],
-            concatenate_block_size = 50,
+            concatenate_size = 50,
             bounds = (3,10)
         )
         #------------------------------------------------------------------------------------------------
