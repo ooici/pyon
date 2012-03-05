@@ -12,127 +12,206 @@ from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
 
-def acquire_data( hdf_files = None, var_names=None, buffer_size = None, slice_=(), concatenate_block_size = None):
 
-    arrays_out = {}
-
-    # the numpy arrays will be stored here as a list to begin with
-
-    # the default dataset names that are going to be used for input...
-    default_var_names = ['temperature', 'conductivity', 'salinity', 'pressure']
-
-    assert hdf_files, NotFound('No hdf_files provided to extract data from!')
-    assert buffer_size, NotFound('No buffer_size provided.')
+def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bounds = None):
 
     import h5py, numpy
 
-    def check_for_dataset(nodes):
+    assert hdf_files, NotFound('No hdf_files provided to extract data from.')
+    assert var_names, NotFound('Variable names where not provided.')
+    assert concatenate_size, NotFound('The concatenation size was not provided')
+
+    arrays_out = {}
+
+    if bounds:
+        start_index, stop_index = bounds
+        num_entries_to_read = stop_index - start_index + 1
+    else:
+        start_index = 0
+        num_entries_to_read = None
+
+    def check_for_dataset(nodes, var_names):
         """
         A function to check for datasets in an hdf file and collect them
         """
+
+        import h5py
+
         for node in nodes:
+
             if isinstance(node, h5py._hl.dataset.Dataset):
-                list_of_h5py_datasets.append(node)
+
+                #-------------------------------------------------------------------------------------------------------
+                # if the name of the dataset (without grp/subgrp name) is one of the supplied variable names of interest,
+                # update the dictionary for relevant datasets
+                #-------------------------------------------------------------------------------------------------------
+
+                dataset_name = node.name.rsplit('/', 1)[1]
+                dataset = node
+
+                if dataset_name in var_names:
+                    dict_of_h5py_datasets[dataset_name] = dataset
+
             elif isinstance( node , h5py._hl.group.Group):
                 check_for_dataset(node.values())
 
 
     for hdf_file in hdf_files:
 
+        #-------------------------------------------------------------------------------------------------------
         # refresh the h5py dataset list
-        list_of_h5py_datasets = []
+        #-------------------------------------------------------------------------------------------------------
+
+        dict_of_h5py_datasets = {}
 
         log.debug('Reading file: %s' % hdf_file)
 
+        #-------------------------------------------------------------------------------------------------------
         # make a file object
-        f = h5py.File(hdf_file,'r')
+        #-------------------------------------------------------------------------------------------------------
 
+        file = h5py.File(hdf_file,'r')
+
+        #-------------------------------------------------------------------------------------------------------
         # get the list of groups or datasets if there are no groups in the file
-        values = f.values()
+        #-------------------------------------------------------------------------------------------------------
 
-        # checking for datasets in the hdf file
-        check_for_dataset(values)
+        nodes = file.values()
 
-        log.debug('list_of_h5py_datasets: %s' % list_of_h5py_datasets)
-        #--------------------------------------------------------------------------------
-        # Use the ArrayIterator so that the arrays come in buffer sized chunks
-        #--------------------------------------------------------------------------------
+        #-------------------------------------------------------------------------------------------------------
+        # checking for datasets in the hdf file whose names appear in the list of variable names supplied
+        #-------------------------------------------------------------------------------------------------------
 
-        # var_name = 'conductivity'
-        if var_names is None:
-            vars = default_var_names
-        else:
-            vars = [] + var_names
+        check_for_dataset(nodes, var_names)
+        log.debug('dict_of_h5py_datasets: %s' % dict_of_h5py_datasets)
 
-        if not isinstance(slice_, tuple): slice_ = (slice_,)
+        #-------------------------------------------------------------------------------------------------------
+        # if no relevant dataset was found in the hdf file, then skip that file
+        #-------------------------------------------------------------------------------------------------------
 
-        for vn in vars:
+        if not dict_of_h5py_datasets:
+            continue
 
-            for dataset in list_of_h5py_datasets:
+        #-------------------------------------------------------------------------------------------------------
+        # Iterate over the supplied variable names
+        #-------------------------------------------------------------------------------------------------------
 
-                str = dataset.name # in general this dataset name will have the grp/subgrp names also in it
+        for vn in var_names:
 
-                if str.rsplit('/', 1)[1] == vn: # strip off the grp and subgrp names
+            #-------------------------------------------------------------------------------------------------------
+            # fetch the dataset
+            #-------------------------------------------------------------------------------------------------------
 
-                    # the shape of the dataset is the same as the shape of the numpy array it contains
-                    ndims = len(dataset.shape)
+            dataset = dict_of_h5py_datasets.get(vn, None)
 
-                    # Ensure the slice_ is the appropriate length
-                    if len(slice_) < ndims:
-                        slice_ += (slice(None),) * (ndims-len(slice_))
+            #-------------------------------------------------------------------------------------------------------
+            # if this variable is not in a dataset in the hdf file, skip this variable name for this hdf file
+            #-------------------------------------------------------------------------------------------------------
 
-                    arri = ArrayIterator(dataset, buffer_size)[slice_]
+            if not dataset:
+                continue
 
-                    for d in arri:
-                        if d.dtype.char is "S":
-                            # Obviously, we can't get the range of values for a string data type!
-                            rng = None
-                        elif isinstance(d, numpy.ma.masked_array):
-                            # TODO: This is a temporary fix because numpy 'nanmin' and 'nanmax'
-                            # are currently broken for masked_arrays:
-                            # http://mail.scipy.org/pipermail/numpy-discussion/2011-July/057806.html
-                            dc=d.compressed()
-                            if dc.size == 0:
-                                rng = None
-                            else:
-                                rng = (numpy.nanmin(dc), numpy.nanmax(dc))
-                        else:
-                            rng = (numpy.nanmin(d), numpy.nanmax(d))
+            #-------------------------------------------------------------------------------------------------------
+            # if the array in the dataset is too small, grab the whole array
+            #-------------------------------------------------------------------------------------------------------
 
-                        if concatenate_block_size:
-
-                            if vn in arrays_out:
-                                if arrays_out[vn].size < concatenate_block_size:
-                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d), axis = 0)
-                                else:
-                                    indices_left = concatenate_block_size - arrays_out[vn].size
-
-                                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:indices_left]), axis = 0)
-
-                                    temp_array = d[indices_left:]
-
-                                    # yields variable_name, the current slice, range, the sliced data,
-                                    # the dictionary holding the concatenated arrays by variable name
-                                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
-                                    yield vn, arri.curr_slice, rng, d, arrays_out, arrays_out[vn]
-
-                                    arrays_out[vn] = temp_array
-                            else:
-                                arrays_out[vn] = d
-
-                        # if no concatenate_block_size is provided
-                        else:
-
-                            # to have the same yielded values as when the concatenate_block_size
-                            # is provided, we need to make sure that an empty dictionary goes out for arrays_out
-                            # and the arrays_out[vn] values are None
-
-                            # its good to keep the same interface and that is why we are yielding the same
-                            # number of output parameters for all cases of concatenate_block_size
-
-                            yield vn, arri.curr_slice, rng, d, None, None
+            read_entries = 0
+            log.warn("read_entries: %s" % read_entries)
 
 
+            if dataset.value.size < concatenate_size:
+
+                # grab the whole array in the dataset upto the user specified bounds
+
+                if num_entries_to_read:
+                    d = dataset.value[ start_index : start_index + num_entries_to_read - 1]
+
+                    read_entries += d.size
+                    log.warn("read_entries: %s" % read_entries)
+
+                    left_to_read_entries = max(num_entries_to_read - read_entries,0)
+                    log.warn("left_to_read_entries: %s" % left_to_read_entries)
+
+                else:
+                    d = dataset.value
+
+                # update the arrays_out dict
+                arrays_out[vn] = d
+
+                current_slice = (slice(0,dataset.value.size))
+
+                rng = (numpy.nanmin(d), numpy.nanmax(d))
+
+                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                out_dict = {'variable_name' : vn,
+                            'current_slice' : current_slice,
+                            'range' : rng,
+                            'current_array_chunk' : d,
+                            'arrays_out_dict' : arrays_out,
+                            'concatenated_array' : arrays_out[vn],
+                            }
+
+                yield out_dict
+
+                read_entries += d.size
+                log.warn("read_entries: %s" % read_entries)
+
+            else:
+                #--------------------------------------------------------------------------------------------------------------
+                # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
+                #--------------------------------------------------------------------------------------------------------------
+
+                # if no bounds is provided, num_entries_to_read is None and so the stop_index is determined only by
+                # hte size of the dataset
+                if num_entries_to_read:
+                    log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
+                    log.warn("dataset.value.size: %s" % dataset.value.size)
+                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
+                else:
+                    log.warn("dataset.value.size: %s" % dataset.value.size)
+                    arri = ArrayIterator(dataset, concatenate_size)[(slice(start_index, dataset.value.size))]
+
+                count = 0
+
+                for d in arri:
+
+
+                    arrays_out[vn] = numpy.array(0)
+                    count += 1
+                    log.warn("iteration count: %s" % count)
+
+                    upper_bound = concatenate_size
+
+                    if concatenate_size:
+                        log.warn("concatenate_size: %s" % concatenate_size)
+
+                        if num_entries_to_read:
+                            left_to_read_entries = max(num_entries_to_read - read_entries,0)
+                            log.warn("left_to_read_entries: %s" % left_to_read_entries)
+
+                            upper_bound = min(left_to_read_entries, concatenate_size)
+
+                        arrays_out[vn] = d[:upper_bound]
+
+                    current_slice = arri.curr_slice
+
+                    rng = (numpy.nanmin(d), numpy.nanmax(d))
+
+                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                    out_dict = {'variable_name' : vn,
+                                'current_slice' : current_slice,
+                                'range' : rng,
+                                'current_array_chunk' : d,
+                                'arrays_out_dict' : arrays_out,
+                                'concatenated_array' : arrays_out[vn],
+                                }
+
+                    yield out_dict
+
+                    read_entries += d.size
+                    log.warn("read_entries: %s" % read_entries)
 
 #----------------------------------------------------------------------------------------------------------------------------
 # Copied below ArrayIterator class written by Chris Mueller since eoi-services has not yet been included in my repositories
