@@ -10,33 +10,10 @@
     <PolicyDefaults>
         <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
     </PolicyDefaults>
-    
-    <Target>
-        <!--
-        <Subjects>
-            <Subject>
-                <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ooi</AttributeValue>
-                     <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-qualifier" DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                </SubjectMatch>
-            </Subject>
-        </Subjects>
-
-        <Resources>
-            <Resource>
-                <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
-                     <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                </ResourceMatch>
-            </Resource>
-        </Resources>
--->
-    </Target>
-
-
+<!--
     <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Deny">
         <Description>
-            anonymous user can access most services except create/update operations
+            A global rule which specifies that an anonymous user can access most services except create/update operations
         </Description>
 
         <Target>
@@ -71,7 +48,7 @@
 
     <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Permit">
         <Description>
-            anonymous user can only access datastore.create_doc during bootstrap
+            An anonymous user can only access datastore.create_doc during bootstrap
         </Description>
 
         <Target>
@@ -123,7 +100,7 @@
 
     <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:3" Effect="Permit">
         <Description>
-            anonymous user can onbly access identity_management.create_user_identity during bootstrap
+            An anonymous user can onbly access identity_management.create_user_identity during bootstrap
 
         </Description>
 
@@ -290,6 +267,12 @@
                         <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-role-Member" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </SubjectMatch>
                 </Subject>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
             </Subjects>
 
             <Resources>
@@ -320,4 +303,5 @@
 
 
     </Rule>
+-->
 </Policy>

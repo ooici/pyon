@@ -48,7 +48,7 @@ class PolicyDecisionPoint(object):
         log.debug("Creating a new PDP")
         #Adding an not function to XACML
         from pyon.core.governance.policy.xacml.not_function import Not
-        from pyon.core.governance.policy.xacml.not_equal import NotEqualBase
+        #from pyon.core.governance.policy.xacml.not_equal import NotEqualBase
         functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
         #functionMap['urn:oasis:names:tc:xacml:ooi:function:string-not-equal'] = NotEqualBase
 
