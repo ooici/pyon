@@ -19,8 +19,12 @@ from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.core.bootstrap import CFG
 
-# Marks key range upper bound
-END_MARKER = "ZZZZZ"
+# Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
+# prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
+# or "somestr" <= keys < "somestr"+END_MARKER for string prefix checking
+# Note: Use highest ASCII characters here, not 8bit
+#END_MARKER = "\x7f\x7f\x7f\x7f"
+END_MARKER = "ZZZZZZ"
 
 def sha1hex(doc):
     """

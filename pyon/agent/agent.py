@@ -5,10 +5,10 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import CFG, IonObject
-from pyon.util.log import log
-from pyon.ion.resource import RT, PRED
+from pyon.core import bootstrap
+from pyon.core.bootstrap import IonObject
 from pyon.core import exception as iex
+from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
 from interface.services.iresource_agent import BaseResourceAgent, ResourceAgentProcessClient
@@ -23,24 +23,15 @@ class ResourceAgent(BaseResourceAgent):
 
     def _on_init(self):
         log.debug("Resource Agent initializing. name=%s" % (self._proc_name))
-        # The ID of the agent resource object
+        # The ID of the agent instance resource object
         self.agent_id = None
         # The ID of the agent definition resource object
         self.agent_def_id = None
         # The ID of the target resource object
         self.resource_id = None
 
-        caps = self.get_capabilities()
-        self.container.directory.register("/Agents", self.id,
-                                          **dict(name=self._proc_name,
-                                             container=self.container.id,
-                                             resource_id=self.resource_id,
-                                             agent_id=self.agent_id,
-                                             def_id=self.agent_def_id,
-                                             capabilities=caps))
-
     def _on_quit(self):
-        self.container.directory.unregister("/Agents", self.id)
+        pass
 
     def negotiate(self, resource_id="", sap_in=None):
         pass
@@ -148,6 +139,16 @@ class ResourceAgentClient(ResourceAgentProcessClient):
     def __init__(self, resource_id, *args, **kwargs):
         assert resource_id, "resource_id must be set for an agent"
         self.resource_id = resource_id
+
+        if not 'name' in kwargs:
+            process_id = self._get_agent_process_id(self.resource_id)
+            if process_id:
+                kwargs['name'] = process_id
+                log.debug("Use agent process %s for resource_id=%s" % (process_id, self.resource_id))
+            else:
+                # TODO: Check if there is a service for this type of resource
+                log.debug("No agent process found for resource_id=%s" % self.resource_id)
+
         assert "name" in kwargs, "Name argument for agent target not set"
         ResourceAgentProcessClient.__init__(self, *args, **kwargs)
 
@@ -177,3 +178,14 @@ class ResourceAgentClient(ResourceAgentProcessClient):
 
     def set_agent_param(self, *args, **kwargs):
         return super(ResourceAgentClient, self).set_agent_param(self.resource_id, *args, **kwargs)
+
+    @classmethod
+    def _get_agent_process_id(cls, resource_id):
+        agent_procs = bootstrap.container_instance.directory.find_by_value('/Agents', 'resource_id', resource_id)
+        if agent_procs:
+            if len(agent_procs) > 1:
+                log.warn("Inconsistency: More than one agent registered for resource_id=%s: %s" % (
+                    resource_id, agent_procs))
+            agent_id = bootstrap.container_instance.directory._get_key(agent_procs[0][0])
+            return str(agent_id)
+        return None
