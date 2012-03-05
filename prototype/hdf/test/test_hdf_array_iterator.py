@@ -89,11 +89,11 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         out_dict = generator.next()
         # assert that the dataset 'salinity' in the first hdf5 file has been opened
-        self.assertEquals( str(out_dict['concatenated_array']), str(self.salinity) )
+        self.assertEquals( str(out_dict['salinity']['values']), str(self.salinity) )
 
         out_dict = generator.next()
         # assert that the second hdf5 file has been opened and its data read
-        self.assertEquals( str(out_dict['concatenated_array']), str(self.temp) )
+        self.assertEquals( str(out_dict['temperature']['values']), str(self.temp) )
 
     def test_acquire_data_from_multiple_datasets(self):
         """

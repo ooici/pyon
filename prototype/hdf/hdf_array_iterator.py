@@ -56,7 +56,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                     dict_of_h5py_datasets[dataset_name] = dataset
 
             elif isinstance( node , h5py._hl.group.Group):
-                check_for_dataset(node.values())
+                check_for_dataset(node.values(), var_names)
 
 
     for hdf_file in hdf_files:
@@ -219,6 +219,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 # the last chopped out part is stored here incase, it is required
                 arrays_out[vn] = chopped_end[vn]
 
+        # after having swept over all the variables, and having updated out_dict, we call the yield statement
         if concatenate:
             yield out_dict
 
