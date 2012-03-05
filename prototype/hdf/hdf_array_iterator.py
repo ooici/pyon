@@ -22,6 +22,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
     assert concatenate_size, NotFound('The concatenation size was not provided')
 
     arrays_out = {}
+    out_dict = {}
+    read_entries = {}
+    concatenate = False
 
     if bounds:
         start_index, stop_index = bounds
@@ -63,6 +66,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         #-------------------------------------------------------------------------------------------------------
 
         dict_of_h5py_datasets = {}
+        chopped_end = {}
 
         log.debug('Reading file: %s' % hdf_file)
 
@@ -98,6 +102,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
         for vn in var_names:
 
+            if not read_entries.has_key(vn):
+                read_entries[vn] = 0
+
             #-------------------------------------------------------------------------------------------------------
             # fetch the dataset
             #-------------------------------------------------------------------------------------------------------
@@ -112,12 +119,8 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 continue
 
             #-------------------------------------------------------------------------------------------------------
-            # if the array in the dataset is too small, grab the whole array
+            # Case 1: If the array in the dataset is too small, grab the whole array
             #-------------------------------------------------------------------------------------------------------
-
-            read_entries = 0
-            log.warn("read_entries: %s" % read_entries)
-
 
             if dataset.value.size < concatenate_size:
 
@@ -126,40 +129,53 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 if num_entries_to_read:
                     d = dataset.value[ start_index : start_index + num_entries_to_read - 1]
 
-                    read_entries += d.size
-                    log.warn("read_entries: %s" % read_entries)
-
-                    left_to_read_entries = max(num_entries_to_read - read_entries,0)
+                    left_to_read_entries = max(num_entries_to_read - read_entries[vn],0)
                     log.warn("left_to_read_entries: %s" % left_to_read_entries)
 
                 else:
                     d = dataset.value
 
-                # update the arrays_out dict
-                arrays_out[vn] = d
+                if read_entries.has_key(vn):
+                    read_entries[vn] += d.size
+                else:
+                    read_entries[vn] = d.size
 
-                current_slice = (slice(0,dataset.value.size))
+                # if arrays_out already exists...
+                if arrays_out.has_key(vn):
+                    length_to_add = min(d.size, concatenate_size - arrays_out[vn])
 
-                rng = (numpy.nanmin(d), numpy.nanmax(d))
+                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:length_to_add]), axis = 0)
 
-                log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+                    chopped_end[vn] = d[length_to_add:]
 
-                out_dict = {'variable_name' : vn,
-                            'current_slice' : current_slice,
-                            'range' : rng,
-                            'current_array_chunk' : d,
-                            'arrays_out_dict' : arrays_out,
-                            'concatenated_array' : arrays_out[vn],
-                            }
+                    current_slice = (slice(0, length_to_add))
+                else:
+                    arrays_out[vn] = d
+                    current_slice = (slice(0, d.size))
 
-                yield out_dict
+                #-------------------------------------------------------------------------------------------------------
+                # check if the amount of data read is same as concatenate_size. if yes, then update out_dict and
+                # move to next variable
+                #-------------------------------------------------------------------------------------------------------
 
-                read_entries += d.size
-                log.warn("read_entries: %s" % read_entries)
+                if read_entries[vn] == concatenate_size:
+
+                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
+
+                    out_dict[vn] = {'current_slice' : current_slice,
+                                    'range' : (numpy.nanmin(d), numpy.nanmax(d)),
+                                    'values' : arrays_out[vn]},
+
+                    arrays_out[vn] = chopped_end[vn]
+
+                    concatenate = True
+
+                    # move to the next variable
+                    continue
 
             else:
                 #--------------------------------------------------------------------------------------------------------------
-                # Calling the ArrayIterator to slice the array held by the dataset and yield the bits
+                # Case 2: Calling the ArrayIterator to slice the array held by the dataset and yield the bits
                 #--------------------------------------------------------------------------------------------------------------
 
                 # if no bounds is provided, num_entries_to_read is None and so the stop_index is determined only by
@@ -175,43 +191,40 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 count = 0
 
                 for d in arri:
-
-
                     arrays_out[vn] = numpy.array(0)
                     count += 1
                     log.warn("iteration count: %s" % count)
 
-                    upper_bound = concatenate_size
+                    if num_entries_to_read:
+                        left_to_read_entries = max(num_entries_to_read - read_entries[vn],0)
+                        log.warn("left_to_read_entries: %s" % left_to_read_entries)
+                        upper_bound = min(left_to_read_entries, concatenate_size)
+                    else:
+                        upper_bound = concatenate_size
 
-                    if concatenate_size:
-                        log.warn("concatenate_size: %s" % concatenate_size)
+                    arrays_out[vn] = d[:upper_bound]
 
-                        if num_entries_to_read:
-                            left_to_read_entries = max(num_entries_to_read - read_entries,0)
-                            log.warn("left_to_read_entries: %s" % left_to_read_entries)
+                    chopped_end[vn] = d[upper_bound:]
 
-                            upper_bound = min(left_to_read_entries, concatenate_size)
+                    read_entries[vn] += d.size
 
-                        arrays_out[vn] = d[:upper_bound]
-
-                    current_slice = arri.curr_slice
-
-                    rng = (numpy.nanmin(d), numpy.nanmax(d))
-
+                    log.warn("read_entries[vn]: %s" % read_entries[vn])
                     log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
-                    out_dict = {'variable_name' : vn,
-                                'current_slice' : current_slice,
-                                'range' : rng,
-                                'current_array_chunk' : d,
-                                'arrays_out_dict' : arrays_out,
-                                'concatenated_array' : arrays_out[vn],
-                                }
-
+                    out_dict[vn] = {'current_slice' : arri.curr_slice,
+                                    'range' : (numpy.nanmin(d), numpy.nanmax(d)),
+                                    'values' : arrays_out[vn]}
                     yield out_dict
 
-                    read_entries += d.size
-                    log.warn("read_entries: %s" % read_entries)
+                # the last chopped out part is stored here incase, it is required
+                arrays_out[vn] = chopped_end[vn]
+
+        if concatenate:
+            yield out_dict
+
+    # if all the data has been exhausted, yield the last updated out_dict
+    yield out_dict
+
 
 #----------------------------------------------------------------------------------------------------------------------------
 # Copied below ArrayIterator class written by Chris Mueller since eoi-services has not yet been included in my repositories
