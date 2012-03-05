@@ -24,11 +24,12 @@ from ndg.xacml.core.functions import functionMap, FunctionMap
 
 from pyon.util.log import log
 
+
 THIS_DIR = path.dirname(__file__)
 XACML_ION_POLICY_FILENAME='sample_policies.xml'
 
 SERVICE_PROVIDER_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'resource:service-provider'
-ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-id-role'
+ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-role'
 SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-id-sender'
 
 #"""XACML DATATYPES"""
@@ -47,7 +48,9 @@ class PolicyDecisionPoint(object):
         log.debug("Creating a new PDP")
         #Adding an not function to XACML
         from pyon.core.governance.policy.xacml.not_function import Not
+        from pyon.core.governance.policy.xacml.not_equal import NotEqualBase
         functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
+        #functionMap['urn:oasis:names:tc:xacml:ooi:function:string-not-equal'] = NotEqualBase
 
         self.policy_decision_point = PDP.fromPolicySource(path.join(THIS_DIR, XACML_ION_POLICY_FILENAME), ReaderFactory)
 
@@ -75,12 +78,13 @@ class PolicyDecisionPoint(object):
         receiver_header = invocation.get_header_value('receiver', 'Unknown')
         receiver = invocation.get_service_name(receiver_header)
 
-        ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
         op = invocation.get_header_value('op', 'Unknown')
+        ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
+        actor_roles = invocation.get_header_value('ion-actor-roles', {})
 
 
 
-        log.info("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s" % (sender, receiver, op, ion_actor_id))
+        log.info("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
 
         request = Request()
@@ -89,7 +93,11 @@ class PolicyDecisionPoint(object):
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
        # subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID_QUALIFIER, ion_org_id))
 
-        #subject.attributes.append(createStringAttribute(ROLE_ATTRIBUTE_ID, 'researcher'))
+        #Iterate over the roles associated with the user and create attributes for each - #TODO - figure out how to specify proper Org from multiple Orgs.
+        for org in actor_roles:
+            for role in actor_roles[org]:
+                subject.attributes.append(self.create_string_attribute(ROLE_ATTRIBUTE_ID+'-'+role, "True"))
+
         request.subjects.append(subject)
 
         resource = Resource()

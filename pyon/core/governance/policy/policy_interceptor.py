@@ -34,9 +34,8 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         else:
             log.debug("PolicyInterceptor.incoming: %s", invocation)
 
-
         #If missing default to request just to be safe
-        msg_performative = invocation.headers['performative'] if invocation.headers.has_key('performative') and invocation.headers['performative'] != '' else 'request'
+        msg_performative = invocation.get_header_value('performative', 'request')
 
         #No need to check policy for response or failure messages
         if msg_performative != 'inform-result' and msg_performative != 'failure':

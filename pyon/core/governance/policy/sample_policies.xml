@@ -6,7 +6,7 @@
     xmlns:xf="http://www.w3.org/TR/2002/WD-xquery-operators-20020816/#"
     xmlns:md="http:www.med.example.com/schemas/record.xsd"
     PolicyId="urn:oasis:names:tc:xacml:2.0:example:policyid:1"
-    RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:deny-overrides">
+    RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:permit-overrides">
     <PolicyDefaults>
         <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
     </PolicyDefaults>
@@ -33,20 +33,32 @@
 -->
     </Target>
 
-    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Deny">
+
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Deny">
         <Description>
-            anonymous can access most services except create/update services - except when being called from the bootstrap service
+            anonymous user can access most services except create/update operations
         </Description>
 
         <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+
             <Actions>
                 <Action>
                     <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create*</AttributeValue>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
                     <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">update*</AttributeValue>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">update</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
                </Action>
@@ -54,70 +66,258 @@
 
         </Target>
 
-        <Condition>
 
-            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
-            <Apply FunctionId="urn:oasis:names:tc:xacml:ooi:function:not">
-                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
-                        <SubjectAttributeDesignator
-                                AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-sender"
-                                DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                    </Apply>
-                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">bootstrap</AttributeValue>
-
-                </Apply>
-            </Apply>
-
-            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
-                    <SubjectAttributeDesignator
-                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
-                            DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                </Apply>
-                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
-
-            </Apply>
-            </Apply>
-
-
-        </Condition>
     </Rule>
 
-    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:2" Effect="Permit">
         <Description>
-            anonymous can access everything else
+            anonymous user can only access datastore.create_doc during bootstrap
         </Description>
 
-        <!--
         <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+            <Resources>
+                <Resource>
+                    <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">datastore</AttributeValue>
+                        <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ResourceMatch>
+                </Resource>
+            </Resources>
+
             <Actions>
                 <Action>
-                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello</AttributeValue>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_doc</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
                 </Action>
             </Actions>
 
         </Target>
--->
+
         <Condition>
 
-                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
-                        <SubjectAttributeDesignator
-                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                    <SubjectAttributeDesignator
+                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-sender"
                             DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                    </Apply>
-                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
                 </Apply>
+                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">bootstrap</AttributeValue>
+            </Apply>
+
+        </Condition>
+
+    </Rule>
 
 
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:3" Effect="Permit">
+        <Description>
+            anonymous user can onbly access identity_management.create_user_identity during bootstrap
+
+        </Description>
+
+        <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+            <Resources>
+                <Resource>
+                    <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">identity_management</AttributeValue>
+                        <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ResourceMatch>
+                </Resource>
+            </Resources>
+
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_user_identity</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+
+        <Condition>
+
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                    <SubjectAttributeDesignator
+                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-sender"
+                            DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                </Apply>
+                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">bootstrap</AttributeValue>
+            </Apply>
 
         </Condition>
     </Rule>
 
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:4" Effect="Permit">
+        <Description>
+            anonymous user can only access resource_registry.create and resource_registry.create_association
+            from the identity_management service during bootstrap
+
+        </Description>
+
+        <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">anonymous</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+            <Resources>
+                <Resource>
+                    <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">resource_registry</AttributeValue>
+                        <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ResourceMatch>
+                </Resource>
+            </Resources>
 
 
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create</AttributeValue>
+                    </ActionMatch>
+                </Action>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_association</AttributeValue>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+        <Condition>
+
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                    <SubjectAttributeDesignator
+                            AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-sender"
+                            DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                </Apply>
+                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">identity_management</AttributeValue>
+            </Apply>
+
+        </Condition>
+
+    </Rule>
+
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:5" Effect="Permit">
+        <Description>
+            The org_management.grant_role is only allowed for users that are assigned the User Role of Manager
+        </Description>
+
+        <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">True</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-role-Manager" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+            <Resources>
+                <Resource>
+                    <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">org_management</AttributeValue>
+                        <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ResourceMatch>
+                </Resource>
+            </Resources>
+
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">grant_role</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">revoke_role</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+
+
+    </Rule>
+
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:6" Effect="Deny">
+        <Description>
+            Users with only Member User Roles cannot access these operations in the the org_management servce.
+        </Description>
+
+        <Target>
+
+            <Subjects>
+                <Subject>
+                    <SubjectMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">True</AttributeValue>
+                        <SubjectAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-role-Member" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </SubjectMatch>
+                </Subject>
+            </Subjects>
+
+            <Resources>
+                <Resource>
+                    <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">org_management</AttributeValue>
+                        <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ResourceMatch>
+                </Resource>
+            </Resources>
+
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">grant_role</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-regexp-match">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">revoke_role</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+
+        </Target>
+
+
+    </Rule>
 </Policy>
