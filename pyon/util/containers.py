@@ -171,7 +171,7 @@ def dict_merge(base, upd, inplace=False):
                     current_dst[key] = current_src[key]
     return dst
 
-def get_safe(dict_instance, keypath):
+def get_safe(dict_instance, keypath, default=None):
     """
     Returns a value with in a nested dict structure from a dot separated
     path expression such as "system.server.host" or a list of key entries
@@ -184,7 +184,7 @@ def get_safe(dict_instance, keypath):
             obj = obj[key]
         return obj
     except Exception, ex:
-        return None
+        return default
 
 def named_any(name):
     """

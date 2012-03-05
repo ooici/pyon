@@ -291,7 +291,7 @@ class Container(BaseContainerAgent):
 
         elif capability == "DIRECTORY":
             # Unregister from directory
-            self.directory.unregister_safe("/Container", self.id)
+            self.directory.unregister_safe("/Containers", self.id)
 
             # Close directory (possible CouchDB connection)
             self.directory.close()
