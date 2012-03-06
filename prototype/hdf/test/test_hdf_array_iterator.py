@@ -12,14 +12,13 @@ from prototype.hdf.hdf_array_iterator import acquire_data
 from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.exception import NotFound, BadRequest
-import h5py, numpy
-
 
 @attr('INT', group='dm')
 class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
     def setUp(self):
 
+        import numpy, h5py
 
         #--------------------------------------------------------------------
         # Create an hdf file for testing
@@ -366,6 +365,12 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # Test that files are closed when method compelete normally
         ## How?
+
+        # if the file cannot be opened again, then that means that the file was not closed...
+        # so we check if we can open the file again, making sure that we do close it in the end...
+
+#        try:
+
 
         # Test that files are close when acquire data fails too!
         ## how?
