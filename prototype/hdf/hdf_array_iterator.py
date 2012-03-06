@@ -96,6 +96,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         if not dict_of_h5py_datasets:
             continue
 
+        ### Declare a variable to hold array iterators:
+        array_iterators_by_name ={}
+
         #-------------------------------------------------------------------------------------------------------
         # Iterate over the supplied variable names
         #-------------------------------------------------------------------------------------------------------
@@ -122,11 +125,14 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
             # Case 1: If the array in the dataset is too small, grab the whole array
             #-------------------------------------------------------------------------------------------------------
 
-            if dataset.value.size < concatenate_size:
+            # if we are getting a specific range or the whole array check to see if we can do it in one shot.
+            if num_entries_to_read or dataset.value.size < concatenate_size:
 
                 # grab the whole array in the dataset upto the user specified bounds
 
                 if num_entries_to_read:
+                    # it is okay to give a stop index beyond the bounds of the allocated array.
+                    # It just returns the data in the array
                     d = dataset.value[ start_index : start_index + num_entries_to_read - 1]
 
                     left_to_read_entries = max(num_entries_to_read - read_entries[vn],0)
@@ -142,7 +148,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
                 # if arrays_out already exists...
                 if arrays_out.has_key(vn):
-                    length_to_add = min(d.size, concatenate_size - arrays_out[vn])
+                    length_to_add = min(d.size, concatenate_size - arrays_out[vn].size)
 
                     arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:length_to_add]), axis = 0)
 
@@ -158,7 +164,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 # move to next variable
                 #-------------------------------------------------------------------------------------------------------
 
-                if read_entries[vn] == concatenate_size:
+                if arrays_out[vn].size == concatenate_size:
 
                     log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
@@ -178,15 +184,25 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 # Case 2: Calling the ArrayIterator to slice the array held by the dataset and yield the bits
                 #--------------------------------------------------------------------------------------------------------------
 
+                arri = array_iterators_by_name.get(vn, None)
+
+                if arri is None:
+                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,num_entries_to_read or dataset.value.size) )]
+                    array_iterators_by_name[vn] = arri
+
+
                 # if no bounds is provided, num_entries_to_read is None and so the stop_index is determined only by
-                # hte size of the dataset
+                # the size of the dataset
                 if num_entries_to_read:
                     log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
                     log.warn("dataset.value.size: %s" % dataset.value.size)
                     arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
+
                 else:
                     log.warn("dataset.value.size: %s" % dataset.value.size)
                     arri = ArrayIterator(dataset, concatenate_size)[(slice(start_index, dataset.value.size))]
+
+
 
                 count = 0
 
