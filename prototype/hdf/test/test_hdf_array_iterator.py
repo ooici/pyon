@@ -11,7 +11,140 @@ from prototype.hdf.hdf_array_iterator import acquire_data
 
 from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
-import unittest
+
+
+@attr('INT', group='dm')
+class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
+
+    def setUp(self):
+
+        import h5py, numpy
+
+        #--------------------------------------------------------------------
+        # Create an hdf file for testing
+        #--------------------------------------------------------------------
+
+        self.salinity = [0,]*3
+        self.temperature = [0,]*3
+        self.pressure = [0,]*3
+
+        self.salinity[0] = numpy.arange(50)
+        self.salinity[1] = numpy.arange(50) + 50
+        self.salinity[2] = numpy.arange(50) + 100
+
+        self.temperature[0] = numpy.random.normal(size=50)
+        self.temperature[1] = numpy.random.normal(size=50)
+        self.temperature[2] = numpy.random.normal(size=50)
+
+        self.pressure[0] = numpy.random.uniform(low=0.0, high=1.0, size=50)
+        self.pressure[1] = numpy.random.uniform(low=0.0, high=1.0, size=50)
+        self.pressure[2] = numpy.random.uniform(low=0.0, high=1.0, size=50)
+
+        self.fnames = ['data1.hdf5', 'data2.hdf5', 'data3.hdf5']
+
+        for fname, s, t, p in zip(self.fnames, self.salinity, self.temperature, self.pressure):
+            file = h5py.File(fname, 'w')
+
+            grp1 = file.create_group('fields')
+            dset1 = grp1.create_dataset("salinity", data=s)
+            dset2 = grp1.create_dataset("temperature", data=t)
+            dset3 = grp1.create_dataset("pressure", data=p)
+
+            file.close()
+
+
+    def tearDown(self):
+        """
+        Cleanup. Delete Subscription, Stream, Process Definition
+        """
+
+        for fname in self.fnames:
+            os.remove(fname)
+
+
+    def simple_test(self):
+
+
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names = ['temperature', 'salinity'],
+            concatenate_size = 26,
+            bounds = (slice(63,150))
+        )
+
+
+        for d in generator:
+            print 'Hello!', d
+
+
+
+@attr('INT', group='dm')
+class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
+
+    def setUp(self):
+
+        import h5py, numpy
+
+        #--------------------------------------------------------------------
+        # Create an hdf file for testing
+        #--------------------------------------------------------------------
+
+        self.salinity = [0,]*3
+        self.temperature = [0,]*3
+        self.pressure = [0,]*3
+
+        self.salinity[0] = numpy.arange(50).reshape(5,10)
+        self.salinity[1] = numpy.arange(50).reshape(5,10) + 50
+        self.salinity[2] = numpy.arange(50).reshape(5,10) + 100
+
+        self.temperature[0] = numpy.random.normal(size=50).reshape(5,10)
+        self.temperature[1] = numpy.random.normal(size=50).reshape(5,10)
+        self.temperature[2] = numpy.random.normal(size=50).reshape(5,10)
+
+        self.pressure[0] = numpy.random.uniform(low=0.0, high=1.0, size=50).reshape(5,10)
+        self.pressure[1] = numpy.random.uniform(low=0.0, high=1.0, size=50).reshape(5,10)
+        self.pressure[2] = numpy.random.uniform(low=0.0, high=1.0, size=50).reshape(5,10)
+
+        self.fnames = ['data1.hdf5', 'data2.hdf5', 'data3.hdf5']
+
+        for fname, s, t, p in zip(self.fnames, self.salinity, self.temperature, self.pressure):
+            file = h5py.File(fname, 'w')
+
+            grp1 = file.create_group('fields')
+            dset1 = grp1.create_dataset("salinity", data=s)
+            dset2 = grp1.create_dataset("temperature", data=t)
+            dset3 = grp1.create_dataset("pressure", data=p)
+
+            file.close()
+
+
+    def tearDown(self):
+        """
+        Cleanup. Delete Subscription, Stream, Process Definition
+        """
+
+        for fname in self.fnames:
+            os.remove(fname)
+
+
+    def simple_test(self):
+
+
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names = ['temperature', 'salinity'],
+            concatenate_size = 25,
+            bounds = None #(slice(63,150))
+        )
+
+
+        for d in generator:
+            print 'Hello!', d
+
+
+
+
+
 
 @attr('UNIT', group='dm')
 class HDFArrayIteratorTest(IonIntegrationTestCase):
@@ -26,6 +159,7 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         self.salinity = numpy.arange(50)
 
+        #@todo - put this in a temp file location using FileSytem
         file = h5py.File('data.hdf5', 'w')
 
         dset = file.create_dataset("salinity", data=self.salinity)
@@ -215,4 +349,21 @@ class HDFArrayIteratorTest(IonIntegrationTestCase):
 
         # note that the bounds is inclusive, so the 10th element is meant to be read
         self.assertEquals(str(arrayOut2), str(array2))
+
+
+
+import numpy
+from prototype.hdf.hdf_array_iterator import VirtualDataset
+
+
+a = numpy.arange(24).reshape(2,3,4)
+b = numpy.arange(24).reshape(2,3,4) + 24
+c = numpy.arange(24).reshape(2,3,4) + 48
+
+
+vd = VirtualDataset([a,b,c])
+
+slc_vd = vd[(slice(0,2,), slice(0,3), slice(0,3))]
+
+
 

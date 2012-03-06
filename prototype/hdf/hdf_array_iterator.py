@@ -25,12 +25,6 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
     out_dict = {}
     read_entries = {}
 
-    if bounds:
-        start_index, stop_index = bounds
-        num_entries_to_read = stop_index - start_index + 1
-    else:
-        start_index = 0
-        num_entries_to_read = None
 
     def check_for_dataset(nodes, var_names):
         """
@@ -123,19 +117,29 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
     array_iterators_by_name = {}
 
-    for vname, dset_list in dataset_lists_by_name.itervalues():
+    for vname, dset_list in dataset_lists_by_name.iteritems():
 
         # Create the dataset list object that behaves like a dataset
         virtual_dset = VirtualDataset(dset_list)
 
-        iarray = ArrayIterator(virtual_dset, concatenate_size)[( slice(start_index,num_entries_to_read or virtual_dset.value.size) )]
+        if bounds:
+            iarray = ArrayIterator(virtual_dset, concatenate_size)[bounds]
+        else:
+            iarray = ArrayIterator(virtual_dset, concatenate_size)
+
+
         array_iterators_by_name[vname] = iarray
 
+    log.warn(array_iterators_by_name)
 
     names = array_iterators_by_name.keys()
     iarrays = array_iterators_by_name.values() # Get the list of array iterators
 
-    for ichunks in itertools.izip_longest(iarrays):
+
+    log.warn('Len iarrays: %d' % len(iarrays))
+    for ichunks in itertools.izip_longest(*iarrays):
+
+        log.warn('Len ichunks: %d' % len(ichunks))
 
         for name, chunk, iarray in itertools.izip(names, ichunks, iarrays):
 
@@ -149,14 +153,90 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
 class VirtualDataset(object):
 
+
     def __init__(self, var_list):
-        self.vars = var_list
+
+        import h5py, numpy
+
+        self._vars = []
+
+        self._records = 0
+
+        self._starts = []
+        self._stops = []
+
+
+        agg_shape = None
+        for var in var_list:
+
+            vv = {}
+            vv['data'] = var
+
+            shape = var.shape
+            vv['shape'] = shape
+
+            # set the agg shape if not already set
+            agg_shape = agg_shape or shape[1:]
+            # assert that it is the same
+            assert agg_shape == shape[1:]
+
+            vv['records'] = shape[0]
+
+            self._starts.append(self._records)
+
+            self._records += shape[0]
+
+            self._stops.append(self._records - 1 )
+
+            self._vars.append(vv)
+
+        self._agg_shape = agg_shape
+
+        self._shape = (self._records, ) + self._agg_shape
+
+
+
+
 
     def __getitem__(self, index):
-        """
-        is this needed?
-        """
-        raise RuntimeError('Shit - I need get_item')
+        import h5py, numpy
+
+        assert len(index) == len(self.shape)
+
+        get_start = index[0].start
+
+        get_stop = index[0].stop
+
+        assert get_stop > get_start
+
+        agg_slices = index[1:]
+
+        for start, stop, var in zip(self._starts, self._stops, self._vars):
+
+            if stop < get_start:
+                continue
+
+            if start > get_stop:
+                continue
+
+            elif start <= get_start and stop >= get_start:
+                # found the first of several chunks
+
+                slc = slice(get_start-start, get_stop - start)
+
+                aggregate = var['data'][(slc,) + agg_slices]
+
+
+            elif start > get_start and start <= get_stop:
+                # this is the last bit of the chunk
+
+                slc = slice(0, get_stop - start)
+
+                new = var['data'][(slc,) + agg_slices]
+                aggregate = numpy.concatenate((aggregate, new))
+
+
+        return aggregate
 
 
     @property
@@ -165,8 +245,15 @@ class VirtualDataset(object):
 
     @property
     def shape(self):
-        raise RuntimeError('Shit - pretty sure I need shap!')
+        return self._shape
 
+    @property
+    def size(self):
+        # No good built in product function. http://stackoverflow.com/questions/2104782/returning-the-product-of-a-list
+        res = 1
+        for dim in self.shape:
+            res *= dim
+        return res
 
     def __iter__(self):
         # Skip arrays with degenerate dimensions
@@ -200,6 +287,8 @@ class ArrayIterator(object):
         self.start = [0 for dim in var.shape]
         self.stop = [dim for dim in var.shape]
         self.step = [1 for dim in var.shape]
+
+        self.curr_slice = 'Not set yet!'
 
     def __getitem__(self, index):
         """
