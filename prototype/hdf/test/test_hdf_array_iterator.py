@@ -62,9 +62,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             os.remove(fname)
 
 
-    def simple_test(self):
+    def concatenate_size(self):
 
-
+        # Test with a length greater than the virtual dataset
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
@@ -72,9 +72,53 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             bounds = (slice(63,150))
         )
 
+        # assert the result...
 
-        for d in generator:
-            print 'Hello!', d
+
+        # Test with a length less than the virtual dataset such that mod(length, concatenate_size) == 0
+
+
+        # Test with a length less than the virtual dataset such that mod(length, concatenate_size) != 0
+
+
+    def var_names(self):
+
+        # Test with no names
+        # assert an error?
+
+        # Test with all names
+        # assert result
+
+        # Test with some names
+        # assert result
+
+        # Test with name not in dataset
+        # assert an error
+
+
+    def bounds(self):
+
+        # Test with bad input not a slice and not a tuple...
+        # Assert an error.
+        #@todo can we make the error more transparent to the use - easier to correct their mistake?
+
+        # Test with 2 tuple of slices on the 1d dataset
+        # Assert an error
+
+        # Test with bounds greater than the dataset length
+        # Assert result is the whole dataset
+
+        # Test with normal bounds slice
+        # assert result
+
+        # Test with no bounds
+        # assert result
+
+        # Test with concatenate larger than bounds slice
+        # Assert result
+
+        # Test with concatenate smaller than bounds slice
+        # assert result
 
 
 
