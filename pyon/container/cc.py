@@ -30,6 +30,7 @@ from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.core.governance.governance_controller import GovernanceController
+from pyon.util.sflow import SFlowManager
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
@@ -90,6 +91,9 @@ class Container(BaseContainerAgent):
 
         # Governance Controller - manages the governance related interceptors
         self.governance_controller = GovernanceController(self)
+
+        # sFlow manager - controls sFlow stat emission
+        self.sflow_manager = SFlowManager(self)
 
         # Coordinates the container start
         self._is_started = False
@@ -169,6 +173,9 @@ class Container(BaseContainerAgent):
         self.governance_controller.start()
         self._capabilities.append("GOVERNANCE_CONTROLLER")
 
+        if CFG.container.get('sflow', False):
+            self.sflow_manager.start()
+            self._capabilities.append("SFLOW_MANAGER")
 
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
@@ -332,6 +339,9 @@ class Container(BaseContainerAgent):
 
         elif capability == "PID_FILE":
             self._cleanup_pid()
+
+        elif capability == "SFLOW_MANAGER":
+            self.sflow_manager.stop()
 
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
