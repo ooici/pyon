@@ -11,6 +11,7 @@ from prototype.hdf.hdf_array_iterator import acquire_data
 
 from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.core.exception import NotFound, BadRequest
 import h5py, numpy
 
 
@@ -64,7 +65,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
     def test_concatenate_size(self):
 
+        #--------------------------------------------------------------------------------------
         # Test with a length greater than the virtual dataset
+        #--------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
@@ -81,7 +84,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
         self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
 
+        #---------------------------------------------------------------------------------------------------
         # Test with a length less than the virtual dataset such that mod(length, concatenate_size) == 0
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
@@ -98,7 +103,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         self.assertEquals(str(out['temperature']['values']), str(temperature[63:120]))
         self.assertEquals(str(out['salinity']['values']), str(salinity[63:120]) )
 
+        #---------------------------------------------------------------------------------------------------
         # Test with a length less than the virtual dataset such that mod(length, concatenate_size) != 0
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
@@ -121,15 +128,71 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # Test with no names
         # assert an error?
 
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names =  None,
+            concatenate_size = 26,
+            bounds = (slice(63,120))
+        )
+
+        with self.assertRaises(NotFound):
+            out = generator.next()
+
+        #---------------------------------------------------------------------------------------------------
         # Test with all names
+        #---------------------------------------------------------------------------------------------------
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names =  ['temperature', 'salinity', 'pressure'],
+            concatenate_size = 26,
+            bounds = (slice(63,120))
+        )
+        out = generator.next()
+
         # assert result
 
+        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
+        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+        pressure = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
+
+
+        self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
+        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
+        self.assertEquals(str(out['pressure']['values']), str(pressure[63:89]))
+
+        #---------------------------------------------------------------------------------------------------
         # Test with some names
+        #---------------------------------------------------------------------------------------------------
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names =  ['temperature', 'salinity'],
+            concatenate_size = 26,
+            bounds = (slice(63,120))
+        )
+        out = generator.next()
+
         # assert result
 
+        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
+        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+
+
+        self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
+        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
+
+        #---------------------------------------------------------------------------------------------------
         # Test with name not in dataset
+        #---------------------------------------------------------------------------------------------------
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names =  ['biological_quotient'],
+            concatenate_size = 26,
+            bounds = (slice(63,120))
+        )
+
         # assert an error
-        pass
+
+        with self.assertRaises(NotFound):
+            out = generator.next()
 
     def test_bounds(self):
 

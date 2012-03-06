@@ -17,9 +17,12 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
     import h5py, numpy
 
-    assert hdf_files, NotFound('No hdf_files provided to extract data from.')
-    assert var_names, NotFound('Variable names where not provided.')
-    assert concatenate_size, NotFound('The concatenation size was not provided')
+    if hdf_files is None:
+        raise NotFound('No hdf_files provided to extract data from.')
+    if var_names is None:
+        raise NotFound('Variable names where not provided.')
+    if concatenate_size is None:
+        raise NotFound('The concatenation size was not provided')
 
     out_dict = {}
 
@@ -117,6 +120,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
 
     array_iterators_by_name = {}
+
+    if len(dataset_lists_by_name.keys()) == 0:
+        raise NotFound('No dataset for the variables provided were found in the hdf files.')
 
     for vname, dset_list in dataset_lists_by_name.iteritems():
 
