@@ -15,18 +15,45 @@ import itertools
 
 def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bounds = None):
 
+
     import h5py, numpy
 
     if hdf_files is None:
-        raise NotFound('No hdf_files provided to extract data from.')
+        raise NotFound('No open_hdf_files provided to extract data from.')
     if var_names is None:
         raise NotFound('Variable names where not provided.')
     if concatenate_size is None:
         raise NotFound('The concatenation size was not provided')
 
+    open_files = []
+
+    try:
+        for hdf_file in hdf_files:
+            #-------------------------------------------------------------------------------------------------------
+            # make a file object
+            #-------------------------------------------------------------------------------------------------------
+            file = h5py.File(hdf_file,'r')
+            open_files.append(file)
+
+        gen = _acquire_hdf_data(open_hdf_files=open_files, var_names=var_names, concatenate_size=concatenate_size, bounds=bounds)
+
+        # run the generator yielding to the caller
+        for item in gen:
+            yield item
+
+    finally:
+        # always clean up!
+        for file in open_files:
+            file.close()
+
+
+def _acquire_hdf_data( open_hdf_files = None, var_names=None, concatenate_size = None, bounds = None):
+
+
+    import h5py, numpy
+
     out_dict = {}
 
-    open_files = []
 
     def check_for_dataset(nodes, var_names):
         """
@@ -57,7 +84,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
     ### Declare a variable to hold array iterators:
     dataset_lists_by_name ={}
 
-    for hdf_file in hdf_files:
+    for file in open_hdf_files:
 
         #-------------------------------------------------------------------------------------------------------
         # refresh the h5py dataset list
@@ -66,15 +93,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         dict_of_h5py_datasets = {}
         chopped_end = {}
 
-        log.debug('Reading file: %s' % hdf_file)
-
-        #-------------------------------------------------------------------------------------------------------
-        # make a file object
-        #-------------------------------------------------------------------------------------------------------
-
-        file = h5py.File(hdf_file,'r')
-
-        open_files.append(file)
+        log.debug('Reading file: %s' % file)
 
         #-------------------------------------------------------------------------------------------------------
         # get the list of groups or datasets if there are no groups in the file
@@ -159,8 +178,7 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
         yield out_dict
 
-    for file in open_files:
-        file.close()
+
 
 def check_bounds(bounds, virtual_dset):
     """
