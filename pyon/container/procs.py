@@ -52,10 +52,12 @@ class ProcManager(object):
 
         # Call quit on procs to give them ability to clean up
         # TODO: This can be done concurrently
-        for procid, proc in self.procs.iteritems():
+        while self.procs:
             try:
+                procid = self.procs.keys()[0]
                 # These are service processes with full life cycle
-                proc.quit()
+                #proc.quit()
+                self.terminate_process(procid)
             except Exception:
                 log.exception("Process %s quit failed" % procid)
 
@@ -148,6 +150,8 @@ class ProcManager(object):
 
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: service
     def _spawn_service_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as a service worker.
@@ -169,6 +173,8 @@ class ProcManager(object):
 
         return service_instance
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: stream process
     def _spawn_stream_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as a data stream process.
@@ -192,6 +198,8 @@ class ProcManager(object):
 
         return service_instance
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: agent
     def _spawn_agent_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as agent process.
@@ -203,8 +211,23 @@ class ProcManager(object):
         self._service_init(service_instance)
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
+
+        # Directory registration
+        caps = service_instance.get_capabilities()
+        self.container.directory.register("/Agents", service_instance.id,
+            **dict(name=service_instance._proc_name,
+                container=service_instance.container.id,
+                resource_id=service_instance.resource_id,
+                agent_id=service_instance.agent_id,
+                def_id=service_instance.agent_def_id,
+                capabilities=caps))
+        if not service_instance.resource_id:
+            log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
+
         return service_instance
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: standalone
     def _spawn_standalone_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as standalone process.
@@ -221,6 +244,8 @@ class ProcManager(object):
         self._service_start(service_instance)
         return service_instance
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: simple
     def _spawn_simple_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as simple process.
@@ -236,6 +261,8 @@ class ProcManager(object):
         self._service_start(service_instance)
         return service_instance
 
+    # -----------------------------------------------------------------
+    # PROCESS TYPE: immediate
     def _spawn_immediate_process(self, process_id, name, module, cls, config):
         """
         Spawn a process acting as immediate one off process.
@@ -364,10 +391,13 @@ class ProcManager(object):
         self.container.directory.unregister_safe("/Containers/%s/Processes" % self.container.id,
                 service_instance.id)
 
-        # For service workers
+        # Cleanup for specific process types
         if service_instance._proc_type == "service":
             listen_name = get_safe(service_instance.CFG, "process.listen_name", service_instance.name)
             self.container.directory.unregister_safe("/Services/%s" % listen_name, service_instance.id)
             remaining_workers = self.container.directory.find_entries("/Services/%s" % listen_name)
             if remaining_workers and len(remaining_workers) == 2:
                 self.container.directory.unregister_safe("/Services", listen_name)
+
+        elif service_instance._proc_type == "agent":
+            self.container.directory.unregister_safe("/Agents", service_instance.id)

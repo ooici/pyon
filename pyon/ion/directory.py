@@ -102,6 +102,11 @@ class Directory(object):
                 description="Service instances are registered here")
 
     def _get_dn(self, parent, key=None, org=None):
+        """
+        Returns the distinguished name (= name qualified with org name) for a directory
+        path (parent only) or entry (parent + key). Uses the instance org name by default
+        if no other org name is specified.
+        """
         org = org or self.orgname
         if parent == '/':
             return "%s/%s" % (org, key) if key is not None else org
@@ -109,6 +114,10 @@ class Directory(object):
             return "%s%s/%s" % (org, parent,key) if key is not None else "%s%s" % (org, parent)
         else:
             raise BadRequest("Illegal directory parent: %s" % parent)
+
+    def _get_key(self, qname):
+        parent_dn, key = qname.rsplit("/", 1)
+        return key
 
     def _assert_existence(self, parent, key, **kwargs):
         """
@@ -169,6 +178,10 @@ class Directory(object):
             log.exception("Error registering key=%s/%s, args=%s" % (parent, key, kwargs))
 
     def register_mult(self, entries):
+        """
+        Registers multiple directory entries efficiently in one datastore access.
+        Note: this fails of entries are currently existing, so works for create only.
+        """
         if type(entries) not in (list, tuple):
             raise BadRequest("Bad entries type")
         de_list = []
@@ -218,23 +231,39 @@ class Directory(object):
         delist = self.dir_store.find_dir_entries(qname)
         return delist
 
-    def find_by_value(self, subtree='/', key=None, attribute=None, value=None, **kwargs):
-        if key is None and attribute is None:
+    def find_by_key(self, subtree='/', key=None, **kwargs):
+        """
+        Returns a tuple (qname, attributes) for each directory entry that matches the
+        given key name.
+        """
+        if key is None:
             raise BadRequest("Illegal arguments")
         if subtree is None:
             raise BadRequest("Illegal arguments")
         subtree_dn = self._get_dn(subtree)
-        if key:
-            start_key = [key]
-            if subtree is not None:
-                start_key.append(subtree_dn)
-            res = self.dir_store.find_by_view('directory', 'by_key',
-                            start_key=start_key, end_key=start_key, id_only=False, **kwargs)
-        else:
-            start_key = [attribute, value, subtree_dn]
-            end_key = [attribute, value, subtree_dn+"ZZZZZZZZ"]
-            res = self.dir_store.find_by_view('directory', 'by_attribute',
-                            start_key=start_key, end_key=end_key, id_only=False, **kwargs)
+        start_key = [key]
+        if subtree is not None:
+            start_key.append(subtree_dn)
+        res = self.dir_store.find_by_view('directory', 'by_key',
+            start_key=start_key, end_key=start_key, id_only=False, **kwargs)
+
+        match = [(qname, doc.attributes) for qname, index, doc in res]
+        return match
+
+    def find_by_value(self, subtree='/', attribute=None, value=None, **kwargs):
+        """
+        Returns a tuple (qname, attributes) for each directory entry that has an attribute
+        with the given value.
+        """
+        if attribute is None:
+            raise BadRequest("Illegal arguments")
+        if subtree is None:
+            raise BadRequest("Illegal arguments")
+        subtree_dn = self._get_dn(subtree)
+        start_key = [attribute, value, subtree_dn]
+        end_key = [attribute, value, subtree_dn+"ZZZZZZ"]
+        res = self.dir_store.find_by_view('directory', 'by_attribute',
+                        start_key=start_key, end_key=end_key, id_only=False, **kwargs)
 
         match = [(qname, doc.attributes) for qname, index, doc in res]
         return match
