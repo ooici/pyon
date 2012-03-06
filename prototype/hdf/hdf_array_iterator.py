@@ -130,6 +130,12 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         virtual_dset = VirtualDataset(dset_list)
 
         if bounds:
+            if type(bounds) != tuple and type(bounds) != slice:
+                raise BadRequest('The provided parameter, bounds, is not a tuple as expected.')
+            if len(bounds) > len(virtual_dset.shape):
+                raise BadRequest('The provided parameter, bounds, is trying to restrict more dimensions '
+                                 'than the how many are actually present in the data.')
+
             iarray = ArrayIterator(virtual_dset, concatenate_size)[bounds]
         else:
             iarray = ArrayIterator(virtual_dset, concatenate_size)
