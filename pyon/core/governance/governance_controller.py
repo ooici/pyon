@@ -4,44 +4,66 @@
 __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
 
+from pyon.public import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
+from pyon.core.governance.policy.policy_decision import PolicyDecisionPoint
 
 
 
 class GovernanceController(object):
 
-    interceptor_by_name_dict = {}
-    interceptor_order = []
-
 
     def __init__(self, *args, **kwargs):
         log.debug('GovernanceController.__init__()')
+        self.enabled = False
+        self.interceptor_by_name_dict = dict()
+        self.interceptor_order = []
+        self.policy_decision_point = None
+        self.governance_dispatcher = None
 
+    def start(self):
 
-    def initialize(self,config):
+        log.debug("GovernanceController starting ...")
 
-        self.governance_dispatcher = GovernanceDispatcher()
+        config = CFG.interceptor.interceptors.governance.config
 
-        if 'interceptor_order' in config:
-            self.interceptor_order = config['interceptor_order']
+        if config is None:
+            config['enabled'] = False
 
-        if 'governance_interceptors' in config:
-            gov_ints = config['governance_interceptors']
+        if "enabled" in config:
+            self.enabled = config["enabled"]
 
-            for name in gov_ints:
-                interceptor_def = gov_ints[name]
+        log.debug("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
-                # Instantiate and put in by_name array
-                parts = interceptor_def["class"].split('.')
-                modpath = ".".join(parts[:-1])
-                classname = parts[-1]
-                module = __import__(modpath, fromlist=[classname])
-                classobj = getattr(module, classname)
-                classinst = classobj()
+        if self.enabled:
 
-                # Put in by_name_dict for possible re-use
-                self.interceptor_by_name_dict[name] = classinst
+            self.governance_dispatcher = GovernanceDispatcher()
+
+            self.policy_decision_point = PolicyDecisionPoint()
+
+            if 'interceptor_order' in config:
+                self.interceptor_order = config['interceptor_order']
+
+            if 'governance_interceptors' in config:
+                gov_ints = config['governance_interceptors']
+
+                for name in gov_ints:
+                    interceptor_def = gov_ints[name]
+
+                    # Instantiate and put in by_name array
+                    parts = interceptor_def["class"].split('.')
+                    modpath = ".".join(parts[:-1])
+                    classname = parts[-1]
+                    module = __import__(modpath, fromlist=[classname])
+                    classobj = getattr(module, classname)
+                    classinst = classobj()
+
+                    # Put in by_name_dict for possible re-use
+                    self.interceptor_by_name_dict[name] = classinst
+
+    def stop(self):
+        log.debug("GovernanceController stopping ...")
 
     def process_incoming_message(self,invocation):
 
@@ -60,3 +82,9 @@ class GovernanceController(object):
 
         return invocation
 
+    #TODO - refactor as callback for listener when policy changes
+    def load_policy_for_service(self, service_name, policy_rules):
+
+        #Notify policy decision point of updated rules
+        if self.policy_decision_point is not None:
+            self.policy_decision_point.load_policy_rules(service_name, policy_rules)

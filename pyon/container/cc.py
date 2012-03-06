@@ -4,7 +4,6 @@
 Capability Container base class
 """
 
-
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
@@ -30,6 +29,7 @@ from pyon.net import messaging
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
+from pyon.core.governance.governance_controller import GovernanceController
 
 from interface.services.icontainer_agent import BaseContainerAgent
 from contextlib import contextmanager
@@ -86,6 +86,9 @@ class Container(BaseContainerAgent):
 
         # File System - Interface to the OS File System, using correct path names and setups
         self.file_system = FileSystem(CFG)
+
+        # Governance Controller - manages the governance related interceptors
+        self.governance_controller = GovernanceController()
 
         # Coordinates the container start
         self._is_started = False
@@ -157,6 +160,10 @@ class Container(BaseContainerAgent):
 
         self.app_manager.start()
         self._capabilities.append("APP_MANAGER")
+
+        self.governance_controller.start()
+        self._capabilities.append("GOVERNANCE_CONTROLLER")
+
 
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
@@ -305,6 +312,9 @@ class Container(BaseContainerAgent):
             self.ioloop.kill()
             self.node.client.ioloop.start()     # loop until connection closes
             # destroy AMQP connection
+
+        elif capability == "GOVERNANCE_CONTROLLER":
+            self.governance_controller.stop()
 
         elif capability == "PID_FILE":
             self._cleanup_pid()

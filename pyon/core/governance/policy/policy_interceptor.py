@@ -4,18 +4,14 @@
 __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
 
-
 from pyon.core.governance.governance_interceptor import BaseInternalGovernanceInterceptor
-from pyon.core.governance.policy.policy_decision import PolicyDecisionPoint
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 
 from pyon.util.log import log
+
 from ndg.xacml.core.context.result import Decision
 
 class PolicyInterceptor(BaseInternalGovernanceInterceptor):
-
-    def __init__(self, *args, **kwargs):
-        self.policy_decision_point = PolicyDecisionPoint()
 
     def outgoing(self, invocation):
 
@@ -44,7 +40,9 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
-            ret = self.policy_decision_point.check_policies(invocation)
+            if self.governance_controller is not None:
+                ret = self.governance_controller.policy_decision_point.check_policies(invocation)
+
             log.debug("Policy Decision: " + str(ret))
 
             #Annonate the message has completed policy checking
