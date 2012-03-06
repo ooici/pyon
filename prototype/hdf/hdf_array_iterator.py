@@ -21,10 +21,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
     assert var_names, NotFound('Variable names where not provided.')
     assert concatenate_size, NotFound('The concatenation size was not provided')
 
-    arrays_out = {}
     out_dict = {}
-    read_entries = {}
 
+    open_files = []
 
     def check_for_dataset(nodes, var_names):
         """
@@ -71,6 +70,8 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         #-------------------------------------------------------------------------------------------------------
 
         file = h5py.File(hdf_file,'r')
+
+        open_files.append(file)
 
         #-------------------------------------------------------------------------------------------------------
         # get the list of groups or datasets if there are no groups in the file
@@ -149,6 +150,8 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
 
         yield out_dict
 
+    for file in open_files:
+        file.close()
 
 
 class VirtualDataset(object):
@@ -227,7 +230,7 @@ class VirtualDataset(object):
                 aggregate = var['data'][(slc,) + agg_slices]
 
 
-            elif start > get_start and start <= get_stop:
+            elif start > get_start and start < get_stop:
                 # this is the last bit of the chunk
 
                 slc = slice(0, get_stop - start)

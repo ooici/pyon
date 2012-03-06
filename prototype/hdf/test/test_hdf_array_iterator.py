@@ -62,7 +62,7 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             os.remove(fname)
 
 
-    def concatenate_size(self):
+    def test_concatenate_size(self):
 
         # Test with a length greater than the virtual dataset
 
@@ -71,6 +71,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             concatenate_size = 26,
             bounds = (slice(63,150))
         )
+
+        for d in generator:
+            print d
 
         # assert the result...
 
@@ -81,7 +84,7 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # Test with a length less than the virtual dataset such that mod(length, concatenate_size) != 0
 
 
-    def var_names(self):
+    def test_var_names(self):
 
         # Test with no names
         # assert an error?
@@ -94,9 +97,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # Test with name not in dataset
         # assert an error
+        pass
 
-
-    def bounds(self):
+    def test_bounds(self):
 
         # Test with bad input not a slice and not a tuple...
         # Assert an error.
@@ -120,7 +123,16 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # Test with concatenate smaller than bounds slice
         # assert result
 
+        pass
 
+    def test_files_close(self):
+
+        # Test that files are closed when method compelete normally
+        ## How?
+
+        # Test that files are close when acquire data fails too!
+        ## how?
+        pass
 
 @attr('INT', group='dm')
 class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
