@@ -369,12 +369,36 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # if the file cannot be opened again, then that means that the file was not closed...
         # so we check if we can open the file again, making sure that we do close it in the end...
 
-#        try:
+
+        import h5py
+
+        for fname in self.fnames:
+            file = h5py.File(fname, 'w')
+
+            file.close()
 
 
         # Test that files are close when acquire data fails too!
         ## how?
-        pass
+
+        # make acquire_data fail!
+
+        try:
+            generator = acquire_data(hdf_files = self.fnames,
+                var_names =  ['very bad var_name'],
+                concatenate_size = 'ver bad concatenate_size',
+                bounds = None
+            )
+
+            out = generator.next()
+        except:
+            # catch the exception. We just want to make sure the hdf files get closed even if the acquire method fails
+            pass
+
+        for fname in self.fnames:
+            file = h5py.File(fname, 'w')
+
+            file.close()
 
 
 
