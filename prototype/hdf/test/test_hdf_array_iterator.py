@@ -225,7 +225,23 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             out = generator.next()
 
         # Test with bounds greater than the dataset length
+
+        generator = acquire_data(hdf_files = self.fnames,
+            var_names =  ['temperature', 'salinity'],
+            concatenate_size = 200,
+            bounds = (slice(0,200))
+        )
+
+        out = generator.next()
+
         # Assert result is the whole dataset
+
+        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
+        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+
+
+        self.assertEquals(str(out['temperature']['values']), str(temperature))
+        self.assertEquals(str(out['salinity']['values']), str(salinity) )
 
         # Test with normal bounds slice
         # assert result
