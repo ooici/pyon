@@ -16,6 +16,7 @@ from gevent import event, coros
 from gevent.timeout import Timeout
 from zope import interface
 import uuid
+import time
 
 import traceback
 import sys
@@ -211,7 +212,7 @@ class EndpointUnit(object):
         Assembles the headers of a message from the raw message's content.
         """
         log.debug("EndpointUnit _build_header")
-        return {}
+        return {'ts':str(int(time.time()*1000))}
 
     def _build_payload(self, raw_msg):
         """
@@ -607,6 +608,9 @@ class RequestResponseClient(SendingBaseEndpoint):
         e = self.create_endpoint(self._send_name)
         try:
             retval, headers = e.send(msg, headers=headers, timeout=timeout)
+        except Exception:
+            log.exception('Request failed')
+            raise
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
@@ -957,6 +961,57 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             header['origin-container-id']   = container_id
 
         return header
+
+    def _send(self, msg, headers=None, **kwargs):
+        """
+        _send override, solely for sFlow metrics.
+        """
+        status = -1
+        status_descr = "OK"
+        try:
+            res, res_headers = RPCRequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
+            status = 0
+        except exception.IonException as e:
+
+            # map our status (http-based) to a status sFlow understands - as they make sense
+            # http://sflow.org/draft_sflow_application.txt
+            status_map = {exception.BadRequest: 4,
+                          exception.Unauthorized: 10,
+                          exception.NotFound: 8,
+                          exception.Timeout: 2,
+                          exception.ServiceUnavailable: 9}
+            if type(e) in status_map:
+                status = status_map[type(e)]
+            else:
+                status = 3      # internal error
+
+            status_descr = e.message
+
+            raise e
+        finally:
+
+            sm = self._process.container.sflow_manager
+
+            # build args to pass to transaction
+            extra_attrs = {'conv-id': headers.get('conv-id', ''),
+                           'service': headers.get('sender-service', '')}
+            cur_time_ms = int(time.time() * 1000)
+            time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
+
+            tkwargs = {'op': headers.get('op', ''),
+                       'attrs': extra_attrs,
+                       'status_descr': status_descr,
+                       'status': status,
+                       'req_bytes': len(str(msg)),
+                       'resp_bytes': len(str(msg)),
+                       'uS': time_taken,
+                       'initiator': headers.get('sender', ''),
+                       'target': headers.get('receiver', '')}
+
+            sm.transaction(**tkwargs)
+
+        return res, res_headers
+
 
 class ProcessRPCClient(RPCClient):
     endpoint_unit_type = ProcessRPCRequestEndpointUnit

@@ -1,26 +1,27 @@
 #!/usr/bin/env python
 
 """sFlow integration for pyon"""
-from random import random
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.async import spawn
+from pyon.core.interceptor.interceptor import Interceptor
 import time
 import json
 from socket import socket, AF_INET, SOCK_DGRAM
 import os
+from random import random
 
 class SFlowManager(object):
 
     def __init__(self, container):
         self._container         = container
         self._gl_counter        = None
-        self._counter_interval  = 20            # @TODO: default: from cfg
-        self._hsflowd_addr      = "localhost"   # @TODO same
-        self._hsflowd_port      = 7777          # @TODO same
+        self._counter_interval  = 30            # @TODO: default: from cfg
+        self._hsflowd_addr      = "192.168.56.101"   # @TODO same
+        self._hsflowd_port      = 36343          # @TODO same
         self._hsflowd_conf      = "/etc/hsflowd.auto"
         self._conf_last_mod     = None          # last modified time of the conf file
         self._trans_sample_rate = 1
@@ -153,3 +154,40 @@ class SFlowManager(object):
         json_data = json.dumps(data)
         self._udp_socket.sendto(json_data, (self._hsflowd_addr, self._hsflowd_port))
 
+
+class SFlowInterceptor(Interceptor):
+    """
+    Proof-of-concept to emit sflow stats on completed RPC only.
+    """
+    def incoming(self, invocation):
+        log.warn("HELLO MESSAGE")
+        if invocation.headers.get('protocol', None) == 'rpc':
+            log.warn("LETS TAKEA  LOOK")
+            proc = invocation.args.get('process', None)
+            if proc:
+                sm = proc.container.sflow_manager
+
+                # build args to pass to transaction
+                extra_attrs = {'conv-id': invocation.headers.get('conv-id', ''),
+                               'service': invocation.headers.get('sender-service', '')}
+                time_taken = 5      # @TODO
+
+                tkwargs = {'op': invocation.headers.get('op', ''),
+                           'attrs': extra_attrs,
+                           'status_descr': invocation.headers.get('error_message', ''),
+                           'status': invocation.headers.get('status_code', ''),
+                           'req_bytes': len(str(invocation.message)),
+                           'resp_bytes': len(str(invocation.message)),
+                           'uS': time_taken,
+                           'initiator': proc.id,
+                           'target': invocation.headers.get('sender', '')}
+
+                sm.transaction(**tkwargs)
+
+            else:
+                log.warn("No process found for SFlowInterceptor.incoming, no way to get at sflow manager instance")
+
+        return invocation
+
+    def outgoing(self, invocation):
+        pass
