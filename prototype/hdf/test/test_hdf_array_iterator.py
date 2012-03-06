@@ -69,7 +69,7 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
             concatenate_size = 26,
-            bounds = (slice(63,150))
+            bounds = (slice(63,120))
         )
 
         # assert the result...
@@ -83,7 +83,6 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # Test with a length less than the virtual dataset such that mod(length, concatenate_size) == 0
 
-
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
             concatenate_size = 175,
@@ -92,8 +91,6 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert the result...
         out = generator.next()
-
-        print out
 
         temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
         salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
@@ -111,8 +108,6 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert the result...
         out = generator.next()
-
-        print out
 
         temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
         salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
