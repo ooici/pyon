@@ -11,7 +11,7 @@ resize the arrays into blocks that are of the right size so that they do not hav
 from operator import mul
 from pyon.core.exception import NotFound, BadRequest
 from pyon.public import log
-
+import itertools
 
 def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bounds = None):
 
@@ -24,7 +24,6 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
     arrays_out = {}
     out_dict = {}
     read_entries = {}
-    concatenate = False
 
     if bounds:
         start_index, stop_index = bounds
@@ -58,6 +57,9 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
             elif isinstance( node , h5py._hl.group.Group):
                 check_for_dataset(node.values(), var_names)
 
+
+    ### Declare a variable to hold array iterators:
+    dataset_lists_by_name ={}
 
     for hdf_file in hdf_files:
 
@@ -96,151 +98,80 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
         if not dict_of_h5py_datasets:
             continue
 
-        ### Declare a variable to hold array iterators:
-        array_iterators_by_name ={}
-
         #-------------------------------------------------------------------------------------------------------
         # Iterate over the supplied variable names
         #-------------------------------------------------------------------------------------------------------
 
-        for vn in var_names:
-
-            if not read_entries.has_key(vn):
-                read_entries[vn] = 0
+        for vname in var_names:
 
             #-------------------------------------------------------------------------------------------------------
             # fetch the dataset
             #-------------------------------------------------------------------------------------------------------
 
-            dataset = dict_of_h5py_datasets.get(vn, None)
+            dataset = dict_of_h5py_datasets.get(vname, None)
 
             #-------------------------------------------------------------------------------------------------------
             # if this variable is not in a dataset in the hdf file, skip this variable name for this hdf file
             #-------------------------------------------------------------------------------------------------------
 
-            if not dataset:
-                continue
-
-            #-------------------------------------------------------------------------------------------------------
-            # Case 1: If the array in the dataset is too small, grab the whole array
-            #-------------------------------------------------------------------------------------------------------
-
-            # if we are getting a specific range or the whole array check to see if we can do it in one shot.
-            if num_entries_to_read or dataset.value.size < concatenate_size:
-
-                # grab the whole array in the dataset upto the user specified bounds
-
-                if num_entries_to_read:
-                    # it is okay to give a stop index beyond the bounds of the allocated array.
-                    # It just returns the data in the array
-                    d = dataset.value[ start_index : start_index + num_entries_to_read - 1]
-
-                    left_to_read_entries = max(num_entries_to_read - read_entries[vn],0)
-                    log.warn("left_to_read_entries: %s" % left_to_read_entries)
-
-                else:
-                    d = dataset.value
-
-                if read_entries.has_key(vn):
-                    read_entries[vn] += d.size
-                else:
-                    read_entries[vn] = d.size
-
-                # if arrays_out already exists...
-                if arrays_out.has_key(vn):
-                    length_to_add = min(d.size, concatenate_size - arrays_out[vn].size)
-
-                    arrays_out[vn] = numpy.concatenate((arrays_out[vn], d[:length_to_add]), axis = 0)
-
-                    chopped_end[vn] = d[length_to_add:]
-
-                    current_slice = (slice(0, length_to_add))
-                else:
-                    arrays_out[vn] = d
-                    current_slice = (slice(0, d.size))
-
-                #-------------------------------------------------------------------------------------------------------
-                # check if the amount of data read is same as concatenate_size. if yes, then update out_dict and
-                # move to next variable
-                #-------------------------------------------------------------------------------------------------------
-
-                if arrays_out[vn].size == concatenate_size:
-
-                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
-
-                    out_dict[vn] = {'current_slice' : current_slice,
-                                    'range' : (numpy.nanmin(d), numpy.nanmax(d)),
-                                    'values' : arrays_out[vn]},
-
-                    arrays_out[vn] = chopped_end[vn]
-
-                    concatenate = True
-
-                    # move to the next variable
-                    continue
-
-            else:
-                #--------------------------------------------------------------------------------------------------------------
-                # Case 2: Calling the ArrayIterator to slice the array held by the dataset and yield the bits
-                #--------------------------------------------------------------------------------------------------------------
-
-                arri = array_iterators_by_name.get(vn, None)
-
-                if arri is None:
-                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,num_entries_to_read or dataset.value.size) )]
-                    array_iterators_by_name[vn] = arri
+            if dataset:
+                # Add it to the list of datasets for this variable
+                dset_list = dataset_lists_by_name.get(vname,[])
+                dset_list.append(dataset)
+                dataset_lists_by_name[vname] = dset_list
 
 
-                # if no bounds is provided, num_entries_to_read is None and so the stop_index is determined only by
-                # the size of the dataset
-                if num_entries_to_read:
-                    log.warn("came here!: num of entries to read: %s" % num_entries_to_read)
-                    log.warn("dataset.value.size: %s" % dataset.value.size)
-                    arri = ArrayIterator(dataset, concatenate_size)[( slice(start_index,min(dataset.value.size, num_entries_to_read)) )]
+    array_iterators_by_name = {}
 
-                else:
-                    log.warn("dataset.value.size: %s" % dataset.value.size)
-                    arri = ArrayIterator(dataset, concatenate_size)[(slice(start_index, dataset.value.size))]
+    for vname, dset_list in dataset_lists_by_name.itervalues():
+
+        # Create the dataset list object that behaves like a dataset
+        virtual_dset = VirtualDataset(dset_list)
+
+        iarray = ArrayIterator(virtual_dset, concatenate_size)[( slice(start_index,num_entries_to_read or virtual_dset.value.size) )]
+        array_iterators_by_name[vname] = iarray
+
+
+    names = array_iterators_by_name.keys()
+    iarrays = array_iterators_by_name.values() # Get the list of array iterators
+
+    for ichunks in itertools.izip_longest(iarrays):
+
+        for name, chunk, iarray in itertools.izip(names, ichunks, iarrays):
+
+            out_dict[name] = {'current_slice' : iarray.curr_slice,
+                            'range' : (numpy.nanmin(chunk), numpy.nanmax(chunk)),
+                            'values' : chunk}
+
+        yield out_dict
 
 
 
-                count = 0
+class VirtualDataset(object):
 
-                for d in arri:
-                    arrays_out[vn] = numpy.array(0)
-                    count += 1
-                    log.warn("iteration count: %s" % count)
+    def __init__(self, var_list):
+        self.vars = var_list
 
-                    if num_entries_to_read:
-                        left_to_read_entries = max(num_entries_to_read - read_entries[vn],0)
-                        log.warn("left_to_read_entries: %s" % left_to_read_entries)
-                        upper_bound = min(left_to_read_entries, concatenate_size)
-                    else:
-                        upper_bound = concatenate_size
+    def __getitem__(self, index):
+        """
+        is this needed?
+        """
+        raise RuntimeError('Shit - I need get_item')
 
-                    arrays_out[vn] = d[:upper_bound]
 
-                    chopped_end[vn] = d[upper_bound:]
+    @property
+    def __array_interface__(self):
+        raise RuntimeError('Shit - I need array_interface!')
 
-                    read_entries[vn] += d.size
+    @property
+    def shape(self):
+        raise RuntimeError('Shit - pretty sure I need shap!')
 
-                    log.warn("read_entries[vn]: %s" % read_entries[vn])
-                    log.warn('size of array[%s]: %s' % (vn,arrays_out[vn].size))
 
-                    out_dict[vn] = {'current_slice' : arri.curr_slice,
-                                    'range' : (numpy.nanmin(d), numpy.nanmax(d)),
-                                    'values' : arrays_out[vn]}
-                    yield out_dict
+    def __iter__(self):
+        # Skip arrays with degenerate dimensions
+        raise RuntimeError('Shit - I need iter!')
 
-                # the last chopped out part is stored here incase, it is required
-                arrays_out[vn] = chopped_end[vn]
-
-        # after having swept over all the variables, and having updated out_dict, we call the yield statement
-        if concatenate:
-            yield out_dict
-
-    # if all the data has been exhausted, yield the last updated out_dict
-    yield out_dict
 
 
 #----------------------------------------------------------------------------------------------------------------------------
