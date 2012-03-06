@@ -37,30 +37,33 @@ class GovernanceController(object):
         log.debug("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
         if self.enabled:
+            self.initialize_from_config(config)
 
-            self.governance_dispatcher = GovernanceDispatcher()
+    def initialize_from_config(self, config):
 
-            self.policy_decision_point = PolicyDecisionPoint()
+        self.governance_dispatcher = GovernanceDispatcher()
 
-            if 'interceptor_order' in config:
-                self.interceptor_order = config['interceptor_order']
+        self.policy_decision_point = PolicyDecisionPoint()
 
-            if 'governance_interceptors' in config:
-                gov_ints = config['governance_interceptors']
+        if 'interceptor_order' in config:
+            self.interceptor_order = config['interceptor_order']
 
-                for name in gov_ints:
-                    interceptor_def = gov_ints[name]
+        if 'governance_interceptors' in config:
+            gov_ints = config['governance_interceptors']
 
-                    # Instantiate and put in by_name array
-                    parts = interceptor_def["class"].split('.')
-                    modpath = ".".join(parts[:-1])
-                    classname = parts[-1]
-                    module = __import__(modpath, fromlist=[classname])
-                    classobj = getattr(module, classname)
-                    classinst = classobj()
+            for name in gov_ints:
+                interceptor_def = gov_ints[name]
 
-                    # Put in by_name_dict for possible re-use
-                    self.interceptor_by_name_dict[name] = classinst
+                # Instantiate and put in by_name array
+                parts = interceptor_def["class"].split('.')
+                modpath = ".".join(parts[:-1])
+                classname = parts[-1]
+                module = __import__(modpath, fromlist=[classname])
+                classobj = getattr(module, classname)
+                classinst = classobj()
+
+                # Put in by_name_dict for possible re-use
+                self.interceptor_by_name_dict[name] = classinst
 
     def stop(self):
         log.debug("GovernanceController stopping ...")

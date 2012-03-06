@@ -73,6 +73,7 @@ class PolicyDecisionPoint(object):
         log.info("Loading rules for service: %s" % resource_policy)
 
         #Simply create a new PDP object for the service
+        #TODO - make sure this is thread safe with the evaluation that uses it.
         input_source = StringIO(rules_text)
         self.policy_decision_point[resource_policy] = PDP.fromPolicySource(input_source, ReaderFactory)
 
