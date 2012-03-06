@@ -41,6 +41,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         self.pressure[1] = numpy.random.uniform(low=0.0, high=1.0, size=50)
         self.pressure[2] = numpy.random.uniform(low=0.0, high=1.0, size=50)
 
+        # provide the check_pieces mathod the size of the dataset so that it can do its checking..
+        self.sl = slice(0,150)
+
         self.fnames = ['data1.hdf5', 'data2.hdf5', 'data3.hdf5']
 
         for fname, s, t, p in zip(self.fnames, self.salinity, self.temperature, self.pressure):
@@ -70,6 +73,45 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         for fname in self.fnames:
             os.remove(fname)
 
+    def check_pieces_3_variables(self, generator, sl, concatenate_size):
+
+
+        start = sl.start
+        stop = sl.start + concatenate_size
+        end = sl.stop
+
+        #        with self.assertRaises(StopIteration):
+
+        while start < end - concatenate_size:
+
+            out = generator.next()
+
+            truth1 = out['temperature']['values'] == self.t_result[start:stop]
+            truth2 = out['salinity']['values'] == self.s_result[start:stop]
+            truth3 = out['pressure']['values'] == self.p_result[start:stop]
+
+            self.assertTrue(truth1.all())
+            self.assertTrue(truth2.all())
+            self.assertTrue(truth3.all())
+
+            start += concatenate_size
+            stop += concatenate_size
+
+        out = generator.next()
+
+        truth1 = out['temperature']['values'] == self.t_result[start:stop]
+        truth2 = out['salinity']['values'] == self.s_result[start:stop]
+        truth3 = out['pressure']['values'] == self.p_result[start:stop]
+
+        if type(truth1) == bool: # this means that all the other variables, truth2 and truth 3 are also boolean
+            self.assertTrue(truth1)
+            self.assertTrue(truth2)
+            self.assertTrue(truth3)
+
+        else: # this means that truth1, truth2, and truth3 are numpy arrays with values True or False
+            self.assertTrue(truth1.all())
+            self.assertTrue(truth2.all())
+            self.assertTrue(truth3.all())
 
     def test_concatenate_size(self):
 
@@ -78,53 +120,48 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         #--------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
-            var_names = ['temperature', 'salinity'],
+            var_names = ['temperature', 'salinity', 'pressure'],
             concatenate_size = 175
         )
 
-        # assert the result...
         out = generator.next()
+        # assert the result...
+        truth1 = out['temperature']['values'] == self.t_result
+        truth2 = out['salinity']['values'] == self.s_result
+        truth3 = out['pressure']['values'] == self.p_result
 
-        truth = out['temperature']['values'] == self.t_result
-        self.assertTrue(truth.all())
-        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
+        self.assertTrue(truth3.all())
 
-        #---------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------------------------------------------------
         # Test with a concatenate size less than the length of the virtual dataset such that mod(length, concatenate_size) == 0
-        #---------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------------------------------------------------
+
+        concatenate_size = 25
 
         generator = acquire_data(hdf_files = self.fnames,
-            var_names = ['temperature', 'salinity'],
-            concatenate_size = 25
+            var_names = ['temperature', 'salinity', 'pressure'],
+            concatenate_size = concatenate_size
         )
 
-        # assert the result...
-        out = generator.next()
+        self.check_pieces_3_variables(generator, self.sl, concatenate_size)
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-
-        self.assertEquals(str(out['temperature']['values']), str(temperature[63:120]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[63:120]) )
-
-        #---------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------------------------------------------------
         # Test with a concatenate size less than the length of the virtual dataset such that mod(length, concatenate_size) != 0
-        #---------------------------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------------------------------------------------
+
+        sl = slice(3,63)
+        concatenate_size = 26
 
         generator = acquire_data(hdf_files = self.fnames,
-            var_names = ['temperature', 'salinity'],
-            concatenate_size = 26,
+            var_names = ['temperature', 'salinity', 'pressure'],
+            concatenate_size = concatenate_size,
+            bounds=(sl)
         )
 
         # assert the result...
-        out = generator.next()
-
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-
-        self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
-
+#        self.check_pieces_3_variables(generator, sl, concatenate_size)
 
     def test_var_names(self):
 
@@ -153,12 +190,13 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert result
 
+        truth1 = out['temperature']['values'] == self.t_result[63:89]
+        truth2 = out['salinity']['values'] == self.s_result[63:89]
+        truth3 = out['pressure']['values'] == self.p_result[63:89]
 
-
-
-        self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
-        self.assertEquals(str(out['pressure']['values']), str(pressure[63:89]))
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
+        self.assertTrue(truth3.all())
 
         #---------------------------------------------------------------------------------------------------
         # Test with some names
@@ -173,12 +211,12 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert result
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+        truth1 = out['temperature']['values'] == self.t_result[63:89]
+        truth2 = out['salinity']['values'] == self.s_result[63:89]
 
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
 
-        self.assertEquals(str(out['temperature']['values']), str(temperature[63:89]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[63:89]) )
 
         #---------------------------------------------------------------------------------------------------
         # Test with name not in dataset
@@ -197,7 +235,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
     def test_bounds(self):
 
+        #---------------------------------------------------------------------------------------------------
         # Test with bad input not a slice and not a tuple...
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity'],
@@ -212,7 +252,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         #@todo can we make the error more transparent to the use - easier to correct their mistake?
 
+        #---------------------------------------------------------------------------------------------------
         # Test with 2 tuple of slices on the 1d dataset
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity'],
@@ -225,7 +267,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         with self.assertRaises(BadRequest):
             out = generator.next()
 
+        #---------------------------------------------------------------------------------------------------
         # Test with bounds greater than the dataset length
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity'],
@@ -237,14 +281,15 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # Assert result is the whole dataset
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+        truth1 = out['temperature']['values'] == self.t_result
+        truth2 = out['salinity']['values'] == self.s_result
 
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
 
-        self.assertEquals(str(out['temperature']['values']), str(temperature))
-        self.assertEquals(str(out['salinity']['values']), str(salinity) )
-
+        #---------------------------------------------------------------------------------------------------
         # Test with normal bounds slice
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
@@ -255,36 +300,33 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert result
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-        pressure = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
+        truth1 = out['temperature']['values'] == self.t_result[30:80]
+        truth2 = out['salinity']['values'] == self.s_result[30:80]
 
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
 
-        self.assertEquals(str(out['temperature']['values']), str(temperature[30:80]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[30:80]) )
-        self.assertEquals(str(out['pressure']['values']), str(pressure[30:80]))
-
+        #---------------------------------------------------------------------------------------------------
         # Test with no bounds
+        #---------------------------------------------------------------------------------------------------
+
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = 60,
-            bounds = None
+            concatenate_size = 60
         )
         out = generator.next()
 
         # assert result
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-        pressure = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
+        truth1 = out['temperature']['values'] == self.t_result[:60]
+        truth2 = out['salinity']['values'] == self.s_result[:60]
 
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
 
-        self.assertEquals(str(out['temperature']['values']), str(temperature[0:60]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[0:60]) )
-        self.assertEquals(str(out['pressure']['values']), str(pressure[0:60]))
-
-
+        #---------------------------------------------------------------------------------------------------
         # Test with concatenate larger than bounds slice
+        #---------------------------------------------------------------------------------------------------
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
@@ -295,34 +337,30 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         # assert result
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-        pressure = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
+        truth1 = out['temperature']['values'] == self.t_result[30:50]
+        truth2 = out['salinity']['values'] == self.s_result[30:50]
+        truth3 = out['pressure']['values'] == self.p_result[30:50]
 
+        self.assertTrue(truth1.all())
+        self.assertTrue(truth2.all())
+        self.assertTrue(truth3.all())
 
-        self.assertEquals(str(out['temperature']['values']), str(temperature[30:50]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[30:50]) )
-        self.assertEquals(str(out['pressure']['values']), str(pressure[30:50]))
-
+        #---------------------------------------------------------------------------------------------------
         # Test with concatenate smaller than bounds slice
+        #---------------------------------------------------------------------------------------------------
+
+        sl = slice(30,100)
+        concatenate_size = 10
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = 10,
-            bounds = (slice(30,100))
+            concatenate_size = concatenate_size,
+            bounds = (sl)
         )
-        out = generator.next()
 
         # assert result
 
-        temperature = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
-        salinity = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
-        pressure = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
-
-
-        self.assertEquals(str(out['temperature']['values']), str(temperature[30:40]))
-        self.assertEquals(str(out['salinity']['values']), str(salinity[30:40]) )
-        self.assertEquals(str(out['pressure']['values']), str(pressure[30:40]))
+        self.check_pieces_3_variables(generator, sl, concatenate_size)
 
     def test_files_close(self):
 
