@@ -500,6 +500,13 @@ def ctd_stream_packet(stream_id = None, c=None, t=None, p=None , lat=None, lon=N
 
 
 
+    granule = psc.close_stream_granule()
+
+    if not create_hdf:
+        # Remove the hdf string from the granule
+
+        data_stream = granule.identifiables['data_stream']
+        data_stream.values = ''
 
 
-    return psc.close_stream_granule()
+    return granule
