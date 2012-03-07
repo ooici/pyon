@@ -8,6 +8,8 @@ from gevent import event, coros
 from pika.credentials import PlainCredentials
 from pika.connection import ConnectionParameters
 from pika.adapters import SelectConnection
+from pika import channel as pikachannel
+from pika.exceptions import NoFreeChannels
 
 from pyon.core.bootstrap import CFG
 from pyon.net import amqp
@@ -44,12 +46,12 @@ class NodeB(amqp.Node):
         self.running = 1
         self.ready.set()
 
-    def _new_channel(self, ch_type, **kwargs):
+    def _new_channel(self, ch_type, ch_number=None, **kwargs):
         """
         Creates a pyon Channel based on the passed in type, and activates it for use.
         """
         chan = ch_type(**kwargs)
-        amq_chan = blocking_cb(self.client.channel, 'on_open_callback')
+        amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
         chan.on_channel_open(amq_chan)
         return chan
 
@@ -125,6 +127,40 @@ def ioloop(connection):
         # Loop until the connection is closed
         connection.ioloop.start()
 
+class PyonSelectConnection(SelectConnection):
+    def __init__(self, parameters=None, on_open_callback=None,
+                 reconnection_strategy=None):
+        SelectConnection.__init__(self, parameters=parameters, on_open_callback=on_open_callback, reconnection_strategy=reconnection_strategy)
+        self._bad_channel_numbers = set()
+
+    def _next_channel_number(self):
+        # Our limit is the the Codec's Channel Max or MAX_CHANNELS if it's None
+        limit = self.parameters.channel_max or pikachannel.MAX_CHANNELS
+
+        # We've used all of our channels
+        if len(self._channels) == limit:
+            raise NoFreeChannels()
+
+        # generate a set of available channels
+        available = set(xrange(1, limit))
+
+        # subtract out existing channels
+        available.difference_update(self._channels.keys())
+
+        # also subtract out poison channels
+        available.difference_update(self._bad_channel_numbers)
+
+        # get lowest available!
+        ch_num = min(available)
+
+        log.debug("_next_channel_number: %d (of %d possible, %d used, %d bad)", ch_num, len(available), len(self._channels), len(self._bad_channel_numbers))
+
+        return ch_num
+
+    def mark_bad_channel(self, ch_number):
+        log.debug("Marking %d as a bad channel", ch_number)
+        self._bad_channel_numbers.add(ch_number)
+
 def make_node(connection_params=None):
     """
     Blocking construction and connection of node.
@@ -136,7 +172,7 @@ def make_node(connection_params=None):
     connection_params = connection_params or CFG.server.amqp
     credentials = PlainCredentials(connection_params["username"], connection_params["password"])
     conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
-    connection = SelectConnection(conn_parameters , node.on_connection_open)
+    connection = PyonSelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
     node.ready.wait()

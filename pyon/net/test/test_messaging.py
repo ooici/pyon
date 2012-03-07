@@ -216,13 +216,13 @@ class TestMessaging(PyonTestCase):
                               'vhost': sentinel.vhost,
                               'port': 2111 }
 
-        # make a mocked method for SelectConnection to be patched in - we need a way of simulating the on_connection_open callback
+        # make a mocked method for PyonSelectConnection to be patched in - we need a way of simulating the on_connection_open callback
         cm = Mock()
         def select_connection(params, cb):
             cb(cm)
             return sentinel.connection
 
-        with patch('pyon.net.messaging.SelectConnection', new=select_connection):
+        with patch('pyon.net.messaging.PyonSelectConnection', new=select_connection):
             node, ilp = make_node(connection_params)
 
         self.assertEquals(ilp, sentinel.ioloop_process)
