@@ -65,7 +65,13 @@ class TestScienceObjectCodec(PyonTestCase):
             h5pyfile = h5py.File(filename, mode = 'w', driver='core')
             grp = h5pyfile.create_group(rootgrp_name)
             subgrp = grp.create_group(grp_name)
-            dataset = subgrp.create_dataset(dataset_name, known_array.shape, known_array.dtype.str, maxshape=(None,None))
+            dataset = subgrp.create_dataset(dataset_name,
+                known_array.shape,
+                known_array.dtype.str,
+                compression='gzip',
+                compression_opts=4,
+                maxshape=(None,None))
+
             dataset.write_direct(known_array)
             h5pyfile.close()
 
