@@ -128,27 +128,41 @@ def ioloop(connection):
         connection.ioloop.start()
 
 class PyonSelectConnection(SelectConnection):
+    """
+    Custom-derived Pika SelectConnection to allow us to get around re-using failed channels.
+
+    When a Channel fails, if the channel number is reused again, sometimes Pika/Rabbit will
+    choke. This class overrides the _next_channel_number method in Pika, to hand out channel
+    numbers that we deem safe.
+    """
     def __init__(self, parameters=None, on_open_callback=None,
                  reconnection_strategy=None):
         SelectConnection.__init__(self, parameters=parameters, on_open_callback=on_open_callback, reconnection_strategy=reconnection_strategy)
         self._bad_channel_numbers = set()
 
     def _next_channel_number(self):
+        """
+        Get the next available channel number.
+
+        This improves on Pika's implementation by using a set, so lower channel numbers can be
+        re-used. It factors in channel numbers marked as bad and treats them as if they are in
+        use, so no bad channel number will ever be re-used.
+        """
         # Our limit is the the Codec's Channel Max or MAX_CHANNELS if it's None
         limit = self.parameters.channel_max or pikachannel.MAX_CHANNELS
 
-        # We've used all of our channels
-        if len(self._channels) == limit:
-            raise NoFreeChannels()
-
         # generate a set of available channels
-        available = set(xrange(1, limit))
+        available = set(xrange(1, limit+1))
 
         # subtract out existing channels
         available.difference_update(self._channels.keys())
 
         # also subtract out poison channels
         available.difference_update(self._bad_channel_numbers)
+
+        # used all of our channels
+        if len(available) == 0:
+            raise NoFreeChannels()
 
         # get lowest available!
         ch_num = min(available)
@@ -178,4 +192,3 @@ def make_node(connection_params=None):
     node.ready.wait()
     return node, ioloop_process
     #return node, ioloop, connection
-
