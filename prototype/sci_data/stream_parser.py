@@ -1,9 +1,9 @@
 '''
-@package prototype.hdf.deconstructor_apis
-@file prototype/hdf/deconstructor_apis.py
+@package prototype.hdf.stream_parser
+@file prototype/hdf/stream_parser.py
 @author Tim Giguere
 @author David Stuebe
-@brief This deconstructor class is only used when re-building the internal science object model from an external form.
+@brief This stream_parser class is only used when re-building the internal science object model from an external form.
  These are helper classes that contain implicit knowledge of what the user intends to do so that it is not repeated or
  implemented adhoc by the user.
 '''
@@ -14,7 +14,7 @@ from prototype.hdf.hdf_codec import HDFDecoder, HDFDecoderException
 
 from pyon.util.log import log
 
-class PointSupplementDeconstructor(object):
+class PointSupplementStreamParser(object):
 
     def __init__(self, stream_definition=None, stream_granule=None):
         """
