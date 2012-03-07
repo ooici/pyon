@@ -74,9 +74,17 @@ class AMQPTransport(BaseTransport):
         kwargs[cb_arg] = cb
         with self._push_close_cb(client, eb):
             func(*args, **kwargs)
-            ret_vals = ar.get()
+            ret_vals = ar.get(timeout=10)
 
         if isinstance(ret_vals, TransportError):
+
+            # mark this channel as poison, do not use again!
+            # don't test for type here, we don't want to have to import PyonSelectConnection
+            if hasattr(client.transport, 'connection') and hasattr(client.transport.connection, 'mark_bad_channel'):
+                client.transport.connection.mark_bad_channel(client.channel_number)
+            else:
+                log.warn("Could not mark channel # (%s) as bad, Pika could be corrupt", client.channel_number)
+
             raise ret_vals
 
         if len(ret_vals) == 0:

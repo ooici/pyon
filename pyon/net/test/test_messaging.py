@@ -3,7 +3,7 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.net.messaging import NodeB, ioloop, make_node
+from pyon.net.messaging import NodeB, ioloop, make_node, PyonSelectConnection
 from pyon.net.channel import BaseChannel, BidirClientChannel
 from pyon.util.unit_test import PyonTestCase
 from mock import Mock, sentinel, patch
@@ -14,6 +14,8 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.async import spawn
 from gevent import event, queue
 import time
+from pyon.util.containers import DotDict
+from pika.exceptions import NoFreeChannels
 
 @attr('UNIT')
 class TestNodeB(PyonTestCase):
@@ -216,18 +218,96 @@ class TestMessaging(PyonTestCase):
                               'vhost': sentinel.vhost,
                               'port': 2111 }
 
-        # make a mocked method for SelectConnection to be patched in - we need a way of simulating the on_connection_open callback
+        # make a mocked method for PyonSelectConnection to be patched in - we need a way of simulating the on_connection_open callback
         cm = Mock()
         def select_connection(params, cb):
             cb(cm)
             return sentinel.connection
 
-        with patch('pyon.net.messaging.SelectConnection', new=select_connection):
+        with patch('pyon.net.messaging.PyonSelectConnection', new=select_connection):
             node, ilp = make_node(connection_params)
 
         self.assertEquals(ilp, sentinel.ioloop_process)
         gevmock.assert_called_once_with(ioloop, sentinel.connection)
 
+@attr('UNIT')
+class TestPyonSelectConnection(PyonTestCase):
 
+    @patch('pyon.net.messaging.SelectConnection')
+    def setUp(self, _):
+        self.conn = PyonSelectConnection(sentinel.conn_params, sentinel.open_callback, sentinel.reconn_strat)
+        self.conn.parameters = DotDict({'channel_max':25})
+        self.conn._channels = {}
 
+    def test_mark_bad_channel(self):
+        self.assertEquals(len(self.conn._bad_channel_numbers), 0)
 
+        self.conn.mark_bad_channel(15)
+
+        self.assertEquals(len(self.conn._bad_channel_numbers), 1)
+        self.assertIn(15, self.conn._bad_channel_numbers)
+
+    def test__next_channel_number_first(self):
+        self.assertEquals(self.conn._next_channel_number(), 1)
+
+    def test__next_channel_number_existing_channels(self):
+        self.conn._channels[1] = sentinel.chan1
+        self.conn._channels[2] = sentinel.chan2
+        self.conn._channels[5] = sentinel.chan3
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 3)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 4)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 6)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+    def test__next_channel_number_existing_channels_and_bad(self):
+        self.conn._channels[1] = sentinel.chan1
+        self.conn._channels[2] = sentinel.chan2
+        self.conn._channels[5] = sentinel.chan3
+        self.conn.mark_bad_channel(3)
+        self.conn.mark_bad_channel(6)
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 4)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 7)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+    def test__next_channel_number_after_channel_is_freed(self):
+        self.conn._channels[1] = sentinel.chan1
+        self.conn._channels[2] = sentinel.chan2
+        self.conn._channels[5] = sentinel.chan3
+
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 3)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+        # free up a channel
+        del self.conn._channels[1]
+
+        # acquire again, should be 1
+        new_ch_num = self.conn._next_channel_number()
+        self.assertEquals(new_ch_num, 1)
+        self.conn._channels[new_ch_num] = sentinel.any
+
+    def test__next_channel_number_all_used_by_channels(self):
+        self.conn._channels = {x:sentinel.any for x in xrange(1, 26)}
+        self.assertRaises(NoFreeChannels, self.conn._next_channel_number)
+
+    def test__next_channel_number_all_used_either_channels_or_bad(self):
+        for x in xrange(1, 26):
+            if x % 2:
+                self.conn._channels[x] = sentinel.any
+            else:
+                self.conn.mark_bad_channel(x)
+
+        self.assertRaises(NoFreeChannels, self.conn._next_channel_number)

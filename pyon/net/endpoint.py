@@ -6,7 +6,7 @@ from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
-from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
+from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
 from pyon.util.log import log
@@ -193,8 +193,17 @@ class EndpointUnit(object):
 
     def close(self):
         if self._recv_greenlet is not None:
-            self._recv_greenlet.kill()
+            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+            # @TODO: remove spawn_listener altogether.
+            self.channel._recv_queue.put(ChannelShutdownMessage())
+            self._recv_greenlet.join(timeout=2)
+            self._recv_greenlet.kill()      # he's dead, jim
+
         if self.channel is not None:
+            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
+            # we may end up having a duplicate, but I think logically it would never be a problem.
+            # still, need to clean this up.
             self.channel.close()
 
     def _build_header(self, raw_msg):
@@ -810,7 +819,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         response_headers['conv-id']     = headers.get('conv-id', '')
         response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
-        log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
+        log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
 
         return self.send(result, response_headers)
 
