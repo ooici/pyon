@@ -461,6 +461,9 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
             os.remove(fname)
 
     def check_pieces_3_variables_2d(self, generator, slice_tuple , concatenate_size):
+        """
+        This method checks that the concatenated blocks are what they should be.
+        """
 
         # Unpack the start and stop for each dimension from the slices
 
@@ -475,13 +478,15 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         # the number of entries in teh x dimension
 
 
-        # calculate the start, stop indices in the y dimension... thats the only dimension we need to keep
+        # calculate the vertical_start, vertical_stop indices in the y dimension... thats the only dimension we need to keep
         # track of because of the above mentioned reason
+
+        print (concatenate_size)
 
         num_entries_x = slice_tuple[1].stop - slice_tuple[1].start
 
-        start, end = (slice_tuple[0].start, slice_tuple[0].stop)
-        stop = concatenate_size / num_entries_x + start
+        vertical_start, vertical_end = (slice_tuple[0].start, slice_tuple[0].stop)
+        vertical_stop = min(vertical_start + concatenate_size / num_entries_x, vertical_end)
 
 
         # since the hdf_array_iterator only provides complete valid matrices, we update
@@ -489,36 +494,29 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
 
         concatenate_size = concatenate_size - concatenate_size % num_entries_x
 
-        while stop < end:
+        print ("vertical_start: %s, vertical_stop: %s, concatenate_size: %s" % (vertical_start,vertical_stop, concatenate_size))
+        print ("vertical_end: %s" % vertical_end)
+        print ("num_entries_x: %s" % num_entries_x)
+
+
+        while vertical_stop < vertical_end:
 
             out = generator.next()
 
-            truth1 = out['temperature']['values'] == self.t_result[start:stop, : min(concatenate_size, num_entries_x)]
-            truth2 = out['salinity']['values'] == self.s_result[start:stop, : min(concatenate_size, num_entries_x)]
-            truth3 = out['pressure']['values'] == self.p_result[start:stop, : min(concatenate_size, num_entries_x)]
+            y_stop = min(vertical_stop, vertical_end)
 
+            truth1 = out['temperature']['values'] == self.t_result[vertical_start: y_stop , : min(concatenate_size, num_entries_x)]
+            truth2 = out['salinity']['values'] == self.s_result[vertical_start: y_stop, : min(concatenate_size, num_entries_x)]
+            truth3 = out['pressure']['values'] == self.p_result[vertical_start: y_stop, : min(concatenate_size, num_entries_x)]
+
+            print ("checking here!")
+            print ("%s==%s" % (out['temperature']['values'], self.t_result[vertical_start:vertical_stop, : min(concatenate_size, num_entries_x)]))
             self.assertTrue(truth1.all())
             self.assertTrue(truth2.all())
             self.assertTrue(truth3.all())
 
-            start  = stop
-            stop += concatenate_size / num_entries_x
-
-        out = generator.next()
-
-        truth1 = out['temperature']['values'] == self.t_result[start:end, :]
-        truth2 = out['salinity']['values'] == self.s_result[start:end, :]
-        truth3 = out['pressure']['values'] == self.p_result[start:end, :]
-
-        if type(truth1) == bool: # this means that all the other variables, truth2 and truth 3 are also boolean
-            self.assertTrue(truth1)
-            self.assertTrue(truth2)
-            self.assertTrue(truth3)
-
-        else: # this means that truth1, truth2, and truth3 are numpy arrays with values True or False
-            self.assertTrue(truth1.all())
-            self.assertTrue(truth2.all())
-            self.assertTrue(truth3.all())
+            vertical_start  = vertical_stop
+            vertical_stop += concatenate_size / num_entries_x
 
 
     def test_concatenate_size(self):
@@ -557,7 +555,6 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
             concatenate_size = concatenate_size
         )
 
-
         self.check_pieces_3_variables_2d(generator, self.slice_tuple, concatenate_size)
 
         #--------------------------------------------------------------------------------------------------------------------------
@@ -576,6 +573,6 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         )
 
         # assert the result...
-        self.check_pieces_3_variables_2d(generator, sl, concatenate_size)
+        self.check_pieces_3_variables_2d(generator, bounds, concatenate_size)
 
 
