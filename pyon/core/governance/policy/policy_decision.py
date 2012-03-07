@@ -33,16 +33,16 @@ XACML_SAMPLE_POLICY_FILENAME='sample_policies.xml'
 XACML_EMPTY_POLICY_FILENAME='empty_policy_set.xml'
 
 
-SERVICE_PROVIDER_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'resource:service-provider'
-ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-role'
-SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-id-sender'
+SERVICE_PROVIDER_ATTRIBUTE=XACML_1_0_PREFIX + 'resource:service-provider'
+ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-role-id'
+SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-sender-id'
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
 
-class PolicyDecisionPoint(object):
+class PolicyDecisionPointManager(object):
 
     def __init__(self, *args, **kwargs):
         self.policy_decision_point = dict()
@@ -50,9 +50,9 @@ class PolicyDecisionPoint(object):
 
         #Adding an not function to XACML
         from pyon.core.governance.policy.xacml.not_function import Not
-        #from pyon.core.governance.policy.xacml.not_equal import NotEqualBase
+        from pyon.core.governance.policy.xacml.and_function import And
         functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
-        #functionMap['urn:oasis:names:tc:xacml:ooi:function:string-not-equal'] = NotEqualBase
+        functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
 
 
     def get_pdp(self, resource_policy):
@@ -70,7 +70,7 @@ class PolicyDecisionPoint(object):
 
 
     def load_policy_rules(self, resource_policy, rules_text):
-        log.info("Loading rules for service: %s" % resource_policy)
+        log.debug("Loading rules for service: %s" % resource_policy)
 
         #Simply create a new PDP object for the service
         #TODO - make sure this is thread safe with the evaluation that uses it.
@@ -106,19 +106,25 @@ class PolicyDecisionPoint(object):
 
 
 
-        log.info("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
+        log.debug("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
 
         request = Request()
         subject = Subject()
         subject.attributes.append(self.create_string_attribute(SENDER_ID,sender))
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
-       # subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID_QUALIFIER, ion_org_id))
 
-        #Iterate over the roles associated with the user and create attributes for each - #TODO - figure out how to specify proper Org from multiple Orgs.
+        #Iterate over the roles associated with the user and create attributes for each
         for org in actor_roles:
+            attribute = None
             for role in actor_roles[org]:
-                subject.attributes.append(self.create_string_attribute(ROLE_ATTRIBUTE_ID+'-'+role, "True"))
+                if attribute is None:
+                    attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)  #TODO - Figure out how to handle multiple Org Roles
+                else:
+                    attribute.attributeValues.append(StringAttributeValue())
+                    attribute.attributeValues[-1].value = org + "_" + role
+
+            subject.attributes.append(attribute)
 
         request.subjects.append(subject)
 

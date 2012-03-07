@@ -7,7 +7,7 @@ __license__ = 'Apache 2.0'
 from pyon.public import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
-from pyon.core.governance.policy.policy_decision import PolicyDecisionPoint
+from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 
 
 
@@ -19,7 +19,7 @@ class GovernanceController(object):
         self.enabled = False
         self.interceptor_by_name_dict = dict()
         self.interceptor_order = []
-        self.policy_decision_point = None
+        self.policy_decision_point_manager = None
         self.governance_dispatcher = None
 
     def start(self):
@@ -43,7 +43,7 @@ class GovernanceController(object):
 
         self.governance_dispatcher = GovernanceDispatcher()
 
-        self.policy_decision_point = PolicyDecisionPoint()
+        self.policy_decision_point_manager = PolicyDecisionPointManager()
 
         if 'interceptor_order' in config:
             self.interceptor_order = config['interceptor_order']
@@ -89,5 +89,5 @@ class GovernanceController(object):
     def load_policy_for_service(self, service_name, policy_rules):
 
         #Notify policy decision point of updated rules
-        if self.policy_decision_point is not None:
-            self.policy_decision_point.load_policy_rules(service_name, policy_rules)
+        if self.policy_decision_point_manager is not None:
+            self.policy_decision_point_manager.load_policy_rules(service_name, policy_rules)
