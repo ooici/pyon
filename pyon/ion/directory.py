@@ -240,7 +240,7 @@ class Directory(object):
         match = [doc for qname, index, doc in res]
         return match
 
-    def remove_child_entries(self, parent):
+    def remove_child_entries(self, parent, delete_parent=False):
         pass
 
     def find_by_key(self, subtree='/', key=None, **kwargs):

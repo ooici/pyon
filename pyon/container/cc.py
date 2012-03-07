@@ -135,6 +135,7 @@ class Container(BaseContainerAgent):
         # Instantiate Directory and self-register
         self.directory = Directory()
         self.directory.register("/Containers", self.id, cc_agent=self.name)
+        self.directory.register("/Containers/%s" % self.id, "Processes")
         self._capabilities.append("DIRECTORY")
 
         # Local resource registry
@@ -298,6 +299,7 @@ class Container(BaseContainerAgent):
 
         elif capability == "DIRECTORY":
             # Unregister from directory
+            self.directory.unregister_safe("/Containers/%s" % self.id, "Processes")
             self.directory.unregister_safe("/Containers", self.id)
 
             # Close directory (possible CouchDB connection)
