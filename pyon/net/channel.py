@@ -249,7 +249,7 @@ class BaseChannel(object):
         kwargs[cb_arg] = cb
         with self.push_closed_error_callback(eb):
             func(*args, **kwargs)
-            ret_vals = ar.get()
+            ret_vals = ar.get(timeout=10)
 
         if isinstance(ret_vals, ChannelError):
             raise ret_vals
@@ -635,6 +635,7 @@ class ServerChannel(ListenChannel):
     def _create_accepted_channel(self, amq_chan, msg):
         send_name = NameTrio(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel()
+        ch._recv_name = self._recv_name     # for debugging only
         ch.attach_underlying_channel(amq_chan)
         ch.connect(send_name)
         return ch

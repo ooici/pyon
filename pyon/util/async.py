@@ -55,7 +55,7 @@ def blocking_cb(func, cb_arg, *args, **kwargs):
         ev.set()
     kwargs[cb_arg] = cb
     func(*args, **kwargs)
-    ev.wait()
+    ev.wait(timeout=10)
     if len(ret_vals) == 0:
         return None
     elif len(ret_vals) == 1:
