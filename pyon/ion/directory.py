@@ -231,6 +231,18 @@ class Directory(object):
         delist = self.dir_store.find_dir_entries(qname)
         return delist
 
+    def find_child_entries(self, parent='/', **kwargs):
+        parent_dn = self._get_dn(parent)
+        start_key = [parent_dn]
+        res = self.dir_store.find_by_view('directory', 'by_parent',
+            start_key=start_key, end_key=list(start_key), id_only=False, **kwargs)
+
+        match = [doc for qname, index, doc in res]
+        return match
+
+    def remove_child_entries(self, parent):
+        pass
+
     def find_by_key(self, subtree='/', key=None, **kwargs):
         """
         Returns a tuple (qname, attributes) for each directory entry that matches the

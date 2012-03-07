@@ -173,6 +173,14 @@ function(doc) {
   }
 }""",
         },
+        'by_parent':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "DirEntry") {
+    emit([doc.parent, doc.key], doc);
+  }
+}""",
+        },
         'by_attribute':{
             'map':"""
 function(doc) {
