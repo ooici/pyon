@@ -11,10 +11,26 @@ from prototype.hdf.hdf_array_iterator import acquire_data
 
 from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import IonUnitTestCase
 from pyon.core.exception import NotFound, BadRequest
 
 from pyon.util.file_sys import FS, FileSystem
 from pyon.util.containers import DotDict
+from mock import Mock, patch
+import unittest
+
+
+
+
+@attr('UNIT', group='dm')
+class HDFArrayIteratorUnitTest(IonUnitTestCase):
+
+    @unittest.skip('Unskip once numpy and h5py are imported in the module rather than the method')
+    @patch('prototype.hdf.hdf_array_iterator.acquire_data.h5py')
+    @patch('prototype.hdf.hdf_array_iterator._acquire_hdf_data', Mock(side_effect=TypeError))
+    def test_acquire_data_closes_files_when_exception(self, h5mock):
+        self.assertRaises(TypeError, acquire_data(['anything'], [], [], []))
+        h5mock.File.close.assert_called_once_with()
 
 
 @attr('INT', group='dm')
@@ -384,45 +400,6 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # assert result
 
         self.check_pieces_3_variables_1d(generator, sl, concatenate_size)
-
-    def test_files_close(self):
-
-        # Test that files are closed when method compelete normally
-        ## How?
-
-        # if the file cannot be opened again, then that means that the file was not closed...
-        # so we check if we can open the file again, making sure that we do close it in the end...
-
-
-        import h5py
-
-        for fname in self.fnames:
-            file = h5py.File(fname, 'w')
-
-            file.close()
-
-
-        # Test that files are close when acquire data fails too!
-        ## how?
-
-        # make acquire_data fail!
-
-        try:
-            generator = acquire_data(hdf_files = self.fnames,
-                var_names =  ['very bad var_name'],
-                concatenate_size = 'ver bad concatenate_size',
-                bounds = None
-            )
-
-            out = generator.next()
-        except:
-            # catch the exception. We just want to make sure the hdf files get closed even if the acquire method fails
-            pass
-
-        for fname in self.fnames:
-            file = h5py.File(fname, 'w')
-
-            file.close()
 
 
 
