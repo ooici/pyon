@@ -3,8 +3,7 @@
 
 __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
-
-from pyon.public import CFG
+from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
