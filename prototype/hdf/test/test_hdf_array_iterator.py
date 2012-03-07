@@ -576,6 +576,6 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         )
 
         # assert the result...
-#        self.check_pieces_3_variables_2d(generator, sl, concatenate_size)
+        self.check_pieces_3_variables_2d(generator, sl, concatenate_size)
 
 
