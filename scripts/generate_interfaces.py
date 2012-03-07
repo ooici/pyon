@@ -617,6 +617,14 @@ def generate_model_objects():
             for val in value_val:
                 dataobject_output_text += "    " + val + " = " + str(i) + "\n"
                 i += 1
+            dataobject_output_text += "    _value_map = {"
+            i = 1
+            for val in value_val:
+                if i > 1:
+                    dataobject_output_text += ", "
+                dataobject_output_text += "'" + val + "': " + str(i)
+                i += 1
+            dataobject_output_text += "}\n"
 
     enum_tag = u'!enum'
     def enum_constructor(loader, node):
@@ -625,7 +633,7 @@ def generate_model_objects():
         if 'name' in val_str:
             name_str = val_str.split(',', 1)[0]
             name_val = name_str.split('=')[1].strip()
-            return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"]}
+            return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"], "type": name_val}
 
         else:
             return {"__IsEnum": True, "_NameNotProvided": True}
@@ -645,7 +653,7 @@ def generate_model_objects():
                 value = node.tag.strip('!')
                 # See if this is an enum ref
                 if value in enums_by_name:
-                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"], "type": value}
                 else:
                     return str(value) + "()"
             yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
@@ -671,7 +679,7 @@ def generate_model_objects():
                 value = node.tag.strip('!')
                 # See if this is an enum ref
                 if value in enums_by_name:
-                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"]}
+                    return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"], "type": value}
                 else:
                     return str(value) + "()"
             yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
@@ -745,6 +753,8 @@ def generate_model_objects():
                 except KeyError:
                     # Ignore key error because value is nested
                     continue
+
+                enum_type = ""
                 if isinstance(value, str) and '()' in value:
                     value_type = value.strip('()')
                     converted_value = value
@@ -754,6 +764,7 @@ def generate_model_objects():
                 else:
                     value_type = type(value).__name__
                     if value_type == 'dict' and "__IsEnum" in value:
+                        enum_type = value["type"]
                         value_type = 'int'
                     converted_value = convert_val(value)
                     if value_type in ['OrderedDict', 'list', 'tuple']:
@@ -767,7 +778,10 @@ def generate_model_objects():
                         args.append(field + "=" + converted_value)
                         init_lines.append('        self.' + field + " = " + field + "\n")
                 fields.append(field)
-                current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+                if enum_type:
+                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
+                else:
+                    current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
         elif line and line[0].isalpha():
             if '!enum' in line:
                 continue
@@ -836,6 +850,7 @@ def generate_model_objects():
                             index += 1
                             continue
 
+                        enum_type = ""
                         if isinstance(value, str) and '()' in value:
                             value_type = value.strip('()')
                             converted_value = value
@@ -845,6 +860,7 @@ def generate_model_objects():
                         else:
                             value_type = type(value).__name__
                             if value_type == 'dict' and "__IsEnum" in value:
+                                enum_type = value["type"]
                                 value_type = 'int'
                             converted_value = convert_val(value)
                             if value_type in ['OrderedDict', 'list', 'tuple']:
@@ -858,7 +874,10 @@ def generate_model_objects():
                                 args.append(field + "=" + converted_value)
                                 init_lines.append('        self.' + field + " = " + field + "\n")
                         fields.append(field)
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+                        if enum_type:
+                             current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
+                        else:
+                            current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
                 elif line and line[0].isalpha():
                     if '!enum' in line:
                         index += 1
@@ -977,17 +996,24 @@ def generate_model_objects():
             current_op_name = lines[index].strip(' :')
             messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
             messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
-            messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
-            messageobject_output_text += '    def __init__(self'
-            current_class_schema = "\n    _schema = {"
+            messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
             index += 1
 
             # Find in
             while index < len(lines):
+                if lines[index].startswith('    resource_type:'):
+                    messageobject_output_text += "    _resource_type = '" + lines[index].split('    resource_type:')[1].strip() + "'\n"
+                if lines[index].startswith('    resource_id:'):
+                    messageobject_output_text += "    _resource_id = '" + lines[index].split('    resource_id:')[1].strip() + "'\n"
+                if lines[index].startswith('    operation_type:'):
+                    messageobject_output_text += "    _operation_type = '" + lines[index].split('    operation_type:')[1].strip() + "'\n"
                 if lines[index].startswith('    in:'):
                     break
                 index += 1
             index += 1
+
+            messageobject_output_text += '\n    def __init__(self'
+            current_class_schema = "\n    _schema = {"
 
             while index < len(lines) and not lines[index].startswith('    out:'):
                 if lines[index].isspace():
@@ -1005,7 +1031,7 @@ def generate_model_objects():
                     try:
                         value = line.split(":", 1)[1].strip()
                         if '#' in value:
-                            if '# _required' in value:
+                            if '_required' in value:
                                 is_required = True
                             value = value.split('#')[0].strip()
                     except KeyError:
