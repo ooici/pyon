@@ -120,6 +120,10 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
             self.assertTrue(truth2.all())
             self.assertTrue(truth3.all())
 
+        # check that trying to iterate again will yield a StopIteration
+        with self.assertRaises(StopIteration):
+            out = generator.next()
+
     def test_concatenate_size(self):
 
         #--------------------------------------------------------------------------------------
@@ -224,6 +228,8 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         self.assertTrue(truth1.all())
         self.assertTrue(truth2.all())
 
+        self.assertTrue('pressure' not in out)
+
 
         #---------------------------------------------------------------------------------------------------
         # Test with name not in dataset
@@ -293,6 +299,11 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         self.assertTrue(truth1.all())
         self.assertTrue(truth2.all())
+
+        # try to get the stop iteration by iterating again
+
+        with self.assertRaises(StopIteration):
+            out = generator.next()
 
         #---------------------------------------------------------------------------------------------------
         # Test with normal bounds slice
