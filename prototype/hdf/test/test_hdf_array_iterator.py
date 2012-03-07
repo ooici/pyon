@@ -13,12 +13,18 @@ from nose.plugins.attrib import attr
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.exception import NotFound, BadRequest
 
+from pyon.util.file_sys import FS, FileSystem
+from pyon.util.containers import DotDict
+
+
 @attr('INT', group='dm')
 class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
     def setUp(self):
 
         import numpy, h5py
+
+        FileSystem(DotDict())
 
         #--------------------------------------------------------------------
         # Create an hdf file for testing
@@ -43,7 +49,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         # provide the check_pieces mathod the size of the dataset so that it can do its checking..
         self.sl = slice(0,150)
 
-        self.fnames = ['data1.hdf5', 'data2.hdf5', 'data3.hdf5']
+        self.fnames = [0,]*3
+        for i in range(0,3):
+            self.fnames[i] = FileSystem.get_url(FS.TEMP, 'data%d.hdf5' % (i+1))
 
         for fname, s, t, p in zip(self.fnames, self.salinity, self.temperature, self.pressure):
             file = h5py.File(fname, 'w')
@@ -70,7 +78,7 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         """
 
         for fname in self.fnames:
-            os.remove(fname)
+            FileSystem.unlink(fname)
 
     def check_pieces_3_variables(self, generator, sl, concatenate_size):
 
@@ -98,9 +106,9 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
 
         out = generator.next()
 
-        truth1 = out['temperature']['values'] == self.t_result[start:stop]
-        truth2 = out['salinity']['values'] == self.s_result[start:stop]
-        truth3 = out['pressure']['values'] == self.p_result[start:stop]
+        truth1 = out['temperature']['values'] == self.t_result[start:end]
+        truth2 = out['salinity']['values'] == self.s_result[start:end]
+        truth3 = out['pressure']['values'] == self.p_result[start:end]
 
         if type(truth1) == bool: # this means that all the other variables, truth2 and truth 3 are also boolean
             self.assertTrue(truth1)
@@ -160,7 +168,7 @@ class HDFArrayIteratorTest_1d(IonIntegrationTestCase):
         )
 
         # assert the result...
-#        self.check_pieces_3_variables(generator, sl, concatenate_size)
+        self.check_pieces_3_variables(generator, sl, concatenate_size)
 
     def test_var_names(self):
 
@@ -429,6 +437,13 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         self.pressure[1] = numpy.random.uniform(low=0.0, high=1.0, size=50).reshape(5,10)
         self.pressure[2] = numpy.random.uniform(low=0.0, high=1.0, size=50).reshape(5,10)
 
+        # Concatenate the test values for comparison:
+
+        self.t_result = numpy.concatenate((self.temperature[0],self.temperature[1],self.temperature[2]), axis = 0)
+        self.s_result = numpy.concatenate((self.salinity[0],self.salinity[1],self.salinity[2]), axis = 0)
+        self.p_result = numpy.concatenate((self.pressure[0],self.pressure[1],self.pressure[2]), axis = 0)
+
+
         self.fnames = ['data1.hdf5', 'data2.hdf5', 'data3.hdf5']
 
         for fname, s, t, p in zip(self.fnames, self.salinity, self.temperature, self.pressure):
@@ -457,13 +472,18 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
 
         generator = acquire_data(hdf_files = self.fnames,
             var_names = ['temperature', 'salinity'],
-            concatenate_size = 25,
+            concatenate_size = 50,
             bounds = None #(slice(63,150))
         )
 
+        out = generator.next()
 
-        for d in generator:
-            print 'Hello!', d
+#        print("t_result: %s\n" % self.t_result)
+#
+#        print("s_result: %s\n" % self.s_result)
+#
+#        print ("out: %s" % out)
+
 
 
 
