@@ -27,8 +27,9 @@ class TestMessagingSpeed(IonIntegrationTestCase):
         print >>sys.stderr, ""
 
         self.counter = 0
+        self.alive = True
         def sendem():
-            while True:
+            while self.alive:
                 hsc.noop('data')
                 self.counter += 1
 
@@ -36,9 +37,11 @@ class TestMessagingSpeed(IonIntegrationTestCase):
 
         sendgl = spawn(sendem)
         time.sleep(5)
-        sendgl.kill()
-
         end_time = time.time()
+
+        self.alive = False
+        sendgl.join(timeout=2)
+        sendgl.kill()
 
         diff = end_time - start_time
         mps = float(self.counter) / diff
@@ -51,8 +54,9 @@ class TestMessagingSpeed(IonIntegrationTestCase):
         print >>sys.stderr, ""
 
         self.counter = 0
+        self.alive = True
         def sendem():
-            while True:
+            while self.alive:
                 self.counter += 1
                 pub.publish('meh')
 
@@ -60,9 +64,13 @@ class TestMessagingSpeed(IonIntegrationTestCase):
 
         sendgl = spawn(sendem)
         time.sleep(5)
+        end_time = time.time()
+
+        self.alive = False
+        sendgl.join(timeout=2)
         sendgl.kill()
 
-        end_time = time.time()
+
 
         diff = end_time - start_time
         mps = float(self.counter) / diff
