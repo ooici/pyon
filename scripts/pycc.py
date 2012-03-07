@@ -160,6 +160,10 @@ def main(opts, *args, **kwargs):
             if not start_ok:
                 raise Exception("Cannot start deploy file '%s'" % opts.rel)
 
+        if opts.mx:
+            container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
+            print "Container UI started ... listening on http://localhost:8080"
+
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
             from pyon.container.shell_api import get_shell_api
@@ -230,6 +234,7 @@ def entry():
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
+    parser.add_argument('-m', '--mx', action='store_true', help='Start a management web UI')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
     parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file.')
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
