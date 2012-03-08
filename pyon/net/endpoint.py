@@ -980,37 +980,38 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             raise e
         finally:
 
-            sm = self._process.container.sflow_manager
+            if CFG.container.get('sflow', {}).get('enabled', False):
+                sm = self._process.container.sflow_manager
 
-            with sm.sample_transaction() as will_sample:
-                if will_sample:
-                    # build args to pass to transaction
-                    extra_attrs = {'conv-id': headers.get('conv-id', ''),
-                                   'service': res_headers.get('sender-service', '')}
+                with sm.sample_transaction() as will_sample:
+                    if will_sample:
+                        # build args to pass to transaction
+                        extra_attrs = {'conv-id': headers.get('conv-id', ''),
+                                       'service': res_headers.get('sender-service', '')}
 
-                    cur_time_ms = int(time.time() * 1000)
-                    time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
+                        cur_time_ms = int(time.time() * 1000)
+                        time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
 
-                    # build op name: typically sender-service.op, or falling back to sender.op
-                    op_first = res_headers.get('sender-service', res_headers.get('sender', headers.get('receiver', '')))
-                    if "," in op_first:
-                        op_first = op_first.rsplit(',', 1)[-1]
+                        # build op name: typically sender-service.op, or falling back to sender.op
+                        op_first = res_headers.get('sender-service', res_headers.get('sender', headers.get('receiver', '')))
+                        if "," in op_first:
+                            op_first = op_first.rsplit(',', 1)[-1]
 
-                    op = ".".join((op_first,
-                                   headers.get('op', 'unknown')))
+                        op = ".".join((op_first,
+                                       headers.get('op', 'unknown')))
 
-                    tkwargs = { 'app_name':     str(self._process.id),
-                                'op':           op,
-                                'attrs':        extra_attrs,
-                                'status_descr': status_descr,
-                                'status':       status,
-                                'req_bytes':    len(str(msg)),
-                                'resp_bytes':   len(str(msg)),
-                                'uS':           time_taken,
-                                'initiator':    headers.get('sender', ''),
-                                'target':       headers.get('receiver', '')}
+                        tkwargs = { 'app_name':     str(self._process.id),
+                                    'op':           op,
+                                    'attrs':        extra_attrs,
+                                    'status_descr': status_descr,
+                                    'status':       status,
+                                    'req_bytes':    len(str(msg)),
+                                    'resp_bytes':   len(str(msg)),
+                                    'uS':           time_taken,
+                                    'initiator':    headers.get('sender', ''),
+                                    'target':       headers.get('receiver', '')}
 
-                    sm.transaction(**tkwargs)
+                        sm.transaction(**tkwargs)
 
         return res, res_headers
 
