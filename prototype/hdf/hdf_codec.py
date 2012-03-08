@@ -260,6 +260,8 @@ class HDFEncoder(object):
         dataset = lowest_subgroup.create_dataset(name_of_dataset,
             shape,
             nparray.dtype.str,
+            compression='gzip',
+            compression_opts=4,
             maxshape=([None for rank in range(len(shape))])
             )
 
