@@ -209,6 +209,14 @@ class ProcManager(object):
         if not isinstance(service_instance, ResourceAgent):
             raise ContainerConfigError("Agent process must extend ResourceAgent")
         self._service_init(service_instance)
+
+        resource_id = get_safe(service_instance.CFG, "agent.resource_id")
+        if not service_instance.resource_id:
+            # The agent subclass has not set self.resource_id
+            service_instance.resource_id = resource_id
+        if not service_instance.resource_id:
+            log.warn("New agent pid=%s has no resource_id set" % process_id)
+
         self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
 
