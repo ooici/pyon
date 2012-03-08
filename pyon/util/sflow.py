@@ -7,34 +7,53 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.async import spawn
-from pyon.core.interceptor.interceptor import Interceptor
+from pyon.core.bootstrap import CFG, get_sys_name
+from pyon.core import exception
 import time
 import json
 from socket import socket, AF_INET, SOCK_DGRAM
 import os
 from random import random
+from contextlib import contextmanager
+from collections import defaultdict
 
 class SFlowManager(object):
+
+    # map our status (http-based) to a status sFlow understands - as appropriate
+    # http://sflow.org/draft_sflow_application.txt
+    status_map = defaultdict(lambda: 3).update({      # 3 == INTERNAL_ERROR, default return for anything?
+                  exception.BadRequest:         4,      # BAD_REQUEST
+                  exception.Unauthorized:       10,     # UNAUTHORIZED
+                  exception.NotFound:           8,      # NOT_FOUND
+                  exception.Timeout:            2,      # TIMEOUT
+                  exception.ServiceUnavailable: 9})     # UNAVAILABLE
 
     def __init__(self, container):
         self._container         = container
         self._gl_counter        = None
-        self._counter_interval  = 30            # @TODO: default: from cfg
-        self._hsflowd_addr      = "192.168.56.101"   # @TODO same
-        self._hsflowd_port      = 36343          # @TODO same
-        self._hsflowd_conf      = "/etc/hsflowd.auto"
         self._conf_last_mod     = None          # last modified time of the conf file
-        self._trans_sample_rate = 1
+
+        sflowcfg                = CFG.container.get('sflow', {})
+        self._counter_interval  = sflowcfg.get('counter_interval', 30)          # number of seconds between counter pulses, 0 means don't do it
+        self._hsflowd_addr      = sflowcfg.get("hsflowd_addr", "localhost")     # host where hsflowd is running
+        self._hsflowd_port      = sflowcfg.get("hsflowd_port", 36343)           # udp port on host where hsflowd is listening for json
+        self._hsflowd_conf      = sflowcfg.get("hsflowd_auto_file", "/etc/hsflowd.auto")    # hsflowd auto-conf file, where we poll for updates (only if addr is local)
+        self._trans_sample_rate = sflowcfg.get("trans_sample_rate", 1)          # transaction sample rate, 1 means do everything!
 
     def start(self):
         log.debug("SFlowManager.start")
-        self._gl_counter = spawn(self._counter)
+
+        if self._counter_interval > 0:
+            self._gl_counter = spawn(self._counter)
+        else:
+            log.debug("Counter interval is 0, not spawning counter greenlet")
 
         self._udp_socket = socket(AF_INET, SOCK_DGRAM)
 
     def stop(self):
         log.debug("SFlowManager.stop")
-        self._gl_counter.kill()
+        if self._gl_counter:
+            self._gl_counter.kill()
 
     def _counter(self):
         """
@@ -44,7 +63,7 @@ class SFlowManager(object):
         """
         while True:
             # ensure counter interval is up to date
-#            self._read_interval_time()
+            self._read_interval_time()
 
             log.debug("SFlowManager._counter: sleeping for %s", self._counter_interval)
 
@@ -81,30 +100,55 @@ class SFlowManager(object):
         """
         Reads the hsflowd conf file to determine what time should be used.
         """
-        try:
-            mtime = os.stat(self._hsflowd_conf).st_mtime
-        except OSError:
-            log.info("Could not stat hsflowd.auto file")
-            mtime = self._conf_last_mod
-
-        if mtime != self._conf_last_mod:
-            self._conf_last_mod = mtime
-
-            # appears to be simple key=value, one per line
+        if not (self._hsflowd_addr == "localhost" or self._hsflowd_addr == "127.0.0.1"):
+            log.debug("Skipping reading hsflow auto file, hsflowd is not running locally")
+        else:
             try:
-                with open(self._hsflowd_conf) as f:
-                    while True:
-                        c = f.readline()
-                        if c == "":
-                            break
-                        elif c.startswith('polling='):
-                            self._counter_interval = int(c.rstrip().split('=')[1])
-                            log.debug("New polling interval time: %d", self._counter_interval)
-                            break
-            except IOError:
-                log.exception("Could not open/read hsflowd.auto")
+                mtime = os.stat(self._hsflowd_conf).st_mtime
+            except OSError:
+                # if you can't stat it, you can't read it most likely
+                log.info("Could not stat hsflowd.auto file")
+                return
 
-    def transaction(self, op=None,
+            if mtime != self._conf_last_mod:
+                self._conf_last_mod = mtime
+
+                # appears to be simple key=value, one per line
+                try:
+                    with open(self._hsflowd_conf) as f:
+                        while True:
+                            c = f.readline()
+                            if c == "":
+                                break
+                            elif c.startswith('polling='):
+                                self._counter_interval = int(c.rstrip().split('=')[1])
+                                log.debug("New polling interval time: %d", self._counter_interval)
+                                break
+                except IOError:
+                    log.exception("Could not open/read hsflowd.auto")
+
+    @contextmanager
+    def sample_transaction(self):
+        """
+        The preferred way of doing a transaction sample.
+
+        This method lets a potential sampler know if there is going to be a sample occuring so you don't
+        do all this work to build your sample before the transaction method decides it won't sample it.
+
+        To use:
+        with sflow_manager.sample_transaction() as will_sample:
+            if will_sample:
+                # build your sample
+                sflow_manager.transaction(op=stuff, attrs=stuff, ...)
+        """
+        sampling_probability = 1.0 / self._trans_sample_rate
+        log.debug("sample_transaction (sampling prob: %f)", sampling_probability)
+
+        will_sample = random() <= sampling_probability
+        yield will_sample
+
+    def transaction(self, app_name=None,
+                          op=None,
                           attrs=None,
                           status_descr=None,
                           status=None,
@@ -118,34 +162,42 @@ class SFlowManager(object):
 
         Called from Process level endpoint layer.
         """
-        sampling_probability = 1.0 / self._trans_sample_rate
-        log.debug("Transaction (sampling prob: %f)", sampling_probability)
-        if random() <= sampling_probability:
-            log.debug("Sampling")
-            tsample = { 'flow_sample':{
-                            'app_name': str(self._container.id),
-                            'sampling_rate': 1,     # @TODO ??
-                            'app_operation': {
-                                'operation': op,
-                                'attributes': "&".join(["%s=%s" % (k, v) for k, v in attrs.iteritems()]),
-                                'status_descr': status_descr,
-                                'status': status,
-                                'req_bytes': req_bytes,
-                                'resp_bytes': resp_bytes,
-                                'uS': uS
-                            },
-                            'app_initiator': {
-                                'actor': initiator,
-                            },
-                            'app_target': {
-                                'actor': target,
-                            }
-                        }
-                      }
 
-            self._publish(tsample)
+        log.debug("SFlowManager.transaction")
+
+        # build up the true app name
+        full_app = ['ion', get_sys_name()]
+
+        # don't duplicate the container (proc ids are typically containerid.number)
+        if self._container.id in app_name:
+            full_app.append(app_name)
         else:
-            log.debug("Not sampling this transaction")
+            full_app.extend((self._container.id, app_name))
+
+        full_app_name = ".".join(full_app)
+
+        tsample = { 'flow_sample':{
+                        'app_name': full_app_name,
+                        'sampling_rate': self._trans_sample_rate,
+                        'app_operation': {
+                            'operation': op,
+                            'attributes': "&".join(["%s=%s" % (k, v) for k, v in attrs.iteritems()]),
+                            'status_descr': status_descr,
+                            'status': status,
+                            'req_bytes': req_bytes,
+                            'resp_bytes': resp_bytes,
+                            'uS': uS
+                        },
+                        'app_initiator': {
+                            'actor': initiator,
+                        },
+                        'app_target': {
+                            'actor': target,
+                        }
+                    }
+                  }
+
+        self._publish(tsample)
 
     def _publish(self, data):
         """
@@ -153,41 +205,3 @@ class SFlowManager(object):
         """
         json_data = json.dumps(data)
         self._udp_socket.sendto(json_data, (self._hsflowd_addr, self._hsflowd_port))
-
-
-class SFlowInterceptor(Interceptor):
-    """
-    Proof-of-concept to emit sflow stats on completed RPC only.
-    """
-    def incoming(self, invocation):
-        log.warn("HELLO MESSAGE")
-        if invocation.headers.get('protocol', None) == 'rpc':
-            log.warn("LETS TAKEA  LOOK")
-            proc = invocation.args.get('process', None)
-            if proc:
-                sm = proc.container.sflow_manager
-
-                # build args to pass to transaction
-                extra_attrs = {'conv-id': invocation.headers.get('conv-id', ''),
-                               'service': invocation.headers.get('sender-service', '')}
-                time_taken = 5      # @TODO
-
-                tkwargs = {'op': invocation.headers.get('op', ''),
-                           'attrs': extra_attrs,
-                           'status_descr': invocation.headers.get('error_message', ''),
-                           'status': invocation.headers.get('status_code', ''),
-                           'req_bytes': len(str(invocation.message)),
-                           'resp_bytes': len(str(invocation.message)),
-                           'uS': time_taken,
-                           'initiator': proc.id,
-                           'target': invocation.headers.get('sender', '')}
-
-                sm.transaction(**tkwargs)
-
-            else:
-                log.warn("No process found for SFlowInterceptor.incoming, no way to get at sflow manager instance")
-
-        return invocation
-
-    def outgoing(self, invocation):
-        pass

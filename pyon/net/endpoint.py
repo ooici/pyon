@@ -20,7 +20,7 @@ import time
 
 import traceback
 import sys
-
+from pyon.util.sflow import SFlowManager
 
 
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
@@ -966,49 +966,51 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
         """
         _send override, solely for sFlow metrics.
         """
-        status = -1
-        status_descr = "OK"
+        status          = 0
+        status_descr    = "OK"
+        res_headers     = {}
         try:
             res, res_headers = RPCRequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
-            status = 0
         except exception.IonException as e:
 
-            # map our status (http-based) to a status sFlow understands - as they make sense
-            # http://sflow.org/draft_sflow_application.txt
-            status_map = {exception.BadRequest: 4,
-                          exception.Unauthorized: 10,
-                          exception.NotFound: 8,
-                          exception.Timeout: 2,
-                          exception.ServiceUnavailable: 9}
-            if type(e) in status_map:
-                status = status_map[type(e)]
-            else:
-                status = 3      # internal error
-
-            status_descr = e.message
+            # assign status in sflow terms
+            status          = SFlowManager.status_map[type(e)]
+            status_descr    = e.message
 
             raise e
         finally:
 
             sm = self._process.container.sflow_manager
 
-            # build args to pass to transaction
-            extra_attrs = {'conv-id': headers.get('conv-id', ''),
-                           'service': headers.get('sender-service', '')}
-            cur_time_ms = int(time.time() * 1000)
-            time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
+            with sm.sample_transaction() as will_sample:
+                if will_sample:
+                    # build args to pass to transaction
+                    extra_attrs = {'conv-id': headers.get('conv-id', ''),
+                                   'service': res_headers.get('sender-service', '')}
 
-            tkwargs = {'op': headers.get('op', ''),
-                       'attrs': extra_attrs,
-                       'status_descr': status_descr,
-                       'status': status,
-                       'req_bytes': len(str(msg)),
-                       'resp_bytes': len(str(msg)),
-                       'uS': time_taken,
-                       'initiator': headers.get('sender', ''),
-                       'target': headers.get('receiver', '')}
+                    cur_time_ms = int(time.time() * 1000)
+                    time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
 
-            sm.transaction(**tkwargs)
+                    # build op name: typically sender-service.op, or falling back to sender.op
+                    op_first = res_headers.get('sender-service', res_headers.get('sender', headers.get('receiver', '')))
+                    if "," in op_first:
+                        op_first = op_first.rsplit(',', 1)[-1]
+
+                    op = ".".join((op_first,
+                                   headers.get('op', 'unknown')))
+
+                    tkwargs = { 'app_name':     str(self._process.id),
+                                'op':           op,
+                                'attrs':        extra_attrs,
+                                'status_descr': status_descr,
+                                'status':       status,
+                                'req_bytes':    len(str(msg)),
+                                'resp_bytes':   len(str(msg)),
+                                'uS':           time_taken,
+                                'initiator':    headers.get('sender', ''),
+                                'target':       headers.get('receiver', '')}
+
+                    sm.transaction(**tkwargs)
 
         return res, res_headers
 
