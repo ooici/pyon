@@ -47,7 +47,7 @@ def main():
 
         if statstr != "RUNNING":
             node.client.close()
-            sys.exit(1)
+            sys.exit(2)
     else:
         print "Returned", retval
 
