@@ -173,7 +173,7 @@ class Container(BaseContainerAgent):
         self.governance_controller.start()
         self._capabilities.append("GOVERNANCE_CONTROLLER")
 
-        if CFG.container.get('sflow', False):
+        if CFG.container.get('sflow', {}).get('enabled', False):
             self.sflow_manager.start()
             self._capabilities.append("SFLOW_MANAGER")
 
