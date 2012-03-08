@@ -575,7 +575,7 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         # assert the result...
         self.check_pieces_3_variables_2d(generator, bounds, concatenate_size)
 
-
+#    @unittest.skip("todo")
     def test_bounds(self):
 
 
@@ -596,42 +596,44 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
 
         out = generator.next()
 
-        self.check_pieces_3_variables_2d(generator, (slice(2,4), self.slice_tuple[1]), concatenate_size)
 
+        self.check_pieces_3_variables_2d(generator, (slice(2,4), self.slice_tuple[1]), concatenate_size)
 
 
         #---------------------------------------------------------------------------------------------------
         # Test with bounds greater than the dataset length
         #---------------------------------------------------------------------------------------------------
 
-        bounds = (slice(0,200), slice(0,200))
-        generator = acquire_data(hdf_files = self.fnames,
-            var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = 20,
-            bounds = bounds
-        )
-
-        out = generator.next()
-
-        # Assert result is the whole dataset
-
-
+#        bounds = (slice(0,200), slice(0,200))
+#        concatenate_size = 20
+#
+#        generator = acquire_data(hdf_files = self.fnames,
+#            var_names =  ['temperature', 'salinity', 'pressure'],
+#            concatenate_size = concatenate_size,
+#            bounds = bounds
+#        )
+#
+#        out = generator.next()
+#
+#        # Assert result is the whole dataset
 
         #---------------------------------------------------------------------------------------------------
         # Test with normal bounds slice
         #---------------------------------------------------------------------------------------------------
 
         bounds = (slice(2,3),slice(2,5) )
+        concatenate_size = 60
+
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = 60,
+            concatenate_size = concatenate_size,
             bounds = bounds
         )
         out = generator.next()
 
         # assert result
 
-
+        self.check_pieces_3_variables_2d(generator, (slice(2,4), self.slice_tuple[1]), concatenate_size)
 
         #---------------------------------------------------------------------------------------------------
         # Test with no bounds
@@ -645,21 +647,24 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         )
         # assert result
 
-#        self.check_pieces_3_variables_2d(generator, self.slice_tuple, concatenate_size)
+        self.check_pieces_3_variables_2d(generator, self.slice_tuple, concatenate_size)
 
         #---------------------------------------------------------------------------------------------------
         # Test with concatenate larger than bounds overall extent
         #---------------------------------------------------------------------------------------------------
 
         bounds = (slice(2,5), slice(2,10))
+        concatenate_size = 200
         generator = acquire_data(hdf_files = self.fnames,
             var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = 200,
+            concatenate_size = concatenate_size,
             bounds = bounds
         )
         out = generator.next()
 
         # assert result
+
+        self.check_pieces_3_variables_2d(generator, self.slice_tuple, concatenate_size)
 
 
 
@@ -668,17 +673,21 @@ class HDFArrayIteratorTest_2d(IonIntegrationTestCase):
         # and not a multiple of the y coordinate of the rank
         #----------------------------------------------------------------------------------------------------------------------
 
-        bounds = (slice(1,4),slice(1,8))
-        concatenate_size = 10
-
-        generator = acquire_data(hdf_files = self.fnames,
-            var_names =  ['temperature', 'salinity', 'pressure'],
-            concatenate_size = concatenate_size,
-            bounds = bounds
-        )
-
-        # assert result
-
+#        bounds = (slice(1,4),slice(1,8))
+#        concatenate_size = 10
+#
+#        generator = acquire_data(hdf_files = self.fnames,
+#            var_names =  ['temperature', 'salinity', 'pressure'],
+#            concatenate_size = concatenate_size,
+#            bounds = bounds
+#        )
+#
+#        # assert result
+#
+#        print ("out: %s" % out)
+#
+#        out = generator.next()
+#
 #        self.check_pieces_3_variables_2d(generator, bounds, concatenate_size)
 
 
