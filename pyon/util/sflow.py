@@ -8,25 +8,21 @@ __license__ = 'Apache 2.0'
 from pyon.util.log import log
 from pyon.util.async import spawn
 from pyon.core.bootstrap import CFG, get_sys_name
-from pyon.core import exception
 import time
 import json
 from socket import socket, AF_INET, SOCK_DGRAM
 import os
 from random import random
-from contextlib import contextmanager
-from collections import defaultdict
 
 class SFlowManager(object):
 
     # map our status (http-based) to a status sFlow understands - as appropriate
     # http://sflow.org/draft_sflow_application.txt
-    status_map = defaultdict(lambda: 3).update({      # 3 == INTERNAL_ERROR, default return for anything?
-                  exception.BadRequest:         4,      # BAD_REQUEST
-                  exception.Unauthorized:       10,     # UNAUTHORIZED
-                  exception.NotFound:           8,      # NOT_FOUND
-                  exception.Timeout:            2,      # TIMEOUT
-                  exception.ServiceUnavailable: 9})     # UNAVAILABLE
+    status_map = {400:    4,      # BAD_REQUEST
+                  401:    10,     # UNAUTHORIZED
+                  404:    8,      # NOT_FOUND
+                  -1:     2,      # TIMEOUT
+                  503:    9}
 
     def __init__(self, container):
         self._container         = container
@@ -127,25 +123,20 @@ class SFlowManager(object):
                 except IOError:
                     log.exception("Could not open/read hsflowd.auto")
 
-    @contextmanager
-    def sample_transaction(self):
+    @property
+    def should_sample(self):
         """
-        The preferred way of doing a transaction sample.
+        Use this before building your transaction sample/calling transaction, as we may be configured
+        to sample randomly.
 
-        This method lets a potential sampler know if there is going to be a sample occuring so you don't
-        do all this work to build your sample before the transaction method decides it won't sample it.
-
-        To use:
-        with sflow_manager.sample_transaction() as will_sample:
-            if will_sample:
-                # build your sample
-                sflow_manager.transaction(op=stuff, attrs=stuff, ...)
+        if sflow_manager.should_sample:
+            # build params
+            sflow_manager.transaction(app_name=name, op=...)
         """
         sampling_probability = 1.0 / self._trans_sample_rate
-        log.debug("sample_transaction (sampling prob: %f)", sampling_probability)
+        log.debug("should_sample (sampling prob: %f)", sampling_probability)
 
-        will_sample = random() <= sampling_probability
-        yield will_sample
+        return random() <= sampling_probability
 
     def transaction(self, app_name=None,
                           op=None,
