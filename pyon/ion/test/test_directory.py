@@ -16,6 +16,8 @@ class TestDirectory(IonUnitTestCase):
         dsm = DatastoreManager()
         directory = Directory(dsm)
 
+        self.addCleanup(directory.dir_store.delete_datastore)
+
         root = directory.lookup("/")
         self.assert_(root is not None)
 
