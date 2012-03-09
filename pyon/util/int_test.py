@@ -4,6 +4,7 @@
 
 from pyon.container.cc import Container
 from pyon.core.bootstrap import bootstrap_pyon, service_registry
+from pyon.core.exception import BadRequest
 from pyon.datastore.datastore import DatastoreManager
 from pyon.event.event import EventRepository
 from pyon.ion.directory import Directory
@@ -44,8 +45,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         elif db_type == 'COUCH':
             self._turn_on_couchdb()
 
-        # create any DBs necessary - False means don't delete, just create
-        self._force_clean(False)
+        # delete/create any known DBs with names matching our prefix - should be rare
+        self._force_clean(True)
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
@@ -72,7 +73,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
-        self._force_clean()
+        self._force_clean()         # deletes only
 
 
     def _turn_on_queue_auto_delete(self):
@@ -157,7 +158,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _force_clean(self, delete=True):
+    def _force_clean(self, recreate=False):
         from pyon.core.bootstrap import get_sys_name
         from pyon.datastore.datastore import DatastoreManager
         if DatastoreManager.persistent is None:
@@ -170,9 +171,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
         try:
             for thing in things_to_clean:
-                if delete:
-                    datastore.delete_datastore(datastore_name=thing)
-                else:
+                datastore.delete_datastore(datastore_name=thing)
+                if recreate:
                     datastore.create_datastore(datastore_name=thing)
+
         finally:
             datastore.close()
