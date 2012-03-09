@@ -13,8 +13,28 @@ import json
 from socket import socket, AF_INET, SOCK_DGRAM
 import os
 from random import random
+import resource
 
 class SFlowManager(object):
+    """
+    An SFlow emit point.
+
+    This manager exists inside the Container and speaks JSON over UDP to an hsflowd process.
+    It is responsible for two types of samples:
+    - Counter Samples: periodic samples giving system/user CPU time for this process, and memory info
+    - Transaction Samples: logical "operations" in the code, such as a completed RPC request
+
+    To use SFlow in your container, put the following lines in your pyon.local.yml:
+
+    container:
+      sflow:
+        enabled: True
+        hsflowd_addr: localhost                 # wherever hsflowd is running
+        hsflowd_port: 36343
+        hsflowd_auto_file: /etc/hsflowd.auto    # if hsflowd is not localhost, this doesn't matter
+        trans_sample_rate: 1                    # 1 == transaction sample everything!
+
+    """
 
     # map our status (http-based) to a status sFlow understands - as appropriate
     # http://sflow.org/draft_sflow_application.txt
@@ -65,17 +85,20 @@ class SFlowManager(object):
 
             time.sleep(self._counter_interval)
 
+            # get a cpu times sample
+            res = resource.getrusage(resource.RUSAGE_SELF)
+
             # build and send counter structure
             csample = { 'counters_sample': {
                             'app_name': str(self._container.id),
                             'app_resources': {
-                                'user_time': 0,
-                                'system_time': 0,
-                                'mem_used': 0,
-                                'mem_max': 0,
-                                'fd_open': 0,
-                                'fd_max': 0,
-                                'conn_open': 0,
+                                'user_time': int(res.ru_utime * 1000),
+                                'system_time': int(res.ru_stime * 1000),
+                                'mem_used': 0,   # @TODO
+                                'mem_max': res.ru_maxrss * 1024,
+                                'fd_open': 0,   # @TODO do we care?
+                                'fd_max': 0,    # @TODO ""
+                                'conn_open': 0, # @TODO couch/rabbit connection summary somehow
                                 'conn_max': 0
                             }
                         },
