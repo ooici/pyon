@@ -100,6 +100,9 @@ class Container(BaseContainerAgent):
         self._capabilities = []
         self._status = "INIT"
 
+        # protection for when the container itself is used as a Process for clients
+        self.container = self
+
         log.debug("Container initialized, OK.")
 
 
