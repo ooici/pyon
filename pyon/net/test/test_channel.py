@@ -73,13 +73,24 @@ class TestBaseChannel(PyonTestCase):
         self.assertEquals(ch._amq_chan, ac)
 
     def test_on_channel_close(self):
-        # er this just does logging, make the calls anyway for coverage.
         ch = BaseChannel()
         ch._amq_chan = Mock()
         ch._amq_chan.channel_number = 1
 
         ch.on_channel_close(0, 'hi')
-        ch.on_channel_close(1, 'onoes')
+        self.assertIsNone(ch._amq_chan)
+
+    def test_on_channel_closed_with_error_callback(self):
+        ch = BaseChannel()
+        ch._amq_chan = Mock()
+        ch._amq_chan.channel_number = 1
+
+        closemock = Mock()
+        ch.set_closed_error_callback(closemock)
+
+        ch.on_channel_close(1, 'hi')
+
+        closemock.assert_called_once_with(ch, 1, 'hi')
 
     def test_get_channel_id(self):
         ch = BaseChannel()
@@ -469,6 +480,11 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn(sentinel.delivery_tag, ac.basic_reject.call_args[0])
         self.assertIn('requeue', ac.basic_reject.call_args[1])
         self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
+
+    def test_on_channel_close_stops_consuming(self):
+        self.ch._consuming = True
+        self.ch.on_channel_close(0, 'hi')
+        self.assertFalse(self.ch._consuming)
 
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')

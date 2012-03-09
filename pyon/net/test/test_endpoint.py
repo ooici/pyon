@@ -57,7 +57,12 @@ class TestEndpointUnit(PyonTestCase):
         ch.close.assert_called_once_with()
 
     def test_spawn_listener(self):
+        def recv():
+            ar = event.AsyncResult()
+            ar.wait()
+
         ch = Mock(spec=BidirClientChannel)
+        ch.recv.side_effect = recv
         self._endpoint_unit.attach_channel(ch)
 
         self._endpoint_unit.spawn_listener()

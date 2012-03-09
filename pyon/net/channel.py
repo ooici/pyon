@@ -166,18 +166,21 @@ class BaseChannel(object):
         """
         log.debug("BaseChannel.close_impl (%d)", self.get_channel_id())
         if self._amq_chan:
-            self._amq_chan.close()
+
+            # the close destroys self._amq_chan, so keep a ref here
+            amq_chan = self._amq_chan
+            amq_chan.close()
 
             # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
             # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
             # up for Pika here so we don't goof up when reusing a channel number.
-            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Basic.GetEmpty')
-            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, 'Channel.Close')
-            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_deliver')
-            self._amq_chan.callbacks.remove(self._amq_chan.channel_number, '_on_basic_get')
+            amq_chan.callbacks.remove(amq_chan.channel_number, 'Basic.GetEmpty')
+            amq_chan.callbacks.remove(amq_chan.channel_number, 'Channel.Close')
+            amq_chan.callbacks.remove(amq_chan.channel_number, '_on_basic_deliver')
+            amq_chan.callbacks.remove(amq_chan.channel_number, '_on_basic_get')
 
             # uncomment these lines to see the full callback list that Pika maintains
-            #stro = pprint.pformat(self.amq_chan.callbacks._callbacks)
+            #stro = pprint.pformat(callbacks._callbacks)
             #log.error(str(stro))
 
     def on_channel_open(self, amq_chan):
@@ -222,7 +225,11 @@ class BaseChannel(object):
         logmeth = log.debug
         if not (code == 0 or code == 200):
             logmeth = log.error
-        logmeth("BaseChannel.on_channel_close\n\tchannel number: %d\n\tcode: %d\n\ttext: %s", self._amq_chan.channel_number, code, text)
+        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.get_channel_id(), code, text)
+
+        # remove amq_chan so we don't try to use it again
+        # (all?) calls are protected via _ensure_amq_chan, which raise a ChannelError if you try to do anything with it.
+        self._amq_chan = None
 
         # make callback if it exists!
         if not (code == 0 or code == 200) and self._closed_error_callback:
@@ -333,6 +340,10 @@ class RecvChannel(BaseChannel):
         self._setup_listener_called = False
 
         BaseChannel.__init__(self, **kwargs)
+
+    def on_channel_close(self, code, text):
+        BaseChannel.on_channel_close(self, code, text)
+        self._consuming = False
 
     def setup_listener(self, name=None, binding=None):
         """
@@ -617,7 +628,7 @@ class ListenChannel(RecvChannel):
                     - has the initial received message here put onto its recv gqueue
                     - recv() returns messages in its gqueue, endpoint should ack
         """
-        self._ensure_amq_chan()
+#        self._ensure_amq_chan()
         m = self.recv()
         ch = self._create_accepted_channel(self._amq_chan, m)
         ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
