@@ -70,14 +70,14 @@ class LRUCache (object):
             age = LRUCache.currentTimeMicros() - ts
 
             if age > self.maxAge:
-                self.erase(key)
+                self.evict(key)
                 return value
         # we found the key in cache return it
         else:
             self._freshen(key)
             return ret
-        # erase key
-    def erase(self, key):
+        # evict key
+    def evict(self, key):
         if self.has_key(key):
             del self.cache[key]
             ts = self.timeStampTable[key]
