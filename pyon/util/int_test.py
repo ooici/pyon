@@ -43,12 +43,17 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._turn_on_mockdb()
         elif db_type == 'COUCH':
             self._turn_on_couchdb()
+
+        # create any DBs necessary - False means don't delete, just create
+        self._force_clean(False)
+
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
             self._turn_on_couchdb()
             self._turn_off_force_clean()
             from ion.processes.bootstrap.datastore_loader import DatastoreLoader
             DatastoreLoader.load_datastore('res/dd')
+
         # hack to force_clean on filesystem
         try:
             CFG['container']['filesystem']['force_clean']=True
@@ -152,7 +157,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _force_clean(self):
+    def _force_clean(self, delete=True):
         from pyon.core.bootstrap import get_sys_name
         from pyon.datastore.datastore import DatastoreManager
         if DatastoreManager.persistent is None:
@@ -165,7 +170,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
         try:
             for thing in things_to_clean:
-                datastore.delete_datastore(datastore_name=thing)
-                datastore.create_datastore(datastore_name=thing)
+                if delete:
+                    datastore.delete_datastore(datastore_name=thing)
+                else:
+                    datastore.create_datastore(datastore_name=thing)
         finally:
             datastore.close()
