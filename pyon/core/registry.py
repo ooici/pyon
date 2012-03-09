@@ -72,6 +72,16 @@ def get_message_class_out_parm_type(service_name, service_operation, parameter):
     return  get_message_class_parm_type(service_name, service_operation, parameter, 'out')
 
 
+def is_ion_object(_def):
+    try:
+        if _def in model_classes:
+            return True
+        elif _def in message_classes:
+            return True
+    except:
+        pass
+
+    return False
 
 class IonObjectRegistry(object):
     """
@@ -91,6 +101,8 @@ class IonObjectRegistry(object):
         classes = inspect.getmembers(interface.messages, inspect.isclass)
         for name, clzz in classes:
             message_classes[name] = clzz
+
+
 
     def new(self, _def, _dict=None, **kwargs):
         """ See get_def() for definition lookup options. """

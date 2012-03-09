@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 import collections
 import string
 import time
+import simplejson
 
 
 class DotNotationGetItem(object):
@@ -300,3 +301,11 @@ def create_basic_identifier(name):
 
 def is_basic_identifier(name):
     return name == create_basic_identifier(name)
+
+#Used by json encoder
+def ion_object_encoder(obj):
+    return obj.__dict__
+
+def make_json(data):
+    result = simplejson.dumps(data, default=ion_object_encoder, indent=2)
+    return result
