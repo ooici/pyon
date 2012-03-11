@@ -65,7 +65,8 @@ class EventPublisher(Publisher):
 
         event_msg = bootstrap.IonObject(self.event_type, **kwargs)
         event_msg.base_types = event_msg._get_extends()
-        event_msg._validate()
+        # Would like to validate here but blows up if an object is provided where a dict is
+        #event_msg._validate()
 
         return event_msg
 

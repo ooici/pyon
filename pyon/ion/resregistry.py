@@ -12,12 +12,13 @@ from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
+from pyon.event.event import EventPublisher
 from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
 from pyon.util.config import CFG
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
-from interface.objects import Attachment, AttachmentType, ServiceDefinition
+from interface.objects import Attachment, AttachmentType, ServiceDefinition, ResourceModificationType
 
 
 class ResourceRegistry(object):
@@ -33,6 +34,9 @@ class ResourceRegistry(object):
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
         self._init()
+
+        self.event_lc_pub = EventPublisher("ResourceLifecycleEvent")
+        self.event_mod_pub = EventPublisher("ResourceModifiedEvent")
 
     def close(self):
         """
@@ -75,6 +79,9 @@ class ResourceRegistry(object):
             log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
+        self.event_mod_pub.publish_event(origin=res_id, origin_type=object._get_type(),
+                                        mod_type=ResourceModificationType.CREATE)
+
         return res
 
     def _create_mult(self, res_list):
@@ -108,6 +115,9 @@ class ResourceRegistry(object):
                 res_obj.lcstate, object.lcstate))
             object.lcstate = res_obj.lcstate
 
+        self.event_mod_pub.publish_event(origin=object._id, origin_type=object._get_type(),
+                                        mod_type=ResourceModificationType.UPDATE)
+
         return self.rr_store.update(object)
 
     def delete(self, object_id=''):
@@ -121,6 +131,10 @@ class ResourceRegistry(object):
             self.rr_store.delete_association(object_id, PRED.hasOwner, oid)
 
         res = self.rr_store.delete(res_obj)
+
+        self.event_mod_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
+                                        mod_type=ResourceModificationType.UPDATE)
+
         return res
 
     def execute_lifecycle_transition(self, resource_id='', transition_event=''):
@@ -131,7 +145,8 @@ class ResourceRegistry(object):
         if not restype_workflow:
             raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
-        new_state = restype_workflow.get_successor(res_obj.lcstate, transition_event)
+        old_state = res_obj.lcstate
+        new_state = restype_workflow.get_successor(old_state, transition_event)
         if not new_state:
             raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
                 resource_id, restype, res_obj.lcstate, transition_event))
@@ -139,6 +154,10 @@ class ResourceRegistry(object):
         res_obj.lcstate = new_state
         res_obj.ts_updated = get_ion_ts()
         updres = self.rr_store.update(res_obj)
+
+        self.event_lc_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
+                                        old_state=old_state, new_state=new_state, transition_event=transition_event)
+
         return new_state
 
     def set_lifecycle_state(self, resource_id='', target_lcstate=''):
@@ -152,12 +171,16 @@ class ResourceRegistry(object):
             raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
         # Check that target state is allowed
+        old_state = res_obj.lcstate
         if not target_lcstate in restype_workflow.get_successors(res_obj.lcstate).values():
             raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, res_obj.lcstate))
 
         res_obj.lcstate = target_lcstate
         res_obj.ts_updated = get_ion_ts()
         updres = self.rr_store.update(res_obj)
+
+        self.event_lc_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
+                                    old_state=old_state, new_state=target_lcstate)
 
     def create_attachment(self, resource_id='', attachment=None):
         if attachment is None:
