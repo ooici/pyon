@@ -21,20 +21,22 @@ from pyon.util.unit_test import IonUnitTestCase
 
 from interface.objects import Event, ResourceLifecycleEvent
 
-@attr('UNIT')
+@attr('UNIT',group='event')
 class TestEventPublisher(IonUnitTestCase):
 
     def setUp(self):
         self._node = Mock(spec=NodeB)
-        self._pub = EventPublisher(node=self._node)
+        self._pub = EventPublisher(event_type="Event", node=self._node)
 
     def test_init(self):
         self.assertEquals(self._pub._send_name.exchange, "%s.pyon.events" % bootstrap.get_sys_name())
         self.assertEquals(self._pub._send_name.queue, None)
+        self.assertEquals(self._pub.event_type, "Event")
 
-        pub = EventPublisher(node=self._node, xp=sentinel.xp)
+        pub = EventPublisher(event_type="ResourceLifecycleEvent", node=self._node, xp=sentinel.xp)
         self.assertEquals(pub._send_name.exchange, sentinel.xp)
         self.assertEquals(pub._send_name.queue, None)
+        self.assertEquals(pub.event_type, "ResourceLifecycleEvent")
 
     def test__topic_no_origin(self):
         self.assertRaises(AssertionError, self._pub._topic, None)
@@ -42,96 +44,23 @@ class TestEventPublisher(IonUnitTestCase):
     def test__topic(self):
         topic = self._pub._topic(sentinel.origin)
         self.assertIn(str(sentinel.origin), topic)
-        self.assertIn(str(self._pub.event_name), topic)
+        self.assertIn(str(self._pub.event_type), topic)
 
-        self.assertEquals(topic, "%s.%s" % (self._pub.event_name, str(sentinel.origin)))
+        self.assertEquals(topic, "%s.%s" % (self._pub.event_type, str(sentinel.origin)))
 
     def test__topic_new_event_name(self):
-        self._pub.event_name = sentinel.event_name
+        self._pub.event_type = sentinel.event_name
 
         topic2 = self._pub._topic(sentinel.origin2)
         self.assertEquals(topic2, "%s.%s" % (str(sentinel.event_name), str(sentinel.origin2)))
 
-    def test__set_event_msg_fields_no_args(self):
-        msg = Mock()     # Mock has a __dict__ member so this works
-
-        pre_dict = str(msg.__dict__)
-        unused = self._pub._set_event_msg_fields(msg, {})
-
-        self.assertEquals(len(unused), 0)
-        self.assertEquals(str(pre_dict), str(msg.__dict__))
-
-    def test__set_event_msg_fields_args_not_in_msg(self):
-        msg = Mock()
-
-        pre_dict = str(msg.__dict__)
-        unused = self._pub._set_event_msg_fields(msg, {'field': sentinel.value, 'field2': sentinel.value2})
-
-        self.assertEquals(len(unused), 2)
-        self.assertIn('field', unused)
-        self.assertIn('field2', unused)
-
-        self.assertEquals(str(pre_dict), str(msg.__dict__))
-
-    def test__set_event_msg_fields(self):
-        msg = Mock()
-        msg.field = sentinel.old_value
-        msg.field2 = sentinel.old_value2
-        msg.field3 = sentinel.old_value3
-
-        pre_dict = str(msg.__dict__)
-        unused = self._pub._set_event_msg_fields(msg, {'field': sentinel.value, 'field2': sentinel.value2})
-
-        self.assertEquals(len(unused), 0)
-        self.assertNotEquals(str(pre_dict), str(msg.__dict__))
-
-        self.assertEquals(msg.field, sentinel.value)
-        self.assertEquals(msg.field2, sentinel.value2)
-        self.assertEquals(msg.field3, sentinel.old_value3)
-
-    @patch('pyon.event.event.bootstrap')
-    def test_create_event_default_timestamp(self, mockobj):
-        m = Mock()
-        m.ts_created = sentinel.old_ts_created
-        mockobj.IonObject.return_value = m
-
-        ev = self._pub.create_event()
-        mockobj.IonObject.assert_called_once_with(self._pub.msg_type)
-
-        self.assertTrue(hasattr(ev, 'ts_created'))
-        self.assertNotEquals(ev.ts_created, sentinel.old_ts_created)
-        self.assertIsInstance(ev.ts_created, float)
-
-    @patch('pyon.event.event.bootstrap')
-    def test_create_event_with_kwargs(self, mockobj):
-        m = Mock()
-        m.ts_created = sentinel.old_ts_created
-        m.field = sentinel.old_value
-        mockobj.IonObject.return_value = m
-
-        ev = self._pub.create_event(field=sentinel.value)
-        mockobj.IonObject.assert_called_once_with(self._pub.msg_type)
-
-        self.assertEquals(m.field, sentinel.value)
-
-    @patch('pyon.event.event.bootstrap')
-    def test_create_event_unknown_kwargs(self, mockobj):
-        m = Mock()
-        m.ts_created = sentinel.old_ts_created
-        mockobj.IonObject.return_value = m
-
-        with self.assertRaises(EventError) as cm:
-            self._pub.create_event(extra=sentinel.extra)
-
-        self.assertIn('extra', cm.exception.message)
-
     def test_publish_event_no_origin(self):
-        self.assertRaises(AssertionError, self._pub.publish_event, sentinel.event_msg)
+        self.assertRaises(AssertionError, self._pub._publish_event, sentinel.event_msg, None)
 
     def test_publish_event(self):
         self._pub.publish = Mock()
 
-        self._pub.publish_event(sentinel.event_msg, origin=sentinel.origin)
+        self._pub._publish_event(sentinel.event_msg, origin=sentinel.origin)
         self._pub.publish.assert_called_once_with(sentinel.event_msg, to_name=(get_events_exchange_point(), self._pub._topic(sentinel.origin)))
         self._pub.publish().close.assert_called_once_with()
 
@@ -139,21 +68,21 @@ class TestEventPublisher(IonUnitTestCase):
         self._pub.publish = Mock()
         self._pub.event_repo = Mock()
 
-        self._pub.publish_event(sentinel.event_msg, origin=sentinel.origin)
+        self._pub._publish_event(sentinel.event_msg, origin=sentinel.origin)
 
         self._pub.event_repo.put_event.assert_called_once_with(sentinel.event_msg)
 
     def test_create_and_publish_event(self):
-        self._pub.create_event = Mock()
-        self._pub.create_event.return_value = sentinel.event_msg
-        self._pub.publish_event = Mock()
+        self._pub._create_event = Mock()
+        self._pub._create_event.return_value = sentinel.event_msg
+        self._pub._publish_event = Mock()
 
-        self._pub.create_and_publish_event(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
+        self._pub.publish_event(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
 
-        self._pub.create_event.assert_called_once_with(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
-        self._pub.publish_event.assert_called_once_with(sentinel.event_msg, origin=sentinel.origin)
+        self._pub._create_event.assert_called_once_with(origin=sentinel.origin, field=sentinel.value, field2=sentinel.value2)
+        self._pub._publish_event.assert_called_once_with(sentinel.event_msg, origin=sentinel.origin)
 
-@attr('UNIT')
+@attr('UNIT',group='event')
 class TestEventSubscriber(IonUnitTestCase):
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -171,13 +100,13 @@ class TestEventSubscriber(IonUnitTestCase):
         self.assertEquals(sub._recv_name.exchange, sentinel.xp)
         self.assertEquals(sub._recv_name.queue, None)
 
-    def test_init_with_event_name(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, event_name=sentinel.event_name)
-        self.assertEquals(sub._binding, "%s.#" % str(sentinel.event_name))
+    def test_init_with_event_type(self):
+        sub = EventSubscriber(node=self._node, callback=self._cb, event_type=sentinel.event_type)
+        self.assertEquals(sub._binding, "%s.#" % str(sentinel.event_type))
 
     def test_init_with_origin(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, event_name=sentinel.event_name, origin=sentinel.origin)
-        self.assertEquals(sub._binding, "%s.%s" % (str(sentinel.event_name), str(sentinel.origin)))
+        sub = EventSubscriber(node=self._node, callback=self._cb, event_type=sentinel.event_type, origin=sentinel.origin)
+        self.assertEquals(sub._binding, "%s.%s" % (str(sentinel.event_type), str(sentinel.origin)))
 
     def test_init_with_queue_name(self):
         sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=str(sentinel.queue))
@@ -194,23 +123,18 @@ class TestEventSubscriber(IonUnitTestCase):
         self.assertEquals(self._sub._topic(None), "*.#")
 
     def test__topic_with_name(self):
-        self._sub._event_name = "pancakes"
+        self._sub.event_type = "pancakes"
         self.assertEquals(self._sub._topic(None), "pancakes.#")
 
     def test__topic_with_origin(self):
         self.assertEquals(self._sub._topic(sentinel.origin), "*.%s" % str(sentinel.origin))
 
     def test__topic_with_name_and_origin(self):
-        self._sub._event_name = "pancakes"
+        self._sub.event_type = "pancakes"
         self.assertEquals(self._sub._topic(sentinel.origin), "pancakes.%s" % str(sentinel.origin))
 
-@attr('INT')
+@attr('INT',group='event')
 class TestEvents(IonIntegrationTestCase):
-
-    class TestEventPublisher(EventPublisher):
-        event_name = "TESTEVENT"
-    class TestEventSubscriber(EventSubscriber):
-        event_name = "TESTEVENT"
 
     def setUp(self):
         self._listens = []
@@ -235,20 +159,20 @@ class TestEvents(IonIntegrationTestCase):
         ar = event.AsyncResult()
         def cb(*args, **kwargs):
             ar.set(args)
-        sub = self.TestEventSubscriber(node=self.container.node, callback=cb, origin="specific")
-        pub = self.TestEventPublisher(node=self.container.node)
+        sub = EventSubscriber(event_type="ResourceEvent", callback=cb, origin="specific")
+        pub = EventPublisher(event_type="ResourceEvent")
 
         self._listen(sub)
-        pub.create_and_publish_event(origin="specific", description="hello")
+        pub.publish_event(origin="specific", description="hello")
 
         evmsg, evheaders = ar.get(timeout=5)
 
         self.assertEquals(evmsg.description, "hello")
-        self.assertAlmostEquals(evmsg.ts_created, time.time(), delta=5000)
+        self.assertAlmostEquals(int(evmsg.ts_created), int(get_ion_ts()), delta=5000)
 
     def test_pub_with_event_repo(self):
-        pub = self.TestEventPublisher(node=self.container.node, event_repo=self.container.event_repository)
-        pub.create_and_publish_event(origin="specifics", description="hallo")
+        pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)
+        pub.publish_event(origin="specifics", description="hallo")
 
         evs = self.container.event_repository.find_events(origin='specifics')
         self.assertEquals(len(evs), 1)
@@ -264,14 +188,14 @@ class TestEvents(IonIntegrationTestCase):
             if self.count == 3:
                 ar.set()
 
-        sub = self.TestEventSubscriber(node=self.container.node, callback=cb)
-        pub = self.TestEventPublisher(node=self.container.node)
+        sub = EventSubscriber(event_type="ResourceEvent", callback=cb)
+        pub = EventPublisher(event_type="ResourceEvent")
 
         self._listen(sub)
 
-        pub.create_and_publish_event(origin="one", description="1")
-        pub.create_and_publish_event(origin="two", description="2")
-        pub.create_and_publish_event(origin="three", description="3")
+        pub.publish_event(origin="one", description="1")
+        pub.publish_event(origin="two", description="2")
+        pub.publish_event(origin="three", description="3")
 
         ar.get(timeout=5)
 
@@ -295,14 +219,14 @@ class TestEvents(IonIntegrationTestCase):
             if self.count == 2:
                 ar.set()
 
-        sub = EventSubscriber(node=self.container.node, callback=cb)
-        pub1 = self.TestEventPublisher(node=self.container.node)
-        pub2 = EventPublisher(node=self.container.node)
+        sub = EventSubscriber(callback=cb)
+        pub1 = EventPublisher(event_type="ResourceEvent")
+        pub2 = EventPublisher(event_type="ContainerLifecycleEvent")
 
         self._listen(sub)
 
-        pub1.create_and_publish_event(origin="some", description="1")
-        pub2.create_and_publish_event(origin="other", description="2")
+        pub1.publish_event(origin="some", description="1")
+        pub2.publish_event(origin="other", description="2")
 
         ar.get(timeout=5)
 
@@ -321,15 +245,15 @@ class TestEvents(IonIntegrationTestCase):
             self.count += 1
             ar.set(args[0])
 
-        sub = self.TestEventSubscriber(node=self.container.node, origin="specific", callback=cb)
-        pub = self.TestEventPublisher(node=self.container.node)
+        sub = EventSubscriber(event_type="ResourceEvent", origin="specific", callback=cb)
+        pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)
 
         self._listen(sub)
 
-        pub.create_and_publish_event(origin="notspecific", description="1")
-        pub.create_and_publish_event(origin="notspecific", description="2")
-        pub.create_and_publish_event(origin="specific", description="3")
-        pub.create_and_publish_event(origin="notspecific", description="4")
+        pub.publish_event(origin="notspecific", description="1")
+        pub.publish_event(origin="notspecific", description="2")
+        pub.publish_event(origin="specific", description="3")
+        pub.publish_event(origin="notspecific", description="4")
 
         evmsg = ar.get(timeout=5)
         self.assertEquals(self.count, 1)
