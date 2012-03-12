@@ -942,6 +942,10 @@ class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
             actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
             container_id        = context.get('origin-container-id', None)
+            global_conversation_id = context.get('global-conv-id', None)
+
+            if global_conversation_id:
+                header['global-conv-id']  = global_conversation_id
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
@@ -1045,6 +1049,10 @@ class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
             actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
             container_id        = context.get('origin-container-id', None)
+            global_conversation_id  = context.get('global-conv-id', None)
+
+            if global_conversation_id:
+                header['global-conv-id'] = global_conversation_id
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:

@@ -28,7 +28,8 @@ tokens {
 	INT = 'int';
 	STRING = 'string';
 	GLOBAL_ESCAPE = 'GLOBAL_ESCAPE';
-
+	EMPTY = 'EMPTY';
+	ROLES = 'ROLES';
 }
 
 /*------------------------------------------------------------------
@@ -50,13 +51,13 @@ dataTypeDef: StringLiteral ;
 simpleName: ID ;
 
 protocolDef: 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}'
-	     -> ^(PROTOCOL protocolBlockDef+);
+	     -> ^(PROTOCOL roleName  parameterDefs* protocolBlockDef+);
 
 protocolName: ID ;
 
-parameterDefs: '('! parameterDef ( ','! parameterDef )* ')'! ;
+parameterDefs: '(' roleparameDef ( ',' roleparameDef )* ')' -> ^(ROLES roleparameDef+);
 
-parameterDef: ( typeReferenceDef | 'role' ) simpleName ;
+roleparameDef: 'role' simpleName -> simpleName;
 
 protocolBlockDef: activityListDef -> activityListDef;
 
@@ -78,9 +79,12 @@ roleDef: ID -> ID;
 
 roleName: ID -> ID;
 
-typeReferenceDef: ID ->ID ;
+typeReferenceDef: ID ->ID;
+interactionSignatureDef: ((typeReferenceDef ('(' valueDecl (',' valueDecl)* ')')? -> typeReferenceDef ^(VALUE valueDecl*))
+			 | (('(' valueDecl (',' valueDecl)* ')') -> ^(VALUE valueDecl*)));
 
-interactionSignatureDef: (typeReferenceDef ('(' ID ':' primitivetype ')')? -> ^(VALUE ID* primitivetype*) typeReferenceDef);
+valueDecl : ID (':'! primitivetype)?;	 
+firstValueDecl	: valueDecl;
 
 // TODO: add the to roleNames
 interactionDef: 
