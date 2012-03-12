@@ -18,6 +18,7 @@ from pyon.service.service import BaseService
 from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe
 from pyon.util.log import log
 
+from interface.objects import ProcessStateEnum
 
 class ProcManager(object):
     def __init__(self, container):
@@ -377,6 +378,12 @@ class ProcManager(object):
         self.container.directory.register_safe("/Containers/%s/Processes" % self.container.id,
                                                service_instance.id, name=name)
 
+        self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
+                                               origin=service_instance.id, origin_type="ContainerProcess",
+                                               container_id=self.container.id,
+                                               process_type=service_instance._proc_type, process_name=service_instance._proc_name,
+                                               state=ProcessStateEnum.SPAWN)
+
     def terminate_process(self, process_id):
         service_instance = self.procs.get(process_id, None)
         if not service_instance:
@@ -409,3 +416,9 @@ class ProcManager(object):
 
         elif service_instance._proc_type == "agent":
             self.container.directory.unregister_safe("/Agents", service_instance.id)
+
+        self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
+                                            origin=service_instance.id, origin_type="ContainerProcess",
+                                            container_id=self.container.id,
+                                            process_type=service_instance._proc_type, process_name=service_instance._proc_name,
+                                            state=ProcessStateEnum.TERMINATE)

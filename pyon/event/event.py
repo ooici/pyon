@@ -29,7 +29,7 @@ class EventError(IonException):
 
 class EventPublisher(Publisher):
 
-    def __init__(self, event_type, xp=None, **kwargs):
+    def __init__(self, event_type=None, xp=None, **kwargs):
         """
         Constructs a publisher of events for a specific type.
 
@@ -50,30 +50,32 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, to_name=name, **kwargs)
 
-    def _topic(self, origin):
+    def _topic(self, event_type, origin):
         """
         Builds the topic that this event should be published to.
         """
-        assert self.event_type and origin
-        return "%s.%s" % (str(self.event_type), str(origin))
+        assert event_type and origin
+        return "%s.%s" % (event_type, origin)
 
-    def _create_event(self, **kwargs):
-        assert self.event_type
+    def _create_event(self, event_type=None, **kwargs):
+        event_type = event_type or self.event_type
+        assert event_type
 
         if 'ts_created' not in kwargs:
             kwargs['ts_created'] = get_ion_ts()
 
-        event_msg = bootstrap.IonObject(self.event_type, **kwargs)
+        event_msg = bootstrap.IonObject(event_type, **kwargs)
         event_msg.base_types = event_msg._get_extends()
-        # Would like to validate here but blows up if an object is provided where a dict is
+        # Would like to validate here but blows up if an object is provided where a dict is declared
         #event_msg._validate()
 
         return event_msg
 
-    def _publish_event(self, event_msg, origin, **kwargs):
-        assert origin
+    def _publish_event(self, event_msg, origin, event_type=None, **kwargs):
+        event_type = event_type or self.event_type
+        assert origin and event_type
 
-        to_name = (self._send_name.exchange, self._topic(origin))
+        to_name = (self._send_name.exchange, self._topic(event_type, origin))
         log.debug("Publishing event message to %s", to_name)
 
         ep = self.publish(event_msg, to_name=to_name)
@@ -83,9 +85,9 @@ class EventPublisher(Publisher):
         if self.event_repo:
             self.event_repo.put_event(event_msg)
 
-    def publish_event(self, origin=None, **kwargs):
-        event_msg = self._create_event(origin=origin, **kwargs)
-        self._publish_event(event_msg, origin=origin)
+    def publish_event(self, origin=None, event_type=None, **kwargs):
+        event_msg = self._create_event(origin=origin, event_type=event_type, **kwargs)
+        self._publish_event(event_msg, origin=origin, event_type=event_type)
 
 
 class EventSubscriber(Subscriber):
