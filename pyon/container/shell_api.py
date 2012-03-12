@@ -242,7 +242,7 @@ def define_vars():
     if public_vars: return public_vars
     cc = container
     proc, pn = get_proc()
-
+    govc = cc.instance.governance_controller
     return locals()
 
 def get_shell_api(cc):

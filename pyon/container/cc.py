@@ -88,7 +88,7 @@ class Container(BaseContainerAgent):
         self.file_system = FileSystem(CFG)
 
         # Governance Controller - manages the governance related interceptors
-        self.governance_controller = GovernanceController()
+        self.governance_controller = GovernanceController(self)
 
         # Coordinates the container start
         self._is_started = False
