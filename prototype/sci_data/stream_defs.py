@@ -75,6 +75,50 @@ def SBE37_CDM_stream_definition():
 
     return sdc.close_structure()
 
+def USGS_stream_definition():
+
+    sdc = StreamDefinitionConstructor(
+        description='CONNECTICUT RIVER AT THOMPSONVILLE CT (01184000) - Daily Value',
+        nil_value=-9999.99,
+        encoding='hdf5'
+    )
+
+
+    sdc.define_temporal_coordinates(
+        reference_frame='http://www.opengis.net/def/trs/OGC/0/GPS',
+        definition='http://www.opengis.net/def/property/OGC/0/SamplingTime',
+        reference_time='1970-01-01T00:00:00Z',
+        unit_code='s'
+    )
+
+    sdc.define_geospatial_coordinates(
+        definition="http://www.opengis.net/def/property/OGC/0/PlatformLocation",
+        reference_frame='urn:ogc:def:crs:EPSG::4326'
+
+    )
+
+    sdc.define_coverage(
+        field_name='water_height',
+        field_definition="urn:x-ogc:def:phenomenon:OGC:water_height", # Copied from SSDS
+        field_units_code='ft_us'
+    )
+
+    sdc.define_coverage(
+        field_name = 'water_temperature',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:water_temperature", # Copied from SSDS
+        field_units_code = 'Cel'
+    )
+
+
+    sdc.define_coverage(
+        field_name = 'streamflow',
+        field_definition = "urn:x-ogc:def:phenomenon:OGC:streamflow", # Copied from SSDS
+        field_units_code = 'cft_i/s'
+    )
+
+
+    return sdc.close_structure()
+
 # Keep the old method operational...
 def ctd_stream_definition(stream_id = None):
 
