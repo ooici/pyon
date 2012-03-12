@@ -78,17 +78,37 @@ class EventPublisher(Publisher):
         to_name = (self._send_name.exchange, self._topic(event_type, origin))
         log.debug("Publishing event message to %s", to_name)
 
-        ep = self.publish(event_msg, to_name=to_name)
-        ep.close()
+        try:
+            ep = self.publish(event_msg, to_name=to_name)
+            ep.close()
+        except Exception as ex:
+            log.exception("Failed to publish event '%s'" % (event_msg))
+            return False
 
-        # store published event but only if we specified an event_repo
-        if self.event_repo:
-            self.event_repo.put_event(event_msg)
+        try:
+            # store published event but only if we specified an event_repo
+            if self.event_repo:
+                self.event_repo.put_event(event_msg)
+        except Exception as ex:
+            log.exception("Failed to store published event '%s'" % (event_msg))
+            return False
+
+        return True
 
     def publish_event(self, origin=None, event_type=None, **kwargs):
+        """
+        Publishes an event of given type for the given origin. Event_type defaults to an
+        event_type set when initializing the EventPublisher. Other kwargs fill out the fields
+        of the event. This operation will log any errors occuring during event creation,
+        but will not fail with an exception.
+        @param origin     the origin field value
+        @param event_type the event type (defaults to the EventPublisher's event_typeif set)
+        @param kwargs     additional event fields
+        @retval  Boolean indicating success of this operation
+        """
         event_msg = self._create_event(origin=origin, event_type=event_type, **kwargs)
-        self._publish_event(event_msg, origin=origin, event_type=event_type)
-
+        success = self._publish_event(event_msg, origin=origin, event_type=event_type)
+        return success
 
 class EventSubscriber(Subscriber):
 
