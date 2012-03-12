@@ -1,15 +1,15 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 src/SavedFSM/BuildFSM.g 2012-03-11 20:00:23
+# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 src/SavedFSM/BuildFSM.g 2012-03-12 22:19:58
 
 import sys
 from antlr3 import *
 from antlr3.tree import *
 from antlr3.compat import set, frozenset
         
-from core.fsm import FSM
-from core.fsm import ExceptionFSM
-from core.transition import TransitionFactory
-from core.LocalType import LocalType
-from extensions.SimpleLogic import *
+from pyon.core.governance.conversation.core.fsm import FSM
+from pyon.core.governance.conversation.core.fsm import ExceptionFSM
+from pyon.core.governance.conversation.core.transition import TransitionFactory
+from pyon.core.governance.conversation.core.local_type import LocalType
+from pyon.core.governance.conversation.extensions.simple_logic import *
 
 def checkMessages(fsm):
 	print "Message is checked: %s" %(fsm.input_symbol)

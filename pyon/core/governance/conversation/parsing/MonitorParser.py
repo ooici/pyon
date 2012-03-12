@@ -1,4 +1,4 @@
-# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 src/SavedFSM/Monitor.g 2012-02-23 17:37:18
+# $ANTLR 3.1.3 Mar 18, 2009 10:09:25 src/SavedFSM/Monitor.g 2012-03-12 22:09:37
 
 import sys
 from antlr3 import *
@@ -13,19 +13,21 @@ HIDDEN = BaseRecognizer.HIDDEN
 
 # token types
 RESV=12
-ANNOTATION=24
-ASSERTION=27
+ANNOTATION=25
+ASSERTION=28
 PARALLEL=19
-ID=25
+ID=26
+T__61=61
 EOF=-1
 T__60=60
 PROTOCOL=20
 TYPE=14
 T__55=55
-ML_COMMENT=31
+ML_COMMENT=32
 T__56=56
 INTERACTION=4
 T__57=57
+ROLES=24
 T__58=58
 T__51=51
 T__52=52
@@ -35,7 +37,7 @@ T__59=59
 FULLSTOP=11
 PLUS=7
 SEND=13
-DIGIT=29
+DIGIT=30
 T__50=50
 T__42=42
 T__43=43
@@ -45,12 +47,12 @@ T__46=46
 T__47=47
 T__44=44
 T__45=45
-LINE_COMMENT=32
+LINE_COMMENT=33
 T__48=48
 T__49=49
 RECLABEL=18
-NUMBER=28
-WHITESPACE=30
+NUMBER=29
+WHITESPACE=31
 INT=5
 MINUS=8
 MULT=9
@@ -58,8 +60,7 @@ VALUE=15
 ASSERT=21
 UNORDERED=17
 EMPTY=23
-StringLiteral=26
-T__33=33
+StringLiteral=27
 GLOBAL_ESCAPE=22
 T__34=34
 T__35=35
@@ -76,12 +77,13 @@ tokenNames = [
     "<invalid>", "<EOR>", "<DOWN>", "<UP>", 
     "INTERACTION", "INT", "STRING", "PLUS", "MINUS", "MULT", "DIV", "FULLSTOP", 
     "RESV", "SEND", "TYPE", "VALUE", "BRANCH", "UNORDERED", "RECLABEL", 
-    "PARALLEL", "PROTOCOL", "ASSERT", "GLOBAL_ESCAPE", "EMPTY", "ANNOTATION", 
-    "ID", "StringLiteral", "ASSERTION", "NUMBER", "DIGIT", "WHITESPACE", 
-    "ML_COMMENT", "LINE_COMMENT", "'import'", "'protocol'", "','", "';'", 
-    "'from'", "'as'", "'at'", "'{'", "'}'", "'('", "')'", "'role'", "'introduces'", 
-    "':'", "'to'", "'choice'", "'or'", "'repeat'", "'rec'", "'end'", "'run'", 
-    "'inline'", "'parallel'", "'and'", "'do'", "'interrupt'", "'by'", "'unordered'"
+    "PARALLEL", "PROTOCOL", "ASSERT", "GLOBAL_ESCAPE", "EMPTY", "ROLES", 
+    "ANNOTATION", "ID", "StringLiteral", "ASSERTION", "NUMBER", "DIGIT", 
+    "WHITESPACE", "ML_COMMENT", "LINE_COMMENT", "'import'", "'protocol'", 
+    "','", "';'", "'from'", "'as'", "'at'", "'{'", "'}'", "'('", "')'", 
+    "'role'", "'introduces'", "':'", "'to'", "'choice'", "'or'", "'repeat'", 
+    "'rec'", "'end'", "'run'", "'inline'", "'parallel'", "'and'", "'do'", 
+    "'interrupt'", "'by'", "'unordered'"
 ]
 
 
@@ -110,26 +112,26 @@ class MonitorParser(Parser):
             transition = self.DFA3_transition
             )
 
-        self.dfa18 = self.DFA18(
-            self, 18,
-            eot = self.DFA18_eot,
-            eof = self.DFA18_eof,
-            min = self.DFA18_min,
-            max = self.DFA18_max,
-            accept = self.DFA18_accept,
-            special = self.DFA18_special,
-            transition = self.DFA18_transition
+        self.dfa17 = self.DFA17(
+            self, 17,
+            eot = self.DFA17_eot,
+            eof = self.DFA17_eof,
+            min = self.DFA17_min,
+            max = self.DFA17_max,
+            accept = self.DFA17_accept,
+            special = self.DFA17_special,
+            transition = self.DFA17_transition
             )
 
-        self.dfa36 = self.DFA36(
-            self, 36,
-            eot = self.DFA36_eot,
-            eof = self.DFA36_eof,
-            min = self.DFA36_min,
-            max = self.DFA36_max,
-            accept = self.DFA36_accept,
-            special = self.DFA36_special,
-            transition = self.DFA36_transition
+        self.dfa35 = self.DFA35(
+            self, 35,
+            eot = self.DFA35_eot,
+            eof = self.DFA35_eof,
+            min = self.DFA35_min,
+            max = self.DFA35_max,
+            accept = self.DFA35_accept,
+            special = self.DFA35_special,
+            transition = self.DFA35_transition
             )
 
 
@@ -209,7 +211,7 @@ class MonitorParser(Parser):
                             if alt1 == 1:
                                 # src/SavedFSM/Monitor.g:39:18: ANNOTATION
                                 pass 
-                                ANNOTATION1=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_description234) 
+                                ANNOTATION1=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_description241) 
                                 if self._state.backtracking == 0:
                                     stream_ANNOTATION.add(ANNOTATION1)
 
@@ -220,10 +222,10 @@ class MonitorParser(Parser):
                         alt2 = 2
                         LA2_0 = self.input.LA(1)
 
-                        if (LA2_0 == 33) :
+                        if (LA2_0 == 34) :
                             LA2_1 = self.input.LA(2)
 
-                            if (LA2_1 == 34) :
+                            if (LA2_1 == 35) :
                                 alt2 = 1
                             elif ((ID <= LA2_1 <= StringLiteral)) :
                                 alt2 = 2
@@ -246,7 +248,7 @@ class MonitorParser(Parser):
                         if alt2 == 1:
                             # src/SavedFSM/Monitor.g:39:34: importProtocolStatement
                             pass 
-                            self._state.following.append(self.FOLLOW_importProtocolStatement_in_description241)
+                            self._state.following.append(self.FOLLOW_importProtocolStatement_in_description248)
                             importProtocolStatement2 = self.importProtocolStatement()
 
                             self._state.following.pop()
@@ -257,7 +259,7 @@ class MonitorParser(Parser):
                         elif alt2 == 2:
                             # src/SavedFSM/Monitor.g:39:60: importTypeStatement
                             pass 
-                            self._state.following.append(self.FOLLOW_importTypeStatement_in_description245)
+                            self._state.following.append(self.FOLLOW_importTypeStatement_in_description252)
                             importTypeStatement3 = self.importTypeStatement()
 
                             self._state.following.pop()
@@ -282,14 +284,14 @@ class MonitorParser(Parser):
                     if alt4 == 1:
                         # src/SavedFSM/Monitor.g:39:87: ANNOTATION
                         pass 
-                        ANNOTATION4=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_description254) 
+                        ANNOTATION4=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_description261) 
                         if self._state.backtracking == 0:
                             stream_ANNOTATION.add(ANNOTATION4)
 
 
                     else:
                         break #loop4
-                self._state.following.append(self.FOLLOW_protocolDef_in_description259)
+                self._state.following.append(self.FOLLOW_protocolDef_in_description266)
                 protocolDef5 = self.protocolDef()
 
                 self._state.following.pop()
@@ -381,19 +383,19 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                string_literal6=self.match(self.input, 33, self.FOLLOW_33_in_importProtocolStatement270)
+                string_literal6=self.match(self.input, 34, self.FOLLOW_34_in_importProtocolStatement277)
                 if self._state.backtracking == 0:
 
                     string_literal6_tree = self._adaptor.createWithPayload(string_literal6)
                     self._adaptor.addChild(root_0, string_literal6_tree)
 
-                string_literal7=self.match(self.input, 34, self.FOLLOW_34_in_importProtocolStatement272)
+                string_literal7=self.match(self.input, 35, self.FOLLOW_35_in_importProtocolStatement279)
                 if self._state.backtracking == 0:
 
                     string_literal7_tree = self._adaptor.createWithPayload(string_literal7)
                     self._adaptor.addChild(root_0, string_literal7_tree)
 
-                self._state.following.append(self.FOLLOW_importProtocolDef_in_importProtocolStatement274)
+                self._state.following.append(self.FOLLOW_importProtocolDef_in_importProtocolStatement281)
                 importProtocolDef8 = self.importProtocolDef()
 
                 self._state.following.pop()
@@ -404,15 +406,15 @@ class MonitorParser(Parser):
                     alt5 = 2
                     LA5_0 = self.input.LA(1)
 
-                    if (LA5_0 == 35) :
+                    if (LA5_0 == 36) :
                         alt5 = 1
 
 
                     if alt5 == 1:
                         # src/SavedFSM/Monitor.g:41:66: ',' importProtocolDef
                         pass 
-                        char_literal9=self.match(self.input, 35, self.FOLLOW_35_in_importProtocolStatement278)
-                        self._state.following.append(self.FOLLOW_importProtocolDef_in_importProtocolStatement281)
+                        char_literal9=self.match(self.input, 36, self.FOLLOW_36_in_importProtocolStatement285)
+                        self._state.following.append(self.FOLLOW_importProtocolDef_in_importProtocolStatement288)
                         importProtocolDef10 = self.importProtocolDef()
 
                         self._state.following.pop()
@@ -422,7 +424,7 @@ class MonitorParser(Parser):
 
                     else:
                         break #loop5
-                char_literal11=self.match(self.input, 36, self.FOLLOW_36_in_importProtocolStatement286)
+                char_literal11=self.match(self.input, 37, self.FOLLOW_37_in_importProtocolStatement293)
 
 
 
@@ -478,14 +480,14 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID12=self.match(self.input, ID, self.FOLLOW_ID_in_importProtocolDef295)
+                ID12=self.match(self.input, ID, self.FOLLOW_ID_in_importProtocolDef302)
                 if self._state.backtracking == 0:
 
                     ID12_tree = self._adaptor.createWithPayload(ID12)
                     self._adaptor.addChild(root_0, ID12_tree)
 
-                string_literal13=self.match(self.input, 37, self.FOLLOW_37_in_importProtocolDef297)
-                StringLiteral14=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_importProtocolDef300)
+                string_literal13=self.match(self.input, 38, self.FOLLOW_38_in_importProtocolDef304)
+                StringLiteral14=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_importProtocolDef307)
                 if self._state.backtracking == 0:
 
                     StringLiteral14_tree = self._adaptor.createWithPayload(StringLiteral14)
@@ -556,7 +558,7 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                string_literal15=self.match(self.input, 33, self.FOLLOW_33_in_importTypeStatement313)
+                string_literal15=self.match(self.input, 34, self.FOLLOW_34_in_importTypeStatement320)
                 if self._state.backtracking == 0:
 
                     string_literal15_tree = self._adaptor.createWithPayload(string_literal15)
@@ -574,7 +576,7 @@ class MonitorParser(Parser):
                 if alt6 == 1:
                     # src/SavedFSM/Monitor.g:45:33: simpleName
                     pass 
-                    self._state.following.append(self.FOLLOW_simpleName_in_importTypeStatement317)
+                    self._state.following.append(self.FOLLOW_simpleName_in_importTypeStatement324)
                     simpleName16 = self.simpleName()
 
                     self._state.following.pop()
@@ -583,7 +585,7 @@ class MonitorParser(Parser):
 
 
 
-                self._state.following.append(self.FOLLOW_importTypeDef_in_importTypeStatement322)
+                self._state.following.append(self.FOLLOW_importTypeDef_in_importTypeStatement329)
                 importTypeDef17 = self.importTypeDef()
 
                 self._state.following.pop()
@@ -594,15 +596,15 @@ class MonitorParser(Parser):
                     alt7 = 2
                     LA7_0 = self.input.LA(1)
 
-                    if (LA7_0 == 35) :
+                    if (LA7_0 == 36) :
                         alt7 = 1
 
 
                     if alt7 == 1:
                         # src/SavedFSM/Monitor.g:45:63: ',' importTypeDef
                         pass 
-                        char_literal18=self.match(self.input, 35, self.FOLLOW_35_in_importTypeStatement326)
-                        self._state.following.append(self.FOLLOW_importTypeDef_in_importTypeStatement329)
+                        char_literal18=self.match(self.input, 36, self.FOLLOW_36_in_importTypeStatement333)
+                        self._state.following.append(self.FOLLOW_importTypeDef_in_importTypeStatement336)
                         importTypeDef19 = self.importTypeDef()
 
                         self._state.following.pop()
@@ -616,13 +618,13 @@ class MonitorParser(Parser):
                 alt8 = 2
                 LA8_0 = self.input.LA(1)
 
-                if (LA8_0 == 37) :
+                if (LA8_0 == 38) :
                     alt8 = 1
                 if alt8 == 1:
                     # src/SavedFSM/Monitor.g:45:87: 'from' StringLiteral
                     pass 
-                    string_literal20=self.match(self.input, 37, self.FOLLOW_37_in_importTypeStatement336)
-                    StringLiteral21=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_importTypeStatement339)
+                    string_literal20=self.match(self.input, 38, self.FOLLOW_38_in_importTypeStatement343)
+                    StringLiteral21=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_importTypeStatement346)
                     if self._state.backtracking == 0:
 
                         StringLiteral21_tree = self._adaptor.createWithPayload(StringLiteral21)
@@ -631,7 +633,7 @@ class MonitorParser(Parser):
 
 
 
-                char_literal22=self.match(self.input, 36, self.FOLLOW_36_in_importTypeStatement344)
+                char_literal22=self.match(self.input, 37, self.FOLLOW_37_in_importTypeStatement351)
 
 
 
@@ -696,17 +698,17 @@ class MonitorParser(Parser):
                 if alt9 == 1:
                     # src/SavedFSM/Monitor.g:47:18: dataTypeDef 'as'
                     pass 
-                    self._state.following.append(self.FOLLOW_dataTypeDef_in_importTypeDef355)
+                    self._state.following.append(self.FOLLOW_dataTypeDef_in_importTypeDef362)
                     dataTypeDef23 = self.dataTypeDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
                         self._adaptor.addChild(root_0, dataTypeDef23.tree)
-                    string_literal24=self.match(self.input, 38, self.FOLLOW_38_in_importTypeDef357)
+                    string_literal24=self.match(self.input, 39, self.FOLLOW_39_in_importTypeDef364)
 
 
 
-                ID25=self.match(self.input, ID, self.FOLLOW_ID_in_importTypeDef363)
+                ID25=self.match(self.input, ID, self.FOLLOW_ID_in_importTypeDef370)
                 if self._state.backtracking == 0:
 
                     ID25_tree = self._adaptor.createWithPayload(ID25)
@@ -763,7 +765,7 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                StringLiteral26=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_dataTypeDef371)
+                StringLiteral26=self.match(self.input, StringLiteral, self.FOLLOW_StringLiteral_in_dataTypeDef378)
                 if self._state.backtracking == 0:
 
                     StringLiteral26_tree = self._adaptor.createWithPayload(StringLiteral26)
@@ -820,7 +822,7 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID27=self.match(self.input, ID, self.FOLLOW_ID_in_simpleName379)
+                ID27=self.match(self.input, ID, self.FOLLOW_ID_in_simpleName386)
                 if self._state.backtracking == 0:
 
                     ID27_tree = self._adaptor.createWithPayload(ID27)
@@ -858,7 +860,7 @@ class MonitorParser(Parser):
 
 
     # $ANTLR start "protocolDef"
-    # src/SavedFSM/Monitor.g:53:1: protocolDef : 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}' -> ^( PROTOCOL ( protocolBlockDef )+ ) ;
+    # src/SavedFSM/Monitor.g:53:1: protocolDef : 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}' -> ^( PROTOCOL roleName ( parameterDefs )* ( protocolBlockDef )+ ) ;
     def protocolDef(self, ):
 
         retval = self.protocolDef_return()
@@ -887,11 +889,11 @@ class MonitorParser(Parser):
         char_literal33_tree = None
         ANNOTATION35_tree = None
         char_literal37_tree = None
+        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
         stream_41 = RewriteRuleTokenStream(self._adaptor, "token 41")
         stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
-        stream_34 = RewriteRuleTokenStream(self._adaptor, "token 34")
+        stream_35 = RewriteRuleTokenStream(self._adaptor, "token 35")
         stream_ANNOTATION = RewriteRuleTokenStream(self._adaptor, "token ANNOTATION")
-        stream_39 = RewriteRuleTokenStream(self._adaptor, "token 39")
         stream_parameterDefs = RewriteRuleSubtreeStream(self._adaptor, "rule parameterDefs")
         stream_protocolDef = RewriteRuleSubtreeStream(self._adaptor, "rule protocolDef")
         stream_protocolName = RewriteRuleSubtreeStream(self._adaptor, "rule protocolName")
@@ -899,13 +901,13 @@ class MonitorParser(Parser):
         stream_roleName = RewriteRuleSubtreeStream(self._adaptor, "rule roleName")
         try:
             try:
-                # src/SavedFSM/Monitor.g:53:12: ( 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}' -> ^( PROTOCOL ( protocolBlockDef )+ ) )
+                # src/SavedFSM/Monitor.g:53:12: ( 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}' -> ^( PROTOCOL roleName ( parameterDefs )* ( protocolBlockDef )+ ) )
                 # src/SavedFSM/Monitor.g:53:14: 'protocol' protocolName ( 'at' roleName )? ( parameterDefs )? '{' protocolBlockDef ( ( ANNOTATION )* protocolDef )* '}'
                 pass 
-                string_literal28=self.match(self.input, 34, self.FOLLOW_34_in_protocolDef387) 
+                string_literal28=self.match(self.input, 35, self.FOLLOW_35_in_protocolDef394) 
                 if self._state.backtracking == 0:
-                    stream_34.add(string_literal28)
-                self._state.following.append(self.FOLLOW_protocolName_in_protocolDef389)
+                    stream_35.add(string_literal28)
+                self._state.following.append(self.FOLLOW_protocolName_in_protocolDef396)
                 protocolName29 = self.protocolName()
 
                 self._state.following.pop()
@@ -915,15 +917,15 @@ class MonitorParser(Parser):
                 alt10 = 2
                 LA10_0 = self.input.LA(1)
 
-                if (LA10_0 == 39) :
+                if (LA10_0 == 40) :
                     alt10 = 1
                 if alt10 == 1:
                     # src/SavedFSM/Monitor.g:53:40: 'at' roleName
                     pass 
-                    string_literal30=self.match(self.input, 39, self.FOLLOW_39_in_protocolDef393) 
+                    string_literal30=self.match(self.input, 40, self.FOLLOW_40_in_protocolDef400) 
                     if self._state.backtracking == 0:
-                        stream_39.add(string_literal30)
-                    self._state.following.append(self.FOLLOW_roleName_in_protocolDef395)
+                        stream_40.add(string_literal30)
+                    self._state.following.append(self.FOLLOW_roleName_in_protocolDef402)
                     roleName31 = self.roleName()
 
                     self._state.following.pop()
@@ -936,12 +938,12 @@ class MonitorParser(Parser):
                 alt11 = 2
                 LA11_0 = self.input.LA(1)
 
-                if (LA11_0 == 42) :
+                if (LA11_0 == 43) :
                     alt11 = 1
                 if alt11 == 1:
                     # src/SavedFSM/Monitor.g:53:59: parameterDefs
                     pass 
-                    self._state.following.append(self.FOLLOW_parameterDefs_in_protocolDef402)
+                    self._state.following.append(self.FOLLOW_parameterDefs_in_protocolDef409)
                     parameterDefs32 = self.parameterDefs()
 
                     self._state.following.pop()
@@ -950,10 +952,10 @@ class MonitorParser(Parser):
 
 
 
-                char_literal33=self.match(self.input, 40, self.FOLLOW_40_in_protocolDef407) 
+                char_literal33=self.match(self.input, 41, self.FOLLOW_41_in_protocolDef414) 
                 if self._state.backtracking == 0:
-                    stream_40.add(char_literal33)
-                self._state.following.append(self.FOLLOW_protocolBlockDef_in_protocolDef409)
+                    stream_41.add(char_literal33)
+                self._state.following.append(self.FOLLOW_protocolBlockDef_in_protocolDef416)
                 protocolBlockDef34 = self.protocolBlockDef()
 
                 self._state.following.pop()
@@ -964,7 +966,7 @@ class MonitorParser(Parser):
                     alt13 = 2
                     LA13_0 = self.input.LA(1)
 
-                    if (LA13_0 == ANNOTATION or LA13_0 == 34) :
+                    if (LA13_0 == ANNOTATION or LA13_0 == 35) :
                         alt13 = 1
 
 
@@ -983,14 +985,14 @@ class MonitorParser(Parser):
                             if alt12 == 1:
                                 # src/SavedFSM/Monitor.g:53:101: ANNOTATION
                                 pass 
-                                ANNOTATION35=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_protocolDef415) 
+                                ANNOTATION35=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_protocolDef422) 
                                 if self._state.backtracking == 0:
                                     stream_ANNOTATION.add(ANNOTATION35)
 
 
                             else:
                                 break #loop12
-                        self._state.following.append(self.FOLLOW_protocolDef_in_protocolDef420)
+                        self._state.following.append(self.FOLLOW_protocolDef_in_protocolDef427)
                         protocolDef36 = self.protocolDef()
 
                         self._state.following.pop()
@@ -1000,12 +1002,12 @@ class MonitorParser(Parser):
 
                     else:
                         break #loop13
-                char_literal37=self.match(self.input, 41, self.FOLLOW_41_in_protocolDef425) 
+                char_literal37=self.match(self.input, 42, self.FOLLOW_42_in_protocolDef432) 
                 if self._state.backtracking == 0:
-                    stream_41.add(char_literal37)
+                    stream_42.add(char_literal37)
 
                 # AST Rewrite
-                # elements: protocolBlockDef
+                # elements: parameterDefs, roleName, protocolBlockDef
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -1022,12 +1024,19 @@ class MonitorParser(Parser):
 
 
                     root_0 = self._adaptor.nil()
-                    # 54:7: -> ^( PROTOCOL ( protocolBlockDef )+ )
-                    # src/SavedFSM/Monitor.g:54:10: ^( PROTOCOL ( protocolBlockDef )+ )
+                    # 54:7: -> ^( PROTOCOL roleName ( parameterDefs )* ( protocolBlockDef )+ )
+                    # src/SavedFSM/Monitor.g:54:10: ^( PROTOCOL roleName ( parameterDefs )* ( protocolBlockDef )+ )
                     root_1 = self._adaptor.nil()
                     root_1 = self._adaptor.becomeRoot(self._adaptor.createFromType(PROTOCOL, "PROTOCOL"), root_1)
 
-                    # src/SavedFSM/Monitor.g:54:21: ( protocolBlockDef )+
+                    self._adaptor.addChild(root_1, stream_roleName.nextTree())
+                    # src/SavedFSM/Monitor.g:54:31: ( parameterDefs )*
+                    while stream_parameterDefs.hasNext():
+                        self._adaptor.addChild(root_1, stream_parameterDefs.nextTree())
+
+
+                    stream_parameterDefs.reset();
+                    # src/SavedFSM/Monitor.g:54:46: ( protocolBlockDef )+
                     if not (stream_protocolBlockDef.hasNext()):
                         raise RewriteEarlyExitException()
 
@@ -1093,7 +1102,7 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID38=self.match(self.input, ID, self.FOLLOW_ID_in_protocolName447)
+                ID38=self.match(self.input, ID, self.FOLLOW_ID_in_protocolName460)
                 if self._state.backtracking == 0:
 
                     ID38_tree = self._adaptor.createWithPayload(ID38)
@@ -1131,7 +1140,7 @@ class MonitorParser(Parser):
 
 
     # $ANTLR start "parameterDefs"
-    # src/SavedFSM/Monitor.g:58:1: parameterDefs : '(' parameterDef ( ',' parameterDef )* ')' ;
+    # src/SavedFSM/Monitor.g:58:1: parameterDefs : '(' roleparameDef ( ',' roleparameDef )* ')' -> ^( ROLES ( roleparameDef )+ ) ;
     def parameterDefs(self, ):
 
         retval = self.parameterDefs_return()
@@ -1142,53 +1151,99 @@ class MonitorParser(Parser):
         char_literal39 = None
         char_literal41 = None
         char_literal43 = None
-        parameterDef40 = None
+        roleparameDef40 = None
 
-        parameterDef42 = None
+        roleparameDef42 = None
 
 
         char_literal39_tree = None
         char_literal41_tree = None
         char_literal43_tree = None
-
+        stream_43 = RewriteRuleTokenStream(self._adaptor, "token 43")
+        stream_44 = RewriteRuleTokenStream(self._adaptor, "token 44")
+        stream_36 = RewriteRuleTokenStream(self._adaptor, "token 36")
+        stream_roleparameDef = RewriteRuleSubtreeStream(self._adaptor, "rule roleparameDef")
         try:
             try:
-                # src/SavedFSM/Monitor.g:58:14: ( '(' parameterDef ( ',' parameterDef )* ')' )
-                # src/SavedFSM/Monitor.g:58:16: '(' parameterDef ( ',' parameterDef )* ')'
+                # src/SavedFSM/Monitor.g:58:14: ( '(' roleparameDef ( ',' roleparameDef )* ')' -> ^( ROLES ( roleparameDef )+ ) )
+                # src/SavedFSM/Monitor.g:58:16: '(' roleparameDef ( ',' roleparameDef )* ')'
                 pass 
-                root_0 = self._adaptor.nil()
-
-                char_literal39=self.match(self.input, 42, self.FOLLOW_42_in_parameterDefs455)
-                self._state.following.append(self.FOLLOW_parameterDef_in_parameterDefs458)
-                parameterDef40 = self.parameterDef()
+                char_literal39=self.match(self.input, 43, self.FOLLOW_43_in_parameterDefs468) 
+                if self._state.backtracking == 0:
+                    stream_43.add(char_literal39)
+                self._state.following.append(self.FOLLOW_roleparameDef_in_parameterDefs470)
+                roleparameDef40 = self.roleparameDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, parameterDef40.tree)
-                # src/SavedFSM/Monitor.g:58:34: ( ',' parameterDef )*
+                    stream_roleparameDef.add(roleparameDef40.tree)
+                # src/SavedFSM/Monitor.g:58:34: ( ',' roleparameDef )*
                 while True: #loop14
                     alt14 = 2
                     LA14_0 = self.input.LA(1)
 
-                    if (LA14_0 == 35) :
+                    if (LA14_0 == 36) :
                         alt14 = 1
 
 
                     if alt14 == 1:
-                        # src/SavedFSM/Monitor.g:58:36: ',' parameterDef
+                        # src/SavedFSM/Monitor.g:58:36: ',' roleparameDef
                         pass 
-                        char_literal41=self.match(self.input, 35, self.FOLLOW_35_in_parameterDefs462)
-                        self._state.following.append(self.FOLLOW_parameterDef_in_parameterDefs465)
-                        parameterDef42 = self.parameterDef()
+                        char_literal41=self.match(self.input, 36, self.FOLLOW_36_in_parameterDefs474) 
+                        if self._state.backtracking == 0:
+                            stream_36.add(char_literal41)
+                        self._state.following.append(self.FOLLOW_roleparameDef_in_parameterDefs476)
+                        roleparameDef42 = self.roleparameDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, parameterDef42.tree)
+                            stream_roleparameDef.add(roleparameDef42.tree)
 
 
                     else:
                         break #loop14
-                char_literal43=self.match(self.input, 43, self.FOLLOW_43_in_parameterDefs470)
+                char_literal43=self.match(self.input, 44, self.FOLLOW_44_in_parameterDefs481) 
+                if self._state.backtracking == 0:
+                    stream_44.add(char_literal43)
+
+                # AST Rewrite
+                # elements: roleparameDef
+                # token labels: 
+                # rule labels: retval
+                # token list labels: 
+                # rule list labels: 
+                # wildcard labels: 
+                if self._state.backtracking == 0:
+
+                    retval.tree = root_0
+
+                    if retval is not None:
+                        stream_retval = RewriteRuleSubtreeStream(self._adaptor, "rule retval", retval.tree)
+                    else:
+                        stream_retval = RewriteRuleSubtreeStream(self._adaptor, "token retval", None)
+
+
+                    root_0 = self._adaptor.nil()
+                    # 58:61: -> ^( ROLES ( roleparameDef )+ )
+                    # src/SavedFSM/Monitor.g:58:64: ^( ROLES ( roleparameDef )+ )
+                    root_1 = self._adaptor.nil()
+                    root_1 = self._adaptor.becomeRoot(self._adaptor.createFromType(ROLES, "ROLES"), root_1)
+
+                    # src/SavedFSM/Monitor.g:58:72: ( roleparameDef )+
+                    if not (stream_roleparameDef.hasNext()):
+                        raise RewriteEarlyExitException()
+
+                    while stream_roleparameDef.hasNext():
+                        self._adaptor.addChild(root_1, stream_roleparameDef.nextTree())
+
+
+                    stream_roleparameDef.reset()
+
+                    self._adaptor.addChild(root_0, root_1)
+
+
+
+                    retval.tree = root_0
 
 
 
@@ -1211,84 +1266,70 @@ class MonitorParser(Parser):
 
     # $ANTLR end "parameterDefs"
 
-    class parameterDef_return(ParserRuleReturnScope):
+    class roleparameDef_return(ParserRuleReturnScope):
         def __init__(self):
-            super(MonitorParser.parameterDef_return, self).__init__()
+            super(MonitorParser.roleparameDef_return, self).__init__()
 
             self.tree = None
 
 
 
 
-    # $ANTLR start "parameterDef"
-    # src/SavedFSM/Monitor.g:60:1: parameterDef : ( typeReferenceDef | 'role' ) simpleName ;
-    def parameterDef(self, ):
+    # $ANTLR start "roleparameDef"
+    # src/SavedFSM/Monitor.g:60:1: roleparameDef : 'role' simpleName -> simpleName ;
+    def roleparameDef(self, ):
 
-        retval = self.parameterDef_return()
+        retval = self.roleparameDef_return()
         retval.start = self.input.LT(1)
 
         root_0 = None
 
-        string_literal45 = None
-        typeReferenceDef44 = None
-
-        simpleName46 = None
+        string_literal44 = None
+        simpleName45 = None
 
 
-        string_literal45_tree = None
-
+        string_literal44_tree = None
+        stream_45 = RewriteRuleTokenStream(self._adaptor, "token 45")
+        stream_simpleName = RewriteRuleSubtreeStream(self._adaptor, "rule simpleName")
         try:
             try:
-                # src/SavedFSM/Monitor.g:60:13: ( ( typeReferenceDef | 'role' ) simpleName )
-                # src/SavedFSM/Monitor.g:60:15: ( typeReferenceDef | 'role' ) simpleName
+                # src/SavedFSM/Monitor.g:60:14: ( 'role' simpleName -> simpleName )
+                # src/SavedFSM/Monitor.g:60:16: 'role' simpleName
                 pass 
-                root_0 = self._adaptor.nil()
-
-                # src/SavedFSM/Monitor.g:60:15: ( typeReferenceDef | 'role' )
-                alt15 = 2
-                LA15_0 = self.input.LA(1)
-
-                if (LA15_0 == ID) :
-                    alt15 = 1
-                elif (LA15_0 == 44) :
-                    alt15 = 2
-                else:
-                    if self._state.backtracking > 0:
-                        raise BacktrackingFailed
-
-                    nvae = NoViableAltException("", 15, 0, self.input)
-
-                    raise nvae
-
-                if alt15 == 1:
-                    # src/SavedFSM/Monitor.g:60:17: typeReferenceDef
-                    pass 
-                    self._state.following.append(self.FOLLOW_typeReferenceDef_in_parameterDef481)
-                    typeReferenceDef44 = self.typeReferenceDef()
-
-                    self._state.following.pop()
-                    if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, typeReferenceDef44.tree)
-
-
-                elif alt15 == 2:
-                    # src/SavedFSM/Monitor.g:60:36: 'role'
-                    pass 
-                    string_literal45=self.match(self.input, 44, self.FOLLOW_44_in_parameterDef485)
-                    if self._state.backtracking == 0:
-
-                        string_literal45_tree = self._adaptor.createWithPayload(string_literal45)
-                        self._adaptor.addChild(root_0, string_literal45_tree)
-
-
-
-
-                self._state.following.append(self.FOLLOW_simpleName_in_parameterDef489)
-                simpleName46 = self.simpleName()
+                string_literal44=self.match(self.input, 45, self.FOLLOW_45_in_roleparameDef497) 
+                if self._state.backtracking == 0:
+                    stream_45.add(string_literal44)
+                self._state.following.append(self.FOLLOW_simpleName_in_roleparameDef499)
+                simpleName45 = self.simpleName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, simpleName46.tree)
+                    stream_simpleName.add(simpleName45.tree)
+
+                # AST Rewrite
+                # elements: simpleName
+                # token labels: 
+                # rule labels: retval
+                # token list labels: 
+                # rule list labels: 
+                # wildcard labels: 
+                if self._state.backtracking == 0:
+
+                    retval.tree = root_0
+
+                    if retval is not None:
+                        stream_retval = RewriteRuleSubtreeStream(self._adaptor, "rule retval", retval.tree)
+                    else:
+                        stream_retval = RewriteRuleSubtreeStream(self._adaptor, "token retval", None)
+
+
+                    root_0 = self._adaptor.nil()
+                    # 60:34: -> simpleName
+                    self._adaptor.addChild(root_0, stream_simpleName.nextTree())
+
+
+
+                    retval.tree = root_0
 
 
 
@@ -1309,7 +1350,7 @@ class MonitorParser(Parser):
             pass
         return retval
 
-    # $ANTLR end "parameterDef"
+    # $ANTLR end "roleparameDef"
 
     class protocolBlockDef_return(ParserRuleReturnScope):
         def __init__(self):
@@ -1329,7 +1370,7 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        activityListDef47 = None
+        activityListDef46 = None
 
 
         stream_activityListDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityListDef")
@@ -1338,12 +1379,12 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:62:17: ( activityListDef -> activityListDef )
                 # src/SavedFSM/Monitor.g:62:19: activityListDef
                 pass 
-                self._state.following.append(self.FOLLOW_activityListDef_in_protocolBlockDef497)
-                activityListDef47 = self.activityListDef()
+                self._state.following.append(self.FOLLOW_activityListDef_in_protocolBlockDef510)
+                activityListDef46 = self.activityListDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_activityListDef.add(activityListDef47.tree)
+                    stream_activityListDef.add(activityListDef46.tree)
 
                 # AST Rewrite
                 # elements: activityListDef
@@ -1409,33 +1450,33 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        char_literal48 = None
-        char_literal50 = None
-        activityListDef49 = None
+        char_literal47 = None
+        char_literal49 = None
+        activityListDef48 = None
 
 
-        char_literal48_tree = None
-        char_literal50_tree = None
+        char_literal47_tree = None
+        char_literal49_tree = None
+        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
         stream_41 = RewriteRuleTokenStream(self._adaptor, "token 41")
-        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
         stream_activityListDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityListDef")
         try:
             try:
                 # src/SavedFSM/Monitor.g:64:9: ( '{' activityListDef '}' -> ^( BRANCH activityListDef ) )
                 # src/SavedFSM/Monitor.g:64:11: '{' activityListDef '}'
                 pass 
-                char_literal48=self.match(self.input, 40, self.FOLLOW_40_in_blockDef508) 
+                char_literal47=self.match(self.input, 41, self.FOLLOW_41_in_blockDef521) 
                 if self._state.backtracking == 0:
-                    stream_40.add(char_literal48)
-                self._state.following.append(self.FOLLOW_activityListDef_in_blockDef510)
-                activityListDef49 = self.activityListDef()
+                    stream_41.add(char_literal47)
+                self._state.following.append(self.FOLLOW_activityListDef_in_blockDef523)
+                activityListDef48 = self.activityListDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_activityListDef.add(activityListDef49.tree)
-                char_literal50=self.match(self.input, 41, self.FOLLOW_41_in_blockDef512) 
+                    stream_activityListDef.add(activityListDef48.tree)
+                char_literal49=self.match(self.input, 42, self.FOLLOW_42_in_blockDef525) 
                 if self._state.backtracking == 0:
-                    stream_41.add(char_literal50)
+                    stream_42.add(char_literal49)
 
                 # AST Rewrite
                 # elements: activityListDef
@@ -1507,9 +1548,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ASSERTION51 = None
+        ASSERTION50 = None
 
-        ASSERTION51_tree = None
+        ASSERTION50_tree = None
         stream_ASSERTION = RewriteRuleTokenStream(self._adaptor, "token ASSERTION")
 
         try:
@@ -1518,17 +1559,17 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:66:13: ( ASSERTION )?
                 pass 
                 # src/SavedFSM/Monitor.g:66:13: ( ASSERTION )?
-                alt16 = 2
-                LA16_0 = self.input.LA(1)
+                alt15 = 2
+                LA15_0 = self.input.LA(1)
 
-                if (LA16_0 == ASSERTION) :
-                    alt16 = 1
-                if alt16 == 1:
+                if (LA15_0 == ASSERTION) :
+                    alt15 = 1
+                if alt15 == 1:
                     # src/SavedFSM/Monitor.g:66:14: ASSERTION
                     pass 
-                    ASSERTION51=self.match(self.input, ASSERTION, self.FOLLOW_ASSERTION_in_assertDef534) 
+                    ASSERTION50=self.match(self.input, ASSERTION, self.FOLLOW_ASSERTION_in_assertDef547) 
                     if self._state.backtracking == 0:
-                        stream_ASSERTION.add(ASSERTION51)
+                        stream_ASSERTION.add(ASSERTION50)
 
 
 
@@ -1608,11 +1649,11 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ANNOTATION52 = None
-        activityDef53 = None
+        ANNOTATION51 = None
+        activityDef52 = None
 
 
-        ANNOTATION52_tree = None
+        ANNOTATION51_tree = None
         stream_ANNOTATION = RewriteRuleTokenStream(self._adaptor, "token ANNOTATION")
         stream_activityDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityDef")
         try:
@@ -1621,41 +1662,41 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:68:18: ( ( ANNOTATION )* activityDef )*
                 pass 
                 # src/SavedFSM/Monitor.g:68:18: ( ( ANNOTATION )* activityDef )*
-                while True: #loop18
-                    alt18 = 2
-                    alt18 = self.dfa18.predict(self.input)
-                    if alt18 == 1:
+                while True: #loop17
+                    alt17 = 2
+                    alt17 = self.dfa17.predict(self.input)
+                    if alt17 == 1:
                         # src/SavedFSM/Monitor.g:68:20: ( ANNOTATION )* activityDef
                         pass 
                         # src/SavedFSM/Monitor.g:68:20: ( ANNOTATION )*
-                        while True: #loop17
-                            alt17 = 2
-                            LA17_0 = self.input.LA(1)
+                        while True: #loop16
+                            alt16 = 2
+                            LA16_0 = self.input.LA(1)
 
-                            if (LA17_0 == ANNOTATION) :
-                                alt17 = 1
+                            if (LA16_0 == ANNOTATION) :
+                                alt16 = 1
 
 
-                            if alt17 == 1:
+                            if alt16 == 1:
                                 # src/SavedFSM/Monitor.g:68:22: ANNOTATION
                                 pass 
-                                ANNOTATION52=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_activityListDef556) 
+                                ANNOTATION51=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_activityListDef569) 
                                 if self._state.backtracking == 0:
-                                    stream_ANNOTATION.add(ANNOTATION52)
+                                    stream_ANNOTATION.add(ANNOTATION51)
 
 
                             else:
-                                break #loop17
-                        self._state.following.append(self.FOLLOW_activityDef_in_activityListDef561)
-                        activityDef53 = self.activityDef()
+                                break #loop16
+                        self._state.following.append(self.FOLLOW_activityDef_in_activityListDef574)
+                        activityDef52 = self.activityDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            stream_activityDef.add(activityDef53.tree)
+                            stream_activityDef.add(activityDef52.tree)
 
 
                     else:
-                        break #loop18
+                        break #loop17
 
                 # AST Rewrite
                 # elements: activityDef
@@ -1729,11 +1770,11 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        INT54 = None
-        STRING55 = None
+        INT53 = None
+        STRING54 = None
 
-        INT54_tree = None
-        STRING55_tree = None
+        INT53_tree = None
+        STRING54_tree = None
         stream_INT = RewriteRuleTokenStream(self._adaptor, "token INT")
         stream_STRING = RewriteRuleTokenStream(self._adaptor, "token STRING")
 
@@ -1743,27 +1784,27 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:70:16: ( INT -> INT | STRING -> STRING )
                 pass 
                 # src/SavedFSM/Monitor.g:70:16: ( INT -> INT | STRING -> STRING )
-                alt19 = 2
-                LA19_0 = self.input.LA(1)
+                alt18 = 2
+                LA18_0 = self.input.LA(1)
 
-                if (LA19_0 == INT) :
-                    alt19 = 1
-                elif (LA19_0 == STRING) :
-                    alt19 = 2
+                if (LA18_0 == INT) :
+                    alt18 = 1
+                elif (LA18_0 == STRING) :
+                    alt18 = 2
                 else:
                     if self._state.backtracking > 0:
                         raise BacktrackingFailed
 
-                    nvae = NoViableAltException("", 19, 0, self.input)
+                    nvae = NoViableAltException("", 18, 0, self.input)
 
                     raise nvae
 
-                if alt19 == 1:
+                if alt18 == 1:
                     # src/SavedFSM/Monitor.g:70:17: INT
                     pass 
-                    INT54=self.match(self.input, INT, self.FOLLOW_INT_in_primitivetype577) 
+                    INT53=self.match(self.input, INT, self.FOLLOW_INT_in_primitivetype590) 
                     if self._state.backtracking == 0:
-                        stream_INT.add(INT54)
+                        stream_INT.add(INT53)
 
                     # AST Rewrite
                     # elements: INT
@@ -1791,12 +1832,12 @@ class MonitorParser(Parser):
                         retval.tree = root_0
 
 
-                elif alt19 == 2:
+                elif alt18 == 2:
                     # src/SavedFSM/Monitor.g:70:28: STRING
                     pass 
-                    STRING55=self.match(self.input, STRING, self.FOLLOW_STRING_in_primitivetype583) 
+                    STRING54=self.match(self.input, STRING, self.FOLLOW_STRING_in_primitivetype596) 
                     if self._state.backtracking == 0:
-                        stream_STRING.add(STRING55)
+                        stream_STRING.add(STRING54)
 
                     # AST Rewrite
                     # elements: STRING
@@ -1865,279 +1906,279 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        RECLABEL62 = None
-        char_literal63 = None
-        introducesDef56 = None
+        RECLABEL61 = None
+        char_literal62 = None
+        introducesDef55 = None
 
-        interactionDef57 = None
+        interactionDef56 = None
 
-        inlineDef58 = None
+        inlineDef57 = None
 
-        runDef59 = None
+        runDef58 = None
 
-        recursionDef60 = None
+        recursionDef59 = None
 
-        endDef61 = None
+        endDef60 = None
 
-        choiceDef64 = None
+        choiceDef63 = None
 
-        directedChoiceDef65 = None
+        directedChoiceDef64 = None
 
-        parallelDef66 = None
+        parallelDef65 = None
 
-        repeatDef67 = None
+        repeatDef66 = None
 
-        unorderedDef68 = None
+        unorderedDef67 = None
 
-        recBlockDef69 = None
+        recBlockDef68 = None
 
-        globalEscapeDef70 = None
+        globalEscapeDef69 = None
 
 
-        RECLABEL62_tree = None
-        char_literal63_tree = None
+        RECLABEL61_tree = None
+        char_literal62_tree = None
 
         try:
             try:
                 # src/SavedFSM/Monitor.g:72:12: ( ( introducesDef | interactionDef | inlineDef | runDef | recursionDef | endDef | RECLABEL ) ';' | choiceDef | directedChoiceDef | parallelDef | repeatDef | unorderedDef | recBlockDef | globalEscapeDef )
-                alt21 = 8
-                LA21 = self.input.LA(1)
-                if LA21 == RECLABEL or LA21 == ID or LA21 == 42 or LA21 == 52 or LA21 == 53 or LA21 == 54:
-                    alt21 = 1
-                elif LA21 == 48:
-                    alt21 = 2
-                elif LA21 == 37 or LA21 == 40 or LA21 == 47:
-                    alt21 = 3
-                elif LA21 == 55:
-                    alt21 = 4
-                elif LA21 == 50:
-                    alt21 = 5
-                elif LA21 == 60:
-                    alt21 = 6
-                elif LA21 == 51:
-                    alt21 = 7
-                elif LA21 == 57:
-                    alt21 = 8
+                alt20 = 8
+                LA20 = self.input.LA(1)
+                if LA20 == RECLABEL or LA20 == ID or LA20 == 43 or LA20 == 53 or LA20 == 54 or LA20 == 55:
+                    alt20 = 1
+                elif LA20 == 49:
+                    alt20 = 2
+                elif LA20 == 38 or LA20 == 41 or LA20 == 48:
+                    alt20 = 3
+                elif LA20 == 56:
+                    alt20 = 4
+                elif LA20 == 51:
+                    alt20 = 5
+                elif LA20 == 61:
+                    alt20 = 6
+                elif LA20 == 52:
+                    alt20 = 7
+                elif LA20 == 58:
+                    alt20 = 8
                 else:
                     if self._state.backtracking > 0:
                         raise BacktrackingFailed
 
-                    nvae = NoViableAltException("", 21, 0, self.input)
+                    nvae = NoViableAltException("", 20, 0, self.input)
 
                     raise nvae
 
-                if alt21 == 1:
+                if alt20 == 1:
                     # src/SavedFSM/Monitor.g:72:14: ( introducesDef | interactionDef | inlineDef | runDef | recursionDef | endDef | RECLABEL ) ';'
                     pass 
                     root_0 = self._adaptor.nil()
 
                     # src/SavedFSM/Monitor.g:72:14: ( introducesDef | interactionDef | inlineDef | runDef | recursionDef | endDef | RECLABEL )
-                    alt20 = 7
-                    LA20 = self.input.LA(1)
-                    if LA20 == ID:
-                        LA20 = self.input.LA(2)
-                        if LA20 == 36:
-                            alt20 = 5
-                        elif LA20 == 37 or LA20 == 42 or LA20 == 47:
-                            alt20 = 2
-                        elif LA20 == 45:
-                            alt20 = 1
+                    alt19 = 7
+                    LA19 = self.input.LA(1)
+                    if LA19 == ID:
+                        LA19 = self.input.LA(2)
+                        if LA19 == 37:
+                            alt19 = 5
+                        elif LA19 == 46:
+                            alt19 = 1
+                        elif LA19 == 38 or LA19 == 43 or LA19 == 48:
+                            alt19 = 2
                         else:
                             if self._state.backtracking > 0:
                                 raise BacktrackingFailed
 
-                            nvae = NoViableAltException("", 20, 1, self.input)
+                            nvae = NoViableAltException("", 19, 1, self.input)
 
                             raise nvae
 
-                    elif LA20 == 42:
-                        alt20 = 2
-                    elif LA20 == 54:
-                        alt20 = 3
-                    elif LA20 == 53:
-                        alt20 = 4
-                    elif LA20 == 52:
-                        alt20 = 6
-                    elif LA20 == RECLABEL:
-                        alt20 = 7
+                    elif LA19 == 43:
+                        alt19 = 2
+                    elif LA19 == 55:
+                        alt19 = 3
+                    elif LA19 == 54:
+                        alt19 = 4
+                    elif LA19 == 53:
+                        alt19 = 6
+                    elif LA19 == RECLABEL:
+                        alt19 = 7
                     else:
                         if self._state.backtracking > 0:
                             raise BacktrackingFailed
 
-                        nvae = NoViableAltException("", 20, 0, self.input)
+                        nvae = NoViableAltException("", 19, 0, self.input)
 
                         raise nvae
 
-                    if alt20 == 1:
+                    if alt19 == 1:
                         # src/SavedFSM/Monitor.g:72:16: introducesDef
                         pass 
-                        self._state.following.append(self.FOLLOW_introducesDef_in_activityDef596)
-                        introducesDef56 = self.introducesDef()
+                        self._state.following.append(self.FOLLOW_introducesDef_in_activityDef609)
+                        introducesDef55 = self.introducesDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, introducesDef56.tree)
+                            self._adaptor.addChild(root_0, introducesDef55.tree)
 
 
-                    elif alt20 == 2:
+                    elif alt19 == 2:
                         # src/SavedFSM/Monitor.g:72:32: interactionDef
                         pass 
-                        self._state.following.append(self.FOLLOW_interactionDef_in_activityDef600)
-                        interactionDef57 = self.interactionDef()
+                        self._state.following.append(self.FOLLOW_interactionDef_in_activityDef613)
+                        interactionDef56 = self.interactionDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, interactionDef57.tree)
+                            self._adaptor.addChild(root_0, interactionDef56.tree)
 
 
-                    elif alt20 == 3:
+                    elif alt19 == 3:
                         # src/SavedFSM/Monitor.g:72:49: inlineDef
                         pass 
-                        self._state.following.append(self.FOLLOW_inlineDef_in_activityDef604)
-                        inlineDef58 = self.inlineDef()
+                        self._state.following.append(self.FOLLOW_inlineDef_in_activityDef617)
+                        inlineDef57 = self.inlineDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, inlineDef58.tree)
+                            self._adaptor.addChild(root_0, inlineDef57.tree)
 
 
-                    elif alt20 == 4:
+                    elif alt19 == 4:
                         # src/SavedFSM/Monitor.g:72:61: runDef
                         pass 
-                        self._state.following.append(self.FOLLOW_runDef_in_activityDef608)
-                        runDef59 = self.runDef()
+                        self._state.following.append(self.FOLLOW_runDef_in_activityDef621)
+                        runDef58 = self.runDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, runDef59.tree)
+                            self._adaptor.addChild(root_0, runDef58.tree)
 
 
-                    elif alt20 == 5:
+                    elif alt19 == 5:
                         # src/SavedFSM/Monitor.g:72:70: recursionDef
                         pass 
-                        self._state.following.append(self.FOLLOW_recursionDef_in_activityDef612)
-                        recursionDef60 = self.recursionDef()
+                        self._state.following.append(self.FOLLOW_recursionDef_in_activityDef625)
+                        recursionDef59 = self.recursionDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, recursionDef60.tree)
+                            self._adaptor.addChild(root_0, recursionDef59.tree)
 
 
-                    elif alt20 == 6:
+                    elif alt19 == 6:
                         # src/SavedFSM/Monitor.g:72:85: endDef
                         pass 
-                        self._state.following.append(self.FOLLOW_endDef_in_activityDef616)
-                        endDef61 = self.endDef()
+                        self._state.following.append(self.FOLLOW_endDef_in_activityDef629)
+                        endDef60 = self.endDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, endDef61.tree)
+                            self._adaptor.addChild(root_0, endDef60.tree)
 
 
-                    elif alt20 == 7:
+                    elif alt19 == 7:
                         # src/SavedFSM/Monitor.g:72:94: RECLABEL
                         pass 
-                        RECLABEL62=self.match(self.input, RECLABEL, self.FOLLOW_RECLABEL_in_activityDef620)
+                        RECLABEL61=self.match(self.input, RECLABEL, self.FOLLOW_RECLABEL_in_activityDef633)
                         if self._state.backtracking == 0:
 
-                            RECLABEL62_tree = self._adaptor.createWithPayload(RECLABEL62)
-                            self._adaptor.addChild(root_0, RECLABEL62_tree)
+                            RECLABEL61_tree = self._adaptor.createWithPayload(RECLABEL61)
+                            self._adaptor.addChild(root_0, RECLABEL61_tree)
 
 
 
 
-                    char_literal63=self.match(self.input, 36, self.FOLLOW_36_in_activityDef624)
+                    char_literal62=self.match(self.input, 37, self.FOLLOW_37_in_activityDef637)
 
 
-                elif alt21 == 2:
+                elif alt20 == 2:
                     # src/SavedFSM/Monitor.g:73:4: choiceDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_choiceDef_in_activityDef633)
-                    choiceDef64 = self.choiceDef()
+                    self._state.following.append(self.FOLLOW_choiceDef_in_activityDef646)
+                    choiceDef63 = self.choiceDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, choiceDef64.tree)
+                        self._adaptor.addChild(root_0, choiceDef63.tree)
 
 
-                elif alt21 == 3:
+                elif alt20 == 3:
                     # src/SavedFSM/Monitor.g:73:16: directedChoiceDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_directedChoiceDef_in_activityDef637)
-                    directedChoiceDef65 = self.directedChoiceDef()
+                    self._state.following.append(self.FOLLOW_directedChoiceDef_in_activityDef650)
+                    directedChoiceDef64 = self.directedChoiceDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, directedChoiceDef65.tree)
+                        self._adaptor.addChild(root_0, directedChoiceDef64.tree)
 
 
-                elif alt21 == 4:
+                elif alt20 == 4:
                     # src/SavedFSM/Monitor.g:73:36: parallelDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_parallelDef_in_activityDef641)
-                    parallelDef66 = self.parallelDef()
+                    self._state.following.append(self.FOLLOW_parallelDef_in_activityDef654)
+                    parallelDef65 = self.parallelDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, parallelDef66.tree)
+                        self._adaptor.addChild(root_0, parallelDef65.tree)
 
 
-                elif alt21 == 5:
+                elif alt20 == 5:
                     # src/SavedFSM/Monitor.g:73:50: repeatDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_repeatDef_in_activityDef645)
-                    repeatDef67 = self.repeatDef()
+                    self._state.following.append(self.FOLLOW_repeatDef_in_activityDef658)
+                    repeatDef66 = self.repeatDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, repeatDef67.tree)
+                        self._adaptor.addChild(root_0, repeatDef66.tree)
 
 
-                elif alt21 == 6:
+                elif alt20 == 6:
                     # src/SavedFSM/Monitor.g:73:62: unorderedDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_unorderedDef_in_activityDef649)
-                    unorderedDef68 = self.unorderedDef()
+                    self._state.following.append(self.FOLLOW_unorderedDef_in_activityDef662)
+                    unorderedDef67 = self.unorderedDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, unorderedDef68.tree)
+                        self._adaptor.addChild(root_0, unorderedDef67.tree)
 
 
-                elif alt21 == 7:
+                elif alt20 == 7:
                     # src/SavedFSM/Monitor.g:74:4: recBlockDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_recBlockDef_in_activityDef656)
-                    recBlockDef69 = self.recBlockDef()
+                    self._state.following.append(self.FOLLOW_recBlockDef_in_activityDef669)
+                    recBlockDef68 = self.recBlockDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, recBlockDef69.tree)
+                        self._adaptor.addChild(root_0, recBlockDef68.tree)
 
 
-                elif alt21 == 8:
+                elif alt20 == 8:
                     # src/SavedFSM/Monitor.g:74:18: globalEscapeDef
                     pass 
                     root_0 = self._adaptor.nil()
 
-                    self._state.following.append(self.FOLLOW_globalEscapeDef_in_activityDef660)
-                    globalEscapeDef70 = self.globalEscapeDef()
+                    self._state.following.append(self.FOLLOW_globalEscapeDef_in_activityDef673)
+                    globalEscapeDef69 = self.globalEscapeDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, globalEscapeDef70.tree)
+                        self._adaptor.addChild(root_0, globalEscapeDef69.tree)
 
 
                 retval.stop = self.input.LT(-1)
@@ -2177,17 +2218,17 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal72 = None
-        char_literal74 = None
-        roleDef71 = None
+        string_literal71 = None
+        char_literal73 = None
+        roleDef70 = None
 
-        roleDef73 = None
+        roleDef72 = None
 
-        roleDef75 = None
+        roleDef74 = None
 
 
-        string_literal72_tree = None
-        char_literal74_tree = None
+        string_literal71_tree = None
+        char_literal73_tree = None
 
         try:
             try:
@@ -2196,52 +2237,52 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_roleDef_in_introducesDef668)
-                roleDef71 = self.roleDef()
+                self._state.following.append(self.FOLLOW_roleDef_in_introducesDef681)
+                roleDef70 = self.roleDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, roleDef71.tree)
-                string_literal72=self.match(self.input, 45, self.FOLLOW_45_in_introducesDef670)
+                    self._adaptor.addChild(root_0, roleDef70.tree)
+                string_literal71=self.match(self.input, 46, self.FOLLOW_46_in_introducesDef683)
                 if self._state.backtracking == 0:
 
-                    string_literal72_tree = self._adaptor.createWithPayload(string_literal72)
-                    self._adaptor.addChild(root_0, string_literal72_tree)
+                    string_literal71_tree = self._adaptor.createWithPayload(string_literal71)
+                    self._adaptor.addChild(root_0, string_literal71_tree)
 
-                self._state.following.append(self.FOLLOW_roleDef_in_introducesDef672)
-                roleDef73 = self.roleDef()
+                self._state.following.append(self.FOLLOW_roleDef_in_introducesDef685)
+                roleDef72 = self.roleDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, roleDef73.tree)
+                    self._adaptor.addChild(root_0, roleDef72.tree)
                 # src/SavedFSM/Monitor.g:76:45: ( ',' roleDef )*
-                while True: #loop22
-                    alt22 = 2
-                    LA22_0 = self.input.LA(1)
+                while True: #loop21
+                    alt21 = 2
+                    LA21_0 = self.input.LA(1)
 
-                    if (LA22_0 == 35) :
-                        alt22 = 1
+                    if (LA21_0 == 36) :
+                        alt21 = 1
 
 
-                    if alt22 == 1:
+                    if alt21 == 1:
                         # src/SavedFSM/Monitor.g:76:47: ',' roleDef
                         pass 
-                        char_literal74=self.match(self.input, 35, self.FOLLOW_35_in_introducesDef676)
+                        char_literal73=self.match(self.input, 36, self.FOLLOW_36_in_introducesDef689)
                         if self._state.backtracking == 0:
 
-                            char_literal74_tree = self._adaptor.createWithPayload(char_literal74)
-                            self._adaptor.addChild(root_0, char_literal74_tree)
+                            char_literal73_tree = self._adaptor.createWithPayload(char_literal73)
+                            self._adaptor.addChild(root_0, char_literal73_tree)
 
-                        self._state.following.append(self.FOLLOW_roleDef_in_introducesDef678)
-                        roleDef75 = self.roleDef()
+                        self._state.following.append(self.FOLLOW_roleDef_in_introducesDef691)
+                        roleDef74 = self.roleDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, roleDef75.tree)
+                            self._adaptor.addChild(root_0, roleDef74.tree)
 
 
                     else:
-                        break #loop22
+                        break #loop21
 
 
 
@@ -2282,9 +2323,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID76 = None
+        ID75 = None
 
-        ID76_tree = None
+        ID75_tree = None
         stream_ID = RewriteRuleTokenStream(self._adaptor, "token ID")
 
         try:
@@ -2292,9 +2333,9 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:78:8: ( ID -> ID )
                 # src/SavedFSM/Monitor.g:78:10: ID
                 pass 
-                ID76=self.match(self.input, ID, self.FOLLOW_ID_in_roleDef689) 
+                ID75=self.match(self.input, ID, self.FOLLOW_ID_in_roleDef702) 
                 if self._state.backtracking == 0:
-                    stream_ID.add(ID76)
+                    stream_ID.add(ID75)
 
                 # AST Rewrite
                 # elements: ID
@@ -2360,9 +2401,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID77 = None
+        ID76 = None
 
-        ID77_tree = None
+        ID76_tree = None
         stream_ID = RewriteRuleTokenStream(self._adaptor, "token ID")
 
         try:
@@ -2370,9 +2411,9 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:80:9: ( ID -> ID )
                 # src/SavedFSM/Monitor.g:80:11: ID
                 pass 
-                ID77=self.match(self.input, ID, self.FOLLOW_ID_in_roleName700) 
+                ID76=self.match(self.input, ID, self.FOLLOW_ID_in_roleName713) 
                 if self._state.backtracking == 0:
-                    stream_ID.add(ID77)
+                    stream_ID.add(ID76)
 
                 # AST Rewrite
                 # elements: ID
@@ -2438,9 +2479,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID78 = None
+        ID77 = None
 
-        ID78_tree = None
+        ID77_tree = None
         stream_ID = RewriteRuleTokenStream(self._adaptor, "token ID")
 
         try:
@@ -2448,9 +2489,9 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:82:17: ( ID -> ID )
                 # src/SavedFSM/Monitor.g:82:19: ID
                 pass 
-                ID78=self.match(self.input, ID, self.FOLLOW_ID_in_typeReferenceDef711) 
+                ID77=self.match(self.input, ID, self.FOLLOW_ID_in_typeReferenceDef724) 
                 if self._state.backtracking == 0:
-                    stream_ID.add(ID78)
+                    stream_ID.add(ID77)
 
                 # AST Rewrite
                 # elements: ID
@@ -2516,32 +2557,32 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        char_literal80 = None
-        char_literal82 = None
+        char_literal79 = None
+        char_literal81 = None
+        char_literal83 = None
         char_literal84 = None
-        char_literal85 = None
-        char_literal87 = None
-        char_literal89 = None
-        typeReferenceDef79 = None
+        char_literal86 = None
+        char_literal88 = None
+        typeReferenceDef78 = None
 
-        valueDecl81 = None
+        valueDecl80 = None
 
-        valueDecl83 = None
+        valueDecl82 = None
 
-        valueDecl86 = None
+        valueDecl85 = None
 
-        valueDecl88 = None
+        valueDecl87 = None
 
 
-        char_literal80_tree = None
-        char_literal82_tree = None
+        char_literal79_tree = None
+        char_literal81_tree = None
+        char_literal83_tree = None
         char_literal84_tree = None
-        char_literal85_tree = None
-        char_literal87_tree = None
-        char_literal89_tree = None
+        char_literal86_tree = None
+        char_literal88_tree = None
         stream_43 = RewriteRuleTokenStream(self._adaptor, "token 43")
-        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
-        stream_35 = RewriteRuleTokenStream(self._adaptor, "token 35")
+        stream_44 = RewriteRuleTokenStream(self._adaptor, "token 44")
+        stream_36 = RewriteRuleTokenStream(self._adaptor, "token 36")
         stream_typeReferenceDef = RewriteRuleSubtreeStream(self._adaptor, "rule typeReferenceDef")
         stream_valueDecl = RewriteRuleSubtreeStream(self._adaptor, "rule valueDecl")
         try:
@@ -2550,85 +2591,85 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:83:26: ( ( typeReferenceDef ( '(' valueDecl ( ',' valueDecl )* ')' )? -> typeReferenceDef ^( VALUE ( valueDecl )* ) ) | ( ( '(' valueDecl ( ',' valueDecl )* ')' ) -> ^( VALUE ( valueDecl )* ) ) )
                 pass 
                 # src/SavedFSM/Monitor.g:83:26: ( ( typeReferenceDef ( '(' valueDecl ( ',' valueDecl )* ')' )? -> typeReferenceDef ^( VALUE ( valueDecl )* ) ) | ( ( '(' valueDecl ( ',' valueDecl )* ')' ) -> ^( VALUE ( valueDecl )* ) ) )
-                alt26 = 2
-                LA26_0 = self.input.LA(1)
+                alt25 = 2
+                LA25_0 = self.input.LA(1)
 
-                if (LA26_0 == ID) :
-                    alt26 = 1
-                elif (LA26_0 == 42) :
-                    alt26 = 2
+                if (LA25_0 == ID) :
+                    alt25 = 1
+                elif (LA25_0 == 43) :
+                    alt25 = 2
                 else:
                     if self._state.backtracking > 0:
                         raise BacktrackingFailed
 
-                    nvae = NoViableAltException("", 26, 0, self.input)
+                    nvae = NoViableAltException("", 25, 0, self.input)
 
                     raise nvae
 
-                if alt26 == 1:
+                if alt25 == 1:
                     # src/SavedFSM/Monitor.g:83:27: ( typeReferenceDef ( '(' valueDecl ( ',' valueDecl )* ')' )? -> typeReferenceDef ^( VALUE ( valueDecl )* ) )
                     pass 
                     # src/SavedFSM/Monitor.g:83:27: ( typeReferenceDef ( '(' valueDecl ( ',' valueDecl )* ')' )? -> typeReferenceDef ^( VALUE ( valueDecl )* ) )
                     # src/SavedFSM/Monitor.g:83:28: typeReferenceDef ( '(' valueDecl ( ',' valueDecl )* ')' )?
                     pass 
-                    self._state.following.append(self.FOLLOW_typeReferenceDef_in_interactionSignatureDef722)
-                    typeReferenceDef79 = self.typeReferenceDef()
+                    self._state.following.append(self.FOLLOW_typeReferenceDef_in_interactionSignatureDef735)
+                    typeReferenceDef78 = self.typeReferenceDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_typeReferenceDef.add(typeReferenceDef79.tree)
+                        stream_typeReferenceDef.add(typeReferenceDef78.tree)
                     # src/SavedFSM/Monitor.g:83:45: ( '(' valueDecl ( ',' valueDecl )* ')' )?
-                    alt24 = 2
-                    LA24_0 = self.input.LA(1)
+                    alt23 = 2
+                    LA23_0 = self.input.LA(1)
 
-                    if (LA24_0 == 42) :
-                        alt24 = 1
-                    if alt24 == 1:
+                    if (LA23_0 == 43) :
+                        alt23 = 1
+                    if alt23 == 1:
                         # src/SavedFSM/Monitor.g:83:46: '(' valueDecl ( ',' valueDecl )* ')'
                         pass 
-                        char_literal80=self.match(self.input, 42, self.FOLLOW_42_in_interactionSignatureDef725) 
+                        char_literal79=self.match(self.input, 43, self.FOLLOW_43_in_interactionSignatureDef738) 
                         if self._state.backtracking == 0:
-                            stream_42.add(char_literal80)
-                        self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef727)
-                        valueDecl81 = self.valueDecl()
+                            stream_43.add(char_literal79)
+                        self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef740)
+                        valueDecl80 = self.valueDecl()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            stream_valueDecl.add(valueDecl81.tree)
+                            stream_valueDecl.add(valueDecl80.tree)
                         # src/SavedFSM/Monitor.g:83:60: ( ',' valueDecl )*
-                        while True: #loop23
-                            alt23 = 2
-                            LA23_0 = self.input.LA(1)
+                        while True: #loop22
+                            alt22 = 2
+                            LA22_0 = self.input.LA(1)
 
-                            if (LA23_0 == 35) :
-                                alt23 = 1
+                            if (LA22_0 == 36) :
+                                alt22 = 1
 
 
-                            if alt23 == 1:
+                            if alt22 == 1:
                                 # src/SavedFSM/Monitor.g:83:61: ',' valueDecl
                                 pass 
-                                char_literal82=self.match(self.input, 35, self.FOLLOW_35_in_interactionSignatureDef730) 
+                                char_literal81=self.match(self.input, 36, self.FOLLOW_36_in_interactionSignatureDef743) 
                                 if self._state.backtracking == 0:
-                                    stream_35.add(char_literal82)
-                                self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef732)
-                                valueDecl83 = self.valueDecl()
+                                    stream_36.add(char_literal81)
+                                self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef745)
+                                valueDecl82 = self.valueDecl()
 
                                 self._state.following.pop()
                                 if self._state.backtracking == 0:
-                                    stream_valueDecl.add(valueDecl83.tree)
+                                    stream_valueDecl.add(valueDecl82.tree)
 
 
                             else:
-                                break #loop23
-                        char_literal84=self.match(self.input, 43, self.FOLLOW_43_in_interactionSignatureDef736) 
+                                break #loop22
+                        char_literal83=self.match(self.input, 44, self.FOLLOW_44_in_interactionSignatureDef749) 
                         if self._state.backtracking == 0:
-                            stream_43.add(char_literal84)
+                            stream_44.add(char_literal83)
 
 
 
 
                     # AST Rewrite
-                    # elements: valueDecl, typeReferenceDef
+                    # elements: typeReferenceDef, valueDecl
                     # token labels: 
                     # rule labels: retval
                     # token list labels: 
@@ -2668,7 +2709,7 @@ class MonitorParser(Parser):
 
 
 
-                elif alt26 == 2:
+                elif alt25 == 2:
                     # src/SavedFSM/Monitor.g:84:7: ( ( '(' valueDecl ( ',' valueDecl )* ')' ) -> ^( VALUE ( valueDecl )* ) )
                     pass 
                     # src/SavedFSM/Monitor.g:84:7: ( ( '(' valueDecl ( ',' valueDecl )* ')' ) -> ^( VALUE ( valueDecl )* ) )
@@ -2677,43 +2718,43 @@ class MonitorParser(Parser):
                     # src/SavedFSM/Monitor.g:84:8: ( '(' valueDecl ( ',' valueDecl )* ')' )
                     # src/SavedFSM/Monitor.g:84:9: '(' valueDecl ( ',' valueDecl )* ')'
                     pass 
-                    char_literal85=self.match(self.input, 42, self.FOLLOW_42_in_interactionSignatureDef760) 
+                    char_literal84=self.match(self.input, 43, self.FOLLOW_43_in_interactionSignatureDef773) 
                     if self._state.backtracking == 0:
-                        stream_42.add(char_literal85)
-                    self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef762)
-                    valueDecl86 = self.valueDecl()
+                        stream_43.add(char_literal84)
+                    self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef775)
+                    valueDecl85 = self.valueDecl()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_valueDecl.add(valueDecl86.tree)
+                        stream_valueDecl.add(valueDecl85.tree)
                     # src/SavedFSM/Monitor.g:84:23: ( ',' valueDecl )*
-                    while True: #loop25
-                        alt25 = 2
-                        LA25_0 = self.input.LA(1)
+                    while True: #loop24
+                        alt24 = 2
+                        LA24_0 = self.input.LA(1)
 
-                        if (LA25_0 == 35) :
-                            alt25 = 1
+                        if (LA24_0 == 36) :
+                            alt24 = 1
 
 
-                        if alt25 == 1:
+                        if alt24 == 1:
                             # src/SavedFSM/Monitor.g:84:24: ',' valueDecl
                             pass 
-                            char_literal87=self.match(self.input, 35, self.FOLLOW_35_in_interactionSignatureDef765) 
+                            char_literal86=self.match(self.input, 36, self.FOLLOW_36_in_interactionSignatureDef778) 
                             if self._state.backtracking == 0:
-                                stream_35.add(char_literal87)
-                            self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef767)
-                            valueDecl88 = self.valueDecl()
+                                stream_36.add(char_literal86)
+                            self._state.following.append(self.FOLLOW_valueDecl_in_interactionSignatureDef780)
+                            valueDecl87 = self.valueDecl()
 
                             self._state.following.pop()
                             if self._state.backtracking == 0:
-                                stream_valueDecl.add(valueDecl88.tree)
+                                stream_valueDecl.add(valueDecl87.tree)
 
 
                         else:
-                            break #loop25
-                    char_literal89=self.match(self.input, 43, self.FOLLOW_43_in_interactionSignatureDef771) 
+                            break #loop24
+                    char_literal88=self.match(self.input, 44, self.FOLLOW_44_in_interactionSignatureDef784) 
                     if self._state.backtracking == 0:
-                        stream_43.add(char_literal89)
+                        stream_44.add(char_literal88)
 
 
 
@@ -2799,13 +2840,13 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID90 = None
-        char_literal91 = None
-        primitivetype92 = None
+        ID89 = None
+        char_literal90 = None
+        primitivetype91 = None
 
 
-        ID90_tree = None
-        char_literal91_tree = None
+        ID89_tree = None
+        char_literal90_tree = None
 
         try:
             try:
@@ -2814,28 +2855,28 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID90=self.match(self.input, ID, self.FOLLOW_ID_in_valueDecl791)
+                ID89=self.match(self.input, ID, self.FOLLOW_ID_in_valueDecl804)
                 if self._state.backtracking == 0:
 
-                    ID90_tree = self._adaptor.createWithPayload(ID90)
-                    self._adaptor.addChild(root_0, ID90_tree)
+                    ID89_tree = self._adaptor.createWithPayload(ID89)
+                    self._adaptor.addChild(root_0, ID89_tree)
 
                 # src/SavedFSM/Monitor.g:86:16: ( ':' primitivetype )?
-                alt27 = 2
-                LA27_0 = self.input.LA(1)
+                alt26 = 2
+                LA26_0 = self.input.LA(1)
 
-                if (LA27_0 == 46) :
-                    alt27 = 1
-                if alt27 == 1:
+                if (LA26_0 == 47) :
+                    alt26 = 1
+                if alt26 == 1:
                     # src/SavedFSM/Monitor.g:86:17: ':' primitivetype
                     pass 
-                    char_literal91=self.match(self.input, 46, self.FOLLOW_46_in_valueDecl794)
-                    self._state.following.append(self.FOLLOW_primitivetype_in_valueDecl797)
-                    primitivetype92 = self.primitivetype()
+                    char_literal90=self.match(self.input, 47, self.FOLLOW_47_in_valueDecl807)
+                    self._state.following.append(self.FOLLOW_primitivetype_in_valueDecl810)
+                    primitivetype91 = self.primitivetype()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, primitivetype92.tree)
+                        self._adaptor.addChild(root_0, primitivetype91.tree)
 
 
 
@@ -2879,7 +2920,7 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        valueDecl93 = None
+        valueDecl92 = None
 
 
 
@@ -2890,12 +2931,12 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_valueDecl_in_firstValueDecl808)
-                valueDecl93 = self.valueDecl()
+                self._state.following.append(self.FOLLOW_valueDecl_in_firstValueDecl821)
+                valueDecl92 = self.valueDecl()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, valueDecl93.tree)
+                    self._adaptor.addChild(root_0, valueDecl92.tree)
 
 
 
@@ -2936,23 +2977,23 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal95 = None
-        string_literal97 = None
+        string_literal94 = None
+        string_literal96 = None
         role = None
 
-        interactionSignatureDef94 = None
+        interactionSignatureDef93 = None
 
-        assertDef96 = None
+        assertDef95 = None
 
-        roleName98 = None
+        roleName97 = None
 
-        assertDef99 = None
+        assertDef98 = None
 
 
-        string_literal95_tree = None
-        string_literal97_tree = None
-        stream_47 = RewriteRuleTokenStream(self._adaptor, "token 47")
-        stream_37 = RewriteRuleTokenStream(self._adaptor, "token 37")
+        string_literal94_tree = None
+        string_literal96_tree = None
+        stream_48 = RewriteRuleTokenStream(self._adaptor, "token 48")
+        stream_38 = RewriteRuleTokenStream(self._adaptor, "token 38")
         stream_assertDef = RewriteRuleSubtreeStream(self._adaptor, "rule assertDef")
         stream_roleName = RewriteRuleSubtreeStream(self._adaptor, "rule roleName")
         stream_interactionSignatureDef = RewriteRuleSubtreeStream(self._adaptor, "rule interactionSignatureDef")
@@ -2961,35 +3002,35 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:90:15: ( interactionSignatureDef ( 'from' role= roleName ( assertDef ) -> ^( RESV interactionSignatureDef $role assertDef ) | 'to' roleName ( assertDef ) -> ^( SEND interactionSignatureDef roleName assertDef ) ) )
                 # src/SavedFSM/Monitor.g:91:7: interactionSignatureDef ( 'from' role= roleName ( assertDef ) -> ^( RESV interactionSignatureDef $role assertDef ) | 'to' roleName ( assertDef ) -> ^( SEND interactionSignatureDef roleName assertDef ) )
                 pass 
-                self._state.following.append(self.FOLLOW_interactionSignatureDef_in_interactionDef823)
-                interactionSignatureDef94 = self.interactionSignatureDef()
+                self._state.following.append(self.FOLLOW_interactionSignatureDef_in_interactionDef836)
+                interactionSignatureDef93 = self.interactionSignatureDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_interactionSignatureDef.add(interactionSignatureDef94.tree)
+                    stream_interactionSignatureDef.add(interactionSignatureDef93.tree)
                 # src/SavedFSM/Monitor.g:91:31: ( 'from' role= roleName ( assertDef ) -> ^( RESV interactionSignatureDef $role assertDef ) | 'to' roleName ( assertDef ) -> ^( SEND interactionSignatureDef roleName assertDef ) )
-                alt28 = 2
-                LA28_0 = self.input.LA(1)
+                alt27 = 2
+                LA27_0 = self.input.LA(1)
 
-                if (LA28_0 == 37) :
-                    alt28 = 1
-                elif (LA28_0 == 47) :
-                    alt28 = 2
+                if (LA27_0 == 38) :
+                    alt27 = 1
+                elif (LA27_0 == 48) :
+                    alt27 = 2
                 else:
                     if self._state.backtracking > 0:
                         raise BacktrackingFailed
 
-                    nvae = NoViableAltException("", 28, 0, self.input)
+                    nvae = NoViableAltException("", 27, 0, self.input)
 
                     raise nvae
 
-                if alt28 == 1:
+                if alt27 == 1:
                     # src/SavedFSM/Monitor.g:92:3: 'from' role= roleName ( assertDef )
                     pass 
-                    string_literal95=self.match(self.input, 37, self.FOLLOW_37_in_interactionDef829) 
+                    string_literal94=self.match(self.input, 38, self.FOLLOW_38_in_interactionDef842) 
                     if self._state.backtracking == 0:
-                        stream_37.add(string_literal95)
-                    self._state.following.append(self.FOLLOW_roleName_in_interactionDef834)
+                        stream_38.add(string_literal94)
+                    self._state.following.append(self.FOLLOW_roleName_in_interactionDef847)
                     role = self.roleName()
 
                     self._state.following.pop()
@@ -2998,18 +3039,18 @@ class MonitorParser(Parser):
                     # src/SavedFSM/Monitor.g:92:26: ( assertDef )
                     # src/SavedFSM/Monitor.g:92:27: assertDef
                     pass 
-                    self._state.following.append(self.FOLLOW_assertDef_in_interactionDef838)
-                    assertDef96 = self.assertDef()
+                    self._state.following.append(self.FOLLOW_assertDef_in_interactionDef851)
+                    assertDef95 = self.assertDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_assertDef.add(assertDef96.tree)
+                        stream_assertDef.add(assertDef95.tree)
 
 
 
 
                     # AST Rewrite
-                    # elements: interactionSignatureDef, role, assertDef
+                    # elements: assertDef, role, interactionSignatureDef
                     # token labels: 
                     # rule labels: retval, role
                     # token list labels: 
@@ -3048,33 +3089,33 @@ class MonitorParser(Parser):
                         retval.tree = root_0
 
 
-                elif alt28 == 2:
+                elif alt27 == 2:
                     # src/SavedFSM/Monitor.g:93:10: 'to' roleName ( assertDef )
                     pass 
-                    string_literal97=self.match(self.input, 47, self.FOLLOW_47_in_interactionDef862) 
+                    string_literal96=self.match(self.input, 48, self.FOLLOW_48_in_interactionDef875) 
                     if self._state.backtracking == 0:
-                        stream_47.add(string_literal97)
-                    self._state.following.append(self.FOLLOW_roleName_in_interactionDef864)
-                    roleName98 = self.roleName()
+                        stream_48.add(string_literal96)
+                    self._state.following.append(self.FOLLOW_roleName_in_interactionDef877)
+                    roleName97 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_roleName.add(roleName98.tree)
+                        stream_roleName.add(roleName97.tree)
                     # src/SavedFSM/Monitor.g:93:25: ( assertDef )
                     # src/SavedFSM/Monitor.g:93:26: assertDef
                     pass 
-                    self._state.following.append(self.FOLLOW_assertDef_in_interactionDef868)
-                    assertDef99 = self.assertDef()
+                    self._state.following.append(self.FOLLOW_assertDef_in_interactionDef881)
+                    assertDef98 = self.assertDef()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_assertDef.add(assertDef99.tree)
+                        stream_assertDef.add(assertDef98.tree)
 
 
 
 
                     # AST Rewrite
-                    # elements: roleName, interactionSignatureDef, assertDef
+                    # elements: roleName, assertDef, interactionSignatureDef
                     # token labels: 
                     # rule labels: retval
                     # token list labels: 
@@ -3148,22 +3189,22 @@ class MonitorParser(Parser):
 
         root_0 = None
 
+        string_literal99 = None
         string_literal100 = None
-        string_literal101 = None
-        string_literal104 = None
-        roleName102 = None
+        string_literal103 = None
+        roleName101 = None
 
-        blockDef103 = None
+        blockDef102 = None
 
-        blockDef105 = None
+        blockDef104 = None
 
 
+        string_literal99_tree = None
         string_literal100_tree = None
-        string_literal101_tree = None
-        string_literal104_tree = None
+        string_literal103_tree = None
         stream_49 = RewriteRuleTokenStream(self._adaptor, "token 49")
-        stream_48 = RewriteRuleTokenStream(self._adaptor, "token 48")
-        stream_39 = RewriteRuleTokenStream(self._adaptor, "token 39")
+        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
+        stream_50 = RewriteRuleTokenStream(self._adaptor, "token 50")
         stream_roleName = RewriteRuleSubtreeStream(self._adaptor, "rule roleName")
         stream_blockDef = RewriteRuleSubtreeStream(self._adaptor, "rule blockDef")
         try:
@@ -3171,64 +3212,64 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:95:10: ( 'choice' ( 'at' roleName )? blockDef ( 'or' blockDef )* -> ^( 'choice' ( blockDef )+ ) )
                 # src/SavedFSM/Monitor.g:95:12: 'choice' ( 'at' roleName )? blockDef ( 'or' blockDef )*
                 pass 
-                string_literal100=self.match(self.input, 48, self.FOLLOW_48_in_choiceDef889) 
+                string_literal99=self.match(self.input, 49, self.FOLLOW_49_in_choiceDef902) 
                 if self._state.backtracking == 0:
-                    stream_48.add(string_literal100)
+                    stream_49.add(string_literal99)
                 # src/SavedFSM/Monitor.g:95:21: ( 'at' roleName )?
-                alt29 = 2
-                LA29_0 = self.input.LA(1)
+                alt28 = 2
+                LA28_0 = self.input.LA(1)
 
-                if (LA29_0 == 39) :
-                    alt29 = 1
-                if alt29 == 1:
+                if (LA28_0 == 40) :
+                    alt28 = 1
+                if alt28 == 1:
                     # src/SavedFSM/Monitor.g:95:23: 'at' roleName
                     pass 
-                    string_literal101=self.match(self.input, 39, self.FOLLOW_39_in_choiceDef893) 
+                    string_literal100=self.match(self.input, 40, self.FOLLOW_40_in_choiceDef906) 
                     if self._state.backtracking == 0:
-                        stream_39.add(string_literal101)
-                    self._state.following.append(self.FOLLOW_roleName_in_choiceDef895)
-                    roleName102 = self.roleName()
+                        stream_40.add(string_literal100)
+                    self._state.following.append(self.FOLLOW_roleName_in_choiceDef908)
+                    roleName101 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_roleName.add(roleName102.tree)
+                        stream_roleName.add(roleName101.tree)
 
 
 
-                self._state.following.append(self.FOLLOW_blockDef_in_choiceDef900)
-                blockDef103 = self.blockDef()
+                self._state.following.append(self.FOLLOW_blockDef_in_choiceDef913)
+                blockDef102 = self.blockDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_blockDef.add(blockDef103.tree)
+                    stream_blockDef.add(blockDef102.tree)
                 # src/SavedFSM/Monitor.g:95:49: ( 'or' blockDef )*
-                while True: #loop30
-                    alt30 = 2
-                    LA30_0 = self.input.LA(1)
+                while True: #loop29
+                    alt29 = 2
+                    LA29_0 = self.input.LA(1)
 
-                    if (LA30_0 == 49) :
-                        alt30 = 1
+                    if (LA29_0 == 50) :
+                        alt29 = 1
 
 
-                    if alt30 == 1:
+                    if alt29 == 1:
                         # src/SavedFSM/Monitor.g:95:51: 'or' blockDef
                         pass 
-                        string_literal104=self.match(self.input, 49, self.FOLLOW_49_in_choiceDef904) 
+                        string_literal103=self.match(self.input, 50, self.FOLLOW_50_in_choiceDef917) 
                         if self._state.backtracking == 0:
-                            stream_49.add(string_literal104)
-                        self._state.following.append(self.FOLLOW_blockDef_in_choiceDef906)
-                        blockDef105 = self.blockDef()
+                            stream_50.add(string_literal103)
+                        self._state.following.append(self.FOLLOW_blockDef_in_choiceDef919)
+                        blockDef104 = self.blockDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            stream_blockDef.add(blockDef105.tree)
+                            stream_blockDef.add(blockDef104.tree)
 
 
                     else:
-                        break #loop30
+                        break #loop29
 
                 # AST Rewrite
-                # elements: 48, blockDef
+                # elements: 49, blockDef
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -3248,7 +3289,7 @@ class MonitorParser(Parser):
                     # 95:68: -> ^( 'choice' ( blockDef )+ )
                     # src/SavedFSM/Monitor.g:95:71: ^( 'choice' ( blockDef )+ )
                     root_1 = self._adaptor.nil()
-                    root_1 = self._adaptor.becomeRoot(stream_48.nextNode(), root_1)
+                    root_1 = self._adaptor.becomeRoot(stream_49.nextNode(), root_1)
 
                     # src/SavedFSM/Monitor.g:95:82: ( blockDef )+
                     if not (stream_blockDef.hasNext()):
@@ -3305,25 +3346,25 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal106 = None
-        string_literal108 = None
-        char_literal110 = None
-        char_literal112 = None
-        char_literal114 = None
-        roleName107 = None
+        string_literal105 = None
+        string_literal107 = None
+        char_literal109 = None
+        char_literal111 = None
+        char_literal113 = None
+        roleName106 = None
 
-        roleName109 = None
+        roleName108 = None
 
-        roleName111 = None
+        roleName110 = None
 
-        onMessageDef113 = None
+        onMessageDef112 = None
 
 
-        string_literal106_tree = None
-        string_literal108_tree = None
-        char_literal110_tree = None
-        char_literal112_tree = None
-        char_literal114_tree = None
+        string_literal105_tree = None
+        string_literal107_tree = None
+        char_literal109_tree = None
+        char_literal111_tree = None
+        char_literal113_tree = None
 
         try:
             try:
@@ -3333,119 +3374,119 @@ class MonitorParser(Parser):
                 root_0 = self._adaptor.nil()
 
                 # src/SavedFSM/Monitor.g:97:20: ( 'from' roleName )?
-                alt31 = 2
-                LA31_0 = self.input.LA(1)
+                alt30 = 2
+                LA30_0 = self.input.LA(1)
 
-                if (LA31_0 == 37) :
-                    alt31 = 1
-                if alt31 == 1:
+                if (LA30_0 == 38) :
+                    alt30 = 1
+                if alt30 == 1:
                     # src/SavedFSM/Monitor.g:97:22: 'from' roleName
                     pass 
-                    string_literal106=self.match(self.input, 37, self.FOLLOW_37_in_directedChoiceDef927)
+                    string_literal105=self.match(self.input, 38, self.FOLLOW_38_in_directedChoiceDef940)
                     if self._state.backtracking == 0:
 
-                        string_literal106_tree = self._adaptor.createWithPayload(string_literal106)
-                        self._adaptor.addChild(root_0, string_literal106_tree)
+                        string_literal105_tree = self._adaptor.createWithPayload(string_literal105)
+                        self._adaptor.addChild(root_0, string_literal105_tree)
 
-                    self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef929)
-                    roleName107 = self.roleName()
+                    self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef942)
+                    roleName106 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, roleName107.tree)
+                        self._adaptor.addChild(root_0, roleName106.tree)
 
 
 
                 # src/SavedFSM/Monitor.g:97:41: ( 'to' roleName ( ',' roleName )* )?
-                alt33 = 2
-                LA33_0 = self.input.LA(1)
+                alt32 = 2
+                LA32_0 = self.input.LA(1)
 
-                if (LA33_0 == 47) :
-                    alt33 = 1
-                if alt33 == 1:
+                if (LA32_0 == 48) :
+                    alt32 = 1
+                if alt32 == 1:
                     # src/SavedFSM/Monitor.g:97:43: 'to' roleName ( ',' roleName )*
                     pass 
-                    string_literal108=self.match(self.input, 47, self.FOLLOW_47_in_directedChoiceDef936)
+                    string_literal107=self.match(self.input, 48, self.FOLLOW_48_in_directedChoiceDef949)
                     if self._state.backtracking == 0:
 
-                        string_literal108_tree = self._adaptor.createWithPayload(string_literal108)
-                        self._adaptor.addChild(root_0, string_literal108_tree)
+                        string_literal107_tree = self._adaptor.createWithPayload(string_literal107)
+                        self._adaptor.addChild(root_0, string_literal107_tree)
 
-                    self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef938)
-                    roleName109 = self.roleName()
+                    self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef951)
+                    roleName108 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, roleName109.tree)
+                        self._adaptor.addChild(root_0, roleName108.tree)
                     # src/SavedFSM/Monitor.g:97:57: ( ',' roleName )*
-                    while True: #loop32
-                        alt32 = 2
-                        LA32_0 = self.input.LA(1)
+                    while True: #loop31
+                        alt31 = 2
+                        LA31_0 = self.input.LA(1)
 
-                        if (LA32_0 == 35) :
-                            alt32 = 1
+                        if (LA31_0 == 36) :
+                            alt31 = 1
 
 
-                        if alt32 == 1:
+                        if alt31 == 1:
                             # src/SavedFSM/Monitor.g:97:59: ',' roleName
                             pass 
-                            char_literal110=self.match(self.input, 35, self.FOLLOW_35_in_directedChoiceDef942)
-                            self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef945)
-                            roleName111 = self.roleName()
+                            char_literal109=self.match(self.input, 36, self.FOLLOW_36_in_directedChoiceDef955)
+                            self._state.following.append(self.FOLLOW_roleName_in_directedChoiceDef958)
+                            roleName110 = self.roleName()
 
                             self._state.following.pop()
                             if self._state.backtracking == 0:
-                                self._adaptor.addChild(root_0, roleName111.tree)
+                                self._adaptor.addChild(root_0, roleName110.tree)
 
 
                         else:
-                            break #loop32
+                            break #loop31
 
 
 
-                char_literal112=self.match(self.input, 40, self.FOLLOW_40_in_directedChoiceDef953)
+                char_literal111=self.match(self.input, 41, self.FOLLOW_41_in_directedChoiceDef966)
                 if self._state.backtracking == 0:
 
-                    char_literal112_tree = self._adaptor.createWithPayload(char_literal112)
-                    self._adaptor.addChild(root_0, char_literal112_tree)
+                    char_literal111_tree = self._adaptor.createWithPayload(char_literal111)
+                    self._adaptor.addChild(root_0, char_literal111_tree)
 
                 # src/SavedFSM/Monitor.g:97:83: ( onMessageDef )+
-                cnt34 = 0
-                while True: #loop34
-                    alt34 = 2
-                    LA34_0 = self.input.LA(1)
+                cnt33 = 0
+                while True: #loop33
+                    alt33 = 2
+                    LA33_0 = self.input.LA(1)
 
-                    if (LA34_0 == ID or LA34_0 == 42) :
-                        alt34 = 1
+                    if (LA33_0 == ID or LA33_0 == 43) :
+                        alt33 = 1
 
 
-                    if alt34 == 1:
+                    if alt33 == 1:
                         # src/SavedFSM/Monitor.g:97:85: onMessageDef
                         pass 
-                        self._state.following.append(self.FOLLOW_onMessageDef_in_directedChoiceDef957)
-                        onMessageDef113 = self.onMessageDef()
+                        self._state.following.append(self.FOLLOW_onMessageDef_in_directedChoiceDef970)
+                        onMessageDef112 = self.onMessageDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, onMessageDef113.tree)
+                            self._adaptor.addChild(root_0, onMessageDef112.tree)
 
 
                     else:
-                        if cnt34 >= 1:
-                            break #loop34
+                        if cnt33 >= 1:
+                            break #loop33
 
                         if self._state.backtracking > 0:
                             raise BacktrackingFailed
 
-                        eee = EarlyExitException(34, self.input)
+                        eee = EarlyExitException(33, self.input)
                         raise eee
 
-                    cnt34 += 1
-                char_literal114=self.match(self.input, 41, self.FOLLOW_41_in_directedChoiceDef962)
+                    cnt33 += 1
+                char_literal113=self.match(self.input, 42, self.FOLLOW_42_in_directedChoiceDef975)
                 if self._state.backtracking == 0:
 
-                    char_literal114_tree = self._adaptor.createWithPayload(char_literal114)
-                    self._adaptor.addChild(root_0, char_literal114_tree)
+                    char_literal113_tree = self._adaptor.createWithPayload(char_literal113)
+                    self._adaptor.addChild(root_0, char_literal113_tree)
 
 
 
@@ -3487,13 +3528,13 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        char_literal116 = None
-        interactionSignatureDef115 = None
+        char_literal115 = None
+        interactionSignatureDef114 = None
 
-        activityList117 = None
+        activityList116 = None
 
 
-        char_literal116_tree = None
+        char_literal115_tree = None
 
         try:
             try:
@@ -3502,24 +3543,24 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_interactionSignatureDef_in_onMessageDef969)
-                interactionSignatureDef115 = self.interactionSignatureDef()
+                self._state.following.append(self.FOLLOW_interactionSignatureDef_in_onMessageDef982)
+                interactionSignatureDef114 = self.interactionSignatureDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, interactionSignatureDef115.tree)
-                char_literal116=self.match(self.input, 46, self.FOLLOW_46_in_onMessageDef971)
+                    self._adaptor.addChild(root_0, interactionSignatureDef114.tree)
+                char_literal115=self.match(self.input, 47, self.FOLLOW_47_in_onMessageDef984)
                 if self._state.backtracking == 0:
 
-                    char_literal116_tree = self._adaptor.createWithPayload(char_literal116)
-                    self._adaptor.addChild(root_0, char_literal116_tree)
+                    char_literal115_tree = self._adaptor.createWithPayload(char_literal115)
+                    self._adaptor.addChild(root_0, char_literal115_tree)
 
-                self._state.following.append(self.FOLLOW_activityList_in_onMessageDef973)
-                activityList117 = self.activityList()
+                self._state.following.append(self.FOLLOW_activityList_in_onMessageDef986)
+                activityList116 = self.activityList()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, activityList117.tree)
+                    self._adaptor.addChild(root_0, activityList116.tree)
 
 
 
@@ -3560,11 +3601,11 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ANNOTATION118 = None
-        activityDef119 = None
+        ANNOTATION117 = None
+        activityDef118 = None
 
 
-        ANNOTATION118_tree = None
+        ANNOTATION117_tree = None
 
         try:
             try:
@@ -3574,44 +3615,44 @@ class MonitorParser(Parser):
                 root_0 = self._adaptor.nil()
 
                 # src/SavedFSM/Monitor.g:101:15: ( ( ANNOTATION )* activityDef )*
-                while True: #loop36
-                    alt36 = 2
-                    alt36 = self.dfa36.predict(self.input)
-                    if alt36 == 1:
+                while True: #loop35
+                    alt35 = 2
+                    alt35 = self.dfa35.predict(self.input)
+                    if alt35 == 1:
                         # src/SavedFSM/Monitor.g:101:17: ( ANNOTATION )* activityDef
                         pass 
                         # src/SavedFSM/Monitor.g:101:17: ( ANNOTATION )*
-                        while True: #loop35
-                            alt35 = 2
-                            LA35_0 = self.input.LA(1)
+                        while True: #loop34
+                            alt34 = 2
+                            LA34_0 = self.input.LA(1)
 
-                            if (LA35_0 == ANNOTATION) :
-                                alt35 = 1
+                            if (LA34_0 == ANNOTATION) :
+                                alt34 = 1
 
 
-                            if alt35 == 1:
+                            if alt34 == 1:
                                 # src/SavedFSM/Monitor.g:101:19: ANNOTATION
                                 pass 
-                                ANNOTATION118=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_activityList986)
+                                ANNOTATION117=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_activityList999)
                                 if self._state.backtracking == 0:
 
-                                    ANNOTATION118_tree = self._adaptor.createWithPayload(ANNOTATION118)
-                                    self._adaptor.addChild(root_0, ANNOTATION118_tree)
+                                    ANNOTATION117_tree = self._adaptor.createWithPayload(ANNOTATION117)
+                                    self._adaptor.addChild(root_0, ANNOTATION117_tree)
 
 
 
                             else:
-                                break #loop35
-                        self._state.following.append(self.FOLLOW_activityDef_in_activityList991)
-                        activityDef119 = self.activityDef()
+                                break #loop34
+                        self._state.following.append(self.FOLLOW_activityDef_in_activityList1004)
+                        activityDef118 = self.activityDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, activityDef119.tree)
+                            self._adaptor.addChild(root_0, activityDef118.tree)
 
 
                     else:
-                        break #loop36
+                        break #loop35
 
 
 
@@ -3652,22 +3693,22 @@ class MonitorParser(Parser):
 
         root_0 = None
 
+        string_literal119 = None
         string_literal120 = None
-        string_literal121 = None
-        char_literal123 = None
-        roleName122 = None
+        char_literal122 = None
+        roleName121 = None
 
-        roleName124 = None
+        roleName123 = None
 
-        blockDef125 = None
+        blockDef124 = None
 
 
+        string_literal119_tree = None
         string_literal120_tree = None
-        string_literal121_tree = None
-        char_literal123_tree = None
-        stream_35 = RewriteRuleTokenStream(self._adaptor, "token 35")
-        stream_39 = RewriteRuleTokenStream(self._adaptor, "token 39")
-        stream_50 = RewriteRuleTokenStream(self._adaptor, "token 50")
+        char_literal122_tree = None
+        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
+        stream_51 = RewriteRuleTokenStream(self._adaptor, "token 51")
+        stream_36 = RewriteRuleTokenStream(self._adaptor, "token 36")
         stream_roleName = RewriteRuleSubtreeStream(self._adaptor, "rule roleName")
         stream_blockDef = RewriteRuleSubtreeStream(self._adaptor, "rule blockDef")
         try:
@@ -3675,64 +3716,64 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:103:10: ( 'repeat' ( 'at' roleName ( ',' roleName )* )? blockDef -> ^( 'repeat' blockDef ) )
                 # src/SavedFSM/Monitor.g:103:12: 'repeat' ( 'at' roleName ( ',' roleName )* )? blockDef
                 pass 
-                string_literal120=self.match(self.input, 50, self.FOLLOW_50_in_repeatDef1001) 
+                string_literal119=self.match(self.input, 51, self.FOLLOW_51_in_repeatDef1014) 
                 if self._state.backtracking == 0:
-                    stream_50.add(string_literal120)
+                    stream_51.add(string_literal119)
                 # src/SavedFSM/Monitor.g:103:21: ( 'at' roleName ( ',' roleName )* )?
-                alt38 = 2
-                LA38_0 = self.input.LA(1)
+                alt37 = 2
+                LA37_0 = self.input.LA(1)
 
-                if (LA38_0 == 39) :
-                    alt38 = 1
-                if alt38 == 1:
+                if (LA37_0 == 40) :
+                    alt37 = 1
+                if alt37 == 1:
                     # src/SavedFSM/Monitor.g:103:23: 'at' roleName ( ',' roleName )*
                     pass 
-                    string_literal121=self.match(self.input, 39, self.FOLLOW_39_in_repeatDef1005) 
+                    string_literal120=self.match(self.input, 40, self.FOLLOW_40_in_repeatDef1018) 
                     if self._state.backtracking == 0:
-                        stream_39.add(string_literal121)
-                    self._state.following.append(self.FOLLOW_roleName_in_repeatDef1007)
-                    roleName122 = self.roleName()
+                        stream_40.add(string_literal120)
+                    self._state.following.append(self.FOLLOW_roleName_in_repeatDef1020)
+                    roleName121 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        stream_roleName.add(roleName122.tree)
+                        stream_roleName.add(roleName121.tree)
                     # src/SavedFSM/Monitor.g:103:37: ( ',' roleName )*
-                    while True: #loop37
-                        alt37 = 2
-                        LA37_0 = self.input.LA(1)
+                    while True: #loop36
+                        alt36 = 2
+                        LA36_0 = self.input.LA(1)
 
-                        if (LA37_0 == 35) :
-                            alt37 = 1
+                        if (LA36_0 == 36) :
+                            alt36 = 1
 
 
-                        if alt37 == 1:
+                        if alt36 == 1:
                             # src/SavedFSM/Monitor.g:103:39: ',' roleName
                             pass 
-                            char_literal123=self.match(self.input, 35, self.FOLLOW_35_in_repeatDef1011) 
+                            char_literal122=self.match(self.input, 36, self.FOLLOW_36_in_repeatDef1024) 
                             if self._state.backtracking == 0:
-                                stream_35.add(char_literal123)
-                            self._state.following.append(self.FOLLOW_roleName_in_repeatDef1013)
-                            roleName124 = self.roleName()
+                                stream_36.add(char_literal122)
+                            self._state.following.append(self.FOLLOW_roleName_in_repeatDef1026)
+                            roleName123 = self.roleName()
 
                             self._state.following.pop()
                             if self._state.backtracking == 0:
-                                stream_roleName.add(roleName124.tree)
+                                stream_roleName.add(roleName123.tree)
 
 
                         else:
-                            break #loop37
+                            break #loop36
 
 
 
-                self._state.following.append(self.FOLLOW_blockDef_in_repeatDef1021)
-                blockDef125 = self.blockDef()
+                self._state.following.append(self.FOLLOW_blockDef_in_repeatDef1034)
+                blockDef124 = self.blockDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_blockDef.add(blockDef125.tree)
+                    stream_blockDef.add(blockDef124.tree)
 
                 # AST Rewrite
-                # elements: 50, blockDef
+                # elements: 51, blockDef
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -3752,7 +3793,7 @@ class MonitorParser(Parser):
                     # 103:68: -> ^( 'repeat' blockDef )
                     # src/SavedFSM/Monitor.g:103:71: ^( 'repeat' blockDef )
                     root_1 = self._adaptor.nil()
-                    root_1 = self._adaptor.becomeRoot(stream_50.nextNode(), root_1)
+                    root_1 = self._adaptor.becomeRoot(stream_51.nextNode(), root_1)
 
                     self._adaptor.addChild(root_1, stream_blockDef.nextTree())
 
@@ -3801,14 +3842,14 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal126 = None
-        labelName127 = None
+        string_literal125 = None
+        labelName126 = None
 
-        blockDef128 = None
+        blockDef127 = None
 
 
-        string_literal126_tree = None
-        stream_51 = RewriteRuleTokenStream(self._adaptor, "token 51")
+        string_literal125_tree = None
+        stream_52 = RewriteRuleTokenStream(self._adaptor, "token 52")
         stream_labelName = RewriteRuleSubtreeStream(self._adaptor, "rule labelName")
         stream_blockDef = RewriteRuleSubtreeStream(self._adaptor, "rule blockDef")
         try:
@@ -3816,24 +3857,24 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:105:12: ( 'rec' labelName blockDef -> ^( 'rec' labelName blockDef ) )
                 # src/SavedFSM/Monitor.g:105:14: 'rec' labelName blockDef
                 pass 
-                string_literal126=self.match(self.input, 51, self.FOLLOW_51_in_recBlockDef1037) 
+                string_literal125=self.match(self.input, 52, self.FOLLOW_52_in_recBlockDef1050) 
                 if self._state.backtracking == 0:
-                    stream_51.add(string_literal126)
-                self._state.following.append(self.FOLLOW_labelName_in_recBlockDef1039)
-                labelName127 = self.labelName()
+                    stream_52.add(string_literal125)
+                self._state.following.append(self.FOLLOW_labelName_in_recBlockDef1052)
+                labelName126 = self.labelName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_labelName.add(labelName127.tree)
-                self._state.following.append(self.FOLLOW_blockDef_in_recBlockDef1041)
-                blockDef128 = self.blockDef()
+                    stream_labelName.add(labelName126.tree)
+                self._state.following.append(self.FOLLOW_blockDef_in_recBlockDef1054)
+                blockDef127 = self.blockDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_blockDef.add(blockDef128.tree)
+                    stream_blockDef.add(blockDef127.tree)
 
                 # AST Rewrite
-                # elements: labelName, 51, blockDef
+                # elements: labelName, blockDef, 52
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -3853,7 +3894,7 @@ class MonitorParser(Parser):
                     # 105:39: -> ^( 'rec' labelName blockDef )
                     # src/SavedFSM/Monitor.g:105:42: ^( 'rec' labelName blockDef )
                     root_1 = self._adaptor.nil()
-                    root_1 = self._adaptor.becomeRoot(stream_51.nextNode(), root_1)
+                    root_1 = self._adaptor.becomeRoot(stream_52.nextNode(), root_1)
 
                     self._adaptor.addChild(root_1, stream_labelName.nextTree())
                     self._adaptor.addChild(root_1, stream_blockDef.nextTree())
@@ -3903,9 +3944,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID129 = None
+        ID128 = None
 
-        ID129_tree = None
+        ID128_tree = None
         stream_ID = RewriteRuleTokenStream(self._adaptor, "token ID")
 
         try:
@@ -3913,9 +3954,9 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:107:10: ( ID -> ID )
                 # src/SavedFSM/Monitor.g:107:12: ID
                 pass 
-                ID129=self.match(self.input, ID, self.FOLLOW_ID_in_labelName1058) 
+                ID128=self.match(self.input, ID, self.FOLLOW_ID_in_labelName1071) 
                 if self._state.backtracking == 0:
-                    stream_ID.add(ID129)
+                    stream_ID.add(ID128)
 
                 # AST Rewrite
                 # elements: ID
@@ -3981,7 +4022,7 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        labelName130 = None
+        labelName129 = None
 
 
         stream_labelName = RewriteRuleSubtreeStream(self._adaptor, "rule labelName")
@@ -3990,12 +4031,12 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:109:13: ( labelName -> ^( RECLABEL labelName ) )
                 # src/SavedFSM/Monitor.g:109:15: labelName
                 pass 
-                self._state.following.append(self.FOLLOW_labelName_in_recursionDef1070)
-                labelName130 = self.labelName()
+                self._state.following.append(self.FOLLOW_labelName_in_recursionDef1083)
+                labelName129 = self.labelName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_labelName.add(labelName130.tree)
+                    stream_labelName.add(labelName129.tree)
 
                 # AST Rewrite
                 # elements: labelName
@@ -4067,9 +4108,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal131 = None
+        string_literal130 = None
 
-        string_literal131_tree = None
+        string_literal130_tree = None
 
         try:
             try:
@@ -4078,11 +4119,11 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                string_literal131=self.match(self.input, 52, self.FOLLOW_52_in_endDef1086)
+                string_literal130=self.match(self.input, 53, self.FOLLOW_53_in_endDef1099)
                 if self._state.backtracking == 0:
 
-                    string_literal131_tree = self._adaptor.createWithPayload(string_literal131)
-                    root_0 = self._adaptor.becomeRoot(string_literal131_tree, root_0)
+                    string_literal130_tree = self._adaptor.createWithPayload(string_literal130)
+                    root_0 = self._adaptor.becomeRoot(string_literal130_tree, root_0)
 
 
 
@@ -4124,25 +4165,25 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal132 = None
-        char_literal134 = None
-        char_literal136 = None
-        char_literal138 = None
-        string_literal139 = None
-        protocolRefDef133 = None
+        string_literal131 = None
+        char_literal133 = None
+        char_literal135 = None
+        char_literal137 = None
+        string_literal138 = None
+        protocolRefDef132 = None
 
-        parameter135 = None
+        parameter134 = None
 
-        parameter137 = None
+        parameter136 = None
 
-        roleName140 = None
+        roleName139 = None
 
 
-        string_literal132_tree = None
-        char_literal134_tree = None
-        char_literal136_tree = None
-        char_literal138_tree = None
-        string_literal139_tree = None
+        string_literal131_tree = None
+        char_literal133_tree = None
+        char_literal135_tree = None
+        char_literal137_tree = None
+        string_literal138_tree = None
 
         try:
             try:
@@ -4151,73 +4192,73 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                string_literal132=self.match(self.input, 53, self.FOLLOW_53_in_runDef1096)
+                string_literal131=self.match(self.input, 54, self.FOLLOW_54_in_runDef1109)
                 if self._state.backtracking == 0:
 
-                    string_literal132_tree = self._adaptor.createWithPayload(string_literal132)
-                    root_0 = self._adaptor.becomeRoot(string_literal132_tree, root_0)
+                    string_literal131_tree = self._adaptor.createWithPayload(string_literal131)
+                    root_0 = self._adaptor.becomeRoot(string_literal131_tree, root_0)
 
-                self._state.following.append(self.FOLLOW_protocolRefDef_in_runDef1099)
-                protocolRefDef133 = self.protocolRefDef()
+                self._state.following.append(self.FOLLOW_protocolRefDef_in_runDef1112)
+                protocolRefDef132 = self.protocolRefDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, protocolRefDef133.tree)
+                    self._adaptor.addChild(root_0, protocolRefDef132.tree)
                 # src/SavedFSM/Monitor.g:115:31: ( '(' parameter ( ',' parameter )* ')' )?
-                alt40 = 2
-                LA40_0 = self.input.LA(1)
+                alt39 = 2
+                LA39_0 = self.input.LA(1)
 
-                if (LA40_0 == 42) :
-                    alt40 = 1
-                if alt40 == 1:
+                if (LA39_0 == 43) :
+                    alt39 = 1
+                if alt39 == 1:
                     # src/SavedFSM/Monitor.g:115:33: '(' parameter ( ',' parameter )* ')'
                     pass 
-                    char_literal134=self.match(self.input, 42, self.FOLLOW_42_in_runDef1103)
-                    self._state.following.append(self.FOLLOW_parameter_in_runDef1106)
-                    parameter135 = self.parameter()
+                    char_literal133=self.match(self.input, 43, self.FOLLOW_43_in_runDef1116)
+                    self._state.following.append(self.FOLLOW_parameter_in_runDef1119)
+                    parameter134 = self.parameter()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, parameter135.tree)
+                        self._adaptor.addChild(root_0, parameter134.tree)
                     # src/SavedFSM/Monitor.g:115:48: ( ',' parameter )*
-                    while True: #loop39
-                        alt39 = 2
-                        LA39_0 = self.input.LA(1)
+                    while True: #loop38
+                        alt38 = 2
+                        LA38_0 = self.input.LA(1)
 
-                        if (LA39_0 == 35) :
-                            alt39 = 1
+                        if (LA38_0 == 36) :
+                            alt38 = 1
 
 
-                        if alt39 == 1:
+                        if alt38 == 1:
                             # src/SavedFSM/Monitor.g:115:50: ',' parameter
                             pass 
-                            char_literal136=self.match(self.input, 35, self.FOLLOW_35_in_runDef1110)
-                            self._state.following.append(self.FOLLOW_parameter_in_runDef1113)
-                            parameter137 = self.parameter()
+                            char_literal135=self.match(self.input, 36, self.FOLLOW_36_in_runDef1123)
+                            self._state.following.append(self.FOLLOW_parameter_in_runDef1126)
+                            parameter136 = self.parameter()
 
                             self._state.following.pop()
                             if self._state.backtracking == 0:
-                                self._adaptor.addChild(root_0, parameter137.tree)
+                                self._adaptor.addChild(root_0, parameter136.tree)
 
 
                         else:
-                            break #loop39
-                    char_literal138=self.match(self.input, 43, self.FOLLOW_43_in_runDef1118)
+                            break #loop38
+                    char_literal137=self.match(self.input, 44, self.FOLLOW_44_in_runDef1131)
 
 
 
-                string_literal139=self.match(self.input, 37, self.FOLLOW_37_in_runDef1124)
+                string_literal138=self.match(self.input, 38, self.FOLLOW_38_in_runDef1137)
                 if self._state.backtracking == 0:
 
-                    string_literal139_tree = self._adaptor.createWithPayload(string_literal139)
-                    self._adaptor.addChild(root_0, string_literal139_tree)
+                    string_literal138_tree = self._adaptor.createWithPayload(string_literal138)
+                    self._adaptor.addChild(root_0, string_literal138_tree)
 
-                self._state.following.append(self.FOLLOW_roleName_in_runDef1126)
-                roleName140 = self.roleName()
+                self._state.following.append(self.FOLLOW_roleName_in_runDef1139)
+                roleName139 = self.roleName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, roleName140.tree)
+                    self._adaptor.addChild(root_0, roleName139.tree)
 
 
 
@@ -4258,13 +4299,13 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID141 = None
-        string_literal142 = None
-        roleName143 = None
+        ID140 = None
+        string_literal141 = None
+        roleName142 = None
 
 
-        ID141_tree = None
-        string_literal142_tree = None
+        ID140_tree = None
+        string_literal141_tree = None
 
         try:
             try:
@@ -4273,33 +4314,33 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID141=self.match(self.input, ID, self.FOLLOW_ID_in_protocolRefDef1134)
+                ID140=self.match(self.input, ID, self.FOLLOW_ID_in_protocolRefDef1147)
                 if self._state.backtracking == 0:
 
-                    ID141_tree = self._adaptor.createWithPayload(ID141)
-                    self._adaptor.addChild(root_0, ID141_tree)
+                    ID140_tree = self._adaptor.createWithPayload(ID140)
+                    self._adaptor.addChild(root_0, ID140_tree)
 
                 # src/SavedFSM/Monitor.g:117:20: ( 'at' roleName )?
-                alt41 = 2
-                LA41_0 = self.input.LA(1)
+                alt40 = 2
+                LA40_0 = self.input.LA(1)
 
-                if (LA41_0 == 39) :
-                    alt41 = 1
-                if alt41 == 1:
+                if (LA40_0 == 40) :
+                    alt40 = 1
+                if alt40 == 1:
                     # src/SavedFSM/Monitor.g:117:22: 'at' roleName
                     pass 
-                    string_literal142=self.match(self.input, 39, self.FOLLOW_39_in_protocolRefDef1138)
+                    string_literal141=self.match(self.input, 40, self.FOLLOW_40_in_protocolRefDef1151)
                     if self._state.backtracking == 0:
 
-                        string_literal142_tree = self._adaptor.createWithPayload(string_literal142)
-                        self._adaptor.addChild(root_0, string_literal142_tree)
+                        string_literal141_tree = self._adaptor.createWithPayload(string_literal141)
+                        self._adaptor.addChild(root_0, string_literal141_tree)
 
-                    self._state.following.append(self.FOLLOW_roleName_in_protocolRefDef1140)
-                    roleName143 = self.roleName()
+                    self._state.following.append(self.FOLLOW_roleName_in_protocolRefDef1153)
+                    roleName142 = self.roleName()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, roleName143.tree)
+                        self._adaptor.addChild(root_0, roleName142.tree)
 
 
 
@@ -4343,9 +4384,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        ID144 = None
+        ID143 = None
 
-        ID144_tree = None
+        ID143_tree = None
 
         try:
             try:
@@ -4354,11 +4395,11 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                ID144=self.match(self.input, ID, self.FOLLOW_ID_in_declarationName1151)
+                ID143=self.match(self.input, ID, self.FOLLOW_ID_in_declarationName1164)
                 if self._state.backtracking == 0:
 
-                    ID144_tree = self._adaptor.createWithPayload(ID144)
-                    self._adaptor.addChild(root_0, ID144_tree)
+                    ID143_tree = self._adaptor.createWithPayload(ID143)
+                    self._adaptor.addChild(root_0, ID143_tree)
 
 
 
@@ -4400,7 +4441,7 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        declarationName145 = None
+        declarationName144 = None
 
 
 
@@ -4411,12 +4452,12 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_declarationName_in_parameter1159)
-                declarationName145 = self.declarationName()
+                self._state.following.append(self.FOLLOW_declarationName_in_parameter1172)
+                declarationName144 = self.declarationName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, declarationName145.tree)
+                    self._adaptor.addChild(root_0, declarationName144.tree)
 
 
 
@@ -4457,21 +4498,21 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal146 = None
-        char_literal148 = None
-        char_literal150 = None
-        char_literal152 = None
-        protocolRefDef147 = None
+        string_literal145 = None
+        char_literal147 = None
+        char_literal149 = None
+        char_literal151 = None
+        protocolRefDef146 = None
 
-        parameter149 = None
+        parameter148 = None
 
-        parameter151 = None
+        parameter150 = None
 
 
-        string_literal146_tree = None
-        char_literal148_tree = None
-        char_literal150_tree = None
-        char_literal152_tree = None
+        string_literal145_tree = None
+        char_literal147_tree = None
+        char_literal149_tree = None
+        char_literal151_tree = None
 
         try:
             try:
@@ -4480,58 +4521,58 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                string_literal146=self.match(self.input, 54, self.FOLLOW_54_in_inlineDef1168)
+                string_literal145=self.match(self.input, 55, self.FOLLOW_55_in_inlineDef1181)
                 if self._state.backtracking == 0:
 
-                    string_literal146_tree = self._adaptor.createWithPayload(string_literal146)
-                    root_0 = self._adaptor.becomeRoot(string_literal146_tree, root_0)
+                    string_literal145_tree = self._adaptor.createWithPayload(string_literal145)
+                    root_0 = self._adaptor.becomeRoot(string_literal145_tree, root_0)
 
-                self._state.following.append(self.FOLLOW_protocolRefDef_in_inlineDef1171)
-                protocolRefDef147 = self.protocolRefDef()
+                self._state.following.append(self.FOLLOW_protocolRefDef_in_inlineDef1184)
+                protocolRefDef146 = self.protocolRefDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, protocolRefDef147.tree)
+                    self._adaptor.addChild(root_0, protocolRefDef146.tree)
                 # src/SavedFSM/Monitor.g:124:37: ( '(' parameter ( ',' parameter )* ')' )?
-                alt43 = 2
-                LA43_0 = self.input.LA(1)
+                alt42 = 2
+                LA42_0 = self.input.LA(1)
 
-                if (LA43_0 == 42) :
-                    alt43 = 1
-                if alt43 == 1:
+                if (LA42_0 == 43) :
+                    alt42 = 1
+                if alt42 == 1:
                     # src/SavedFSM/Monitor.g:124:39: '(' parameter ( ',' parameter )* ')'
                     pass 
-                    char_literal148=self.match(self.input, 42, self.FOLLOW_42_in_inlineDef1175)
-                    self._state.following.append(self.FOLLOW_parameter_in_inlineDef1178)
-                    parameter149 = self.parameter()
+                    char_literal147=self.match(self.input, 43, self.FOLLOW_43_in_inlineDef1188)
+                    self._state.following.append(self.FOLLOW_parameter_in_inlineDef1191)
+                    parameter148 = self.parameter()
 
                     self._state.following.pop()
                     if self._state.backtracking == 0:
-                        self._adaptor.addChild(root_0, parameter149.tree)
+                        self._adaptor.addChild(root_0, parameter148.tree)
                     # src/SavedFSM/Monitor.g:124:54: ( ',' parameter )*
-                    while True: #loop42
-                        alt42 = 2
-                        LA42_0 = self.input.LA(1)
+                    while True: #loop41
+                        alt41 = 2
+                        LA41_0 = self.input.LA(1)
 
-                        if (LA42_0 == 35) :
-                            alt42 = 1
+                        if (LA41_0 == 36) :
+                            alt41 = 1
 
 
-                        if alt42 == 1:
+                        if alt41 == 1:
                             # src/SavedFSM/Monitor.g:124:56: ',' parameter
                             pass 
-                            char_literal150=self.match(self.input, 35, self.FOLLOW_35_in_inlineDef1182)
-                            self._state.following.append(self.FOLLOW_parameter_in_inlineDef1185)
-                            parameter151 = self.parameter()
+                            char_literal149=self.match(self.input, 36, self.FOLLOW_36_in_inlineDef1195)
+                            self._state.following.append(self.FOLLOW_parameter_in_inlineDef1198)
+                            parameter150 = self.parameter()
 
                             self._state.following.pop()
                             if self._state.backtracking == 0:
-                                self._adaptor.addChild(root_0, parameter151.tree)
+                                self._adaptor.addChild(root_0, parameter150.tree)
 
 
                         else:
-                            break #loop42
-                    char_literal152=self.match(self.input, 43, self.FOLLOW_43_in_inlineDef1190)
+                            break #loop41
+                    char_literal151=self.match(self.input, 44, self.FOLLOW_44_in_inlineDef1203)
 
 
 
@@ -4575,57 +4616,57 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal153 = None
-        string_literal155 = None
-        blockDef154 = None
+        string_literal152 = None
+        string_literal154 = None
+        blockDef153 = None
 
-        blockDef156 = None
+        blockDef155 = None
 
 
-        string_literal153_tree = None
-        string_literal155_tree = None
+        string_literal152_tree = None
+        string_literal154_tree = None
+        stream_57 = RewriteRuleTokenStream(self._adaptor, "token 57")
         stream_56 = RewriteRuleTokenStream(self._adaptor, "token 56")
-        stream_55 = RewriteRuleTokenStream(self._adaptor, "token 55")
         stream_blockDef = RewriteRuleSubtreeStream(self._adaptor, "rule blockDef")
         try:
             try:
                 # src/SavedFSM/Monitor.g:126:12: ( 'parallel' blockDef ( 'and' blockDef )* -> ^( PARALLEL ( blockDef )+ ) )
                 # src/SavedFSM/Monitor.g:126:14: 'parallel' blockDef ( 'and' blockDef )*
                 pass 
-                string_literal153=self.match(self.input, 55, self.FOLLOW_55_in_parallelDef1202) 
+                string_literal152=self.match(self.input, 56, self.FOLLOW_56_in_parallelDef1215) 
                 if self._state.backtracking == 0:
-                    stream_55.add(string_literal153)
-                self._state.following.append(self.FOLLOW_blockDef_in_parallelDef1204)
-                blockDef154 = self.blockDef()
+                    stream_56.add(string_literal152)
+                self._state.following.append(self.FOLLOW_blockDef_in_parallelDef1217)
+                blockDef153 = self.blockDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_blockDef.add(blockDef154.tree)
+                    stream_blockDef.add(blockDef153.tree)
                 # src/SavedFSM/Monitor.g:126:34: ( 'and' blockDef )*
-                while True: #loop44
-                    alt44 = 2
-                    LA44_0 = self.input.LA(1)
+                while True: #loop43
+                    alt43 = 2
+                    LA43_0 = self.input.LA(1)
 
-                    if (LA44_0 == 56) :
-                        alt44 = 1
+                    if (LA43_0 == 57) :
+                        alt43 = 1
 
 
-                    if alt44 == 1:
+                    if alt43 == 1:
                         # src/SavedFSM/Monitor.g:126:36: 'and' blockDef
                         pass 
-                        string_literal155=self.match(self.input, 56, self.FOLLOW_56_in_parallelDef1208) 
+                        string_literal154=self.match(self.input, 57, self.FOLLOW_57_in_parallelDef1221) 
                         if self._state.backtracking == 0:
-                            stream_56.add(string_literal155)
-                        self._state.following.append(self.FOLLOW_blockDef_in_parallelDef1210)
-                        blockDef156 = self.blockDef()
+                            stream_57.add(string_literal154)
+                        self._state.following.append(self.FOLLOW_blockDef_in_parallelDef1223)
+                        blockDef155 = self.blockDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            stream_blockDef.add(blockDef156.tree)
+                            stream_blockDef.add(blockDef155.tree)
 
 
                     else:
-                        break #loop44
+                        break #loop43
 
                 # AST Rewrite
                 # elements: blockDef
@@ -4705,42 +4746,42 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal157 = None
-        char_literal158 = None
-        char_literal160 = None
-        activityListDef159 = None
+        string_literal156 = None
+        char_literal157 = None
+        char_literal159 = None
+        activityListDef158 = None
 
 
-        string_literal157_tree = None
-        char_literal158_tree = None
-        char_literal160_tree = None
-        stream_57 = RewriteRuleTokenStream(self._adaptor, "token 57")
+        string_literal156_tree = None
+        char_literal157_tree = None
+        char_literal159_tree = None
+        stream_58 = RewriteRuleTokenStream(self._adaptor, "token 58")
+        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
         stream_41 = RewriteRuleTokenStream(self._adaptor, "token 41")
-        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
         stream_activityListDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityListDef")
         try:
             try:
                 # src/SavedFSM/Monitor.g:129:11: ( 'do' '{' activityListDef '}' -> ^( 'do' activityListDef ) )
                 # src/SavedFSM/Monitor.g:129:13: 'do' '{' activityListDef '}'
                 pass 
-                string_literal157=self.match(self.input, 57, self.FOLLOW_57_in_doBlockDef1230) 
+                string_literal156=self.match(self.input, 58, self.FOLLOW_58_in_doBlockDef1243) 
                 if self._state.backtracking == 0:
-                    stream_57.add(string_literal157)
-                char_literal158=self.match(self.input, 40, self.FOLLOW_40_in_doBlockDef1232) 
+                    stream_58.add(string_literal156)
+                char_literal157=self.match(self.input, 41, self.FOLLOW_41_in_doBlockDef1245) 
                 if self._state.backtracking == 0:
-                    stream_40.add(char_literal158)
-                self._state.following.append(self.FOLLOW_activityListDef_in_doBlockDef1234)
-                activityListDef159 = self.activityListDef()
+                    stream_41.add(char_literal157)
+                self._state.following.append(self.FOLLOW_activityListDef_in_doBlockDef1247)
+                activityListDef158 = self.activityListDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_activityListDef.add(activityListDef159.tree)
-                char_literal160=self.match(self.input, 41, self.FOLLOW_41_in_doBlockDef1237) 
+                    stream_activityListDef.add(activityListDef158.tree)
+                char_literal159=self.match(self.input, 42, self.FOLLOW_42_in_doBlockDef1250) 
                 if self._state.backtracking == 0:
-                    stream_41.add(char_literal160)
+                    stream_42.add(char_literal159)
 
                 # AST Rewrite
-                # elements: 57, activityListDef
+                # elements: activityListDef, 58
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -4760,7 +4801,7 @@ class MonitorParser(Parser):
                     # 129:43: -> ^( 'do' activityListDef )
                     # src/SavedFSM/Monitor.g:129:46: ^( 'do' activityListDef )
                     root_1 = self._adaptor.nil()
-                    root_1 = self._adaptor.becomeRoot(stream_57.nextNode(), root_1)
+                    root_1 = self._adaptor.becomeRoot(stream_58.nextNode(), root_1)
 
                     self._adaptor.addChild(root_1, stream_activityListDef.nextTree())
 
@@ -4809,23 +4850,23 @@ class MonitorParser(Parser):
 
         root_0 = None
 
+        string_literal160 = None
         string_literal161 = None
-        string_literal162 = None
-        char_literal164 = None
-        char_literal166 = None
-        roleName163 = None
+        char_literal163 = None
+        char_literal165 = None
+        roleName162 = None
 
-        activityListDef165 = None
+        activityListDef164 = None
 
 
+        string_literal160_tree = None
         string_literal161_tree = None
-        string_literal162_tree = None
-        char_literal164_tree = None
-        char_literal166_tree = None
+        char_literal163_tree = None
+        char_literal165_tree = None
         stream_59 = RewriteRuleTokenStream(self._adaptor, "token 59")
-        stream_58 = RewriteRuleTokenStream(self._adaptor, "token 58")
+        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
         stream_41 = RewriteRuleTokenStream(self._adaptor, "token 41")
-        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
+        stream_60 = RewriteRuleTokenStream(self._adaptor, "token 60")
         stream_activityListDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityListDef")
         stream_roleName = RewriteRuleSubtreeStream(self._adaptor, "rule roleName")
         try:
@@ -4833,33 +4874,33 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:131:13: ( 'interrupt' 'by' roleName '{' activityListDef '}' -> ^( 'interrupt' roleName activityListDef ) )
                 # src/SavedFSM/Monitor.g:131:15: 'interrupt' 'by' roleName '{' activityListDef '}'
                 pass 
-                string_literal161=self.match(self.input, 58, self.FOLLOW_58_in_interruptDef1255) 
+                string_literal160=self.match(self.input, 59, self.FOLLOW_59_in_interruptDef1268) 
                 if self._state.backtracking == 0:
-                    stream_58.add(string_literal161)
-                string_literal162=self.match(self.input, 59, self.FOLLOW_59_in_interruptDef1257) 
+                    stream_59.add(string_literal160)
+                string_literal161=self.match(self.input, 60, self.FOLLOW_60_in_interruptDef1270) 
                 if self._state.backtracking == 0:
-                    stream_59.add(string_literal162)
-                self._state.following.append(self.FOLLOW_roleName_in_interruptDef1259)
-                roleName163 = self.roleName()
+                    stream_60.add(string_literal161)
+                self._state.following.append(self.FOLLOW_roleName_in_interruptDef1272)
+                roleName162 = self.roleName()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_roleName.add(roleName163.tree)
-                char_literal164=self.match(self.input, 40, self.FOLLOW_40_in_interruptDef1261) 
+                    stream_roleName.add(roleName162.tree)
+                char_literal163=self.match(self.input, 41, self.FOLLOW_41_in_interruptDef1274) 
                 if self._state.backtracking == 0:
-                    stream_40.add(char_literal164)
-                self._state.following.append(self.FOLLOW_activityListDef_in_interruptDef1263)
-                activityListDef165 = self.activityListDef()
+                    stream_41.add(char_literal163)
+                self._state.following.append(self.FOLLOW_activityListDef_in_interruptDef1276)
+                activityListDef164 = self.activityListDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_activityListDef.add(activityListDef165.tree)
-                char_literal166=self.match(self.input, 41, self.FOLLOW_41_in_interruptDef1265) 
+                    stream_activityListDef.add(activityListDef164.tree)
+                char_literal165=self.match(self.input, 42, self.FOLLOW_42_in_interruptDef1278) 
                 if self._state.backtracking == 0:
-                    stream_41.add(char_literal166)
+                    stream_42.add(char_literal165)
 
                 # AST Rewrite
-                # elements: 58, activityListDef, roleName
+                # elements: activityListDef, 59, roleName
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -4879,7 +4920,7 @@ class MonitorParser(Parser):
                     # 131:65: -> ^( 'interrupt' roleName activityListDef )
                     # src/SavedFSM/Monitor.g:131:68: ^( 'interrupt' roleName activityListDef )
                     root_1 = self._adaptor.nil()
-                    root_1 = self._adaptor.becomeRoot(stream_58.nextNode(), root_1)
+                    root_1 = self._adaptor.becomeRoot(stream_59.nextNode(), root_1)
 
                     self._adaptor.addChild(root_1, stream_roleName.nextTree())
                     self._adaptor.addChild(root_1, stream_activityListDef.nextTree())
@@ -4929,9 +4970,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        doBlockDef167 = None
+        doBlockDef166 = None
 
-        interruptDef168 = None
+        interruptDef167 = None
 
 
         stream_interruptDef = RewriteRuleSubtreeStream(self._adaptor, "rule interruptDef")
@@ -4941,21 +4982,21 @@ class MonitorParser(Parser):
                 # src/SavedFSM/Monitor.g:133:16: ( doBlockDef interruptDef -> ^( GLOBAL_ESCAPE doBlockDef interruptDef ) )
                 # src/SavedFSM/Monitor.g:133:19: doBlockDef interruptDef
                 pass 
-                self._state.following.append(self.FOLLOW_doBlockDef_in_globalEscapeDef1283)
-                doBlockDef167 = self.doBlockDef()
+                self._state.following.append(self.FOLLOW_doBlockDef_in_globalEscapeDef1296)
+                doBlockDef166 = self.doBlockDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_doBlockDef.add(doBlockDef167.tree)
-                self._state.following.append(self.FOLLOW_interruptDef_in_globalEscapeDef1286)
-                interruptDef168 = self.interruptDef()
+                    stream_doBlockDef.add(doBlockDef166.tree)
+                self._state.following.append(self.FOLLOW_interruptDef_in_globalEscapeDef1299)
+                interruptDef167 = self.interruptDef()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    stream_interruptDef.add(interruptDef168.tree)
+                    stream_interruptDef.add(interruptDef167.tree)
 
                 # AST Rewrite
-                # elements: doBlockDef, interruptDef
+                # elements: interruptDef, doBlockDef
                 # token labels: 
                 # rule labels: retval
                 # token list labels: 
@@ -5025,77 +5066,77 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        string_literal169 = None
-        char_literal170 = None
-        ANNOTATION171 = None
-        char_literal173 = None
-        activityDef172 = None
+        string_literal168 = None
+        char_literal169 = None
+        ANNOTATION170 = None
+        char_literal172 = None
+        activityDef171 = None
 
 
-        string_literal169_tree = None
-        char_literal170_tree = None
-        ANNOTATION171_tree = None
-        char_literal173_tree = None
+        string_literal168_tree = None
+        char_literal169_tree = None
+        ANNOTATION170_tree = None
+        char_literal172_tree = None
+        stream_42 = RewriteRuleTokenStream(self._adaptor, "token 42")
         stream_41 = RewriteRuleTokenStream(self._adaptor, "token 41")
-        stream_40 = RewriteRuleTokenStream(self._adaptor, "token 40")
         stream_ANNOTATION = RewriteRuleTokenStream(self._adaptor, "token ANNOTATION")
-        stream_60 = RewriteRuleTokenStream(self._adaptor, "token 60")
+        stream_61 = RewriteRuleTokenStream(self._adaptor, "token 61")
         stream_activityDef = RewriteRuleSubtreeStream(self._adaptor, "rule activityDef")
         try:
             try:
                 # src/SavedFSM/Monitor.g:135:13: ( 'unordered' '{' ( ( ANNOTATION )* activityDef )* '}' -> ^( PARALLEL ( ^( BRANCH activityDef ) )+ ) )
                 # src/SavedFSM/Monitor.g:135:15: 'unordered' '{' ( ( ANNOTATION )* activityDef )* '}'
                 pass 
-                string_literal169=self.match(self.input, 60, self.FOLLOW_60_in_unorderedDef1303) 
+                string_literal168=self.match(self.input, 61, self.FOLLOW_61_in_unorderedDef1316) 
                 if self._state.backtracking == 0:
-                    stream_60.add(string_literal169)
-                char_literal170=self.match(self.input, 40, self.FOLLOW_40_in_unorderedDef1305) 
+                    stream_61.add(string_literal168)
+                char_literal169=self.match(self.input, 41, self.FOLLOW_41_in_unorderedDef1318) 
                 if self._state.backtracking == 0:
-                    stream_40.add(char_literal170)
+                    stream_41.add(char_literal169)
                 # src/SavedFSM/Monitor.g:135:31: ( ( ANNOTATION )* activityDef )*
-                while True: #loop46
-                    alt46 = 2
-                    LA46_0 = self.input.LA(1)
+                while True: #loop45
+                    alt45 = 2
+                    LA45_0 = self.input.LA(1)
 
-                    if (LA46_0 == RECLABEL or (ANNOTATION <= LA46_0 <= ID) or LA46_0 == 37 or LA46_0 == 40 or LA46_0 == 42 or (47 <= LA46_0 <= 48) or (50 <= LA46_0 <= 55) or LA46_0 == 57 or LA46_0 == 60) :
-                        alt46 = 1
+                    if (LA45_0 == RECLABEL or (ANNOTATION <= LA45_0 <= ID) or LA45_0 == 38 or LA45_0 == 41 or LA45_0 == 43 or (48 <= LA45_0 <= 49) or (51 <= LA45_0 <= 56) or LA45_0 == 58 or LA45_0 == 61) :
+                        alt45 = 1
 
 
-                    if alt46 == 1:
+                    if alt45 == 1:
                         # src/SavedFSM/Monitor.g:135:33: ( ANNOTATION )* activityDef
                         pass 
                         # src/SavedFSM/Monitor.g:135:33: ( ANNOTATION )*
-                        while True: #loop45
-                            alt45 = 2
-                            LA45_0 = self.input.LA(1)
+                        while True: #loop44
+                            alt44 = 2
+                            LA44_0 = self.input.LA(1)
 
-                            if (LA45_0 == ANNOTATION) :
-                                alt45 = 1
+                            if (LA44_0 == ANNOTATION) :
+                                alt44 = 1
 
 
-                            if alt45 == 1:
+                            if alt44 == 1:
                                 # src/SavedFSM/Monitor.g:135:35: ANNOTATION
                                 pass 
-                                ANNOTATION171=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_unorderedDef1311) 
+                                ANNOTATION170=self.match(self.input, ANNOTATION, self.FOLLOW_ANNOTATION_in_unorderedDef1324) 
                                 if self._state.backtracking == 0:
-                                    stream_ANNOTATION.add(ANNOTATION171)
+                                    stream_ANNOTATION.add(ANNOTATION170)
 
 
                             else:
-                                break #loop45
-                        self._state.following.append(self.FOLLOW_activityDef_in_unorderedDef1316)
-                        activityDef172 = self.activityDef()
+                                break #loop44
+                        self._state.following.append(self.FOLLOW_activityDef_in_unorderedDef1329)
+                        activityDef171 = self.activityDef()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            stream_activityDef.add(activityDef172.tree)
+                            stream_activityDef.add(activityDef171.tree)
 
 
                     else:
-                        break #loop46
-                char_literal173=self.match(self.input, 41, self.FOLLOW_41_in_unorderedDef1321) 
+                        break #loop45
+                char_literal172=self.match(self.input, 42, self.FOLLOW_42_in_unorderedDef1334) 
                 if self._state.backtracking == 0:
-                    stream_41.add(char_literal173)
+                    stream_42.add(char_literal172)
 
                 # AST Rewrite
                 # elements: activityDef
@@ -5181,13 +5222,13 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        set175 = None
-        term174 = None
+        set174 = None
+        term173 = None
 
-        term176 = None
+        term175 = None
 
 
-        set175_tree = None
+        set174_tree = None
 
         try:
             try:
@@ -5196,29 +5237,29 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_term_in_expr1346)
-                term174 = self.term()
+                self._state.following.append(self.FOLLOW_term_in_expr1359)
+                term173 = self.term()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, term174.tree)
+                    self._adaptor.addChild(root_0, term173.tree)
                 # src/SavedFSM/Monitor.g:144:13: ( ( PLUS | MINUS ) term )*
-                while True: #loop47
-                    alt47 = 2
-                    LA47_0 = self.input.LA(1)
+                while True: #loop46
+                    alt46 = 2
+                    LA46_0 = self.input.LA(1)
 
-                    if ((PLUS <= LA47_0 <= MINUS)) :
-                        alt47 = 1
+                    if ((PLUS <= LA46_0 <= MINUS)) :
+                        alt46 = 1
 
 
-                    if alt47 == 1:
+                    if alt46 == 1:
                         # src/SavedFSM/Monitor.g:144:15: ( PLUS | MINUS ) term
                         pass 
-                        set175 = self.input.LT(1)
+                        set174 = self.input.LT(1)
                         if (PLUS <= self.input.LA(1) <= MINUS):
                             self.input.consume()
                             if self._state.backtracking == 0:
-                                self._adaptor.addChild(root_0, self._adaptor.createWithPayload(set175))
+                                self._adaptor.addChild(root_0, self._adaptor.createWithPayload(set174))
                             self._state.errorRecovery = False
 
                         else:
@@ -5229,16 +5270,16 @@ class MonitorParser(Parser):
                             raise mse
 
 
-                        self._state.following.append(self.FOLLOW_term_in_expr1361)
-                        term176 = self.term()
+                        self._state.following.append(self.FOLLOW_term_in_expr1374)
+                        term175 = self.term()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, term176.tree)
+                            self._adaptor.addChild(root_0, term175.tree)
 
 
                     else:
-                        break #loop47
+                        break #loop46
 
 
 
@@ -5279,13 +5320,13 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        set178 = None
-        factor177 = None
+        set177 = None
+        factor176 = None
 
-        factor179 = None
+        factor178 = None
 
 
-        set178_tree = None
+        set177_tree = None
 
         try:
             try:
@@ -5294,29 +5335,29 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                self._state.following.append(self.FOLLOW_factor_in_term1373)
-                factor177 = self.factor()
+                self._state.following.append(self.FOLLOW_factor_in_term1386)
+                factor176 = self.factor()
 
                 self._state.following.pop()
                 if self._state.backtracking == 0:
-                    self._adaptor.addChild(root_0, factor177.tree)
+                    self._adaptor.addChild(root_0, factor176.tree)
                 # src/SavedFSM/Monitor.g:146:15: ( ( MULT | DIV ) factor )*
-                while True: #loop48
-                    alt48 = 2
-                    LA48_0 = self.input.LA(1)
+                while True: #loop47
+                    alt47 = 2
+                    LA47_0 = self.input.LA(1)
 
-                    if ((MULT <= LA48_0 <= DIV)) :
-                        alt48 = 1
+                    if ((MULT <= LA47_0 <= DIV)) :
+                        alt47 = 1
 
 
-                    if alt48 == 1:
+                    if alt47 == 1:
                         # src/SavedFSM/Monitor.g:146:17: ( MULT | DIV ) factor
                         pass 
-                        set178 = self.input.LT(1)
+                        set177 = self.input.LT(1)
                         if (MULT <= self.input.LA(1) <= DIV):
                             self.input.consume()
                             if self._state.backtracking == 0:
-                                self._adaptor.addChild(root_0, self._adaptor.createWithPayload(set178))
+                                self._adaptor.addChild(root_0, self._adaptor.createWithPayload(set177))
                             self._state.errorRecovery = False
 
                         else:
@@ -5327,16 +5368,16 @@ class MonitorParser(Parser):
                             raise mse
 
 
-                        self._state.following.append(self.FOLLOW_factor_in_term1387)
-                        factor179 = self.factor()
+                        self._state.following.append(self.FOLLOW_factor_in_term1400)
+                        factor178 = self.factor()
 
                         self._state.following.pop()
                         if self._state.backtracking == 0:
-                            self._adaptor.addChild(root_0, factor179.tree)
+                            self._adaptor.addChild(root_0, factor178.tree)
 
 
                     else:
-                        break #loop48
+                        break #loop47
 
 
 
@@ -5377,9 +5418,9 @@ class MonitorParser(Parser):
 
         root_0 = None
 
-        NUMBER180 = None
+        NUMBER179 = None
 
-        NUMBER180_tree = None
+        NUMBER179_tree = None
 
         try:
             try:
@@ -5388,11 +5429,11 @@ class MonitorParser(Parser):
                 pass 
                 root_0 = self._adaptor.nil()
 
-                NUMBER180=self.match(self.input, NUMBER, self.FOLLOW_NUMBER_in_factor1399)
+                NUMBER179=self.match(self.input, NUMBER, self.FOLLOW_NUMBER_in_factor1412)
                 if self._state.backtracking == 0:
 
-                    NUMBER180_tree = self._adaptor.createWithPayload(NUMBER180)
-                    self._adaptor.addChild(root_0, NUMBER180_tree)
+                    NUMBER179_tree = self._adaptor.createWithPayload(NUMBER179)
+                    self._adaptor.addChild(root_0, NUMBER179_tree)
 
 
 
@@ -5431,11 +5472,11 @@ class MonitorParser(Parser):
         )
 
     DFA3_min = DFA.unpack(
-        u"\2\30\2\uffff"
+        u"\2\31\2\uffff"
         )
 
     DFA3_max = DFA.unpack(
-        u"\2\42\2\uffff"
+        u"\2\43\2\uffff"
         )
 
     DFA3_accept = DFA.unpack(
@@ -5460,80 +5501,80 @@ class MonitorParser(Parser):
         pass
 
 
-    # lookup tables for DFA #18
+    # lookup tables for DFA #17
 
-    DFA18_eot = DFA.unpack(
+    DFA17_eot = DFA.unpack(
         u"\4\uffff"
         )
 
-    DFA18_eof = DFA.unpack(
+    DFA17_eof = DFA.unpack(
         u"\4\uffff"
         )
 
-    DFA18_min = DFA.unpack(
+    DFA17_min = DFA.unpack(
         u"\2\22\2\uffff"
         )
 
-    DFA18_max = DFA.unpack(
-        u"\2\74\2\uffff"
+    DFA17_max = DFA.unpack(
+        u"\2\75\2\uffff"
         )
 
-    DFA18_accept = DFA.unpack(
+    DFA17_accept = DFA.unpack(
         u"\2\uffff\1\2\1\1"
         )
 
-    DFA18_special = DFA.unpack(
+    DFA17_special = DFA.unpack(
         u"\4\uffff"
         )
 
             
-    DFA18_transition = [
-        DFA.unpack(u"\1\3\5\uffff\1\1\1\3\10\uffff\1\2\2\uffff\1\3\2\uffff"
+    DFA17_transition = [
+        DFA.unpack(u"\1\3\6\uffff\1\1\1\3\10\uffff\1\2\2\uffff\1\3\2\uffff"
         u"\1\3\1\2\1\3\4\uffff\2\3\1\uffff\6\3\1\uffff\1\3\2\uffff\1\3"),
-        DFA.unpack(u"\1\3\5\uffff\1\1\1\3\10\uffff\1\2\2\uffff\1\3\2\uffff"
+        DFA.unpack(u"\1\3\6\uffff\1\1\1\3\10\uffff\1\2\2\uffff\1\3\2\uffff"
         u"\1\3\1\uffff\1\3\4\uffff\2\3\1\uffff\6\3\1\uffff\1\3\2\uffff\1"
         u"\3"),
         DFA.unpack(u""),
         DFA.unpack(u"")
     ]
 
-    # class definition for DFA #18
+    # class definition for DFA #17
 
-    class DFA18(DFA):
+    class DFA17(DFA):
         pass
 
 
-    # lookup tables for DFA #36
+    # lookup tables for DFA #35
 
-    DFA36_eot = DFA.unpack(
+    DFA35_eot = DFA.unpack(
         u"\32\uffff"
         )
 
-    DFA36_eof = DFA.unpack(
+    DFA35_eof = DFA.unpack(
         u"\1\1\31\uffff"
         )
 
-    DFA36_min = DFA.unpack(
-        u"\1\22\1\uffff\1\44\1\31\1\uffff\1\31\2\43\1\5\1\31\1\45\1\5\1\31"
-        u"\1\45\6\43\2\5\4\43"
+    DFA35_min = DFA.unpack(
+        u"\1\22\1\uffff\1\45\1\32\1\uffff\1\32\2\44\1\5\1\32\1\46\1\5\1\32"
+        u"\1\46\6\44\2\5\4\44"
         )
 
-    DFA36_max = DFA.unpack(
-        u"\1\74\1\uffff\1\57\1\31\1\uffff\1\31\2\56\1\6\1\31\1\57\1\6\1\31"
-        u"\1\57\2\53\1\56\2\53\1\56\2\6\4\53"
+    DFA35_max = DFA.unpack(
+        u"\1\75\1\uffff\1\60\1\32\1\uffff\1\32\2\57\1\6\1\32\1\60\1\6\1\32"
+        u"\1\60\2\54\1\57\2\54\1\57\2\6\4\54"
         )
 
-    DFA36_accept = DFA.unpack(
+    DFA35_accept = DFA.unpack(
         u"\1\uffff\1\2\2\uffff\1\1\25\uffff"
         )
 
-    DFA36_special = DFA.unpack(
+    DFA35_special = DFA.unpack(
         u"\32\uffff"
         )
 
             
-    DFA36_transition = [
-        DFA.unpack(u"\1\4\5\uffff\1\4\1\2\13\uffff\1\4\2\uffff\1\4\1\1\1"
+    DFA35_transition = [
+        DFA.unpack(u"\1\4\6\uffff\1\4\1\2\13\uffff\1\4\2\uffff\1\4\1\1\1"
         u"\3\4\uffff\2\4\1\uffff\6\4\1\uffff\1\4\2\uffff\1\4"),
         DFA.unpack(u""),
         DFA.unpack(u"\2\4\4\uffff\1\5\2\uffff\1\4\1\1\1\4"),
@@ -5562,195 +5603,194 @@ class MonitorParser(Parser):
         DFA.unpack(u"\1\14\7\uffff\1\15")
     ]
 
-    # class definition for DFA #36
+    # class definition for DFA #35
 
-    class DFA36(DFA):
+    class DFA35(DFA):
         pass
 
 
  
 
-    FOLLOW_ANNOTATION_in_description234 = frozenset([24, 33])
-    FOLLOW_importProtocolStatement_in_description241 = frozenset([24, 33, 34])
-    FOLLOW_importTypeStatement_in_description245 = frozenset([24, 33, 34])
-    FOLLOW_ANNOTATION_in_description254 = frozenset([24, 34])
-    FOLLOW_protocolDef_in_description259 = frozenset([1])
-    FOLLOW_33_in_importProtocolStatement270 = frozenset([34])
-    FOLLOW_34_in_importProtocolStatement272 = frozenset([25])
-    FOLLOW_importProtocolDef_in_importProtocolStatement274 = frozenset([35, 36])
-    FOLLOW_35_in_importProtocolStatement278 = frozenset([25])
-    FOLLOW_importProtocolDef_in_importProtocolStatement281 = frozenset([35, 36])
-    FOLLOW_36_in_importProtocolStatement286 = frozenset([1])
-    FOLLOW_ID_in_importProtocolDef295 = frozenset([37])
-    FOLLOW_37_in_importProtocolDef297 = frozenset([26])
-    FOLLOW_StringLiteral_in_importProtocolDef300 = frozenset([1])
-    FOLLOW_33_in_importTypeStatement313 = frozenset([25, 26])
-    FOLLOW_simpleName_in_importTypeStatement317 = frozenset([25, 26])
-    FOLLOW_importTypeDef_in_importTypeStatement322 = frozenset([35, 36, 37])
-    FOLLOW_35_in_importTypeStatement326 = frozenset([25, 26])
-    FOLLOW_importTypeDef_in_importTypeStatement329 = frozenset([35, 36, 37])
-    FOLLOW_37_in_importTypeStatement336 = frozenset([26])
-    FOLLOW_StringLiteral_in_importTypeStatement339 = frozenset([36])
-    FOLLOW_36_in_importTypeStatement344 = frozenset([1])
-    FOLLOW_dataTypeDef_in_importTypeDef355 = frozenset([38])
-    FOLLOW_38_in_importTypeDef357 = frozenset([25])
-    FOLLOW_ID_in_importTypeDef363 = frozenset([1])
-    FOLLOW_StringLiteral_in_dataTypeDef371 = frozenset([1])
-    FOLLOW_ID_in_simpleName379 = frozenset([1])
-    FOLLOW_34_in_protocolDef387 = frozenset([25])
-    FOLLOW_protocolName_in_protocolDef389 = frozenset([39, 40, 42])
-    FOLLOW_39_in_protocolDef393 = frozenset([25])
-    FOLLOW_roleName_in_protocolDef395 = frozenset([40, 42])
-    FOLLOW_parameterDefs_in_protocolDef402 = frozenset([40])
-    FOLLOW_40_in_protocolDef407 = frozenset([18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_protocolBlockDef_in_protocolDef409 = frozenset([24, 34, 41])
-    FOLLOW_ANNOTATION_in_protocolDef415 = frozenset([24, 34])
-    FOLLOW_protocolDef_in_protocolDef420 = frozenset([24, 34, 41])
-    FOLLOW_41_in_protocolDef425 = frozenset([1])
-    FOLLOW_ID_in_protocolName447 = frozenset([1])
-    FOLLOW_42_in_parameterDefs455 = frozenset([25, 44])
-    FOLLOW_parameterDef_in_parameterDefs458 = frozenset([35, 43])
-    FOLLOW_35_in_parameterDefs462 = frozenset([25, 44])
-    FOLLOW_parameterDef_in_parameterDefs465 = frozenset([35, 43])
-    FOLLOW_43_in_parameterDefs470 = frozenset([1])
-    FOLLOW_typeReferenceDef_in_parameterDef481 = frozenset([25])
-    FOLLOW_44_in_parameterDef485 = frozenset([25])
-    FOLLOW_simpleName_in_parameterDef489 = frozenset([1])
-    FOLLOW_activityListDef_in_protocolBlockDef497 = frozenset([1])
-    FOLLOW_40_in_blockDef508 = frozenset([18, 24, 25, 37, 40, 41, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityListDef_in_blockDef510 = frozenset([41])
-    FOLLOW_41_in_blockDef512 = frozenset([1])
-    FOLLOW_ASSERTION_in_assertDef534 = frozenset([1])
-    FOLLOW_ANNOTATION_in_activityListDef556 = frozenset([18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityDef_in_activityListDef561 = frozenset([1, 18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_INT_in_primitivetype577 = frozenset([1])
-    FOLLOW_STRING_in_primitivetype583 = frozenset([1])
-    FOLLOW_introducesDef_in_activityDef596 = frozenset([36])
-    FOLLOW_interactionDef_in_activityDef600 = frozenset([36])
-    FOLLOW_inlineDef_in_activityDef604 = frozenset([36])
-    FOLLOW_runDef_in_activityDef608 = frozenset([36])
-    FOLLOW_recursionDef_in_activityDef612 = frozenset([36])
-    FOLLOW_endDef_in_activityDef616 = frozenset([36])
-    FOLLOW_RECLABEL_in_activityDef620 = frozenset([36])
-    FOLLOW_36_in_activityDef624 = frozenset([1])
-    FOLLOW_choiceDef_in_activityDef633 = frozenset([1])
-    FOLLOW_directedChoiceDef_in_activityDef637 = frozenset([1])
-    FOLLOW_parallelDef_in_activityDef641 = frozenset([1])
-    FOLLOW_repeatDef_in_activityDef645 = frozenset([1])
-    FOLLOW_unorderedDef_in_activityDef649 = frozenset([1])
-    FOLLOW_recBlockDef_in_activityDef656 = frozenset([1])
-    FOLLOW_globalEscapeDef_in_activityDef660 = frozenset([1])
-    FOLLOW_roleDef_in_introducesDef668 = frozenset([45])
-    FOLLOW_45_in_introducesDef670 = frozenset([25])
-    FOLLOW_roleDef_in_introducesDef672 = frozenset([1, 35])
-    FOLLOW_35_in_introducesDef676 = frozenset([25])
-    FOLLOW_roleDef_in_introducesDef678 = frozenset([1, 35])
-    FOLLOW_ID_in_roleDef689 = frozenset([1])
-    FOLLOW_ID_in_roleName700 = frozenset([1])
-    FOLLOW_ID_in_typeReferenceDef711 = frozenset([1])
-    FOLLOW_typeReferenceDef_in_interactionSignatureDef722 = frozenset([1, 42])
-    FOLLOW_42_in_interactionSignatureDef725 = frozenset([25])
-    FOLLOW_valueDecl_in_interactionSignatureDef727 = frozenset([35, 43])
-    FOLLOW_35_in_interactionSignatureDef730 = frozenset([25])
-    FOLLOW_valueDecl_in_interactionSignatureDef732 = frozenset([35, 43])
-    FOLLOW_43_in_interactionSignatureDef736 = frozenset([1])
-    FOLLOW_42_in_interactionSignatureDef760 = frozenset([25])
-    FOLLOW_valueDecl_in_interactionSignatureDef762 = frozenset([35, 43])
-    FOLLOW_35_in_interactionSignatureDef765 = frozenset([25])
-    FOLLOW_valueDecl_in_interactionSignatureDef767 = frozenset([35, 43])
-    FOLLOW_43_in_interactionSignatureDef771 = frozenset([1])
-    FOLLOW_ID_in_valueDecl791 = frozenset([1, 46])
-    FOLLOW_46_in_valueDecl794 = frozenset([5, 6])
-    FOLLOW_primitivetype_in_valueDecl797 = frozenset([1])
-    FOLLOW_valueDecl_in_firstValueDecl808 = frozenset([1])
-    FOLLOW_interactionSignatureDef_in_interactionDef823 = frozenset([37, 47])
-    FOLLOW_37_in_interactionDef829 = frozenset([25])
-    FOLLOW_roleName_in_interactionDef834 = frozenset([27])
-    FOLLOW_assertDef_in_interactionDef838 = frozenset([1])
-    FOLLOW_47_in_interactionDef862 = frozenset([25])
-    FOLLOW_roleName_in_interactionDef864 = frozenset([27])
-    FOLLOW_assertDef_in_interactionDef868 = frozenset([1])
-    FOLLOW_48_in_choiceDef889 = frozenset([39, 40])
-    FOLLOW_39_in_choiceDef893 = frozenset([25])
-    FOLLOW_roleName_in_choiceDef895 = frozenset([39, 40])
-    FOLLOW_blockDef_in_choiceDef900 = frozenset([1, 49])
-    FOLLOW_49_in_choiceDef904 = frozenset([39, 40])
-    FOLLOW_blockDef_in_choiceDef906 = frozenset([1, 49])
-    FOLLOW_37_in_directedChoiceDef927 = frozenset([25])
-    FOLLOW_roleName_in_directedChoiceDef929 = frozenset([40, 47])
-    FOLLOW_47_in_directedChoiceDef936 = frozenset([25])
-    FOLLOW_roleName_in_directedChoiceDef938 = frozenset([35, 40])
-    FOLLOW_35_in_directedChoiceDef942 = frozenset([25])
-    FOLLOW_roleName_in_directedChoiceDef945 = frozenset([35, 40])
-    FOLLOW_40_in_directedChoiceDef953 = frozenset([25, 42])
-    FOLLOW_onMessageDef_in_directedChoiceDef957 = frozenset([25, 41, 42])
-    FOLLOW_41_in_directedChoiceDef962 = frozenset([1])
-    FOLLOW_interactionSignatureDef_in_onMessageDef969 = frozenset([46])
-    FOLLOW_46_in_onMessageDef971 = frozenset([18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityList_in_onMessageDef973 = frozenset([1])
-    FOLLOW_ANNOTATION_in_activityList986 = frozenset([18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityDef_in_activityList991 = frozenset([1, 18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_50_in_repeatDef1001 = frozenset([39, 40])
-    FOLLOW_39_in_repeatDef1005 = frozenset([25])
-    FOLLOW_roleName_in_repeatDef1007 = frozenset([35, 39, 40])
-    FOLLOW_35_in_repeatDef1011 = frozenset([25])
-    FOLLOW_roleName_in_repeatDef1013 = frozenset([35, 39, 40])
-    FOLLOW_blockDef_in_repeatDef1021 = frozenset([1])
-    FOLLOW_51_in_recBlockDef1037 = frozenset([25])
-    FOLLOW_labelName_in_recBlockDef1039 = frozenset([39, 40])
-    FOLLOW_blockDef_in_recBlockDef1041 = frozenset([1])
-    FOLLOW_ID_in_labelName1058 = frozenset([1])
-    FOLLOW_labelName_in_recursionDef1070 = frozenset([1])
-    FOLLOW_52_in_endDef1086 = frozenset([1])
-    FOLLOW_53_in_runDef1096 = frozenset([25])
-    FOLLOW_protocolRefDef_in_runDef1099 = frozenset([37, 42])
-    FOLLOW_42_in_runDef1103 = frozenset([25])
-    FOLLOW_parameter_in_runDef1106 = frozenset([35, 43])
-    FOLLOW_35_in_runDef1110 = frozenset([25])
-    FOLLOW_parameter_in_runDef1113 = frozenset([35, 43])
-    FOLLOW_43_in_runDef1118 = frozenset([37])
-    FOLLOW_37_in_runDef1124 = frozenset([25])
-    FOLLOW_roleName_in_runDef1126 = frozenset([1])
-    FOLLOW_ID_in_protocolRefDef1134 = frozenset([1, 39])
-    FOLLOW_39_in_protocolRefDef1138 = frozenset([25])
-    FOLLOW_roleName_in_protocolRefDef1140 = frozenset([1])
-    FOLLOW_ID_in_declarationName1151 = frozenset([1])
-    FOLLOW_declarationName_in_parameter1159 = frozenset([1])
-    FOLLOW_54_in_inlineDef1168 = frozenset([25])
-    FOLLOW_protocolRefDef_in_inlineDef1171 = frozenset([1, 42])
-    FOLLOW_42_in_inlineDef1175 = frozenset([25])
-    FOLLOW_parameter_in_inlineDef1178 = frozenset([35, 43])
-    FOLLOW_35_in_inlineDef1182 = frozenset([25])
-    FOLLOW_parameter_in_inlineDef1185 = frozenset([35, 43])
-    FOLLOW_43_in_inlineDef1190 = frozenset([1])
-    FOLLOW_55_in_parallelDef1202 = frozenset([39, 40])
-    FOLLOW_blockDef_in_parallelDef1204 = frozenset([1, 56])
-    FOLLOW_56_in_parallelDef1208 = frozenset([39, 40])
-    FOLLOW_blockDef_in_parallelDef1210 = frozenset([1, 56])
-    FOLLOW_57_in_doBlockDef1230 = frozenset([40])
-    FOLLOW_40_in_doBlockDef1232 = frozenset([18, 24, 25, 37, 40, 41, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityListDef_in_doBlockDef1234 = frozenset([41])
-    FOLLOW_41_in_doBlockDef1237 = frozenset([1])
-    FOLLOW_58_in_interruptDef1255 = frozenset([59])
-    FOLLOW_59_in_interruptDef1257 = frozenset([25])
-    FOLLOW_roleName_in_interruptDef1259 = frozenset([40])
-    FOLLOW_40_in_interruptDef1261 = frozenset([18, 24, 25, 37, 40, 41, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityListDef_in_interruptDef1263 = frozenset([41])
-    FOLLOW_41_in_interruptDef1265 = frozenset([1])
-    FOLLOW_doBlockDef_in_globalEscapeDef1283 = frozenset([58])
-    FOLLOW_interruptDef_in_globalEscapeDef1286 = frozenset([1])
-    FOLLOW_60_in_unorderedDef1303 = frozenset([40])
-    FOLLOW_40_in_unorderedDef1305 = frozenset([18, 24, 25, 37, 40, 41, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_ANNOTATION_in_unorderedDef1311 = frozenset([18, 24, 25, 37, 40, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_activityDef_in_unorderedDef1316 = frozenset([18, 24, 25, 37, 40, 41, 42, 47, 48, 50, 51, 52, 53, 54, 55, 57, 60])
-    FOLLOW_41_in_unorderedDef1321 = frozenset([1])
-    FOLLOW_term_in_expr1346 = frozenset([1, 7, 8])
-    FOLLOW_set_in_expr1350 = frozenset([28])
-    FOLLOW_term_in_expr1361 = frozenset([1, 7, 8])
-    FOLLOW_factor_in_term1373 = frozenset([1, 9, 10])
-    FOLLOW_set_in_term1377 = frozenset([28])
-    FOLLOW_factor_in_term1387 = frozenset([1, 9, 10])
-    FOLLOW_NUMBER_in_factor1399 = frozenset([1])
+    FOLLOW_ANNOTATION_in_description241 = frozenset([25, 34])
+    FOLLOW_importProtocolStatement_in_description248 = frozenset([25, 34, 35])
+    FOLLOW_importTypeStatement_in_description252 = frozenset([25, 34, 35])
+    FOLLOW_ANNOTATION_in_description261 = frozenset([25, 35])
+    FOLLOW_protocolDef_in_description266 = frozenset([1])
+    FOLLOW_34_in_importProtocolStatement277 = frozenset([35])
+    FOLLOW_35_in_importProtocolStatement279 = frozenset([26])
+    FOLLOW_importProtocolDef_in_importProtocolStatement281 = frozenset([36, 37])
+    FOLLOW_36_in_importProtocolStatement285 = frozenset([26])
+    FOLLOW_importProtocolDef_in_importProtocolStatement288 = frozenset([36, 37])
+    FOLLOW_37_in_importProtocolStatement293 = frozenset([1])
+    FOLLOW_ID_in_importProtocolDef302 = frozenset([38])
+    FOLLOW_38_in_importProtocolDef304 = frozenset([27])
+    FOLLOW_StringLiteral_in_importProtocolDef307 = frozenset([1])
+    FOLLOW_34_in_importTypeStatement320 = frozenset([26, 27])
+    FOLLOW_simpleName_in_importTypeStatement324 = frozenset([26, 27])
+    FOLLOW_importTypeDef_in_importTypeStatement329 = frozenset([36, 37, 38])
+    FOLLOW_36_in_importTypeStatement333 = frozenset([26, 27])
+    FOLLOW_importTypeDef_in_importTypeStatement336 = frozenset([36, 37, 38])
+    FOLLOW_38_in_importTypeStatement343 = frozenset([27])
+    FOLLOW_StringLiteral_in_importTypeStatement346 = frozenset([37])
+    FOLLOW_37_in_importTypeStatement351 = frozenset([1])
+    FOLLOW_dataTypeDef_in_importTypeDef362 = frozenset([39])
+    FOLLOW_39_in_importTypeDef364 = frozenset([26])
+    FOLLOW_ID_in_importTypeDef370 = frozenset([1])
+    FOLLOW_StringLiteral_in_dataTypeDef378 = frozenset([1])
+    FOLLOW_ID_in_simpleName386 = frozenset([1])
+    FOLLOW_35_in_protocolDef394 = frozenset([26])
+    FOLLOW_protocolName_in_protocolDef396 = frozenset([40, 41, 43])
+    FOLLOW_40_in_protocolDef400 = frozenset([26])
+    FOLLOW_roleName_in_protocolDef402 = frozenset([41, 43])
+    FOLLOW_parameterDefs_in_protocolDef409 = frozenset([41])
+    FOLLOW_41_in_protocolDef414 = frozenset([18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_protocolBlockDef_in_protocolDef416 = frozenset([25, 35, 42])
+    FOLLOW_ANNOTATION_in_protocolDef422 = frozenset([25, 35])
+    FOLLOW_protocolDef_in_protocolDef427 = frozenset([25, 35, 42])
+    FOLLOW_42_in_protocolDef432 = frozenset([1])
+    FOLLOW_ID_in_protocolName460 = frozenset([1])
+    FOLLOW_43_in_parameterDefs468 = frozenset([45])
+    FOLLOW_roleparameDef_in_parameterDefs470 = frozenset([36, 44])
+    FOLLOW_36_in_parameterDefs474 = frozenset([45])
+    FOLLOW_roleparameDef_in_parameterDefs476 = frozenset([36, 44])
+    FOLLOW_44_in_parameterDefs481 = frozenset([1])
+    FOLLOW_45_in_roleparameDef497 = frozenset([26])
+    FOLLOW_simpleName_in_roleparameDef499 = frozenset([1])
+    FOLLOW_activityListDef_in_protocolBlockDef510 = frozenset([1])
+    FOLLOW_41_in_blockDef521 = frozenset([18, 25, 26, 38, 41, 42, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityListDef_in_blockDef523 = frozenset([42])
+    FOLLOW_42_in_blockDef525 = frozenset([1])
+    FOLLOW_ASSERTION_in_assertDef547 = frozenset([1])
+    FOLLOW_ANNOTATION_in_activityListDef569 = frozenset([18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityDef_in_activityListDef574 = frozenset([1, 18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_INT_in_primitivetype590 = frozenset([1])
+    FOLLOW_STRING_in_primitivetype596 = frozenset([1])
+    FOLLOW_introducesDef_in_activityDef609 = frozenset([37])
+    FOLLOW_interactionDef_in_activityDef613 = frozenset([37])
+    FOLLOW_inlineDef_in_activityDef617 = frozenset([37])
+    FOLLOW_runDef_in_activityDef621 = frozenset([37])
+    FOLLOW_recursionDef_in_activityDef625 = frozenset([37])
+    FOLLOW_endDef_in_activityDef629 = frozenset([37])
+    FOLLOW_RECLABEL_in_activityDef633 = frozenset([37])
+    FOLLOW_37_in_activityDef637 = frozenset([1])
+    FOLLOW_choiceDef_in_activityDef646 = frozenset([1])
+    FOLLOW_directedChoiceDef_in_activityDef650 = frozenset([1])
+    FOLLOW_parallelDef_in_activityDef654 = frozenset([1])
+    FOLLOW_repeatDef_in_activityDef658 = frozenset([1])
+    FOLLOW_unorderedDef_in_activityDef662 = frozenset([1])
+    FOLLOW_recBlockDef_in_activityDef669 = frozenset([1])
+    FOLLOW_globalEscapeDef_in_activityDef673 = frozenset([1])
+    FOLLOW_roleDef_in_introducesDef681 = frozenset([46])
+    FOLLOW_46_in_introducesDef683 = frozenset([26])
+    FOLLOW_roleDef_in_introducesDef685 = frozenset([1, 36])
+    FOLLOW_36_in_introducesDef689 = frozenset([26])
+    FOLLOW_roleDef_in_introducesDef691 = frozenset([1, 36])
+    FOLLOW_ID_in_roleDef702 = frozenset([1])
+    FOLLOW_ID_in_roleName713 = frozenset([1])
+    FOLLOW_ID_in_typeReferenceDef724 = frozenset([1])
+    FOLLOW_typeReferenceDef_in_interactionSignatureDef735 = frozenset([1, 43])
+    FOLLOW_43_in_interactionSignatureDef738 = frozenset([26])
+    FOLLOW_valueDecl_in_interactionSignatureDef740 = frozenset([36, 44])
+    FOLLOW_36_in_interactionSignatureDef743 = frozenset([26])
+    FOLLOW_valueDecl_in_interactionSignatureDef745 = frozenset([36, 44])
+    FOLLOW_44_in_interactionSignatureDef749 = frozenset([1])
+    FOLLOW_43_in_interactionSignatureDef773 = frozenset([26])
+    FOLLOW_valueDecl_in_interactionSignatureDef775 = frozenset([36, 44])
+    FOLLOW_36_in_interactionSignatureDef778 = frozenset([26])
+    FOLLOW_valueDecl_in_interactionSignatureDef780 = frozenset([36, 44])
+    FOLLOW_44_in_interactionSignatureDef784 = frozenset([1])
+    FOLLOW_ID_in_valueDecl804 = frozenset([1, 47])
+    FOLLOW_47_in_valueDecl807 = frozenset([5, 6])
+    FOLLOW_primitivetype_in_valueDecl810 = frozenset([1])
+    FOLLOW_valueDecl_in_firstValueDecl821 = frozenset([1])
+    FOLLOW_interactionSignatureDef_in_interactionDef836 = frozenset([38, 48])
+    FOLLOW_38_in_interactionDef842 = frozenset([26])
+    FOLLOW_roleName_in_interactionDef847 = frozenset([28])
+    FOLLOW_assertDef_in_interactionDef851 = frozenset([1])
+    FOLLOW_48_in_interactionDef875 = frozenset([26])
+    FOLLOW_roleName_in_interactionDef877 = frozenset([28])
+    FOLLOW_assertDef_in_interactionDef881 = frozenset([1])
+    FOLLOW_49_in_choiceDef902 = frozenset([40, 41])
+    FOLLOW_40_in_choiceDef906 = frozenset([26])
+    FOLLOW_roleName_in_choiceDef908 = frozenset([40, 41])
+    FOLLOW_blockDef_in_choiceDef913 = frozenset([1, 50])
+    FOLLOW_50_in_choiceDef917 = frozenset([40, 41])
+    FOLLOW_blockDef_in_choiceDef919 = frozenset([1, 50])
+    FOLLOW_38_in_directedChoiceDef940 = frozenset([26])
+    FOLLOW_roleName_in_directedChoiceDef942 = frozenset([41, 48])
+    FOLLOW_48_in_directedChoiceDef949 = frozenset([26])
+    FOLLOW_roleName_in_directedChoiceDef951 = frozenset([36, 41])
+    FOLLOW_36_in_directedChoiceDef955 = frozenset([26])
+    FOLLOW_roleName_in_directedChoiceDef958 = frozenset([36, 41])
+    FOLLOW_41_in_directedChoiceDef966 = frozenset([26, 43])
+    FOLLOW_onMessageDef_in_directedChoiceDef970 = frozenset([26, 42, 43])
+    FOLLOW_42_in_directedChoiceDef975 = frozenset([1])
+    FOLLOW_interactionSignatureDef_in_onMessageDef982 = frozenset([47])
+    FOLLOW_47_in_onMessageDef984 = frozenset([18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityList_in_onMessageDef986 = frozenset([1])
+    FOLLOW_ANNOTATION_in_activityList999 = frozenset([18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityDef_in_activityList1004 = frozenset([1, 18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_51_in_repeatDef1014 = frozenset([40, 41])
+    FOLLOW_40_in_repeatDef1018 = frozenset([26])
+    FOLLOW_roleName_in_repeatDef1020 = frozenset([36, 40, 41])
+    FOLLOW_36_in_repeatDef1024 = frozenset([26])
+    FOLLOW_roleName_in_repeatDef1026 = frozenset([36, 40, 41])
+    FOLLOW_blockDef_in_repeatDef1034 = frozenset([1])
+    FOLLOW_52_in_recBlockDef1050 = frozenset([26])
+    FOLLOW_labelName_in_recBlockDef1052 = frozenset([40, 41])
+    FOLLOW_blockDef_in_recBlockDef1054 = frozenset([1])
+    FOLLOW_ID_in_labelName1071 = frozenset([1])
+    FOLLOW_labelName_in_recursionDef1083 = frozenset([1])
+    FOLLOW_53_in_endDef1099 = frozenset([1])
+    FOLLOW_54_in_runDef1109 = frozenset([26])
+    FOLLOW_protocolRefDef_in_runDef1112 = frozenset([38, 43])
+    FOLLOW_43_in_runDef1116 = frozenset([26])
+    FOLLOW_parameter_in_runDef1119 = frozenset([36, 44])
+    FOLLOW_36_in_runDef1123 = frozenset([26])
+    FOLLOW_parameter_in_runDef1126 = frozenset([36, 44])
+    FOLLOW_44_in_runDef1131 = frozenset([38])
+    FOLLOW_38_in_runDef1137 = frozenset([26])
+    FOLLOW_roleName_in_runDef1139 = frozenset([1])
+    FOLLOW_ID_in_protocolRefDef1147 = frozenset([1, 40])
+    FOLLOW_40_in_protocolRefDef1151 = frozenset([26])
+    FOLLOW_roleName_in_protocolRefDef1153 = frozenset([1])
+    FOLLOW_ID_in_declarationName1164 = frozenset([1])
+    FOLLOW_declarationName_in_parameter1172 = frozenset([1])
+    FOLLOW_55_in_inlineDef1181 = frozenset([26])
+    FOLLOW_protocolRefDef_in_inlineDef1184 = frozenset([1, 43])
+    FOLLOW_43_in_inlineDef1188 = frozenset([26])
+    FOLLOW_parameter_in_inlineDef1191 = frozenset([36, 44])
+    FOLLOW_36_in_inlineDef1195 = frozenset([26])
+    FOLLOW_parameter_in_inlineDef1198 = frozenset([36, 44])
+    FOLLOW_44_in_inlineDef1203 = frozenset([1])
+    FOLLOW_56_in_parallelDef1215 = frozenset([40, 41])
+    FOLLOW_blockDef_in_parallelDef1217 = frozenset([1, 57])
+    FOLLOW_57_in_parallelDef1221 = frozenset([40, 41])
+    FOLLOW_blockDef_in_parallelDef1223 = frozenset([1, 57])
+    FOLLOW_58_in_doBlockDef1243 = frozenset([41])
+    FOLLOW_41_in_doBlockDef1245 = frozenset([18, 25, 26, 38, 41, 42, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityListDef_in_doBlockDef1247 = frozenset([42])
+    FOLLOW_42_in_doBlockDef1250 = frozenset([1])
+    FOLLOW_59_in_interruptDef1268 = frozenset([60])
+    FOLLOW_60_in_interruptDef1270 = frozenset([26])
+    FOLLOW_roleName_in_interruptDef1272 = frozenset([41])
+    FOLLOW_41_in_interruptDef1274 = frozenset([18, 25, 26, 38, 41, 42, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityListDef_in_interruptDef1276 = frozenset([42])
+    FOLLOW_42_in_interruptDef1278 = frozenset([1])
+    FOLLOW_doBlockDef_in_globalEscapeDef1296 = frozenset([59])
+    FOLLOW_interruptDef_in_globalEscapeDef1299 = frozenset([1])
+    FOLLOW_61_in_unorderedDef1316 = frozenset([41])
+    FOLLOW_41_in_unorderedDef1318 = frozenset([18, 25, 26, 38, 41, 42, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_ANNOTATION_in_unorderedDef1324 = frozenset([18, 25, 26, 38, 41, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_activityDef_in_unorderedDef1329 = frozenset([18, 25, 26, 38, 41, 42, 43, 48, 49, 51, 52, 53, 54, 55, 56, 58, 61])
+    FOLLOW_42_in_unorderedDef1334 = frozenset([1])
+    FOLLOW_term_in_expr1359 = frozenset([1, 7, 8])
+    FOLLOW_set_in_expr1363 = frozenset([29])
+    FOLLOW_term_in_expr1374 = frozenset([1, 7, 8])
+    FOLLOW_factor_in_term1386 = frozenset([1, 9, 10])
+    FOLLOW_set_in_term1390 = frozenset([29])
+    FOLLOW_factor_in_term1400 = frozenset([1, 9, 10])
+    FOLLOW_NUMBER_in_factor1412 = frozenset([1])
 
 
 

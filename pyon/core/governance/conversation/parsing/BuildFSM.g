@@ -34,14 +34,15 @@ def format_state_name(state, parent_state = None):
 
 class FSMBuilderState(object):
 	def __init__(self, parent= None):
-	      
 	    self.state_gen = generate_ints()
+	    self.current_state = self.state_gen.next()
 	    if (parent is not None): 
-	    	self.fsm = FSM(format_state_name(self.state_gen.next(), self.parent.get_current_state()))
-	    	self.set_interrupt_transition = parent.set_interrupt_transition
+	    	self.parent = parent  
+	    	self.fsm = FSM(format_state_name(self.current_state, self.parent.get_current_state()))
+	    	self.set_interrupt_transition = self.parent.set_interrupt_transition
 	    	self.top_parent = parent.top_parent
 	    else: 
-	    	self.fsm = FSM(self.state_gen.next())
+	    	self.fsm = FSM(self.current_state)
 	    	self.top_parent = self
 	    	self.set_interrupt_transition = False
 	    self.start_new_par_branch = False
@@ -50,16 +51,21 @@ class FSMBuilderState(object):
 	    self.choice_end_state = []
 	    # Recursion states
 	    self.recursions_states = {}
-	    self.parent = parent
-        
+	    self.parent = parent  
+
+	def format_state_name(self, state):
+		if self.parent is not None:
+			return "\%s_\%s" \%(self.parent.get_current_state(), state)
+		else: return state
+	 
 	def move_current_state(self, value = None):
 		if value is None:
-			self.fsm.current_state = self.state_gen.next()
+			self.current_state = self.state_gen.next()
 		else: 
-			self.fsm.current_state = value
-		return self.fsm.current_state
+			self.current_state = value
+		return self.current_state
 	def get_current_state(self):
-		return self.fsm.current_state
+		return self.current_state
 		
 	def add_transition(self, transition, assertion = None, transition_context  = None):	        
 	       
@@ -93,28 +99,38 @@ class FSMBuilderState(object):
 # memory here is used only for logging and debugging purposes. 
 # We append bebugging information to memory so we can print it later. 
 self.memory = []
+self.roles = []
 self.main_fsm = FSMBuilderState()
 self.current_fsm = self.main_fsm
 }
 
-description: ^(PROTOCOL activityDef+) {print "ProtocolDefinition"};
+description: ^(PROTOCOL roleName parameterDefs activityDef+) {print "ProtocolDefinition"};	 
+parameterDefs: ^(ROLES roleName+);	 
 activityDef:
-	^(RESV {local_context = []}
-	   (^(VALUE ((val=ID vtype=(INT|STRING)){if (($val is not None) and ($vtype is not None)): local_context.append(($val.text, $vtype.text))})*)) 
-	   rlabel = ID {#INFO: This is the way to write comments in actions self.memory.append('resv' + $rlabel.text)} 
-	   (rtype = ID {self.memory.append($rtype.text)})* role = ID
+	^(RESV {
+		local_context = []
+		label = ''}
+	   (rlabel = ID {
+	   	if ($rlabel is not None): label = $rlabel.text
+	   	self.memory.append('before setting the label:' +  label)})?
+	   (^(VALUE ((val=ID vtype=(INT|STRING)?){if (($val is not None) and ($vtype is not None)): local_context.append(($val.text, $vtype.text))})*))
+	   role = ID { if not($role.text in self.roles): self.roles.append($role.text)}
 	   (^(ASSERT (assertion=ASSERTION)?)))
 	{
-	 
-	 self.current_fsm.add_transition(TransitionFactory.create(LocalType.RESV,$rlabel, $role), $assertion, local_context)
+	 self.memory.append('label is:' +  label);
+	 self.current_fsm.add_transition(TransitionFactory.create(LocalType.RESV, label, $role), $assertion, local_context)
 	}
-	    
-	|^(SEND {local_context = []}
-       	   (^(VALUE ((val=ID vtype= (INT|STRING)){if (($val is not None) and ($vtype is not None)): local_context.append(($val.text, $vtype.text))})*)) 
-	   slabel = ID {self.memory.append('send' + $slabel.text)} ( stype = ID {self.memory.append($stype.text)})* role = ID
+	|^(SEND {
+		local_context = []
+		label = ''}
+	   (slabel = ID {
+	   		self.memory.append('send' + $slabel.text)
+	   		if ($slabel is not None): label = $slabel.text})?
+       	   (^(VALUE ((val=ID vtype= (INT|STRING)?){if (($val is not None) and ($vtype is not None)): local_context.append(($val.text, $vtype.text))})*))  
+	    role = ID { if not($role.text in self.roles): self.roles.append($role.text)}
 	   (^(ASSERT (assertion=ASSERTION)?)))	  {self.memory.append('In SEND assertion')}
 	{
-	 self.current_fsm.add_transition(TransitionFactory.create(LocalType.SEND,$slabel, $role), $assertion, local_context)
+	 self.current_fsm.add_transition(TransitionFactory.create(LocalType.SEND, label, $role), $assertion, local_context)
 	} 
 
 	|^('choice' 
@@ -168,7 +184,7 @@ activityDef:
 
         |^('rec' label = ID
         {self.memory.append('enter rec state ' + $label.text + str(self.current_fsm.get_current_state()))
-         self.current_fsm.recursions_states.setdefault($label.text, (self.current_fsm.get_current_state(), True))
+         self.current_fsm.recursions_states.setdefault($label.text, (self.current_fsm.format_state_name(self.current_fsm.get_current_state()), True))
         } 
 	(^(BRANCH (activityDef {self.memory.append('rec statement')})+))) 
 	{
@@ -184,7 +200,7 @@ activityDef:
 	self.memory.append('rec label:' + $labelID.text + 'starts from state:' + str(start_rec_state))
 	if isActive:
 		self.current_fsm.fsm.add_transition(self.current_fsm.fsm.EMPTY_TRANSITION, 
-						    self.current_fsm.get_current_state(), 
+						    self.current_fsm.format_state_name(self.current_fsm.get_current_state()), 
 						    start_rec_state)
 		# Generate unreachable state for the choice construct						    
 		self.current_fsm.move_current_state()	
@@ -201,7 +217,9 @@ activityDef:
 	    self.current_fsm.interrupt_start_state = self.current_fsm.move_current_state()
 	    self.current_fsm.set_interrupt_transition = True} (activityDef+))))
 	;
-roleName: ID;
+roleName: role = ID { 
+	if not($role.text in self.roles): 
+		self.roles.append($role.text)};
 labelName: ID;
 roleDef: ID;
 primitivetype :INT;
