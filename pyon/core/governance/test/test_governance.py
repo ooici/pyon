@@ -9,13 +9,15 @@ from mock import Mock
 from nose.plugins.attrib import attr
 from pyon.core.governance.governance_controller import GovernanceController
 
+
 @attr('UNIT')
 class GovernanceTest(PyonTestCase):
 
     governance_controller = None
     
     def setUp(self):
-        self.governance_controller = GovernanceController()
+
+        self.governance_controller = GovernanceController(FakeContainer())
   
     def test_initialize_from_config(self):
 
@@ -35,3 +37,7 @@ class GovernanceTest(PyonTestCase):
     def test_process_message(self):
         pass
 
+class FakeContainer(object):
+    def __init__(self):
+        self.id = "containerid"
+        self.node = None

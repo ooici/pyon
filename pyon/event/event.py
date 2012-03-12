@@ -29,7 +29,7 @@ class EventError(IonException):
 
 class EventPublisher(Publisher):
 
-    def __init__(self, event_type, xp=None, **kwargs):
+    def __init__(self, event_type=None, xp=None, **kwargs):
         """
         Constructs a publisher of events for a specific type.
 
@@ -50,43 +50,65 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, to_name=name, **kwargs)
 
-    def _topic(self, origin):
+    def _topic(self, event_type, origin):
         """
         Builds the topic that this event should be published to.
         """
-        assert self.event_type and origin
-        return "%s.%s" % (str(self.event_type), str(origin))
+        assert event_type and origin
+        return "%s.%s" % (event_type, origin)
 
-    def _create_event(self, **kwargs):
-        assert self.event_type
+    def _create_event(self, event_type=None, **kwargs):
+        event_type = event_type or self.event_type
+        assert event_type
 
         if 'ts_created' not in kwargs:
             kwargs['ts_created'] = get_ion_ts()
 
-        event_msg = bootstrap.IonObject(self.event_type, **kwargs)
+        event_msg = bootstrap.IonObject(event_type, **kwargs)
         event_msg.base_types = event_msg._get_extends()
-        # Would like to validate here but blows up if an object is provided where a dict is
+        # Would like to validate here but blows up if an object is provided where a dict is declared
         #event_msg._validate()
 
         return event_msg
 
-    def _publish_event(self, event_msg, origin, **kwargs):
-        assert origin
+    def _publish_event(self, event_msg, origin, event_type=None, **kwargs):
+        event_type = event_type or self.event_type
+        assert origin and event_type
 
-        to_name = (self._send_name.exchange, self._topic(origin))
+        to_name = (self._send_name.exchange, self._topic(event_type, origin))
         log.debug("Publishing event message to %s", to_name)
 
-        ep = self.publish(event_msg, to_name=to_name)
-        ep.close()
+        try:
+            ep = self.publish(event_msg, to_name=to_name)
+            ep.close()
+        except Exception as ex:
+            log.exception("Failed to publish event '%s'" % (event_msg))
+            return False
 
-        # store published event but only if we specified an event_repo
-        if self.event_repo:
-            self.event_repo.put_event(event_msg)
+        try:
+            # store published event but only if we specified an event_repo
+            if self.event_repo:
+                self.event_repo.put_event(event_msg)
+        except Exception as ex:
+            log.exception("Failed to store published event '%s'" % (event_msg))
+            return False
 
-    def publish_event(self, origin=None, **kwargs):
-        event_msg = self._create_event(origin=origin, **kwargs)
-        self._publish_event(event_msg, origin=origin)
+        return True
 
+    def publish_event(self, origin=None, event_type=None, **kwargs):
+        """
+        Publishes an event of given type for the given origin. Event_type defaults to an
+        event_type set when initializing the EventPublisher. Other kwargs fill out the fields
+        of the event. This operation will log any errors occuring during event creation,
+        but will not fail with an exception.
+        @param origin     the origin field value
+        @param event_type the event type (defaults to the EventPublisher's event_typeif set)
+        @param kwargs     additional event fields
+        @retval  Boolean indicating success of this operation
+        """
+        event_msg = self._create_event(origin=origin, event_type=event_type, **kwargs)
+        success = self._publish_event(event_msg, origin=origin, event_type=event_type)
+        return success
 
 class EventSubscriber(Subscriber):
 
@@ -154,11 +176,12 @@ class EventRepository(object):
         event_obj = self.event_store.read(event_id)
         return event_obj
 
-    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, reverse_order=False, max_results=0):
-        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, reverse_order=%s, max_results=%s" % (
-                event_type,origin,start_ts,end_ts,reverse_order,max_results))
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
+        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s" % (
+                event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None)))
         events = None
 
+        design_name = "event"
         view_name = None
         start_key = []
         end_key = []
@@ -179,15 +202,17 @@ class EventRepository(object):
             start_key=[]
             end_key=[]
         else:
-            raise BadRequest("Cannot query events")
+            view_name = "by_time"
+            if kwargs.get("limit", 0) < 1:
+                kwargs["limit"] = 100
+                log.warn("Querying all events, no limit given. Set limit to 100")
 
         if start_ts:
             start_key.append(start_ts)
         if end_ts:
             end_key.append(end_ts)
 
-        events = self.event_store.find_by_view("event", view_name, start_key=start_key, end_key=end_key,
-                                                descending=reverse_order, limit=max_results, id_only=False)
+        events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
+                                                id_only=False, **kwargs)
 
-        #log.info("Events: %s" % events)
         return events

@@ -55,11 +55,12 @@ class PolicyDecisionPointManager(object):
         functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
 
 
-    def get_pdp(self, resource_policy):
+    #Return a compiled policy indexed by the specified resource_id
+    def get_pdp(self, resource_id):
 
 
-        if self.policy_decision_point.has_key(resource_policy):
-            return self.policy_decision_point[resource_policy]
+        if self.policy_decision_point.has_key(resource_id):
+            return self.policy_decision_point[resource_id]
 
         #If a PDP does not exist for this resource - then return default.
         if self.default_pdp is None:
@@ -69,15 +70,21 @@ class PolicyDecisionPointManager(object):
         return self.default_pdp
 
 
-    def load_policy_rules(self, resource_policy, rules_text):
-        log.debug("Loading rules for service: %s" % resource_policy)
+    def load_policy_rules(self, resource_id, rules_text):
+        log.debug("Loading policies for resource: %s" % resource_id)
+
+        self.clear_resource_policy(resource_id)
 
         #Simply create a new PDP object for the service
         #TODO - make sure this is thread safe with the evaluation that uses it.
         input_source = StringIO(rules_text)
-        self.policy_decision_point[resource_policy] = PDP.fromPolicySource(input_source, ReaderFactory)
+        self.policy_decision_point[resource_id] = PDP.fromPolicySource(input_source, ReaderFactory)
 
 
+    #Remove any policy indexed by the resource_id
+    def clear_resource_policy(self, resource_id):
+        if self.policy_decision_point.has_key(resource_id):
+            del self.policy_decision_point[resource_id]
 
     def create_string_attribute(self, attrib_id, id):
         attribute = Attribute()

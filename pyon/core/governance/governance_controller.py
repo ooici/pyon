@@ -7,14 +7,16 @@ from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
+from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 
 
 
 class GovernanceController(object):
 
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self,container):
         log.debug('GovernanceController.__init__()')
+        self.container = container
         self.enabled = False
         self.interceptor_by_name_dict = dict()
         self.interceptor_order = []
@@ -85,8 +87,18 @@ class GovernanceController(object):
         return invocation
 
     #TODO - refactor as callback for listener when policy changes
-    def load_policy_for_service(self, service_name, policy_rules):
+    def update_resource_policy(self, resource_name, policy_rules):
 
         #Notify policy decision point of updated rules
         if self.policy_decision_point_manager is not None:
-            self.policy_decision_point_manager.load_policy_rules(service_name, policy_rules)
+            self.policy_decision_point_manager.load_policy_rules(resource_name, policy_rules)
+
+    def trigger_policy_update(self, org_id, resource_name):
+
+        try:
+            policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
+            policy_rules = policy_client.get_active_service_policy_rules(org_id, resource_name)
+            self.update_resource_policy(resource_name, policy_rules)
+        except Exception, e:
+            log.error(e.message)
+
