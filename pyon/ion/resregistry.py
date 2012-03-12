@@ -35,8 +35,7 @@ class ResourceRegistry(object):
 
         self._init()
 
-        self.event_lc_pub = EventPublisher("ResourceLifecycleEvent")
-        self.event_mod_pub = EventPublisher("ResourceModifiedEvent")
+        self.event_pub = EventPublisher()
 
     def close(self):
         """
@@ -79,8 +78,9 @@ class ResourceRegistry(object):
             log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
-        self.event_mod_pub.publish_event(origin=res_id, origin_type=object._get_type(),
-                                        mod_type=ResourceModificationType.CREATE)
+        self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+                                     origin=res_id, origin_type=object._get_type(),
+                                     mod_type=ResourceModificationType.CREATE)
 
         return res
 
@@ -93,7 +93,15 @@ class ResourceRegistry(object):
             resobj.ts_updated = cur_time
 
         res = self.rr_store.create_mult(res_list)
-        return [(rid,rrv) for success,rid,rrv in res]
+        res_list = [(rid,rrv) for success,rid,rrv in res]
+
+        # TODO: Publish events (skipped, because this is inefficent one by one for a large list
+#        for rid,rrv in res_list:
+#            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+#                origin=res_id, origin_type=object._get_type(),
+#                mod_type=ResourceModificationType.CREATE)
+
+        return res_list
 
     def read(self, object_id='', rev_id=''):
         if not object_id:
@@ -115,8 +123,9 @@ class ResourceRegistry(object):
                 res_obj.lcstate, object.lcstate))
             object.lcstate = res_obj.lcstate
 
-        self.event_mod_pub.publish_event(origin=object._id, origin_type=object._get_type(),
-                                        mod_type=ResourceModificationType.UPDATE)
+        self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+                                     origin=object._id, origin_type=object._get_type(),
+                                     mod_type=ResourceModificationType.UPDATE)
 
         return self.rr_store.update(object)
 
@@ -132,8 +141,9 @@ class ResourceRegistry(object):
 
         res = self.rr_store.delete(res_obj)
 
-        self.event_mod_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
-                                        mod_type=ResourceModificationType.UPDATE)
+        self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+                                     origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     mod_type=ResourceModificationType.UPDATE)
 
         return res
 
@@ -155,8 +165,9 @@ class ResourceRegistry(object):
         res_obj.ts_updated = get_ion_ts()
         updres = self.rr_store.update(res_obj)
 
-        self.event_lc_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
-                                        old_state=old_state, new_state=new_state, transition_event=transition_event)
+        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+                                     origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     old_state=old_state, new_state=new_state, transition_event=transition_event)
 
         return new_state
 
@@ -179,8 +190,9 @@ class ResourceRegistry(object):
         res_obj.ts_updated = get_ion_ts()
         updres = self.rr_store.update(res_obj)
 
-        self.event_lc_pub.publish_event(origin=res_obj._id, origin_type=res_obj._get_type(),
-                                    old_state=old_state, new_state=target_lcstate)
+        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+                                     origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     old_state=old_state, new_state=target_lcstate)
 
     def create_attachment(self, resource_id='', attachment=None):
         if attachment is None:

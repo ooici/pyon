@@ -19,7 +19,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, bootstrap_pyon
 from pyon.core.exception import ContainerError
 from pyon.datastore.datastore import DataStore, DatastoreManager
-from pyon.event.event import EventRepository
+from pyon.event.event import EventRepository, EventPublisher
 from pyon.ion.directory import Directory
 from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
@@ -31,6 +31,7 @@ from pyon.util.log import log
 from pyon.util.containers import DictModifier, dict_merge
 from pyon.core.governance.governance_controller import GovernanceController
 
+from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
 from contextlib import contextmanager
 
@@ -140,6 +141,8 @@ class Container(BaseContainerAgent):
 
         # Event repository
         self.event_repository = EventRepository()
+        self.event_pub = EventPublisher()
+
         self._capabilities.append("EVENT_REPOSITORY")
 
         # Local resource registry
@@ -174,6 +177,10 @@ class Container(BaseContainerAgent):
         proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
+
+        self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                     origin=self.id, origin_type="CapabilityContainer",
+                                     state=ContainerStateEnum.START)
 
         self._is_started    = True
         self._status        = "RUNNING"
@@ -240,6 +247,10 @@ class Container(BaseContainerAgent):
 
     def stop(self):
         log.info("=============== Container stopping... ===============")
+
+        self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                     origin=self.id, origin_type="CapabilityContainer",
+                                     state=ContainerStateEnum.TERMINATE)
 
         while self._capabilities:
             capability = self._capabilities.pop()
