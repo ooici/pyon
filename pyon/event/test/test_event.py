@@ -286,10 +286,10 @@ class TestEventRepository(IonUnitTestCase):
         events_r = event_repo.find_events(origin='resource2')
         self.assertEquals(len(events_r), 5)
 
-        events_r = event_repo.find_events(origin='resource2', reverse_order=True)
+        events_r = event_repo.find_events(origin='resource2', descending=True)
         self.assertEquals(len(events_r), 5)
 
-        events_r = event_repo.find_events(origin='resource2', max_results=3)
+        events_r = event_repo.find_events(origin='resource2', limit=3)
         self.assertEquals(len(events_r), 3)
 
         events_r = event_repo.find_events(origin='resource2', start_ts=str(ts+3))

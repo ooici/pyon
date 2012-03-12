@@ -138,19 +138,20 @@ class Container(BaseContainerAgent):
         self.directory.register("/Containers/%s" % self.id, "Processes")
         self._capabilities.append("DIRECTORY")
 
+        # Event repository
+        self.event_repository = EventRepository()
+        self._capabilities.append("EVENT_REPOSITORY")
+
         # Local resource registry
         self.resource_registry = ResourceRegistry()
         self._capabilities.append("RESOURCE_REGISTRY")
 
-        # Create other repositories to make sure they are there and clean if needed
-
+        # Persistent objects
         self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
 
+        # State repository
         self.state_repository = StateRepository()
         self._capabilities.append("STATE_REPOSITORY")
-
-        self.event_repository = EventRepository()
-        self._capabilities.append("EVENT_REPOSITORY")
 
         # Start ExchangeManager, which starts the node (broker connection)
         self.node, self.ioloop = self.ex_manager.start()

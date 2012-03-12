@@ -154,11 +154,12 @@ class EventRepository(object):
         event_obj = self.event_store.read(event_id)
         return event_obj
 
-    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, reverse_order=False, max_results=0):
-        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, reverse_order=%s, max_results=%s" % (
-                event_type,origin,start_ts,end_ts,reverse_order,max_results))
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
+        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s" % (
+                event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None)))
         events = None
 
+        design_name = "event"
         view_name = None
         start_key = []
         end_key = []
@@ -179,15 +180,17 @@ class EventRepository(object):
             start_key=[]
             end_key=[]
         else:
-            raise BadRequest("Cannot query events")
+            view_name = "by_time"
+            if kwargs.get("limit", 0) < 1:
+                kwargs["limit"] = 100
+                log.warn("Querying all events, no limit given. Set limit to 100")
 
         if start_ts:
             start_key.append(start_ts)
         if end_ts:
             end_key.append(end_ts)
 
-        events = self.event_store.find_by_view("event", view_name, start_key=start_key, end_key=end_key,
-                                                descending=reverse_order, limit=max_results, id_only=False)
+        events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
+                                                id_only=False, **kwargs)
 
-        #log.info("Events: %s" % events)
         return events

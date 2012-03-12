@@ -98,7 +98,7 @@ class IonObjectBase(object):
         return self.__class__.__name__
 
     def _get_extends(self):
-        return [parent.__class__.__name__ for parent in self.__class__.__mro__ if parent.__class__.__name__ not in ['IonObjectBase','object']]
+        return [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase','object'] + list(self._get_type())]
 
 
     def __contains__(self, item):
