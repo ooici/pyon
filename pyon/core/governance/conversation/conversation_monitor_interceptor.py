@@ -118,16 +118,16 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         log.debug("ConversationMonitorInterceptor.incoming error: %s", error)
 
     def _get_conversation_context_key(self, principal, invocation):
-        global_conv_id = invocation.get_header_value('global-conv-id', None)
+        initiating_conv_id = invocation.get_header_value('initiating-conv-id', None)
         # Note, one principal can play only one role, but in general the key should be: (conv_id, prinicpla.od, role)
-        key = (global_conv_id, principal.id, principal.name)
+        key = (initiating_conv_id, principal.id, principal.name)
         return key
 
     def _should_be_monitored(self, invocation, principal_name, operation):
-        global_conv_id = invocation.get_header_value('global-conv-id', None)
+        initiating_conv_id = invocation.get_header_value('initiating-conv-id', None)
         return   ((principal_name in self.conversations_for_monitoring) and \
                   (operation in self.conversations_for_monitoring[principal_name])) and  \
-                   global_conv_id
+                   initiating_conv_id
 
     def _get_protocol_spec(self, role, operation ):
         return self.conversations_for_monitoring[role][operation]

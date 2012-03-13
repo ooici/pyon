@@ -1247,3 +1247,4 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
             prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
     except Exception as ex:
         log.warning("%s log error: %s", prefix, str(ex))
+
