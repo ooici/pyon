@@ -39,6 +39,15 @@ class NegotiateRequestFactory(object):
         return request_object
 
 
+    @classmethod
+    def create_acquire_resource(self,org_id, user_id, resource_id):
+
+        request_object = IonObject(RT.ResourceRequest, name='Acquire Resource Request', org_id=org_id, user_id=user_id, resource_id=resource_id,
+            status="Initialized", description='%s Acquire Resource Request at %s' % (user_id, str(now)))
+
+        return request_object
+
+
 
 class NegotiateRequest(object):
 
@@ -50,10 +59,12 @@ class NegotiateRequest(object):
         org_id = request_object.org_id
         user_id = request_object.user_id
 
+        neg_obj = self._get_negotiation_definition(request_object)
 
         #First make sure the preconditions for the object are met
-        for pc in request_object.pre_condition:
-            pre_condition_met = eval("self."+pc)
+        if neg_obj is not None:
+            for pc in neg_obj.pre_condition:
+                pre_condition_met = eval("self."+pc)
 
         #if no exceptions were thrown evaluating pre-conditions then return request object
         request_object.status = "Open"
@@ -62,6 +73,7 @@ class NegotiateRequest(object):
         #TODO - Send request_accepted notification
 
         return req_id
+
 
     def approve_request(self, request_object):
         request_object.status = REQUEST_APPROVED
@@ -103,6 +115,16 @@ class NegotiateRequest(object):
 
         return request_object
 
+    def _get_negotiation_definition(self, request_object):
+
+        #Get the name of the associated negotiation type
+        negotiation_type = request_object.__class__.__name__
+
+        neg_def, _ = self.requesting_service.clients.resource_registry.find_resources(restype=RT.NegotiationDefinition, name=negotiation_type)
+        if len(neg_def) > 0:
+            return neg_def[0]
+
+        return None
 
     def _create_request(self, org_id, user_id, request_object):
         req_id, _ = self.requesting_service.clients.resource_registry.create(request_object)
@@ -134,11 +156,13 @@ class NegotiateRequest(object):
         if request_object._schema.has_key('role_name'):
             role_name = request_object.role_name
 
-        if request_object._schema.has_key('accept_action'):
-            action = request_object.accept_action
 
+        neg_obj = self._get_negotiation_definition(request_object)
 
-        action_result = eval("self."+action)
+        #First make sure the preconditions for the object are met
+        if neg_obj is not None and neg_obj._schema.has_key('accept_action'):
+            action = neg_obj.accept_action
+            action_result = eval("self."+action)
 
         #TODO - Send request_accepted notification
 
@@ -177,4 +201,8 @@ class NegotiateRequest(object):
 
     def grant_role(self, org_id,user_id, role_name):
         ret = self.requesting_service.grant_role(org_id, user_id, role_name)
+        return ret
+
+    def acquire_resource(self, org_id,user_id, resource_id):
+        ret = self.requesting_service.acquire_resource(org_id, user_id, resource_id)
         return ret
