@@ -12,65 +12,15 @@ from gevent import event, queue
 from unittest import SkipTest
 
 from pyon.core import bootstrap
-from pyon.event.event import EventPublisher, EventError, get_events_exchange_point, EventSubscriber, EventRepository
-from pyon.net.messaging import NodeB
+from pyon.event.event import EventPublisher, EventSubscriber, EventRepository
 from pyon.util.async import spawn
+from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import IonUnitTestCase
 
 from interface.objects import Event, ResourceLifecycleEvent
 
-@attr('UNIT',group='event')
-class TestEventSubscriber(IonUnitTestCase):
-    def setUp(self):
-        self._node = Mock(spec=NodeB)
-        self._cb = lambda *args, **kwargs: False
-        self._sub = EventSubscriber(node=self._node, callback=self._cb)
-
-    def test_init(self):
-        self.assertEquals(self._sub._recv_name.exchange, "%s.pyon.events" % bootstrap.get_sys_name())
-        self.assertEquals(self._sub._recv_name.queue, None)
-        self.assertEquals(self._sub._binding, "*.#")
-        self.assertEquals(self._sub._callback, self._cb)
-
-    def test_init_with_xp(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp)
-        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
-        self.assertEquals(sub._recv_name.queue, None)
-
-    def test_init_with_event_type(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, event_type=sentinel.event_type)
-        self.assertEquals(sub._binding, "%s.#" % str(sentinel.event_type))
-
-    def test_init_with_origin(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, event_type=sentinel.event_type, origin=sentinel.origin)
-        self.assertEquals(sub._binding, "%s.%s" % (str(sentinel.event_type), str(sentinel.origin)))
-
-    def test_init_with_queue_name(self):
-        sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=str(sentinel.queue))
-        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
-        self.assertEquals(sub._recv_name.queue, "%s.%s" % (bootstrap.get_sys_name(), str(sentinel.queue)))
-
-    def test_init_with_queue_name_with_sysname(self):
-        queue_name = "%s-dacshund" % bootstrap.get_sys_name()
-        sub = EventSubscriber(node=self._node, callback=self._cb, xp_name=sentinel.xp, queue_name=queue_name)
-        self.assertEquals(sub._recv_name.exchange, sentinel.xp)
-        self.assertEquals(sub._recv_name.queue, queue_name)
-
-    def test__topic(self):
-        self.assertEquals(self._sub._topic(None), "*.#")
-
-    def test__topic_with_name(self):
-        self._sub.event_type = "pancakes"
-        self.assertEquals(self._sub._topic(None), "pancakes.#")
-
-    def test__topic_with_origin(self):
-        self.assertEquals(self._sub._topic(sentinel.origin), "*.%s" % str(sentinel.origin))
-
-    def test__topic_with_name_and_origin(self):
-        self._sub.event_type = "pancakes"
-        self.assertEquals(self._sub._topic(sentinel.origin), "pancakes.%s" % str(sentinel.origin))
 
 @attr('INT',group='event')
 class TestEvents(IonIntegrationTestCase):
@@ -146,6 +96,38 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(res[0].description, "1")
         self.assertEquals(res[1].description, "2")
         self.assertEquals(res[2].description, "3")
+
+    def test_pub_on_different_subtypes(self):
+        ar = event.AsyncResult()
+        gq = queue.Queue()
+        self.count = 0
+
+        def cb(event, *args, **kwargs):
+            self.count += 1
+            gq.put(event)
+            if event.description == "end":
+                ar.set()
+
+        sub = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1", callback=cb)
+        sub.activate()
+
+        pub1 = EventPublisher(event_type="ResourceModifiedEvent")
+        pub2 = EventPublisher(event_type="ContainerLifecycleEvent")
+
+        pub1.publish_event(origin="two", sub_type="st2", description="2")
+        pub2.publish_event(origin="three", sub_type="st1", description="3")
+        pub1.publish_event(origin="one", sub_type="st1", description="1")
+        pub1.publish_event(origin="four", sub_type="st1", description="end")
+
+        ar.get(timeout=5)
+        sub.deactivate()
+
+        res = []
+        for x in xrange(self.count):
+            res.append(gq.get(timeout=5))
+
+        self.assertEquals(len(res), 2)
+        self.assertEquals(res[0].description, "1")
 
     def test_base_subscriber_as_catchall(self):
         ar = event.AsyncResult()

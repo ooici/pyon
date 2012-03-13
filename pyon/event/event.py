@@ -5,12 +5,11 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-import time
-
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException
 from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import Publisher, Subscriber
+from pyon.util.async import spawn
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -50,12 +49,17 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, to_name=name, **kwargs)
 
-    def _topic(self, event_type, origin):
+    def _topic(self, event_type, origin, base_types=None, sub_type=None, origin_type=None):
         """
         Builds the topic that this event should be published to.
         """
         assert event_type and origin
-        return "%s.%s" % (event_type, origin)
+        base_types = base_types or []
+        base_str = ".".join(reversed(base_types))
+        sub_type = sub_type or "_"
+        origin_type = origin_type or "_"
+        routing_key = "%s.%s.%s.%s.%s" % (base_str, event_type, sub_type, origin_type, origin)
+        return routing_key
 
     def _create_event(self, event_type=None, **kwargs):
         event_type = event_type or self.event_type
@@ -66,16 +70,19 @@ class EventPublisher(Publisher):
 
         event_msg = bootstrap.IonObject(event_type, **kwargs)
         event_msg.base_types = event_msg._get_extends()
+
         # Would like to validate here but blows up if an object is provided where a dict is declared
         #event_msg._validate()
 
         return event_msg
 
-    def _publish_event(self, event_msg, origin, event_type=None, **kwargs):
-        event_type = event_type or self.event_type
+    def _publish_event(self, event_msg, origin, event_type=None):
+        event_type = event_type or self.event_type or event_msg._get_type()
         assert origin and event_type
 
-        to_name = (self._send_name.exchange, self._topic(event_type, origin))
+        topic = self._topic(event_type, origin, base_types=event_msg.base_types,
+            sub_type=event_msg.sub_type, origin_type=event_msg.origin_type)
+        to_name = (self._send_name.exchange, topic)
         log.debug("Publishing event message to %s", to_name)
 
         try:
@@ -104,36 +111,56 @@ class EventPublisher(Publisher):
         @param origin     the origin field value
         @param event_type the event type (defaults to the EventPublisher's event_typeif set)
         @param kwargs     additional event fields
-        @retval  Boolean indicating success of this operation
+        @retval  bool  indicating success of this operation
         """
         event_msg = self._create_event(origin=origin, event_type=event_type, **kwargs)
-        success = self._publish_event(event_msg, origin=origin, event_type=event_type)
+        success = self._publish_event(event_msg, origin=origin)
         return success
 
 class EventSubscriber(Subscriber):
 
-    def _topic(self, origin):
+    def _topic(self, event_type, origin, sub_type=None, origin_type=None):
         """
         Builds the topic that this event should be published to.
         If either side of the event_id.origin pair are missing, will subscribe to anything.
         """
-        event_type  = self.event_type or "*"
-        origin      = origin or "#"
+        if event_type == "Event":
+            event_type  = "Event.#"
+        elif event_type:
+            event_type  = "#.%s.#" % event_type
+        else:
+            event_type  = "#"
 
-        return "%s.%s" % (event_type, origin)
+        sub_type = sub_type or "*"
+        origin_type = origin_type or "*"
+        origin      = origin or "*"
 
-    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None, *args, **kwargs):
+        return "%s.%s.%s.%s" % (event_type, sub_type, origin_type, origin)
+
+    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
+                 sub_type=None, origin_type=None, *args, **kwargs):
         """
         Initializer.
 
-        If the queue_name is specified here, the sysname is prefixed automatically to it. This is becuase
+        If the queue_name is specified here, the sysname is prefixed automatically to it. This is because
         named queues are not namespaces to their exchanges, so two different systems on the same broker
         can cross-pollute messages if a named queue is used.
+
+        Note: an EventSubscriber needs to be closed to free broker resources
         """
+        self.callback = callback
+        self._cbthread = None
+
         self.event_type = event_type
+        self.sub_type = sub_type
+        self.origin_type = origin_type
+        self.origin = origin
 
         xp_name = xp_name or get_events_exchange_point()
-        binding = self._topic(origin)
+        binding = self._topic(event_type, origin, sub_type, origin_type)
+        self.binding = binding
+
+        # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
 
         # prefix the queue_name, if specified, with the sysname
         # this is because queue names transcend xp boundaries (see R1 OOIION-477)
@@ -144,8 +171,31 @@ class EventSubscriber(Subscriber):
 
         name = (xp_name, queue_name)
 
-        Subscriber.__init__(self, from_name=name, binding=binding, callback=callback, **kwargs)
+        log.debug("EventPublisher events pattern %s", binding)
 
+        Subscriber.__init__(self, from_name=name, binding=binding, callback=self._callback, **kwargs)
+
+    def _callback(self, *args, **kwargs):
+        log.info("Event received: args=%s, kwargs=%s" % (args, kwargs))
+        self.callback(*args, **kwargs)
+
+    def activate(self):
+        """
+        Pass in a subscriber here, this will make it listen in a background greenlet.
+        """
+        assert not self._cbthread, "activate called twice on EventSubscriber"
+        gl = spawn(self.listen)
+        self._cbthread = gl
+        self._ready_event.wait(timeout=5)
+        log.info("EventSubscriber activated. Event pattern=%s" % self.binding)
+        return gl
+
+    def deactivate(self):
+        self.close()
+        self._cbthread.join(timeout=5)
+        self._cbthread.kill()
+        self._cbthread = None
+        log.info("EventSubscriber deactivated. Event pattern=%s" % self.binding)
 
 class EventRepository(object):
     """
@@ -178,7 +228,7 @@ class EventRepository(object):
 
     def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
         log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s" % (
-                event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None)))
+            event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None)))
         events = None
 
         design_name = "event"
@@ -213,6 +263,6 @@ class EventRepository(object):
             end_key.append(end_ts)
 
         events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
-                                                id_only=False, **kwargs)
+            id_only=False, **kwargs)
 
         return events

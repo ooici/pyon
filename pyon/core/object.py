@@ -98,8 +98,8 @@ class IonObjectBase(object):
         return self.__class__.__name__
 
     def _get_extends(self):
-        return [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase','object'] + list(self._get_type())]
-
+        parents = [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase','object',self._get_type()]]
+        return parents
 
     def __contains__(self, item):
         return hasattr(self, item)

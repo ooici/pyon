@@ -80,6 +80,7 @@ class ResourceRegistry(object):
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_id, origin_type=object._get_type(),
+                                     sub_type="CREATE",
                                      mod_type=ResourceModificationType.CREATE)
 
         return res
@@ -125,6 +126,7 @@ class ResourceRegistry(object):
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=object._id, origin_type=object._get_type(),
+                                     sub_type="UPDATE",
                                      mod_type=ResourceModificationType.UPDATE)
 
         return self.rr_store.update(object)
@@ -143,7 +145,8 @@ class ResourceRegistry(object):
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
-                                     mod_type=ResourceModificationType.UPDATE)
+                                     sub_type="DELETE",
+                                     mod_type=ResourceModificationType.DELETE)
 
         return res
 
@@ -167,6 +170,7 @@ class ResourceRegistry(object):
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     sub_type=new_state,
                                      old_state=old_state, new_state=new_state, transition_event=transition_event)
 
         return new_state
@@ -192,6 +196,7 @@ class ResourceRegistry(object):
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     sub_type=target_lcstate,
                                      old_state=old_state, new_state=target_lcstate)
 
     def create_attachment(self, resource_id='', attachment=None):
