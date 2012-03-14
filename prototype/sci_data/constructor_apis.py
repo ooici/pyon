@@ -569,6 +569,8 @@ class RawSupplementConstructor(object):
 
         self._encoding_id = data_stream.encoding_id
 
+        self._encoding = raw_definition.identifiables[self._encoding_id]
+
         #Create a new CountElement object to keep track of the number of records
         self._element_count = CountElement()
         self._granule.identifiables[data_stream.element_count_id] = self._element_count
@@ -594,7 +596,8 @@ class RawSupplementConstructor(object):
 
         sha1 = hashlib.sha1(self._raw_samples).hexdigest().upper()
         self._granule.identifiables[self._encoding_id] = Encoding(
-            sha1=sha1
+            sha1=sha1,
+            encoding_type = self._encoding.encoding_type
         )
     
         tstamp = TimeElement(
@@ -607,6 +610,7 @@ class RawSupplementConstructor(object):
             timestamp=tstamp
         )
 
+        return self._granule
         
 
 class PointSupplementConstructor(object):
@@ -634,6 +638,8 @@ class PointSupplementConstructor(object):
         data_stream = point_definition.identifiables[point_definition.data_stream_id]
 
         self._encoding_id = data_stream.encoding_id
+
+        self._encoding = point_definition.identifiables[self._encoding_id]
 
         #Create a new CountElement object to keep track of the number of records
         self._element_count = CountElement()
@@ -812,7 +818,7 @@ class PointSupplementConstructor(object):
 
         sha1 = hashlib.sha1(hdf_string).hexdigest().upper()
         self._granule.identifiables[self._encoding_id] = Encoding(
-            encoding_type='hdf5',
+            encoding_type = self._encoding.encoding_type,
             compression=None,
             sha1=sha1
         )
