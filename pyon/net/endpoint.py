@@ -609,9 +609,6 @@ class RequestResponseClient(SendingBaseEndpoint):
         e = self.create_endpoint(self._send_name)
         try:
             retval, headers = e.send(msg, headers=headers, timeout=timeout)
-        except Exception:
-            log.exception('Request failed')
-            raise
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
