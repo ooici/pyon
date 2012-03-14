@@ -158,6 +158,7 @@ class NegotiateRequest(object):
 
 
         neg_obj = self._get_negotiation_definition(request_object)
+        action_result = ''
 
         #First make sure the preconditions for the object are met
         if neg_obj is not None and neg_obj._schema.has_key('accept_action'):
