@@ -180,6 +180,7 @@ class Container(BaseContainerAgent):
 
         self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
                                      origin=self.id, origin_type="CapabilityContainer",
+                                     sub_type="START",
                                      state=ContainerStateEnum.START)
 
         self._is_started    = True
@@ -250,6 +251,7 @@ class Container(BaseContainerAgent):
 
         self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
                                      origin=self.id, origin_type="CapabilityContainer",
+                                     sub_type="TERMINATE",
                                      state=ContainerStateEnum.TERMINATE)
 
         while self._capabilities:
