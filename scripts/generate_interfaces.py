@@ -613,17 +613,19 @@ def generate_model_objects():
             enums_by_name[name_val] = {"values": value_val, "default": default_val}
 
             dataobject_output_text += "\nclass " + name_val + "(object):\n"
-            i = 1
-            for val in value_val:
+            for i, val in enumerate(value_val, 1):
                 dataobject_output_text += "    " + val + " = " + str(i) + "\n"
-                i += 1
             dataobject_output_text += "    _value_map = {"
-            i = 1
-            for val in value_val:
+            for i, val in enumerate(value_val, 1):
                 if i > 1:
                     dataobject_output_text += ", "
                 dataobject_output_text += "'" + val + "': " + str(i)
-                i += 1
+            dataobject_output_text += "}\n"
+            dataobject_output_text += "    _str_map = {"
+            for i, val in enumerate(value_val, 1):
+                if i > 1:
+                    dataobject_output_text += ", "
+                dataobject_output_text += str(i) + ": '" + val + "'"
             dataobject_output_text += "}\n"
 
     enum_tag = u'!enum'

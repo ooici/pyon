@@ -39,6 +39,7 @@ class TestEndpointUnit(PyonTestCase):
         self.assertTrue(self._endpoint_unit.channel is not None)
         self.assertEquals(self._endpoint_unit.channel, ch)
 
+    @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
     def test_send(self):
 
         # need a channel to send on
@@ -48,7 +49,7 @@ class TestEndpointUnit(PyonTestCase):
         self._endpoint_unit.attach_channel(ch)
 
         self._endpoint_unit.send("hi", {'header':'value'})
-        ch.send.assert_called_once_with('hi', {'header':'value'})
+        ch.send.assert_called_once_with('hi', {'header':'value', 'ts':sentinel.ts})
 
     def test_close(self):
         ch = Mock(spec=BaseChannel)
@@ -429,6 +430,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
         self.assertEquals(args, ["ein", "zwei"])
 
+    @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
     def test_receive_bad_op(self):
 
         class FakeMsg(object):
@@ -454,8 +456,10 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'encoding':'msgpack',
                                                'format':'NoneType',
                                                'receiver': ',',
+                                               'ts': sentinel.ts,
                                                'reply-by': 'todo'})
 
+    @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
     def test_recv_bad_kwarg(self):
         # we try to call simple with the kwarg "not_named" instead of the correct one
         class FakeMsg(object):
@@ -481,6 +485,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'encoding':'msgpack',
                                                'format':'NoneType',
                                                'receiver': ',',
+                                               'ts': sentinel.ts,
                                                'reply-by': 'todo'})
 
     def test__message_received_interceptor_exception(self):

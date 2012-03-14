@@ -380,6 +380,7 @@ class ProcManager(object):
 
         self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
                                                origin=service_instance.id, origin_type="ContainerProcess",
+                                               sub_type="SPAWN",
                                                container_id=self.container.id,
                                                process_type=service_instance._proc_type, process_name=service_instance._proc_name,
                                                state=ProcessStateEnum.SPAWN)
@@ -419,6 +420,7 @@ class ProcManager(object):
 
         self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
                                             origin=service_instance.id, origin_type="ContainerProcess",
+                                            sub_type="TERMINATE",
                                             container_id=self.container.id,
                                             process_type=service_instance._proc_type, process_name=service_instance._proc_name,
                                             state=ProcessStateEnum.TERMINATE)
