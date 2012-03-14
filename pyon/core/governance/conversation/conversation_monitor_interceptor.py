@@ -16,9 +16,13 @@ from core.conversation_context import ConversationContext
 class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
     def __init__(self):
         self.spec_path = os.path.normpath("%s/../specs/" %__file__)
-        self.conversations_for_monitoring = {'bank':{'buy_bonds':'BankExample_Bank.srt'}}
+        self._initialize_conversation_for_monitoring()
         #map principal to conversation_context
         self.conversation_context = {}
+
+    def _initialize_conversation_for_monitoring(self):
+        self.conversations_for_monitoring = {'bank':{'buy_bonds':'bank/local/BuyBonds_Bank.srt'},
+                                             'trade':{'exercise':'bank/local/BuyBonds_Trade.srt'}}
 
 
     def outgoing(self, invocation):
@@ -85,7 +89,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             else:
                 conversation_context = self._initialize_conversation_context(cid, role_spec,
                                                                         [self_principal, target_principal])
-                self.conversation_context[conversation_key] = conversation_context
+                if conversation_context: self.conversation_context[conversation_key] = conversation_context
 
         # CHECK
         if (conversation_key in self.conversation_context):
