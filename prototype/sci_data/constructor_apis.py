@@ -20,6 +20,7 @@ from interface.objects import StreamGranuleContainer
 import hashlib
 import pyon
 from pyon.core.object import ionprint
+from pyon.util.containers import get_ion_ts
 
 import datetime
 
@@ -603,12 +604,14 @@ class RawSupplementConstructor(object):
         tstamp = TimeElement(
             definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
             reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS",
-            value= timestamp or datetime.datetime.utcnow().isoformat())
+            reference_time='1970-01-01T00:00:00.000Z',
+            value= timestamp or get_ion_ts()
+            )
     
         self._granule.identifiables[self._granule.data_stream_id] = DataStream(
             values=self._raw_samples,
             timestamp=tstamp
-        )
+            )
 
         return self._granule
         
@@ -826,7 +829,9 @@ class PointSupplementConstructor(object):
         tstamp = TimeElement(
             definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
             reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS",
-            value= timestamp or datetime.datetime.utcnow().isoformat())
+            reference_time='1970-01-01T00:00:00.000Z',
+            value= timestamp or get_ion_ts()
+        )
 
         self._granule.identifiables[self._granule.data_stream_id] = DataStream(
             values=hdf_string,
