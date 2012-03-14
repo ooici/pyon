@@ -9,6 +9,7 @@ from pyon.core.object import IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
+from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 from pyon.net.transport import NameTrio, BaseTransport
 
@@ -212,7 +213,7 @@ class EndpointUnit(object):
         Assembles the headers of a message from the raw message's content.
         """
         log.debug("EndpointUnit _build_header")
-        return {'ts':str(int(time.time()*1000))}
+        return {'ts':get_ion_ts()}
 
     def _build_payload(self, raw_msg):
         """
