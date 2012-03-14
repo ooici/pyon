@@ -25,8 +25,8 @@ pyon (ION capability container) v%s
 
 def setup_ipython(shell_api=None):
     from IPython.config.loader import Config
-    cfg = Config()
-    shell_config = cfg.InteractiveShellEmbed
+    ipython_cfg = Config()
+    shell_config = ipython_cfg.InteractiveShellEmbed
     shell_config.prompt_in1 = '><> '
     shell_config.prompt_in2 = '... '
     shell_config.prompt_out = '--> '
@@ -69,7 +69,7 @@ def setup_ipython(shell_api=None):
     # string with options exactly as you would type them if you were starting
     # IPython at the system command line. Any parameters you want to define for
     # configuration can thus be specified here.
-    ipshell = InteractiveShellEmbed(config=cfg,
+    ipshell = InteractiveShellEmbed(config=ipython_cfg,
                            banner1 = \
 """    ____                                ________  _   __   ____________   ____  ___
    / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
@@ -125,8 +125,8 @@ def main(opts, *args, **kwargs):
 
         # Load any additional config paths and merge them into main config
         if len(opts.config):
-            cfg = Config(opts.config)
-            dict_merge(CFG, cfg.data, True)
+            ipython_cfg = Config(opts.config)
+            dict_merge(CFG, ipython_cfg.data, True)
 
         # Create the container instance
         container = Container(*args, **kwargs)
@@ -218,8 +218,8 @@ def parse_args(tokens):
         token = token.lstrip('-')
         if '=' in token:
             key,val = token.split('=', 1)
-            cfg = unflatten({key: yaml.load(val)})
-            kwargs.update(cfg)
+            ipython_cfg = unflatten({key: yaml.load(val)})
+            kwargs.update(ipython_cfg)
         else:
             args.append(yaml.load(token))
 
