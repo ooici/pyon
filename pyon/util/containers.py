@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-__author__ = 'Adam R. Smith'
+__author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 import collections
+import datetime
 import string
 import time
 import simplejson
@@ -235,9 +236,36 @@ def current_time_millis():
 def get_ion_ts():
     """
     Returns standard ION representation of a global timestamp.
-    Currently a str with an integer: current millis in epoch
+    It is defined as a str representing an integer number, the millis in UNIX epoch
     """
     return str(current_time_millis())
+
+def get_datetime(ts, local_time=True):
+    """
+    Returns a datatime instance in either local time or GMT time based on the given ION
+    timestamp
+    @param ts  ION timestamp (str with millis in epoch)
+    @param local_time  if True, returns local time (default), otherwise GMT
+    @retval  datetime instance
+    """
+    tsf = float(ts) / 1000
+    timev = time.localtime(tsf) if local_time else time.gmtime(tsf)
+    dt = datetime.datetime.fromtimestamp(time.mktime(timev))
+    return dt
+
+def get_datetime_str(ts, show_millis=False, local_time=True):
+    """
+    Returns a string with date and time representation from an ION timestamp
+    @param ts  ION timestamp (str with millis in epoch)
+    @param show_millis  If True, appends the milli seconds
+    @param local_time  if True, returns local time (default), otherwise GMT
+    @retval  str with ION standard date and time representation
+    """
+    dt = get_datetime(ts, local_time)
+    dts = str(dt)
+    if show_millis:
+        dts += "." + ts[-3:]
+    return dts
 
 def parse_ion_ts(ts):
     return float(ts) / 1000.0
