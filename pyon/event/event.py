@@ -131,7 +131,7 @@ class EventSubscriber(Subscriber):
         else:
             event_type  = "#"
 
-        sub_type = sub_type or "*"
+        sub_type = sub_type or "*.#"
         origin_type = origin_type or "*"
         origin      = origin or "*"
 

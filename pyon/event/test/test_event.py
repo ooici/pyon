@@ -15,7 +15,7 @@ from pyon.core import bootstrap
 from pyon.event.event import EventPublisher, EventSubscriber, EventRepository
 from pyon.util.async import spawn
 from pyon.util.log import log
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, DotDict
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import IonUnitTestCase
 
@@ -128,6 +128,69 @@ class TestEvents(IonIntegrationTestCase):
 
         self.assertEquals(len(res), 2)
         self.assertEquals(res[0].description, "1")
+
+    def test_pub_on_different_subsubtypes(self):
+        res_list = [DotDict(ar=event.AsyncResult(), gq=queue.Queue(), count=0) for i in xrange(4)]
+
+        def cb_gen(num):
+            def cb(event, *args, **kwargs):
+                res_list[num].count += 1
+                res_list[num].gq.put(event)
+                if event.description == "end":
+                    res_list[num].ar.set()
+            return cb
+
+        sub0 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1.*", callback=cb_gen(0))
+        sub0.activate()
+
+        sub1 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1.a", callback=cb_gen(1))
+        sub1.activate()
+
+        sub2 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="*.a", callback=cb_gen(2))
+        sub2.activate()
+
+        sub3 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1", callback=cb_gen(3))
+        sub3.activate()
+
+        pub1 = EventPublisher(event_type="ResourceModifiedEvent")
+
+        pub1.publish_event(origin="one", sub_type="st1.a", description="1")
+        pub1.publish_event(origin="two", sub_type="st1", description="2")
+        pub1.publish_event(origin="three", sub_type="st1.b", description="3")
+
+        pub1.publish_event(origin="four", sub_type="st2.a", description="4")
+        pub1.publish_event(origin="five", sub_type="st2", description="5")
+
+        pub1.publish_event(origin="six", sub_type="a", description="6")
+        pub1.publish_event(origin="seven", sub_type="", description="7")
+
+        pub1.publish_event(origin="end", sub_type="st1.a", description="end")
+        pub1.publish_event(origin="end", sub_type="st1", description="end")
+
+        [res_list[i].ar.get(timeout=5) for i in xrange(3)]
+
+        sub0.deactivate()
+        sub1.deactivate()
+        sub2.deactivate()
+        sub3.deactivate()
+
+        for i in xrange(4):
+            res_list[i].res = []
+            for x in xrange(res_list[i].count):
+                res_list[i].res.append(res_list[i].gq.get(timeout=5))
+
+        self.assertEquals(len(res_list[0].res), 3)
+        self.assertEquals(res_list[0].res[0].description, "1")
+
+        self.assertEquals(len(res_list[1].res), 2)
+        self.assertEquals(res_list[1].res[0].description, "1")
+
+        self.assertEquals(len(res_list[2].res), 3)
+        self.assertEquals(res_list[2].res[0].description, "1")
+
+        self.assertEquals(len(res_list[3].res), 2)
+        self.assertEquals(res_list[3].res[0].description, "2")
+
 
     def test_base_subscriber_as_catchall(self):
         ar = event.AsyncResult()

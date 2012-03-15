@@ -5,9 +5,12 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+import traceback
+
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core import exception as iex
+from pyon.event.event import EventPublisher
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
@@ -21,14 +24,24 @@ class ResourceAgent(BaseResourceAgent):
 
     process_type = "agent"
 
-    def _on_init(self):
-        log.debug("Resource Agent initializing. name=%s" % (self._proc_name))
-        # The ID of the agent instance resource object
+    # Override in subclass to publish specific types of events
+    COMMAND_EVENT_TYPE = "ResourceCommandEvent"
+    # Override in subclass to set specific origin type
+    ORIGIN_TYPE = "Resource"
+
+    def __init__(self, *args, **kwargs):
+        super(ResourceAgent, self).__init__(*args, **kwargs)
+
+        # The ID of the AgentInstance subtype resource object
         self.agent_id = None
-        # The ID of the agent definition resource object
+        # The ID of the AgentDefinition subtype resource object
         self.agent_def_id = None
-        # The ID of the target resource object
+        # The ID of the target resource object, e.g. a device id
         self.resource_id = None
+
+    def _on_init(self):
+        log.debug("Resource Agent initializing. name=%s, resource_id=%s" % (self._proc_name, self.resource_id))
+        self._event_publisher = EventPublisher()
 
     def _on_quit(self):
         pass
@@ -56,17 +69,33 @@ class ResourceAgent(BaseResourceAgent):
                 res = cmd_func(*command.args, **command.kwargs)
                 cmd_res.status = 0
                 cmd_res.result = res
-            except Exception as ex:
+            except iex.IonException as ex:
                 # TODO: Distinguish application vs. uncaught exception
                 cmd_res.status = getattr(ex, 'status_code', -1)
                 cmd_res.result = str(ex)
-                log.info("Agent function failed with ex=%s msg=%s" % (type(ex), str(ex)))
+                log.info("Agent command %s failed with trace=%s" % (command.command, traceback.format_exc()))
         else:
             log.info("Agent command not supported: %s" % (command.command))
             ex = iex.NotFound("Command not supported: %s" % command.command)
             cmd_res.status = iex.NotFound.status_code
             cmd_res.result = str(ex)
+
+        sub_type = "%s.%s" % (command.command, cmd_res.status)
+        post_event = self._event_publisher._create_event(event_type=self.COMMAND_EVENT_TYPE,
+                                origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
+                                sub_type=sub_type, command=command, result=cmd_res)
+        post_event = self._post_execute_event_hook(post_event)
+        success = self._event_publisher._publish_event(post_event, origin=post_event.origin)
+
         return cmd_res
+
+    def _post_execute_event_hook(self, event):
+        """
+        Hook to add additional values to the event object to be published
+        @param event  A filled out even object of type COMMAND_EVENT_TYPE
+        @retval an event object
+        """
+        return event
 
     def get_capabilities(self, resource_id="", capability_types=[]):
         capability_types = capability_types or ["CONV_TYPE", "AGT_CMD", "AGT_PAR", "RES_CMD", "RES_PAR"]
