@@ -19,8 +19,7 @@ from pyon.util.config import CFG
 __all__ += ['CFG']
 
 from pyon.core.bootstrap import obj_registry, IonObject, get_sys_name
-sys_name = get_sys_name()
-__all__ += ['obj_registry', 'IonObject', 'sys_name']
+__all__ += ['obj_registry', 'IonObject', 'get_sys_name']
 
 from pyon.core.object import ionprint
 __all__ += ['ionprint']
