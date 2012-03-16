@@ -338,15 +338,24 @@ class HDFDecoder(object):
         #except AssertionError as err:
         #    raise HDFDecoderException(err.message)
 
-        self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
-        #try:
+        #self.filename = FileSystem.get_url(fs=FS.TEMP, filename=hashlib.sha1(hdf_string).hexdigest(), ext='_decoder.hdf5')
+
+        f = FileSystem.mktemp(ext='.hdf5')
+
         # save an hdf string to disk - in /tmp to so we can open it as an hdf file and read data from it
-        f = open(self.filename, mode='wb')
         f.write(hdf_string)
         f.close()
+
+        self.filename = f.name
         #except IOError:
         #    log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
         #    raise HDFDecoderException("Error while trying to open file. ")
+
+    def __del__(self):
+        # This is dangerous - I don't like implementing del!!!
+
+        # Clean up files!
+        FileSystem.unlink(self.filename)
 
     def get_hdf_groups(self):
         #try:
