@@ -346,6 +346,8 @@ class HDFDecoder(object):
         f.write(hdf_string)
         f.close()
 
+        self._list_of_datasets = []
+
         self.filename = f.name
         #except IOError:
         #    log.debug("Error opening binary file for writing hdfstring in HDFDecoder. ")
@@ -356,6 +358,22 @@ class HDFDecoder(object):
 
         # Clean up files!
         FileSystem.unlink(self.filename)
+
+
+    def list_datasets(self):
+
+        if not self._list_of_datasets:
+            import h5py
+            h5pyfile = h5py.File(self.filename, mode = 'r', driver='core')
+
+            h5pyfile.visit(self._list_of_datasets.append)
+
+            h5pyfile.close()
+
+        return self._list_of_datasets
+
+
+
 
     def get_hdf_groups(self):
         #try:
