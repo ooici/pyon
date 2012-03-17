@@ -161,12 +161,13 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        self._service_start(service_instance)
+
         listen_name = get_safe(config, "process.listen_name") or service_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
 
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
-        self._service_start(service_instance)
 
         # Directory registration
         self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
@@ -184,6 +185,9 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        # Start the service
+        self._service_start(service_instance)
+
         listen_name = get_safe(config, "process.listen_name") or name
         # Throws an exception if no listen name is given!
         self._set_subscription_endpoint(service_instance, listen_name)
@@ -193,9 +197,6 @@ class ProcManager(object):
         self._set_publisher_endpoints(service_instance, publish_streams)
 
         self._set_service_endpoint(service_instance, service_instance.id)
-
-        # Start the service
-        self._service_start(service_instance)
 
         return service_instance
 
@@ -221,8 +222,9 @@ class ProcManager(object):
         if not service_instance.resource_id:
             log.warn("New agent pid=%s has no resource_id set" % process_id)
 
-        self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
+
+        self._set_service_endpoint(service_instance, service_instance.id)
 
         # Directory registration
         caps = service_instance.get_capabilities()
@@ -247,13 +249,15 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
+
+        self._service_start(service_instance)
+
         self._set_service_endpoint(service_instance, service_instance.id)
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
-        self._service_start(service_instance)
         return service_instance
 
     # -----------------------------------------------------------------
@@ -266,11 +270,12 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        self._service_start(service_instance)
+
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
-        self._service_start(service_instance)
         return service_instance
 
     # -----------------------------------------------------------------
