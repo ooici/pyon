@@ -37,7 +37,13 @@ class PointSupplementStreamParser(object):
 
         hdf_path = self._get_hdf_path(field_name)
 
-        return self._decoder.read_hdf_dataset(hdf_path)
+        try:
+            array = self._decoder.read_hdf_dataset(hdf_path)
+        except KeyError, ke:
+            log.warn('Could not find requested dataset. Datasets present in hdf file: "%s"', self._decoder.list_datasets())
+            raise ke
+
+        return array
 
     def _get_hdf_path(self, field_name):
 

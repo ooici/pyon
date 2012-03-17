@@ -98,6 +98,14 @@ class TestScienceObjectCodec(PyonTestCase):
             os.remove(i)
 
 
+    def test_list_datasets(self):
+
+        hdfdecoder = HDFDecoder(self.known_hdf_as_string)
+
+        datasets = hdfdecoder.list_datasets()
+
+        self.assertIn(self.path_to_dataset ,datasets)
+
 
 
     def add_two_datasets_read_compare(self, filename, dataset_name1, dataset_name2):
