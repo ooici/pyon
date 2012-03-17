@@ -13,6 +13,7 @@ from pyon.core.exception import Conflict, NotFound, BadRequest
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
+from pyon.util.containers import get_ion_ts
 
 from interface.objects import DirEntry
 
@@ -128,8 +129,9 @@ class Directory(object):
         direntry = self._safe_read(dn)
         existed = bool(direntry)
         if not direntry:
+            cur_time = get_ion_ts()
             parent_dn = self._get_dn(parent)
-            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs)
+            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
             # TODO: This may fail because of concurrent create
             self.dir_store.create(direntry, dn)
         return existed
@@ -159,14 +161,16 @@ class Directory(object):
 
         entry_old = None
         direntry = self._safe_read(dn)
+        cur_time = get_ion_ts()
         if direntry:
             entry_old = direntry.attributes
             direntry.attributes = kwargs
+            direntry.ts_updated=cur_time
             # TODO: This may fail because of concurrent update
             self.dir_store.update(direntry)
         else:
             parent_dn = self._get_dn(parent)
-            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs)
+            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
             self.dir_store.create(direntry, dn)
 
         return entry_old
@@ -186,9 +190,10 @@ class Directory(object):
             raise BadRequest("Bad entries type")
         de_list = []
         deid_list = []
+        cur_time = get_ion_ts()
         for parent, key, attrs in entries:
             parent_dn = self._get_dn(parent)
-            de = DirEntry(parent=parent_dn, key=key, attributes=attrs)
+            de = DirEntry(parent=parent_dn, key=key, attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
             de_list.append(de)
             dn = self._get_dn(parent, key)
             deid_list.append(dn)
