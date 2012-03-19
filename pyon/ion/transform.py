@@ -33,7 +33,7 @@ class TransformBase(StreamProcess):
             event_publisher = EventPublisher()
             event_publisher.publish_event(origin=self.name, event_type='ExceptionEvent',
                 exception_type=str(type(e)), exception_message=e.message)
-            log.exception('Unhandled exception caught (%s): %s',str(type(e)), e.message)
+            log.exception('Unhandled caught in transform process')
 
 
     def process(self, packet):
