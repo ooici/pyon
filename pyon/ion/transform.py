@@ -18,10 +18,15 @@ class TransformBase(StreamProcess):
     def on_start(self):
         super(TransformBase,self).on_start()
         # Assign a name based on CFG, required for messaging
-        self.name = self.CFG.get('process',{}).get('name',None)
+        self.name = self.CFG.get_safe('process.name',None)
 
         # Assign a list of streams available
-        self.streams = self.CFG.get('process',{}).get('publish_streams',[])
+        self.streams = self.CFG.get_safe('process.publish_streams',[])
+
+        # Assign the transform resource id
+        self._transform_id = self.CFG.get_safe('process.transform_id','Unknown_transform_id')
+
+
 
     def callback(self):
         pass
@@ -30,10 +35,10 @@ class TransformBase(StreamProcess):
         try:
             self.process(packet)
         except Exception as e:
-            event_publisher = EventPublisher()
-            event_publisher.publish_event(origin=self.name, event_type='ExceptionEvent',
-                exception_type=str(type(e)), exception_message=e.message)
             log.exception('Unhandled caught in transform process')
+            event_publisher = EventPublisher()
+            event_publisher.publish_event(origin=self._transform_id, event_type='ExceptionEvent',
+                exception_type=str(type(e)), exception_message=e.message)
 
 
     def process(self, packet):
