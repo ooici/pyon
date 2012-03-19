@@ -5,13 +5,16 @@
 @file: pyon/ion/transform.py
 @description: Implementation for TransformBase class
 '''
+from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
+from pyon.util.log import log
 
 class TransformBase(StreamProcess):
     """
 
     """
+
     def on_start(self):
         super(TransformBase,self).on_start()
         # Assign a name based on CFG, required for messaging
@@ -23,8 +26,19 @@ class TransformBase(StreamProcess):
     def callback(self):
         pass
 
+    def call_process(self, packet):
+        try:
+            self.process(packet)
+        except Exception as e:
+            event_publisher = EventPublisher()
+            event_publisher.publish_event(origin=self.name, event_type='ExceptionEvent',
+                exception_type=str(type(e)), exception_message=e.message)
+            log.exception('Unhandled caught in transform process')
+
+
     def process(self, packet):
         pass
+
 
 class TransformProcessAdaptor(TransformBase):
     """
