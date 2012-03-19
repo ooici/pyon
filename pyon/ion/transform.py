@@ -5,6 +5,7 @@
 @file: pyon/ion/transform.py
 @description: Implementation for TransformBase class
 '''
+from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
 from pyon.util.log import log
@@ -29,6 +30,9 @@ class TransformBase(StreamProcess):
         try:
             self.process(packet)
         except Exception as e:
+            event_publisher = EventPublisher()
+            event_publisher.publish_event(origin=self.name, event_type='ExceptionEvent',
+                exception_type=str(type(e)), exception_message=e.message)
             log.exception('Unhandled exception caught (%s): %s',str(type(e)), e.message)
 
 
