@@ -7,11 +7,13 @@
 '''
 
 from pyon.ion.streamproc import StreamProcess
+from pyon.util.log import log
 
 class TransformBase(StreamProcess):
     """
 
     """
+
     def on_start(self):
         super(TransformBase,self).on_start()
         # Assign a name based on CFG, required for messaging
@@ -23,8 +25,16 @@ class TransformBase(StreamProcess):
     def callback(self):
         pass
 
+    def call_process(self, packet):
+        try:
+            self.process(packet)
+        except Exception as e:
+            log.exception('Unhandled exception caught (%s): %s',str(type(e)), e.message)
+
+
     def process(self, packet):
         pass
+
 
 class TransformProcessAdaptor(TransformBase):
     """
