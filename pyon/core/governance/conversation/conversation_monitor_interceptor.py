@@ -21,8 +21,10 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         self.conversation_context = {}
 
     def _initialize_conversation_for_monitoring(self):
-        self.conversations_for_monitoring = {'bank':{'buy_bonds':'bank/local/BuyBonds_Bank.srt'},
-                                             'trade':{'exercise':'bank/local/BuyBonds_Trade.srt'}}
+        self.conversations_for_monitoring = {'bank':{'buy_bonds':'bank/local/BuyBonds_Bank.srt',
+                                                     'new_account':'bank/local/NewAccount_Bank.srt'},
+                                             'trade':{'exercise':'bank/local/BuyBonds_Trade.srt'}
+                                            }
 
 
     def outgoing(self, invocation):
