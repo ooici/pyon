@@ -1,0 +1,13 @@
+protocol NewAccount (role bank, role resource_registry) {
+	new_account from client to bank;
+	find_resources from bank to resource_registry;
+	(Customer) from resource_registry to bank;
+	create(account_obj) from bank to resource_registry;
+    (Account) from resource_registry to bank;
+	choice at bank {create(customer_obj) from bank to resource_registry;
+	                (Customer) from resource_registry to bank;
+					}
+	create_association(customer_id, account_id) from bank to resource_registry;
+	(status) from resource_registry to bank;
+	(accountID) from bank to client;
+}
