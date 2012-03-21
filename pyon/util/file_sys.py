@@ -162,6 +162,29 @@ class FileSystem(object):
         return os.path.join(FS_DIRECTORY[fs], '%s%s' % (FileSystem._parse_filename(filename), ext))
 
     @staticmethod
+    def get_hierarchical_url(fs, filename, ext=''):
+        """
+        @param fs The file system enumeration for the resource where this file belongs. 'TEMP', 'LIBRARY' etc.
+        @param file The filename to be turned into a path and name
+        @param ext Optional: guarantees the file will have the extension specified
+        @return The full path to the desired resource on the file system
+        """
+        clean_name = FileSystem._parse_filename(filename)
+
+        if len(clean_name) < 6:
+            return os.path.join(FS_DIRECTORY[fs], '%s%s' % (clean_name, ext))
+
+        else:
+
+            path = os.path.join(FS_DIRECTORY[fs], "%s/%s" % (clean_name[0:2], clean_name[2:4]))
+
+            if not os.path.exists(path=path):
+                os.makedirs(path)
+
+            return os.path.join(path, '%s%s' % (clean_name[4:], ext))
+
+
+    @staticmethod
     def mktemp(filename='', ext=''):
         """
         @description Creates a temporary file that is semi-persistent
