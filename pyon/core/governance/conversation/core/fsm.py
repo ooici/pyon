@@ -41,7 +41,6 @@ class FSM:
         self.error_transition = self.ERROR_TRANSITION
         self.empty_transition = self.EMPTY_TRANSITION
         self.input_symbol = None
-        print 'initial_state is: %s' %(initial_state)
         self.initial_state = initial_state
         self.current_state = self.initial_state
         self.next_state = None
@@ -94,7 +93,6 @@ class FSM:
 
         if next_state is None:
             next_state = state
-        print "%s-%s" %(state, next_state)
         self.state_transitions[(input_symbol, state)] = (transition_context, action, next_state)
 
     def add_transition_list (self, list_input_symbols, state, next_state=None, 
@@ -189,7 +187,6 @@ class FSM:
       
     #-------------------------------------------Methods for handling global interrupt-------------------------
     def add_interrupt_transition(self, transition, next_state):
-        print 'Add interrupt transition %s' %(transition)
         self.interrupt_transition = transition
         self.interrupt_start_state = next_state 
         
@@ -299,8 +296,7 @@ class FSM:
         is not called and only the current state is changed. This method
         processes one complete input symbol. You can process a list of symbols
         (or a string) by calling process_list(). """
-        
-        print 'current state: %s, final_state: %s' %(self.current_state, self.final_state)
+
         if (self.current_state == self.final_state):
             raise ExceptionFSM('What are you sending?.The communication has finished.')
         
