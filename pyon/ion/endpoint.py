@@ -199,6 +199,8 @@ class StreamSubscriberRegistrar(object):
         """
 
         if not exchange_name:
+            #@todo - remove this! it does not belong here!
+
             # if not create a new one based on the process id
             exchange_name =  '%s_subscriber_%d' % (self.process.id, self._subscriber_cnt)
             self._subscriber_cnt += 1
