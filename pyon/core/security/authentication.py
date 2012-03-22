@@ -13,8 +13,6 @@ import os
 import sys
 import tempfile
 import datetime
-import calendar
-import time
 
 from M2Crypto import EVP, X509, BIO, SMIME, RSA
 
@@ -212,17 +210,14 @@ class Authentication(object):
         """
         Test if the current date is covered by the certificates valid within date range.
         """
-        os.environ['TZ'] = 'GMT'
-        time.tzset()
-
         cert = X509.load_cert_string(user_cert)
         nvb = datetime.datetime.strptime(str(cert.get_not_before()),"%b %d %H:%M:%S %Y %Z")
         nva = datetime.datetime.strptime(str(cert.get_not_after()),"%b %d %H:%M:%S %Y %Z")
-        today = datetime.datetime.today()
+        now = datetime.datetime.utcnow()
         
-        if today < nvb:
+        if now < nvb:
             return False
-        if today > nva:
+        if now > nva:
             return False
         return True
 
