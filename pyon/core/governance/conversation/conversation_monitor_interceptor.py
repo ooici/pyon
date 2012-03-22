@@ -121,8 +121,11 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             return (False, e.value)
 
     def _report_error(self, invocation, error):
-        invocation.message_annotations.setdefault('conversation', error)
-        log.debug("ConversationMonitorInterceptor.incoming error: %s", error)
+        cur_label = invocation.get_header_value('op', None)
+        if not cur_label: cur_label = invocation.message
+        msg = 'Conversation error for message %s \n  Error: %s' %(cur_label, error)
+        invocation.message_annotations.setdefault(msg)
+        log.debug("ConversationMonitorInterceptor error: %s", msg)
 
     def _get_conversation_context_key(self, principal, invocation):
         initiating_conv_id = invocation.get_header_value('initiating-conv-id', None)
