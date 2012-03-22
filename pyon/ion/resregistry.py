@@ -139,7 +139,7 @@ class ResourceRegistry(object):
         # Delete all owner users.
         owners,_ = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.UserIdentity, id_only=True)
         for oid in owners:
-            self.rr_store.delete_association(object_id, PRED.hasOwner, oid)
+            self.rr_store.delete_association(oid)
 
         res = self.rr_store.delete(res_obj)
 

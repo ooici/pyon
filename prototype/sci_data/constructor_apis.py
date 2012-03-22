@@ -10,7 +10,7 @@
  implemented adhoc by the user.
 '''
 
-from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues, Domain, Vector
+from interface.objects import CoordinateAxis, StreamDefinitionContainer, ElementType, DataRecord, NilValue, Coverage, CategoryElement, UnitReferenceProperty, AllowedValues, Domain, Vector, TimeElement
 from interface.objects import CountElement
 from interface.objects import DataStream
 from interface.objects import Encoding
@@ -20,6 +20,9 @@ from interface.objects import StreamGranuleContainer
 import hashlib
 import pyon
 from pyon.core.object import ionprint
+from pyon.util.containers import get_ion_ts
+
+import datetime
 
 from prototype.hdf.hdf_codec import HDFEncoder, HDFEncoderException, HDFDecoder, HDFDecoderException
 from pyon.util.log import log
@@ -544,6 +547,75 @@ class PointDataStreamDefinitionConstructor(object):
         pass
 
 
+
+class RawSupplementConstructor(object):
+
+
+    def __init__(self, raw_definition=None, stream_id=None, number_of_packets_in_record=None, packet_number_in_record=None):
+        """
+        @param raw_definition is the metadata object defining the raw record for this stream
+        @todo implement number_of_packets_in_record and packet_number_in_record
+        """
+
+
+
+        self._granule = StreamGranuleContainer(
+            stream_resource_id=stream_id or raw_definition.stream_resource_id,
+            data_stream_id=raw_definition.data_stream_id
+        )
+
+
+        #Get the point definition's DataStream object
+        data_stream = raw_definition.identifiables[raw_definition.data_stream_id]
+
+        self._encoding_id = data_stream.encoding_id
+
+        self._encoding = raw_definition.identifiables[self._encoding_id]
+
+        #Create a new CountElement object to keep track of the number of records
+        self._element_count = CountElement()
+        self._granule.identifiables[data_stream.element_count_id] = self._element_count
+
+
+        self._raw_samples = None
+
+    def set_samples(self, raw_samples, num_of_samples=0):
+        """
+        Add a point to the dataset - one record
+        @param raw_samples is a string (possibly binary containing the raw data)
+        """
+
+        # calculate the bounds for time and location and create or update the bounds for the coordinate axis
+        # hold onto the values so you can put them in an hdf...
+
+        self._element_count.value = num_of_samples
+
+        assert self._raw_samples is None, 'Can not append multiple raw samples using the set_samples interface'
+        self._raw_samples = raw_samples
+
+    def close_stream_granule(self, timestamp=None):
+
+        sha1 = hashlib.sha1(self._raw_samples).hexdigest().upper()
+        self._granule.identifiables[self._encoding_id] = Encoding(
+            sha1=sha1,
+            encoding_type = self._encoding.encoding_type
+        )
+    
+        tstamp = TimeElement(
+            definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
+            reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS",
+            reference_time='1970-01-01T00:00:00.000Z',
+            value= timestamp or get_ion_ts()
+            )
+    
+        self._granule.identifiables[self._granule.data_stream_id] = DataStream(
+            values=self._raw_samples,
+            timestamp=tstamp
+            )
+
+        return self._granule
+        
+
 class PointSupplementConstructor(object):
 
 
@@ -561,15 +633,16 @@ class PointSupplementConstructor(object):
         self._coordinates = {}
 
         self._granule = StreamGranuleContainer(
-            stream_resource_id=point_definition.stream_resource_id or stream_id,
+            stream_resource_id=stream_id or point_definition.stream_resource_id,
             data_stream_id=point_definition.data_stream_id
         )
-
 
         #Get the point definition's DataStream object
         data_stream = point_definition.identifiables[point_definition.data_stream_id]
 
         self._encoding_id = data_stream.encoding_id
+
+        self._encoding = point_definition.identifiables[self._encoding_id]
 
         #Create a new CountElement object to keep track of the number of records
         self._element_count = CountElement()
@@ -700,7 +773,7 @@ class PointSupplementConstructor(object):
         """
         # ignore for now...
 
-    def close_stream_granule(self):
+    def close_stream_granule(self, timestamp=None):
 
         import numpy
 
@@ -748,13 +821,21 @@ class PointSupplementConstructor(object):
 
         sha1 = hashlib.sha1(hdf_string).hexdigest().upper()
         self._granule.identifiables[self._encoding_id] = Encoding(
-            encoding_type='hdf5',
+            encoding_type = self._encoding.encoding_type,
             compression=None,
             sha1=sha1
         )
 
+        tstamp = TimeElement(
+            definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
+            reference_frame="http://www.opengis.net/def/trs/OGC/0/GPS",
+            reference_time='1970-01-01T00:00:00.000Z',
+            value= timestamp or get_ion_ts()
+        )
+
         self._granule.identifiables[self._granule.data_stream_id] = DataStream(
-            values=hdf_string
+            values=hdf_string,
+            timestamp=tstamp
         )
 
         return self._granule

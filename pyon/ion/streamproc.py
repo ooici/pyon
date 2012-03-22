@@ -23,7 +23,11 @@ class StreamProcess(BaseService):
 
     process_type = "stream_process"
 
-
+    def call_process(self, packet):
+        '''
+        Handles preprocessing of packet and process work
+        '''
+        self.process(packet)
 
     def process(self, packet):
         """

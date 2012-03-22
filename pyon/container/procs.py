@@ -2,6 +2,7 @@
 
 """Part of the container that manages ION processes etc."""
 from pyon.core import exception
+from pyon.ion.streamproc import StreamProcess
 
 __author__ = 'Michael Meisinger'
 
@@ -161,12 +162,13 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        self._service_start(service_instance)
+
         listen_name = get_safe(config, "process.listen_name") or service_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
 
         self._set_service_endpoint(service_instance, listen_name)
         self._set_service_endpoint(service_instance, service_instance.id)
-        self._service_start(service_instance)
 
         # Directory registration
         self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
@@ -184,6 +186,9 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        # Start the service
+        self._service_start(service_instance)
+
         listen_name = get_safe(config, "process.listen_name") or name
         # Throws an exception if no listen name is given!
         self._set_subscription_endpoint(service_instance, listen_name)
@@ -193,9 +198,6 @@ class ProcManager(object):
         self._set_publisher_endpoints(service_instance, publish_streams)
 
         self._set_service_endpoint(service_instance, service_instance.id)
-
-        # Start the service
-        self._service_start(service_instance)
 
         return service_instance
 
@@ -209,17 +211,21 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         if not isinstance(service_instance, ResourceAgent):
             raise ContainerConfigError("Agent process must extend ResourceAgent")
+
+        # Set the resource ID if we get it through the config
+        resource_id = get_safe(service_instance.CFG, "agent.resource_id")
+        if resource_id:
+            service_instance.resource_id = resource_id
+
+        # Now call the on_init of the agent.
         self._service_init(service_instance)
 
-        resource_id = get_safe(service_instance.CFG, "agent.resource_id")
-        if not service_instance.resource_id:
-            # The agent subclass has not set self.resource_id
-            service_instance.resource_id = resource_id
         if not service_instance.resource_id:
             log.warn("New agent pid=%s has no resource_id set" % process_id)
 
-        self._set_service_endpoint(service_instance, service_instance.id)
         self._service_start(service_instance)
+
+        self._set_service_endpoint(service_instance, service_instance.id)
 
         # Directory registration
         caps = service_instance.get_capabilities()
@@ -244,13 +250,15 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
+
+        self._service_start(service_instance)
+
         self._set_service_endpoint(service_instance, service_instance.id)
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
-        self._service_start(service_instance)
         return service_instance
 
     # -----------------------------------------------------------------
@@ -263,11 +271,12 @@ class ProcManager(object):
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
 
+        self._service_start(service_instance)
+
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
-        self._service_start(service_instance)
         return service_instance
 
     # -----------------------------------------------------------------
@@ -346,7 +355,8 @@ class ProcManager(object):
 
         service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
 
-        sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.process(m))
+        sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.call_process(m))
+
 
         proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name,
                                     proc_name=service_instance._proc_name)

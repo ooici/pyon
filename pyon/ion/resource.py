@@ -199,10 +199,14 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
     DEPLOY = "deploy"
     RETIRE = "retire"
 
+
     ANNOUNCE = "announce"
     UNANNOUNCE = "unannounce"
     ENABLE = "enable"
     DISABLE = "disable"
+
+    MAT_EVENTS = [PLAN, DEVELOP, INTEGRATE, DEPLOY, RETIRE]
+    VIS_EVENTS = [ANNOUNCE, UNANNOUNCE, ENABLE, DISABLE]
 
     BASE_EVENTS = [
         PLAN, DEVELOP, INTEGRATE, DEPLOY,

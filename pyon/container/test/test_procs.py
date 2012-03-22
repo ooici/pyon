@@ -22,7 +22,7 @@ class SampleProcess(BaseService):
 class SampleAgent(ResourceAgent):
     pass
 
-@attr('INT')
+@attr('INT',group='p')
 class TestProcManager(IonIntegrationTestCase):
 
     def test_procmanager_iso(self):
@@ -51,14 +51,14 @@ class TestProcManager(IonIntegrationTestCase):
 
         with self.assertRaises(Exception) as ex:
             config = {'process':{'type':'unknown_type'}}
-            success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+            pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
             self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
     def _spawnproc(self, pm, ptype, pcls=None):
         pcls = pcls or 'SampleProcess'
         config = {'process':{'type':ptype}}
-        success = pm.spawn_process('sample1', 'pyon.container.test.test_procs', pcls, config)
-        self.assertTrue(success)
+        pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', pcls, config)
+        self.assertTrue(pid)
 
 if __name__ == "__main__":
     unittest.main()
