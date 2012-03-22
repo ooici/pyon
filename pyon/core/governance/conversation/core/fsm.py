@@ -165,7 +165,7 @@ class FSM:
             Then we start new parallel branch. Thus we create a new FSA for that branch and put it in the list of FSAs
             for the state """
         if (state not in self.memory):
-            raise ExceptionFSM("""The given state is not in the list of states taht are allowed to have nested transitions. 
+            raise ExceptionFSM("""The given state is not in the list of states that are allowed to have nested transitions.
             Please check that you have called the add_fsm_to_memory function. It adds the state to the list.""")
         
         # get the list of FSM associated with the given state
