@@ -58,7 +58,7 @@ setup(  name = 'pyon',
             'nose==1.1.2',
             'ipython==0.11',
             'readline==6.2.1',
-            'mock',
+            'mock==0.8',
             'ndg-xacml==0.4.0',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
 
