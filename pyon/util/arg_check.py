@@ -1,51 +1,82 @@
 #!/usr/bin/env python
+'''
+@author Luke Campbell <LCampbell@ASAScience.com>
+@file pyon/util/arg_check.py
+@description Utility for managing assertions in a contained, decisive and deterministic manner
+'''
 
 from pyon.core.exception import BadRequest
 from pyon.util.log import log
+import sys
 
-"""
-The appearance of the error and the log statement in a service is very important.
-
-If all the log statements for the errors point to this class that is not good. The traceback must end at the calling class
-not in pyon.util.arg_check!
-
-"""
-
-
-def assertEqual(a,b,message='a not equal b'):
-    if a != b:
-        raise(BadRequest(message))
-
-def assertNotEqual(a, b, message='a is equal b'):
-    pass
-
-def assertTrue(x,message='x is not True'):
-    pass
-
-def assertIsInstance(a, b, message='a is not an instance of b'):
-    pass
-
-    """
-    assertFalse(x)	bool(x) is False
-    assertIs(a, b)	a is b	2.7
-    assertIsNot(a, b)	a is not b	2.7
-    assertIsNone(x)	x is None	2.7
-    assertIsNotNone(x)	x is not None	2.7
-    assertIn(a, b)	a in b	2.7
-    assertNotIn(a, b)	a not in b	2.7
-    assertIsInstance(a, b)	isinstance(a, b)	2.7
-    assertNotIsInstance(a, b)	not isinstance(a, b)	2.7
-    """
+class ArgCheck(object):
+    '''
+    Utility for handling argument assertions and preconditions
+    '''
+    def __init__(self,name, exception=None):
+        self.name = name
+        self.exception = exception or BadRequest
+    def assertion(self, conditional, message):
+        if not conditional:
+            log.name = self.name
+            log.exception(message)
+            raise self.exception(message)
 
 
-def foo(bar, baz, bish=None, bosh=67, bash='stuff'):
+import_paths = [__name__]
+def scoped_assertion():
+    frame = sys._getframe(1)
+    name = frame.f_globals.get('__name__',None)
+    while name in import_paths and frame.f_back:
+        frame = frame.f_back
+        name = frame.f_globals.get('__name__', None)
+    return name
 
 
-        assertEqual(bar,5)
+def assertTrue(conditional, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(conditional,message)
 
-        bish = bish or {}
-        assertIsInstance(bish, dict)
+def assertEqual(a,b,message='',exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(a==b,message)
 
+def assertNotEqual(a,b,message='',exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(a!=b,message)
 
-foo('junk','jip')
+def assertFalse(conditional, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(not conditional,message)
 
+def assertIs(a,b, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(a is b,message)
+
+def assertIsNot(a,b, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(a is not b,message)
+
+def assertIsNotNone(conditional, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(conditional is not None,message)
+
+def assertTrue(conditional, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(conditional,message)
+
+def assertIn(needle,haystack, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(needle in haystack,message)
+
+def assertNotIn(needle,haystack, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(not (needle in haystack),message)
+
+def assertIsInstance(a,cls,message='',exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(isinstance(a,cls),message)
+
+def assertNotIsInstance(a,cls, message='', exception=None):
+    name = scoped_assertion()
+    ArgCheck(name,exception).assertion(not isinstance(a,cls),message)
