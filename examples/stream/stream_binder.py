@@ -27,7 +27,7 @@ from pyon.public import log, SimpleProcess
 from pyon.net.channel import SubscriberChannel
 
 from pyon.core import bootstrap
-
+from pyon.net.transport import NameTrio
 
 class BindingChannel(SubscriberChannel):
     """
@@ -36,7 +36,7 @@ class BindingChannel(SubscriberChannel):
     """
     def _declare_queue(self, queue):
 
-        self._recv_name = (self._recv_name[0], '.'.join(self._recv_name))
+        self._recv_name = NameTrio(self._recv_name.exchange, '.'.join((self._recv_name.exchange, self._recv_name.queue)))
 
 
 class StreamBinder(SimpleProcess):
@@ -50,9 +50,9 @@ class StreamBinder(SimpleProcess):
         binding = self.CFG.get('args',{}).get('binding',None)
 
         # Create scoped exchange name
-        XP = '.'.join([bootstrap.sys_name,'science_data'])
+        XP = '.'.join([bootstrap.get_sys_name(),'science_data'])
 
         self.channel = self.container.node.channel(BindingChannel)
-        self.channel.setup_listener((XP,queue_name),binding=binding)
+        self.channel.setup_listener(NameTrio(XP,queue_name),binding=binding)
 
         # How do we make this process end now?
