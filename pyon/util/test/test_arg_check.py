@@ -7,13 +7,23 @@
 '''
 from pyon.core.exception import BadRequest
 from pyon.util.containers import DotDict
+from nose.plugins.attrib import attr
 
 from pyon.util.unit_test import PyonTestCase
-import pyon.util.arg_check as arg_check
 
+@attr('UNIT')
 class ArgCheckTest(PyonTestCase):
 
+    class _FakeLog(object):
+        def __init__(self):
+            self.name = ''
+            self.messages = list()
+        def exception(self, message, *args):
+            self.messages.append(message)
+
     def test_assertions(self):
+        import pyon.util.arg_check as arg_check
+
         with self.assertRaises(BadRequest):
             arg_check.assertTrue(False,'test')
 
@@ -58,3 +68,13 @@ class ArgCheckTest(PyonTestCase):
             one = list()
             arg_check.assertNotIsInstance(one,list,'test')
 
+    def test_asserts_success(self):
+        import pyon.util.arg_check as ac
+        fl = self._FakeLog()
+        ac.log = fl
+        try:
+            ac.assertTrue(False,'blah')
+        except BadRequest as e:
+            self.assertTrue(e.message == 'blah')
+
+        self.assertEquals(fl.name,"pyon.util.test.test_arg_check")
