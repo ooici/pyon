@@ -73,7 +73,8 @@ class ResourceRegistry(object):
         object.ts_updated = cur_time
         res = self.rr_store.create(object)
         res_id, rev = res
-
+        object._id = res_id
+        object._rev = rev
         if actor_id and actor_id != 'anonymous':
             log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
