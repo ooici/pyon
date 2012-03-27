@@ -61,10 +61,6 @@ def assertIsNotNone(conditional, message='', exception=None):
     name = scoped_assertion()
     ArgCheck(name,exception).assertion(conditional is not None,message)
 
-def assertTrue(conditional, message='', exception=None):
-    name = scoped_assertion()
-    ArgCheck(name,exception).assertion(conditional,message)
-
 def assertIn(needle,haystack, message='', exception=None):
     name = scoped_assertion()
     ArgCheck(name,exception).assertion(needle in haystack,message)
