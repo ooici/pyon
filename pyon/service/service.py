@@ -82,7 +82,12 @@ class BaseService(LocalContextMixin):
         """
 
     def quit(self):
-        res = self.on_quit()
+        res = None
+        try:
+            res = self.on_quit()
+        except Exception:
+            log.exception("Error while service quitting")
+
         self._on_quit()
         return res
 
