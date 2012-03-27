@@ -80,3 +80,5 @@ def assertIsInstance(a,cls,message='',exception=None):
 def assertNotIsInstance(a,cls, message='', exception=None):
     name = scoped_assertion()
     ArgCheck(name,exception).assertion(not isinstance(a,cls),message)
+
+
