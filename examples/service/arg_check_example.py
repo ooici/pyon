@@ -24,7 +24,7 @@ class ArgCheckService(object):
 
     def pass_float(self, val=1.0):
         '''
-        Say you were expecting an integer from the client
+        Say you were expecting a float from the client
         '''
         assertIsInstance(val,float,'Value is not a float.')
         return val
