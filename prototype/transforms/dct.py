@@ -12,12 +12,11 @@ class TransformDCT(TransformBenchTesting):
     '''
     Transform for computing the discrete cosine transform
     O(N^2/2 + N)
-    x[k] =
     '''
     @staticmethod
     def dct(vector):
         import numpy as np
-        assert isinstance(vector,np.ndarray)
+        validateIsInstance(vector,np.ndarray)
         N = vector.size
 
         x = list()
@@ -31,16 +30,9 @@ class TransformDCT(TransformBenchTesting):
 
     def process(self, packet):
         import numpy as np
-        validateIsInstance(packet,list)
+        if not isinstance(packet,list):
+            return
         for i in packet:
-            validateIsInstance(i,float)
+            if not isinstance(i,float):
+                return
         self.publish(self.dct(np.array(packet)))
-'''
-from prototype.transforms.dct import TransformDCT
-def p(t):
-    print t
-
-t = TransformDCT()
-t.publish = p
-t.process([1.,2.,3.,4.])
-'''
