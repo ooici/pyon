@@ -9,6 +9,9 @@ from pyon.util.arg_check import assertIsInstance, assertIn, assertEqual, assertT
 
 
 class ArgCheckService(object):
+    '''
+    Example Service illustrating how to use the various assertion mechanisms
+    '''
     def __init__(self):
         pass
 
