@@ -3,6 +3,7 @@
 """Part of the container that manages ION processes etc."""
 from pyon.core import exception
 from pyon.ion.streamproc import StreamProcess
+from pyon.util.async import spawn, join
 
 __author__ = 'Michael Meisinger'
 
@@ -53,15 +54,10 @@ class ProcManager(object):
         log.debug("ProcManager stopping ...")
 
         # Call quit on procs to give them ability to clean up
-        # TODO: This can be done concurrently
-        while self.procs:
-            try:
-                procid = self.procs.keys()[0]
-                # These are service processes with full life cycle
-                #proc.quit()
-                self.terminate_process(procid)
-            except Exception:
-                log.exception("Process %s quit failed" % procid)
+        # @TODO terminate_process is not gl-safe
+#        gls = map(lambda k: spawn(self.terminate_process, k), self.procs.keys())
+#        join(gls)
+        map(self.terminate_process, self.procs.keys())
 
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
