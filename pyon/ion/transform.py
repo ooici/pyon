@@ -134,9 +134,11 @@ class TransformBenchTesting(TransformDataProcess):
 
     def on_stop(self):
         TransformDataProcess.on_stop(self)
+        self._stop_listener()
 
     def on_quit(self):
         TransformDataProcess.on_quit(self)
+        self._stop_listener()
 
 
 
