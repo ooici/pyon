@@ -78,3 +78,4 @@ class ArgCheckTest(PyonTestCase):
             self.assertTrue(e.message == 'blah')
 
         self.assertEquals(fl.name,"pyon.util.test.test_arg_check")
+
