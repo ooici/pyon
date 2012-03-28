@@ -5,9 +5,13 @@
 @file: pyon/ion/transform.py
 @description: Implementation for TransformBase class
 '''
+import uuid
 from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
+from pyon.net.endpoint import Subscriber, Publisher
+from pyon.net.transport import NameTrio
+from pyon.util.async import spawn
 from pyon.util.log import log
 
 class TransformBase(StreamProcess):
@@ -87,6 +91,7 @@ class TransformDataProcess(TransformBase):
         '''
         # Ensure the publisher list is only initialized once
         if not self._pub_init:
+            self._pub_init = True
             stream_names = list(k for k,v in self.streams.iteritems())
             self.publishers = []
             for stream in stream_names:
@@ -97,7 +102,42 @@ class TransformDataProcess(TransformBase):
             publisher.publish(msg)
 
 class TransformBenchTesting(TransformDataProcess):
-    pass
+
+    """
+    Easiest way to run:
+    from pyon.util.containers import DotDict
+    tbt=cc.proc_manager._create_service_instance('55', 'tbt', 'pyon.ion.transform', 'TransformBenchTesting', DotDict({'process':{'name':'tbt', 'transform_id':'55'}}))
+    tbt.init()
+    tbt.start()
+    """
+
+    def on_start(self):
+        TransformDataProcess.__init__(self)
+
+        # set up subscriber to *
+        self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),
+                                  from_name=NameTrio('test_exchange', None, '*'))
+
+        # spawn listener
+        self._sub_gl = spawn(self._bt_sub.listen)
+
+        # set up publisher to anything!
+        self._bt_pub = Publisher(to_name=NameTrio('test_exchange', str(uuid.uuid4())[0:6]))
+
+    def publish(self, msg):
+        self._bt_pub.publish(msg)
+
+    def _stop_listener(self):
+        self._bt_sub.close()
+        self._sub_gl.join(timeout=2)
+        self._sub_gl.kill()
+
+    def on_stop(self):
+        TransformDataProcess.on_stop(self)
+
+    def on_quit(self):
+        TransformDataProcess.on_quit(self)
+
 
 
 class TransformFunction(TransformDataProcess):
