@@ -2,7 +2,7 @@
 '''
 @author Luke Campbell <LCampbell@ASAScience.com>
 @file pyon/util/arg_check.py
-@description Utility for managing assertions in a contained, decisive and deterministic manner
+@description Utility for managing validations in a contained, decisive and deterministic manner
 '''
 
 from pyon.core.exception import BadRequest
@@ -11,12 +11,12 @@ import sys
 
 class ArgCheck(object):
     '''
-    Utility for handling argument assertions and preconditions
+    Utility for handling argument validations and preconditions
     '''
     def __init__(self,name, exception=None):
         self.name = name
         self.exception = exception or BadRequest
-    def assertion(self, conditional,message, lineno):
+    def validation(self, conditional,message, lineno):
         if not conditional:
             log.name = self.name
             log.exception('[%s] %s: %s', lineno or '?',self.exception.__name__,message)
@@ -25,10 +25,10 @@ class ArgCheck(object):
 
 
 import_paths = [__name__]
-def scoped_assertion():
+def scoped_validation():
     '''
     Determines the calling module and line number.
-    Allows us to determine the file and line number where the assertion is made.
+    Allows us to determine the file and line number where the validation is made.
     Inspired by pyon/util/log.py (Adam Smith)
     '''
     frame = sys._getframe(1)
@@ -41,19 +41,19 @@ def scoped_assertion():
     return name,lineno
 
 
-def assertTrue(conditional, message='', exception=None):
+def validateTrue(conditional, message='', exception=None):
     '''
-    Manages an assertion
+    Manages an validation
     @param conditional The conditional statement to be evaluated
     @param message Error message to be included with the exception
     @param Exception, exception module to use in lieu of default
     @throws BadRequest if conditional is evaluated to False
     '''
     if not conditional:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertEqual(a,b,message='',exception=None):
+def validateEqual(a,b,message='',exception=None):
     '''
     Raises an exception if a != b
     @param a 
@@ -63,10 +63,10 @@ def assertEqual(a,b,message='',exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if a!=b:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertNotEqual(a,b,message='',exception=None):
+def validateNotEqual(a,b,message='',exception=None):
     '''
     Raises an exception if a == b
     @param a
@@ -76,10 +76,10 @@ def assertNotEqual(a,b,message='',exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if a==b:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertFalse(conditional, message='', exception=None):
+def validateFalse(conditional, message='', exception=None):
     '''
     Raises an exception if conditional evaluates to False
     @param conditional The conditional statement to be evaluated
@@ -88,10 +88,10 @@ def assertFalse(conditional, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if conditional:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertIs(a,b, message='', exception=None):
+def validateIs(a,b, message='', exception=None):
     '''
     Raises an exception if a does not points to the same object as b
     @param a
@@ -101,10 +101,10 @@ def assertIs(a,b, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if not a is b:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertIsNot(a,b, message='', exception=None):
+def validateIsNot(a,b, message='', exception=None):
     '''
     Raises an exception if a points to the same object as b
     @param a
@@ -114,10 +114,10 @@ def assertIsNot(a,b, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if a is b:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertIsNotNone(conditional, message='', exception=None):
+def validateIsNotNone(conditional, message='', exception=None):
     '''
     Raises an exception if conditional is None, does not point to anything and is not a number.
     @param conditional The conditional statement to be evaluated
@@ -127,10 +127,10 @@ def assertIsNotNone(conditional, message='', exception=None):
     '''
     if conditional is None:
 
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertIn(needle,haystack, message='', exception=None):
+def validateIn(needle,haystack, message='', exception=None):
     '''
     Raises an exception if needle is not in haystack
     @param needle Item to be evaluated for
@@ -140,10 +140,10 @@ def assertIn(needle,haystack, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if not needle in haystack:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertNotIn(needle,haystack, message='', exception=None):
+def validateNotIn(needle,haystack, message='', exception=None):
     '''
     Raises an exception if needle is in haystack
     @param needle Item to be evaluated for
@@ -153,10 +153,10 @@ def assertNotIn(needle,haystack, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if needle in haystack:
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertIsInstance(a,cls,message='',exception=None):
+def validateIsInstance(a,cls,message='',exception=None):
     '''
     Raises an exception if a is not an instance of cls
     @param a Object
@@ -166,10 +166,10 @@ def assertIsInstance(a,cls,message='',exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if not isinstance(a,cls):
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
-def assertNotIsInstance(a,cls, message='', exception=None):
+def validateNotIsInstance(a,cls, message='', exception=None):
     '''
     Raises an exception if a is an instance of cls
     @param a Object
@@ -179,8 +179,8 @@ def assertNotIsInstance(a,cls, message='', exception=None):
     @throws BadRequest if conditional is evaluated to False
     '''
     if isinstance(a,cls):
-        name,l = scoped_assertion()
-        ArgCheck(name,exception).assertion(False,message,l)
+        name,l = scoped_validation()
+        ArgCheck(name,exception).validation(False,message,l)
 
 
 

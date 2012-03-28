@@ -21,59 +21,59 @@ class ArgCheckTest(PyonTestCase):
         def exception(self, message, *args):
             self.messages.append(message)
 
-    def test_assertions(self):
+    def test_validations(self):
         import pyon.util.arg_check as arg_check
 
         with self.assertRaises(BadRequest):
-            arg_check.assertTrue(False,'test')
+            arg_check.validateTrue(False,'test')
 
         with self.assertRaises(BadRequest):
-            arg_check.assertEqual(3,4,'test')
+            arg_check.validateEqual(3,4,'test')
 
         with self.assertRaises(BadRequest):
-            arg_check.assertNotEqual(4,4,'test')
+            arg_check.validateNotEqual(4,4,'test')
 
         with self.assertRaises(BadRequest):
-            arg_check.assertFalse(True,'test')
+            arg_check.validateFalse(True,'test')
 
         with self.assertRaises(BadRequest):
             one = list()
             two = list()
-            arg_check.assertIs(one,two,'test')
+            arg_check.validateIs(one,two,'test')
 
         with self.assertRaises(BadRequest):
             one = list()
             two = one
-            arg_check.assertIsNot(one,two,'test')
+            arg_check.validateIsNot(one,two,'test')
 
         with self.assertRaises(BadRequest):
             c = None
-            arg_check.assertIsNotNone(c,'test')
+            arg_check.validateIsNotNone(c,'test')
 
         with self.assertRaises(BadRequest):
             one = list([1,3])
             two = 2
-            arg_check.assertIn(two,one,'test')
+            arg_check.validateIn(two,one,'test')
 
         with self.assertRaises(BadRequest):
             one = list([1,2,3])
             two = 2
-            arg_check.assertNotIn(two,one,'test')
+            arg_check.validateNotIn(two,one,'test')
 
         with self.assertRaises(BadRequest):
             one = list()
-            arg_check.assertIsInstance(one,dict,'test')
+            arg_check.validateIsInstance(one,dict,'test')
 
         with self.assertRaises(BadRequest):
             one = list()
-            arg_check.assertNotIsInstance(one,list,'test')
+            arg_check.validateNotIsInstance(one,list,'test')
 
-    def test_asserts_success(self):
+    def test_validates_success(self):
         import pyon.util.arg_check as ac
         fl = self._FakeLog()
         ac.log = fl
         try:
-            ac.assertTrue(False,'blah')
+            ac.validateTrue(False,'blah')
         except BadRequest as e:
             self.assertTrue(e.message == 'blah')
 
