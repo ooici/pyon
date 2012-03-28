@@ -6,6 +6,8 @@
 @description: Implementation for TransformBase class
 '''
 import uuid
+import time
+import gevent
 from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
@@ -100,6 +102,8 @@ class TransformDataProcess(TransformBase):
 
         for publisher in self.publishers:
             publisher.publish(msg)
+            
+
 
 class TransformBenchTesting(TransformDataProcess):
 
@@ -110,7 +114,27 @@ class TransformBenchTesting(TransformDataProcess):
     tbt.init()
     tbt.start()
     """
+    def __init__(self):
+        super(TransformBenchTesting,self).__init__()
+        self.count = 0
+        
+    def perf(self):
+        then = time.time()
+        ocount = self.count
+        while True:
+            gevent.sleep(5.)
+            now = time.time()
+            count = self.count
+            delta_t = now - then
+            delta_c = count - ocount
 
+            print 'PERF - [%s] Iterations Per Second: %f' % (time.strftime("%H:%M:%s", time.gmtime()), delta_c / delta_t)
+            then = now
+            ocount = count
+            
+        
+        
+        
     def on_start(self):
         TransformDataProcess.__init__(self)
 
@@ -126,6 +150,7 @@ class TransformBenchTesting(TransformDataProcess):
 
     def publish(self, msg):
         self._bt_pub.publish(msg)
+        self.count+=1
 
     def _stop_listener(self):
         self._bt_sub.close()
