@@ -37,47 +37,59 @@ def scoped_assertion():
 
 
 def assertTrue(conditional, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(conditional,message,l)
+    if not conditional:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertEqual(a,b,message='',exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(a==b,message,l)
+    if not a==b:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertNotEqual(a,b,message='',exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(a!=b,message,l)
+    if a==b:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertFalse(conditional, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(not conditional,message,l)
+    if conditional:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertIs(a,b, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(a is b,message,l)
+    if not a is b:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertIsNot(a,b, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(a is not b,message,l)
+    if a is b:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertIsNotNone(conditional, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(conditional is not None,message,l)
+    if conditional is None:
+
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertIn(needle,haystack, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(needle in haystack,message,l)
+    if not needle in haystack:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertNotIn(needle,haystack, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(not (needle in haystack),message,l)
+    if needle in haystack:
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertIsInstance(a,cls,message='',exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(isinstance(a,cls),message,l)
+    if not isinstance(a,cls):
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 def assertNotIsInstance(a,cls, message='', exception=None):
-    name,l = scoped_assertion()
-    ArgCheck(name,exception).assertion(not isinstance(a,cls),message,l)
+    if isinstance(a,cls):
+        name,l = scoped_assertion()
+        ArgCheck(name,exception).assertion(False,message,l)
 
 
