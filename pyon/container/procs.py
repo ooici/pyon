@@ -84,7 +84,7 @@ class ProcManager(object):
                 # Override config with spawn args
                 dict_merge(config, self.container.spawn_args, inplace=True)
 
-        log.debug("spawn_process() pid=%s config=%s", process_id, config)
+        #log.debug("spawn_process() pid=%s config=%s", process_id, config)
 
         # PROCESS TYPE. Determines basic process context (messaging, service interface)
         # One of: service, stream_process, agent, simple, immediate
