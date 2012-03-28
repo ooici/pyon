@@ -183,3 +183,4 @@ def assertNotIsInstance(a,cls, message='', exception=None):
         ArgCheck(name,exception).assertion(False,message,l)
 
 
+
