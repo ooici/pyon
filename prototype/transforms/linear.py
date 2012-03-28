@@ -9,6 +9,8 @@ from pyon.ion.transform import TransformDataProcess
 from pyon.util.arg_check import validateIsInstance
 
 class TransformLinearShift(TransformDataProcess):
+    def __init__(self):
+        super(TransformLinearShift,self).__init__()
     '''
     Represents an algorithm of O(N)
     '''
