@@ -5,10 +5,10 @@
 @date 03/28/12 14:59
 @description Linear Phase Shift
 '''
-from pyon.ion.transform import TransformDataProcess
+from pyon.ion.transform import TransformBenchTesting
 from pyon.util.arg_check import validateIsInstance
 
-class TransformLinearShift(TransformDataProcess):
+class TransformLinearShift(TransformBenchTesting):
     def __init__(self):
         super(TransformLinearShift,self).__init__()
     '''
