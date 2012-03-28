@@ -96,6 +96,8 @@ class TransformDataProcess(TransformBase):
         for publisher in self.publishers:
             publisher.publish(msg)
 
+class TransformBenchTesting(TransformDataProcess):
+    pass
 
 
 class TransformFunction(TransformDataProcess):
