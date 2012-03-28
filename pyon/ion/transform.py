@@ -141,7 +141,7 @@ class TransformBenchTesting(TransformDataProcess):
 
         # set up subscriber to *
         self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),
-                                  from_name=NameTrio('test_exchange', None, '*'))
+                                  from_name=NameTrio('test_exchange', 'test_queue', '*'))
 
         # spawn listener
         self._sub_gl = spawn(self._bt_sub.listen)
