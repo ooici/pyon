@@ -8,6 +8,7 @@
 import uuid
 import time
 import gevent
+import sys
 from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
@@ -128,7 +129,7 @@ class TransformBenchTesting(TransformDataProcess):
             delta_t = now - then
             delta_c = count - ocount
 
-            print 'PERF - [%s] Iterations Per Second: %f' % (time.strftime("%H:%M:%s", time.gmtime()), delta_c / delta_t)
+            print >>sys.stderr, 'PERF - [%s] Iterations Per Second: %f' % (time.strftime("%H:%M:%s", time.gmtime()), float(delta_c) / delta_t)
             then = now
             ocount = count
             
