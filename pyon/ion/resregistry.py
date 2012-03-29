@@ -265,6 +265,34 @@ class ResourceRegistry(object):
     def find(self, **kwargs):
         raise NotImplementedError("Do not use find. Use a specific find operation instead.")
 
+    def read_object(self, subject="", predicate="", object_type="", assoc="", id_only=False):
+        if assoc:
+            if type(assoc) is str:
+                assoc = self.read(assoc)
+            return assoc.o if id_only else self.read(assoc.o)
+        else:
+            obj_list, assoc_list = self.find_objects(subject=subject, predicate=predicate, object_type=object_type, id_only=True)
+            if not obj_list:
+                raise NotFound("No object found for subject=%s, predicate=%s, object_type=%s" % (subject, predicate, object_type))
+            elif len(obj_list) > 1:
+                raise Inconsistent("More than one object found for subject=%s, predicate=%s, object_type=%s: count=%s" % (
+                    subject, predicate, object_type, len(obj_list)))
+            return obj_list[0] if id_only else self.read(obj_list[0])
+
+    def read_subject(self, subject_type="", predicate="", object="", assoc="", id_only=False):
+        if assoc:
+            if type(assoc) is str:
+                assoc = self.read(assoc)
+            return assoc.s if id_only else self.read(assoc.s)
+        else:
+            sub_list, assoc_list = self.find_subjects(subject_type=subject_type, predicate=predicate, object=object, id_only=True)
+            if not sub_list:
+                raise NotFound("No subject found for subject_type=%s, predicate=%s, object=%s" % (subject_type, predicate, object))
+            elif len(sub_list) > 1:
+                raise Inconsistent("More than one subject found for subject_type=%s, predicate=%s, object=%s: count=%s" % (
+                    subject_type, predicate, object, len(sub_list)))
+            return sub_list[0] if id_only else self.read(sub_list[0])
+
     def find_objects(self, subject="", predicate="", object_type="", id_only=False):
         return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only)
 
