@@ -137,9 +137,9 @@ class ResourceRegistry(object):
             raise NotFound("Resource %s does not exist" % object_id)
 
         # Delete all owner users.
-        owners,_ = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.UserIdentity, id_only=True)
-        for oid in owners:
-            self.rr_store.delete_association(oid)
+        owners,assocs = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.UserIdentity, id_only=True)
+        for aid in assocs:
+            self.rr_store.delete_association(aid)
 
         res = self.rr_store.delete(res_obj)
 
