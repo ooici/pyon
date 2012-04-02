@@ -107,7 +107,6 @@ class TransformDataProcess(TransformBase):
 
 
 class TransformBenchTesting(TransformDataProcess):
-
     """
     Easiest way to run:
     from pyon.util.containers import DotDict
@@ -115,9 +114,11 @@ class TransformBenchTesting(TransformDataProcess):
     tbt.init()
     tbt.start()
     """
+    transform_number = 0
     def __init__(self):
         super(TransformBenchTesting,self).__init__()
         self.count = 0
+        TransformBenchTesting.transform_number += 1
         
     def perf(self):
         then = time.time()
@@ -129,7 +130,7 @@ class TransformBenchTesting(TransformDataProcess):
             delta_t = now - then
             delta_c = count - ocount
 
-            print >>sys.stderr, 'PERF - [%s] Iterations Per Second: %f' % (time.strftime("%H:%M:%s", time.gmtime()), float(delta_c) / delta_t)
+            print >>sys.stderr, '[%s] (%s) %3.3f ' % (time.strftime("%H:%M:%S", time.gmtime()),TransformBenchTesting.transform_number, float(delta_c) / delta_t)
             then = now
             ocount = count
             

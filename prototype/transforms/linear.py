@@ -30,7 +30,7 @@ class TransformLinear(TransformBenchTesting):
         self.publish(self.shift(packet))
 
 
-class TransofmrSquare(TransformBenchTesting):
+class TransformSquare(TransformBenchTesting):
     '''
     Represents an algorithm of O(N^2)
     '''
@@ -54,7 +54,7 @@ class TransofmrSquare(TransformBenchTesting):
 
 class TransformInPlace(TransformBenchTesting):
     '''
-    Represents an algorith of O(1)
+    Represents an algorithm of O(1)
     '''
     @staticmethod
     def shift(vector):
@@ -68,4 +68,5 @@ class TransformInPlace(TransformBenchTesting):
     def process(self, packet):
         if not isinstance(packet, list):
             return
-        self.publish(self.shift(vector))
+        self.publish(self.shift(packet))
+
