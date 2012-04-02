@@ -8,9 +8,7 @@
 from pyon.ion.transform import TransformBenchTesting
 from pyon.util.arg_check import validateIsInstance
 
-class TransformLinearShift(TransformBenchTesting):
-    def __init__(self):
-        super(TransformLinearShift,self).__init__()
+class TransformLinear(TransformBenchTesting):
     '''
     Represents an algorithm of O(N)
     '''
@@ -30,3 +28,44 @@ class TransformLinearShift(TransformBenchTesting):
         if not isinstance(packet,list):
             return
         self.publish(self.shift(packet))
+
+
+class TransofmrSquare(TransformBenchTesting):
+    '''
+    Represents an algorithm of O(N^2)
+    '''
+
+    @staticmethod
+    def shift(vector):
+        validateIsInstance(vector, list)
+        N = len(vector)
+        x = list()
+        for i in xrange(N):
+            v = 0
+            for j in xrange(N):
+                v += vector[i] - vector[j]
+            x.append(v)
+        return x
+
+    def process(self, packet):
+        if not isinstance(packet, list):
+            return
+        self.publish(self.shift(packet))
+
+class TransformInPlace(TransformBenchTesting):
+    '''
+    Represents an algorith of O(1)
+    '''
+    @staticmethod
+    def shift(vector):
+        validateIsInstance(vector,list)
+        N = len(vector)
+        x = vector[0]
+        vector[0] = vector[N-1]
+        vector[N-1] = x
+        return vector
+
+    def process(self, packet):
+        if not isinstance(packet, list):
+            return
+        self.publish(self.shift(vector))
