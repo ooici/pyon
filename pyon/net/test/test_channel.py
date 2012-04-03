@@ -92,6 +92,20 @@ class TestBaseChannel(PyonTestCase):
 
         closemock.assert_called_once_with(ch, 1, 'hi')
 
+    @patch('pyon.net.channel.log')
+    def test_on_channel_close_with_error_in_error_callback(self, logmock):
+        ch = BaseChannel()
+        ch._amq_chan = Mock()
+        ch._amq_chan.channel_number = 1
+
+        closemock = Mock()
+        closemock.side_effect = StandardError
+        ch.set_closed_error_callback(closemock)
+
+        ch.on_channel_close(1, 'hi')
+
+        self.assertEquals(logmock.warn.call_count, 1)
+
     def test_get_channel_id(self):
         ch = BaseChannel()
 
@@ -100,6 +114,63 @@ class TestBaseChannel(PyonTestCase):
         ch._amq_chan = Mock()
         self.assertEquals(ch.get_channel_id(), ch._amq_chan.channel_number)
 
+    def test__ensure_amq_chan(self):
+        ch = BaseChannel()
+        self.assertRaises(ChannelError, ch._ensure_amq_chan)
+
+    def test__sync_call_no_ret_value(self):
+
+        def async_func(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam()
+
+        ch = BaseChannel()
+        rv = ch._sync_call(async_func, 'callback')
+        self.assertIsNone(rv)
+
+    def test__sync_call_with_ret_value(self):
+        def async_func(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam(sentinel.val)
+
+        ch = BaseChannel()
+        rv = ch._sync_call(async_func, 'callback')
+        self.assertEquals(rv, sentinel.val)
+
+    def test__sync_call_with_mult_rets(self):
+        def async_func(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam(sentinel.val, sentinel.val2)
+
+        ch = BaseChannel()
+        rv = ch._sync_call(async_func, 'callback')
+        self.assertEquals(rv, (sentinel.val, sentinel.val2))
+
+    def test__sync_call_with_kwarg_rets(self):
+        def async_func(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam(sup=sentinel.val, sup2=sentinel.val2)
+
+        ch = BaseChannel()
+        rv = ch._sync_call(async_func, 'callback')
+        self.assertEquals(rv, {'sup':sentinel.val, 'sup2':sentinel.val2})
+
+    def test__sync_call_with_normal_and_kwarg_rets(self):
+        def async_func(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam(sentinel.arg, sup=sentinel.val, sup2=sentinel.val2)
+
+        ch = BaseChannel()
+        rv = ch._sync_call(async_func, 'callback')
+        self.assertEquals(rv, (sentinel.arg, {'sup':sentinel.val, 'sup2':sentinel.val2}))
+
+    def test__sync_call_with_error(self):
+        ch = BaseChannel()
+
+        def async_func(*args, **kwargs):
+            ch.on_channel_close(1, 'bam')
+
+        self.assertRaises(ChannelError, ch._sync_call, async_func, 'callback')
 
 @attr('UNIT')
 class TestSendChannel(PyonTestCase):
@@ -156,6 +227,17 @@ class TestSendChannel(PyonTestCase):
 class TestRecvChannel(PyonTestCase):
     def setUp(self):
         self.ch = RecvChannel()
+
+    def _create_channel(self):
+        """
+        Test helper method, creates mocked up broker interaction.
+        """
+        ch = RecvChannel()
+        ch._declare_exchange = Mock()
+        ch._declare_queue = Mock()
+        ch._declare_queue.return_value = sentinel.anon_queue
+        ch._bind = Mock()
+        return ch
 
     def test_setup_listener(self):
         # sub in mocks for _declare_exchange, _declare_queue, _bind
@@ -225,6 +307,28 @@ class TestRecvChannel(PyonTestCase):
         mxp.assert_called_with(sentinel.xp4)
         mdq.assert_called_with(None)
         mb.assert_called_with(sentinel.binding2)
+
+    def test_setup_listener_existing_recv_name(self):
+        ch = self._create_channel()
+
+        recv_name = NameTrio(sentinel.xp, sentinel.queue, sentinel.binding)
+        ch._recv_name = recv_name
+
+        ch.setup_listener()
+        self.assertEquals(ch._recv_name, recv_name)
+
+    def test_setup_listener_existing_recv_name_with_differing_name(self):
+        ch = self._create_channel()
+
+        recv_name = NameTrio(sentinel.xp, sentinel.queue, sentinel.binding)
+        ch._recv_name = recv_name
+
+        ch.setup_listener(name=NameTrio(sentinel.xp, sentinel.queue, sentinel.notbinding))
+        self.assertNotEquals(ch._recv_name, recv_name)
+
+        self.assertEquals(ch._recv_name.exchange, sentinel.xp)
+        self.assertEquals(ch._recv_name.queue, sentinel.queue)
+        self.assertEquals(ch._recv_name.binding, sentinel.notbinding)
 
     def test__destroy_queue_no_recv_name(self):
         self.assertRaises(AssertionError, self.ch.destroy_listener)
@@ -330,6 +434,24 @@ class TestRecvChannel(PyonTestCase):
     def test_stop_consume_havent_started(self):
         # we're not consuming, so this should raise
         self.assertRaises(ChannelError, self.ch.stop_consume)
+
+    @patch('pyon.net.channel.log')
+    def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
+        ac = Mock(pchannel.Channel)
+        self.ch._amq_chan = ac
+
+        self.ch._consuming = True
+        self.ch._consumer_tag = sentinel.consumer_tag
+        self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue, sentinel.binding)
+
+        self.ch._ensure_amq_chan = Mock()
+        self.ch._sync_call = Mock()
+        self.ch._queue_auto_delete = True
+
+        self.ch.stop_consume()
+
+        self.assertTrue(mocklog.debug.called)
+        self.assertIn(sentinel.queue, mocklog.debug.call_args[0])
 
     def test_recv(self):
         # replace recv_queue with a mock obj
@@ -578,6 +700,13 @@ class TestListenChannel(PyonTestCase):
 
         cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
         retch._recv_queue.put.assert_called_once_with(sentinel.msg)
+
+    def test_AcceptedListenChannel_close_does_not_close_underlying_amqp_channel(self):
+        ac = Mock(pchannel.Channel)
+        newch = self.ch._create_accepted_channel(ac, sentinel.msg)
+
+        newch.close()
+        self.assertEquals(ac.close.call_count, 0)
 
 @attr('UNIT')
 class TestSusbcriberChannel(PyonTestCase):
