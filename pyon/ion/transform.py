@@ -158,7 +158,7 @@ class TransformBenchTesting(TransformDataProcess):
         pids = 1
         TransformBenchTesting.message_length = message_length
         cc = Container.instance
-        pub = Publisher(to_name=NameTrio('test_exchange',str(uuid.uuid4())[0:6]))
+        pub = Publisher(to_name=NameTrio(get_sys_name(),str(uuid.uuid4())[0:6]))
         for i in xrange(num):
             tbt=cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlace', DotDict({'process':{'name':'tbt%d' % pids, 'transform_id':pids}}))
             tbt.init()
@@ -176,13 +176,13 @@ class TransformBenchTesting(TransformDataProcess):
 
         # set up subscriber to *
         self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),
-                                  from_name=NameTrio('test_exchange', 'bench_queue', '*'))
+                                  from_name=NameTrio(get_sys_name(), 'bench_queue', '*'))
 
         # spawn listener
         self._sub_gl = spawn(self._bt_sub.listen)
 
         # set up publisher to anything!
-        self._bt_pub = Publisher(to_name=NameTrio('test_exchange', str(uuid.uuid4())[0:6]))
+        self._bt_pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
 
     def publish(self, msg):
         self._bt_pub.publish(msg)
