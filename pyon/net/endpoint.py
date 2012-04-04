@@ -1094,6 +1094,15 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         ProcessEndpointUnitMixin.__init__(self, process=process)
         RPCResponseEndpointUnit.__init__(self, **kwargs)
 
+    def _message_received(self, msg, headers):
+        """
+        Message received override.
+
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
+        """
+        with self._process.push_context(headers):
+            return RPCResponseEndpointUnit._message_received(self, msg, headers)
+
     def _build_header(self, raw_msg):
         """
         Override to direct the calls in _build_header - first the RPCResponse side, then the Process mixin.
