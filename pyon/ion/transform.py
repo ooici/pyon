@@ -145,7 +145,7 @@ class TransformBenchTesting(TransformDataProcess):
         
 
     @staticmethod
-    def launch_benchmark(transform_number=1, message_length=4):
+    def launch_benchmark(transform_number=1, primer=1,message_length=4):
         import gevent
         from gevent.greenlet import Greenlet
         from pyon.util.containers import DotDict
@@ -164,7 +164,8 @@ class TransformBenchTesting(TransformDataProcess):
             tbt.init()
             tbt.start()
             gevent.sleep(0.2)
-            pub.publish(list(xrange(msg_len)))
+            for i in xrange(primer):
+                pub.publish(list(xrange(msg_len)))
             g = Greenlet(tbt.perf)
             g.start()
             transforms.append(tbt)
