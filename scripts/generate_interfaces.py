@@ -826,7 +826,8 @@ def generate_model_objects():
                 schema_extended = False
                 current_class_schema = "\n    _schema = {"
                 line = line.replace(':','(IonObjectBase')
-            dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
+            init_lines.append("        self.type_ = '" + current_class + "'\n")
+            dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
 
     # Find any data model definitions lurking in the service interface
     # definition yaml files and generate classes for them.
@@ -921,7 +922,8 @@ def generate_model_objects():
                         schema_extended = False
                         current_class_schema = "\n    _schema = {"
                         line = line.replace(':','(IonObjectBase')
-                    dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
+                    init_lines.append("        self.type_ = '" + current_class + "'\n")
+                    dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
                     
                 index += 1
 

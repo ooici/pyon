@@ -32,13 +32,13 @@ class IonObjectBase(object):
         Compare fields to the schema and raise AttributeError if mismatched.
         Named _validate instead of validate because the data may have a field named "validate".
         """
-        id_and_rev_set = set(['_id','_rev', 'type_'])
+        id_rev_and_type_set = set(['_id','_rev', 'type_'])
         fields, schema = self.__dict__, self._schema
-        extra_fields = fields.viewkeys() - schema.viewkeys() - id_and_rev_set
+        extra_fields = fields.viewkeys() - schema.viewkeys() - id_rev_and_type_set
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
-            if key in id_and_rev_set:
+            if key in id_rev_and_type_set:
                 continue
             field_val, schema_val = fields[key], schema[key]
             if type(field_val).__name__ != schema_val['type']:
@@ -194,8 +194,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
     def _transform(self, obj):
         if isinstance(obj, IonObjectBase):
-            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in ['_id', '_rev'])
-            res["type_"] = obj.__class__.__name__
+            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in ['_id', '_rev', 'type_'])
             return res
         if _have_numpy:
             if isinstance(obj,np.ndarray):
@@ -229,13 +228,14 @@ class IonObjectDeserializer(IonObjectSerializationBase):
         # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict) and "type_" in obj:
             objc    = obj.copy()
-            type    = objc.pop('type_')
+            type    = objc['type_'].encode('ascii')
 
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
-            ion_obj = self._obj_registry.new(type.encode('ascii'))
+            ion_obj = self._obj_registry.new(type)
             for k, v in objc.iteritems():
-                setattr(ion_obj, k, v)
+                if k != "type_":
+                    setattr(ion_obj, k, v)
 
             return ion_obj
         if _have_numpy:

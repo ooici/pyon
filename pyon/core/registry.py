@@ -121,7 +121,7 @@ class IonObjectRegistry(object):
         # include additional client side validation
         if self.validate_setattr:
             def validating_setattr(self, name, value):
-                if name not in self._schema and name != "_id" and name != "_rev":
+                if name not in self._schema and name not in ["_id", "_rev", "type_"]:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
                 self.__dict__[name] = value
 
@@ -144,6 +144,6 @@ class IonObjectRegistry(object):
             obj = clzz(**keywordargs)
         else:
             obj = clzz(**kwargs)
-            
+
         return obj
 
