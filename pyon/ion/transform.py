@@ -9,6 +9,8 @@ import uuid
 import time
 import gevent
 import sys
+from pyon.container.cc import Container
+from pyon.core.bootstrap import get_sys_name
 from pyon.event.event import EventPublisher
 
 from pyon.ion.streamproc import StreamProcess
@@ -115,34 +117,65 @@ class TransformBenchTesting(TransformDataProcess):
     tbt.start()
     """
     transform_number = 0
+    message_length = 0
     def __init__(self):
         super(TransformBenchTesting,self).__init__()
         self.count = 0
         TransformBenchTesting.transform_number += 1
+
         
     def perf(self):
-        then = time.time()
-        ocount = self.count
-        while True:
-            gevent.sleep(5.)
-            now = time.time()
-            count = self.count
-            delta_t = now - then
-            delta_c = count - ocount
 
-            print >>sys.stderr, '[%s] (%s) %3.3f ' % (time.strftime("%H:%M:%S", time.gmtime()),TransformBenchTesting.transform_number, float(delta_c) / delta_t)
-            then = now
-            ocount = count
+        with open('/tmp/pyon_performance.dat','a') as f:
+            then = time.time()
+            ocount = self.count
+            while True:
+                gevent.sleep(2.)
+                now = time.time()
+                count = self.count
+                delta_t = now - then
+                delta_c = count - ocount
+
+                f.write('%s|%s\t%s\t%s\t%3.3f\n' % (get_sys_name(),time.strftime("%H:%M:%S", time.gmtime()),TransformBenchTesting.message_length,TransformBenchTesting.transform_number, float(delta_c) / delta_t))
+                then = now
+                ocount = count
+                f.flush()
             
         
         
-        
+
+    @staticmethod
+    def launch_benchmark(transform_number=1, message_length=4):
+        import gevent
+        from gevent.greenlet import Greenlet
+        from pyon.util.containers import DotDict
+        from pyon.net.transport import NameTrio
+        from pyon.net.endpoint import Publisher
+        import uuid
+        num = transform_number
+        msg_len = message_length
+        transforms = list()
+        pids = 1
+        TransformBenchTesting.message_length = message_length
+        cc = Container.instance
+        pub = Publisher(to_name=NameTrio('test_exchange',str(uuid.uuid4())[0:6]))
+        for i in xrange(num):
+            tbt=cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlace', DotDict({'process':{'name':'tbt%d' % pids, 'transform_id':pids}}))
+            tbt.init()
+            tbt.start()
+            gevent.sleep(0.2)
+            pub.publish(list(xrange(msg_len)))
+            g = Greenlet(tbt.perf)
+            g.start()
+            transforms.append(tbt)
+            pids += 1
+
     def on_start(self):
         TransformDataProcess.__init__(self)
 
         # set up subscriber to *
         self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),
-                                  from_name=NameTrio('test_exchange', 'test_queue', '*'))
+                                  from_name=NameTrio('test_exchange', 'bench_queue', '*'))
 
         # spawn listener
         self._sub_gl = spawn(self._bt_sub.listen)
