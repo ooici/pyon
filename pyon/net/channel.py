@@ -375,10 +375,7 @@ class RecvChannel(BaseChannel):
 
         # only reset the name if it was passed in
         if name != self._recv_name:
-            if isinstance(name, NameTrio):
-                self._recv_name = name
-            else:
-                self._recv_name = NameTrio(exchange, queue, binding)
+            self._recv_name = name
 
         self._declare_exchange(exchange)
         queue   = self._declare_queue(queue)
