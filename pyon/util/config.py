@@ -58,10 +58,11 @@ logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
 
 LOGGING_CFG = None
 
-def initialize_logging():
+def read_logging_config():
     global LOGGING_CFG
     LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
 
+def initialize_logging():
     # Ensure the logging directories exist
     for handler in LOGGING_CFG.get('handlers', {}).itervalues():
         if 'filename' in handler:
@@ -73,6 +74,7 @@ def initialize_logging():
     if LOGGING_CFG:
         logging.config.dictConfig(LOGGING_CFG)
 
+read_logging_config()
 initialize_logging()
 
 # CONFIG. Read global configuration

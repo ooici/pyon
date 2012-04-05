@@ -110,11 +110,23 @@ def main(opts, *args, **kwargs):
         from pyon.util.config import Config
 
         # Check if user opted to override logging config
+        # Requires re-initializing logging
         if opts.logcfg:
-            from pyon.util.config import logging_conf_paths, initialize_logging
-            # Re-initialize logging
-            logging_conf_paths.append(opts.logcfg)
-            initialize_logging()
+            from pyon.util.config import LOGGING_CFG, logging_conf_paths, read_logging_config, initialize_logging
+            import ast
+            # Dict of config values
+            if '{' in opts.logcfg:
+                try:
+                    eval_value = ast.literal_eval(opts.logcfg)
+                except ValueError:
+                    raise Exception("Value error in logcfg arg '%s'" % opts.logcfg)
+                dict_merge(LOGGING_CFG, eval_value)
+                initialize_logging()
+            # YAML file containing config values
+            else:
+                logging_conf_paths.append(opts.logcfg)
+                read_logging_config()
+                initialize_logging()
 
         # Set that system is not testing. We are running as standalone container
         dict_merge(CFG, {'system':{'testing':False}}, True)
