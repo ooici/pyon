@@ -38,7 +38,8 @@ class SFlowManager(object):
 
     # map our status (http-based) to a status sFlow understands - as appropriate
     # http://sflow.org/draft_sflow_application.txt
-    status_map = {400:    4,      # BAD_REQUEST
+    status_map = {200:    0,      # SUCCESS
+                  400:    4,      # BAD_REQUEST
                   401:    10,     # UNAUTHORIZED
                   404:    8,      # NOT_FOUND
                   -1:     2,      # TIMEOUT

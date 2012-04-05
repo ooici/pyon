@@ -83,12 +83,6 @@ class EndpointUnit(object):
         log.debug("channel %s" % str(channel))
         self.channel = channel
 
-    # @TODO: is this used?
-    def channel_attached(self):
-        """
-        """
-        log.debug("In EndpointUnit.channel_attached")
-
     def _build_invocation(self, **kwargs):
         """
         Builds an Invocation instance to be used by the interceptor stack.
@@ -577,7 +571,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         self.response_queue = event.AsyncResult()
         self.message_received = lambda m, h: self.response_queue.set((m, h))
 
-        EndpointUnit._send(self, msg, headers=headers)
+        BidirectionalEndpointUnit._send(self, msg, headers=headers)
 
         try:
             result_data, result_headers = self.response_queue.get(timeout=timeout)

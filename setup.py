@@ -34,7 +34,8 @@ setup(  name = 'pyon',
                 ]
             },
         dependency_links = [
-            'http://ooici.net/releases'
+            'http://ooici.net/releases',
+            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
         ],
         test_suite = 'pyon',
         install_requires = [
@@ -61,6 +62,7 @@ setup(  name = 'pyon',
             'mock==0.8',
             'ndg-xacml==0.4.0',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
+            'python-gevent-profiler',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
