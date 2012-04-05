@@ -83,6 +83,16 @@ def is_ion_object(_def):
 
     return False
 
+
+def is_ion_object_dict(obj):
+    try:
+        if "type_" in obj:
+            return True
+    except:
+        pass
+
+    return False
+
 class IonObjectRegistry(object):
     """
     A simple key-value store that stores by name and by definition hash for versioning.
