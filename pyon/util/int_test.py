@@ -73,7 +73,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
-        self._force_clean()         # deletes only
+        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
+            self._force_clean()         # deletes only
 
 
     def _turn_on_queue_auto_delete(self):
