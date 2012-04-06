@@ -234,6 +234,9 @@ class Container(BaseContainerAgent):
                 self.proc_manager.proc_sup.join_children()
             except (KeyboardInterrupt, SystemExit) as ex:
                 log.info('Received a kill signal, shutting down the container.')
+                watch_parent = CFG.system.get('watch_parent', None)
+                if watch_parent:
+                    watch_parent.kill()
             except:
                 log.exception('Unhandled error! Forcing container shutdown')
         else:

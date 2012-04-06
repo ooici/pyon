@@ -176,6 +176,22 @@ def main(opts, *args, **kwargs):
             container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
             print "Container UI started ... listening on http://localhost:8080"
 
+        if opts.signalparent:
+            import os
+            import signal
+            print 'Signal parent pid %d that pycc pid %d service start process is complete...' % (os.getppid(), os.getpid())
+            os.kill(os.getppid(), signal.SIGUSR1)
+
+            def is_parent_gone():
+                while os.getppid() != 1:
+                    gevent.sleep(1)
+                print 'Now I am an orphan ... notifying serve_forever to stop'
+                os.kill(os.getpid(), signal.SIGINT)
+            import gevent
+            ipg =gevent.spawn(is_parent_gone)
+            from pyon.util.containers import dict_merge
+            from pyon.public import CFG
+            dict_merge(CFG, {'system':{'watch_parent': ipg}}, True)
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
             from pyon.container.shell_api import get_shell_api
@@ -252,6 +268,7 @@ def entry():
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-i', '--immediate', action='store_true', help='Will exit the container if the only procs started are immediate proc types. Sets CFG system.immediate flag.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
+    parser.add_argument('-sp', '--signalparent', action='store_true', help='Signal parent process after service start up complete')
     parser.add_argument('-c', '--config', action='append', type=str, help='Additional config files to load.', default=[])
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()

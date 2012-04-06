@@ -25,6 +25,11 @@ setup(  name = 'pyon',
         keywords = ['ooici','ioncore', 'pyon'],
         packages = find_packages(),
         entry_points = {
+             'nose.plugins.0.10': [
+                 'pycc_plugin=pyon.util.pycc_plugin:PYCC',
+                 'insulate=pyon.util.insulate:Insulate',
+                 'insulateslave=pyon.util.insulate:InsulateSlave'
+             ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
                 'control_cc=scripts.control_cc:main',
