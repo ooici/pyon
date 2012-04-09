@@ -230,7 +230,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
         self.assertTrue(isinstance(data_set_read_obj, interface.objects.DataSet))
         self.assertTrue(data_set_read_obj.description == "Real-time water data for Choptank River near Greensboro, MD")
-        self.assertTrue(not 'type_' in data_set_read_obj)
+        self.assertTrue('type_' in data_set_read_obj)
 
         # Update DataSet's Description field and write
         data_set_read_obj.description = "Updated Description"
