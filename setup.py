@@ -28,7 +28,8 @@ setup(  name = 'pyon',
              'nose.plugins.0.10': [
                  'pycc_plugin=pyon.util.pycc_plugin:PYCC',
                  'insulate=pyon.util.insulate:Insulate',
-                 'insulateslave=pyon.util.insulate:InsulateSlave'
+                 'insulateslave=pyon.util.insulate:InsulateSlave',
+                 'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler'
              ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
