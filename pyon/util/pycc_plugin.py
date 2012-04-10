@@ -66,9 +66,21 @@ class PYCC(Plugin):
             signal.signal(signal.SIGINT, die)
 
             def no_zombie(signum, frame):
-                debug.write('Child is dead...Clean up now so there is no zombie')
-                val = os.wait()
-                self.ccs = []
+                # Debug to figure out who's dying
+                debug.write('SIGCHLD received\n')
+                stack = []
+                while frame:
+                    stack.append(frame)
+                    frame =frame.f_back
+                stack.reverse()
+                for frame in stack:
+                    debug.write('Frame %s in %s at line %s\n' %
+                            (frame.f_code.co_name,
+                                frame.f_code.co_filename, frame.f_lineno))
+                debug.write('Child is dead...Clean up now so there is no zombie\n')
+                (pid, status) = os.wait()
+                exitstatus, signum = status & 0xff, (status & 0xff00) >> 8
+                debug.write('Child pid %d with exit status %d and signum %d\n' % (pid, exitstatus, signum))
 
             signal.signal(signal.SIGCHLD, no_zombie)
 
