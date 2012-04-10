@@ -177,6 +177,7 @@ class ResourceAgentClient(ResourceAgentProcessClient):
             else:
                 # TODO: Check if there is a service for this type of resource
                 log.debug("No agent process found for resource_id=%s" % self.resource_id)
+                raise iex.NotFound("No agent process found for resource_id=%s" % self.resource_id)
 
         assert "name" in kwargs, "Name argument for agent target not set"
         ResourceAgentProcessClient.__init__(self, *args, **kwargs)
