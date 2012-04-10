@@ -81,8 +81,8 @@ class PYCC(Plugin):
                 (pid, status) = os.wait()
                 exitstatus, signum = status & 0xff, (status & 0xff00) >> 8
                 debug.write('Child pid %d with exit status %d and signum %d\n' % (pid, exitstatus, signum))
-
-            signal.signal(signal.SIGCHLD, no_zombie)
+            # Could be dangerous.  Comment this out.
+            # signal.signal(signal.SIGCHLD, no_zombie)
 
             def container_started_cb(signum, frame):
                 """Callback when child pycc service is ready"""
