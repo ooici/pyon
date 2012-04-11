@@ -46,6 +46,7 @@ class PYCC(Plugin):
         perform any setup needed before testing begins.
         """
         try:
+
             from pyon.public import get_sys_name
             sysname = get_sys_name()
 
@@ -94,7 +95,7 @@ class PYCC(Plugin):
             ccargs = ['bin/pycc', '--noshell', '-sp', '--system.name=%s' %
                     sysname,
                     '--logcfg=res/config/logging.pycc.yml',
-                    '--rel=%s' % self.rel]
+                    '--rel=%s' % self.rel,  'system.force_clean=False']
             debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
             newenv = os.environ.copy()
             po = subprocess.Popen(ccargs, env=newenv, close_fds=True)
