@@ -696,10 +696,9 @@ class TestListenChannel(PyonTestCase):
         self.ch._create_accepted_channel = cacmock
         self.ch._amq_chan = sentinel.amq_chan
 
-        retch = self.ch.accept()
-
-        cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
-        retch._recv_queue.put.assert_called_once_with(sentinel.msg)
+        with self.ch.accept() as retch:
+            cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
+            retch._recv_queue.put.assert_called_once_with(sentinel.msg)
 
     def test_AcceptedListenChannel_close_does_not_close_underlying_amqp_channel(self):
         ac = Mock(pchannel.Channel)

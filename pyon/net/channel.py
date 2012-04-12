@@ -42,7 +42,7 @@ from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
 from contextlib import contextmanager
-from gevent.event import AsyncResult
+from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
 
 class ChannelError(StandardError):
@@ -288,7 +288,7 @@ class SendChannel(BaseChannel):
         self._send(self._send_name, data, headers=headers)
 
     def _send(self, name, data, headers=None):
-        log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, data, headers)
+        log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, "-", headers)
         exchange    = name.exchange
         routing_key = name.binding    # uses "_queue" if binding not explictly defined
         headers = headers or {}
@@ -310,6 +310,7 @@ class RecvChannel(BaseChannel):
     # data for this receive channel
     _recv_queue     = None
     _consuming      = False
+    _closing        = False     # @TODO move to FSM
     _consumer_tag   = None
     _recv_name      = None      # name this receiving channel is receiving on - tuple (exchange, queue)
     _recv_binding   = None      # binding this queue is listening on (set via _bind)
@@ -467,11 +468,19 @@ class RecvChannel(BaseChannel):
         Pulls a message off the queue, will block if there are none.
         Typically done by the EndpointUnit layer. Should ack the message there as it is "taking ownership".
         """
-        msg = self._recv_queue.get()
+        while True:
+            msg = self._recv_queue.get()
 
-        # how we handle closed/closing calls, not the best @TODO
-        if isinstance(msg, ChannelShutdownMessage):
-            raise ChannelClosedError('Attempt to recv on a channel that is being closed.')
+            # spin on non-closed messages until we get to what we are waiting for
+            if self._closing and not isinstance(msg, ChannelShutdownMessage):
+                log.info("RecvChannel.recv: discarding non-shutdown message while in closing state")
+                continue
+
+            # how we handle closed/closing calls, not the best @TODO
+            if isinstance(msg, ChannelShutdownMessage):
+                raise ChannelClosedError('Attempt to recv on a channel that is being closed.')
+
+            break
 
         return msg
 
@@ -484,6 +493,8 @@ class RecvChannel(BaseChannel):
         """
         # stop consuming if we are consuming
         log.debug("RecvChannel.close_impl (%s): consuming %s", self.get_channel_id(), self._consuming)
+
+        self._closing = True
 
         if self._consuming:
             self.stop_consume()
@@ -527,13 +538,14 @@ class RecvChannel(BaseChannel):
         self._recv_binding = binding
 
     def _on_deliver(self, chan, method_frame, header_frame, body):
-        log.debug("RecvChannel._on_deliver")
 
         consumer_tag = method_frame.consumer_tag # use to further route?
         delivery_tag = method_frame.delivery_tag # use to ack
         redelivered = method_frame.redelivered
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
+
+        log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %d", delivery_tag, self._recv_queue.qsize())
 
         # put body, headers, delivery tag (for acking) in the recv queue
         self._recv_queue.put((body, header_frame.headers, delivery_tag))
@@ -614,9 +626,15 @@ class ListenChannel(RecvChannel):
         ch.attach_underlying_channel(amq_chan)
         return ch
 
+    @contextmanager
     def accept(self):
         """
-        @returns A new channel that can:
+        Context manager method to accept new connections for listening endpoints.
+
+        Defers calls to close during handling of the message, to be called after
+        the context manager returns.
+
+        Yields A new channel that can:
                     - takes a copy of the underlying transport channel
                     - send() aka reply
                     - close without closing underlying transport channel
@@ -625,12 +643,32 @@ class ListenChannel(RecvChannel):
                     - has the initial received message here put onto its recv gqueue
                     - recv() returns messages in its gqueue, endpoint should ack
         """
-#        self._ensure_amq_chan()
+        #        self._ensure_amq_chan()
         m = self.recv()
         ch = self._create_accepted_channel(self._amq_chan, m)
         ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
-        return ch
+        # swap out destructive close with polite fake close, to be closed later
+        # @TODO: a FSM would clean this up nicely
+        class FakeClose(object):
+            def __init__(self):
+                self.close_called = False
+
+            def __call__(self, *args, **kwargs):
+                self.close_called = True
+
+        fc = FakeClose()
+
+        oldclose = self.close
+        self.close = fc
+
+        try:
+            yield ch
+        finally:
+            # restore normal close and call it if it was called during accept context
+            self.close = oldclose
+            if fc.close_called:
+                self.close()
 
 class SubscriberChannel(ListenChannel):
     pass

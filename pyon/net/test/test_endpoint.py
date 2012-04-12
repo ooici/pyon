@@ -314,9 +314,9 @@ class TestListeningBaseEndpoint(PyonTestCase):
     def test_listen_exception_in_handling(self, mocklog):
 
         # make a listen loop that will return one message (to blow up in processing)
-        chmock = Mock(spec=ListenChannel)
-        chmock.accept.return_value = Mock()
-        chmock.accept.return_value.recv = Mock(return_value=(sentinel.msg, sentinel.headers, sentinel.delivery_tag))
+        chmock = MagicMock(spec=ListenChannel)
+        chmock.accept.return_value.__enter__.return_value = Mock()
+        chmock.accept.return_value.__enter__.return_value.recv = Mock(return_value=(sentinel.msg, sentinel.headers, sentinel.delivery_tag))
 
         nodemock = Mock(spec=NodeB)
         nodemock.channel.return_value = chmock
@@ -334,8 +334,8 @@ class TestListeningBaseEndpoint(PyonTestCase):
         chmock.start_consume.assert_called_once_with()
 
         chmock.accept.assert_called_once_with()
-        chmock.accept.return_value.recv.assert_called_once_with()
-        ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value)
+        chmock.accept.return_value.__enter__.return_value.recv.assert_called_once_with()
+        ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value.__enter__.return_value)
         self.assertEquals(mocklog.exception.call_count, 1)
 
 @patch.dict(endpoint.interceptors, no_interceptors, clear=True)
@@ -391,7 +391,7 @@ class RecvMockMixin(object):
         @param  op              The op name, relevant only for RR comms.
         @param  value           The msg body to be returned.
         """
-        ch = Mock(spec=ch_type())
+        ch = MagicMock(spec=ch_type())
         # set a return value for recv so we get an immediate response
         vals = [(value, {'status_code':status_code, 'error_message':error_message, 'op': op}, sentinel.delivery_tag)]
         def _ret(*args, **kwargs):
@@ -438,7 +438,7 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         sub.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return itself when accepted
-        listen_channel_mock.accept.return_value = listen_channel_mock
+        listen_channel_mock.accept.return_value.__enter__.return_value = listen_channel_mock
 
         # we're ready! call listen
         sub.listen()
@@ -838,7 +838,7 @@ class TestRPCServer(PyonTestCase, RecvMockMixin):
         rpcs.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return a mocked handler channel when accepted (listen() implementation detail)
-        listen_channel_mock.accept.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue, op="simple")
+        listen_channel_mock.accept.return_value.__enter__.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue, op="simple")
 
         rpcs.listen()
 
