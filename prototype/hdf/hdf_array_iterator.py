@@ -36,7 +36,18 @@ def acquire_data( hdf_files = None, var_names=None, concatenate_size = None, bou
                 file = h5py.File(hdf_file,'r')
             except IOError as ioe:
                 log.exception('Unable to open file: "%s"', hdf_file)
-                raise ioe
+
+                # Try again?
+                try:
+                    file = h5py.File(hdf_file,'r')
+
+                except:
+                    log.exception('Still Unable to open file: "%s" !', hdf_file)
+
+                    # If we are only opening one file - we must fail - but otherwise for now, just let it go!
+                    if len(hdf_files) == 1:
+                        raise ioe
+
 
 
             open_files.append(file)
