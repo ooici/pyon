@@ -5,6 +5,8 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from gevent import event as gevent_event
+
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException
 from pyon.datastore.datastore import DataStore
@@ -266,3 +268,19 @@ class EventRepository(object):
             id_only=False, **kwargs)
 
         return events
+
+class EventGate(EventSubscriber):
+    def __init__(self, *args, **kwargs):
+        EventSubscriber.__init__(self, *args, callback=self.trigger_cb, **kwargs)
+
+    def trigger_cb(self, event):
+        self.deactivate()
+        self.gate.set()
+
+    def await(self, timeout=None):
+        self.gate = gevent_event.Event()
+        self.activate()
+        return self.gate.wait(timeout)
+
+    def check_or_await(self):
+        pass
