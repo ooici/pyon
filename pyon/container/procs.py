@@ -17,7 +17,7 @@ from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistr
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
-from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe
+from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_basic_identifier
 from pyon.util.log import log
 
 from interface.objects import ProcessStateEnum
@@ -63,13 +63,17 @@ class ProcManager(object):
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
         log.debug("ProcManager stopped, OK.")
 
-    def spawn_process(self, name=None, module=None, cls=None, config=None):
+    def spawn_process(self, name=None, module=None, cls=None, config=None, process_id=None):
         """
         Spawn a process within the container. Processes can be of different type.
         """
-        # Generate a new process id
+
+        if process_id and not is_basic_identifier(process_id):
+            raise BadRequest("Given process_id %s is not a valid identifier" % process_id)
+
+        # Generate a new process id if not provided
         # TODO: Ensure it is system-wide unique
-        process_id =  "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
+        process_id =  process_id or "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
         log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s", name, module, cls, process_id)
 
         if not config:
