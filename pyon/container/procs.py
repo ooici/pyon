@@ -17,7 +17,7 @@ from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistr
 from pyon.ion.process import IonProcessSupervisor
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
-from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_basic_identifier
+from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 
 from interface.objects import ProcessStateEnum
@@ -68,7 +68,7 @@ class ProcManager(object):
         Spawn a process within the container. Processes can be of different type.
         """
 
-        if process_id and not is_basic_identifier(process_id):
+        if process_id and not is_valid_identifier(process_id, ws_sub='_'):
             raise BadRequest("Given process_id %s is not a valid identifier" % process_id)
 
         # Generate a new process id if not provided

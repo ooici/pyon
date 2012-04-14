@@ -330,6 +330,9 @@ def create_basic_identifier(name):
 def is_basic_identifier(name):
     return name == create_basic_identifier(name)
 
+def is_valid_identifier(name, valid_chars=BASIC_VALID, dot_sub=None, ws_sub=None):
+    return name == create_valid_identifier(name, valid_chars=valid_chars, dot_sub=dot_sub, ws_sub=ws_sub)
+
 #Used by json encoder
 def ion_object_encoder(obj):
     return obj.__dict__
