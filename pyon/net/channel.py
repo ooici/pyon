@@ -44,6 +44,7 @@ from gevent import queue as gqueue
 from contextlib import contextmanager
 from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
+from pyon.util.fsm import FSM
 
 class ChannelError(StandardError):
     """
@@ -72,6 +73,13 @@ class BaseChannel(object):
     _exchange_auto_delete       = True
     _exchange_durable           = False
 
+    # States, Inputs for FSM
+    S_INIT                      = 'INIT'
+    S_ACTIVE                    = 'ACTIVE'
+    S_CLOSED                    = 'CLOSED'
+    I_ATTACH                    = 'ATTACH'
+    I_CLOSE                     = 'CLOSE'
+
     def __init__(self, transport=None, close_callback=None):
         """
         Initializes a BaseChannel instance.
@@ -85,6 +93,13 @@ class BaseChannel(object):
         """
         self.set_close_callback(close_callback)
         self._transport = transport or AMQPTransport.get_instance()
+
+        # setup FSM for BaseChannel / SendChannel tree
+        self._fsm = FSM(self.S_INIT)
+        self._fsm.add_transition(self.I_ATTACH, self.S_INIT, None, self.S_ACTIVE)
+        self._fsm.add_transition(self.I_CLOSE, self.S_ACTIVE, self._on_close, self.S_CLOSED)
+        self._fsm.add_transition(self.I_CLOSE, self.S_CLOSED, None, self.S_CLOSED)              # closed is a goal state, multiple closes are ok and are no-ops
+        self._fsm.add_transition(self.I_CLOSE, self.S_INIT, None, self.S_CLOSED)                # INIT to CLOSED is fine too
 
     def set_close_callback(self, close_callback):
         """
@@ -133,6 +148,7 @@ class BaseChannel(object):
         Attaches an AMQP channel and indicates this channel is now open.
         """
         self._amq_chan = amq_chan
+        self._fsm.process(self.I_ATTACH)
 
     def get_channel_id(self):
         """
@@ -147,7 +163,13 @@ class BaseChannel(object):
 
     def close(self):
         """
-        Default close method.
+        Default public close method.
+        """
+        self._fsm.process(self.I_CLOSE)
+
+    def _on_close(self, fsm):
+        """
+        FSM action method for going to the CLOSED state.
 
         If a close callback was specified when creating this instance, it will call that,
         otherwise it calls close_impl.
@@ -309,8 +331,6 @@ class RecvChannel(BaseChannel):
     """
     # data for this receive channel
     _recv_queue     = None
-    _consuming      = False
-    _closing        = False     # @TODO move to FSM
     _consumer_tag   = None
     _recv_name      = None      # name this receiving channel is receiving on - tuple (exchange, queue)
     _recv_binding   = None      # binding this queue is listening on (set via _bind)
@@ -323,6 +343,11 @@ class RecvChannel(BaseChannel):
     # consumer defaults
     _consumer_exclusive = False
     _consumer_no_ack    = False     # endpoint layers do the acking as they call recv()
+
+    # RecvChannel specific FSM states, inputs
+    S_CONSUMING         = 'CONSUMING'
+    I_START_CONSUME     = 'START_CONSUME'
+    I_STOP_CONSUME      = 'STOP_CONSUME'
 
     def __init__(self, name=None, binding=None, **kwargs):
         """
@@ -342,9 +367,10 @@ class RecvChannel(BaseChannel):
 
         BaseChannel.__init__(self, **kwargs)
 
-    def on_channel_close(self, code, text):
-        BaseChannel.on_channel_close(self, code, text)
-        self._consuming = False
+        # setup RecvChannel specific state transitions
+        self._fsm.add_transition(self.I_START_CONSUME, self.S_ACTIVE, self._on_start_consume, self.S_CONSUMING)
+        self._fsm.add_transition(self.I_STOP_CONSUME, self.S_CONSUMING, self._on_stop_consume, self.S_ACTIVE)
+        self._fsm.add_transition(self.I_CLOSE, self.S_CONSUMING, self._on_close_while_consume, self.S_CLOSED)
 
     def setup_listener(self, name=None, binding=None):
         """
@@ -430,9 +456,15 @@ class RecvChannel(BaseChannel):
 
         setup_listener must have been called first.
         """
-        log.debug("RecvChannel.start_consume")
-        if self._consuming:
-            raise ChannelError("Already consuming")
+        self._fsm.process(self.I_START_CONSUME)
+
+    def _on_start_consume(self, fsm):
+        """
+        Starts consuming messages.
+
+        setup_listener must have been called first.
+        """
+        log.debug("RecvChannel._on_start_consume")
 
         if self._consumer_tag and self._queue_auto_delete:
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
@@ -443,17 +475,21 @@ class RecvChannel(BaseChannel):
                                                           queue=self._recv_name.queue,
                                                           no_ack=self._consumer_no_ack,
                                                           exclusive=self._consumer_exclusive)
-        self._consuming = True
-
     def stop_consume(self):
         """
         Stops consuming messages.
 
         If the queue has auto_delete, this will delete it.
         """
-        log.debug("RecvChannel.stop_consume")
-        if not self._consuming:
-            raise ChannelError("Not consuming")
+        self._fsm.process(self.I_STOP_CONSUME)
+
+    def _on_stop_consume(self, fsm):
+        """
+        Stops consuming messages.
+
+        If the queue has auto_delete, this will delete it.
+        """
+        log.debug("RecvChannel._on_stop_consume")
 
         if self._queue_auto_delete:
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
@@ -461,7 +497,12 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
 
         self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
-        self._consuming = False
+
+    def _on_close_while_consume(self, fsm):
+        """
+        Handles the case where close is issued on a consuming channel.
+        """
+        self._fsm.process_list([self.I_STOP_CONSUME, self.I_CLOSE])
 
     def recv(self):
         """
@@ -472,17 +513,25 @@ class RecvChannel(BaseChannel):
             msg = self._recv_queue.get()
 
             # spin on non-closed messages until we get to what we are waiting for
-            if self._closing and not isinstance(msg, ChannelShutdownMessage):
-                log.info("RecvChannel.recv: discarding non-shutdown message while in closing state")
+            if self._should_discard and not isinstance(msg, ChannelShutdownMessage):
+                log.debug("RecvChannel.recv: discarding non-shutdown message while in closing/closed state")
                 continue
 
             # how we handle closed/closing calls, not the best @TODO
             if isinstance(msg, ChannelShutdownMessage):
                 raise ChannelClosedError('Attempt to recv on a channel that is being closed.')
 
-            break
+            return msg
 
-        return msg
+    @property
+    def _should_discard(self):
+        """
+        If the recv loop should discard any messages, aka while closed or closing.
+
+        This method's existence is an implementation detail, to be overridden by derived classes
+        that may define different closed or closing states.
+        """
+        return self._fsm.current_state == self.S_CLOSED
 
     def close_impl(self):
         """
@@ -491,13 +540,7 @@ class RecvChannel(BaseChannel):
         If we've declared and we're not auto_delete, must delete here.
         Also put a ChannelShutdownMessage in the recv queue so anything blocking on reading it will get notified via ChannelClosedError.
         """
-        # stop consuming if we are consuming
-        log.debug("RecvChannel.close_impl (%s): consuming %s", self.get_channel_id(), self._consuming)
-
-        self._closing = True
-
-        if self._consuming:
-            self.stop_consume()
+        log.debug("RecvChannel.close_impl (%s)", self.get_channel_id())
 
         self._recv_queue.put(ChannelShutdownMessage())
 
@@ -611,6 +654,13 @@ class ListenChannel(RecvChannel):
                            to interact and returns it
     """
 
+    # States, Inputs for ListenChannel FSM
+    S_STOPPING      = 'STOPPING'
+    S_CLOSING       = 'CLOSING'
+    S_ACCEPTED      = 'ACCEPTED'
+    I_ENTER_ACCEPT  = 'ENTER_ACCEPT'
+    I_EXIT_ACCEPT   = 'EXIT_ACCEPT'
+
     class AcceptedListenChannel(RecvChannel):
         """
         The type of channel returned by accept.
@@ -621,10 +671,49 @@ class ListenChannel(RecvChannel):
             """
             pass
 
+    def __init__(self, name=None, binding=None, **kwargs):
+        RecvChannel.__init__(self, name=name, binding=binding, **kwargs)
+
+        # setup ListenChannel specific state transitions
+        self._fsm.add_transition(self.I_ENTER_ACCEPT,   self.S_CONSUMING,   None, self.S_ACCEPTED)
+        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_ACCEPTED,    None, self.S_CONSUMING)
+        self._fsm.add_transition(self.I_CLOSE,          self.S_ACCEPTED,    None, self.S_CLOSING)
+        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_CLOSING,     self._on_close_while_accepted,  self.S_CLOSED)
+        self._fsm.add_transition(self.I_STOP_CONSUME,   self.S_ACCEPTED,    None, self.S_STOPPING)
+        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_STOPPING,    self._on_stop_consume_while_accepted, self.S_ACTIVE)
+
     def _create_accepted_channel(self, amq_chan, msg):
+        """
+        Creates an AcceptedListenChannel.
+
+        Can be overridden by derived classes to get custom class types/functionality.
+        """
         ch = self.AcceptedListenChannel()
         ch.attach_underlying_channel(amq_chan)
         return ch
+
+    @property
+    def _should_discard(self):
+        """
+        If the recv loop should discard any messages, aka while closed or closing.
+
+        This method's existence is an implementation detail, to be overridden by derived classes
+        that may define different closed or closing states.
+        """
+        return self._fsm.current_state == self.S_CLOSED or self._fsm.current_state == self.S_CLOSING
+
+    def _on_close_while_accepted(self, fsm):
+        """
+        Handles the delayed closing of a channel after the accept context has been exited.
+        """
+        self._on_stop_consume(fsm)
+        self._on_close(fsm)
+
+    def _on_stop_consume_while_accepted(self, fsm):
+        """
+        Handles the delayed consumer stop of a channel after the accept context has been exited.
+        """
+        self._on_stop_consume(fsm)
 
     @contextmanager
     def accept(self):
@@ -648,27 +737,10 @@ class ListenChannel(RecvChannel):
         ch = self._create_accepted_channel(self._amq_chan, m)
         ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
-        # swap out destructive close with polite fake close, to be closed later
-        # @TODO: a FSM would clean this up nicely
-        class FakeClose(object):
-            def __init__(self):
-                self.close_called = False
+        self._fsm.process(self.I_ENTER_ACCEPT)
+        yield ch
+        self._fsm.process(self.I_EXIT_ACCEPT)
 
-            def __call__(self, *args, **kwargs):
-                self.close_called = True
-
-        fc = FakeClose()
-
-        oldclose = self.close
-        self.close = fc
-
-        try:
-            yield ch
-        finally:
-            # restore normal close and call it if it was called during accept context
-            self.close = oldclose
-            if fc.close_called:
-                self.close()
 
 class SubscriberChannel(ListenChannel):
     pass
