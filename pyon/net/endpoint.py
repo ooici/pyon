@@ -423,27 +423,52 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._ready_event.set()
 
         while True:
-            log.debug("LEF: %s blocking, waiting for a message" % str(self._recv_name))
+            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
-                newchan = self._chan.accept()
-                msg, headers, delivery_tag = newchan.recv()
+                with self._chan.accept() as newchan:
+                    msg, headers, delivery_tag = newchan.recv()
 
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, msg, headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+                    log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+                    log_message(self._recv_name, msg, headers, delivery_tag)
+
+                    try:
+                        e = self.create_endpoint(existing_channel=newchan)
+                        e._message_received(msg, headers)
+                    except Exception:
+                        log.exception("Unhandled error while handling received message")
+                        raise
+                    finally:
+                        # ALWAYS ACK
+                        newchan.ack(delivery_tag)
 
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
                 break
 
-            try:
-                e = self.create_endpoint(existing_channel=newchan)
-                e._message_received(msg, headers)
-            except Exception:
-                log.exception("Unhandled error while handling received message")
-                raise
-            finally:
-                # ALWAYS ACK
-                newchan.ack(delivery_tag)
+
+
+#        while True:
+#            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+#            try:
+#                newchan = self._chan.accept()
+#                msg, headers, delivery_tag = newchan.recv()
+#
+#                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+#                log_message(self._recv_name, msg, headers, delivery_tag)
+#
+#            except ChannelClosedError as ex:
+#                log.debug('Channel was closed during LEF.listen')
+#                break
+#
+#            try:
+#                e = self.create_endpoint(existing_channel=newchan)
+#                e._message_received(msg, headers)
+#            except Exception:
+#                log.exception("Unhandled error while handling received message")
+#                raise
+#            finally:
+#                # ALWAYS ACK
+#                newchan.ack(delivery_tag)
 
     def close(self):
         BaseEndpoint.close(self)
