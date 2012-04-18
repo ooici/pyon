@@ -2,6 +2,30 @@ import msgpack
 
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
+import numpy
+
+def decode_ion( obj):
+    if "__ion_array__" in obj:
+        return numpy.array(obj['content'],dtype=numpy.dtype(obj['shape']['type']))
+
+    elif '__complex__' in obj:
+        return complex(obj['real'], obj['imag'])
+        ## Always return object
+    return obj
+
+def encode_ion( obj):
+    if isinstance(obj, numpy.ndarray):
+        return {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+
+    elif isinstance(obj, complex):
+        return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
+
+    else:
+        # Must raise type error to avoid recursive failure
+        raise TypeError('Unknown type in user specified encoder')
+    return obj
+
+
 
 class EncodeInterceptor(Interceptor):
     def outgoing(self, invocation):
@@ -9,7 +33,7 @@ class EncodeInterceptor(Interceptor):
         log.debug("Pre-transform: %s", invocation.message)
 
         # msgpack the content (ensures string)
-        invocation.message = msgpack.dumps(invocation.message)
+        invocation.message = msgpack.packb(invocation.message, default=encode_ion)
 
         # make sure no Nones exist in headers - this indicates a problem somewhere up the stack
         # pika will choke hard on them as well, masking the actual problem, so we catch here.
@@ -22,6 +46,6 @@ class EncodeInterceptor(Interceptor):
     def incoming(self, invocation):
         log.debug("EncodeInterceptor.incoming: %s", invocation)
         log.debug("Pre-transform: %s", invocation.message)
-        invocation.message = msgpack.loads(invocation.message)
+        invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion)
         log.debug("Post-transform: %s", invocation.message)
         return invocation
