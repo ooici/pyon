@@ -628,6 +628,15 @@ class TestRecvChannel(PyonTestCase):
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
         self.assertTrue(ac.basic_cancel.called)
 
+    def test_get_stats(self):
+        self.ch._amq_chan = sentinel.amq_chan
+        self.ch._transport = Mock()
+        self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
+
+        self.ch.get_stats()
+
+        self.ch._transport.get_stats.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
 class TestPublisherChannel(PyonTestCase):

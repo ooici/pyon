@@ -36,6 +36,9 @@ class BaseTransport(object):
     def setup_listener(self, binding, default_cb):
         raise NotImplementedError()
 
+    def get_stats(self, client, queue):
+        raise NotImplementedError()
+
 class AMQPTransport(BaseTransport):
     """
     This is STATELESS. You can make instances of it, but no need to (true singleton).
@@ -136,6 +139,16 @@ class AMQPTransport(BaseTransport):
         Calls setup listener via the default callback passed in.
         """
         return default_cb(self, binding)
+
+    def get_stats(self, client, queue):
+        """
+        Gets a tuple of number of messages, number of consumers on a queue.
+        """
+        log.debug("AMQPTransport.get_stats: Q %s", queue)
+        frame = self._sync_call(client, client.queue_declare, 'callback',
+                                        queue=queue or '',
+                                        passive=True)
+        return frame.method.message_count, frame.method.consumer_count
 
 
 class NameTrio(object):
