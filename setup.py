@@ -41,7 +41,8 @@ setup(  name = 'pyon',
             },
         dependency_links = [
             'http://ooici.net/releases',
-            'https://github.com/ooici/msgpack-python/tarball/master#egg=msgpack-python-0.1.13',            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
+            'https://github.com/ooici/msgpack-python/tarball/master#egg=msgpack-python-0.1.13',
+            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
         ],
         test_suite = 'pyon',
         install_requires = [
