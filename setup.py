@@ -41,15 +41,16 @@ setup(  name = 'pyon',
             },
         dependency_links = [
             'http://ooici.net/releases',
-            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
+            'https://github.com/ooici/msgpack-python/tarball/master#egg=msgpack-python-0.1.13',            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
         ],
         test_suite = 'pyon',
         install_requires = [
             # Patched greenlet to work on ARMS
+            'cython==0.15.1',
             'greenlet==0.3.1-p1',
             'gevent==0.13.6',
             'simplejson==2.1.6',
-            'msgpack-python==0.1.9',
+            'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
             'pyyaml==3.10',
             'pika==0.9.5',

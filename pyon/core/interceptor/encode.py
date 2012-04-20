@@ -15,14 +15,19 @@ def decode_ion( obj):
 
 def encode_ion( obj):
     if isinstance(obj, numpy.ndarray):
-        return {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+        new_obj = {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+
+        return new_obj
 
     elif isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
 
+    if isinstance(obj, (numpy.float, numpy.float16, numpy.float32, numpy.float64)):
+        raise ValueError('Can not encode numpy scalars!')
+
     else:
         # Must raise type error to avoid recursive failure
-        raise TypeError('Unknown type in user specified encoder')
+        raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
     return obj
 
 
