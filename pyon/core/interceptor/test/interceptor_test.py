@@ -23,14 +23,10 @@ class InterceptorTest(PyonTestCase):
 
         a = np.array([90,8010,3,14112,3.14159265358979323846264],dtype='float32')
 
-        print 'Array Type:',type(a[0])
-        print 'List Type:',type(a.tolist()[0])
-
         invoke = Invocation()
         invoke.message = a
         codec = EncodeInterceptor()
 
-        print 'LSSLSJSL',type(invoke.message)
         mangled = codec.outgoing(invoke)
 
         received = codec.incoming(mangled)

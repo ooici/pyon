@@ -4,9 +4,19 @@ from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
 import numpy
 
+"""
+@todod Add other ion object stuff here...
+"""
+
+
 def decode_ion( obj):
+    """
+    MsgPack object hook to decode any ion object as part of the message pack walk rather than implementing it again in
+    pyon
+    """
     if "__ion_array__" in obj:
-        return numpy.array(obj['content'],dtype=numpy.dtype(obj['shape']['type']))
+        # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
+        return numpy.array(obj['content'],dtype=numpy.dtype(obj['header']['type']))
 
     elif '__complex__' in obj:
         return complex(obj['real'], obj['imag'])
@@ -14,10 +24,12 @@ def decode_ion( obj):
     return obj
 
 def encode_ion( obj):
+    """
+    MsgPack object hook to encode any ion object as part of the message pack walk rather than implementing it again in
+    pyon
+    """
     if isinstance(obj, numpy.ndarray):
-        new_obj = {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tolist(),"__ion_array__":True}
-
-        return new_obj
+        return {"header":{"type":str(obj.dtype),"nd":len(obj.shape),"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
     elif isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
