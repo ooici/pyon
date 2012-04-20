@@ -47,7 +47,6 @@ setup(  name = 'pyon',
         test_suite = 'pyon',
         install_requires = [
             # Patched greenlet to work on ARMS
-            'cython==0.15.1',
             'greenlet==0.3.1-p1',
             'gevent==0.13.6',
             'simplejson==2.1.6',
