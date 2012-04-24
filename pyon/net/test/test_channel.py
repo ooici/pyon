@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.util.fsm import ExceptionFSM
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -47,21 +48,26 @@ class TestBaseChannel(PyonTestCase):
 
     @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
     def test_close(self):
-        # with close callback
-        cbmock = Mock()
-        ch = BaseChannel(close_callback=cbmock)
-        ch.close()
-
-        cbmock.assert_called_once_with(ch)
 
         # without close callback
         ac = Mock() #pchannel.Channel)  # cannot use this because callbacks is populated dynamically
         ch = BaseChannel()
         ch._amq_chan = ac
+        ch._fsm.current_state = ch.S_ACTIVE
         
         ch.close()
         ac.close.assert_called_once_with()
         self.assertEquals(ac.callbacks.remove.call_count, 4)
+
+    def test_close_with_callback(self):
+        # with close callback
+        cbmock = Mock()
+        ch = BaseChannel(close_callback=cbmock)
+        ch._fsm.current_state = ch.S_ACTIVE
+        ch.close()
+
+        cbmock.assert_called_once_with(ch)
+
 
     def test_on_channel_open(self):
         ch = BaseChannel()
@@ -376,6 +382,7 @@ class TestRecvChannel(PyonTestCase):
     def test_start_consume(self):
         ac = Mock(pchannel.Channel)
         self.ch._amq_chan = ac
+        self.ch._fsm.current_state = self.ch.S_ACTIVE
 
         ac.basic_consume.return_value = sentinel.consumer_tag
 
@@ -384,19 +391,20 @@ class TestRecvChannel(PyonTestCase):
 
         self.ch.start_consume()
 
-        self.assertTrue(self.ch._consuming)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_CONSUMING)
         self.assertEquals(self.ch._consumer_tag, sentinel.consumer_tag)
 
         ac.basic_consume.assert_called_once_with(self.ch._on_deliver, queue=sentinel.queue, no_ack=self.ch._consumer_no_ack, exclusive=self.ch._consumer_exclusive)
 
     def test_start_consume_already_started(self):
-        self.ch._consuming = True
-        self.assertRaises(ChannelError, self.ch.start_consume)
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
+        self.assertRaises(ExceptionFSM, self.ch.start_consume)
 
     @patch('pyon.net.channel.log')
     def test_start_consume_with_consumer_tag_and_auto_delete(self, mocklog):
         ac = Mock(pchannel.Channel)
         self.ch._amq_chan = ac
+        self.ch._fsm.current_state = self.ch.S_ACTIVE
 
         # set up recv name for queue
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
@@ -412,7 +420,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._amq_chan = ac
 
         # pretend we're consuming
-        self.ch._consuming = True
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
 
         # callback sideffect!
         def basic_cancel_side(*args, **kwargs):
@@ -427,22 +435,22 @@ class TestRecvChannel(PyonTestCase):
         # now make the call
         self.ch.stop_consume()
 
-        self.assertFalse(self.ch._consuming)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
         self.assertTrue(ac.basic_cancel.called)
         self.assertIn(sentinel.consumer_tag, ac.basic_cancel.call_args[0])
 
     def test_stop_consume_havent_started(self):
         # we're not consuming, so this should raise
-        self.assertRaises(ChannelError, self.ch.stop_consume)
+        self.ch._fsm.current_state = self.ch.S_ACTIVE
+        self.assertRaises(ExceptionFSM, self.ch.stop_consume)
 
     @patch('pyon.net.channel.log')
     def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
         ac = Mock(pchannel.Channel)
         self.ch._amq_chan = ac
-
-        self.ch._consuming = True
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue, sentinel.binding)
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
 
         self.ch._ensure_amq_chan = Mock()
         self.ch._sync_call = Mock()
@@ -494,17 +502,6 @@ class TestRecvChannel(PyonTestCase):
         mockrq.put.assert_called_once_with(mockshutdown())
 
         mockbasechannel.close_impl.assert_called_once_with(self.ch)
-
-    @patch('pyon.net.channel.BaseChannel')
-    @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
-    def test_close_impl_stops_consuming(self, mockbasechannel):
-        self.ch._consuming = True
-        scmock = Mock()
-
-        self.ch.stop_consume = scmock
-
-        self.ch.close_impl()
-        scmock.assert_called_once_with()
 
     def test_declare_queue(self):
         self.ch._transport = Mock(BaseTransport)
@@ -603,11 +600,6 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn('requeue', ac.basic_reject.call_args[1])
         self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
 
-    def test_on_channel_close_stops_consuming(self):
-        self.ch._consuming = True
-        self.ch.on_channel_close(0, 'hi')
-        self.assertFalse(self.ch._consuming)
-
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
 class TestPublisherChannel(PyonTestCase):
@@ -695,11 +687,71 @@ class TestListenChannel(PyonTestCase):
         self.ch.recv = rmock
         self.ch._create_accepted_channel = cacmock
         self.ch._amq_chan = sentinel.amq_chan
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
 
-        retch = self.ch.accept()
+        with self.ch.accept() as retch:
+            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+            cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
+            retch._recv_queue.put.assert_called_once_with(sentinel.msg)
 
-        cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
-        retch._recv_queue.put.assert_called_once_with(sentinel.msg)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_CONSUMING)
+
+    def test_close_while_accepted(self):
+        rmock = Mock()
+        rmock.return_value = sentinel.msg
+
+        cacmock = Mock()
+
+        self.ch.recv = rmock
+        self.ch._create_accepted_channel = cacmock
+        self.ch._amq_chan = sentinel.amq_chan
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
+
+        # to test close to make sure nothing happened
+        self.ch.close_impl = Mock()
+
+        # stub out stop consume reaction
+        self.ch._on_stop_consume = Mock()
+
+        with self.ch.accept() as retch:
+            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+
+            self.ch.close()
+
+            # ensure nothing close-like got called!
+            self.assertFalse(self.ch.close_impl.called)
+            self.assertFalse(self.ch._on_stop_consume.called)
+            self.assertEquals(self.ch._fsm.current_state, self.ch.S_CLOSING)
+
+        self.assertTrue(self.ch.close_impl.called)
+        self.assertTrue(self.ch._on_stop_consume.called)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_CLOSED)
+
+    def test_stop_consume_while_accepted(self):
+        rmock = Mock()
+        rmock.return_value = sentinel.msg
+
+        cacmock = Mock()
+
+        self.ch.recv = rmock
+        self.ch._create_accepted_channel = cacmock
+        self.ch._amq_chan = sentinel.amq_chan
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
+
+        # to test stop_consume reaction
+        self.ch._on_stop_consume = Mock()
+
+        with self.ch.accept() as retch:
+            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+
+            self.ch.stop_consume()
+
+            # we didn't stop consume yet
+            self.assertFalse(self.ch._on_stop_consume.called)
+            self.assertEquals(self.ch._fsm.current_state, self.ch.S_STOPPING)
+
+        self.assertTrue(self.ch._on_stop_consume.called)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
 
     def test_AcceptedListenChannel_close_does_not_close_underlying_amqp_channel(self):
         ac = Mock(pchannel.Channel)
