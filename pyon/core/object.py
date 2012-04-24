@@ -3,6 +3,7 @@
 __author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
 __license__ = 'Apache 2.0'
 
+import os
 import inspect
 from collections import OrderedDict, Mapping, Iterable
 import pprint
@@ -15,6 +16,8 @@ try:
     _have_numpy = True
 except ImportError as e:
     _have_numpy = False
+
+built_in_attrs = set(['_id','_rev', 'type_', 'blame_'])
 
 class IonObjectBase(object):
 
@@ -32,13 +35,12 @@ class IonObjectBase(object):
         Compare fields to the schema and raise AttributeError if mismatched.
         Named _validate instead of validate because the data may have a field named "validate".
         """
-        id_rev_and_type_set = set(['_id','_rev', 'type_'])
         fields, schema = self.__dict__, self._schema
-        extra_fields = fields.viewkeys() - schema.viewkeys() - id_rev_and_type_set
+        extra_fields = fields.viewkeys() - schema.viewkeys() - built_in_attrs
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
         for key in fields.iterkeys():
-            if key in id_rev_and_type_set:
+            if key in built_in_attrs:
                 continue
             field_val, schema_val = fields[key], schema[key]
             if type(field_val).__name__ != schema_val['type']:
@@ -116,6 +118,9 @@ class IonObjectBase(object):
         for key in other.__dict__:
             setattr(self, key, other.__dict__[key])
 
+class IonMessageObjectBase(IonObjectBase):
+    pass
+    
 def walk(o, cb):
     """
     Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
@@ -194,7 +199,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
     def _transform(self, obj):
         if isinstance(obj, IonObjectBase):
-            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in ['_id', '_rev', 'type_'])
+            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs)
             return res
         if _have_numpy:
             if isinstance(obj,np.ndarray):
@@ -208,6 +213,16 @@ class IonObjectSerializer(IonObjectSerializationBase):
                 return res
 
         return obj
+
+class IonObjectBlameSerializer(IonObjectSerializer):
+    
+    def _transform(self, obj):
+        res = IonObjectSerializer._transform(self, obj)
+        blame = os.environ["BLAME"]
+        if blame and isinstance(obj, IonObjectBase) and not isinstance(obj, IonMessageObjectBase):
+            res["blame_"] = blame
+
+        return res
 
 class IonObjectDeserializer(IonObjectSerializationBase):
     """
@@ -253,6 +268,14 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 
         return obj
 
+class IonObjectBlameDeserializer(IonObjectDeserializer):
+    
+    def _transform(self, obj):
+        if isinstance(obj, dict) and "type_" in obj:
+            if "blame_" in obj:
+                obj.pop("blame_")
+
+        return IonObjectDeserializer._transform(obj)
 
 ion_serializer = IonObjectSerializer()
 
