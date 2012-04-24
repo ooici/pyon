@@ -1,6 +1,6 @@
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.bootstrap import obj_registry
-from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, walk
+from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, IonObjectBlameDeserializer, IonObjectBlameSerializer, walk
 from pyon.util.log import log
 
 class CodecInterceptor(Interceptor):
@@ -41,3 +41,14 @@ class CodecInterceptor(Interceptor):
         log.debug("Payload, post-transform: %s", invocation.message)
 
         return invocation
+
+
+class BlameCodecInterceptor(CodecInterceptor):
+    """
+    Transforms IonObject <-> dict and adds "blame_" attribute
+    """
+    def __init__(self):
+        Interceptor.__init__(self)
+        self._io_serializer = IonObjectBlameSerializer()
+        # Use the normal deserializer so that the blame attr flows through the system
+        self._io_deserializer = IonObjectDeserializer(obj_registry=obj_registry)
