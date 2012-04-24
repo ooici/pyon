@@ -168,7 +168,13 @@ class CouchDB_DataStore(DataStore):
                 pass
 
         # Assign an id to doc (recommended in CouchDB documentation)
-        doc["_id"] = object_id or uuid4().hex
+        if object_id:
+            doc["_id"] = object_id
+        else:
+            if "type_" in doc:
+                doc["_id"] = doc["type_"] + "_" + uuid4().hex
+            else:
+                doc["_id"] = uuid4().hex
         log.info('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 

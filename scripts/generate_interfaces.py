@@ -940,7 +940,7 @@ def generate_model_objects():
             dataobject_output_text += current_class_schema + "\n              }\n"
  
 #    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.exception import BadRequest\nfrom pyon.core.object import IonObjectBase\n"
-    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
+    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
     current_class_schema = ""
 
     # Now process the service definition yaml files to
@@ -998,7 +998,7 @@ def generate_model_objects():
             args = []
             init_lines = []
             current_op_name = lines[index].strip(' :')
-            messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
+            messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
             messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
             messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
             index += 1
@@ -1099,7 +1099,7 @@ def generate_model_objects():
             if index < len(lines) and lines[index].startswith('    out:'):
                 args = []
                 init_lines = []
-                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
+                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
                 messageobject_output_text += '    def __init__(self'
