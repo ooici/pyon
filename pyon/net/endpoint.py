@@ -949,7 +949,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
         try:
+            ######
+            ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
+            ######
             result = ro_meth(**cmd_arg_obj)
+            ######
 
             response_headers = { 'status_code': 200, 'error_message': '' }
         except TypeError as ex:
@@ -1119,6 +1123,9 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
         """
+        ######
+        ###### THIS IS WHERE THE THREAD LOCAL HEADERS CONTEXT IS SET ######
+        ######
         with self._process.push_context(headers):
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
