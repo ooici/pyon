@@ -201,16 +201,6 @@ class IonObjectSerializer(IonObjectSerializationBase):
         if isinstance(obj, IonObjectBase):
             res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs)
             return res
-        if _have_numpy:
-            if isinstance(obj,np.ndarray):
-                log.debug('got numpy: %s', type(obj))
-                res = {'numpy': {
-                    'type':str(obj.dtype),
-                    'shape':obj.shape,
-                    'body':obj.tostring()
-                }}
-                log.debug('res: %s', res)
-                return res
 
         return obj
 
@@ -253,18 +243,6 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                     setattr(ion_obj, k, v)
 
             return ion_obj
-        if _have_numpy:
-            if isinstance(obj, dict):
-                msg = obj.get('numpy',False)
-                log.debug('message = %s', msg)
-                if msg:
-                    shape = msg.get('shape')
-                    type = msg.get('type')
-                    data = msg.get('body')
-                    log.debug('Numpy Array Detected:\n  type: %s\n  shape: %s\n  body: %s',type,shape,data)
-                    ret = np.fromstring(string=data,dtype=type).reshape(shape)
-                    return np.array(ret)
-
 
         return obj
 
