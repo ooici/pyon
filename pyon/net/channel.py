@@ -161,15 +161,17 @@ class BaseChannel(object):
 
         return self._amq_chan.channel_number
 
+    def reset(self):
+        """
+        Provides a hook for resetting a node (used only by pooling in the node).
+
+        At this base level, is a no-op.
+        """
+        pass
+
     def close(self):
         """
-        Default public close method.
-        """
-        self._fsm.process(self.I_CLOSE)
-
-    def _on_close(self, fsm):
-        """
-        FSM action method for going to the CLOSED state.
+        Public close method.
 
         If a close callback was specified when creating this instance, it will call that,
         otherwise it calls close_impl.
@@ -180,7 +182,10 @@ class BaseChannel(object):
         if self._close_callback:
             self._close_callback(self)
         else:
-            self.close_impl()
+            self._fsm.process(self.I_CLOSE)
+
+    def _on_close(self, fsm):
+        self.close_impl()
 
     def close_impl(self):
         """
@@ -502,7 +507,17 @@ class RecvChannel(BaseChannel):
         """
         Handles the case where close is issued on a consuming channel.
         """
-        self._fsm.process_list([self.I_STOP_CONSUME, self.I_CLOSE])
+        self.stop_consume()
+        self.close()
+
+    def reset(self):
+        """
+        Provides a hook for resetting a node (used only by pooling in the node).
+
+        If consuming, stops it. Otherwise, no-op.
+        """
+        if self._fsm.current_state == self.S_CONSUMING:
+            self.stop_consume()
 
     def recv(self):
         """
@@ -588,7 +603,7 @@ class RecvChannel(BaseChannel):
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
 
-        log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %d", delivery_tag, self._recv_queue.qsize())
+        log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %s", delivery_tag, self._recv_queue.qsize())
 
         # put body, headers, delivery tag (for acking) in the recv queue
         self._recv_queue.put((body, header_frame.headers, delivery_tag))

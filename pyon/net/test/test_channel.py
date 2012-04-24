@@ -600,6 +600,34 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn('requeue', ac.basic_reject.call_args[1])
         self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
 
+    def test_reset(self):
+        self.ch.reset()
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_INIT)
+
+    def test_reset_when_consuming(self):
+        # have to setup a lot here, can't just mock
+        # _on_stop_consume because the FSM holds onto it
+        ac = Mock(pchannel.Channel)
+        self.ch._amq_chan = ac
+
+        # pretend we're consuming
+        self.ch._fsm.current_state = self.ch.S_CONSUMING
+
+        # callback sideffect!
+        def basic_cancel_side(*args, **kwargs):
+            cbparam = kwargs.get('callback')
+            cbparam()
+
+        ac.basic_cancel.side_effect = basic_cancel_side
+
+        # set a sentinel as our consumer tag
+        self.ch._consumer_tag = sentinel.consumer_tag
+
+        self.ch.reset()
+
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
+        self.assertTrue(ac.basic_cancel.called)
+
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
 class TestPublisherChannel(PyonTestCase):
