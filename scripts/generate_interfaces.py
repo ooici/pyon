@@ -659,9 +659,10 @@ def find_subtypes(clz):
 # TODO make this method legit by utilizing a parser to handle walking
 # the tokens.    
 def generate_model_objects(opts):
-    from pyon.ion import resource
-    resource.load_definitions()
-    from pyon.ion.resource import Predicates
+    from pyon.util.config import Config
+    from pyon.util.containers import DotDict
+    Predicates = DotDict()
+    Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
 
     data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
     data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
