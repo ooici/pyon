@@ -165,7 +165,6 @@ class DataStore(object):
         """
         pass
 
-
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type=AT.H2H):
         """
         Create an association between two IonObjects with a given predicate
