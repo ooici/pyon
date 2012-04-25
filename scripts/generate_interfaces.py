@@ -23,7 +23,6 @@ from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
 from pyon.util.containers import named_any
-from pyon.public import PRED
 
 # Do not remove any of the imports below this comment!!!!!!
 from pyon.util import yaml_ordered_dict
