@@ -51,5 +51,4 @@ class BlameCodecInterceptor(CodecInterceptor):
     def __init__(self):
         Interceptor.__init__(self)
         self._io_serializer = IonObjectBlameSerializer()
-        # Use the normal deserializer so that the blame attr flows through the system
-        self._io_deserializer = IonObjectDeserializer(obj_registry=obj_registry)
+        self._io_deserializer = IonObjectBlameDeserializer(obj_registry=obj_registry)

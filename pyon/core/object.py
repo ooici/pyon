@@ -209,7 +209,7 @@ class IonObjectBlameSerializer(IonObjectSerializer):
     def _transform(self, obj):
         res = IonObjectSerializer._transform(self, obj)
         blame = os.environ["BLAME"]
-        if blame and isinstance(obj, IonObjectBase) and not isinstance(obj, IonMessageObjectBase):
+        if blame and isinstance(obj, IonObjectBase):
             res["blame_"] = blame
 
         return res
@@ -249,11 +249,25 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 class IonObjectBlameDeserializer(IonObjectDeserializer):
     
     def _transform(self, obj):
-        if isinstance(obj, dict) and "type_" in obj:
+        # Note: This check to detect an IonObject is a bit risky (only type_)
+        if isinstance(obj, dict):
             if "blame_" in obj:
-                obj.pop("blame_")
+                if "type_" in obj:
+                    objc    = obj.copy()
+                    type    = objc['type_'].encode('ascii')
 
-        return IonObjectDeserializer._transform(obj)
+                    # don't supply a dict - we want the object to initialize with all its defaults intact,
+                    # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
+                    ion_obj = self._obj_registry.new(type)
+                    for k, v in objc.iteritems():
+                        if k != "type_":
+                            setattr(ion_obj, k, v)
+
+                    return ion_obj
+                else:
+                    obj.pop("blame_")
+
+        return obj
 
 ion_serializer = IonObjectSerializer()
 
