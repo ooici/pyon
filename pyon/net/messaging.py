@@ -98,6 +98,9 @@ class NodeB(amqp.Node):
             log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
             self._pool.release_id(chid)
 
+            # reset channel
+            ch.reset()
+
             # sanity check: if auto delete got turned on, we must remove this channel from the pool
             if ch._queue_auto_delete:
                 log.warn("A pooled channel now has _queue_auto_delete set true, we must remove it: check what caused this as it's likely a timing error")
