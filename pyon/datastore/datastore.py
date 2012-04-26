@@ -8,6 +8,7 @@ from pyon.core.exception import BadRequest, NotFound
 from pyon.ion.resource import AT
 from pyon.util.containers import DotDict, get_ion_ts, get_safe
 from pyon.util.log import log
+from pyon.util.arg_check import validateTrue
 
 
 class DataStore(object):
@@ -317,7 +318,7 @@ class DatastoreManager(object):
         @param profile  One of known constants determining the use of the store
         @param config  Override config to use
         """
-        assert ds_name, "Must provide ds_name"
+        validateTrue(ds_name,'ds_name must be provided')
         if ds_name in self._datastores:
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
             return self._datastores[ds_name]
