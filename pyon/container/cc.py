@@ -12,6 +12,7 @@ import msgpack
 import os
 import signal
 import string
+import traceback
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
@@ -361,6 +362,8 @@ class Container(BaseContainerAgent):
         log.error("Fail Fast: %s", err_msg)
         self.stop()
         log.error("Fail Fast: killing container")
+
+        traceback.print_exc()
 
         # The exit code of the terminated process is set to non-zero
         os.kill(os.getpid(), signal.SIGTERM)
