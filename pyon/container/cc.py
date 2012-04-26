@@ -185,7 +185,7 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc])
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
 

@@ -341,7 +341,7 @@ class ProcManager(object):
                                 service=service_instance,
                                 process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc, name=listen_name,
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc], name=listen_name,
                                     proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_set_service_endpoint for listen_name: %s" % listen_name)
 
@@ -358,7 +358,7 @@ class ProcManager(object):
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name,callback=lambda m,h: service_instance.call_process(m))
 
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=sub, name=listen_name,
+        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[sub], name=listen_name,
                                     proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, '_set_subscription_endpoint for listen_name: %s' % listen_name)
 
@@ -405,8 +405,8 @@ class ProcManager(object):
 
         # find the proc
         lp = list(self.proc_sup.children)
-        lps = [p for p in lp if p.listener._process == service_instance]
-
+        lps = set()
+        map(lambda p: lps.add, (p for p in lp if service_instance in (l._process for l in p.listeners)))
 
         for p in lps:
             p.notify_stop()
