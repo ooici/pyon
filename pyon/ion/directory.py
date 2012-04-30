@@ -13,7 +13,7 @@ from pyon.core.exception import Conflict, NotFound, BadRequest
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, dict_merge
 
 from interface.objects import DirEntry
 
@@ -58,6 +58,7 @@ class Directory(object):
     def _init(self):
         auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
         if not auto_bootstrap:
+            self._load_config()
             return
 
         try:
@@ -299,6 +300,7 @@ class Directory(object):
         de = self.lookup("/Config/CFG")
         if not de:
             raise Conflict("Expected /Config/CFG in directory. Correct Org??")
+        dict_merge(CFG, de, inplace=True)
 
     def _register_service_definitions(self):
         from pyon.core.bootstrap import service_registry
