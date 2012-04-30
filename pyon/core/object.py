@@ -208,7 +208,11 @@ class IonObjectBlameSerializer(IonObjectSerializer):
     
     def _transform(self, obj):
         res = IonObjectSerializer._transform(self, obj)
-        blame = os.environ["BLAME"]
+        blame = None
+        try:
+            blame = os.environ["BLAME"]
+        except:
+            pass
         if blame and isinstance(obj, IonObjectBase):
             res["blame_"] = blame
 
@@ -249,24 +253,31 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 class IonObjectBlameDeserializer(IonObjectDeserializer):
     
     def _transform(self, obj):
+
+        def handle_ion_obj(in_obj):
+            objc    = in_obj.copy()
+            type    = objc['type_'].encode('ascii')
+
+            # don't supply a dict - we want the object to initialize with all its defaults intact,
+            # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
+            ion_obj = self._obj_registry.new(type)
+            for k, v in objc.iteritems():
+                if k != "type_":
+                    setattr(ion_obj, k, v)
+
+            return ion_obj
+
         # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict):
             if "blame_" in obj:
                 if "type_" in obj:
-                    objc    = obj.copy()
-                    type    = objc['type_'].encode('ascii')
-
-                    # don't supply a dict - we want the object to initialize with all its defaults intact,
-                    # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
-                    ion_obj = self._obj_registry.new(type)
-                    for k, v in objc.iteritems():
-                        if k != "type_":
-                            setattr(ion_obj, k, v)
-
-                    return ion_obj
+                    return handle_ion_obj(obj)
                 else:
                     obj.pop("blame_")
-
+            else:
+                if "type_" in obj:
+                    return handle_ion_obj(obj)
+  
         return obj
 
 ion_serializer = IonObjectSerializer()

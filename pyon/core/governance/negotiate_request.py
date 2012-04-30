@@ -31,9 +31,9 @@ class NegotiateRequestFactory(object):
         return request_object
 
     @classmethod
-    def create_role_request(self,org_id, user_id):
+    def create_role_request(self,org_id, user_id, role_name):
 
-        request_object = IonObject(RT.RoleRequest, name='Role Request', org_id=org_id, user_id=user_id,
+        request_object = IonObject(RT.RoleRequest, name='Role Request', org_id=org_id, user_id=user_id, role_name=role_name,
             status="Initialized", description='%s Role Request at %s' % (user_id, str(now)))
 
         return request_object

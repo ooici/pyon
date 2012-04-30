@@ -33,7 +33,7 @@ class GovernanceDispatcher(object):
     STATUS_ERROR = 'error'
 
     def __init__(self, *args, **kwargs):
-        log.info('GovernanceDispatcher.__init__()')
+        log.debug('GovernanceDispatcher.__init__()')
 
 
     def handle_incoming_message(self, invocation):
