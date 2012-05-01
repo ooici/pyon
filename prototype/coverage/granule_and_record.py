@@ -14,8 +14,6 @@ from pyon.util.containers import DotDict
 import numpy
 from interface.objects import Granule, CompoundGranule, Taxonomy
 
-
-
 class GranuleBuilder(object):
     """
     A granule is a unit of information which conveys part of a coverage.
@@ -58,15 +56,18 @@ class GranuleBuilder(object):
 
     def iteritems(self):
         """ D.iteritems() -> an iterator over the (key, value) items of D """
-        pass
+        for k, v in self._tx.iteritems():
+            yield k, self._g.record_dictionary[v]
 
     def iterkeys(self):
         """ D.iterkeys() -> an iterator over the keys of D """
-        pass
+        for k in self._tx.iterkeys():
+            yield k
 
     def itervalues(self):
         """ D.itervalues() -> an iterator over the values of D """
-        pass
+        for k in self._tx.iterkeys():
+            yield self._g.record_dictionary[self._tx[k]]
 
     def update(self, E=None, **F):
         """
@@ -75,27 +76,56 @@ class GranuleBuilder(object):
         If E lacks .keys() method, does:     for (k, v) in E: D[k] = v
         In either case, this is followed by: for k in F: D[k] = F[k]
         """
-        pass
+        if E:
+            if hasattr(E, "keys"):
+                for k in E:
+                    self._g.record_dictionary[self._tx[k]] = E[k]
+            else:
+                for k, v in E.iteritems():
+                    self._g.record_dictionary[self._tx[k]] = v
+
+        if F:
+            for k in F.keys():
+                self._g.record_dictionary[self._tx[k]] = F[k]
 
     def __contains__(self, k):
         """ D.__contains__(k) -> True if D has a key k, else False """
-        return False
+        return self._tx.has_key(k)
 
     def __delitem__(self, y):
         """ x.__delitem__(y) <==> del x[y] """
-        pass
+        del self._g.record_dictionary[self._tx[y]]
+        del self._tx[y]
 
     def __iter__(self):
         """ x.__iter__() <==> iter(x) """
-        pass
+        for k in self._tx.iterkeys():
+            yield k
 
     def __len__(self):
         """ x.__len__() <==> len(x) """
-        pass
+        return len(self._tx)
 
     def __repr__(self):
         """ x.__repr__() <==> repr(x) """
-        pass
+        result = "{"
+        for k, v in self.iteritems():
+            result += "\'{0}\': {1},".format(k, v)
+
+        if len(result) > 1:
+            result = result[:-1] + "}"
+
+        return result
+
+    def __str__(self):
+        result = "{"
+        for k, v in self.iteritems():
+            result += "\'{0}\': {1},".format(k, v)
+
+        if len(result) > 1:
+            result = result[:-1] + "}"
+
+        return result
 
     __hash__ = None
 
