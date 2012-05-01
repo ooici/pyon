@@ -57,7 +57,7 @@ class TaxyCab(object):
     def __init__(self, taxonomy=None):
 
         # An internal counter for the handles of this taxonomy
-        self._cnt = 0
+        self._cnt = -1
 
         self._inv = {}
 
@@ -92,12 +92,12 @@ class TaxyCab(object):
         @brief Add a new set of names in the taxonomy under a new handle
         @param *args is a list of input arguments. All should be hashable
         """
+        self._cnt += 1
         h = self._cnt
         self._t.map[h] = set()
 
         self._extend_taxonomy_set(h, *args)
 
-        self._cnt += 1
 
 
     def get_handles(self, name):
