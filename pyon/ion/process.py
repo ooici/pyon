@@ -1,31 +1,31 @@
 #!/usr/bin/env python
 
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
-from pyon.net import messaging, endpoint
+from pyon.core.process import GreenProcess, GreenProcessSupervisor
 from pyon.service.service import BaseService
-from gevent.event import Event, waitall
+from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
-import time
+from gevent import greenlet
 from pyon.util.async import wait, spawn
 import threading
 
-class IonProcessBase(object):
+class GreenIonProcess(GreenProcess):
     """
     Form the base of an ION process.
     Just add greenlets or python processes to complete.
     """
 
-    def __init__(self, listeners=None, name=None, routing_obj=None):
+    def __init__(self, target=None, listeners=None, name=None, **kwargs):
         self.listeners      = listeners
         self.name           = name
-        self.routing_obj    = routing_obj       # where the requests go
         self._child_procs   = []
         self._ctrl_queue    = Queue()
+
+        GreenProcess.__init__(self, target=target, **kwargs)
 
     def _child_failed(self, child):
         """
@@ -33,7 +33,7 @@ class IonProcessBase(object):
 
         Propogates the error up to the process supervisor.
         """
-        self.proc.throw(child.value)
+        self.proc.throw(child.exception)
 
     def target(self, *args, **kwargs):
         """
@@ -42,7 +42,10 @@ class IonProcessBase(object):
         if self.name:
             threading.current_thread().name = self.name
 
+        # - tell all listeners they need to call here for sync
+        # - spawn listen loops
         for listener in self.listeners:
+            listener.routing_call = self._routing_call
             self._child_procs.append(spawn(listener.listen))
 
         # spawn control flow loop
@@ -52,31 +55,67 @@ class IonProcessBase(object):
         map(lambda x: x.link_exception(self._child_failed), self._child_procs)
 
         # wait on them
-        self._wait_children()
+        wait(self._child_procs)
+
+    def _routing_call(self, call, callargs):
+        """
+        Endpoints call into here to synchronize across the entire IonProcess.
+
+        Returns immediately with an AsyncResult that can be waited on. Calls
+        are made by the loop in _control_flow. We pass in the calling greenlet so
+        exceptions are raised in the correct context.
+        """
+        ar = AsyncResult()
+
+        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs))
+        return ar
 
     def _control_flow(self):
-        for call in self._ctrl_queue:
-            # @TODO!
-            pass
+        """
+        Main process thread of execution method.
+
+        This method is run inside a greenlet and exists for each ION process. Listeners
+        attached to the process, either RPC Servers or Subscribers, synchronize their calls
+        by placing future calls into the queue by calling _routing_call.  This is all done
+        automatically for you by the Container's Process Manager.
+
+        This method blocks until there are calls to be made in the synchronized queue, and
+        then calls from within this greenlet.  Any exception raised is caught and re-raised
+        in the greenlet that originally scheduled the call.  If successful, the AsyncResult
+        created at scheduling time is set with the result of the call.
+        """
+        for calltuple in self._ctrl_queue:
+            calling_gl, ar, call, callargs = calltuple
+            log.debug("control_flow making call: %s %s", call, callargs)
+
+            res = None
+            try:
+                res = call(**callargs)
+            except Exception as e:
+                # raise the exception in the calling greenlet, and don't
+                # wait for it to die - it's likely not going to do so.
+                calling_gl.kill(exception=e, block=False)
+
+            ar.set(res)
 
     def _notify_stop(self):
+        """
+        Called when the process is about to be shut down.
+
+        Instructs all listeners to close, puts a StopIteration into the synchronized queue,
+        and waits for the listeners to close and for the control queue to exit.
+        """
         map(lambda x: x.close(), self.listeners)
         self._ctrl_queue.put(StopIteration)
 
-        self._wait_children()
+        wait(self._child_procs)
 
-        super(IonProcessBase, self)._notify_stop()
-
-    def _wait_children(self):
-        pass
-
-class GreenIonProcess(IonProcessBase, GreenProcess):
-
-    def __init__(self, target=None, listeners=None, name=None, **kwargs):
-        IonProcessBase.__init__(self, listeners=listeners, name=name)
-        GreenProcess.__init__(self, target=target, **kwargs)
+        GreenProcess._notify_stop(self)
 
     def get_ready_event(self):
+        """
+        Returns an Event that is set when all the listeners in this Process are running.
+        """
         ev = Event()
         def allready(ev):
             waitall([x.get_ready_event() for x in self.listeners])
@@ -85,16 +124,10 @@ class GreenIonProcess(IonProcessBase, GreenProcess):
         spawn(allready, ev)
         return ev
 
-    def _wait_children(self):
-        wait(self._child_procs)
-
-class PythonIonProcess(IonProcessBase, PythonProcess):
-    pass
-
 class IonProcessSupervisor(GreenProcessSupervisor):
     type_callables = {
           'green': GreenIonProcess
-        , 'python': PythonIonProcess
+#        , 'python': PythonIonProcess
     }
 
 # ---------------------------------------------------------------------------------------------------
