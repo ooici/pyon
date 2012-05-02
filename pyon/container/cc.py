@@ -129,7 +129,6 @@ class Container(BaseContainerAgent):
 
         log.debug("Container initialized, OK.")
 
-
     def start(self):
         log.debug("Container starting...")
         if self._is_started:
