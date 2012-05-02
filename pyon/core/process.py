@@ -10,7 +10,6 @@ from pyon.util.log import log
 from pyon.core.exception import ContainerError
 
 import time
-import multiprocessing as mp
 import os
 import signal
 
@@ -136,34 +135,6 @@ class GreenProcess(PyonProcess):
         ev.set()
         return ev
 
-class PythonProcess(PyonProcess):
-    """
-    @brief A BaseProcess that uses a full OS process to do its work.
-    """
-
-    def _pid(self):
-        return self.proc.pid
-
-    def _spawn(self):
-        # Multiprocessing spawn
-        proc = mp.Process(target=self.target, args=self.spawn_args, kwargs=self.spawn_kwargs)
-        proc.daemon = True
-        proc.start()
-        return proc
-
-    def _join(self, timeout=None):
-        return self.proc.join(timeout)
-
-    def _stop(self):
-        return self.proc.terminate()
-
-    def _running(self):
-        return self.proc.is_alive()
-
-    def get_ready_event(self):
-        log.warn("get ready event not implemented for PythonProcess")
-        return None
-
 class ProcessSupervisor(object):
     """
     @brief Manage spawning processes of multiple kinds and ensure they're alive.
@@ -172,7 +143,7 @@ class ProcessSupervisor(object):
 
     type_callables = {
           'green': GreenProcess
-        , 'python': PythonProcess
+#        , 'python': PythonProcess
     }
 
     def __init__(self, heartbeat_secs=10.0, failure_notify_callback=None):
@@ -236,10 +207,6 @@ class ProcessSupervisor(object):
         @param  timeout     Amount of time (in seconds) to wait for the ready, default 10 seconds.
         @throws ContainerError  If the process dies or if we get a timeout before the process signals ready.
         """
-
-        if isinstance(proc, PythonProcess):
-            log.warn("ensure_ready does not yet work on PythonProcesses")
-            return True
 
         if not errmsg:
             errmsg = "ensure_ready failed"

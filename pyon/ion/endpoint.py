@@ -91,7 +91,7 @@ class StreamPublisherRegistrar(object):
         stream_route = self.pubsub_client.register_producer(self.exchange_name, stream_id)
 
         # Create the Stream publisher, ready to publish messages to the stream
-        return StreamPublisher(name=(self.XP, stream_route.routing_key), process=self.process, node=self.node)
+        return StreamPublisher(to_name=(self.XP, stream_route.routing_key), process=self.process, node=self.node)
 
 
 
@@ -132,7 +132,27 @@ class StreamSubscriber(ProcessSubscriber):
         @param Process is the subscribing process
         @param node is cc.node
         """
+        if not kwargs.get('callback', None):
+            kwargs = kwargs.copy()
+            kwargs['callback'] = self._callback
+
+        self._routing_call = None
+
         ProcessSubscriber.__init__(self, **kwargs)
+
+    @property
+    def routing_call(self):
+        return self._routing_call
+
+    @routing_call.setter
+    def routing_call(self, value):
+        self._routing_call = value
+
+    def _callback(self, m, h):
+        """
+        Built-in Subscriber callback to route a call into process context.
+        """
+        self._routing_call(self._process.call_process, {'packet':m})
 
     def start(self):
         """
@@ -205,6 +225,6 @@ class StreamSubscriberRegistrar(object):
             exchange_name =  '%s_subscriber_%d' % (self.process.id, self._subscriber_cnt)
             self._subscriber_cnt += 1
 
-        return StreamSubscriber(name=(self.XP, exchange_name), process=self.process, callback=callback, node=self.node)
+        return StreamSubscriber(from_name=(self.XP, exchange_name), process=self.process, callback=callback, node=self.node)
 
 

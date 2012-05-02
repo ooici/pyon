@@ -27,8 +27,8 @@ __all__ += ['ionprint']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
-from pyon.core.process import PyonProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
-__all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
+from pyon.core.process import PyonProcessError, GreenProcess, GreenProcessSupervisor
+__all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor']
 
 from pyon.core import exception as iex
 __all__ += ['iex']
