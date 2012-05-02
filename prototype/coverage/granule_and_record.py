@@ -9,12 +9,13 @@
 '''
 
 
-from pyon.public import log
-from pyon.util.containers import DotDict
 import numpy
 from interface.objects import Granule, CompoundGranule, Taxonomy
+from prototype.coverage.taxonomy import TaxyCab
 
-class GranuleBuilder(object):
+
+
+class RecordDictionaryTool(object):
     """
     A granule is a unit of information which conveys part of a coverage.
 
@@ -26,16 +27,15 @@ class GranuleBuilder(object):
 
     Don't worry about raising exceptions at this point - put an @todo for now
     """
-    def __init__(self,data_producer_id, taxonomy):
+    def __init__(self,taxonomy):
         """
         @todo - add docs...
         """
 
-        # Create the ION object we are wrapping
-        self._g = Granule(data_producer_id=data_producer_id, taxonomy_id=taxonomy.tx_id)
+        self._rd = {}
 
         # hold onto the taxonomy - we need it to build the granule...
-        self._tx = taxonomy.map
+        self._tx = taxonomy
 
 
     def __setitem__(self, name, vals):
@@ -43,15 +43,17 @@ class GranuleBuilder(object):
         Give the GB a dictionary like behavior
         """
 
-        self._g.record_dictionary[self._tx[name]] = vals
+        #@todo - reflect on the type and determine how to add it. For a value sequence it is simple, for a nested record dictionary what should we do?
+        self._rd[self._tx.get_handle(name)] = vals
 
 
     def __getitem__(self, name):
         """
         Give the GB a dictionary like behavior
         """
+        #@todo - reflect on the return type and determine how to wrap it. For a value sequence it is simple, for a nested record dictionary what should we do?
 
-        return self._g.record_dictionary[self._tx[name]]
+        return self._rd[self._tx.get_handle(name)]
 
 
     def iteritems(self):
@@ -130,6 +132,20 @@ class GranuleBuilder(object):
     __hash__ = None
 
 
+class GranuleBuilder(object):
+    """
+    A granule is a unit of information which conveys part of a coverage.
+
+    A granule contains a record dictionary. The record dictionary is composed of named value sequences.
+    We want the Granule Builder to have a dictionary like behavior for building record dictionaries, using the taxonomy
+    as a map from the name to the ordinal in the record dictionary.
+
+    @todo - what goes here? Anything?
+    """
+
+
+
+
 
 class CompoundGranuleBuilder(object):
     """
@@ -178,15 +194,30 @@ compound = numpy.ndarray(shape=(50,),dtype=compound_type)
 
 ### Example:
 
-tx = Taxonomy(tx_id='junk')
-tx.map={'temp':1,'cond':2,'pres':3}
-# map is {<local name>: <granule name or path>}
+tx = TaxyCab()
+tx.add_taxonomy_set('temp','long name for temp')
+tx.add_taxonomy_set('cond','long name for cond')
+tx.add_taxonomy_set('pres','long name for pres')
+tx.add_taxonomy_set('group1')
 
-gb = GranuleBuilder(data_producer_id='john', taxonomy=tx)
 
-gb['temp'] = temp_array
-gb['cond'] = cond_array
-gb['pres'] = pres_array
+
+rdt = RecordDictionaryTool(taxonomy=tx)
+
+rdt['temp'] = temp_array
+rdt['cond'] = cond_array
+rdt['pres'] = pres_array
+
+
+rdt2 = RecordDictionaryTool(taxonomy=tx)
+rdt2['pres'] = pres_array
+
+rdt['group1'] = rdt2
+
+
+
+g = Granule(data_producer_id='john', taxonomy=tx._t,record_dictionary=rdt._rd)
+
 
 
 

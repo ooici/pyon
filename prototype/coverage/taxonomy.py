@@ -79,12 +79,12 @@ class TaxyCab(object):
         for name in name_set:
 
             #@todo is it safe to use the builtin hash method?
-            name_hash = name.__hash__()
+            assert name.__hash__ is not None, 'This name has no hash method!'
 
-            h_set = self._inv.get(name_hash,set())
+            h_set = self._inv.get(name,set())
             h_set.add(h)
 
-            self._inv[name_hash] = h_set
+            self._inv[name] = h_set
 
 
     def add_taxonomy_set(self, *args):
@@ -107,7 +107,7 @@ class TaxyCab(object):
         @return set of handles
         """
         #@todo handle key errors?
-        return self._inv[name.__hash__()]
+        return self._inv[name]
 
     def get_handle(self, name):
         """
