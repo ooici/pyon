@@ -41,7 +41,7 @@ def scoped_validation():
     return name,lineno
 
 
-def validateTrue(conditional, message='', exception=None):
+def validate_true(conditional, message='', exception=None):
     '''
     Manages an validation
     @param conditional The conditional statement to be evaluated
@@ -53,7 +53,7 @@ def validateTrue(conditional, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateEqual(a,b,message='',exception=None):
+def validate_equal(a,b,message='',exception=None):
     '''
     Raises an exception if a != b
     @param a 
@@ -66,7 +66,7 @@ def validateEqual(a,b,message='',exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateNotEqual(a,b,message='',exception=None):
+def validate_not_equal(a,b,message='',exception=None):
     '''
     Raises an exception if a == b
     @param a
@@ -79,7 +79,7 @@ def validateNotEqual(a,b,message='',exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateFalse(conditional, message='', exception=None):
+def validate_false(conditional, message='', exception=None):
     '''
     Raises an exception if conditional evaluates to False
     @param conditional The conditional statement to be evaluated
@@ -91,7 +91,7 @@ def validateFalse(conditional, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateIs(a,b, message='', exception=None):
+def validate_is(a,b, message='', exception=None):
     '''
     Raises an exception if a does not points to the same object as b
     @param a
@@ -104,7 +104,7 @@ def validateIs(a,b, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateIsNot(a,b, message='', exception=None):
+def validate_is_not(a,b, message='', exception=None):
     '''
     Raises an exception if a points to the same object as b
     @param a
@@ -117,7 +117,7 @@ def validateIsNot(a,b, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateIsNotNone(conditional, message='', exception=None):
+def validate_is_not_none(conditional, message='', exception=None):
     '''
     Raises an exception if conditional is None, does not point to anything and is not a number.
     @param conditional The conditional statement to be evaluated
@@ -130,7 +130,7 @@ def validateIsNotNone(conditional, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateIn(needle,haystack, message='', exception=None):
+def validate_in(needle,haystack, message='', exception=None):
     '''
     Raises an exception if needle is not in haystack
     @param needle Item to be evaluated for
@@ -143,7 +143,7 @@ def validateIn(needle,haystack, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateNotIn(needle,haystack, message='', exception=None):
+def validate_not_in(needle,haystack, message='', exception=None):
     '''
     Raises an exception if needle is in haystack
     @param needle Item to be evaluated for
@@ -156,7 +156,7 @@ def validateNotIn(needle,haystack, message='', exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateIsInstance(a,cls,message='',exception=None):
+def validate_is_instance(a,cls,message='',exception=None):
     '''
     Raises an exception if a is not an instance of cls
     @param a Object
@@ -169,7 +169,7 @@ def validateIsInstance(a,cls,message='',exception=None):
         name,l = scoped_validation()
         ArgCheck(name,exception).validation(False,message,l)
 
-def validateNotIsInstance(a,cls, message='', exception=None):
+def validate_not_is_instance(a,cls, message='', exception=None):
     '''
     Raises an exception if a is an instance of cls
     @param a Object
