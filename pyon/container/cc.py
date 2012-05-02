@@ -80,14 +80,15 @@ class Container(BaseContainerAgent):
         # in the value of the auto_bootstrap setting
         self.directory = Directory()
 
-        # Look for an apply any local file config overrides
+        # Look for and apply any local file config overrides
         from pyon.util.config import Config
         conf_paths = ['res/config/pyon.local.yml']
         local_cfg = Config(conf_paths, ignore_not_found=True).data
+        # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
         dict_merge(CFG, local_cfg, inplace=True)
 
         # Now apply any command line config overrides
-        # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
+        # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
         dict_merge(CFG, kwargs, inplace=True)
 
         bootstrap.assert_configuration(CFG)
