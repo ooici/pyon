@@ -172,7 +172,7 @@ class TransformBenchTesting(TransformDataProcess):
             pids += 1
 
     def on_start(self):
-        TransformDataProcess.__init__(self)
+        TransformDataProcess.on_start(self)
 
         # set up subscriber to *
         self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),

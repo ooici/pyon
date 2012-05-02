@@ -6,7 +6,7 @@
 @description Discrete Cosine Transform
 '''
 from pyon.ion.transform import TransformBenchTesting
-from pyon.util.arg_check import validateIsInstance
+from pyon.util.arg_check import validate_is_instance
 
 class TransformDCT(TransformBenchTesting):
     '''
@@ -16,7 +16,7 @@ class TransformDCT(TransformBenchTesting):
     @staticmethod
     def dct(vector):
         import numpy as np
-        validateIsInstance(vector,np.ndarray)
+        validate_is_instance(vector,np.ndarray)
         N = vector.size
 
         x = list()
