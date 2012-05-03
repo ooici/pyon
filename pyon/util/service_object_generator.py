@@ -189,7 +189,114 @@ html_doc_templates = {
 <p><br class="atl-forced-newline" /></p>''',
 
 'arg': '${name}: ${val}<BR>',
-'exception': '${type}: ${description}<BR>'
+'exception': '${type}: ${description}<BR>',
+
+'obj_doc':
+'''<!-- <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>${classname}</title>
+</head>
+<body> -->
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Class Details</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Object Type: </th>
+          <td class='confluenceTd'>${classname}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Base Types: </th>
+          <td class='confluenceTd'>${baseclasses}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Description: </th>
+          <td class='confluenceTd'>${classcomment} </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${attrtableentries}
+      </table>
+    </div>
+  </div>
+</div>
+${super_class_attr_tables}
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Associations</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Subject </th>
+          <th class='confluenceTh'> Predicate </th>
+          <th class='confluenceTh'> Object </th>
+          <th class='confluenceTh'> Constraints </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${assoctableentries}
+      </table>
+    </div>
+  </div>
+</div>
+<!-- </body>
+</html> -->
+''',
+'attribute_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${attrname}</td>
+          <td class='confluenceTd'>${type}</td>
+          <td class='confluenceTd'>${default}</td>
+          <td class='confluenceTd'> ${attrcomment} </td>
+        </tr>''',
+'association_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${subject}</td>
+          <td class='confluenceTd'>${predicate}</td>
+          <td class='confluenceTd'>${object}</td>
+          <td class='confluenceTd'>${constraints}</td>
+          <td class='confluenceTd'>${description}</td>
+        </tr>''',
+'super_class_attribute_table':
+'''<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes of Superclass ${super_class_name}</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${superclassattrtableentries}
+      </table>
+    </div>
+  </div>
+</div>'''
 
 
 }
@@ -668,14 +775,7 @@ class ServiceObjectGenerator :
     #
     # Generates services
     #
-    def generate (self):
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-f', '--force', action='store_true', help='Do not do MD5 comparisons, always generate new files')
-        parser.add_argument('-d', '--dryrun', action='store_true', help='Do not generate new files, just print status and exit with 1 if changes need to be made')
-        parser.add_argument('-sd', '--servicedoc', action='store_true', help='Generate HTML service doc inclusion files')
-        opts       = parser.parse_args()
-        opts.force = True
+    def generate (self, opts):
 
         service_dir, interface_dir = 'obj/services', 'interface'
 

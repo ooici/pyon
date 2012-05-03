@@ -29,6 +29,13 @@ from pyon.util.service_object_generator import ServiceObjectGenerator
 #
 def main():
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--force', action='store_true', help='Do not do MD5 comparisons, always generate new files')
+    parser.add_argument('-d', '--dryrun', action='store_true', help='Do not generate new files, just print status and exit with 1 if changes need to be made')
+    parser.add_argument('-sd', '--servicedoc', action='store_true', help='Generate HTML service doc inclusion files')
+    parser.add_argument('-od', '--objectdoc', action='store_true', help='Generate HTML object doc files')
+    opts = parser.parse_args()
+
     model_object   = ObjectModelGenerator ()
     message_object = MessageObjectGenerator ()
     service_object = ServiceObjectGenerator ()
@@ -57,9 +64,9 @@ def main():
 
 
     # Generate objects
-    model_object.generate ()
-    message_object.generate ()
-    service_object.generate ()
+    model_object.generate (opts)
+    message_object.generate (opts)
+    service_object.generate (opts)
 
 
 

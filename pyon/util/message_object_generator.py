@@ -27,10 +27,11 @@ enums_by_name = {}
 class MessageObjectGenerator:
 
 
-    def generate (self):
+    def generate (self, opts):
         service_yaml_files = list_files_recursive('obj/services', '*.yml')
 
-        messageobject_output_text = "# Message Objects\n\n#\n# This file is auto generated \n# \nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
+        ### messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
+        messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
         current_class_schema = ""
 
         # Now process the service definition yaml files to
@@ -88,7 +89,8 @@ class MessageObjectGenerator:
                 args = []
                 init_lines = []
                 current_op_name = lines[index].strip(' :')
-                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
+                ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
+                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
                 index += 1
@@ -189,7 +191,8 @@ class MessageObjectGenerator:
                 if index < len(lines) and lines[index].startswith('    out:'):
                     args = []
                     init_lines = []
-                    messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
+                    ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
+                    messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
                     messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                     messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
                     messageobject_output_text += '    def __init__(self'
