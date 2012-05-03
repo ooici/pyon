@@ -107,7 +107,10 @@ class TaxyCab(object):
         @return set of handles
         """
         #@todo handle key errors?
-        return self._inv[name]
+        if name in self._inv:
+            return self._inv[name]
+        else:
+            return [-1]
 
     def get_handle(self, name):
         """

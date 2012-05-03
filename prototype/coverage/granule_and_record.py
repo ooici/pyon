@@ -44,7 +44,11 @@ class RecordDictionaryTool(object):
         """
 
         #@todo - reflect on the type and determine how to add it. For a value sequence it is simple, for a nested record dictionary what should we do?
-        self._rd[self._tx.get_handle(name)] = vals
+        if isinstance(vals, RecordDictionaryTool):
+            assert vals._tx == self._tx
+            self._rd[self._tx.get_handle(name)] = vals._rd
+        else:
+            self._rd[self._tx.get_handle(name)] = vals
 
 
     def __getitem__(self, name):
@@ -52,24 +56,28 @@ class RecordDictionaryTool(object):
         Give the GB a dictionary like behavior
         """
         #@todo - reflect on the return type and determine how to wrap it. For a value sequence it is simple, for a nested record dictionary what should we do?
-
-        return self._rd[self._tx.get_handle(name)]
+        if isinstance(self._rd[self._tx.get_handle(name)], dict):
+            result = RecordDictionaryTool(taxonomy=self._tx)
+            result._rd = self._rd[self._tx.get_handle(name)]
+            return result
+        else:
+            return self._rd[self._tx.get_handle(name)]
 
 
     def iteritems(self):
         """ D.iteritems() -> an iterator over the (key, value) items of D """
-        for k, v in self._tx.iteritems():
-            yield k, self._g.record_dictionary[v]
+        for k, v in self._rd.iteritems():
+            yield self._tx.get_names(k), v
 
     def iterkeys(self):
         """ D.iterkeys() -> an iterator over the keys of D """
-        for k in self._tx.iterkeys():
-            yield k
+        for k in self._rd.iterkeys():
+            yield self._tx.get_names(k)
 
     def itervalues(self):
         """ D.itervalues() -> an iterator over the values of D """
-        for k in self._tx.iterkeys():
-            yield self._g.record_dictionary[self._tx[k]]
+        for v in self._rd.itervalues():
+            yield v
 
     def update(self, E=None, **F):
         """
@@ -81,32 +89,36 @@ class RecordDictionaryTool(object):
         if E:
             if hasattr(E, "keys"):
                 for k in E:
-                    self._g.record_dictionary[self._tx[k]] = E[k]
+                    t = tuple(k)
+                    self[t[0]] = E[k]
             else:
                 for k, v in E.iteritems():
-                    self._g.record_dictionary[self._tx[k]] = v
+                    t = tuple(k)    #need to use a better index than this, but it works
+                    self[t[0]] = v
 
         if F:
             for k in F.keys():
-                self._g.record_dictionary[self._tx[k]] = F[k]
+                t = tuple(k)
+                self[t[0]] = F[k(0)]
 
     def __contains__(self, k):
         """ D.__contains__(k) -> True if D has a key k, else False """
-        return self._tx.has_key(k)
+        return self._tx.get_handle(k) >= 0
 
     def __delitem__(self, y):
         """ x.__delitem__(y) <==> del x[y] """
-        del self._g.record_dictionary[self._tx[y]]
-        del self._tx[y]
+        #not sure if this is right, might just have to remove the name, not the whole handle
+        del self._rd[self._tx.get_handle(y)]
+        #will probably need to delete the name from _tx
 
     def __iter__(self):
         """ x.__iter__() <==> iter(x) """
-        for k in self._tx.iterkeys():
-            yield k
+        for k in self._rd.iterkeys():
+            yield self._tx.get_names(k)
 
     def __len__(self):
         """ x.__len__() <==> len(x) """
-        return len(self._tx)
+        return len(self._rd)
 
     def __repr__(self):
         """ x.__repr__() <==> repr(x) """
@@ -142,7 +154,8 @@ class GranuleBuilder(object):
 
     @todo - what goes here? Anything?
     """
-
+    def __init__(self, taxonomy):
+        self._tx = taxonomy
 
 
 
@@ -208,15 +221,12 @@ rdt['temp'] = temp_array
 rdt['cond'] = cond_array
 rdt['pres'] = pres_array
 
-
 rdt2 = RecordDictionaryTool(taxonomy=tx)
 rdt2['pres'] = pres_array
 
 rdt['group1'] = rdt2
 
-
-
-g = Granule(data_producer_id='john', taxonomy=tx._t,record_dictionary=rdt._rd)
+#g = Granule(data_producer_id='john', taxonomy=tx._t,record_dictionary=rdt._rd)
 
 
 
