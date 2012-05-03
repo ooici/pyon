@@ -254,9 +254,9 @@ class ThreadManager(object):
         unset()
         return elapsed
 
-class GreenThreadManager(ThreadManager, PyonThread):
+class PyonThreadManager(ThreadManager, PyonThread):
     """
-    A supervisor that runs in a thread and can spawn threads.
+    A thread manager that runs in a thread and can spawn threads.
     """
     pass
 

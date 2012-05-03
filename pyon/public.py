@@ -27,8 +27,8 @@ __all__ += ['ionprint']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
-from pyon.core.thread import PyonThreadError, PyonThread, GreenThreadManager
-__all__ += ['PyonThreadError', 'PyonThread', 'GreenThreadManager']
+from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
+__all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 
 from pyon.core import exception as iex
 __all__ += ['iex']
@@ -36,8 +36,8 @@ __all__ += ['iex']
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessSupervisor, SimpleProcess, StandaloneProcess, ImmediateProcess
-__all__ += ['IonProcessSupervisor', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
+from pyon.ion.process import IonProcessThreadManager, SimpleProcess, StandaloneProcess, ImmediateProcess
+__all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
 
 from pyon.container.cc import Container
 __all__ += ['Container']

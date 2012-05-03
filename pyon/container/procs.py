@@ -14,7 +14,7 @@ from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerConfigError, BadRequest
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
-from pyon.ion.process import IonProcessSupervisor
+from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
 from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
@@ -43,7 +43,7 @@ class ProcManager(object):
         self._spawned_proc_to_process = {}
 
         # The pyon worker process supervisor
-        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
+        self.proc_sup = IonProcessThreadManager(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
 
     def start(self):
         log.debug("ProcManager starting ...")
