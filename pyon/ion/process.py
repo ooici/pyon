@@ -5,7 +5,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.process import GreenProcess, GreenThreadManager
+from pyon.core.thread import GreenThreadManager, PyonThread
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
@@ -13,10 +13,9 @@ from gevent import greenlet
 from pyon.util.async import wait, spawn
 import threading
 
-class GreenIonProcess(GreenProcess):
+class IonProcessThread(PyonThread):
     """
     Form the base of an ION process.
-    Just add greenlets or python processes to complete.
     """
 
     def __init__(self, target=None, listeners=None, name=None, **kwargs):
@@ -26,7 +25,7 @@ class GreenIonProcess(GreenProcess):
         self._child_procs       = []
         self._ctrl_queue        = Queue()
 
-        GreenProcess.__init__(self, target=target, **kwargs)
+        PyonThread.__init__(self, target=target, **kwargs)
 
     def _child_failed(self, child):
         """
@@ -124,7 +123,7 @@ class GreenIonProcess(GreenProcess):
 
         wait(self._child_procs)
 
-        GreenProcess._notify_stop(self)
+        PyonThread._notify_stop(self)
 
     def get_ready_event(self):
         """
@@ -139,10 +138,9 @@ class GreenIonProcess(GreenProcess):
         return ev
 
 class IonProcessSupervisor(GreenThreadManager):
-    type_callables = {
-          'green': GreenIonProcess
-#        , 'python': PythonIonProcess
-    }
+
+    def _create_thread(self, target=None, **kwargs):
+        return IonProcessThread(target=target, **kwargs)
 
 # ---------------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ __license__ = 'Apache 2.0'
 
 from mock import sentinel, Mock
 from nose.plugins.attrib import attr
-from pyon.ion.process import GreenIonProcess
+from pyon.ion.process import IonProcessThread
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.net.endpoint import ProcessRPCServer
 from gevent.event import AsyncResult
@@ -21,7 +21,7 @@ class ProcessTest(PyonTestCase):
         pass
 
     def test_spawn_proc_with_no_listeners(self):
-        p = GreenIonProcess(name=sentinel.name, listeners=[])
+        p = IonProcessThread(name=sentinel.name, listeners=[])
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -35,7 +35,7 @@ class ProcessTest(PyonTestCase):
 
     def test_spawn_proc_with_one_listener(self):
         mocklistener = Mock(spec=ProcessRPCServer)
-        p = GreenIonProcess(name=sentinel.name, listeners=[mocklistener])
+        p = IonProcessThread(name=sentinel.name, listeners=[mocklistener])
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -52,7 +52,7 @@ class ProcessTest(PyonTestCase):
     def test_spawn_with_listener_failure(self):
         mocklistener = Mock(spec=ProcessRPCServer)
         mocklistener.listen.side_effect = self.ExpectedFailure
-        p = GreenIonProcess(name=sentinel.name, listeners=[mocklistener])
+        p = IonProcessThread(name=sentinel.name, listeners=[mocklistener])
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -69,7 +69,7 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test__routing_call(self):
-        p = GreenIonProcess(name=sentinel.name, listeners=[])
+        p = IonProcessThread(name=sentinel.name, listeners=[])
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -83,7 +83,7 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test_competing__routing_call(self):
-        p = GreenIonProcess(name=sentinel.name, listeners=[])
+        p = IonProcessThread(name=sentinel.name, listeners=[])
         p.start()
         p.get_ready_event().wait(timeout=5)
 

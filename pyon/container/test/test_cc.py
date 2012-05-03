@@ -30,12 +30,15 @@ class TestCC(PyonTestCase):
 @attr('INT')
 class TestCCInt(IonIntegrationTestCase):
 
+    class ExpectedFailure(StandardError):
+        pass
+
     def setUp(self):
         # we don't want to connect to AMQP or do a pidfile or any of that jazz - just the proc manager please
         self.cc = Container()
         self.cc.proc_manager.start()
         self.cc.stop = Mock()
-        self.cc.stop.side_effect = self.cc.proc_manager.stop()
+        self.cc.stop.side_effect = self.cc.proc_manager.stop
 
     def tearDown(self):
         pass
@@ -52,9 +55,10 @@ class TestCCInt(IonIntegrationTestCase):
 
         # spawn the proc, wait for it to die and kill the container
         def failtarget(*args, **kwargs):
-            raise StandardError("I am supposed to fail!")
+            raise self.ExpectedFailure("I am supposed to fail!")
 
-        self.cc.proc_manager.proc_sup.spawn(('green', failtarget))
+        proc = self.cc.proc_manager.proc_sup.spawn(failtarget)
+        self.cc.proc_manager.proc_sup.ensure_ready(proc)
 
         # wait for the kill signal to happen
         ev.wait(timeout=5)

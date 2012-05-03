@@ -178,7 +178,7 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc1, rsvc2], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(listeners=[rsvc1, rsvc2], name=service_instance.id, proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, service_instance.id)))
 
         # map gproc to service_instance
@@ -217,7 +217,7 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc, sub], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(listeners=[rsvc, sub], name=service_instance.id, proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
 
         # map gproc to service_instance
@@ -254,7 +254,7 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -291,7 +291,7 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_standalone_process for %s" % service_instance.id)
 
         # map gproc to service_instance

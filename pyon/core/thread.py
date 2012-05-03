@@ -13,22 +13,22 @@ import time
 import os
 import signal
 
-class PyonProcessError(Exception):
+class PyonThreadError(Exception):
     pass
 
-class PyonProcess(object):
+class PyonThread(object):
     """
-    @brief Process abstract base class for doing work in the container.
-    There will be subclasses for various process kinds like greenlets and OS processes.
+    @brief Threadlike base class for doing work in the container.
+    Wraps gevent's greenlet class.
     """
 
     def __init__(self, target=None, *args, **kwargs):
         """
-        @param target The Callable to start as independent process
-        @param args  Provided as spawn args to process
-        @param kwargs  Provided as spawn kwargs to process
+        @param target The Callable to start as independent thread
+        @param args  Provided as spawn args to thread
+        @param kwargs  Provided as spawn kwargs to thread
         """
-        super(PyonProcess, self).__init__()
+        super(PyonThread, self).__init__()
 
         if target is not None or not hasattr(self, 'target'):   # Allow setting target at class level
             self.target = target
@@ -39,35 +39,35 @@ class PyonProcess(object):
         self.proc = None
         self.supervisor = None
 
-    # Implement the next few methods in derived classes
     def _pid(self):
-        pass
+        return id(self.proc)
 
     def _spawn(self):
-        pass
+        # Gevent spawn
+        return spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
 
     def _join(self, timeout=None):
-        pass
+        return self.proc.join(timeout)
 
-    def _notify_stop(self):
-        """ Get ready, you're about to get shutdown. """
-    
     def _stop(self):
-        pass
+        return self.proc.kill()
 
     def _running(self):
+        return self.proc.started
+
+    def _notify_stop(self):
         pass
 
     @property
     def pid(self):
-        """ Return the process ID for the spawned process. If not spawned yet, return 0. """
+        """ Return the process ID for the spawned thread. If not spawned yet, return 0. """
         if self.proc is None:
             return 0
         return self._pid()
 
     @property
     def running(self):
-        """ Is the process actually running? """
+        """ Is the thread actually running? """
         return bool(self.proc and self._running())
 
     def start(self):
@@ -98,35 +98,6 @@ class PyonProcess(object):
 
     def get_ready_event(self):
         """
-        Implement in derived classes.  Should return an object similar to gevent's Event that
-        can be wait()ed on.
-        """
-        pass
-
-
-class GreenProcess(PyonProcess):
-    """
-    @brief A BaseProcess that uses a greenlet to do its work.
-    """
-
-    def _pid(self):
-        return id(self.proc)
-
-    def _spawn(self):
-        # Gevent spawn
-        return spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
-
-    def _join(self, timeout=None):
-        return self.proc.join(timeout)
-
-    def _stop(self):
-        return self.proc.kill()
-
-    def _running(self):
-        return self.proc.started
-
-    def get_ready_event(self):
-        """
         By default, it is always ready.
 
         Override this in your specific process.
@@ -137,14 +108,9 @@ class GreenProcess(PyonProcess):
 
 class ThreadManager(object):
     """
-    @brief Manage spawning processes of multiple kinds and ensure they're alive.
+    @brief Manage spawning threads of multiple kinds and ensure they're alive.
     TODO: Add heartbeats with zeromq for monitoring and restarting.
     """
-
-    type_callables = {
-          'green': GreenProcess
-#        , 'python': PythonProcess
-    }
 
     def __init__(self, heartbeat_secs=10.0, failure_notify_callback=None):
         """
@@ -153,7 +119,7 @@ class ThreadManager(object):
         @param  heartbeat_secs              Seconds between heartbeats.
         @param  failure_notify_callback     Callback to execute when a child fails unexpectedly. Should be
                                             a callable taking two params: this process supervisor, and the
-                                            proc (Green/Python) that failed.
+                                            thread that failed.
         """
         super(ThreadManager, self).__init__()
 
@@ -163,22 +129,19 @@ class ThreadManager(object):
         self._shutting_down = False
         self._failure_notify_callback = failure_notify_callback
 
-
-    def spawn(self, type_and_target, *args, **kwargs):
+    def _create_thread(self, target=None, **kwargs):
         """
-        @brief Spawn a pyon process
-        @param type_and_target should either be a tuple of (type, target) where type is a string in type_callables
-        and target is a callable, or a subclass of PyonProcess that defines its own "target" method.
+        Creates a "thread" of the proper type.
         """
-        if isinstance(type_and_target, tuple):
-            proc_type, proc_target = type_and_target
-            proc_callable = self.type_callables[proc_type]
-            proc = proc_callable(proc_target, *args, **kwargs)
-        elif issubclass(type_and_target, PyonProcess) and hasattr(type_and_target, 'target'):
-            proc = type_and_target(*args, **kwargs)
-        else:
-            raise PyonProcessError('Invalid proc_type (must be tuple or PyonProcess subclass with a target method)')
+        return PyonThread(target=target, **kwargs)
 
+    def spawn(self, target=None, **kwargs):
+        """
+        @brief Spawn a pyon thread
+
+        """
+        log.debug("ThreadManager.spawn, target=%s, kwargs=%s", target, kwargs)
+        proc = self._create_thread(target=target, **kwargs)
         proc.supervisor = self
 
         proc.start()
@@ -196,16 +159,16 @@ class ThreadManager(object):
 
     def ensure_ready(self, proc, errmsg=None, timeout=10):
         """
-        Waits until either the process dies or reports it is ready, whichever comes first.
+        Waits until either the thread dies or reports it is ready, whichever comes first.
 
-        If the process dies or times out while waiting for it to be ready, a ContainerError is raised.
-        You must be sure the process implements get_ready_event properly, otherwise this method
+        If the thread dies or times out while waiting for it to be ready, a ContainerError is raised.
+        You must be sure the thread implements get_ready_event properly, otherwise this method
         returns immediately as the base class behavior simply passes.
 
-        @param  proc        The process to wait on.
+        @param  proc        The thread to wait on.
         @param  errmsg      A custom error message to put in the ContainerError's message. May be blank.
         @param  timeout     Amount of time (in seconds) to wait for the ready, default 10 seconds.
-        @throws ContainerError  If the process dies or if we get a timeout before the process signals ready.
+        @throws ContainerError  If the thread dies or if we get a timeout before the process signals ready.
         """
 
         if not errmsg:
@@ -225,7 +188,7 @@ class ThreadManager(object):
         # unlink the events: ready event is probably harmless but the exception one, we want to install our own later
         proc.get_ready_event().unlink(cb)
 
-        # if the process is stopped while we are waiting, proc.proc is set to None
+        # if the thread is stopped while we are waiting, proc.proc is set to None
         if proc.proc is not None:
             proc.proc.unlink(cb)
 
@@ -246,7 +209,7 @@ class ThreadManager(object):
                 proc.proc.unlink(self._child_failed)
 
     def join_children(self, timeout=None):
-        """ Give child processes "timeout" seconds to shutdown, then forcibly terminate. """
+        """ Give child threads "timeout" seconds to shutdown, then forcibly terminate. """
 
         time_start = time.time()
         child_count = len(self.children)
@@ -269,7 +232,7 @@ class ThreadManager(object):
                 proc.join()
 
         time_elapsed = time.time() - time_start
-        log.debug('Took %.2fs to shutdown %d child processes' % (time_elapsed, child_count))
+        log.debug('Took %.2fs to shutdown %d child processes', time_elapsed, child_count)
 
         return time_elapsed
 
@@ -281,7 +244,7 @@ class ThreadManager(object):
 
     def shutdown(self, timeout=30.0):
         """
-        @brief Give child processes "timeout" seconds to shutdown, then forcibly terminate.
+        @brief Give child thread "timeout" seconds to shutdown, then forcibly terminate.
         """
 
         unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
@@ -291,15 +254,15 @@ class ThreadManager(object):
         unset()
         return elapsed
 
-class GreenThreadManager(ThreadManager, GreenProcess):
+class GreenThreadManager(ThreadManager, PyonThread):
     """
-    A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses.
+    A supervisor that runs in a thread and can spawn threads.
     """
     pass
 
 def shutdown_or_die(delay_sec=0):
     """
-    Wait the given number of seconds and forcibly kill this process if it's still running.
+    Wait the given number of seconds and forcibly kill this OS process if it's still running.
     """
 
     def diediedie(sig=None, frame=None):
@@ -324,10 +287,3 @@ def shutdown_or_die(delay_sec=0):
         diediedie()
 
     return dontdie
-
-if __name__ == '__main__':
-    unset = shutdown_or_die(3)
-    unset()
-    while True:
-        pass
-    
