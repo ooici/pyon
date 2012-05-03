@@ -20,10 +20,11 @@ class GreenIonProcess(GreenProcess):
     """
 
     def __init__(self, target=None, listeners=None, name=None, **kwargs):
-        self.listeners      = listeners
-        self.name           = name
-        self._child_procs   = []
-        self._ctrl_queue    = Queue()
+        self._startup_listeners = listeners or []
+        self.listeners          = []
+        self.name               = name
+        self._child_procs       = []
+        self._ctrl_queue        = Queue()
 
         GreenProcess.__init__(self, target=target, **kwargs)
 
@@ -35,6 +36,21 @@ class GreenIonProcess(GreenProcess):
         """
         self.proc.throw(child.exception)
 
+    def add_endpoint(self, listener):
+        """
+        Adds a listening endpoint to this ION process.
+
+        Spawns the listen loop and sets the routing call to synchronize incoming messages
+        here. If this process hasn't been started yet, adds it to the list of listeners
+        to start on startup.
+        """
+        if self.proc:
+            listener.routing_call = self._routing_call
+            self._child_procs.append(spawn(listener.listen))
+            self.listeners.append(listener)
+        else:
+            self._startup_listeners.append(listener)
+
     def target(self, *args, **kwargs):
         """
         Control entrypoint. Setup the base properties for this process (mainly a listener).
@@ -42,11 +58,9 @@ class GreenIonProcess(GreenProcess):
         if self.name:
             threading.current_thread().name = self.name
 
-        # - tell all listeners they need to call here for sync
-        # - spawn listen loops
-        for listener in self.listeners:
-            listener.routing_call = self._routing_call
-            self._child_procs.append(spawn(listener.listen))
+        # spawn all listeners in startup listeners (from initializer, or added later)
+        for listener in self._startup_listeners:
+            self.add_endpoint(listener)
 
         # spawn control flow loop
         self._child_procs.append(spawn(self._control_flow))
