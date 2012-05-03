@@ -110,7 +110,7 @@ class TaxyCab(object):
         if name in self._inv:
             return self._inv[name]
         else:
-            return [-1]
+            return set([-1])
 
     def get_handle(self, name):
         """
