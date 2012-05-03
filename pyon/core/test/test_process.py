@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.core.process import GreenProcess, GreenProcessSupervisor
+from pyon.core.process import GreenProcess, GreenThreadManager
 from pyon.core.exception import ContainerError
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
@@ -30,7 +30,7 @@ class ProcessTest(PyonTestCase):
 
     def test_supervisor(self):
         self.counter = 0
-        sup = GreenProcessSupervisor()
+        sup = GreenThreadManager()
         sup.start()
         proc = sup.spawn(('green', self.increment), amount=2)
         self.assertEqual(self.counter, 0)
@@ -39,7 +39,7 @@ class ProcessTest(PyonTestCase):
 
     def test_supervisor_shutdown(self):
         """ Test shutdown joining/forcing with timeouts. """
-        sup = GreenProcessSupervisor()
+        sup = GreenThreadManager()
         sup.start()
 
         import gevent
@@ -73,7 +73,7 @@ class ProcessTest(PyonTestCase):
 
     def test_ensure_ready(self):
         # GreenProcess by default will signal ready immediately, but we can still pass it through to make sure it's ok
-        sup = GreenProcessSupervisor()
+        sup = GreenThreadManager()
         sup.start()
 
         proc = sup.spawn(('green', self.increment), amount=5)
@@ -90,7 +90,7 @@ class ProcessTest(PyonTestCase):
             def target(self, *args, **kwargs):
                 return "The goggles, they do nothing"
 
-        sup = GreenProcessSupervisor()
+        sup = GreenThreadManager()
         sup.start()
 
         proc = sup.spawn(SlowGreenProcess)
@@ -102,7 +102,7 @@ class ProcessTest(PyonTestCase):
         def failboat():
             self.increment(5, 1)    # too many params, will fail
 
-        sup = GreenProcessSupervisor()
+        sup = GreenThreadManager()
         sup.start()
 
         proc = sup.spawn(('green', failboat))

@@ -5,7 +5,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.process import GreenProcess, GreenProcessSupervisor
+from pyon.core.process import GreenProcess, GreenThreadManager
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
@@ -138,7 +138,7 @@ class GreenIonProcess(GreenProcess):
         spawn(allready, ev)
         return ev
 
-class IonProcessSupervisor(GreenProcessSupervisor):
+class IonProcessSupervisor(GreenThreadManager):
     type_callables = {
           'green': GreenIonProcess
 #        , 'python': PythonIonProcess

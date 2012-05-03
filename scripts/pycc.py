@@ -254,7 +254,7 @@ def parse_args(tokens):
     return args, kwargs
 
 def entry():
-    #proc_types = GreenProcessSupervisor.type_callables.keys()
+    #proc_types = GreenThreadManager.type_callables.keys()
 
     # NOTE: Resist the temptation to add other parameters here! Most container config options
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args

@@ -135,7 +135,7 @@ class GreenProcess(PyonProcess):
         ev.set()
         return ev
 
-class ProcessSupervisor(object):
+class ThreadManager(object):
     """
     @brief Manage spawning processes of multiple kinds and ensure they're alive.
     TODO: Add heartbeats with zeromq for monitoring and restarting.
@@ -148,14 +148,14 @@ class ProcessSupervisor(object):
 
     def __init__(self, heartbeat_secs=10.0, failure_notify_callback=None):
         """
-        Creates a ProcessSupervisor.
+        Creates a ThreadManager.
 
         @param  heartbeat_secs              Seconds between heartbeats.
         @param  failure_notify_callback     Callback to execute when a child fails unexpectedly. Should be
                                             a callable taking two params: this process supervisor, and the
                                             proc (Green/Python) that failed.
         """
-        super(ProcessSupervisor, self).__init__()
+        super(ThreadManager, self).__init__()
 
         # NOTE: Assumes that pids never overlap between the various process types
         self.children = set()
@@ -291,7 +291,7 @@ class ProcessSupervisor(object):
         unset()
         return elapsed
 
-class GreenProcessSupervisor(ProcessSupervisor, GreenProcess):
+class GreenThreadManager(ThreadManager, GreenProcess):
     """
     A supervisor that runs in a greenlet and can spawn either greenlets or python subprocesses.
     """
