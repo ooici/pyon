@@ -3,16 +3,17 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
+from pyon.core.process import GreenProcess, GreenProcessSupervisor
 from pyon.core.exception import ContainerError
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import PyonTestCase
 from unittest import SkipTest
 from nose.plugins.attrib import attr
 
 import time
 
 @attr('UNIT', group='process')
-class ProcessTest(IonIntegrationTestCase):
+class ProcessTest(PyonTestCase):
     def setUp(self):
         self.counter = 0
 
@@ -70,15 +71,6 @@ class ProcessTest(IonIntegrationTestCase):
         elapsed = sup.shutdown()
         self.assertLess(elapsed - proc_sleep_secs, 0.2)
 
-    def test_python(self):
-        raise SkipTest('Need a better test here')
-        self.counter = 0
-        proc = PythonProcess(self.increment, 2)
-        proc.start()
-        self.assertEqual(self.counter, 0)
-        proc.join()
-        self.assertEqual(self.counter, 2)
-
     def test_ensure_ready(self):
         # GreenProcess by default will signal ready immediately, but we can still pass it through to make sure it's ok
         sup = GreenProcessSupervisor()
@@ -115,6 +107,5 @@ class ProcessTest(IonIntegrationTestCase):
 
         proc = sup.spawn(('green', failboat))
         self.assertRaises(ContainerError, sup.ensure_ready, proc)
-
 
 

@@ -78,6 +78,6 @@ read_logging_config()
 initialize_logging()
 
 # CONFIG. Read global configuration
-conf_paths = ['res/config/pyon.yml', 'res/config/pyon.local.yml']
+conf_paths = ['res/config/pyon.yml']
 CFG = Config(conf_paths, ignore_not_found=True).data
         

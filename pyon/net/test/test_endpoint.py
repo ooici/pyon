@@ -1039,9 +1039,10 @@ class TestProcessRPCServer(PyonTestCase):
     @patch('pyon.net.endpoint.RPCServer.create_endpoint')
     def test_create_endpoint(self, mockce):
         prps = ProcessRPCServer(process=sentinel.process)
+        prps.routing_call = sentinel.rcall
         prps.create_endpoint(to_name=sentinel.to_name)
 
-        mockce.assert_called_once_with(prps, process=sentinel.process, to_name=sentinel.to_name)
+        mockce.assert_called_once_with(prps, process=sentinel.process, to_name=sentinel.to_name, routing_call=sentinel.rcall)
 
 
 
