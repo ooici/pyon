@@ -6,6 +6,8 @@
 @author David Stuebe
 @author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
+
+@todo - move to pyon.ion.granule.record_dictionary
 '''
 
 
@@ -13,6 +15,8 @@ import numpy
 from interface.objects import Granule, CompoundGranule, Taxonomy
 from prototype.coverage.taxonomy import TaxyCab
 
+import pprint
+import StringIO
 
 class RecordDictionaryTool(object):
     """
@@ -26,12 +30,15 @@ class RecordDictionaryTool(object):
 
     Don't worry about raising exceptions at this point - put an @todo for now
     """
-    def __init__(self,taxonomy):
+    def __init__(self,taxonomy, length=None):
         """
         @todo - add docs...
         """
 
         self._rd = {}
+
+        self._len = length
+        #@todo make length required
 
         # hold onto the taxonomy - we need it to build the granule...
         self._tx = taxonomy
@@ -51,6 +58,7 @@ class RecordDictionaryTool(object):
             assert vals._tx == self._tx
             self._rd[self._tx.get_handle(name)] = vals._rd
         else:
+            #@todo assert length matches self._len when setting value sequences
             self._rd[self._tx.get_handle(name)] = vals
 
 
@@ -155,21 +163,34 @@ class RecordDictionaryTool(object):
 
     __hash__ = None
 
+    def pretty_print(self):
+        #@todo Add pretty print method that returns a string - here is a good start, but not sure if it works with numpy...
+
+        fstream = StringIO.StringIO()
+        pprint.pprint(self._rd, stream=fstream)
+        result = fstream.getvalue()
+        fstream.close()
+        return result
+
 
 def build_granule(data_producer_id, taxonomy, record_dictionary):
     """
+    This method is a simple wrapper that knows how to produce a granule IonObject from a RecordDictionaryTool and a TaxonomyTool
+
     A granule is a unit of information which conveys part of a coverage.
 
     A granule contains a record dictionary. The record dictionary is composed of named value sequences.
     We want the Granule Builder to have a dictionary like behavior for building record dictionaries, using the taxonomy
     as a map from the name to the ordinal in the record dictionary.
 
-    @todo - what goes here? Anything?
+    @todo move to pyon.ion.granule.granule
+    @todo add test module for this method and test this method and RDT.load_from_granule and TaxyTool.load_from_granule
     """
     return Granule(data_producer_id=data_producer_id, record_dictionary=record_dictionary._rd, taxonomy=taxonomy._t)
 
 
 
+#@todo - move this to a module in examples.granule
 
 temp_array = numpy.random.standard_normal(100)
 cond_array = numpy.random.standard_normal(100)

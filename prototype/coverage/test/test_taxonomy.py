@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#@todo - move to pyon.ion.granule.test.test_taxonomy
 
 '''
 @package prototype.coverage.record_set
@@ -15,6 +16,7 @@ from prototype.coverage.taxonomy import Taxonomy, TaxyCab
 @attr('UNIT', group='dmproto2')
 class GranuleBuilderTestCase(unittest.TestCase):
 
+    #@todo - change name to TaxyToolTestCase
     def test_init(self):
         """
         test initialization of the TaxyCab

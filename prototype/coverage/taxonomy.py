@@ -6,6 +6,8 @@
 @author David Stuebe
 @author Don Brittain
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
+
+@todo - move to pyon.ion.granule.taxonomy
 '''
 
 
@@ -52,6 +54,7 @@ class TaxyCab(object):
 
     In practice they are strings for nicknames and Taxonomy Description objects for complex definitions
 
+    @todo - rename this class TaxyTool
     """
 
     def __init__(self, taxonomy=None):
@@ -170,6 +173,7 @@ class TaxyCab(object):
         Prototype dumping a taxonomy as yaml for an instrument agent to store locally.
         """
 
+        #@todo - get the serializer and tests to pass - need to serialize sets to yaml???
         d = ion_serializer.serialize(self._t)
         return yaml.dump(d)
 

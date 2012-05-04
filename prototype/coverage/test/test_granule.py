@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+#@todo change name to test_record_dictionary and move with other stuff
+
+
 '''
 @package prototype.coverage.record_set
 @file prototype/coverage/record_set.py
@@ -170,7 +173,10 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
             self.assertTrue(False)
 
 
+    #@todo add test for pretty print compare string output with expected result for some complex RDTs
+
 def _workflow(self):
+    #@todo - move to pyon:examples.granule
     #Define a taxonomy and add sets. add_taxonomy_set takes one or more names and assigns them to one handle
     tx = TaxyCab()
     tx.add_taxonomy_set('temp', 'long_temp_name')
