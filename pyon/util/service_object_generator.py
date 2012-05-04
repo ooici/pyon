@@ -190,115 +190,6 @@ html_doc_templates = {
 
 'arg': '${name}: ${val}<BR>',
 'exception': '${type}: ${description}<BR>',
-
-'obj_doc':
-'''<!-- <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
-<head>
-    <title>${classname}</title>
-</head>
-<body> -->
-<p>
-  <br class="atl-forced-newline" />
-</p>
-<div class="panel" style="border-width: 1px;">
-  <div class="panelContent">
-    <h3>Class Details</h3>
-    <div class='table-wrap'>
-      <table class='confluenceTable'>
-        <tr>
-          <th class='confluenceTh'> Object Type: </th>
-          <td class='confluenceTd'>${classname}</td>
-        </tr>
-        <tr>
-          <th class='confluenceTh'> Base Types: </th>
-          <td class='confluenceTd'>${baseclasses}</td>
-        </tr>
-        <tr>
-          <th class='confluenceTh'> Description: </th>
-          <td class='confluenceTd'>${classcomment} </td>
-        </tr>
-      </table>
-    </div>
-  </div>
-</div>
-<p>
-  <br class="atl-forced-newline" />
-</p>
-<div class="panel" style="border-width: 1px;">
-  <div class="panelContent">
-    <h3>Attributes</h3>
-    <div class='table-wrap'>
-      <table class='confluenceTable'>
-        <tr>
-          <th class='confluenceTh'> Name </th>
-          <th class='confluenceTh'> Type </th>
-          <th class='confluenceTh'> Default </th>
-          <th class='confluenceTh'> Description </th>
-        </tr>
-        ${attrtableentries}
-      </table>
-    </div>
-  </div>
-</div>
-${super_class_attr_tables}
-<p>
-  <br class="atl-forced-newline" />
-</p>
-<div class="panel" style="border-width: 1px;">
-  <div class="panelContent">
-    <h3>Associations</h3>
-    <div class='table-wrap'>
-      <table class='confluenceTable'>
-        <tr>
-          <th class='confluenceTh'> Subject </th>
-          <th class='confluenceTh'> Predicate </th>
-          <th class='confluenceTh'> Object </th>
-          <th class='confluenceTh'> Constraints </th>
-          <th class='confluenceTh'> Description </th>
-        </tr>
-        ${assoctableentries}
-      </table>
-    </div>
-  </div>
-</div>
-<!-- </body>
-</html> -->
-''',
-'attribute_table_entry':
-'''<tr>
-          <td class='confluenceTd'>${attrname}</td>
-          <td class='confluenceTd'>${type}</td>
-          <td class='confluenceTd'>${default}</td>
-          <td class='confluenceTd'> ${attrcomment} </td>
-        </tr>''',
-'association_table_entry':
-'''<tr>
-          <td class='confluenceTd'>${subject}</td>
-          <td class='confluenceTd'>${predicate}</td>
-          <td class='confluenceTd'>${object}</td>
-          <td class='confluenceTd'>${constraints}</td>
-          <td class='confluenceTd'>${description}</td>
-        </tr>''',
-'super_class_attribute_table':
-'''<div class="panel" style="border-width: 1px;">
-  <div class="panelContent">
-    <h3>Attributes of Superclass ${super_class_name}</h3>
-    <div class='table-wrap'>
-      <table class='confluenceTable'>
-        <tr>
-          <th class='confluenceTh'> Name </th>
-          <th class='confluenceTh'> Type </th>
-          <th class='confluenceTh'> Default </th>
-          <th class='confluenceTh'> Description </th>
-        </tr>
-        ${superclassattrtableentries}
-      </table>
-    </div>
-  </div>
-</div>'''
-
-
 }
 
 
@@ -372,9 +263,6 @@ class ServiceObjectGenerator :
 
 
 
-    #
-    #
-    #
     def find_object_reference(self, arg):
         for obj, node in self.object_references.iteritems():
             if node.find(arg) > -1:
@@ -382,6 +270,35 @@ class ServiceObjectGenerator :
 
         return "dict"
 
+
+    def build_exception_doc_html(self, _def):
+        # Handle case where method has no parameters
+        args = []
+
+        for key,val in (_def or {}).iteritems():
+            args.append(html_doc_templates['exception'].substitute(type=key, description=val))
+
+        args_str = ''.join(args)
+        return args_str
+
+
+    def build_args_doc_html(self, _def):
+        # Handle case where method has no parameters
+        args = []
+
+        for key,val in (_def or {}).iteritems():
+            if isinstance(val, datetime.datetime):
+                val="datetime"
+            elif isinstance(val,dict):
+                val=self.find_object_reference(key)
+            elif isinstance(val,list):
+                val="list"
+            else:
+                val = str(type(val)).replace("<type '","").replace("'>","")
+            args.append(html_doc_templates['arg'].substitute(name=key, val=val))
+
+        args_str = ''.join(args)
+        return args_str
 
     #
     #
@@ -704,12 +621,10 @@ class ServiceObjectGenerator :
                                                                         outargs=outargs_str))
 
             if opts.servicedoc:
-
-
-                doc_inargs_str             = build_args_doc_html(def_in)
-                doc_outargs_str            = build_args_doc_html(def_out)
-                doc_exceptions_str         = build_exception_doc_html(def_throws)
-                methoddocstring            = docstring_formatted.replace("method docstring","")
+                doc_inargs_str = self.build_args_doc_html(def_in)
+                doc_outargs_str = self.build_args_doc_html(def_out)
+                doc_exceptions_str = self.build_exception_doc_html(def_throws)
+                methoddocstring = docstring_formatted.replace("method docstring","")
                 doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str, exceptions=doc_exceptions_str))
 
 

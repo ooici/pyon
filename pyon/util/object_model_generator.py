@@ -26,6 +26,121 @@ class IonYamlLoader(yaml.Loader):
 
 enums_by_name = {}
 
+html_doc_templates = {
+'obj_doc':
+'''<!-- <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>${classname}</title>
+</head>
+<body> -->
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Class Details</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Object Type: </th>
+          <td class='confluenceTd'>${classname}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Base Types: </th>
+          <td class='confluenceTd'>${baseclasses}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Description: </th>
+          <td class='confluenceTd'>${classcomment} </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${attrtableentries}
+      </table>
+    </div>
+  </div>
+</div>
+${super_class_attr_tables}
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Associations</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Subject </th>
+          <th class='confluenceTh'> Predicate </th>
+          <th class='confluenceTh'> Object </th>
+          <th class='confluenceTh'> Constraints </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${assoctableentries}
+      </table>
+    </div>
+  </div>
+</div>
+<!-- </body>
+</html> -->
+''',
+'attribute_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${attrname}</td>
+          <td class='confluenceTd'>${type}</td>
+          <td class='confluenceTd'>${default}</td>
+          <td class='confluenceTd'> ${attrcomment} </td>
+        </tr>''',
+'association_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${subject}</td>
+          <td class='confluenceTd'>${predicate}</td>
+          <td class='confluenceTd'>${object}</td>
+          <td class='confluenceTd'>${constraints}</td>
+          <td class='confluenceTd'>${description}</td>
+        </tr>''',
+'super_class_attribute_table':
+'''<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes of Superclass ${super_class_name}</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${superclassattrtableentries}
+      </table>
+    </div>
+  </div>
+</div>'''
+
+
+}
+
+html_doc_templates = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
+
+
+
 class ObjectModelGenerator:
 
 
@@ -218,7 +333,7 @@ class ObjectModelGenerator:
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
 
 
-    def lookup_associations(classname):
+    def lookup_associations(self, classname):
         from pyon.util.config import Config
         from pyon.util.containers import DotDict
         Predicates = DotDict()
@@ -304,10 +419,10 @@ class ObjectModelGenerator:
                 else:
                     if opts.objectdoc:
                         attrtableentries = ""
-                        field_details.sort()
+                        self.field_details.sort()
                         for self.field_detail in self.field_details:
                             ###attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=self.field_detail["attrname"], type=self.field_detail["attrtype"], default=self.field_detail["attrdefault"], attrcomment="TODO")
-                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), attrcomment="")
+                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=self.field_detail[0], type=self.field_detail[1].replace("'",'"'), default=self.field_detail[2].replace("'",'"'), attrcomment="")
 
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
@@ -323,13 +438,13 @@ class ObjectModelGenerator:
                         super_class_attribute_tables = ""
                         while sup != "IonObjectBase":
                             super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
-                            fld_details = class_args_dict[sup]["field_details"]
+                            fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
                             for fld_detail in fld_details:
                                 superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'",'"'), default=fld_detail[2].replace("'",'"'), attrcomment="")
                             super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=sup, superclassattrtableentries=superclassattrtableentries)
-                            sup = class_args_dict[sup]["extends"]
+                            sup = self.class_args_dict[sup]["extends"]
                         super_classes += '<a href="#IonObjectBase">IonObjectBase</a>'
 
                         doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)

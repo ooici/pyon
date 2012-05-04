@@ -36,12 +36,14 @@ def main():
     parser.add_argument('-od', '--objectdoc', action='store_true', help='Generate HTML object doc files')
     opts = parser.parse_args()
 
-    model_object   = ObjectModelGenerator ()
-    message_object = MessageObjectGenerator ()
-    service_object = ServiceObjectGenerator ()
+    model_object = ObjectModelGenerator()
+    message_object = MessageObjectGenerator()
+    service_object = ServiceObjectGenerator()
 
 
     print "Forcing --force, we keep changing generate_interfaces, sorry!"
+    opts.force = True
+
     if os.getcwd().endswith('scripts'):
         sys.exit('This script needs to be run from the pyon root.')
 
