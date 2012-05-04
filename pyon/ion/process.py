@@ -18,10 +18,12 @@ class IonProcessThread(PyonThread):
     Form the base of an ION process.
     """
 
-    def __init__(self, target=None, listeners=None, name=None, **kwargs):
+    def __init__(self, target=None, listeners=None, name=None, service=None, **kwargs):
         self._startup_listeners = listeners or []
         self.listeners          = []
         self.name               = name
+        self.service            = service
+
         self._child_procs       = []
         self._ctrl_queue        = Queue()
 

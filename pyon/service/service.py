@@ -32,12 +32,13 @@ class BaseService(LocalContextMixin):
     process_type = "service"
 
     def __init__(self, *args, **kwargs):
-        self.id = None
+        self.id         = None
         self._proc_name = None
         self._proc_type = None
-        self.errcause = None
-        self.container = None
-        self.CFG = None
+        self.errcause   = None
+        self.container  = None
+        self.CFG        = None
+        self._process   = None      # reference to IonProcess, internal
         super(BaseService, self).__init__()
 
     def init(self):
