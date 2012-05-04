@@ -5,9 +5,17 @@
 __author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-import datetime, fnmatch, inspect, pkgutil, os, re, sys, string
-import yaml, hashlib, argparse
-
+import datetime
+import fnmatch
+import inspect
+import pkgutil
+import os
+import re
+import sys
+import string
+import yaml
+import hashlib
+import argparse
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService

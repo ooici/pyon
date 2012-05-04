@@ -6,18 +6,10 @@ __author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster
 __license__ = 'Apache 2.0'
   
 
-import ast, datetime, fnmatch, inspect, pkgutil, os, re, sys, string, yaml, hashlib, argparse
-
-from collections import OrderedDict
-from collections import OrderedDict
-from pyon.core.path import list_files_recursive
-from pyon.service.service import BaseService
-from pyon.util.containers import named_any
-
-# Do not remove any of the imports below this comment!!!!!!
-from pyon.util import yaml_ordered_dict
-
-
+import fnmatch
+import os
+import sys
+import argparse
 from pyon.util.object_model_generator import ObjectModelGenerator
 from pyon.util.message_object_generator import MessageObjectGenerator
 from pyon.util.service_object_generator import ServiceObjectGenerator

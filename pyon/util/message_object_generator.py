@@ -1,28 +1,10 @@
 
 import ast
-import datetime
-import fnmatch
-import inspect
-import pkgutil
 import os
-import re
-import sys
-import string
-
-import yaml
-import hashlib
-import argparse
-
-from collections import OrderedDict
 from pyon.core.path import list_files_recursive
-from pyon.service.service import BaseService
-from pyon.util.containers import named_any
 
-# Do not remove any of the imports below this comment!!!!!!
-from pyon.util import yaml_ordered_dict
 
 enums_by_name = {}
-
 
 class MessageObjectGenerator:
 

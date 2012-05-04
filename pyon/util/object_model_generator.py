@@ -1,24 +1,15 @@
-import ast
-import datetime
-import fnmatch
-import inspect
-import pkgutil
+#!/usr/bin/env python
+
+# Ion utility for generating interfaces from object definitions (and vice versa).
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster@asascience.com>'
+__license__ = 'Apache 2.0'
+
 import os
-import re
-import sys
 import string
-
 import yaml
-import hashlib
-import argparse
-
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
-from pyon.service.service import BaseService
-from pyon.util.containers import named_any
 
-# Do not remove any of the imports below this comment!!!!!!
-from pyon.util import yaml_ordered_dict
 
 class IonYamlLoader(yaml.Loader):
     """ For ION-specific overrides of YAML loading behavior. """
@@ -306,33 +297,6 @@ class ObjectModelGenerator:
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
 
 
-        # Do the same for any data model objects in the service
-        # definition files.
-        defs = yaml.load_all(self.service_yaml_text, Loader=IonYamlLoader)
-        for def_set in defs:
-            for name,_def in def_set.get('obj', {}).iteritems():
-                if isinstance(_def, OrderedDict):
-                    self.def_dict[name] = _def
-                tag = u'!%s' % (name)
-                def constructor(loader, node):
-                    value = node.tag.strip('!')
-                    # See if this is an enum ref
-                    if value in enums_by_name:
-                        return {"__IsEnum": True, "value": value + "." + enums_by_name[value]["default"], "type": value}
-                    else:
-                        return str(value) + "()"
-                yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
-
-                xtag = u'!Extends_%s' % (name)
-                def extends_constructor(loader, node):
-                    if isinstance(node, yaml.MappingNode):
-                        value = loader.construct_mapping(node)
-                    else:
-                        value = {}
-                    return value
-                yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
-
-
     def lookup_associations(self, classname):
         from pyon.util.config import Config
         from pyon.util.containers import DotDict
@@ -530,7 +494,7 @@ class ObjectModelGenerator:
     # Find any data model definitions lurking in the service interface
     # definition yaml files and generate classes for them.
     #
-    def generate_service_object (self, current_class, init_lines, current_class_schema, schema_extended):
+    def generate_service_object(self, current_class, init_lines, current_class_schema, schema_extended):
 
         # Find any data model definitions lurking in the service interface
         # definition yaml files and generate classes for them.
@@ -638,7 +602,7 @@ class ObjectModelGenerator:
     #
     # Generate object model
     #
-    def generate (self, opts):
+    def generate(self, opts):
        
 
         # Get data from the file
@@ -670,7 +634,7 @@ class ObjectModelGenerator:
 
         # Add YAML constructors
         yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
-        self.add_yaml_constructor ()
+        self.add_yaml_constructor()
 
 
         # Delimit the break between the enum classes and
@@ -679,8 +643,8 @@ class ObjectModelGenerator:
 
 
         # Generate corresponding classes in the object.py file
-        self.generate_object (opts)
+        self.generate_object(opts)
         
         # Write to the objects.py file
-        self.write_to_object_model_file ()
+        self.write_to_object_model_file()
 
