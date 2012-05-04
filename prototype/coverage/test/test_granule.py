@@ -55,6 +55,8 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         rdt['rdt'] = temp_array
         self._rdt['rdt'] = rdt
 
+        print self._rdt
+
     def test_iteration(self):
         """
         Test all four iteration methods for items in the granule

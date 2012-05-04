@@ -14,7 +14,6 @@ from interface.objects import Granule, CompoundGranule, Taxonomy
 from prototype.coverage.taxonomy import TaxyCab
 
 
-
 class RecordDictionaryTool(object):
     """
     A granule is a unit of information which conveys part of a coverage.
@@ -48,7 +47,6 @@ class RecordDictionaryTool(object):
         Give the GB a dictionary like behavior
         """
 
-        #@todo - reflect on the type and determine how to add it. For a value sequence it is simple, for a nested record dictionary what should we do?
         if isinstance(vals, RecordDictionaryTool):
             assert vals._tx == self._tx
             self._rd[self._tx.get_handle(name)] = vals._rd
@@ -60,7 +58,6 @@ class RecordDictionaryTool(object):
         """
         Give the GB a dictionary like behavior
         """
-        #@todo - reflect on the return type and determine how to wrap it. For a value sequence it is simple, for a nested record dictionary what should we do?
         if isinstance(self._rd[self._tx.get_handle(name)], dict):
             result = RecordDictionaryTool(taxonomy=self._tx)
             result._rd = self._rd[self._tx.get_handle(name)]
@@ -72,7 +69,12 @@ class RecordDictionaryTool(object):
     def iteritems(self):
         """ D.iteritems() -> an iterator over the (key, value) items of D """
         for k, v in self._rd.iteritems():
-            yield self._tx.get_names(k), v
+            if isinstance(v, dict):
+                result = RecordDictionaryTool(taxonomy=self._tx)
+                result._rd = v
+                yield self._tx.get_names(k), result
+            else:
+                yield self._tx.get_names(k), v
 
     def iterkeys(self):
         """ D.iterkeys() -> an iterator over the keys of D """
@@ -82,7 +84,12 @@ class RecordDictionaryTool(object):
     def itervalues(self):
         """ D.itervalues() -> an iterator over the values of D """
         for v in self._rd.itervalues():
-            yield v
+            if isinstance(v, dict):
+                result = RecordDictionaryTool(taxonomy=self._tx)
+                result._rd = v
+                yield result
+            else:
+                yield v
 
     def update(self, E=None, **F):
         """
