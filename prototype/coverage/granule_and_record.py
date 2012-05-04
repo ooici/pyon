@@ -37,6 +37,11 @@ class RecordDictionaryTool(object):
         # hold onto the taxonomy - we need it to build the granule...
         self._tx = taxonomy
 
+    @classmethod
+    def load_from_granule(cls, g):
+        result = cls(TaxyCab(g.taxonomy))
+        result._rd = g.record_dictionary
+        return result
 
     def __setitem__(self, name, vals):
         """
@@ -144,7 +149,7 @@ class RecordDictionaryTool(object):
     __hash__ = None
 
 
-class GranuleBuilder(object):
+def build_granule(self, data_producer_id, taxonomy, record_dictionary):
     """
     A granule is a unit of information which conveys part of a coverage.
 
@@ -154,36 +159,7 @@ class GranuleBuilder(object):
 
     @todo - what goes here? Anything?
     """
-    def __init__(self, taxonomy):
-        self._tx = taxonomy
-
-
-
-
-class CompoundGranuleBuilder(object):
-    """
-    A compound granule is the ability to send many granules as one messsage - a list.
-
-    @Tim G - ignore this for now....
-    """
-
-    def __init__(self):
-        """
-        @todo - add docs...
-        """
-
-        # Create the ION object we are wrapping
-        self._cg = CompoundGranule(granules=[])
-
-
-    def add_granule(self, data_producer_id, taxonomy):
-
-
-        gb = GranuleBuilder(data_producer_id=data_producer_id, taxonomy=taxonomy)
-        self._cg.granules.append(g._g)
-
-        return gb
-
+    return Granule(data_producer_id=data_producer_id, record_dictionary=record_dictionary, taxonomy_id=taxonomy.tx_id)
 
 
 

@@ -71,6 +71,9 @@ class TaxyCab(object):
 
         self._t = taxonomy
 
+    @classmethod
+    def load_from_granule(cls, g):
+        return cls(g.taxonomy)
 
     def _update_inverse(self, h, name_set):
         """
