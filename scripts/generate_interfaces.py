@@ -685,7 +685,7 @@ def generate_model_objects(opts):
     Predicates = DotDict()
     Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
 
-    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
     data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
 
     service_yaml_files = list_files_recursive('obj/services', '*.yml')
