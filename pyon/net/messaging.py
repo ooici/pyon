@@ -94,10 +94,12 @@ class NodeB(amqp.Node):
 
         assert ch.get_channel_id() in self._pool_map
         with self._lock:
-            ch.stop_consume()
             chid = self._pool_map.pop(ch.get_channel_id())
             log.debug("Releasing BiDir pool Pika #%d, our id #%d", ch.get_channel_id(), chid)
             self._pool.release_id(chid)
+
+            # reset channel
+            ch.reset()
 
             # sanity check: if auto delete got turned on, we must remove this channel from the pool
             if ch._queue_auto_delete:

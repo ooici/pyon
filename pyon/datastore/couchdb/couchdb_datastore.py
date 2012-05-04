@@ -194,11 +194,11 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s' % str(res))
 
-    def create_mult(self, objects, object_ids=None):
+    def create_mult(self, objects, object_ids=None, allow_ids=False):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
                 raise BadRequest("Obj param is not instance of IonObjectBase")
         return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
-                                    object_ids)
+                                    object_ids, allow_ids=allow_ids)
 
     def create_doc_mult(self, docs, object_ids=None, allow_ids=False):
         if not allow_ids:

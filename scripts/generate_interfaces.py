@@ -207,8 +207,114 @@ html_doc_templates = {
 <p><br class="atl-forced-newline" /></p>''',
 
 'arg': '${name}: ${val}<BR>',
-'exception': '${type}: ${description}<BR>'
+'exception': '${type}: ${description}<BR>',
 
+'obj_doc':
+'''<!-- <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>${classname}</title>
+</head>
+<body> -->
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Class Details</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Object Type: </th>
+          <td class='confluenceTd'>${classname}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Base Types: </th>
+          <td class='confluenceTd'>${baseclasses}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'> Description: </th>
+          <td class='confluenceTd'>${classcomment} </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${attrtableentries}
+      </table>
+    </div>
+  </div>
+</div>
+${super_class_attr_tables}
+<p>
+  <br class="atl-forced-newline" />
+</p>
+<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Associations</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Subject </th>
+          <th class='confluenceTh'> Predicate </th>
+          <th class='confluenceTh'> Object </th>
+          <th class='confluenceTh'> Constraints </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${assoctableentries}
+      </table>
+    </div>
+  </div>
+</div>
+<!-- </body>
+</html> -->
+''',
+'attribute_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${attrname}</td>
+          <td class='confluenceTd'>${type}</td>
+          <td class='confluenceTd'>${default}</td>
+          <td class='confluenceTd'> ${attrcomment} </td>
+        </tr>''',
+'association_table_entry':
+'''<tr>
+          <td class='confluenceTd'>${subject}</td>
+          <td class='confluenceTd'>${predicate}</td>
+          <td class='confluenceTd'>${object}</td>
+          <td class='confluenceTd'>${constraints}</td>
+          <td class='confluenceTd'>${description}</td>
+        </tr>''',
+'super_class_attribute_table':
+'''<div class="panel" style="border-width: 1px;">
+  <div class="panelContent">
+    <h3>Attributes of Superclass ${super_class_name}</h3>
+    <div class='table-wrap'>
+      <table class='confluenceTable'>
+        <tr>
+          <th class='confluenceTh'> Name </th>
+          <th class='confluenceTh'> Type </th>
+          <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Description </th>
+        </tr>
+        ${superclassattrtableentries}
+      </table>
+    </div>
+  </div>
+</div>'''
 
 }
 
@@ -573,8 +679,13 @@ def find_subtypes(clz):
 # are two files:  interfaces/objects.py and interfaces/messages.py
 # TODO make this method legit by utilizing a parser to handle walking
 # the tokens.    
-def generate_model_objects():
-    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+def generate_model_objects(opts):
+    from pyon.util.config import Config
+    from pyon.util.containers import DotDict
+    Predicates = DotDict()
+    Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
+
+    data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
     data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
 
     service_yaml_files = list_files_recursive('obj/services', '*.yml')
@@ -592,6 +703,7 @@ def generate_model_objects():
 
     for line in combined_yaml_text.split('\n'):
         if '!enum ' in line:
+            
             # If stand alone enum type definition
             tokens = line.split(':')
             classname = tokens[0].strip()
@@ -729,7 +841,25 @@ def generate_model_objects():
         else:
             outline = str(value)
         return outline
-            
+
+    def lookup_associations(classname):
+        def convert_pred_to_tuple(key, predicate):
+            domain = str(predicate["domain"]).strip("[]'")
+            range = str(predicate["range"]).strip("[]'")
+            return (domain, key, range)
+
+        output = []
+        for key in Predicates:
+            domain = Predicates[key]["domain"]
+            range = Predicates[key]["range"]
+            for sub in domain:
+                if sub == classname:
+                    output.append(convert_pred_to_tuple(key, Predicates[key]))
+            for obj in range:
+                if obj == classname:
+                    output.append(convert_pred_to_tuple(key, Predicates[key]))
+        return output
+                    
     # Now walk the data model definition yaml files.  Generate
     # corresponding classes in the objects.py file.
     current_class_def_dict = None
@@ -740,6 +870,7 @@ def generate_model_objects():
     class_args_dict = {}
     args = []
     fields = []
+    field_details = []
     init_lines = []
     first_time = True
     for line in data_yaml_text.split('\n'):
@@ -780,6 +911,7 @@ def generate_model_objects():
                         args.append(field + "=" + converted_value)
                         init_lines.append('        self.' + field + " = " + field + "\n")
                 fields.append(field)
+                field_details.append((field, value_type, converted_value))
                 if enum_type:
                     current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
                 else:
@@ -790,7 +922,45 @@ def generate_model_objects():
             if first_time:
                 first_time = False
             else:
-                class_args_dict[current_class] = {'args': args, 'fields': fields}
+                if opts.objectdoc:
+                    attrtableentries = ""
+                    field_details.sort()
+                    for field_detail in field_details:
+                        attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), attrcomment="")
+
+                    related_associations = lookup_associations(current_class)
+                    assoctableentries = ""
+                    for assoc in related_associations:
+                        assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
+
+                    super_classes = ""
+                    sup = super_class
+                    super_class_attribute_tables = ""
+                    while sup != "IonObjectBase":
+                        super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
+                        fld_details = class_args_dict[sup]["field_details"]
+                        superclassattrtableentries = ""
+                        fld_details.sort()
+                        for fld_detail in fld_details:
+                            superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'",'"'), default=fld_detail[2].replace("'",'"'), attrcomment="")
+                        super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=sup, superclassattrtableentries=superclassattrtableentries)
+                        sup = class_args_dict[sup]["extends"]
+                    super_classes += '<a href="#IonObjectBase">IonObjectBase</a>'
+
+                    doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+
+                    datamodelhtmldir = 'interface/object_html'
+                    if not os.path.exists(datamodelhtmldir):
+                        os.makedirs(datamodelhtmldir)
+                    datamodelhtmlfile = os.path.join(datamodelhtmldir, current_class + ".html")
+                    try:
+                        os.unlink(datamodelhtmlfile)
+                    except:
+                        pass
+                    with open(datamodelhtmlfile, 'w') as f:
+                        f.write(doc_output)                        
+                    
+                class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class}
                 for arg in args:
                     dataobject_output_text += arg
                 dataobject_output_text += "):\n"
@@ -804,6 +974,7 @@ def generate_model_objects():
             dataobject_output_text += '\n'
             args = []
             fields = []
+            field_details = []
             init_lines = []
             current_class = line.split(":")[0]
             try:
@@ -940,7 +1111,7 @@ def generate_model_objects():
             dataobject_output_text += current_class_schema + "\n              }\n"
  
 #    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.exception import BadRequest\nfrom pyon.core.object import IonObjectBase\n"
-    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
+    messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
     current_class_schema = ""
 
     # Now process the service definition yaml files to
@@ -998,7 +1169,7 @@ def generate_model_objects():
             args = []
             init_lines = []
             current_op_name = lines[index].strip(' :')
-            messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
+            messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
             messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
             messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
             index += 1
@@ -1099,7 +1270,7 @@ def generate_model_objects():
             if index < len(lines) and lines[index].startswith('    out:'):
                 args = []
                 init_lines = []
-                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
+                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
                 messageobject_output_text += '    def __init__(self'
@@ -1222,6 +1393,7 @@ def main():
     parser.add_argument('-f', '--force', action='store_true', help='Do not do MD5 comparisons, always generate new files')
     parser.add_argument('-d', '--dryrun', action='store_true', help='Do not generate new files, just print status and exit with 1 if changes need to be made')
     parser.add_argument('-sd', '--servicedoc', action='store_true', help='Generate HTML service doc inclusion files')
+    parser.add_argument('-od', '--objectdoc', action='store_true', help='Generate HTML object doc files')
     opts = parser.parse_args()
 
     print "Forcing --force, we keep changing generate_interfaces, sorry!"
@@ -1246,7 +1418,7 @@ def main():
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
     # Generate data object definitions into python classes
-    generate_model_objects()
+    generate_model_objects(opts)
 
     enum_tag = u'!enum'
     def enum_constructor(loader, node):

@@ -6,7 +6,7 @@
 @description Linear Phase Shift
 '''
 from pyon.ion.transform import TransformBenchTesting
-from pyon.util.arg_check import validateIsInstance
+from pyon.util.arg_check import validate_is_instance
 
 class TransformLinear(TransformBenchTesting):
     '''
@@ -14,7 +14,7 @@ class TransformLinear(TransformBenchTesting):
     '''
     @staticmethod
     def shift(vector):
-        validateIsInstance(vector,list)
+        validate_is_instance(vector,list)
         N = len(vector)
         x = list()
         for i in xrange(N):
@@ -37,7 +37,7 @@ class TransformSquare(TransformBenchTesting):
 
     @staticmethod
     def shift(vector):
-        validateIsInstance(vector, list)
+        validate_is_instance(vector, list)
         N = len(vector)
         x = list()
         for i in xrange(N):
@@ -58,7 +58,7 @@ class TransformInPlace(TransformBenchTesting):
     '''
     @staticmethod
     def shift(vector):
-        validateIsInstance(vector,list)
+        validate_is_instance(vector,list)
         N = len(vector)
         x = vector[0]
         vector[0] = vector[N-1]

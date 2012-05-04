@@ -175,6 +175,7 @@ class EndpointUnit(object):
                     msg, headers, delivery_tag = self.channel.recv()
                     log.debug("client_recv got a message")
                     log_message(self.channel._send_name , msg, headers, delivery_tag)
+
                     try:
                         self._message_received(msg, headers)
                     finally:
@@ -423,27 +424,52 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._ready_event.set()
 
         while True:
-            log.debug("LEF: %s blocking, waiting for a message" % str(self._recv_name))
+            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
-                newchan = self._chan.accept()
-                msg, headers, delivery_tag = newchan.recv()
+                with self._chan.accept() as newchan:
+                    msg, headers, delivery_tag = newchan.recv()
 
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, msg, headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+                    log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+                    log_message(self._recv_name, msg, headers, delivery_tag)
+
+                    try:
+                        e = self.create_endpoint(existing_channel=newchan)
+                        e._message_received(msg, headers)
+                    except Exception:
+                        log.exception("Unhandled error while handling received message")
+                        raise
+                    finally:
+                        # ALWAYS ACK
+                        newchan.ack(delivery_tag)
 
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
                 break
 
-            try:
-                e = self.create_endpoint(existing_channel=newchan)
-                e._message_received(msg, headers)
-            except Exception:
-                log.exception("Unhandled error while handling received message")
-                raise
-            finally:
-                # ALWAYS ACK
-                newchan.ack(delivery_tag)
+
+
+#        while True:
+#            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+#            try:
+#                newchan = self._chan.accept()
+#                msg, headers, delivery_tag = newchan.recv()
+#
+#                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+#                log_message(self._recv_name, msg, headers, delivery_tag)
+#
+#            except ChannelClosedError as ex:
+#                log.debug('Channel was closed during LEF.listen')
+#                break
+#
+#            try:
+#                e = self.create_endpoint(existing_channel=newchan)
+#                e._message_received(msg, headers)
+#            except Exception:
+#                log.exception("Unhandled error while handling received message")
+#                raise
+#            finally:
+#                # ALWAYS ACK
+#                newchan.ack(delivery_tag)
 
     def close(self):
         BaseEndpoint.close(self)
@@ -924,9 +950,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
         try:
-            result = ro_meth(**cmd_arg_obj)
+            ######
+            ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
+            ######
+            result              = self._make_routing_call(ro_meth, cmd_arg_obj)
+            response_headers    = { 'status_code': 200, 'error_message': '' }
+            ######
 
-            response_headers = { 'status_code': 200, 'error_message': '' }
         except TypeError as ex:
             log.exception("TypeError while attempting to call routing object's method")
             response_headers = self._create_error_response(ServerError(ex.message))
@@ -938,6 +968,15 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         return {'status_code': ex.get_status_code(),
                 'error_message': str(ex.get_error_message()),
                 'performative':'failure'}
+
+    def _make_routing_call(self, call, op_args):
+        """
+        Calls into the routing object.
+
+        May be overridden at a lower level.
+        """
+        return call(**op_args)
+
 
 class RPCServer(RequestResponseServer):
     endpoint_unit_type = RPCResponseEndpointUnit
@@ -1084,9 +1123,10 @@ class ProcessRPCClient(RPCClient):
 
 
 class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpointUnit):
-    def __init__(self, process=None, **kwargs):
+    def __init__(self, process=None, routing_call=None, **kwargs):
         ProcessEndpointUnitMixin.__init__(self, process=process)
         RPCResponseEndpointUnit.__init__(self, **kwargs)
+        self._routing_call = routing_call
 
     def _message_received(self, msg, headers):
         """
@@ -1094,6 +1134,9 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
         """
+        ######
+        ###### THIS IS WHERE THE THREAD LOCAL HEADERS CONTEXT IS SET ######
+        ######
         with self._process.push_context(headers):
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
@@ -1109,15 +1152,33 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         return header1
 
+    def _make_routing_call(self, call, op_args):
+        if not self._routing_call:
+            return RPCResponseEndpointUnit._make_routing_call(self, call, op_args)
+
+        ar = self._routing_call(call, op_args)
+        return ar.get()     # @TODO: timeout?
+
+
 class ProcessRPCServer(RPCServer):
     endpoint_unit_type = ProcessRPCResponseEndpointUnit
 
-    def __init__(self, process=None, **kwargs):
+    def __init__(self, process=None, routing_call=None, **kwargs):
         assert process
         self._process = process
+        self._routing_call = routing_call
         RPCServer.__init__(self, **kwargs)
+
+    @property
+    def routing_call(self):
+        return self._routing_call
+
+    @routing_call.setter
+    def routing_call(self, value):
+        self._routing_call = value
 
     def create_endpoint(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs['process'] = self._process
+        newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)

@@ -1,6 +1,6 @@
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.bootstrap import obj_registry
-from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, walk
+from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, IonObjectBlameDeserializer, IonObjectBlameSerializer, walk
 from pyon.util.log import log
 
 class CodecInterceptor(Interceptor):
@@ -29,6 +29,7 @@ class CodecInterceptor(Interceptor):
 
         # Horrible, hacky workaround for msgpack issue
         # See http://jira.msgpack.org/browse/MSGPACK-15
+        #@todo replace this with use_list in msgpack.unpackb !!!
         def convert_tuples_to_lists(obj):
             if isinstance(obj, tuple):
                 res = list(obj)
@@ -41,3 +42,13 @@ class CodecInterceptor(Interceptor):
         log.debug("Payload, post-transform: %s", invocation.message)
 
         return invocation
+
+
+class BlameCodecInterceptor(CodecInterceptor):
+    """
+    Transforms IonObject <-> dict and adds "blame_" attribute
+    """
+    def __init__(self):
+        Interceptor.__init__(self)
+        self._io_serializer = IonObjectBlameSerializer()
+        self._io_deserializer = IonObjectBlameDeserializer(obj_registry=obj_registry)
