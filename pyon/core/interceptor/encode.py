@@ -18,10 +18,10 @@ def decode_ion( obj):
     if "__set__" in obj:
         return set(obj['tuple'])
 
-    if "__list__" in obj:
+    elif "__list__" in obj:
         return list(obj['tuple'])
 
-    if "__ion_array__" in obj:
+    elif "__ion_array__" in obj:
         # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
         return numpy.array(obj['content'],dtype=numpy.dtype(obj['header']['type']))
 
