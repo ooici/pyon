@@ -149,7 +149,7 @@ class RecordDictionaryTool(object):
     __hash__ = None
 
 
-def build_granule(self, data_producer_id, taxonomy, record_dictionary):
+def build_granule(data_producer_id, taxonomy, record_dictionary):
     """
     A granule is a unit of information which conveys part of a coverage.
 
@@ -159,7 +159,7 @@ def build_granule(self, data_producer_id, taxonomy, record_dictionary):
 
     @todo - what goes here? Anything?
     """
-    return Granule(data_producer_id=data_producer_id, record_dictionary=record_dictionary, taxonomy_id=taxonomy.tx_id)
+    return Granule(data_producer_id=data_producer_id, record_dictionary=record_dictionary._rd, taxonomy=taxonomy._t)
 
 
 
