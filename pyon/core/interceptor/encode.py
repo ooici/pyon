@@ -14,6 +14,13 @@ def decode_ion( obj):
     MsgPack object hook to decode any ion object as part of the message pack walk rather than implementing it again in
     pyon
     """
+
+    if "__set__" in obj:
+        return set(obj['tuple'])
+
+    if "__list__" in obj:
+        return list(obj['tuple'])
+
     if "__ion_array__" in obj:
         # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
         return numpy.array(obj['content'],dtype=numpy.dtype(obj['header']['type']))
@@ -28,7 +35,14 @@ def encode_ion( obj):
     MsgPack object hook to encode any ion object as part of the message pack walk rather than implementing it again in
     pyon
     """
-    if isinstance(obj, numpy.ndarray):
+
+    if isinstance(obj, list):
+        return {"__list__":True, 'tuple':tuple(obj)}
+
+    elif isinstance(obj, set):
+        return {"__set__":True, 'tuple':tuple(obj)}
+
+    elif isinstance(obj, numpy.ndarray):
         return {"header":{"type":str(obj.dtype),"nd":len(obj.shape),"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
     elif isinstance(obj, complex):
