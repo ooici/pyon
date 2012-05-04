@@ -77,6 +77,6 @@ class EncodeInterceptor(Interceptor):
     def incoming(self, invocation):
         log.debug("EncodeInterceptor.incoming: %s", invocation)
         log.debug("Pre-transform: %s", invocation.message)
-        invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion)
+        invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion, use_list=1)
         log.debug("Post-transform: %s", invocation.message)
         return invocation

@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+
 '''
 @author Luke Campbell <lcampbell@asascience.com>
 @file pyon/core/interceptor/test/interceptor_test.py
@@ -49,3 +52,22 @@ class InterceptorTest(PyonTestCase):
         c = b.get('double stuffed')
         for d in c:
             self.assertTrue((a==d).all())
+
+
+    def test_set(self):
+
+        a = {'s':set([1,2,3]),'l':[1,2,3],'t':(1,2,3)}
+
+        invoke = Invocation()
+        invoke.message = a
+        codec = EncodeInterceptor()
+
+        mangled = codec.outgoing(invoke)
+
+        received = codec.incoming(mangled)
+
+        b = received.message
+
+        # We only get lists back - damn you msgpack!
+        only_lists = {'s':set([1,2,3]),'l':[1,2,3],'t':[1,2,3]}
+        self.assertEquals(only_lists,b)
