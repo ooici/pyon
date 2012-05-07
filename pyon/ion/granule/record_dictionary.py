@@ -12,8 +12,8 @@
 
 
 import numpy
-from interface.objects import Granule, CompoundGranule, Taxonomy
-from prototype.coverage.taxonomy import TaxyCab
+from interface.objects import Granule
+from pyon.ion.granule.taxonomy import TaxyCab
 
 import pprint
 import StringIO
