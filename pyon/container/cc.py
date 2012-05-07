@@ -73,14 +73,6 @@ class Container(BaseContainerAgent):
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
-        config_from_directory = CFG.get_safe("system.config_from_directory", False)
-        if config_from_directory:
-            # Look for and apply any local file config overrides
-            from pyon.util.config import Config
-            conf_paths = ['res/config/pyon.local.yml']
-            local_cfg = Config(conf_paths, ignore_not_found=True).data
-            dict_merge(CFG, local_cfg, inplace=True)
-
         # Instantiate Directory and self-register
         # Has the additional side effect of either
         # bootstrapping the configuration into the
@@ -88,10 +80,11 @@ class Container(BaseContainerAgent):
         # in the value of the auto_bootstrap setting
         self.directory = Directory()
 
+        config_from_directory = CFG.get_safe("system.config_from_directory", False)
+        from pyon.util.config import Config
+        conf_paths = ['res/config/pyon.local.yml']
         if not config_from_directory:
             # Look for and apply any local file config overrides
-            from pyon.util.config import Config
-            conf_paths = ['res/config/pyon.local.yml']
             local_cfg = Config(conf_paths, ignore_not_found=True).data
             dict_merge(CFG, local_cfg, inplace=True)
 
