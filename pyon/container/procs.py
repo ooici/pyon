@@ -132,7 +132,7 @@ class ProcManager(object):
             log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
             raise
 
-    def _spawned_proc_failed(self, proc_sup, gproc):
+    def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s", gproc)
 
         # for now - don't worry about the mapping, if we get a failure, just kill the container.

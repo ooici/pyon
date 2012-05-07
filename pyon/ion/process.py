@@ -5,7 +5,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.thread import PyonThreadManager, PyonThread
+from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
@@ -24,7 +24,7 @@ class IonProcessThread(PyonThread):
         self.name               = name
         self.service            = service
 
-        self._child_procs       = []
+        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
         self._ctrl_queue        = Queue()
 
         PyonThread.__init__(self, target=target, **kwargs)
@@ -35,7 +35,7 @@ class IonProcessThread(PyonThread):
 
         Propogates the error up to the process supervisor.
         """
-        self.proc.throw(child.exception)
+        self.proc.kill(child.exception)
 
     def add_endpoint(self, listener):
         """
@@ -47,7 +47,7 @@ class IonProcessThread(PyonThread):
         """
         if self.proc:
             listener.routing_call = self._routing_call
-            self._child_procs.append(spawn(listener.listen))
+            self.thread_manager.spawn(listener.listen)
             self.listeners.append(listener)
         else:
             self._startup_listeners.append(listener)
@@ -64,13 +64,10 @@ class IonProcessThread(PyonThread):
             self.add_endpoint(listener)
 
         # spawn control flow loop
-        self._child_procs.append(spawn(self._control_flow))
+        ct = self.thread_manager.spawn(self._control_flow)
 
-        # link them all to a failure handler
-        map(lambda x: x.link_exception(self._child_failed), self._child_procs)
-
-        # wait on them
-        wait(self._child_procs)
+        # wait on control flow loop!
+        ct.get()
 
     def _routing_call(self, call, callargs):
         """
@@ -123,7 +120,9 @@ class IonProcessThread(PyonThread):
         map(lambda x: x.close(), self.listeners)
         self._ctrl_queue.put(StopIteration)
 
-        wait(self._child_procs)
+        # wait_children will join them and then get() them, which may raise an exception if any of them
+        # died with an exception.
+        self.thread_manager.wait_children(30)
 
         PyonThread._notify_stop(self)
 

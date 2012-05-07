@@ -58,7 +58,7 @@ class TestCCInt(IonIntegrationTestCase):
             raise self.ExpectedFailure("I am supposed to fail!")
 
         proc = self.cc.proc_manager.proc_sup.spawn(failtarget)
-        self.cc.proc_manager.proc_sup.ensure_ready(proc)
+        # do not ensure ready - ensure ready will blow up with a container error, on purpose
 
         # wait for the kill signal to happen
         ev.wait(timeout=5)

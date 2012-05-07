@@ -25,8 +25,9 @@ class ProcessTest(PyonTestCase):
         proc = PyonThread(self.increment, 2)
         proc.start()
         self.assertEqual(self.counter, 0)
+        time.sleep(0.2)
         proc.join()
-        self.assertEqual(self.counter, 2)
+        self.assertGreaterEqual(self.counter, 2)
 
     def test_supervisor(self):
         self.counter = 0
@@ -34,8 +35,9 @@ class ProcessTest(PyonTestCase):
         sup.start()
         proc = sup.spawn(self.increment, amount=2)
         self.assertEqual(self.counter, 0)
+        time.sleep(0.2)
         sup.join_children()
-        self.assertEqual(self.counter, 2)
+        self.assertGreaterEqual(self.counter, 2)
 
     def test_supervisor_shutdown(self):
         """ Test shutdown joining/forcing with timeouts. """

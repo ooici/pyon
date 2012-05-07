@@ -82,19 +82,28 @@ class PyonThread(object):
         if self.running:
             self._stop()
 
-        self.proc = None
-
         if self.supervisor is not None:
             self.supervisor.child_stopped(self)
 
         return self
 
     def join(self, timeout=None):
-        if self.proc is not None:
+        if self.proc is not None and self.running:
             self._join(timeout)
             self.stop()
             
         return self
+
+    def get(self):
+        """
+        Returns the value (or raises the exception) of the wrapped thread.
+
+        If not running yet, returns None.
+        """
+        if self.proc is not None:
+            return self.proc.get()
+
+        return None
 
     def get_ready_event(self):
         """
@@ -124,7 +133,7 @@ class ThreadManager(object):
         super(ThreadManager, self).__init__()
 
         # NOTE: Assumes that pids never overlap between the various process types
-        self.children = set()
+        self.children = []
         self.heartbeat_secs = heartbeat_secs
         self._shutting_down = False
         self._failure_notify_callback = failure_notify_callback
@@ -145,7 +154,7 @@ class ThreadManager(object):
         proc.supervisor = self
 
         proc.start()
-        self.children.add(proc)
+        self.children.append(proc)
 
         # install failure monitor
         proc.proc.link_exception(self._child_failed)
@@ -155,7 +164,7 @@ class ThreadManager(object):
     def _child_failed(self, gproc):
         log.error("Child failed with an exception: %s", gproc.exception)
         if self._failure_notify_callback:
-            self._failure_notify_callback(self, gproc)
+            self._failure_notify_callback(gproc)
 
     def ensure_ready(self, proc, errmsg=None, timeout=10):
         """
@@ -202,8 +211,6 @@ class ThreadManager(object):
 
     def child_stopped(self, proc):
         if proc in self.children:
-            self.children.remove(proc)
-
             # no longer need to listen for exceptions
             if proc.proc is not None:
                 proc.proc.unlink(self._child_failed)
@@ -214,9 +221,8 @@ class ThreadManager(object):
         time_start = time.time()
         child_count = len(self.children)
 
-        while len(self.children):
-            proc = self.children.pop()
-            
+        for proc in self.children:
+
             time_elapsed = time.time() - time_start
             if timeout is not None:
                 time_remaining = timeout - time_elapsed
@@ -235,6 +241,15 @@ class ThreadManager(object):
         log.debug('Took %.2fs to shutdown %d child processes', time_elapsed, child_count)
 
         return time_elapsed
+
+    def wait_children(self, timeout=None):
+        """
+        Performs a join to allow children to complete, then a get() to fetch their results.
+
+        This will raise an exception if any of the children raises an exception.
+        """
+        self.join_children(timeout=timeout)
+        return [x.get() for x in self.children]
 
     def target(self):
         # TODO: Implement monitoring and such
