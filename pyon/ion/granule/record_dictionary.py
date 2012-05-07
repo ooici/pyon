@@ -7,13 +7,12 @@
 @author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
 
-@todo - move to pyon.ion.granule.record_dictionary
 '''
 
 
 import numpy
 from interface.objects import Granule
-from pyon.ion.granule.taxonomy import TaxyCab
+from pyon.ion.granule.taxonomy import TaxyTool
 
 import pprint
 import StringIO
@@ -36,16 +35,16 @@ class RecordDictionaryTool(object):
         """
 
         self._rd = {}
-
-        self._len = length
-        #@todo make length required
+        self._len = -1
+        if length:
+            self._len = length
 
         # hold onto the taxonomy - we need it to build the granule...
         self._tx = taxonomy
 
     @classmethod
     def load_from_granule(cls, g):
-        result = cls(TaxyCab(g.taxonomy))
+        result = cls(TaxyTool(g.taxonomy))
         result._rd = g.record_dictionary
         return result
 
@@ -59,6 +58,9 @@ class RecordDictionaryTool(object):
             self._rd[self._tx.get_handle(name)] = vals._rd
         else:
             #@todo assert length matches self._len when setting value sequences
+            if self._len == -1:
+                self._len = len(vals)
+            assert self._len == len(vals), 'Invalid value length'
             self._rd[self._tx.get_handle(name)] = vals
 
 
@@ -138,7 +140,7 @@ class RecordDictionaryTool(object):
 
     def __len__(self):
         """ x.__len__() <==> len(x) """
-        return len(self._rd)
+        return self._len
 
     def __repr__(self):
         """ x.__repr__() <==> repr(x) """
@@ -164,12 +166,14 @@ class RecordDictionaryTool(object):
     __hash__ = None
 
     def pretty_print(self):
-        #@todo Add pretty print method that returns a string - here is a good start, but not sure if it works with numpy...
+        result = ''
+        for k, v in self.iteritems():
+            if isinstance(v, RecordDictionaryTool):
+                result += 'RDT %s contains:\n' % k
+                result += v.pretty_print()
+            else:
+                result += '    item: %s\n    values: %s\n' % (k, v)
 
-        fstream = StringIO.StringIO()
-        pprint.pprint(self._rd, stream=fstream)
-        result = fstream.getvalue()
-        fstream.close()
         return result
 
 
@@ -211,7 +215,7 @@ compound = numpy.ndarray(shape=(50,),dtype=compound_type)
 
 ### Example:
 
-tx = TaxyCab()
+tx = TaxyTool()
 tx.add_taxonomy_set('temp','long name for temp')
 tx.add_taxonomy_set('cond','long name for cond')
 tx.add_taxonomy_set('pres','long name for pres')

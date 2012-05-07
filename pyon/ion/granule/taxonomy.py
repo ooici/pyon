@@ -7,7 +7,6 @@
 @author Don Brittain
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
 
-@todo - move to pyon.ion.granule.taxonomy
 '''
 
 
@@ -40,7 +39,7 @@ ion_deserializer = IonObjectDeserializer(obj_registry=ior)
 
 
 
-class TaxyCab(object):
+class TaxyTool(object):
     """
     Wraps up a Taxonomy (IONObject) in a class which uses that information
 
@@ -54,7 +53,6 @@ class TaxyCab(object):
 
     In practice they are strings for nicknames and Taxonomy Description objects for complex definitions
 
-    @todo - rename this class TaxyTool
     """
 
     def __init__(self, taxonomy=None):

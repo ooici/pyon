@@ -11,7 +11,7 @@
 
 import unittest
 from nose.plugins.attrib import attr
-from pyon.ion.granule.taxonomy import Taxonomy, TaxyCab
+from pyon.ion.granule.taxonomy import Taxonomy, TaxyTool
 
 @attr('UNIT', group='dmproto2')
 class GranuleBuilderTestCase(unittest.TestCase):
@@ -22,7 +22,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
         test initialization of the TaxyCab
         """
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         #@todo - replace this with a better exception?
         #tjg - taken out, changed get_handles to always return something
         #self.assertRaises(KeyError,tc.get_handles,0)
@@ -31,30 +31,30 @@ class GranuleBuilderTestCase(unittest.TestCase):
 
         tx = Taxonomy(map={1:set(['a'])})
 
-        tc2 = TaxyCab(taxonomy=tx)
+        tc2 = TaxyTool(taxonomy=tx)
         self.assertEquals(tc2._cnt,1)
         self.assertEquals(tc2.get_handle('a'),1)
 
-        tc3 = TaxyCab(tx)
+        tc3 = TaxyTool(tx)
         self.assertEquals(tc2.get_names(1),set(['a']))
 
 
     def test_taxonomy_set(self):
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set()
         #tjg - taken out, changed get_handles to always return something
         #self.assertRaises(KeyError,tc.get_handles,0)
         self.assertRaises(KeyError,tc.get_names,'a')
 
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('a')
         self.assertEquals(tc.get_handle('a'),0)
         self.assertEquals(tc.get_names(0),set(['a']))
 
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('a')
         tc.add_taxonomy_set('b')
 
@@ -64,7 +64,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
         self.assertEquals(tc.get_handle('b'),1)
         self.assertEquals(tc.get_names(1),set(['b']))
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('a')
         tc.add_taxonomy_set('a')
 
@@ -74,7 +74,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
         self.assertEquals(tc.get_names(0),set(['a']))
         self.assertEquals(tc.get_names(1),set(['a']))
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('a','b','c')
         self.assertEquals(tc.get_handle('a'),0)
         self.assertEquals(tc.get_handle('b'),0)
@@ -84,7 +84,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
 
     def test_extend_names(self):
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('1','a')
         tc.add_taxonomy_set('1','b')
 
@@ -111,7 +111,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
 
     def test_yamlize(self):
 
-        tc = TaxyCab()
+        tc = TaxyTool()
         tc.add_taxonomy_set('1','a')
         tc.add_taxonomy_set('1','b')
 
@@ -122,7 +122,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
 
         s = tc.dump()
 
-        tc2 = TaxyCab.load(s)
+        tc2 = TaxyTool.load(s)
 
         #@todo - a list is not a set and the yaml dump/ion serialization can not handle sets...
         self.assertEquals(tc2._cnt,1)

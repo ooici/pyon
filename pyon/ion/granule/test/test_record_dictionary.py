@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-#@todo change name to test_record_dictionary and move with other stuff
-
-
 '''
 @package prototype.coverage.record_set
 @file prototype/coverage/record_set.py
@@ -15,14 +12,14 @@
 import unittest
 from nose.plugins.attrib import attr
 import numpy
-from pyon.ion.granule.record_dictionary import RecordDictionaryTool, TaxyCab
+from pyon.ion.granule.record_dictionary import RecordDictionaryTool, TaxyTool
 
 @attr('UNIT', group='dmproto')
 class RecordDictionaryToolTestCase(unittest.TestCase):
 
     def setUp(self):
 
-        self._tx = TaxyCab()
+        self._tx = TaxyTool()
         self._tx.add_taxonomy_set('temp', 'long_temp_name')
         self._tx.add_taxonomy_set('cond', 'long_cond_name')
         self._tx.add_taxonomy_set('pres', 'long_pres_name')
@@ -57,8 +54,6 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         rdt = RecordDictionaryTool(taxonomy=self._tx)
         rdt['rdt'] = temp_array
         self._rdt['rdt'] = rdt
-
-        print self._rdt
 
     def test_iteration(self):
         """
@@ -172,56 +167,31 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         if 'temp_not_found' in self._rdt:
             self.assertTrue(False)
 
+    def test_pretty_print(self):
+        temp_array = numpy.random.standard_normal(100)
+        cond_array = numpy.random.standard_normal(100)
+        pres_array = numpy.random.standard_normal(100)
 
-    #@todo add test for pretty print compare string output with expected result for some complex RDTs
+        self._rdt['temp'] = temp_array
+        self._rdt['cond'] = cond_array
+        self._rdt['pres'] = pres_array
 
-def _workflow(self):
-    #@todo - move to pyon:examples.granule
-    #Define a taxonomy and add sets. add_taxonomy_set takes one or more names and assigns them to one handle
-    tx = TaxyCab()
-    tx.add_taxonomy_set('temp', 'long_temp_name')
-    tx.add_taxonomy_set('cond', 'long_cond_name')
-    tx.add_taxonomy_set('pres', 'long_pres_name')
-    tx.add_taxonomy_set('rdt')
-    # map is {<local name>: <granule name or path>}
+        self.assertTrue(numpy.allclose(self._rdt['temp'], temp_array))
+        self.assertTrue(numpy.allclose(self._rdt['cond'], cond_array))
+        self.assertTrue(numpy.allclose(self._rdt['pres'], pres_array))
 
-    #Use RecordDictionaryTool to create a record dictionary. Send in the taxonomy so the Tool knows what to expect
-    rdt = RecordDictionaryTool(taxonomy=tx)
+        self.assertTrue(numpy.allclose(self._rdt['long_temp_name'], temp_array))
+        self.assertTrue(numpy.allclose(self._rdt['long_cond_name'], cond_array))
+        self.assertTrue(numpy.allclose(self._rdt['long_pres_name'], pres_array))
 
-    #Create some arrays and fill them with random values
-    temp_array = numpy.random.standard_normal(100)
-    cond_array = numpy.random.standard_normal(100)
-    pres_array = numpy.random.standard_normal(100)
+        # map is {<local name>: <granule name or path>}
 
-    #Use the RecordDictionaryTool to add the values. This also would work if you used long_temp_name, etc.
-    rdt['temp'] = temp_array
-    rdt['cond'] = cond_array
-    rdt['pres'] = pres_array
+        rdt = RecordDictionaryTool(taxonomy=self._tx)
+        rdt['rdt'] = temp_array
+        self._rdt['rdt'] = rdt
 
-    #You can also add in another RecordDictionaryTool, providing the taxonomies are the same.
-    rdt = RecordDictionaryTool(taxonomy=tx)
-    rdt['temp'] = temp_array
-    rdt['rdt'] = rdt
-
-    #To iterate through the items in the RecordDictionaryTool, use iteritems
-    for k, v in self._rdt.iteritems():
-        if isinstance(k, set):  #The keys are returned as sets.
-            if 'long_temp_name' in k and 'temp' in k:   #Determine which data we're looking at
-                assert(v == temp_array) #Verify we have the correct data
-            elif 'cond' in k and 'long_cond_name' in k:
-                assert(v == cond_array) #Verify we have the correct data
-            elif 'pres' in k and 'long_pres_name' in k:
-                assert(v == pres_array) #Verify we have the correct data
-
-    #you can get a string reprentation of the RecordDictionaryTool
-    print rdt
-    print repr(rdt)
-
-    #Determine the length of the RecordDictionary using the len function
-    print len(rdt)
-
-    #Delete an item in the RecordDictionary
-    del rdt['rdt']
+        print self._rdt.pretty_print()
+        self.assertTrue(len(self._rdt.pretty_print()) > 0)
 
 
 
