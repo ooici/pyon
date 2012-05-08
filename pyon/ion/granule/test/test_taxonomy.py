@@ -30,7 +30,7 @@ class TaxonomyToolTestCase(unittest.TestCase):
 
         tc2 = TaxyTool(taxonomy=tx)
         self.assertEquals(tc2._cnt,1)
-        self.assertEquals(tc2.get_handles('a'),set([1]))
+        self.assertEquals(tc2.get_handles('a'),{1,})
         self.assertEquals(tc2.get_handle('nick_name'),1)
 
         tc3 = TaxyTool(tx)
@@ -39,83 +39,79 @@ class TaxonomyToolTestCase(unittest.TestCase):
 
     def test_taxonomy_set(self):
 
+        nick_name = 'nick_name'
+        a = 'a'
+        b = 'b'
+        c = 'c'
         tc = TaxyTool()
-        tc.add_taxonomy_set()
-        self.assertEquals(tc.get_handles(0), set([-1,]))
-        self.assertRaises(KeyError,tc.get_names,'a')
-
-
-        tc = TaxyTool()
-        tc.add_taxonomy_set('a')
-        self.assertEquals(tc.get_handle('a'),0)
-        self.assertEquals(tc.get_names(0),set(['a']))
+        tc.add_taxonomy_set(nick_name=nick_name)
+        self.assertEquals(tc.get_handles(0), {-1,})
+        self.assertRaises(KeyError,tc.get_names,a)
 
 
         tc = TaxyTool()
-        tc.add_taxonomy_set('a')
-        tc.add_taxonomy_set('b')
+        tc.add_taxonomy_set(a)
+        self.assertEquals(tc.get_handle(a),0)
+        self.assertEquals(tc.get_names(0),{a,})
 
-        self.assertEquals(tc.get_handle('a'),0)
-        self.assertEquals(tc.get_names(0),set(['a']))
-
-        self.assertEquals(tc.get_handle('b'),1)
-        self.assertEquals(tc.get_names(1),set(['b']))
 
         tc = TaxyTool()
-        tc.add_taxonomy_set('a')
-        tc.add_taxonomy_set('a')
+        tc.add_taxonomy_set(a)
+        tc.add_taxonomy_set(b)
 
-        self.assertEquals(tc.get_handle('a'),-1)
+        self.assertEquals(tc.get_handle(a),0)
+        self.assertEquals(tc.get_names(0),{a,})
 
-        self.assertEquals(tc.get_handles('a'),set([0,1]))
-        self.assertEquals(tc.get_names(0),set(['a']))
-        self.assertEquals(tc.get_names(1),set(['a']))
+        self.assertEquals(tc.get_handle(b),1)
+        self.assertEquals(tc.get_names(1),{b,})
 
         tc = TaxyTool()
-        tc.add_taxonomy_set('a','b','c')
-        self.assertEquals(tc.get_handle('a'),0)
-        self.assertEquals(tc.get_handle('b'),0)
-        self.assertEquals(tc.get_handle('c'),0)
-        self.assertEquals(tc.get_names(0),set(['b','a','c']))
+        tc.add_taxonomy_set(nick_name, a, b, c)
+        self.assertEquals(tc.get_handle(nick_name),0)
+        self.assertEquals(tc.get_handles(a),{0,})
+        self.assertEquals(tc.get_handles(b),{0,})
+        self.assertEquals(tc.get_handles(c),{0,})
+        self.assertEquals(tc.get_names(0),{nick_name,a,b,c,})
 
 
     def test_extend_names(self):
 
         tc = TaxyTool()
         tc.add_taxonomy_set('1','a')
-        tc.add_taxonomy_set('1','b')
+        tc.add_taxonomy_set('2','a')
 
-        self.assertEquals(tc.get_handles('1'),set([0,1]))
+        self.assertEquals(tc.get_handles('1'),{0,})
+        self.assertEquals(tc.get_handles('2'),{1,})
 
-        self.assertEquals(tc.get_names(0),set(['1','a']))
-        self.assertEquals(tc.get_names(1),set(['1','b']))
+        self.assertEquals(tc.get_names(0),{'1', 'a',})
+        self.assertEquals(tc.get_names(1),{'2', 'a',})
 
-        tc.extend_names('1','2')
-        tc.extend_names('a','z')
-        tc.extend_names('b','c')
+        tc.extend_names_by_nick_name('1', 'c', 'e')
+        tc.extend_names_by_nick_name('2', 'z', 'x')
+        tc.extend_names_by_nick_name('1', 'd', 'f')
 
-        self.assertEquals(tc.get_handles('2'),set([0,1]))
+        self.assertEquals(tc.get_handles('a'),{0,1})
+        self.assertEquals(tc.get_handles('z'),{1,})
+        self.assertEquals(tc.get_handles('c'),{0,})
 
+        #Test for a name that isn't in the taxonomy
+        self.assertEquals(tc.get_handles('b'),{-1,})
 
-        self.assertEquals(tc.get_handles('a'),set([0]))
-        self.assertEquals(tc.get_handles('z'),set([0]))
-        self.assertEquals(tc.get_handles('b'),set([1]))
-        self.assertEquals(tc.get_handles('c'),set([1]))
+        self.assertEquals(tc.get_names(0),{'1', 'a', 'c', 'e', 'd', 'f',})
+        self.assertEquals(tc.get_names(1),{'2', 'a', 'z', 'x',})
 
-        self.assertEquals(tc.get_names(0),set(['1','2','a','z']))
-        self.assertEquals(tc.get_names(1),set(['1','2','b','c']))
-
+        tc.extend_names_by_anyname('a', 'extend')
+        self.assertEquals(tc.get_handles('extend'),{0,1,})
 
     def test_yamlize(self):
 
         tc = TaxyTool()
         tc.add_taxonomy_set('1','a')
-        tc.add_taxonomy_set('1','b')
+        tc.add_taxonomy_set('2','b')
 
-        tc.extend_names('1','2')
-        tc.extend_names('a','z')
-        tc.extend_names('b','c')
-
+        tc.extend_names_by_nick_name('1','x')
+        tc.extend_names_by_anyname('a','z')
+        tc.extend_names_by_anyname('b','c')
 
         s = tc.dump()
 
@@ -123,12 +119,12 @@ class TaxonomyToolTestCase(unittest.TestCase):
 
         #@todo - a list is not a set and the yaml dump/ion serialization can not handle sets...
         self.assertEquals(tc2._cnt,1)
-        self.assertEquals(set(tc2.get_names(0)),set(['1','2','a','z']))
-        self.assertEquals(set(tc2.get_names(1)),set(['1','2','b','c']))
+        self.assertEquals(set(tc2.get_names(0)),{'1','x','a','z',})
+        self.assertEquals(set(tc2.get_names(1)),{'2','b','c',})
 
 
         self.assertEquals(tc._cnt,1)
-        self.assertEquals(set(tc.get_names(0)),set(['1','2','a','z']))
-        self.assertEquals(set(tc.get_names(1)),set(['1','2','b','c']))
+        self.assertEquals(set(tc.get_names(0)),{'1','x','a','z',})
+        self.assertEquals(set(tc.get_names(1)),{'2','b','c',})
 
 
