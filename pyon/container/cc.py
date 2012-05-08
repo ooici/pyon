@@ -56,16 +56,42 @@ class Container(BaseContainerAgent):
 
         self._is_started = False
 
+        self._capabilities = []
+
         # set id and name (as they are set in base class call)
         self.id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
         self.name = "cc_agent_%s" % self.id
 
         Container.instance = self
 
-        # TODO: Bug: Replacing CFG instance not work because references are already public. Update directly
-        dict_merge(CFG, kwargs, inplace=True)
         from pyon.core import bootstrap
         bootstrap.container_instance = self
+
+        # DatastoreManager - controls access to Datastores (both mock and couch backed)
+        self.datastore_manager = DatastoreManager()
+
+        self.datastore_manager.start()
+        self._capabilities.append("DATASTORE_MANAGER")
+
+        # Instantiate Directory and self-register
+        # Has the additional side effect of either
+        # bootstrapping the configuration into the
+        # directory or read the configuration based
+        # in the value of the auto_bootstrap setting
+        self.directory = Directory()
+
+        config_from_directory = CFG.get_safe("system.config_from_directory", False)
+        from pyon.util.config import Config
+        conf_paths = ['res/config/pyon.local.yml']
+        if not config_from_directory:
+            # Look for and apply any local file config overrides
+            local_cfg = Config(conf_paths, ignore_not_found=True).data
+            dict_merge(CFG, local_cfg, inplace=True)
+
+        # Now apply any command line config overrides
+        # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
+        dict_merge(CFG, kwargs, inplace=True)
+
         bootstrap.assert_configuration(CFG)
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
 
@@ -98,14 +124,12 @@ class Container(BaseContainerAgent):
 
         # Coordinates the container start
         self._is_started = False
-        self._capabilities = []
         self._status = "INIT"
 
         # protection for when the container itself is used as a Process for clients
         self.container = self
 
         log.debug("Container initialized, OK.")
-
 
     def start(self):
         log.debug("Container starting...")
@@ -141,8 +165,7 @@ class Container(BaseContainerAgent):
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
-        # Instantiate Directory and self-register
-        self.directory = Directory()
+        # Self-register with Directory
         self.directory.register("/Containers", self.id, cc_agent=self.name)
         self.directory.register("/Containers/%s" % self.id, "Processes")
         self._capabilities.append("DIRECTORY")
@@ -185,7 +208,7 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listener=rsvc)
+        proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self)
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
 

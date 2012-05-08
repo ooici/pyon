@@ -27,17 +27,6 @@ class CodecInterceptor(Interceptor):
         payload = invocation.message
         log.debug("Payload, pre-transform: %s", payload)
 
-        # Horrible, hacky workaround for msgpack issue
-        # See http://jira.msgpack.org/browse/MSGPACK-15
-        #@todo replace this with use_list in msgpack.unpackb !!!
-        def convert_tuples_to_lists(obj):
-            if isinstance(obj, tuple):
-                res = list(obj)
-                return res
-            return obj
-
-        payload = walk(payload, convert_tuples_to_lists)
-
         invocation.message = self._io_deserializer.deserialize(payload)
         log.debug("Payload, post-transform: %s", invocation.message)
 

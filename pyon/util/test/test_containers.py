@@ -43,5 +43,35 @@ class Test_Containers(IonIntegrationTestCase):
         self.assertEqual(dict_modifier["bah"], "trah")
         self.assertEqual(dict_modifier["doh"], "ray")
 
+    def test_dotdict_chaining(self):
+        base = DotDict({'test':None})
+        base.chained.example.provides.utility = True
+        self.assertTrue(base['chained']['example']['provides']['utility'])
+        base.setting = True
+        self.assertTrue(base.setting)
+        self.assertTrue(base['setting'])
+
+        base.map = {'key':'value'}
+        self.assertIsInstance(base.map,DotDict, '%s' % type(base.map))
+        self.assertTrue(base.map.key=='value')
+
+    def test_dotdict_error(self):
+        base = DotDict()
+        with self.assertRaises(AttributeError):
+            test_case = base.non_existent
+        with self.assertRaises(KeyError):
+            base['non_existent']
+
+    def test_dotdict_builtin_error(self):
+        # Ensures that you can not override the builtin methods
+        base = DotDict()
+        with self.assertRaises(AttributeError):
+            base.pop = 'shouldnt work'
+        with self.assertRaises(AttributeError):
+            base.__getitem__ = 'really shouldnt work'
+
+        with self.assertRaises(AttributeError):
+            base.another.chained.pop = 'again should not work'
+
 if __name__ == "__main__":
     unittest.main()

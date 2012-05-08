@@ -12,8 +12,9 @@ from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import Conflict, NotFound, BadRequest
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
+from pyon.event.event import EventPublisher, EventSubscriber
 from pyon.util.log import log
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, dict_merge
 
 from interface.objects import DirEntry
 
@@ -32,7 +33,11 @@ class Directory(object):
         self.orgname = orgname or CFG.system.root_org
         self.is_root = (self.orgname == CFG.system.root_org)
 
+        self.event_pub = None
+        self.event_sub = None
+
         self._init()
+        self._init_change_notification()
 
     def close(self):
         """
@@ -54,10 +59,11 @@ class Directory(object):
         root_obj = DirEntry(parent='', key=self.orgname, attributes=dict(sys_name=bootstrap.get_sys_name()))
         root_id,rev = self.dir_store.create(root_obj, self.orgname)
 
-
     def _init(self):
+        # determine config flow to follow
         auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
         if not auto_bootstrap:
+            self._load_config()
             return
 
         try:
@@ -101,6 +107,20 @@ class Directory(object):
 
         self._assert_existence("/", "Services",
                 description="Service instances are registered here")
+
+    def receive_directory_change_event(event_msg, headers):
+        # @TODO add support to fold updated config into container config
+        pass
+
+    def _init_change_notification(self):
+                
+        # init change event publisher
+        self.event_pub = EventPublisher()
+        
+        # Register to receive directory changes
+        self.event_sub = EventSubscriber(event_type="ContainerConfigModifiedEvent",
+                                         origin="Directory",
+                                         callback=self.receive_directory_change_event)
 
     def _get_dn(self, parent, key=None, org=None):
         """
@@ -173,6 +193,11 @@ class Directory(object):
             direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
             self.dir_store.create(direntry, dn)
 
+        if self.event_pub:
+            if parent.startswith("/Config"):
+                self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
+                                             origin="Directory")
+
         return entry_old
 
     def register_safe(self, parent, key, **kwargs):
@@ -220,6 +245,11 @@ class Directory(object):
         if direntry:
             entry_old = direntry.attributes
             self.dir_store.delete(direntry)
+
+        if self.event_pub:
+            if parent.startswith("/Config"):
+                self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
+                                             origin="Directory")
 
         return entry_old
 
@@ -299,6 +329,7 @@ class Directory(object):
         de = self.lookup("/Config/CFG")
         if not de:
             raise Conflict("Expected /Config/CFG in directory. Correct Org??")
+        dict_merge(CFG, de, inplace=True)
 
     def _register_service_definitions(self):
         from pyon.core.bootstrap import service_registry

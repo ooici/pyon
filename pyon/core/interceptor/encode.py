@@ -14,7 +14,14 @@ def decode_ion( obj):
     MsgPack object hook to decode any ion object as part of the message pack walk rather than implementing it again in
     pyon
     """
-    if "__ion_array__" in obj:
+
+    if "__set__" in obj:
+        return set(obj['tuple'])
+
+    elif "__list__" in obj:
+        return list(obj['tuple'])
+
+    elif "__ion_array__" in obj:
         # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
         return numpy.array(obj['content'],dtype=numpy.dtype(obj['header']['type']))
 
@@ -28,7 +35,14 @@ def encode_ion( obj):
     MsgPack object hook to encode any ion object as part of the message pack walk rather than implementing it again in
     pyon
     """
-    if isinstance(obj, numpy.ndarray):
+
+    if isinstance(obj, list):
+        return {"__list__":True, 'tuple':tuple(obj)}
+
+    elif isinstance(obj, set):
+        return {"__set__":True, 'tuple':tuple(obj)}
+
+    elif isinstance(obj, numpy.ndarray):
         return {"header":{"type":str(obj.dtype),"nd":len(obj.shape),"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
     elif isinstance(obj, complex):
@@ -63,6 +77,6 @@ class EncodeInterceptor(Interceptor):
     def incoming(self, invocation):
         log.debug("EncodeInterceptor.incoming: %s", invocation)
         log.debug("Pre-transform: %s", invocation.message)
-        invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion)
+        invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion, use_list=1)
         log.debug("Post-transform: %s", invocation.message)
         return invocation
