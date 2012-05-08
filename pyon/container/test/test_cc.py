@@ -9,6 +9,7 @@ from pyon.container.cc import Container
 import signal
 from gevent.event import Event
 from mock import Mock, patch
+from interface.services.icontainer_agent import ContainerAgentClient
 
 @attr('UNIT')
 class TestCC(PyonTestCase):
@@ -65,4 +66,12 @@ class TestCCInt(IonIntegrationTestCase):
 
         # verify things got called
         self.cc.stop.assert_called_once_with()
+
+    def test_start_hello(self):
+        # start a service over messaging
+        self._start_container()
+        cc_client = ContainerAgentClient(node=self.container.node, name=self.container.name)
+
+        p = cc_client.spawn_process('hello', 'examples.service.hello_service', 'HelloService')
+
 
