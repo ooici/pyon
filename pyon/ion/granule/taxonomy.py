@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 '''
-@package prototype.coverage.record_set
-@file prototype/coverage/record_set.py
+@package pyon.ion.granule.taxonomy
+@file pyon.ion.granule.taxonomy.py
 @author David Stuebe
 @author Don Brittain
+@author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
-
 '''
 
 
@@ -14,35 +14,16 @@ import yaml
 from pyon.core.object import ion_serializer, IonObjectDeserializer
 from pyon.core.registry import IonObjectRegistry
 
-from interface.objects import Granule, CompoundGranule, Taxonomy
+from interface.objects import Taxonomy
 
-class GenericTaxonomyDescription(dict):
-
-    def __init__(self,*args, **kwargs):
-
-        dict.__init__(self, *args, **kwargs)
-
-        self['_taxonomy_description_type'] = self.__class__.__name__
-
-class GMLTaxonomyDescription(GenericTaxonomyDescription):
-    pass
-
-class ISOTaxonomyDescription(GenericTaxonomyDescription):
-    pass
-
-class ReferenceTaxonomyDescription(GenericTaxonomyDescription):
-    pass
-
+# Create an IonObjectDeserializer used in the prototype loads method...
 ior = IonObjectRegistry()
-
 ion_deserializer = IonObjectDeserializer(obj_registry=ior)
-
 
 
 class TaxyTool(object):
     """
-    Wraps up a Taxonomy (IONObject) in a class which uses that information
-
+    @brief Wraps up a Taxonomy (IONObject) in a class which uses that information
     Definition of the Taxonomy Ion Resource:
     Taxonomy: !Extends_InformationResource
       map: {}
@@ -62,12 +43,17 @@ class TaxyTool(object):
 
         self._inv = {}
 
+        self._by_nick_names = {}
+
         if taxonomy is None:
             taxonomy = Taxonomy()
         else:
             self._cnt = max(taxonomy.map.keys())
 
-            for h, name_set in taxonomy.map.iteritems():
+            for h, names in taxonomy.map.iteritems():
+                nick_name, name_set =  names
+
+                self._add_nickname(nick_name, h)
                 self._update_inverse(h, name_set)
 
         self._t = taxonomy
@@ -91,14 +77,23 @@ class TaxyTool(object):
             self._inv[name] = h_set
 
 
-    def add_taxonomy_set(self, *args):
+    def _add_nickname(self, nick_name, h):
+        if nick_name not in self._by_nick_names:
+            self._by_nick_names[nick_name] = h
+        else:
+            raise KeyError('The nick name "%s" is not unique in this taxonomy', nick_name)
+
+    def add_taxonomy_set(self, nick_name, *args):
         """
         @brief Add a new set of names in the taxonomy under a new handle
         @param *args is a list of input arguments. All should be hashable
         """
         self._cnt += 1
         h = self._cnt
-        self._t.map[h] = set()
+
+        self._add_nickname(nick_name, h)
+
+        self._t.map[h] = (nick_name, {nick_name,})
 
         self._extend_taxonomy_set(h, *args)
 
@@ -114,31 +109,43 @@ class TaxyTool(object):
         if name in self._inv:
             return self._inv[name]
         else:
-            return set([-1])
+            return {-1,}
 
-    def get_handle(self, name):
+    def get_handle(self, nick_name):
         """
         Only works if the name maps to a unique handle
         @todo fix the exceptions later
         """
-        s = self.get_handles(name)
-        if len(s) != 1:
-            #@todo use a better exception? Something consistent?
-            raise RuntimeError('More than one handle for the name: "%s"!' % name)
 
-        # can not index a set - best way to get the value out?
-        t = tuple(s)
-        return t[0]
+        return self._by_nick_names[nick_name]
 
+    def get_nick_names(self, name):
+
+        handles = self.get_handles(name)
+
+        return [self._t.map[h][0] for h in handles]
 
     def get_names(self, handle):
         """
         Get the set of names associated with this handle
         """
         #@todo handle key errors?
-        return self._t.map[handle]
+        return self._t.map[handle][1]
 
-    def extend_names(self, name, *args):
+    def get_nick_name(self, handle):
+
+        return self._t.map[handle][0]
+
+    def extend_names_by_nick_name(self, nick_name, *args):
+        """
+        For a given existing nick name in the taxonomy add the additional names in args
+        """
+
+        handle = self._by_nick_names[nick_name]
+        self._extend_taxonomy_set(handle, *args)
+
+
+    def extend_names_by_anyname(self, name, *args):
         """
         For a given existing name in the taxonomy add the additional names in args everywhere that name already appears
         in the taxonomy
@@ -156,12 +163,12 @@ class TaxyTool(object):
         for item in args:
             assert item.__hash__ is not None
 
-        tmp_set = self._t.map[handle]
+        nick_name, tmp_set = self._t.map[handle]
         # handle the key error in the caller!
 
         name_set = tmp_set.union(set(args))
 
-        self._t.map[handle] = name_set
+        self._t.map[handle] = (nick_name, name_set)
 
         self._update_inverse(handle, name_set)
 
@@ -171,7 +178,7 @@ class TaxyTool(object):
         Prototype dumping a taxonomy as yaml for an instrument agent to store locally.
         """
 
-        #@todo - get the serializer and tests to pass - need to serialize sets to yaml???
+        #@todo - need to serialize sets to yaml???
         d = ion_serializer.serialize(self._t)
         return yaml.dump(d)
 

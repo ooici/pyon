@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 '''
-@package prototype.coverage.record_set
-@file prototype/coverage/record_set.py
+@package pyon.ion.granule.test.test_record_dictionary
+@file pyon/ion/granule/test/test_record_dictionary.py
 @author David Stuebe
 @author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
@@ -14,7 +14,7 @@ from nose.plugins.attrib import attr
 import numpy
 from pyon.ion.granule.record_dictionary import RecordDictionaryTool, TaxyTool
 
-@attr('UNIT', group='dmproto')
+@attr('UNIT', group='dm')
 class RecordDictionaryToolTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -161,11 +161,20 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
                 self.assertTrue(False)
 
     def test_contains(self):
-        if not 'temp' in self._rdt:
-            self.assertTrue(False)
 
-        if 'temp_not_found' in self._rdt:
-            self.assertTrue(False)
+        # Foo bar is not in the taxonomy or the record dictionary
+        self.assertFalse('foobar' in self._rdt)
+
+        # Temp is in the taxonomy but not the record dictionary
+        self.assertFalse('temp' in self._rdt)
+
+
+        # Now put in some data and make sure it works...
+        temp_array = numpy.random.standard_normal(100)
+        self._rdt['temp'] = temp_array
+
+        self.assertTrue('temp' in self._rdt)
+
 
     def test_pretty_print(self):
         temp_array = numpy.random.standard_normal(100)

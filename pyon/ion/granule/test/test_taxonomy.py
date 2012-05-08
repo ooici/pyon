@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-#@todo - move to pyon.ion.granule.test.test_taxonomy
 
 '''
-@package prototype.coverage.record_set
-@file prototype/coverage/test/test_taxonomy.py
+@package pyon.ion.granule.test.test_taxonomy
+@file pyon/ion/granule/test/test_taxonomy.py
 @author David Stuebe
+@author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
 '''
 
@@ -13,38 +13,35 @@ import unittest
 from nose.plugins.attrib import attr
 from pyon.ion.granule.taxonomy import Taxonomy, TaxyTool
 
-@attr('UNIT', group='dmproto2')
-class GranuleBuilderTestCase(unittest.TestCase):
+@attr('UNIT', group='dm')
+class TaxonomyToolTestCase(unittest.TestCase):
 
-    #@todo - change name to TaxyToolTestCase
     def test_init(self):
         """
         test initialization of the TaxyCab
         """
 
         tc = TaxyTool()
-        #@todo - replace this with a better exception?
-        #tjg - taken out, changed get_handles to always return something
-        #self.assertRaises(KeyError,tc.get_handles,0)
-        self.assertRaises(KeyError,tc.get_names,'a')
+        self.assertRaises(KeyError, tc.get_handle, 'nick_name')
+        self.assertRaises(KeyError,tc.get_names, 0)
 
 
-        tx = Taxonomy(map={1:set(['a'])})
+        tx = Taxonomy(map={1:('nick_name',{'nick_name','a'})})
 
         tc2 = TaxyTool(taxonomy=tx)
         self.assertEquals(tc2._cnt,1)
-        self.assertEquals(tc2.get_handle('a'),1)
+        self.assertEquals(tc2.get_handles('a'),set([1]))
+        self.assertEquals(tc2.get_handle('nick_name'),1)
 
         tc3 = TaxyTool(tx)
-        self.assertEquals(tc2.get_names(1),set(['a']))
+        self.assertEquals(tc3.get_names(1),{'nick_name','a'})
 
 
     def test_taxonomy_set(self):
 
         tc = TaxyTool()
         tc.add_taxonomy_set()
-        #tjg - taken out, changed get_handles to always return something
-        #self.assertRaises(KeyError,tc.get_handles,0)
+        self.assertEquals(tc.get_handles(0), set([-1,]))
         self.assertRaises(KeyError,tc.get_names,'a')
 
 
@@ -68,7 +65,7 @@ class GranuleBuilderTestCase(unittest.TestCase):
         tc.add_taxonomy_set('a')
         tc.add_taxonomy_set('a')
 
-        self.assertRaises(RuntimeError,tc.get_handle,'a')
+        self.assertEquals(tc.get_handle('a'),-1)
 
         self.assertEquals(tc.get_handles('a'),set([0,1]))
         self.assertEquals(tc.get_names(0),set(['a']))
