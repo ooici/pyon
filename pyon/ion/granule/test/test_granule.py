@@ -68,12 +68,11 @@ class GranuleTestCase(unittest.TestCase):
 
 
         for k, v in l_rd.iteritems():
-            for name in k:
-                self.assertIn(name, rdt)
+            self.assertIn(k, rdt)
 
-                if isinstance(v, numpy.ndarray):
-                    self.assertTrue( (v == rdt[name]).all())
+            if isinstance(v, numpy.ndarray):
+                self.assertTrue( (v == rdt[k]).all())
 
-                else:
-                    self.assertEquals(v._rd, rdt[name]._rd)
+            else:
+                self.assertEquals(v._rd, rdt[k]._rd)
 

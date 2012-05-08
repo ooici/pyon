@@ -82,14 +82,14 @@ class RecordDictionaryTool(object):
             if isinstance(v, dict):
                 result = RecordDictionaryTool(taxonomy=self._tx)
                 result._rd = v
-                yield self._tx.get_names(k), result
+                yield self._tx.get_nick_name(k), result
             else:
-                yield self._tx.get_names(k), v
+                yield self._tx.get_nick_name(k), v
 
     def iterkeys(self):
         """ D.iterkeys() -> an iterator over the keys of D """
         for k in self._rd.iterkeys():
-            yield self._tx.get_names(k)
+            yield self._tx.get_nick_name(k)
 
     def itervalues(self):
         """ D.itervalues() -> an iterator over the values of D """
@@ -111,17 +111,14 @@ class RecordDictionaryTool(object):
         if E:
             if hasattr(E, "keys"):
                 for k in E:
-                    t = tuple(k)
-                    self[t[0]] = E[k]
+                    self[k] = E[k]
             else:
                 for k, v in E.iteritems():
-                    t = tuple(k)    #need to use a better index than this, but it works
-                    self[t[0]] = v
+                    self[k] = v
 
         if F:
             for k in F.keys():
-                t = tuple(k)
-                self[t[0]] = F[k(0)]
+                self[k] = F[k]
 
     def __contains__(self, k):
         """ D.__contains__(k) -> True if D has a key k, else False """
@@ -141,7 +138,7 @@ class RecordDictionaryTool(object):
     def __iter__(self):
         """ x.__iter__() <==> iter(x) """
         for k in self._rd.iterkeys():
-            yield self._tx.get_names(k)
+            yield self._tx.get_nick_name(k)
 
     def __len__(self):
         """ x.__len__() <==> len(x) """

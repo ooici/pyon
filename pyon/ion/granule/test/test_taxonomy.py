@@ -73,6 +73,13 @@ class TaxonomyToolTestCase(unittest.TestCase):
         self.assertEquals(tc.get_handles(c),{0,})
         self.assertEquals(tc.get_names(0),{nick_name,a,b,c,})
 
+    def test_get_nick_names(self):
+        tc = TaxyTool()
+        tc.add_taxonomy_set('1','a')
+        tc.add_taxonomy_set('2','a')
+
+        self.assertEquals(tc.get_nick_name(0),'1')
+        self.assertEquals(tc.get_nick_names('a'),['1', '2'])
 
     def test_extend_names(self):
 
@@ -121,7 +128,6 @@ class TaxonomyToolTestCase(unittest.TestCase):
         self.assertEquals(tc2._cnt,1)
         self.assertEquals(set(tc2.get_names(0)),{'1','x','a','z',})
         self.assertEquals(set(tc2.get_names(1)),{'2','b','c',})
-
 
         self.assertEquals(tc._cnt,1)
         self.assertEquals(set(tc.get_names(0)),{'1','x','a','z',})
