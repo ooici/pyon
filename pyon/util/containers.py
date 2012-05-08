@@ -72,7 +72,7 @@ class DotDict(DotNotationGetItem, dict):
         raise AttributeError(key)
 
     def __setattr__(self,key,value):
-        if hasattr(self,key):
+        if key in dir(dict):
             raise AttributeError('%s conflicts with builtin.' % key)
         if isinstance(value, dict):
             self[key] = DotDict(value)
