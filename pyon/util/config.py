@@ -80,4 +80,11 @@ initialize_logging()
 # CONFIG. Read global configuration
 conf_paths = ['res/config/pyon.yml']
 CFG = Config(conf_paths, ignore_not_found=True).data
-        
+
+config_from_directory = CFG.get_safe("system.config_from_directory", False)
+if config_from_directory:
+    local_conf_paths = ['res/config/pyon.local.yml']
+    # Look for and apply any local file config overrides
+    local_cfg = Config(local_conf_paths, ignore_not_found=True).data
+    dict_merge(CFG, local_cfg, inplace=True)
+

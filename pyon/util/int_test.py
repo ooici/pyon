@@ -87,7 +87,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         If things are running slowly, diediedie will send a kill -9 to the owning process,
         which could be the test runner! Let the test runner decide if it's time to die.
         """
-        patcher = patch('pyon.core.process.shutdown_or_die')
+        patcher = patch('pyon.core.thread.shutdown_or_die')
         patcher.start()
         self.addCleanup(patcher.stop)
 

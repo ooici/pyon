@@ -14,7 +14,7 @@ from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerConfigError, BadRequest
 from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
 from pyon.ion.endpoint import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
-from pyon.ion.process import IonProcessSupervisor
+from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
 from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
@@ -43,7 +43,7 @@ class ProcManager(object):
         self._spawned_proc_to_process = {}
 
         # The pyon worker process supervisor
-        self.proc_sup = IonProcessSupervisor(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
+        self.proc_sup = IonProcessThreadManager(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
 
     def start(self):
         log.debug("ProcManager starting ...")
@@ -132,7 +132,7 @@ class ProcManager(object):
             log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
             raise
 
-    def _spawned_proc_failed(self, proc_sup, gproc):
+    def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s", gproc)
 
         # for now - don't worry about the mapping, if we get a failure, just kill the container.
@@ -178,11 +178,17 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc1, rsvc2], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(name=service_instance.id,
+                                   service=service_instance,
+                                   listeners=[rsvc1, rsvc2],
+                                   proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, service_instance.id)))
 
         # map gproc to service_instance
         self._spawned_proc_to_process[proc.proc] = service_instance
+
+        # set service's reference to process
+        service_instance._process = proc
 
         # Directory registration
         self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
@@ -217,11 +223,17 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc, sub], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(name=service_instance.id,
+                                   service=service_instance,
+                                   listeners=[rsvc, sub],
+                                   proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
 
         # map gproc to service_instance
         self._spawned_proc_to_process[proc.proc] = service_instance
+
+        # set service's reference to process
+        service_instance._process = proc
 
         return service_instance
 
@@ -254,11 +266,17 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(name=service_instance.id,
+                                   service=service_instance,
+                                   listeners=[rsvc],
+                                   proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
         self._spawned_proc_to_process[proc.proc] = service_instance
+
+        # set service's reference to process
+        service_instance._process = proc
 
         # Directory registration
         caps = service_instance.get_capabilities()
@@ -291,11 +309,17 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
-        proc = self.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc], name=service_instance.id, proc_name=service_instance._proc_name)
+        proc = self.proc_sup.spawn(name=service_instance.id,
+                                   service=service_instance,
+                                   listeners=[rsvc],
+                                   proc_name=service_instance._proc_name)
         self.proc_sup.ensure_ready(proc, "_spawn_standalone_process for %s" % service_instance.id)
 
         # map gproc to service_instance
         self._spawned_proc_to_process[proc.proc] = service_instance
+
+        # set service's reference to process
+        service_instance._process = proc
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
@@ -334,6 +358,12 @@ class ProcManager(object):
         return service_instance
 
     def _create_service_instance(self, process_id, name, module, cls, config):
+        """
+        Creates an instance of a "service", be it a Service, Agent, Stream, etc.
+
+        @rtype BaseService
+        @return An instance of a "service"
+        """
         # SERVICE INSTANCE.
         service_instance = for_name(module, cls)
         if not isinstance(service_instance, BaseService):
