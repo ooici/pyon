@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from pyon.util.async import wait
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -13,6 +12,7 @@ from gevent.event import AsyncResult, Event
 from gevent.coros import Semaphore
 from pyon.util.unit_test import PyonTestCase
 import time
+from pyon.util.context import LocalContextMixin
 
 @attr('UNIT', group='process')
 class ProcessTest(PyonTestCase):
@@ -76,7 +76,8 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test__routing_call(self):
-        p = IonProcessThread(name=sentinel.name, listeners=[])
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -90,7 +91,8 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test_competing__routing_call(self):
-        p = IonProcessThread(name=sentinel.name, listeners=[])
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
 
@@ -122,7 +124,9 @@ class ProcessTest(PyonTestCase):
         p._routing_call(thecall, {'ar':ar2})
 
         # wait on all the ARs to be set
-        wait([ar1, ar2, ar3])
+        ar1.get(timeout=5)
+        ar2.get(timeout=5)
+        ar3.get(timeout=5)
 
         # just getting here without throwing an exception is the true test!
 

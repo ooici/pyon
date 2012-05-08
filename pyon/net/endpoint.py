@@ -1137,6 +1137,12 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         ######
         ###### THIS IS WHERE THE THREAD LOCAL HEADERS CONTEXT IS SET ######
         ######
+
+        # With the property _routing_call set, as is the case 95% of the time in the Process-level endpoints,
+        # we have to set the call context from the ION process' calling greenlet, as context is greenlet-specific.
+        # This is done in the _make_routing_call override here, passing it the context to be set.
+        # See also IonProcessThread._control_flow.
+
         with self._process.push_context(headers):
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
@@ -1156,7 +1162,7 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         if not self._routing_call:
             return RPCResponseEndpointUnit._make_routing_call(self, call, op_args)
 
-        ar = self._routing_call(call, op_args)
+        ar = self._routing_call(call, op_args, context=self._process.get_context())
         return ar.get()     # @TODO: timeout?
 
 

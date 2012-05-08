@@ -69,17 +69,23 @@ class IonProcessThread(PyonThread):
         # wait on control flow loop!
         ct.get()
 
-    def _routing_call(self, call, callargs):
+    def _routing_call(self, call, callargs, context=None):
         """
         Endpoints call into here to synchronize across the entire IonProcess.
 
         Returns immediately with an AsyncResult that can be waited on. Calls
         are made by the loop in _control_flow. We pass in the calling greenlet so
         exceptions are raised in the correct context.
+
+        @param  call        The call to be made within this ION processes' calling greenlet.
+        @param  callargs    The keyword args to pass to the call.
+        @param  context     Optional process-context (usually the headers of the incoming call) to be
+                            set. Process-context is greenlet-local, and since we're crossing greenlet
+                            boundaries, we must set it again in the ION process' calling greenlet.
         """
         ar = AsyncResult()
 
-        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs))
+        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, context))
         return ar
 
     def _control_flow(self):
@@ -97,12 +103,13 @@ class IonProcessThread(PyonThread):
         created at scheduling time is set with the result of the call.
         """
         for calltuple in self._ctrl_queue:
-            calling_gl, ar, call, callargs = calltuple
-            log.debug("control_flow making call: %s %s", call, callargs)
+            calling_gl, ar, call, callargs, context = calltuple
+            log.debug("control_flow making call: %s %s (has context: %s)", call, callargs, context is not None)
 
             res = None
             try:
-                res = call(**callargs)
+                with self.service.push_context(context):
+                    res = call(**callargs)
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.
