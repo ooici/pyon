@@ -229,8 +229,13 @@ class ThreadManager(object):
 
                 if time_remaining > 0:
                     # The nice way; let it do cleanup
-                    proc.notify_stop()
-                    proc.join(time_remaining)
+                    try:
+                        proc.notify_stop()
+                        proc.join(time_remaining)
+                    except Exception:
+                        # not playing nice? just kill it.
+                        proc.stop()
+
                 else:
                     # Out of time. Cya, sucker
                     proc.stop()

@@ -113,6 +113,10 @@ class IonProcessThread(PyonThread):
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.
+
+                # unfortunately, this is the best location for a real stacktrace of what happened - the greenlets
+                # failing will not look pretty.
+                log.exception("_control_flow call to %s failed", call)
                 calling_gl.kill(exception=e, block=False)
 
             ar.set(res)
