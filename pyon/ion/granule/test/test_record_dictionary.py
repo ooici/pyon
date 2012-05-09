@@ -28,6 +28,32 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
 
         self._rdt = RecordDictionaryTool(taxonomy=self._tx)
 
+    def test_init(self):
+
+        # initialize with a taxonomy tool
+        rdt = RecordDictionaryTool(taxonomy=self._tx)
+        self.assertIsInstance(rdt._tx, TaxyTool)
+
+        # initialize with a taxonomy object
+        rdt = RecordDictionaryTool(taxonomy=self._tx._t)
+        self.assertIsInstance(rdt._tx, TaxyTool)
+
+        # initialize with pooo
+        self.assertRaises(TypeError, RecordDictionaryTool, ['foo', 'barr'])
+
+        # initialize with a valid length
+        rdt = RecordDictionaryTool(taxonomy=self._tx, length=5)
+        self.assertEquals(rdt._len, 5)
+
+        # initialize with no length
+        rdt = RecordDictionaryTool(taxonomy=self._tx)
+        self.assertEquals(rdt._len, None)
+
+        # initialize with pooo
+        self.assertRaises(TypeError, RecordDictionaryTool, self._tx, 'not an int')
+
+
+
     def test_set_and_get(self):
         """
         make sure you can set and get items in the granule by name in the taxonomy

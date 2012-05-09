@@ -9,9 +9,10 @@
 '''
 
 import StringIO
-from pyon.ion.granule.taxonomy import TaxyTool
+from pyon.ion.granule.taxonomy import TaxyTool, Taxonomy
 from pyon.util.log import log
 
+_NoneType = type(None)
 class RecordDictionaryTool(object):
     """
     A granule is a unit of information which conveys part of a coverage. It is composed of a taxonomy and a nested
@@ -26,15 +27,25 @@ class RecordDictionaryTool(object):
     def __init__(self,taxonomy, length=None):
         """
         @brief Initialize a new instance of Record Dictionary Tool with a taxonomy and an optional fixed length
-        @param taxonomy is an instance of a TaxonomyTool used in this record dictionary
+        @param taxonomy is an instance of a TaxonomyTool or Taxonomy (IonObject) used in this record dictionary
         @param length is an optional fixed length for the value sequences of this record dictionary
         """
 
         self._rd = {}
         self._len = length
 
+        if not isinstance(length, (_NoneType, int)):
+            raise TypeError('Invalid length argument, received type "%s"; should be None or int', type(length))
+
+
         # hold onto the taxonomy - we need it to build the granule...
-        self._tx = taxonomy
+
+        if isinstance(taxonomy, TaxyTool):
+            self._tx = taxonomy
+        elif isinstance(taxonomy, Taxonomy):
+            self._tx = TaxyTool(taxonomy)
+        else:
+            raise TypeError('Invalid taxonomy argument, received type "%s"; should be Taxonomy or TaxyTool', type(taxonomy))
 
     @classmethod
     def load_from_granule(cls, g):
