@@ -16,6 +16,14 @@ from pyon.ion.granule.record_dictionary import RecordDictionaryTool
 from pyon.ion.granule.granule import build_granule
 
 def granule_example(nsdict):
+    """
+    Usage:
+    from examples.granule import granule_example
+    granule_example(locals())
+
+    tx, g, rdt, rdt2... etc, are now local variables in your shell!
+    """
+
     #Define a taxonomy and add sets. add_taxonomy_set takes one or more names and assigns them to one handle
     tx = TaxyTool()
     tx.add_taxonomy_set('temp', 'long_temp_name')
@@ -51,7 +59,7 @@ def granule_example(nsdict):
     print len(rdt)
 
     #Delete an item in the RecordDictionary
-    del rdt['rdt']
+    del rdt['temp']
 
 
     g = build_granule(data_producer_id='john', taxonomy=tx, record_dictionary=rdt)

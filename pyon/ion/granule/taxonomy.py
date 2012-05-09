@@ -37,8 +37,9 @@ class TaxyTool(object):
     """
 
     def __init__(self, taxonomy=None):
-
-        # An internal counter for the handles of this taxonomy
+        """
+        @brief Initialize the state of the TaxyTool wrapper. Can take an existing taxonomy as an argument.
+        """
         self._cnt = -1
 
         self._inv = {}
@@ -60,6 +61,9 @@ class TaxyTool(object):
 
     @classmethod
     def load_from_granule(cls, g):
+        """
+        Load a TaxyTool from a granule
+        """
         return cls(g.taxonomy)
 
     def _update_inverse(self, h, name_set):
@@ -86,6 +90,7 @@ class TaxyTool(object):
     def add_taxonomy_set(self, nick_name, *args):
         """
         @brief Add a new set of names in the taxonomy under a new handle
+        @param nick_name is the first positional argument, it is unique name in the taxonomy
         @param *args is a list of input arguments. All should be hashable
         """
         self._cnt += 1
@@ -101,11 +106,10 @@ class TaxyTool(object):
 
     def get_handles(self, name):
         """
-        @brief Get the handles for a particular name
-        @param name is a object which is hashable
-        @return set of handles
+        @brief Get the handles for a name
+        @param name is a string or object which is hashable
+        @return set of handles that have that name
         """
-        #@todo handle key errors?
         if name in self._inv:
             return self._inv[name]
         else:
@@ -113,32 +117,55 @@ class TaxyTool(object):
 
     def get_handle(self, nick_name):
         """
-        Only works if the name maps to a unique handle
-        @todo fix the exceptions later
+        @brief Get the handle for a given nick name
+        @param nick_name is a unique name in the taxonomy
+        @return handle is a integer identifier
         """
 
         return self._by_nick_names[nick_name]
 
     def get_nick_names(self, name):
-
+        """
+        @brief Get the nick names for a given name in the taxonomy
+        @param name is a string or object which is hashable
+        @return A set of nick names which are unique in the taxonomy
+        """
         handles = self.get_handles(name)
 
         return [self._t.map[h][0] for h in handles]
 
-    def get_names(self, handle):
+    def get_names_by_handle(self, handle):
         """
-        Get the set of names associated with this handle
+        @brief Get the set of names associated with a handle
+        @param handle is a integer identifier
+        @return A set of names which can be strings or hashable objects
         """
-        #@todo handle key errors?
         return self._t.map[handle][1]
 
-    def get_nick_name(self, handle):
+    def get_names_by_nick_name(self, nick_name):
+        """
+        @brief Get the set of names associated with this nick name
+        @param nick_name is a unique name in the taxonomy
+        @return A set of nick names which are unique in the taxonomy
+        """
+        handle = self.get_handle(nick_name)
+        return self._t.map[handle][1]
 
+
+    def get_nick_name(self, handle):
+        """
+        @brief Get the set of nick name associated with a handle
+        @param handle is a integer identifier
+        @return nick name is a unique name in the taxonomy
+        """
         return self._t.map[handle][0]
 
     def extend_names_by_nick_name(self, nick_name, *args):
         """
-        For a given existing nick name in the taxonomy add the additional names in args
+        @brief For a given existing nick name in the taxonomy add the additional names in args
+        @param nick_name is a unique name in the taxonomy
+        @param args is a list of names which can be strings or hashable objects
+        @return None
         """
 
         handle = self._by_nick_names[nick_name]
@@ -147,8 +174,11 @@ class TaxyTool(object):
 
     def extend_names_by_anyname(self, name, *args):
         """
-        For a given existing name in the taxonomy add the additional names in args everywhere that name already appears
+        @breif For a given existing name in the taxonomy add the additional names in args everywhere that name already appears
         in the taxonomy
+        @param name is a string or object which is hashable
+        @param args is a list of names which can be strings or hashable objects
+        @return None
         """
 
         for handle in self.get_handles(name):
@@ -173,9 +203,20 @@ class TaxyTool(object):
         self._update_inverse(handle, name_set)
 
 
+    def pretty_print(self, offset=''):
+        result = 'Start Pretty Print Taxonomy:'
+        for k, v in self._t.map.iteritems():
+
+            result += '\n= TX nick name: "%s"; handle "%s"' % (v[0], k)
+            for name in v[1]:
+                result += '\n= +name: %s' % name
+
+        result += '\nEnd of Pretty Print'
+        return result
+
     def dump(self):
         """
-        Prototype dumping a taxonomy as yaml for an instrument agent to store locally.
+        @brief Prototype dumping a taxonomy as yaml for instance for an instrument agent to store locally.
         """
 
         #@todo - need to serialize sets to yaml???
@@ -186,7 +227,7 @@ class TaxyTool(object):
     @classmethod
     def load(cls,input):
         """
-        Prototype loading the locally stored yaml for and instrument agent to use in a TaxyCab
+        @brief Prototype loading the locally stored yaml for instance for an instrument agent to use in a TaxyTool
         """
 
         d = yaml.load(input)

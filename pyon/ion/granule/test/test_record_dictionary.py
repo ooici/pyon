@@ -94,24 +94,30 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         Assert that the taxonomies are the same...
         """
 
-        temp_array = numpy.random.standard_normal(100)
-        cond_array = numpy.random.standard_normal(100)
-        pres_array = numpy.random.standard_normal(100)
 
-        self._rdt['temp'] = temp_array
-        self._rdt['cond'] = cond_array
+        pres_array = numpy.random.standard_normal(100)
         self._rdt['pres'] = pres_array
 
         rdt2 = RecordDictionaryTool(taxonomy=self._tx)
         temp_array = numpy.random.standard_normal(100)
         cond_array = numpy.random.standard_normal(100)
-        pres_array = numpy.random.standard_normal(100)
 
         rdt2['temp'] = temp_array
         rdt2['cond'] = cond_array
-        rdt2['pres'] = pres_array
 
-        self._rdt.update(E=rdt2)
+        self._rdt.update(rdt2)
+
+        self.assertIn('pres', self._rdt)
+        self.assertIn('temp', self._rdt)
+        self.assertIn('cond', self._rdt)
+
+        self.assertTrue((self._rdt['pres'] == pres_array).all())
+        self.assertTrue((self._rdt['cond'] == cond_array).all())
+        self.assertTrue((self._rdt['temp'] == temp_array).all())
+
+        self.assertEquals(len(self._rdt), 3)
+
+
 
     def test_len(self):
         temp_array = numpy.random.standard_normal(100)
@@ -122,7 +128,7 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self._rdt['cond'] = cond_array
         self._rdt['pres'] = pres_array
 
-        self.assertTrue(len(self._rdt) > 0)
+        self.assertEquals(len(self._rdt), 3)
 
     def test_repr(self):
         """
@@ -146,25 +152,30 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self._rdt['cond'] = cond_array
         self._rdt['pres'] = pres_array
 
+        self.assertIn('pres', self._rdt)
+        self.assertIn('temp', self._rdt)
+        self.assertIn('cond', self._rdt)
+
         del self._rdt['pres']
-        for k in self._rdt.iterkeys():
-            if k == 'pres':
-                self.assertTrue(False)
+
+        self.assertNotIn('pres', self._rdt)
+        self.assertIn('temp', self._rdt)
+        self.assertIn('cond', self._rdt)
 
     def test_contains(self):
 
-        # Foo bar is not in the taxonomy or the record dictionary
-        self.assertFalse('foobar' in self._rdt)
+        # foobar isn't even in the taxonomy!
+        self.assertNotIn('foobar', self._rdt)
 
         # Temp is in the taxonomy but not the record dictionary
-        self.assertFalse('temp' in self._rdt)
+        self.assertNotIn('temp', self._rdt)
 
 
         # Now put in some data and make sure it works...
         temp_array = numpy.random.standard_normal(100)
         self._rdt['temp'] = temp_array
 
-        self.assertTrue('temp' in self._rdt)
+        self.assertIn('temp', self._rdt)
 
 
     def test_pretty_print(self):
@@ -176,13 +187,12 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self._rdt['cond'] = cond_array
         self._rdt['pres'] = pres_array
 
-        # map is {<local name>: <granule name or path>}
 
         rdt = RecordDictionaryTool(taxonomy=self._tx)
         rdt['rdt'] = temp_array
         self._rdt['rdt'] = rdt
 
-        self.assertTrue(len(self._rdt.pretty_print()) > 0)
+        self.assertGreater(len(self._rdt.pretty_print()), 0)
 
 
 

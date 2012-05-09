@@ -6,67 +6,64 @@
 @author David Stuebe
 @author Tim Giguere
 @brief https://confluence.oceanobservatories.org/display/CIDev/R2+Construction+Data+Model
-
 '''
 
-
-import numpy
-from interface.objects import Granule
-from pyon.ion.granule.taxonomy import TaxyTool
-
-import pprint
 import StringIO
+from pyon.ion.granule.taxonomy import TaxyTool
+from pyon.util.log import log
 
 class RecordDictionaryTool(object):
     """
-    A granule is a unit of information which conveys part of a coverage.
+    A granule is a unit of information which conveys part of a coverage. It is composed of a taxonomy and a nested
+    structure of record dictionaries.
 
-    A granule contains a record dictionary. The record dictionary is composed of named value sequences.
-    We want the Granule Builder to have a dictionary like behavior for building record dictionaries, using the taxonomy
-    as a map from the name to the ordinal in the record dictionary.
+    The record dictionary is composed of named value sequences and other nested record dictionaries.
 
-    The fact that all of the keys are ordinals mapped by the taxonomy should never be exposed
+    The fact that all of the keys in the record dictionary are handles mapped by the taxonomy should never be exposed.
+    The application user refers to everything in the record dictionary by the unique nick name from the taxonomy.
 
-    Don't worry about raising exceptions at this point - put an @todo for now
     """
     def __init__(self,taxonomy, length=None):
         """
-        @todo - add docs...
+        @brief Initialize a new instance of Record Dictionary Tool with a taxonomy and an optional fixed length
+        @param taxonomy is an instance of a TaxonomyTool used in this record dictionary
+        @param length is an optional fixed length for the value sequences of this record dictionary
         """
 
         self._rd = {}
-        self._len = -1
-        if length:
-            self._len = length
+        self._len = length
 
         # hold onto the taxonomy - we need it to build the granule...
         self._tx = taxonomy
 
     @classmethod
     def load_from_granule(cls, g):
+        """
+        @brief return an instance of Record Dictionary Tool from a granule. Used when a granule is received in a message
+        """
         result = cls(TaxyTool(g.taxonomy))
         result._rd = g.record_dictionary
         return result
 
     def __setitem__(self, name, vals):
         """
-        Give the Record Dictionary Tool a dictionary like behavior
+        Set an item by nick name in the record dictionary
         """
 
         if isinstance(vals, RecordDictionaryTool):
             assert vals._tx == self._tx
             self._rd[self._tx.get_handle(name)] = vals._rd
         else:
-            #@todo assert length matches self._len when setting value sequences
-            if self._len == -1:
+            #Otherwise it is a value sequence which should have the correct length
+            if self._len is None:
                 self._len = len(vals)
-            assert self._len == len(vals), 'Invalid value length'
+            assert self._len == len(vals), 'Invalid value length "%s"; Record dictionary defined length is "%s"' % (len(vals),self._len)
             self._rd[self._tx.get_handle(name)] = vals
 
 
     def __getitem__(self, name):
         """
-        Give the Record Dictionary Tool a dictionary like behavior
+        Get an item by nick name from the record dictionary.
         """
         if isinstance(self._rd[self._tx.get_handle(name)], dict):
             result = RecordDictionaryTool(taxonomy=self._tx)
@@ -103,10 +100,9 @@ class RecordDictionaryTool(object):
 
     def update(self, E=None, **F):
         """
-        D.update(E, **F) -> None.  Update D from dict/iterable E and F.
-        If E has a .keys() method, does:     for k in E: D[k] = E[k]
-        If E lacks .keys() method, does:     for (k, v) in E: D[k] = v
-        In either case, this is followed by: for k in F: D[k] = F[k]
+        @brief Dictionary update method exposed for Record Dictionaries
+        @param E is another record dictionary
+        @param F is a dictionary of nicknames and value sequences
         """
         if E:
             if hasattr(E, "keys"):
@@ -120,14 +116,15 @@ class RecordDictionaryTool(object):
             for k in F.keys():
                 self[k] = F[k]
 
-    def __contains__(self, k):
+    def __contains__(self, nick_name):
         """ D.__contains__(k) -> True if D has a key k, else False """
 
-        for handle in self._tx.get_handles(k):
-            if handle in self._rd:
-                return True
-
-        return False
+        try:
+            handle = self._tx.get_handle(nick_name)
+        except KeyError as ke:
+            # if the nick_name is not in the taxonomy, it is certainly not in the record dictionary
+            return False
+        return handle in self._rd
 
     def __delitem__(self, y):
         """ x.__delitem__(y) <==> del x[y] """
@@ -142,7 +139,7 @@ class RecordDictionaryTool(object):
 
     def __len__(self):
         """ x.__len__() <==> len(x) """
-        return self._len
+        return len(self._rd)
 
     def __repr__(self):
         """ x.__repr__() <==> repr(x) """
@@ -168,13 +165,35 @@ class RecordDictionaryTool(object):
     __hash__ = None
 
     def pretty_print(self):
-        result = ''
-        for k, v in self.iteritems():
-            if isinstance(v, RecordDictionaryTool):
-                result += 'RDT %s contains:\n' % k
-                result += v.pretty_print()
-            else:
-                result += '    item: %s\n    values: %s\n' % (k, v)
+        """
+        @brief Pretty Print the record dictionary for debug or log purposes.
+        """
+
+        fid = StringIO.StringIO()
+        # Use string IO inside a try block in case of exceptions or a large return value.
+        try:
+            fid.write('Start Pretty Print Record Dictionary:\n')
+            self._pprint(fid,offset='')
+            fid.write('End of Pretty Print')
+        except Exception, ex:
+            log.exception('Unexpected Exception in Pretty Print Wrapper!')
+            fid.write('Exception! %s' % ex)
+
+        finally:
+            result = fid.getvalue()
+            fid.close()
+
 
         return result
 
+    def _pprint(self, fid, offset=None):
+        """
+        Utility method for pretty print
+        """
+        for k, v in self.iteritems():
+            if isinstance(v, RecordDictionaryTool):
+                fid.write('= %sRDT nick named "%s" contains:\n' % (offset,k))
+                new_offset = offset + '+ '
+                v._pprint(fid, offset=new_offset)
+            else:
+                fid.write('= %sRDT nick name: "%s"\n= %svalues: %s\n' % (offset,k, offset, v))
