@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
-
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager
+from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
 from pyon.util.async import wait, spawn
 import threading
+import traceback
 
 class IonProcessThread(PyonThread):
     """
@@ -114,9 +114,11 @@ class IonProcessThread(PyonThread):
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.
 
-                # unfortunately, this is the best location for a real stacktrace of what happened - the greenlets
-                # failing will not look pretty.
-                log.exception("_control_flow call to %s failed", call)
+                # try decorating the args of the exception with the true traceback
+                # this should be reported by ThreadManager._child_failed
+                exc = PyonThreadTraceback("True traceback captured by IonProcessThread' _control_flow:\n\n" + traceback.format_exc())
+                e.args = e.args + (exc,)
+
                 calling_gl.kill(exception=e, block=False)
 
             ar.set(res)

@@ -16,6 +16,15 @@ import signal
 class PyonThreadError(Exception):
     pass
 
+class PyonThreadTraceback(object):
+    """
+    Sentinel class for extracting a real traceback.
+    """
+    def __init__(self, msg):
+        self._msg = msg
+    def __str__(self):
+        return self._msg
+
 class PyonThread(object):
     """
     @brief Threadlike base class for doing work in the container.
@@ -162,7 +171,12 @@ class ThreadManager(object):
         return proc
 
     def _child_failed(self, gproc):
-        log.error("Child failed with an exception: %s", gproc.exception)
+        # extract any PyonThreadTracebacks - one should be last
+        extra = ""
+        if len(gproc.exception.args) and isinstance(gproc.exception.args[-1], PyonThreadTraceback):
+            extra = "\n" + str(gproc.exception.args[-1])
+
+        log.error("Child failed with an exception: %s%s", gproc.exception, extra)
         if self._failure_notify_callback:
             self._failure_notify_callback(gproc)
 
