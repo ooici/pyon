@@ -207,4 +207,4 @@ class RecordDictionaryTool(object):
                 new_offset = offset + '+ '
                 v._pprint(fid, offset=new_offset)
             else:
-                fid.write('= %sRDT nick name: "%s"\n= %svalues: %s\n' % (offset,k, offset, v))
+                fid.write('= %sRDT nick name: "%s"\n= %svalues: %s\n' % (offset,k, offset, repr(v)))
