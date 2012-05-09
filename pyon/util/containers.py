@@ -56,18 +56,29 @@ class DotDict(DotNotationGetItem, dict):
     """
 
     def __dir__(self):
-        dictdir = dir(dict(self))       # woof, this is slow, but a rarely called method anyway, really for interactive work
-        dictdir.extend(self.iterkeys())
-        return dictdir
+        return self.__dict__.keys() + self.keys()
 
     def __getattr__(self, key):
         """ Make attempts to lookup by nonexistent attributes also attempt key lookups. """
-        try:
-            val = self.__getitem__(key)
-        except KeyError:
-            raise AttributeError(key)
+        if self.has_key(key):
+            return self[key]
+        import sys
+        import dis
+        frame = sys._getframe(1)
+        if '\x00%c' % dis.opmap['STORE_ATTR'] in frame.f_code.co_code:
+            self[key] = DotDict()
+            return self[key]
 
-        return val
+        raise AttributeError(key)
+
+    def __setattr__(self,key,value):
+        if key in dir(dict):
+            raise AttributeError('%s conflicts with builtin.' % key)
+        if isinstance(value, dict):
+            self[key] = DotDict(value)
+        else:
+            self[key] = value
+
 
     def copy(self):
         return DotDict(dict.copy(self))
@@ -93,7 +104,7 @@ class DictModifier(DotDict):
             data = DotDict(data)
         elif not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
-        self.base = base
+        dict.__setattr__(self,'base',base)
 
         if data is not None:
             self.update(data)

@@ -157,7 +157,7 @@
 
     <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:3" Effect="Permit">
         <Description>
-            An anonymous user can onbly access identity_management.create_user_identity during bootstrap
+            An anonymous user can onbly access identity_management.create_actor_identity during bootstrap
 
         </Description>
 
@@ -184,7 +184,7 @@
             <Actions>
                 <Action>
                     <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_user_identity</AttributeValue>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_actor_identity</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
                 </Action>

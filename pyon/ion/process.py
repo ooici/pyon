@@ -5,7 +5,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
-from pyon.core.process import GreenProcess, GreenProcessSupervisor
+from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
@@ -13,19 +13,21 @@ from gevent import greenlet
 from pyon.util.async import wait, spawn
 import threading
 
-class GreenIonProcess(GreenProcess):
+class IonProcessThread(PyonThread):
     """
     Form the base of an ION process.
-    Just add greenlets or python processes to complete.
     """
 
-    def __init__(self, target=None, listeners=None, name=None, **kwargs):
-        self.listeners      = listeners
-        self.name           = name
-        self._child_procs   = []
-        self._ctrl_queue    = Queue()
+    def __init__(self, target=None, listeners=None, name=None, service=None, **kwargs):
+        self._startup_listeners = listeners or []
+        self.listeners          = []
+        self.name               = name
+        self.service            = service
 
-        GreenProcess.__init__(self, target=target, **kwargs)
+        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
+        self._ctrl_queue        = Queue()
+
+        PyonThread.__init__(self, target=target, **kwargs)
 
     def _child_failed(self, child):
         """
@@ -33,7 +35,22 @@ class GreenIonProcess(GreenProcess):
 
         Propogates the error up to the process supervisor.
         """
-        self.proc.throw(child.exception)
+        self.proc.kill(child.exception)
+
+    def add_endpoint(self, listener):
+        """
+        Adds a listening endpoint to this ION process.
+
+        Spawns the listen loop and sets the routing call to synchronize incoming messages
+        here. If this process hasn't been started yet, adds it to the list of listeners
+        to start on startup.
+        """
+        if self.proc:
+            listener.routing_call = self._routing_call
+            self.thread_manager.spawn(listener.listen)
+            self.listeners.append(listener)
+        else:
+            self._startup_listeners.append(listener)
 
     def target(self, *args, **kwargs):
         """
@@ -42,32 +59,33 @@ class GreenIonProcess(GreenProcess):
         if self.name:
             threading.current_thread().name = self.name
 
-        # - tell all listeners they need to call here for sync
-        # - spawn listen loops
-        for listener in self.listeners:
-            listener.routing_call = self._routing_call
-            self._child_procs.append(spawn(listener.listen))
+        # spawn all listeners in startup listeners (from initializer, or added later)
+        for listener in self._startup_listeners:
+            self.add_endpoint(listener)
 
         # spawn control flow loop
-        self._child_procs.append(spawn(self._control_flow))
+        ct = self.thread_manager.spawn(self._control_flow)
 
-        # link them all to a failure handler
-        map(lambda x: x.link_exception(self._child_failed), self._child_procs)
+        # wait on control flow loop!
+        ct.get()
 
-        # wait on them
-        wait(self._child_procs)
-
-    def _routing_call(self, call, callargs):
+    def _routing_call(self, call, callargs, context=None):
         """
         Endpoints call into here to synchronize across the entire IonProcess.
 
         Returns immediately with an AsyncResult that can be waited on. Calls
         are made by the loop in _control_flow. We pass in the calling greenlet so
         exceptions are raised in the correct context.
+
+        @param  call        The call to be made within this ION processes' calling greenlet.
+        @param  callargs    The keyword args to pass to the call.
+        @param  context     Optional process-context (usually the headers of the incoming call) to be
+                            set. Process-context is greenlet-local, and since we're crossing greenlet
+                            boundaries, we must set it again in the ION process' calling greenlet.
         """
         ar = AsyncResult()
 
-        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs))
+        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, context))
         return ar
 
     def _control_flow(self):
@@ -85,15 +103,20 @@ class GreenIonProcess(GreenProcess):
         created at scheduling time is set with the result of the call.
         """
         for calltuple in self._ctrl_queue:
-            calling_gl, ar, call, callargs = calltuple
-            log.debug("control_flow making call: %s %s", call, callargs)
+            calling_gl, ar, call, callargs, context = calltuple
+            log.debug("control_flow making call: %s %s (has context: %s)", call, callargs, context is not None)
 
             res = None
             try:
-                res = call(**callargs)
+                with self.service.push_context(context):
+                    res = call(**callargs)
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.
+
+                # unfortunately, this is the best location for a real stacktrace of what happened - the greenlets
+                # failing will not look pretty.
+                log.exception("_control_flow call to %s failed", call)
                 calling_gl.kill(exception=e, block=False)
 
             ar.set(res)
@@ -108,9 +131,11 @@ class GreenIonProcess(GreenProcess):
         map(lambda x: x.close(), self.listeners)
         self._ctrl_queue.put(StopIteration)
 
-        wait(self._child_procs)
+        # wait_children will join them and then get() them, which may raise an exception if any of them
+        # died with an exception.
+        self.thread_manager.wait_children(30)
 
-        GreenProcess._notify_stop(self)
+        PyonThread._notify_stop(self)
 
     def get_ready_event(self):
         """
@@ -124,11 +149,10 @@ class GreenIonProcess(GreenProcess):
         spawn(allready, ev)
         return ev
 
-class IonProcessSupervisor(GreenProcessSupervisor):
-    type_callables = {
-          'green': GreenIonProcess
-#        , 'python': PythonIonProcess
-    }
+class IonProcessThreadManager(PyonThreadManager):
+
+    def _create_thread(self, target=None, **kwargs):
+        return IonProcessThread(target=target, **kwargs)
 
 # ---------------------------------------------------------------------------------------------------
 

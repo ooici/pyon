@@ -80,12 +80,13 @@ class Container(BaseContainerAgent):
         # in the value of the auto_bootstrap setting
         self.directory = Directory()
 
-        # Look for and apply any local file config overrides
+        config_from_directory = CFG.get_safe("system.config_from_directory", False)
         from pyon.util.config import Config
         conf_paths = ['res/config/pyon.local.yml']
-        local_cfg = Config(conf_paths, ignore_not_found=True).data
-        # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
-        dict_merge(CFG, local_cfg, inplace=True)
+        if not config_from_directory:
+            # Look for and apply any local file config overrides
+            local_cfg = Config(conf_paths, ignore_not_found=True).data
+            dict_merge(CFG, local_cfg, inplace=True)
 
         # Now apply any command line config overrides
         # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
@@ -207,7 +208,7 @@ class Container(BaseContainerAgent):
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_manager.proc_sup.spawn((CFG.cc.proctype or 'green', None), listeners=[rsvc])
+        proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self)
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
 
