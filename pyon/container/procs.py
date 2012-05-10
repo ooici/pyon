@@ -440,14 +440,10 @@ class ProcManager(object):
 
         service_instance.quit()
 
-        # find the proc
-        lp = list(self.proc_sup.children)
-        lps = set()
-        map(lambda p: lps.add, (p for p in lp if service_instance in (l._process for l in p.listeners)))
-
-        for p in lps:
-            p.notify_stop()
-            p.stop()
+        # terminate IonProcessThread (may not have one, i.e. simple process)
+        if service_instance._process:
+            service_instance._process.notify_stop()
+            service_instance._process.stop()
 
         del self.procs[process_id]
 
