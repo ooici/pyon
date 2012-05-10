@@ -438,7 +438,6 @@ class ObjectModelGenerator:
                             args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
                     fields.append(field)
-                    ###self.field_details.append({"attrname": field, "attrtype": value_type, "attrdefault": converted_value})
                     field_details.append((field, value_type, converted_value))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
@@ -454,18 +453,14 @@ class ObjectModelGenerator:
                         attrtableentries = ""
                         field_details.sort()
                         for field_detail in field_details:
-                            ###attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=self.field_detail["attrname"], type=self.field_detail["attrtype"], default=self.field_detail["attrdefault"], attrcomment="TODO")
                             attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), attrcomment="")
                             self.objectattributesrowentries += csv_doc_templates['object_attributes_row_entry'].substitute(classname=current_class, name=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), description="")
 
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
-                        ###for assockey in related_associations:
-                            ### assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]), predicate=assockey, object=str(related_associations[assockey]["range"]), constraints="TODO", description="TODO2")
 
-                        ###doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclassname=super_class, classcomment="TODO", attrtableentries=attrtableentries, assoctableentries=assoctableentries)
-                        for assoc in related_associations:
-                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
+                        for assockey in related_associations:
+                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'",""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'",""), constraints="", description="")
 
                         super_classes = ""
                         sup = super_class
@@ -474,7 +469,8 @@ class ObjectModelGenerator:
                         while sup != "IonObjectBase":
                             if sup == "Resource":
                                 class_type = "resource"
-                            super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
+#                            super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
+                            super_classes += '<a href="' + sup + '">' + sup + '</a>, '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
