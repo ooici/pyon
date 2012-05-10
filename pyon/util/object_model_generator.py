@@ -130,30 +130,50 @@ ${super_class_attr_tables}
 
 html_doc_templates = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
 
+csv_doc_templates = {
+'object_types_doc':
+'''ObjectTypeName,type,extends,description
+${rowentries}
+''',
+'object_types_row_entry':
+'''${classname},${type},${extends},${description}
+''',
+'object_attributes_doc':
+'''ObjectTypeName,attribute name,attribute type, attribute default,description
+${rowentries}
+''',
+'object_attributes_row_entry':
+'''${classname},${name},${type},${default},${description}
+'''
+
+
+}
+
+
+csv_doc_templates = dict(((k, string.Template(v)) for k, v in csv_doc_templates.iteritems()))
 
 
 class ObjectModelGenerator:
 
 
     data_yaml_text = ''
-    service_yaml_text = ''
+    objectattributesrowentries = ""
+    objecttypesrowentries = ""
     dataobject_output_text = ''
     def_dict = {}
-    args = []
-    fields = []
-    field_details = []
     class_args_dict = {}
 
 
     #
-    # Write object model to object.py file
+    # Write object model to object.py file and optionally csv files
     #
-    def write_to_object_model_file (self):
+    def write_files (self, opts):
 
         datadir = 'interface'
         if not os.path.exists(datadir):
             os.makedirs(datadir)
             open(os.path.join(datadir, '__init__.py'), 'w').close()
+
         datamodelfile = os.path.join(datadir, 'objects.py')
         try:
             os.unlink(datamodelfile)
@@ -163,20 +183,41 @@ class ObjectModelGenerator:
         with open(datamodelfile, 'w') as f:
             f.write(self.dataobject_output_text)
 
+        if opts.objectdoc:
+            objecttypecsv_output = csv_doc_templates['object_types_doc'].substitute(rowentries=self.objecttypesrowentries)
+            objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
+            try:
+                os.unlink(objecttypecsvfile)
+            except:
+                pass
+            print "Writing object type csv to '" + objecttypecsvfile + "'"
+            with open(objecttypecsvfile, 'w') as f:
+                f.write(objecttypecsv_output)
+
+            objectattributecsv_output = csv_doc_templates['object_attributes_doc'].substitute(rowentries=self.objectattributesrowentries)
+            objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
+            try:
+                os.unlink(objectattrscsvfile)
+            except:
+                pass
+            print "Writing object attribute csv to '" + objectattrscsvfile + "'"
+            with open(objectattrscsvfile, 'w') as f:
+                f.write(objectattributecsv_output)
+
 
 
 
     #
     # Gets the data from YAML files
     #
-    def get_yaml_text(self):
+    def read_yaml_text(self):
 
         data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml','shared.yml'])
         self.data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
         service_yaml_files = list_files_recursive('obj/services', '*.yml')
-        self.service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
+        service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
 
-        combined_yaml_text = self.data_yaml_text + "\n" + self.service_yaml_text
+        combined_yaml_text = self.data_yaml_text + "\n" + service_yaml_text
 
         return combined_yaml_text
 
@@ -220,11 +261,18 @@ class ObjectModelGenerator:
 
 
     #
-    # Parse YAML text data
+    # Parse YAML text looking for enums
     #
-    def parse_yaml_text (self, combined_yaml_text):
+    def generate_enums (self, combined_yaml_text, opts):
+        # Parse once looking for enum types.  These classes will go at
+        # the top of the objects.py.  Defs are also put into a dict
+        # so we can easily reference their values later in the parsing
+        # logic.
+        self.dataobject_output_text = "#!/usr/bin/env python\n\n"
+        self.dataobject_output_text += "#\n# This file is auto generated\n#\n\n"
+        self.dataobject_output_text += "from pyon.core.object import IonObjectBase\n"
+        self.dataobject_output_text += "#\n# Enums\n"
 
-        dataobject_output_text = ''
         for line in combined_yaml_text.split('\n'):
             if '!enum ' in line:
                 # If stand alone enum type definition
@@ -247,32 +295,50 @@ class ObjectModelGenerator:
                 assert name_val not in enums_by_name, "enum with type name %s redefined" % name_val
                 enums_by_name[name_val] = {"values": value_val, "default": default_val}
 
-                dataobject_output_text += "\nclass " + name_val + "(object):\n"
+                self.dataobject_output_text += "\nclass " + name_val + "(object):\n"
                 for i, val in enumerate(value_val, 1):
-                    dataobject_output_text += "    " + val + " = " + str(i) + "\n"
-                dataobject_output_text += "    _value_map = {"
-                for i, val in enumerate(value_val, 1):
-                    if i > 1:
-                        dataobject_output_text += ", "
-                    dataobject_output_text += "'" + val + "': " + str(i)
-                dataobject_output_text += "}\n"
-                dataobject_output_text += "    _str_map = {"
+                    self.dataobject_output_text += "    " + val + " = " + str(i) + "\n"
+                self.dataobject_output_text += "    _value_map = {"
                 for i, val in enumerate(value_val, 1):
                     if i > 1:
-                        dataobject_output_text += ", "
-                    dataobject_output_text += str(i) + ": '" + val + "'"
-                dataobject_output_text += "}\n"
+                        self.dataobject_output_text += ", "
+                    self.dataobject_output_text += "'" + val + "': " + str(i)
+                self.dataobject_output_text += "}\n"
+                self.dataobject_output_text += "    _str_map = {"
+                for i, val in enumerate(value_val, 1):
+                    if i > 1:
+                        self.dataobject_output_text += ", "
+                    self.dataobject_output_text += str(i) + ": '" + val + "'"
+                    if opts.objectdoc:
+                        self.objectattributesrowentries += csv_doc_templates['object_attributes_row_entry'].substitute(classname=classname, name=val, type='int', default=str(i), description="")
+                self.dataobject_output_text += "}\n"
 
-        return dataobject_output_text
+                if opts.objectdoc:
+                    self.objecttypesrowentries += csv_doc_templates['object_types_row_entry'].substitute(classname=classname, type='enum', extends='object', description="")
 
 
 
     #
     # Walk the data model definition and add Yaml constructors
     #
-    def add_yaml_constructor (self):
+    def add_yaml_constructors (self):
+        # Add constructor for enum types
+        enum_tag = u'!enum'
+        def enum_constructor(loader, node):
+            val_str = str(node.value)
+            val_str = val_str[1:-1].strip()
+            if 'name' in val_str:
+                name_str = val_str.split(',', 1)[0]
+                name_val = name_str.split('=')[1].strip()
+                return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"], "type": name_val}
+
+            else:
+                return {"__IsEnum": True, "_NameNotProvided": True}
+
+        yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
+
+        # Walk data definitions and pre-emptively add instance of and extents constructors
         defs = yaml.load_all(self.data_yaml_text, Loader=IonYamlLoader)
-        self.def_dict = {}
         for def_set in defs:
             for name,_def in def_set.iteritems():
                 if isinstance(_def, OrderedDict):
@@ -314,20 +380,23 @@ class ObjectModelGenerator:
 
 
     #
-    # Now walk the data model definition yaml files.  Generate
+    # Walk the data model definition yaml files.  Generate
     # corresponding classes in the objects.py file.
     #
-    def generate_object (self, opts):
+    def generate_objects (self, opts):
+
+        # Delimit the break between the enum classes and
+        # and the data model classes
+        self.dataobject_output_text += "\n\n# Data Objects\n"
 
         current_class_def_dict = None
         schema_extended = False
         current_class_schema = ""
         current_class = ""
         super_class = "IonObjectBase"
-        self.class_args_dict = {}
-        self.args = []
-        self.fields = []
-        self.field_details = []
+        args = []
+        fields = []
+        field_details = []
         init_lines = []
         first_time = True
 
@@ -349,8 +418,8 @@ class ObjectModelGenerator:
                     if isinstance(value, str) and '()' in value:
                         value_type = value.strip('()')
                         converted_value = value
-                        self.args.append(", ")
-                        self.args.append(field + "=None")
+                        args.append(", ")
+                        args.append(field + "=None")
                         init_lines.append('        self.' + field + " = " + field + " or " + value_type + "()\n")
                     else:
                         value_type = type(value).__name__
@@ -361,16 +430,16 @@ class ObjectModelGenerator:
                         if value_type in ['OrderedDict', 'list', 'tuple']:
                             if value_type == 'OrderedDict':
                                 value_type = 'dict'
-                            self.args.append(", ")
-                            self.args.append(field + "=None")
+                            args.append(", ")
+                            args.append(field + "=None")
                             init_lines.append('        self.' + field + " = " + field + " or " + converted_value + "\n")
                         else:
-                            self.args.append(", ")
-                            self.args.append(field + "=" + converted_value)
+                            args.append(", ")
+                            args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
-                    self.fields.append(field)
+                    fields.append(field)
                     ###self.field_details.append({"attrname": field, "attrtype": value_type, "attrdefault": converted_value})
-                    self.field_details.append((field, value_type, converted_value))
+                    field_details.append((field, value_type, converted_value))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
                     else:
@@ -383,10 +452,11 @@ class ObjectModelGenerator:
                 else:
                     if opts.objectdoc:
                         attrtableentries = ""
-                        self.field_details.sort()
-                        for self.field_detail in self.field_details:
+                        field_details.sort()
+                        for field_detail in field_details:
                             ###attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=self.field_detail["attrname"], type=self.field_detail["attrtype"], default=self.field_detail["attrdefault"], attrcomment="TODO")
-                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=self.field_detail[0], type=self.field_detail[1].replace("'",'"'), default=self.field_detail[2].replace("'",'"'), attrcomment="")
+                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), attrcomment="")
+                            self.objectattributesrowentries += csv_doc_templates['object_attributes_row_entry'].substitute(classname=current_class, name=field_detail[0], type=field_detail[1].replace("'",'"'), default=field_detail[2].replace("'",'"'), description="")
 
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
@@ -400,7 +470,10 @@ class ObjectModelGenerator:
                         super_classes = ""
                         sup = super_class
                         super_class_attribute_tables = ""
+                        class_type = "object"
                         while sup != "IonObjectBase":
+                            if sup == "Resource":
+                                class_type = "resource"
                             super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
@@ -411,8 +484,9 @@ class ObjectModelGenerator:
                             sup = self.class_args_dict[sup]["extends"]
                         super_classes += '<a href="#IonObjectBase">IonObjectBase</a>'
 
-                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+                        self.objecttypesrowentries += csv_doc_templates['object_types_row_entry'].substitute(classname=current_class, type=class_type, extends=super_class, description="")
 
+                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
 
                         datamodelhtmldir = 'interface/object_html'
                         if not os.path.exists(datamodelhtmldir):
@@ -426,9 +500,9 @@ class ObjectModelGenerator:
                             f.write(doc_output)                        
                         
                     ###class_args_dict[current_class] = {'args': self.args, 'fields': self.fields, 'field_details': self.field_details}
-                    self.class_args_dict[current_class] = {'args': self.args, 'fields': self.fields, 'field_details': self.field_details, 'extends': super_class}
+                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class}
 
-                    for arg in self.args:
+                    for arg in args:
                         self.dataobject_output_text += arg
                     self.dataobject_output_text += "):\n"
                     for init_line in init_lines:
@@ -439,8 +513,9 @@ class ObjectModelGenerator:
                     else:
                         self.dataobject_output_text += current_class_schema + "\n              }\n"
                 self.dataobject_output_text += '\n'
-                self.args = []
-                self.fields = []
+                args = []
+                fields = []
+                field_details = []
                 init_lines = []
                 current_class = line.split(":")[0]
                 try:
@@ -450,10 +525,10 @@ class ObjectModelGenerator:
                 super_class = "IonObjectBase"
                 if ': !Extends_' in line:
                     super_class = line.split("!Extends_")[1]
-                    self.args = self.args + self.class_args_dict[super_class]["args"]
+                    args = args + self.class_args_dict[super_class]["args"]
                     init_lines.append('        ' + super_class + ".__init__(self")
-                    self.fields = self.fields + self.class_args_dict[super_class]["fields"]
-                    for super_field in self.fields:
+                    fields = fields + self.class_args_dict[super_class]["fields"]
+                    for super_field in fields:
                         init_lines.append(", " + super_field)
                     init_lines.append(")\n")
                     schema_extended = True
@@ -468,15 +543,8 @@ class ObjectModelGenerator:
                 self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
 
 
-        data =  self.generate_service_object (current_class, init_lines, current_class_schema, schema_extended)
-
-        init_lines = data['init_lines']
-        current_class_schema = data['current_class_schema']
-        schema_extended = data['schema_extended']
-
-
-        if len(self.args) > 0:
-            for arg in self.args:
+        if len(args) > 0:
+            for arg in args:
                 self.dataobject_output_text += arg
             self.dataobject_output_text += "):\n"
             for init_line in init_lines:
@@ -489,116 +557,6 @@ class ObjectModelGenerator:
 
 
 
-
-    #
-    # Find any data model definitions lurking in the service interface
-    # definition yaml files and generate classes for them.
-    #
-    def generate_service_object(self, current_class, init_lines, current_class_schema, schema_extended):
-
-        # Find any data model definitions lurking in the service interface
-        # definition yaml files and generate classes for them.
-        lines = self.service_yaml_text.split('\n')
-        for index in range(1,len(lines)):
-            if lines[index].startswith('obj:'):
-                index += 1
-                while index in range(1,len(lines)) and not lines[index].startswith('---'):
-                    line = lines[index]
-                    if line.isspace():
-                        index += 1
-                        continue
-                    line = line.replace('  ', '', 1)
-                    if line.startswith('  #'):
-                        init_lines.append('  ' + line + '\n')
-                    elif line.startswith('  '):
-                        if current_class_def_dict:
-                            field = line.split(":")[0].strip()
-                            try:
-                                value = current_class_def_dict[field]
-                            except KeyError:
-                                # Ignore key error because value is nested
-                                index += 1
-                                continue
-
-                            enum_type = ""
-                            if isinstance(value, str) and '()' in value:
-                                value_type = value.strip('()')
-                                converted_value = value
-                                self.args.append(", ")
-                                self.args.append(field + "=" + converted_value)
-                                init_lines.append('        self.' + field + " = " + field + " or " + value_type + "()\n")
-                            else:
-                                value_type = type(value).__name__
-                                if value_type == 'dict' and "__IsEnum" in value:
-                                    enum_type = value["type"]
-                                    value_type = 'int'
-                                converted_value = self.convert_val(value)
-                                if value_type in ['OrderedDict', 'list', 'tuple']:
-                                    if value_type == 'OrderedDict':
-                                        value_type = 'dict'
-                                    self.args.append(", ")
-                                    self.args.append(field + "=None")
-                                    init_lines.append('        self.' + field + " = " + field + " or " + converted_value + "\n")
-                                else:
-                                    self.args.append(", ")
-                                    self.args.append(field + "=" + converted_value)
-                                    init_lines.append('        self.' + field + " = " + field + "\n")
-                            self.fields.append(field)
-                            if enum_type:
-                                 current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
-                            else:
-                                current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
-                    elif line and line[0].isalpha():
-                        if '!enum' in line:
-                            index += 1
-                            continue
-                        self.class_args_dict[current_class] = {'args': self.args, 'fields': self.fields}
-                        for arg in self.args:
-                            self.dataobject_output_text += arg
-                        self.dataobject_output_text += "):\n"
-                        for init_line in init_lines:
-                            self.dataobject_output_text += init_line
-                        if len(current_class_schema) > 0:
-                            if schema_extended:
-                                self.dataobject_output_text += current_class_schema + "\n              }.items())\n"
-                            else:
-                                self.dataobject_output_text += current_class_schema + "\n              }\n"
-                        self.dataobject_output_text += '\n'
-                        self.dataobject_output_text += '\n'
-                        self.args = []
-                        self.fields = []
-                        init_lines = []
-                        current_class = line.split(":")[0]
-                        try:
-                            current_class_def_dict = self.def_dict[current_class]
-                        except KeyError:
-                            current_class_def_dict = None
-                        super_class = "IonObjectBase"
-                        if ': !Extends_' in line:
-                            super_class = line.split("!Extends_")[1]
-                            self.args = self.args + self.class_args_dict[super_class]["args"]
-                            init_lines.append('        ' + super_class + ".__init__(self")
-                            self.fields = self.fields + self.class_args_dict[super_class]["fields"]
-                            for super_field in self.fields:
-                                init_lines.append(", " + super_field)
-                            init_lines.append(")\n")
-                            schema_extended = True
-                            current_class_schema = "\n    _schema = dict(" + super_class + "._schema.items() + {"
-                            line = line.replace(': !Extends_','(')
-                        else:
-                            schema_extended = False
-                            current_class_schema = "\n    _schema = {"
-                            line = line.replace(':','(IonObjectBase')
-                        ### self.dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
-                        init_lines.append("        self.type_ = '" + current_class + "'\n")
-                        self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
-                        
-                    index += 1
-        return {'init_lines': init_lines, 'current_class_schema': current_class_schema, 'schema_extended':schema_extended}
-
-
-
-
     #
     # Generate object model
     #
@@ -606,45 +564,17 @@ class ObjectModelGenerator:
        
 
         # Get data from the file
-        combined_yaml_text = self.get_yaml_text();
+        combined_yaml_text = self.read_yaml_text();
 
+        # Parse and generate enums first
+        self.generate_enums(combined_yaml_text, opts)
 
-        # Parse once looking for enum types.  These classes will go at
-        # the top of the objects.py.  Defs are also put into a dict
-        # so we can easily reference their values later in the parsing
-        # logic.
-        self.dataobject_output_text = "#!/usr/bin/env python\n\n"
-        self.dataobject_output_text += "#\n# This file is auto generated\n#\n\n"
-        self.dataobject_output_text += "from pyon.core.object import IonObjectBase\n"
-        self.dataobject_output_text += "# Enums\n"
+        # Add custom constructors so YAML doesn't choke
+        self.add_yaml_constructors()
 
-        # Parse the data
-        self.dataobject_output_text += self.parse_yaml_text(combined_yaml_text)
-        enum_tag = u'!enum'
-        def enum_constructor(loader, node):
-            val_str = str(node.value)
-            val_str = val_str[1:-1].strip()
-            if 'name' in val_str:
-                name_str = val_str.split(',', 1)[0]
-                name_val = name_str.split('=')[1].strip()
-                return {"__IsEnum": True, "value": name_val + "." + enums_by_name[name_val]["default"], "type": name_val}
-
-            else:
-                return {"__IsEnum": True, "_NameNotProvided": True}
-
-        # Add YAML constructors
-        yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
-        self.add_yaml_constructor()
-
-
-        # Delimit the break between the enum classes and
-        # and the data model classes
-        self.dataobject_output_text += "\n\n# Data Objects\n"
-
-
-        # Generate corresponding classes in the object.py file
-        self.generate_object(opts)
+        # Generate model object classes in the object.py file
+        self.generate_objects(opts)
         
         # Write to the objects.py file
-        self.write_to_object_model_file()
+        self.write_files(opts)
 
