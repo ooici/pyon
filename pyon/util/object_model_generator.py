@@ -110,7 +110,7 @@ ${super_class_attr_tables}
 'super_class_attribute_table':
 '''<div class="panel" style="border-width: 1px;">
   <div class="panelContent">
-    <h3>Attributes of Superclass ${super_class_name}</h3>
+    <h3>Attributes of superclass ${super_class_name}</h3>
     <div class='table-wrap'>
       <table class='confluenceTable'>
         <tr>
@@ -462,23 +462,35 @@ class ObjectModelGenerator:
                         for assockey in related_associations:
                             assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'",""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'",""), constraints="", description="")
 
+                        # Determine if class is object or resource
+                        def get_class_type(clzzname):
+                            while clzzname != "IonObjectBase":
+                                if sup == "Resource":
+                                    return "resource"
+                                clzzname = self.class_args_dict[clzzname]["extends"]
+                            
+                            return "object"
+
                         super_classes = ""
                         sup = super_class
                         super_class_attribute_tables = ""
-                        class_type = "object"
+                        class_type = get_class_type(sup)
                         while sup != "IonObjectBase":
-                            if sup == "Resource":
-                                class_type = "resource"
-#                            super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
-                            super_classes += '<a href="' + sup + '">' + sup + '</a>, '
+                            sup_class_type = get_class_type(sup)
+                            anchor = ""
+                            if sup_class_type == "resource":
+                                anchor = '<a href="Resource+Spec+for+' + sup + '">' + sup + '</a>'
+                            else:
+                                anchor = '<a href="Object+Spec+for+' + sup + '">' + sup + '</a>'
+                            super_classes += anchor + ', '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
                             for fld_detail in fld_details:
                                 superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'",'"'), default=fld_detail[2].replace("'",'"'), attrcomment="")
-                            super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=sup, superclassattrtableentries=superclassattrtableentries)
+                            super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=anchor, superclassattrtableentries=superclassattrtableentries)
                             sup = self.class_args_dict[sup]["extends"]
-                        super_classes += '<a href="#IonObjectBase">IonObjectBase</a>'
+                        super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
 
                         self.objecttypesrowentries += csv_doc_templates['object_types_row_entry'].substitute(classname=current_class, type=class_type, extends=super_class, description="")
 
