@@ -483,8 +483,13 @@ class ObjectModelGenerator:
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
 
+<<<<<<< HEAD
                         for assoc in related_associations:
                             assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
+=======
+                        for assockey in related_associations:
+                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'",""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'",""), constraints="", description="")
+>>>>>>> 795aaabd08e56fe4213a7aaddc78935b3e8d7316
 
                         super_classes = ""
                         sup = super_class
@@ -493,7 +498,8 @@ class ObjectModelGenerator:
                         while sup != "IonObjectBase":
                             if sup == "Resource":
                                 class_type = "resource"
-                            super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
+#                            super_classes += '<a href="#' + sup + '">' + sup + '</a>, '
+                            super_classes += '<a href="' + sup + '">' + sup + '</a>, '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
@@ -518,7 +524,6 @@ class ObjectModelGenerator:
                         with open(datamodelhtmlfile, 'w') as f:
                             f.write(doc_output)                        
                         
-                    ###class_args_dict[current_class] = {'args': self.args, 'fields': self.fields, 'field_details': self.field_details}
                     self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class}
 
                     for arg in args:
@@ -557,7 +562,6 @@ class ObjectModelGenerator:
                     schema_extended = False
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':','(IonObjectBase')
-                ### self.dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
                 self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
 
