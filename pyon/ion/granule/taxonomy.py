@@ -235,5 +235,20 @@ class TaxyTool(object):
 
         return cls(t)
 
+    def __eq__(self, other):
+
+        if self is other:
+            return True
+
+        if not isinstance(other, TaxyTool):
+            return False
+
+        if self._t is other._t:
+            return True
+
+        if self._t.map == other._t.map:
+            return True
+
+        return False
 
 
