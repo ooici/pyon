@@ -37,6 +37,23 @@ class InterceptorTest(PyonTestCase):
         b = received.message
         self.assertTrue((a==b).all())
 
+        # Rank 1, length 1 works:
+        a = np.array([90,8010,3,14112,3.14159265358979323846264],dtype='float32')
+        mangled = codec.outgoing(invoke)
+
+        received = codec.incoming(mangled)
+
+        b = received.message
+        self.assertTrue((a==b).all())
+
+        # Rank 0 array raises Value Error because numpy tolist does not return a list
+        a = np.array(3.14159265358979323846264,dtype='float32')
+
+        invoke = Invocation()
+        invoke.message = a
+
+        self.assertRaises(ValueError, codec.outgoing, invoke)
+
     @unittest.skipIf(not _have_numpy,'No numpy')
     def test_packed_numpy(self):
         a = np.array([(90,8010,3,14112,3.14159265358979323846264)],dtype='float32')
@@ -52,7 +69,6 @@ class InterceptorTest(PyonTestCase):
         c = b.get('double stuffed')
         for d in c:
             self.assertTrue((a==d).all())
-
 
     def test_set(self):
 

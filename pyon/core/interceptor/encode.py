@@ -39,22 +39,23 @@ def encode_ion( obj):
     if isinstance(obj, list):
         return {"__list__":True, 'tuple':tuple(obj)}
 
-    elif isinstance(obj, set):
+    if isinstance(obj, set):
         return {"__set__":True, 'tuple':tuple(obj)}
 
-    elif isinstance(obj, numpy.ndarray):
-        return {"header":{"type":str(obj.dtype),"nd":len(obj.shape),"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+    if isinstance(obj, numpy.ndarray):
+        if obj.ndim == 0:
+            raise ValueError('Can not encode a numpy array with rank 0')
+        return {"header":{"type":str(obj.dtype),"nd":obj.ndim,"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
-    elif isinstance(obj, complex):
+    if isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
 
     if isinstance(obj, (numpy.float, numpy.float16, numpy.float32, numpy.float64)):
         raise ValueError('Can not encode numpy scalars!')
 
-    else:
-        # Must raise type error to avoid recursive failure
-        raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
-    return obj
+
+    # Must raise type error to avoid recursive failure
+    raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
 
 
 
