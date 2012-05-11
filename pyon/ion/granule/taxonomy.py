@@ -85,7 +85,7 @@ class TaxyTool(object):
         if nick_name not in self._by_nick_names:
             self._by_nick_names[nick_name] = h
         else:
-            raise KeyError('The nick name "%s" is not unique in this taxonomy', nick_name)
+            raise KeyError('The nick name "%s" is not unique in this taxonomy' % nick_name)
 
     def add_taxonomy_set(self, nick_name, *args):
         """
