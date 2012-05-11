@@ -483,13 +483,10 @@ class ObjectModelGenerator:
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
 
-<<<<<<< HEAD
                         for assoc in related_associations:
                             assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
-=======
                         for assockey in related_associations:
                             assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'",""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'",""), constraints="", description="")
->>>>>>> 795aaabd08e56fe4213a7aaddc78935b3e8d7316
 
                         # Determine if class is object or resource
                         def get_class_type(clzzname):
