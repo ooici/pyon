@@ -17,7 +17,9 @@ import random
 from msgpack import packb, unpackb
 import hashlib
 
+from pyon.core.interceptor.encode import encode_ion, decode_ion
 
+"""
 def decode_numpy( obj):
     if "__ion_array__" in obj:
         return numpy.array(obj['content'],dtype=numpy.dtype(obj['shape']['type']))
@@ -53,6 +55,7 @@ def encode_numpy_as_string( obj):
         # Must raise type error to avoid recursive failure
         raise TypeError('Unknown type in user specified encoder')
     return obj
+"""
 
 def sha1(buf):
     return hashlib.sha1(buf).hexdigest().upper()
@@ -104,14 +107,14 @@ class PackRunBase(object):
         ]
     )
 
-    shapes = ((3,4), (9,12,18), (10,10,10,10),)
+    shapes = ((1,),(3,4), (9,12,18), (10,10,10,10),)
     #shapes = ((100,100,10,10),)
 
 
     def __init__(self, *args, **kwargs):
 
-        self._decoder = decode_numpy
-        self._encoder = encode_numpy
+        self._decoder = decode_ion
+        self._encoder = encode_ion
 
     def test_all(self):
 

@@ -56,13 +56,15 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
 
 
     def test_set_and_get(self):
-        """
-        make sure you can set and get items in the granule by name in the taxonomy
-        """
+        #make sure you can set and get items in the granule by name in the taxonomy
 
         temp_array = numpy.random.standard_normal(100)
         cond_array = numpy.random.standard_normal(100)
         pres_array = numpy.random.standard_normal(100)
+
+
+        self.assertRaises(KeyError, self._rdt.__setitem__, 'long_temp_name',temp_array)
+        self.assertRaises(KeyError, self._rdt.__setitem__, 'nonsense',temp_array)
 
         self._rdt['temp'] = temp_array
         self._rdt['cond'] = cond_array
@@ -90,10 +92,57 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self._rdt['rdt2'] = rdt2
 
 
+        # Now test bad values... list not numpy array...
+        with self.assertRaises(TypeError) as te:
+            rdt2['temp'] = [1,2,3]
+
+        self.assertEquals(
+            te.exception.message,
+            '''Invalid type "<type 'list'>" in Record Dictionary Tool setitem with name "temp". Valid types are numpy.ndarray and RecordDictionaryTool'''
+            )
+
+        # Now test numpy scalar array...
+        with self.assertRaises(TypeError) as te:
+            rdt2['temp'] = numpy.float32(3.14159)
+
+        self.assertEquals(
+            te.exception.message,
+            '''Invalid type "<type 'numpy.float32'>" in Record Dictionary Tool setitem with name "temp". Valid types are numpy.ndarray and RecordDictionaryTool'''
+        )
+
+
+        # Now test rank zero array...
+        with self.assertRaises(ValueError) as te:
+            rdt2['temp'] = numpy.array(22.5)
+
+        self.assertEquals(
+            te.exception.message,
+            '''The rank of a value sequence array in a record dictionary must be 1. Got name "temp" with rank "0"'''
+        )
+
+        # Now test rank 2 array...
+        with self.assertRaises(ValueError) as te:
+            rdt2['temp'] = numpy.array([[22.5,],])
+
+        self.assertEquals(
+            te.exception.message,
+            '''The rank of a value sequence array in a record dictionary must be 1. Got name "temp" with rank "2"'''
+        )
+
+        # Test set invalid length
+
+        pres_array = numpy.random.standard_normal(90)
+        with self.assertRaises(ValueError) as te:
+            rdt2['pres'] = pres_array
+
+        self.assertEquals(
+            te.exception.message,
+            '''Invalid value length "90" for name "pres"; Record dictionary defined length is "100"'''
+        )
+
+
     def test_iteration(self):
-        """
-        Test all four iteration methods for items in the granule
-        """
+        #Test all four iteration methods for items in the granule
 
         temp_array = numpy.random.standard_normal(100)
         cond_array = numpy.random.standard_normal(100)
@@ -123,10 +172,8 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
             self.assertTrue(k == 'temp' or k == 'cond' or k == 'pres')
 
     def test_update(self):
-        """
-        Update this granule with the content of another.
-        Assert that the taxonomies are the same...
-        """
+        # Update this granule with the content of another. Assert that the taxonomies are the same...
+
 
 
         pres_array = numpy.random.standard_normal(100)
@@ -165,9 +212,8 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self.assertEquals(len(self._rdt), 3)
 
     def test_repr(self):
-        """
-        Come up with a reasonable string representation of the granule for debug purposes only
-        """
+        # Come up with a reasonable string representation of the granule for debug purposes only
+
         temp_array = numpy.random.standard_normal(100)
         cond_array = numpy.random.standard_normal(100)
         pres_array = numpy.random.standard_normal(100)
