@@ -24,6 +24,7 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self._tx.add_taxonomy_set('cond', 'long_cond_name')
         self._tx.add_taxonomy_set('pres', 'long_pres_name')
         self._tx.add_taxonomy_set('rdt')
+        self._tx.add_taxonomy_set('rdt2')
         # map is {<local name>: <granule name or path>}
 
         self._rdt = RecordDictionaryTool(taxonomy=self._tx)
@@ -72,15 +73,22 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         self.assertTrue(numpy.allclose(self._rdt['pres'], pres_array))
 
         #want to check to make sure a KeyError is raised when a non-nickname key is used, but it's not working correctly
-        #self.assertRaises(KeyError, numpy.allclose(self._rdt['long_temp_name']))
-        #self.assertRaises(KeyError, self._rdt['long_cond_name'])
-        #self.assertRaises(KeyError, self._rdt['long_pres_name'])
+        self.assertRaises(KeyError, self._rdt.__getitem__, 'long_temp_name')
+        self.assertRaises(KeyError, self._rdt.__getitem__,'nonsense!')
 
-        # map is {<local name>: <granule name or path>}
-
-        rdt = RecordDictionaryTool(taxonomy=self._tx)
-        rdt['rdt'] = temp_array
+        taxy_tool_obj =self._tx
+        rdt = RecordDictionaryTool(taxonomy=taxy_tool_obj)
+        rdt['temp'] = temp_array
         self._rdt['rdt'] = rdt
+
+        # Now test when the Record Dictionary Tool is created with the Taxonomy object rather than the TaxyTool
+        # This can fail if the == method for TaxyTool is implemented incorrectly
+
+        taxonomy_ion_obj = self._tx._t
+        rdt2 = RecordDictionaryTool(taxonomy=taxonomy_ion_obj)
+        rdt2['temp'] = temp_array
+        self._rdt['rdt2'] = rdt2
+
 
     def test_iteration(self):
         """

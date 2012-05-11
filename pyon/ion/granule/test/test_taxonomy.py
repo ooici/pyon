@@ -36,6 +36,70 @@ class TaxonomyToolTestCase(unittest.TestCase):
         tc3 = TaxyTool(tx)
         self.assertEquals(tc3.get_names_by_handle(1),{'nick_name','a'})
 
+    def test_eq(self):
+
+        tx1 = Taxonomy(map={1:('nick_name',{'nick_name','a'}),
+                           2:('nick2',{'nick2','a','b','cc'})} )
+
+        # pass with tt1._t.map "is"
+        tt1 = TaxyTool(tx1)
+        tt2 = TaxyTool(tx1)
+        self.assertEquals(tt1, tt2)
+
+        # after changes - thy are still the same
+        tt2.add_taxonomy_set('new_name','p','q','r')
+        self.assertEquals(tt2,tt1)
+
+
+        # pass with 'is'
+        tt3 = tt1
+        self.assertEquals(tt3, tt1)
+
+        # after changes - thy are still the same
+        tt3.add_taxonomy_set('new_name','p','q','r')
+        self.assertEquals(tt1,tt3)
+
+
+        # pass with tt1._t.map '=='
+        tx1 = Taxonomy(map={1:('nick_name',{'nick_name','a'}),
+                            2:('nick2',{'nick2','a','b','cc'})} )
+
+        tx2 = Taxonomy(map={1:('nick_name',{'nick_name','a'}),
+                            2:('nick2',{'nick2','a','b','cc'})} )
+        self.assertNotEquals(tx1, tx2)
+        self.assertEquals(tx1.map, tx2.map)
+
+        tt1 = TaxyTool(tx1)
+        tt2 = TaxyTool(tx2)
+        self.assertEquals(tt1, tt2)
+
+        # fail with tt1._t.map '=='
+        tx2 = Taxonomy(map={1:('nick_name',{'nick_name','as'}),
+                            2:('nick2',{'nick2','a','b','cc'})} )
+        tt1 = TaxyTool(tx1)
+        tt2 = TaxyTool(tx2)
+        self.assertNotEquals(tt1, tt2)
+
+
+        # Use the interface to build a complex one and test equality as they go in and out of sync...
+        tt1 = TaxyTool()
+        tt2 = TaxyTool()
+        tt1.add_taxonomy_set('a name','junk','1','2')
+        tt2.add_taxonomy_set('a name','junk','1','2')
+
+        self.assertEquals(tt1, tt2)
+
+        tt2.add_taxonomy_set('new_name','1')
+
+        self.assertNotEquals(tt1,tt2)
+
+        tt1.extend_names_by_nick_name('a name','3')
+        tt2.extend_names_by_nick_name('a name','3')
+
+        tt1.add_taxonomy_set('new_name','1')
+
+        self.assertEquals(tt1, tt2)
+
 
     def test_taxonomy_set(self):
 
