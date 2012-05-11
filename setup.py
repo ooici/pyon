@@ -44,6 +44,7 @@ setup(  name = 'pyon',
             'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
         ],
         test_suite = 'pyon',
+        package_data = {'': ['*.xml']},
         install_requires = [
             # Patched greenlet to work on ARMS
             'greenlet==0.3.1-p1',
