@@ -11,6 +11,7 @@
 import StringIO
 from pyon.ion.granule.taxonomy import TaxyTool, Taxonomy
 from pyon.util.log import log
+import numpy
 
 _NoneType = type(None)
 class RecordDictionaryTool(object):
@@ -35,7 +36,7 @@ class RecordDictionaryTool(object):
         self._len = length
 
         if not isinstance(length, (_NoneType, int)):
-            raise TypeError('Invalid length argument, received type "%s"; should be None or int', type(length))
+            raise TypeError('Invalid length argument, received type "%s"; should be None or int' % type(length))
 
 
         # hold onto the taxonomy - we need it to build the granule...
@@ -45,7 +46,7 @@ class RecordDictionaryTool(object):
         elif isinstance(taxonomy, Taxonomy):
             self._tx = TaxyTool(taxonomy)
         else:
-            raise TypeError('Invalid taxonomy argument, received type "%s"; should be Taxonomy or TaxyTool', type(taxonomy))
+            raise TypeError('Invalid taxonomy argument, received type "%s"; should be Taxonomy or TaxyTool' % type(taxonomy))
 
     @classmethod
     def load_from_granule(cls, g):
@@ -64,13 +65,25 @@ class RecordDictionaryTool(object):
         if isinstance(vals, RecordDictionaryTool):
             assert vals._tx == self._tx
             self._rd[self._tx.get_handle(name)] = vals._rd
-        else:
+        elif isinstance(vals, numpy.ndarray):
             #Otherwise it is a value sequence which should have the correct length
+
+            if vals.ndim != 1:
+                raise ValueError('The rank of a value sequence array in a record dictionary must be 1. Got name "%s" with rank "%d"' % (name, vals.ndim))
+
+            # Set _len if it is None
             if self._len is None:
                 self._len = len(vals)
-            assert self._len == len(vals), 'Invalid value length "%s"; Record dictionary defined length is "%s"' % (len(vals),self._len)
+
+            # Test new value sequence length
+            if self._len != len(vals):
+                raise ValueError('Invalid value length "%s" for name "%s"; Record dictionary defined length is "%s"' % (len(vals), name, self._len))
+
             self._rd[self._tx.get_handle(name)] = vals
 
+        else:
+
+            raise TypeError('Invalid type "%s" in Record Dictionary Tool setitem with name "%s". Valid types are numpy.ndarray and RecordDictionaryTool' % (type(vals),name))
 
     def __getitem__(self, name):
         """
