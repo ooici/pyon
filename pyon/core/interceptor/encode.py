@@ -43,7 +43,9 @@ def encode_ion( obj):
         return {"__set__":True, 'tuple':tuple(obj)}
 
     elif isinstance(obj, numpy.ndarray):
-        return {"header":{"type":str(obj.dtype),"nd":len(obj.shape),"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+        if obj.ndim == 0:
+            raise ValueError('Can not encode a numpy array with rank 0')
+        return {"header":{"type":str(obj.dtype),"nd":obj.ndim,"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
     elif isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
