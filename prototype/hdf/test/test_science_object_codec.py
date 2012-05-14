@@ -45,6 +45,10 @@ class TestScienceObjectCodec(PyonTestCase):
     path_to_dataset =rootgrp_name + '/' + grp_name + '/' + dataset_name
 
 
+    @unittest.skip('Sha1 comparison is not valid for hdf files which may have different byte order')
+    def setUp(self):
+        pass
+
     @classmethod
     def setUpClass(cls):
 
