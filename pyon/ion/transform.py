@@ -203,6 +203,69 @@ class TransformBenchTesting(TransformDataProcess):
 
 
 
+
+
+class TransformBenchNewGranuleTesting(TransformBenchTesting):
+    """
+    Easiest way to run:
+    from pyon.util.containers import DotDict
+    tbt=cc.proc_manager._create_service_instance('55', 'tbt', 'pyon.ion.transform', 'TransformBenchTesting', DotDict({'process':{'name':'tbt', 'transform_id':'55'}}))
+    tbt.init()
+    tbt.start()
+    """
+
+    def __init__(self):
+        super(TransformBenchNewGranuleTesting,self).__init__()
+        self.count = 0
+        TransformBenchNewGranuleTesting.transform_number += 1
+
+
+
+
+    @staticmethod
+    def launch_benchmark(transform_number=1, primer=1,message_length=4):
+        import gevent
+        from gevent.greenlet import Greenlet
+        from pyon.util.containers import DotDict
+        from pyon.net.transport import NameTrio
+        from pyon.net.endpoint import Publisher
+        import numpy
+        from pyon.ion.granule.record_dictionary import RecordDictionaryTool
+        from pyon.ion.granule.taxonomy import TaxyTool
+        from pyon.ion.granule.granule import build_granule
+
+        tt = TaxyTool()
+        tt.add_taxonomy_set('a')
+
+        import uuid
+        num = transform_number
+        msg_len = message_length
+        transforms = list()
+        pids = 1
+        TransformBenchTesting.message_length = message_length
+        cc = Container.instance
+        pub = Publisher(to_name=NameTrio(get_sys_name(),str(uuid.uuid4())[0:6]))
+        for i in xrange(num):
+            tbt=cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlaceNewGranule', DotDict({'process':{'name':'tbt%d' % pids, 'transform_id':pids}}))
+            tbt.init()
+            tbt.start()
+            gevent.sleep(0.2)
+            for i in xrange(primer):
+                rd = RecordDictionaryTool(tt, message_length)
+                rd['a'] = numpy.arange(message_length)
+                gran = build_granule(data_producer_id='dp_id',taxonomy=tt, record_dictionary=rd)
+                pub.publish(gran)
+
+            g = Greenlet(tbt.perf)
+            g.start()
+            transforms.append(tbt)
+            pids += 1
+
+
+
+
+
+
 class TransformFunction(TransformDataProcess):
     """ Represents a transform function
     Input is given to the transform, it runs until the transform is complete
