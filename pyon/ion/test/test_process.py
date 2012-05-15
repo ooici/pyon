@@ -7,7 +7,7 @@ from mock import sentinel, Mock
 from nose.plugins.attrib import attr
 from pyon.ion.process import IonProcessThread
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.net.endpoint import ProcessRPCServer
+from pyon.ion.endpoint import ProcessRPCServer
 from gevent.event import AsyncResult, Event
 from gevent.coros import Semaphore
 from pyon.util.unit_test import PyonTestCase

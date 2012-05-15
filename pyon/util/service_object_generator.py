@@ -39,7 +39,8 @@ from collections import OrderedDict, defaultdict
 import interface.objects
 from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
-from pyon.net.endpoint import RPCClient, ProcessRPCClient
+from pyon.net.endpoint import RPCClient
+from pyon.ion.endpoint import ProcessRPCClient
 from pyon.util.log import log
 ${dep_client_imports}
 

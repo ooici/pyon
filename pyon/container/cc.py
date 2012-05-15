@@ -25,7 +25,7 @@ from pyon.ion.directory import Directory
 from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
-from pyon.net.endpoint import ProcessRPCServer
+from pyon.ion.endpoint import ProcessRPCServer
 from pyon.net import messaging
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
