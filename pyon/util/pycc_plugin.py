@@ -27,6 +27,9 @@ class PYCC(Plugin):
         Plugin.__init__(self)
         self.ccs = []
         self.container_started = False
+        self.blames = {'scidata':[], 'state':[], 'directory':[], 'events':[],
+                'resources':[], 'objects':[]}
+        self.last_blame = {}
 
     def options(self, parser, env):
         """Register command line options"""
@@ -132,3 +135,26 @@ class PYCC(Plugin):
         for cc in self.ccs:
             debug.write('\tClosing container with pid:%d\n' % cc.pid)
             os.kill(cc.pid, signal.SIGINT)
+
+    def beforeTest(self, test):
+        os.environ['BLAME'] = test.id()
+
+    def afterTest(self, test):
+        from ion.processes.bootstrap.datastore_loader import DatastoreLoader
+        blame = DatastoreLoader.get_blame_objects()
+        # Having a hard time detecting skips.  Since skipped tests don't
+        # clean we should not save duplicate blames...
+        if blame != self.last_blame:
+            for key in blame.keys():
+                self.blames[key].extend(blame[key])
+        self.last_blame = blame
+
+    def report(self, stream):
+        stream.write('Blame Report on left over objects in couchd db\n')
+        stream.write('='* 20 + '\n')
+        for key, value in self.blames.items():
+            if value != []:
+                stream.write(key + ':\n')
+                stream.write('-'*20 + ':\n')
+                for item in value:
+                    stream.write('\t' + str(item) + '\n')
