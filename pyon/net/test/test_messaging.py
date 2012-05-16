@@ -223,10 +223,10 @@ class TestMessaging(PyonTestCase):
             return sentinel.connection
 
         with patch('pyon.net.messaging.PyonSelectConnection', new=select_connection):
-            node, ilp = make_node(connection_params)
+            node, ilp = make_node(connection_params, name=sentinel.name)
 
         self.assertEquals(ilp, sentinel.ioloop_process)
-        gevmock.assert_called_once_with(ioloop, sentinel.connection)
+        gevmock.assert_called_once_with(ioloop, sentinel.connection, name=sentinel.name)
 
 @attr('UNIT')
 class TestPyonSelectConnection(PyonTestCase):
