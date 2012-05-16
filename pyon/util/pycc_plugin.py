@@ -156,5 +156,10 @@ class PYCC(Plugin):
             if value != []:
                 stream.write(key + ':\n')
                 stream.write('-'*20 + ':\n')
+                last_blame = None
                 for item in value:
+                    blame = item['blame_']
+                    if blame != last_blame:
+                        stream.write(item['blame_'] + ':\n')
                     stream.write('\t' + str(item) + '\n')
+                    last_blame = blame
