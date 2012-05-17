@@ -3,6 +3,7 @@
 
 __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
+import copy
 from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
@@ -11,7 +12,7 @@ from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManag
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
-
+from interface.services.coi.iorg_management_service import OrgManagementServiceProcessClient
 
 class GovernanceController(object):
 
@@ -39,17 +40,17 @@ class GovernanceController(object):
 
         log.debug("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
-        self.event_subscriber = None
+        self.resource_policy_event_subscriber = None
 
         if self.enabled:
             self.initialize_from_config(config)
 
-            self.event_subscriber = EventSubscriber(event_type="ResourceModifiedEvent", origin_type="Policy", callback=self.policy_event_callback)
-            self.event_subscriber.activate()
+            self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.policy_event_callback)
+            self.resource_policy_event_subscriber.activate()
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
-
+            self.org_client = OrgManagementServiceProcessClient(node=self.container.node, process=self.container)
 
     def initialize_from_config(self, config):
 
@@ -80,8 +81,8 @@ class GovernanceController(object):
     def stop(self):
         log.debug("GovernanceController stopping ...")
 
-        if self.event_subscriber is not None:
-            self.event_subscriber.deactivate()
+        if self.resource_policy_event_subscriber is not None:
+            self.resource_policy_event_subscriber.deactivate()
 
 
     def process_incoming_message(self,invocation):
@@ -102,35 +103,26 @@ class GovernanceController(object):
         return invocation
 
     def policy_event_callback(self, *args, **kwargs):
-        policy_event = args[0]
-        log.debug("Policy modified: %s" % policy_event.origin)
-        self.trigger_policy_update(policy_event.origin)
+        resource_policy_event = args[0]
 
-    #This is a function which allows for a manual update of the policies as well.
-    def trigger_policy_update(self, policy_id):
+        policy_id = resource_policy_event.origin
+        resource_id = resource_policy_event.resource_id
+        resource_type = resource_policy_event.resource_type
+        resource_name = resource_policy_event.resource_name
 
-        try:
+        log.debug("Resource policy modified: %s" % policy_id)
 
-            #TODO - Find a better way to work with org_id - use ION Org for now.
-            ion_org,_ = self.rr_client.find_resources(restype=RT.Org, name=CFG.system.root_org)
-
-            resource_list,_ = self.rr_client.find_subjects("", PRED.hasPolicy, policy_id)
-            for res in resource_list:
-                #TODO - may figure out a better way to get the name of the Resource Type - or maybe this is ok
-                resource_type = res.__class__.__name__
-                #log.debug("Resource Type: %s" % resource_type)
-                if resource_type == 'ServiceDefinition':
-                    policy_rules = self.policy_client.get_active_service_policy_rules(ion_org[0]._id, res.name)
-                    self.update_resource_policy(res.name, policy_rules)
-                elif  resource_type == 'Org':
-                    self.update_all_resource_policy(res._id)
-                else:
-                    policy_rules = self.policy_client.get_active_resource_policy_rules(res._id)
-                    self.update_resource_policy(res._id, policy_rules)
-
-
-        except Exception, e:
-            log.error(e.message)
+        if resource_type == 'ServiceDefinition':  #TODO - REDO this to tear services like resources and have a configurable Org bounrady by container
+            ion_org = self.org_client.find_org()
+            policy_rules = self.policy_client.get_active_service_policy_rules(ion_org._id, resource_name)
+            self.update_resource_policy(resource_name, policy_rules)
+        elif  resource_type == 'Org':
+            policy_rules = self.policy_client.get_active_resource_policy_rules(resource_id)
+            if self.policy_decision_point_manager is not None:
+                self.policy_decision_point_manager.load_org_policy_rules(policy_rules)
+        else:
+            policy_rules = self.policy_client.get_active_resource_policy_rules(resource_id)
+            self.update_resource_policy(resource_id, policy_rules)
 
 
     def update_resource_policy(self, resource_name, policy_rules):
@@ -140,14 +132,3 @@ class GovernanceController(object):
             log.debug("Loading policy for resource: %s" % resource_name)
             self.policy_decision_point_manager.load_policy_rules(resource_name, policy_rules)
 
-    def update_all_resource_policy(self, org_id):
-
-
-        #Notify policy decision point of updated rules for all existing services
-        if self.policy_decision_point_manager is not None:
-            for res_name in self.policy_decision_point_manager.policy_decision_point:
-                try:
-                    policy_rules = self.policy_client.get_active_service_policy_rules(org_id, res_name)
-                    self.update_resource_policy(res_name, policy_rules)
-                except Exception, e:
-                    log.error(e.message)
