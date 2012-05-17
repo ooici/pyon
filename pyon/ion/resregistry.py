@@ -110,6 +110,11 @@ class ResourceRegistry(object):
 
         return self.rr_store.read(object_id, rev_id)
 
+    def read_mult(self, object_ids=[]):
+        if not object_ids:
+            raise BadRequest("The object_ids parameter is empty")
+        return self.rr_store.read_mult(object_ids)
+
     def update(self, object=None):
         if object is None:
             raise BadRequest("Object not present")
