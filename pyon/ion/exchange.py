@@ -34,8 +34,6 @@ class ExchangeManager(object):
     Manager object for the CC to manage Exchange related resources.
     """
 
-    NODE_PREFIX = "amqp"
-
     def __init__(self, container):
         log.debug("ExchangeManager initializing ...")
         self.container = container
@@ -68,7 +66,7 @@ class ExchangeManager(object):
         self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
         self._rr_client     = ResourceRegistryServiceProcessClient(process=self.container)
 
-        # mapping of node/ioloop runner by connection name (in config, filtered by NODE_PREFIX)
+        # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
         self._nodes     = {}
         self._ioloops   = {}
 
@@ -85,30 +83,33 @@ class ExchangeManager(object):
             node.ready.set()        # let it fall out below
 
         # Establish connection(s) to broker
-        for name in CFG.server.iterkeys():
-            if name.startswith(self.NODE_PREFIX):
-                total_count += 1
-                log.debug("Starting connection: %s", name)
+        for name, cfgkey in CFG.container.messaging.server.iteritems():
 
-                # start it with a zero timeout so it comes right back to us
-                node, ioloop = messaging.make_node(CFG.server[name], name, 0)
+            if cfgkey not in CFG.server:
+                raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, name))
 
-                # install a finished handler directly on the ioloop just for this startup period
-                fail_handle = lambda _: handle_failure(name, node)
-                ioloop.link(fail_handle)
+            total_count += 1
+            log.debug("Starting connection: %s", name)
 
-                # wait for the node ready event, with a large timeout just in case
-                node_ready = node.ready.wait(timeout=15)
+            # start it with a zero timeout so it comes right back to us
+            node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
 
-                # remove the finished handler, we don't care about it here
-                ioloop.unlink(fail_handle)
+            # install a finished handler directly on the ioloop just for this startup period
+            fail_handle = lambda _: handle_failure(name, node)
+            ioloop.link(fail_handle)
 
-                # only add to our list if we started successfully
-                if not node.running:
-                    ioloop.kill()      # make sure ioloop dead
-                else:
-                    self._nodes[name]   = node
-                    self._ioloops[name] = ioloop
+            # wait for the node ready event, with a large timeout just in case
+            node_ready = node.ready.wait(timeout=15)
+
+            # remove the finished handler, we don't care about it here
+            ioloop.unlink(fail_handle)
+
+            # only add to our list if we started successfully
+            if not node.running:
+                ioloop.kill()      # make sure ioloop dead
+            else:
+                self._nodes[name]   = node
+                self._ioloops[name] = ioloop
 
         fail_count = total_count - len(self._nodes)
         if fail_count > 0 or total_count == 0:
@@ -118,7 +119,7 @@ class ExchangeManager(object):
             log.warn("Some nodes could not be started, ignoring for now")   # @TODO change when ready
 
         self._transport = AMQPTransport.get_instance()
-        self._client    = self._get_channel(self._nodes.values()[0])        # @TODO
+        self._client    = self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
 
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
 
@@ -150,9 +151,10 @@ class ExchangeManager(object):
         """
         Returns the default node connection.
         """
-        if self.NODE_PREFIX in self._nodes:
-            return self._nodes[self.NODE_PREFIX]
+        if 'primary' in self._nodes:
+            return self._nodes['primary']
         elif len(self._nodes):
+            log.warn("No primary connection, returning first available")
             return self._nodes.values()[0]
 
         return None
