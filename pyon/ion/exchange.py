@@ -142,7 +142,7 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.stopping (%d connections)", len(self._nodes))
 
         for name in self._nodes:
-            self._nodes[name].client.close()
+            self._nodes[name].stop_node()
             self._ioloops[name].kill()
             self._nodes[name].client.ioloop.start()     # loop until connection closes
 

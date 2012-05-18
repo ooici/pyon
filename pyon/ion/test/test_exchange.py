@@ -111,7 +111,7 @@ class TestExchangeManager(PyonTestCase):
         self.ex_manager.start()
         self.ex_manager.stop()
 
-        nodemock.client.close.assert_called_once_with()
+        nodemock.stop_node.assert_called_once_with()
         iomock.kill.assert_called_once_with()
 
     def test_default_node_no_connections(self, mockmessaging):

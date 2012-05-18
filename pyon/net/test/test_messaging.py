@@ -4,7 +4,7 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.net.messaging import NodeB, ioloop, make_node, PyonSelectConnection
-from pyon.net.channel import BaseChannel, BidirClientChannel
+from pyon.net.channel import BaseChannel, BidirClientChannel, RecvChannel
 from pyon.util.unit_test import PyonTestCase
 from mock import Mock, sentinel, patch
 from nose.plugins.attrib import attr
@@ -190,6 +190,37 @@ class TestNodeB(PyonTestCase):
 
         # we got the first mocked channel back
         self.assertEquals(ch3.get_channel_id(), sentinel.chid)
+
+    def test_stop_node(self):
+        self._node.client = Mock()
+        self._node._destroy_pool = Mock()
+        self._node.running = True
+
+        self._node.stop_node()
+
+        self._node.client.close.assert_called_once_with()
+        self._node._destroy_pool.assert_called_once_with()
+        self.assertFalse(self._node.running)
+
+    def test_stop_node_not_running(self):
+        self._node.client = Mock()
+        self._node._destroy_pool = Mock()
+        self._node.running = False
+
+        self._node.stop_node()
+
+        self.assertFalse(self._node.client.close.called)
+        self.assertFalse(self._node._destroy_pool.called)
+        self.assertFalse(self._node.running)
+
+    def test_destroy_pool(self):
+        chmock = Mock(spec=RecvChannel)
+        for x in xrange(20):
+            self._node._bidir_pool[x] = chmock
+
+        self._node._destroy_pool()
+
+        self.assertEqual(chmock._destroy_queue.call_count, 20)
 
 @attr('UNIT')
 class TestMessaging(PyonTestCase):

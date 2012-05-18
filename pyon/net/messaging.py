@@ -47,6 +47,25 @@ class NodeB(amqp.Node):
         self.running = True
         self.ready.set()
 
+    def stop_node(self):
+        """
+        Closes the connection to the broker, cleans up resources held by this node.
+        """
+        log.debug("NodeB.stop_node (running: %s)", self.running)
+
+        if self.running:
+            # clean up pooling before we shut connection
+            self._destroy_pool()
+            self.client.close()
+        self.running = False
+
+    def _destroy_pool(self):
+        """
+        Explicitly deletes pooled queues in this Node.
+        """
+        for chan in self._bidir_pool.itervalues():
+            chan._destroy_queue()
+
     def _new_channel(self, ch_type, ch_number=None, **kwargs):
         """
         Creates a pyon Channel based on the passed in type, and activates it for use.
