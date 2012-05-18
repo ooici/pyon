@@ -28,8 +28,27 @@ class TestCC(PyonTestCase):
         self.cc.stop.assert_called_once_with()
         osmock.kill.assert_called_once_with(osmock.getpid(), signal.SIGTERM)
 
+    def test_node_when_not_started(self):
+        self.assertEquals(self.cc.node, None)
+
+    def test_node_when_started(self):
+        self.cc._capabilities.append("EXCHANGE_MANAGER")
+        self.cc.ex_manager = Mock()
+
+        self.assertEquals(self.cc.node, self.cc.ex_manager.default_node)
+
 @attr('INT')
 class TestCCInt(IonIntegrationTestCase):
+
+    def test_start_hello(self):
+        # start a service over messaging
+        self._start_container()
+        cc_client = ContainerAgentClient(node=self.container.node, name=self.container.name)
+
+        p = cc_client.spawn_process('hello', 'examples.service.hello_service', 'HelloService')
+
+@attr('INT')
+class TestCCIntProcs(IonIntegrationTestCase):
 
     class ExpectedFailure(StandardError):
         pass
@@ -66,12 +85,4 @@ class TestCCInt(IonIntegrationTestCase):
 
         # verify things got called
         self.cc.stop.assert_called_once_with()
-
-    def test_start_hello(self):
-        # start a service over messaging
-        self._start_container()
-        cc_client = ContainerAgentClient(node=self.container.node, name=self.container.name)
-
-        p = cc_client.spawn_process('hello', 'examples.service.hello_service', 'HelloService')
-
 
