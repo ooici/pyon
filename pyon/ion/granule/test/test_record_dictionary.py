@@ -42,13 +42,19 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
         # initialize with pooo
         self.assertRaises(TypeError, RecordDictionaryTool, ['foo', 'barr'])
 
-        # initialize with a valid length
-        rdt = RecordDictionaryTool(taxonomy=self._tx, length=5)
-        self.assertEquals(rdt._len, 5)
+        # initialize with a valid shape
+        rdt = RecordDictionaryTool(taxonomy=self._tx, shape=(5,2))
+        self.assertEquals(rdt._shp, (5,2))
+
+        rdt = RecordDictionaryTool(taxonomy=self._tx, shape=(5,))
+        self.assertEquals(rdt._shp, (5,))
+
+        rdt = RecordDictionaryTool(taxonomy=self._tx, shape=5)
+        self.assertEquals(rdt._shp, (5,))
 
         # initialize with no length
         rdt = RecordDictionaryTool(taxonomy=self._tx)
-        self.assertEquals(rdt._len, None)
+        self.assertEquals(rdt._shp, None)
 
         # initialize with pooo
         self.assertRaises(TypeError, RecordDictionaryTool, self._tx, 'not an int')
@@ -117,28 +123,33 @@ class RecordDictionaryToolTestCase(unittest.TestCase):
 
         self.assertEquals(
             te.exception.message,
-            '''The rank of a value sequence array in a record dictionary must be 1. Got name "temp" with rank "0"'''
+            '''The rank of a value sequence array in a record dictionary must be greater than zero. Got name "temp" with rank "0"'''
         )
 
-        # Now test rank 2 array...
-        with self.assertRaises(ValueError) as te:
-            rdt2['temp'] = numpy.array([[22.5,],])
-
-        self.assertEquals(
-            te.exception.message,
-            '''The rank of a value sequence array in a record dictionary must be 1. Got name "temp" with rank "2"'''
-        )
-
-        # Test set invalid length
-
+        # Test set invalid shape
         pres_array = numpy.random.standard_normal(90)
         with self.assertRaises(ValueError) as te:
             rdt2['pres'] = pres_array
 
         self.assertEquals(
             te.exception.message,
-            '''Invalid value length "90" for name "pres"; Record dictionary defined length is "100"'''
+            '''Invalid array shape "(90,)" for name "pres"; Record dictionary defined shape is "(100,)"'''
         )
+
+
+        # make a new RDT for testing higher rank objects...
+        taxy_tool_obj =self._tx
+        rdt = RecordDictionaryTool(taxonomy=taxy_tool_obj)
+
+        # Now test rank 2 array...
+        rdt['temp'] = numpy.array([[22.5,],])
+        self.assertTrue((rdt['temp'] == numpy.array([[22.5,],])).all())
+
+        # Now test rank 2 array...
+        rdt['cond'] = numpy.array([[28.5,],])
+        self.assertTrue((rdt['cond'] == numpy.array([[28.5,],])).all())
+
+
 
 
     def test_iteration(self):
