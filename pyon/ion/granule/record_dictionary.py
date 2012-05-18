@@ -68,6 +68,8 @@ class RecordDictionaryTool(object):
         elif isinstance(vals, numpy.ndarray):
             #Otherwise it is a value sequence which should have the correct length
 
+            #@todo Assert only equal shape
+
             if vals.ndim != 1:
                 raise ValueError('The rank of a value sequence array in a record dictionary must be 1. Got name "%s" with rank "%d"' % (name, vals.ndim))
 
