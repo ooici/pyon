@@ -16,10 +16,10 @@ import string
 import yaml
 import hashlib
 import argparse
+import traceback
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
-from pyon.util.containers import named_any
 from pyon.util import yaml_ordered_dict
 
 
@@ -419,9 +419,10 @@ class ServiceObjectGenerator :
             else:
                 mod_qual = "%s.%s" % (mod_prefix, mod_name)
                 try:
-                    named_any(mod_qual)
+                    __import__(mod_qual)
                 except Exception, ex:
                     print "Import module '%s' failed: %s" % (mod_qual, ex)
+                    traceback.print_exc()
                     if not interfaces:
                         print "Make sure that you have defined an __init__.py in your directory, you have imported the correct service base type"
                         print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"

@@ -195,11 +195,11 @@ class TaxonomyToolTestCase(unittest.TestCase):
 
         #@todo - a list is not a set and the yaml dump/ion serialization can not handle sets...
         self.assertEquals(tc2._cnt,1)
-        self.assertEquals(set(tc2.get_names_by_handle(0)),{'1','x','a','z',})
-        self.assertEquals(set(tc2.get_names_by_handle(1)),{'2','b','c',})
+        self.assertEquals(tc2.get_names_by_handle(0),{'1','x','a','z',})
+        self.assertEquals(tc2.get_names_by_handle(1),{'2','b','c',})
 
         self.assertEquals(tc._cnt,1)
-        self.assertEquals(set(tc.get_names_by_handle(0)),{'1','x','a','z',})
-        self.assertEquals(set(tc.get_names_by_handle(1)),{'2','b','c',})
+        self.assertEquals(tc.get_names_by_handle(0),{'1','x','a','z',})
+        self.assertEquals(tc.get_names_by_handle(1),{'2','b','c',})
 
 

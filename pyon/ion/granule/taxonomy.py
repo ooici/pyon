@@ -15,6 +15,8 @@ from pyon.core.object import ion_serializer, IonObjectDeserializer
 from pyon.core.registry import IonObjectRegistry
 
 from interface.objects import Taxonomy
+from pyon.util.log import log
+
 
 # Create an IonObjectDeserializer used in the prototype loads method...
 ior = IonObjectRegistry()
@@ -40,7 +42,7 @@ class TaxyTool(object):
         """
         @brief Initialize the state of the TaxyTool wrapper. Can take an existing taxonomy as an argument.
         """
-        self._cnt = -1
+        self._cnt = -1 # Cnt is not the length it a unique id in a map...
 
         self._inv = {}
 
@@ -232,6 +234,13 @@ class TaxyTool(object):
 
         d = yaml.load(input)
         t = ion_deserializer.deserialize(d)
+
+        # We know the structure - turn the lists back into sets!
+        try:
+            for k, v in t.map.iteritems():
+                t.map[k] = (v[0], set(v[1]))
+        except IndexError:
+            log.exception("Invalid taxonomy object structure: should be Key:(nickname, {alias',})")
 
         return cls(t)
 
