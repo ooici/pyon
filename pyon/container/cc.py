@@ -160,8 +160,6 @@ class Container(BaseContainerAgent):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
-        self._capabilities.append("EXCHANGE_CONNECTION")
-
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
@@ -188,7 +186,7 @@ class Container(BaseContainerAgent):
         self._capabilities.append("STATE_REPOSITORY")
 
         # Start ExchangeManager, which starts the node (broker connection)
-        self.node, self.ioloop = self.ex_manager.start()
+        self.ex_manager.start()
         self._capabilities.append("EXCHANGE_MANAGER")
 
         self.proc_manager.start()
@@ -221,6 +219,18 @@ class Container(BaseContainerAgent):
         self._status        = "RUNNING"
 
         log.info("Container started, OK.")
+
+    @property
+    def node(self):
+        """
+        Returns the active/default Node that should be used for most communication in the system.
+
+        Defers to exchange manager, but only if it has been started, otherwise returns None.
+        """
+        if "EXCHANGE_MANAGER" in self._capabilities:
+            return self.ex_manager.default_node
+
+        return None
 
     @contextmanager
     def _push_status(self, new_status):
@@ -359,12 +369,6 @@ class Container(BaseContainerAgent):
         elif capability == "DATASTORE_MANAGER":
             # close any open connections to datastores
             self.datastore_manager.stop()
-
-        elif capability == "EXCHANGE_CONNECTION":
-            self.node.client.close()
-            self.ioloop.kill()
-            self.node.client.ioloop.start()     # loop until connection closes
-            # destroy AMQP connection
 
         elif capability == "GOVERNANCE_CONTROLLER":
             self.governance_controller.stop()

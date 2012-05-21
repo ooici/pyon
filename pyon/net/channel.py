@@ -451,7 +451,7 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
         assert self._transport
 
-        log.info("Destroying listener for queue %s", self._recv_name)
+        log.info("Destroying queue: %s", self._recv_name)
         self._transport.delete_queue_impl(self._amq_chan,
                                           queue=self._recv_name.queue)
 
@@ -758,7 +758,12 @@ class ListenChannel(RecvChannel):
 
 
 class SubscriberChannel(ListenChannel):
-    pass
+    def close_impl(self):
+        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-"):
+            log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
+            self._destroy_queue()
+
+        ListenChannel.close_impl(self)
 
 class ServerChannel(ListenChannel):
 
