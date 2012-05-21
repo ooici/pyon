@@ -45,7 +45,6 @@ class IonIntegrationTestCase(unittest.TestCase):
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
-            self._turn_on_couchdb()
             self._turn_off_force_clean()
             from ion.processes.bootstrap.datastore_loader import DatastoreLoader
             DatastoreLoader.load_datastore('res/dd')
