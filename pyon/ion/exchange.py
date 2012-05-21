@@ -17,6 +17,7 @@ from interface.services.coi.iexchange_management_service import ExchangeManageme
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.util.config import CFG
 from pyon.ion.resource import RT
+import time
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -25,10 +26,14 @@ ION_ROOT_XS = "ioncore"
 def valid_xname(name):
     return name and str(name).find(":") == -1 and str(name).find(" ") == -1
 
+class ExchangeManagerError(StandardError):
+    pass
+
 class ExchangeManager(object):
     """
     Manager object for the CC to manage Exchange related resources.
     """
+
     def __init__(self, container):
         log.debug("ExchangeManager initializing ...")
         self.container = container
@@ -61,7 +66,98 @@ class ExchangeManager(object):
         self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
         self._rr_client     = ResourceRegistryServiceProcessClient(process=self.container)
 
-        # TODO: Do more initializing here, not in container
+        # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
+        self._nodes     = {}
+        self._ioloops   = {}
+
+        self._client    = None
+        self._transport = None
+
+    def start(self):
+        log.debug("ExchangeManager.start")
+
+        total_count = 0
+
+        def handle_failure(name, node):
+            log.warn("Node %s could not be started", name)
+            node.ready.set()        # let it fall out below
+
+        # Establish connection(s) to broker
+        for name, cfgkey in CFG.container.messaging.server.iteritems():
+
+            if cfgkey not in CFG.server:
+                raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, name))
+
+            total_count += 1
+            log.debug("Starting connection: %s", name)
+
+            # start it with a zero timeout so it comes right back to us
+            node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
+
+            # install a finished handler directly on the ioloop just for this startup period
+            fail_handle = lambda _: handle_failure(name, node)
+            ioloop.link(fail_handle)
+
+            # wait for the node ready event, with a large timeout just in case
+            node_ready = node.ready.wait(timeout=15)
+
+            # remove the finished handler, we don't care about it here
+            ioloop.unlink(fail_handle)
+
+            # only add to our list if we started successfully
+            if not node.running:
+                ioloop.kill()      # make sure ioloop dead
+            else:
+                self._nodes[name]   = node
+                self._ioloops[name] = ioloop
+
+        fail_count = total_count - len(self._nodes)
+        if fail_count > 0 or total_count == 0:
+            if fail_count == total_count:
+                raise ExchangeManagerError("No node connection was able to start (%d nodes attempted, %d nodes failed)" % (total_count, fail_count))
+
+            log.warn("Some nodes could not be started, ignoring for now")   # @TODO change when ready
+
+        self._transport = AMQPTransport.get_instance()
+        self._client    = self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
+
+        log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
+
+        # Declare root exchange
+        #self.default_xs.ensure_exists(self._get_channel())
+
+    def stop(self, *args, **kwargs):
+        # ##############
+        # HACK HACK HACK
+        #
+        # It appears during shutdown that when a channel is closed, it's not FULLY closed by the pika connection
+        # until the next round of _handle_events. We have to yield here to let that happen, in order to have close
+        # work fine without blowing up.
+        # ##############
+        time.sleep(0.1)
+        # ##############
+        # /HACK
+        # ##############
+
+        log.debug("ExchangeManager.stopping (%d connections)", len(self._nodes))
+
+        for name in self._nodes:
+            self._nodes[name].stop_node()
+            self._ioloops[name].kill()
+            self._nodes[name].client.ioloop.start()     # loop until connection closes
+
+    @property
+    def default_node(self):
+        """
+        Returns the default node connection.
+        """
+        if 'primary' in self._nodes:
+            return self._nodes['primary']
+        elif len(self._nodes):
+            log.warn("No primary connection, returning first available")
+            return self._nodes.values()[0]
+
+        return None
 
     @property
     def xn_by_xs(self):
@@ -91,20 +187,6 @@ class ExchangeManager(object):
 
         self._xs_cache[name] = xs_objs[0]
         return xs_objs[0]
-
-    def start(self):
-        log.debug("ExchangeManager starting ...")
-
-        # Establish connection to broker
-        # @TODO: raise error if sux
-        node, ioloop = messaging.make_node()
-
-        self._transport = AMQPTransport.get_instance()
-        self._client    = self._get_channel(node)
-
-        # Declare root exchange
-        #self.default_xs.ensure_exists(self._get_channel())
-        return node, ioloop
 
     def _ems_available(self):
         """
@@ -264,9 +346,6 @@ class ExchangeManager(object):
             self._ems_client.undeclare_exchange_name(xno_id)        # "canonical name" currently understood to be RR id
         else:
             xn.delete()
-
-    def stop(self, *args, **kwargs):
-        log.debug("ExchangeManager stopping ...")
 
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
