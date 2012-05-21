@@ -194,32 +194,37 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s' % str(res))
 
-    def create_mult(self, objects, object_ids=None):
+    def create_mult(self, objects, object_ids=None, allow_ids=False):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
                 raise BadRequest("Obj param is not instance of IonObjectBase")
         return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
-                                    object_ids)
+                                    object_ids, allow_ids=allow_ids)
 
-    def create_doc_mult(self, docs, object_ids=None):
-        if any(["_id" in doc for doc in docs]):
-            raise BadRequest("Docs must not have '_id'")
-        if any(["_rev" in doc for doc in docs]):
-            raise BadRequest("Docs must not have '_rev'")
+    def create_doc_mult(self, docs, object_ids=None, allow_ids=False):
+        if not allow_ids:
+            if any(["_id" in doc for doc in docs]):
+                raise BadRequest("Docs must not have '_id'")
+            if any(["_rev" in doc for doc in docs]):
+                raise BadRequest("Docs must not have '_rev'")
         if object_ids and len(object_ids) != len(docs):
             raise BadRequest("Invalid object_ids")
+        if type(docs) is not list:
+            raise BadRequest("Invalid type for docs:%s" % type(docs))
 
-        # Assign an id to doc (recommended in CouchDB documentation)
-        object_ids = object_ids or [uuid4().hex for i in xrange(len(docs))]
-
-        for doc, oid in zip(docs, object_ids):
-            doc["_id"] = oid
+        if object_ids:
+            for doc, oid in zip(docs, object_ids):
+                doc["_id"] = oid
+        else:
+            for doc in docs:
+                doc["_id"] = doc.get("_id", None) or uuid4().hex
 
         # Update docs.  CouchDB will assign versions to docs.
         res = self.server[self.datastore_name].update(docs)
         if not res or not all([success for success, oid, rev in res]):
-            log.error('Create error. Result: %s' % str(res))
+            errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
+            log.error('create_doc_mult had errors. Successful: %s, Errors: %s' % (len(res) - len(errors), "\n".join(errors)))
         else:
-            log.debug('Create result: %s' % str(res))
+            log.debug('create_doc_mult result: %s' % str(res))
         return res
 
     def read(self, object_id, rev_id="", datastore_name=""):

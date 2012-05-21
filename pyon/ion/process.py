@@ -1,52 +1,160 @@
 #!/usr/bin/env python
 
-__author__ = 'Adam R. Smith, Michael Meisinger'
+__author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-import threading
-
 from pyon.util.log import log
-from pyon.core.process import GreenProcess, PythonProcess, GreenProcessSupervisor
-from pyon.net import messaging, endpoint
+from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback
 from pyon.service.service import BaseService
+from gevent.event import Event, waitall, AsyncResult
+from gevent.queue import Queue
+from gevent import greenlet
+from pyon.util.async import wait, spawn
+import threading
+import traceback
 
-class IonProcessBase(object):
+class IonProcessThread(PyonThread):
     """
     Form the base of an ION process.
-    Just add greenlets or python processes to complete.
     """
 
-    def __init__(self, listener=None, name=None):
-        self.listener   = listener
-        self.name       = name
+    def __init__(self, target=None, listeners=None, name=None, service=None, **kwargs):
+        self._startup_listeners = listeners or []
+        self.listeners          = []
+        self.name               = name
+        self.service            = service
+
+        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
+        self._ctrl_queue        = Queue()
+
+        PyonThread.__init__(self, target=target, **kwargs)
+
+    def _child_failed(self, child):
+        """
+        Occurs when any child greenlet fails.
+
+        Propogates the error up to the process supervisor.
+        """
+        self.proc.kill(child.exception)
+
+    def add_endpoint(self, listener):
+        """
+        Adds a listening endpoint to this ION process.
+
+        Spawns the listen loop and sets the routing call to synchronize incoming messages
+        here. If this process hasn't been started yet, adds it to the list of listeners
+        to start on startup.
+        """
+        if self.proc:
+            listener.routing_call = self._routing_call
+            self.thread_manager.spawn(listener.listen)
+            self.listeners.append(listener)
+        else:
+            self._startup_listeners.append(listener)
 
     def target(self, *args, **kwargs):
-        """ Control entrypoint. Setup the base properties for this process (mainly a listener)."""
+        """
+        Control entrypoint. Setup the base properties for this process (mainly a listener).
+        """
         if self.name:
             threading.current_thread().name = self.name
-        self.listener.listen()
+
+        # spawn all listeners in startup listeners (from initializer, or added later)
+        for listener in self._startup_listeners:
+            self.add_endpoint(listener)
+
+        # spawn control flow loop
+        ct = self.thread_manager.spawn(self._control_flow)
+
+        # wait on control flow loop!
+        ct.get()
+
+    def _routing_call(self, call, callargs, context=None):
+        """
+        Endpoints call into here to synchronize across the entire IonProcess.
+
+        Returns immediately with an AsyncResult that can be waited on. Calls
+        are made by the loop in _control_flow. We pass in the calling greenlet so
+        exceptions are raised in the correct context.
+
+        @param  call        The call to be made within this ION processes' calling greenlet.
+        @param  callargs    The keyword args to pass to the call.
+        @param  context     Optional process-context (usually the headers of the incoming call) to be
+                            set. Process-context is greenlet-local, and since we're crossing greenlet
+                            boundaries, we must set it again in the ION process' calling greenlet.
+        """
+        ar = AsyncResult()
+
+        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, context))
+        return ar
+
+    def _control_flow(self):
+        """
+        Main process thread of execution method.
+
+        This method is run inside a greenlet and exists for each ION process. Listeners
+        attached to the process, either RPC Servers or Subscribers, synchronize their calls
+        by placing future calls into the queue by calling _routing_call.  This is all done
+        automatically for you by the Container's Process Manager.
+
+        This method blocks until there are calls to be made in the synchronized queue, and
+        then calls from within this greenlet.  Any exception raised is caught and re-raised
+        in the greenlet that originally scheduled the call.  If successful, the AsyncResult
+        created at scheduling time is set with the result of the call.
+        """
+        for calltuple in self._ctrl_queue:
+            calling_gl, ar, call, callargs, context = calltuple
+            log.debug("control_flow making call: %s %s (has context: %s)", call, callargs, context is not None)
+
+            res = None
+            try:
+                with self.service.push_context(context):
+                    res = call(**callargs)
+            except Exception as e:
+                # raise the exception in the calling greenlet, and don't
+                # wait for it to die - it's likely not going to do so.
+
+                # try decorating the args of the exception with the true traceback
+                # this should be reported by ThreadManager._child_failed
+                exc = PyonThreadTraceback("True traceback captured by IonProcessThread' _control_flow:\n\n" + traceback.format_exc())
+                e.args = e.args + (exc,)
+
+                calling_gl.kill(exception=e, block=False)
+
+            ar.set(res)
 
     def _notify_stop(self):
-        self.listener.close()
-        super(IonProcessBase, self)._notify_stop()
+        """
+        Called when the process is about to be shut down.
 
-class GreenIonProcess(IonProcessBase, GreenProcess):
+        Instructs all listeners to close, puts a StopIteration into the synchronized queue,
+        and waits for the listeners to close and for the control queue to exit.
+        """
+        map(lambda x: x.close(), self.listeners)
+        self._ctrl_queue.put(StopIteration)
 
-    def __init__(self, target=None, listener=None, name=None, *args, **kwargs):
-        IonProcessBase.__init__(self, listener=listener, name=name)
-        GreenProcess.__init__(self, target=target, *args, **kwargs)
+        # wait_children will join them and then get() them, which may raise an exception if any of them
+        # died with an exception.
+        self.thread_manager.wait_children(30)
+
+        PyonThread._notify_stop(self)
 
     def get_ready_event(self):
-        return self.listener.get_ready_event()
+        """
+        Returns an Event that is set when all the listeners in this Process are running.
+        """
+        ev = Event()
+        def allready(ev):
+            waitall([x.get_ready_event() for x in self.listeners])
+            ev.set()
 
-class PythonIonProcess(IonProcessBase, PythonProcess):
-    pass
+        spawn(allready, ev)
+        return ev
 
-class IonProcessSupervisor(GreenProcessSupervisor):
-    type_callables = {
-          'green': GreenIonProcess
-        , 'python': PythonIonProcess
-    }
+class IonProcessThreadManager(PyonThreadManager):
+
+    def _create_thread(self, target=None, **kwargs):
+        return IonProcessThread(target=target, **kwargs)
 
 # ---------------------------------------------------------------------------------------------------
 

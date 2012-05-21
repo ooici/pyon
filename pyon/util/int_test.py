@@ -18,6 +18,7 @@ from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from contextlib import contextmanager
 import unittest
 import os
+from gevent import greenlet, spawn
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
@@ -37,6 +38,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         # hack to force queue auto delete on for int tests
         self._turn_on_queue_auto_delete()
         self._patch_out_diediedie()
+        self._patch_out_fail_fast_kill()
         db_type = os.environ.get('DB_TYPE', None)
         if not db_type:
             pass
@@ -73,7 +75,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
-        self._force_clean()         # deletes only
+        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
+            self._force_clean()         # deletes only
 
 
     def _turn_on_queue_auto_delete(self):
@@ -86,7 +89,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         If things are running slowly, diediedie will send a kill -9 to the owning process,
         which could be the test runner! Let the test runner decide if it's time to die.
         """
-        patcher = patch('pyon.core.process.shutdown_or_die')
+        patcher = patch('pyon.core.thread.shutdown_or_die')
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -155,6 +158,18 @@ class IonIntegrationTestCase(unittest.TestCase):
             return True
 
         patcher = patch('pyon.container.apps.AppManager.start_rel_from_url', start_rel_from_url)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _patch_out_fail_fast_kill(self):
+        # Not only is this an enormous hack, it doens't work :/
+        # reinvestigate later
+#        def kill(*args, **kwargs):
+#            def call_in_main_context(main_gl):
+#                main_gl.throw(AssertionError("Container.fail_fast trying to terminate OS process, preventing"))
+#            spawn(call_in_main_context, greenlet.getcurrent())
+
+        patcher = patch('pyon.container.cc.os.kill')        # , kill)
         patcher.start()
         self.addCleanup(patcher.stop)
 

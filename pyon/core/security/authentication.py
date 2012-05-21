@@ -13,131 +13,141 @@ import os
 import sys
 import tempfile
 import datetime
-import calendar
-import time
+import hashlib
 
 from M2Crypto import EVP, X509, BIO, SMIME, RSA
 
+from pyon.core.bootstrap import CFG
+from pyon.container.cc import Container
+from pyon.util.log import log
+
 #XXX @note What is this?
-sys.path.insert(0, "build/lib.linux-i686-2.4/")
+#sys.path.insert(0, "build/lib.linux-i686-2.4/")
 
 #XXX @todo Fix: Should not need absolute paths.
 BASEPATH = os.path.realpath(".")
-CERTIFICATE_PATH = BASEPATH + '/res/certificates/'
+CERTSTORE_PATH = BASEPATH + '/res/certstore/'
+KEYSTORE_PATH = BASEPATH + '/res/keystore/'
+
+CONTAINER_CERT_NAME='container.crt'
+CONTAINER_KEY_NAME='container.key'
+ORG_CERT_NAME='root.crt'
+
 
 class Authentication(object):
     """
     routines for working with crypto (x509 certificates and private_keys)
     """
+    def __init__(self):
+        self.cont_cert = None
+        self.cont_key = None
+        self.root_cert = None
+        self.white_list = []
 
-    def sign_message_hex(self, message, rsa_private_key):
+        # Look for certificates and keys in "the usual places"
+        certstore_path = self.certstore = CFG.authentication.get('certstore', CERTSTORE_PATH)
+        log.debug("certstore_path: %s" % str(certstore_path))
+        keystore_path = self.certstore = CFG.authentication.get('keystore', KEYSTORE_PATH)
+        log.debug("keystore_path: %s" % str(keystore_path))
+
+        if certstore_path and keystore_path:
+            if certstore_path == 'directory':
+                log.debug("Container.instance.directory: " % str(Container.instance.directory))
+                Container.instance.directory.load_authentication()
+            else:
+                cont_cert_path = os.path.join(certstore_path, CONTAINER_CERT_NAME)
+                log.debug("cont_cert_path: %s" % cont_cert_path)
+                cont_key_path = os.path.join(keystore_path, CONTAINER_KEY_NAME)
+                log.debug("cont_key_path: %s" % cont_key_path)
+                root_cert_path = os.path.join(certstore_path, ORG_CERT_NAME)
+                log.debug("root_cert_path: %s" % root_cert_path)
+                
+                if os.path.exists(cont_cert_path) and os.path.exists(cont_key_path) and os.path.exists(root_cert_path):
+                    with open(cont_cert_path, 'r') as f:
+                        self.cont_cert = f.read()
+                    log.debug("cont_cert: %s" % self.cont_cert)
+                    self.cont_key = EVP.load_key(cont_key_path)
+                    with open(root_cert_path, 'r') as f:
+                        self.root_cert = f.read()
+                    log.debug("root_cert: %s" % self.root_cert)
+                    self.add_to_white_list(self.root_cert)
+
+    def add_to_white_list(self, root_cert_string):
+        log.debug("Adding certificate <%s> to white list" % root_cert_string)
+        self.white_list.append(root_cert_string)
+
+    def get_container_cert(self):
+        return self.cont_cert
+
+    def authentication_enabled(self):
+        if self.cont_key:
+            return True
+        else:
+            return False 
+
+    def sign_message_hex(self, message, rsa_private_key=None):
         """
         @param message byte string
         return a hex encoded signature for a message
         """
         return binascii.hexlify(self.sign_message(message, rsa_private_key))
 
-    def sign_message(self, message, rsa_private_key): 
+    def sign_message(self, message, rsa_private_key=None): 
         """
         take a message, and return a binary signature of it
         """
-        pkey = EVP.load_key_string(rsa_private_key)
+        hash = hashlib.sha1(message).hexdigest()
+
+        if rsa_private_key:
+            pkey = EVP.load_key_string(rsa_private_key)
+        else:
+            pkey = self.cont_key
         pkey.sign_init()
-        pkey.sign_update(message)
+        pkey.sign_update(hash)
         sig = pkey.sign_final()
         return sig
 
-    def verify_message_hex(self, message, certificate, signed_message_hex):
+    def verify_message_hex(self, message, cert_string, signed_message_hex):
         """
         verify a hex encoded signature for a message
         """
-        return self.verify_message(message, certificate, binascii.unhexlify(signed_message_hex))
+        return self.verify_message(message, cert_string, binascii.unhexlify(signed_message_hex))
 
-    def verify_message(self, message, certificate, signed_message):
+    def verify_message(self, message, cert_string, signed_message):
         """
         This verifies that the message and the signature are indeed signed by the certificate
         """
-        x509 = X509.load_cert_string(certificate)
+
+        # Check validity of certificate
+        status, cause = self.is_certificate_valid(cert_string)
+        if status != "Valid":
+            log.debug("Message <%s> signed with invalid certificate <%s>. Cause <%s>" % (str(message), cert_string, cause))
+            return status, cause
+
+        hash = hashlib.sha1(message).hexdigest()
+
+        # Check validity of signature
+        x509 = X509.load_cert_string(cert_string)
         pubkey = x509.get_pubkey()
         pubkey.verify_init()
-        pubkey.verify_update(message)
-        if pubkey.verify_final(signed_message) == 1:
-            return True
+        pubkey.verify_update(hash)
+        outcome = pubkey.verify_final(signed_message)
+        if outcome == 1:
+            return 'Valid', 'OK'
         else:
-            return False
+            return 'Invalid', 'Signature failed verification'
 
-    def private_key_encrypt_message_hex(self, message, private_key):
+    def decode_certificate_string(self, cert_string):
         """
-        a version of private_key_encrypt_message that returns ascii safe result
+        Return a Dict of all known attributes for the certificate
         """
-        return binascii.hexlify(self.private_key_encrypt_message(message, private_key))
+        return self.decode_certificate(X509.load_cert_string(cert_string, format=1))
 
-    def private_key_encrypt_message(self, message, private_key):
-        """
-        encrypt a message using the private_key
-        """
-        priv = RSA.load_key_string(private_key)
-        
-        p = getattr(RSA, 'pkcs1_padding')
-        ctxt = priv.private_encrypt(message, p)
-        return ctxt
-
-    def private_key_decrypt_message_hex(self, encrypted_message, private_key):
-        """
-        a version of private_key_decrypt_message that works with ascii safe encryption string
-        """
-        return self.private_key_decrypt_message(binascii.unhexlify(encrypted_message), private_key)
-
-    def private_key_decrypt_message(self, encrypted_message, private_key):
-        """
-        decrypt a message using the private_key
-        """
-        priv = RSA.load_key_string(private_key)
-        p = getattr(RSA, 'pkcs1_padding')
-        ptxt = priv.public_decrypt(encrypted_message, p)
-        return ptxt
-
-    def public_encrypt_hex(self, message, private_key):
-        """
-        this encrypts messages that will be decrypted using private_decrypt, but using ascii safe result
-        """
-        return binascii.hexlify(self.public_encrypt(message, private_key))
-
-    def public_encrypt(self, message, private_key):
-        """
-        this encrypts messages that will be decrypted using private_decrypt
-        """
-        priv = RSA.load_key_string(private_key)
-      
-        p = getattr(RSA, 'pkcs1_padding') # can be either 'pkcs1_padding', 'pkcs1_oaep_padding'
-        ctxt = priv.public_encrypt(message, p)
-        
-        return ctxt
-
-    def private_decrypt_hex(self, encrypted_message, private_key):
-        """
-        this decrypts messages encrypted using public_encrypt, but using ascii safe input
-        """
-        return self.private_decrypt(binascii.unhexlify(encrypted_message), private_key)
-
-    def private_decrypt(self, encrypted_message, private_key):
-        """
-        this decrypts messages encrypted using public_encrypt
-        """
-        
-        priv = RSA.load_key_string(private_key)
-        
-        p = getattr(RSA, 'pkcs1_padding') # can be either 'pkcs1_padding', 'pkcs1_oaep_padding'
-        ptxt = priv.private_decrypt(encrypted_message, p)
-        
-        return ptxt
-
-    def decode_certificate(self, certificate):
+    def decode_certificate(self, x509):
         """
         Return a Dict of all known attributes for the certificate
         """
         attributes = {}
-        x509 = X509.load_cert_string(certificate, format=1)
         
         attributes['subject_items'] = {}
         attributes['subject'] = str(x509.get_subject())
@@ -169,60 +179,53 @@ class Authentication(object):
         
         return attributes
 
-    def is_certificate_descended_from(self, user_cert, ca_file_name):
+    def is_certificate_valid(self, cert_string):
+        """
+        This returns if the certificate is valid.
+        """
+        if not self.is_certificate_within_date_range(cert_string):
+            return 'Invalid', 'Certificate is not within date range'
+        if self.is_certificate_in_white_list(cert_string):
+            return 'Valid', 'OK'
+        else:
+            return 'Invalid', ' Certificate does not derive from any known root certificates'
+
+    def is_certificate_in_white_list(self, cert_string):
+        for root_cert in self.white_list:
+            if self.is_certificate_descended_from(cert_string, root_cert):
+                return True
+        return False
+
+    def is_certificate_descended_from(self, cert_string, root_cert):
         """
         tests if the certificate was issued by the passed in certificate authority
         """
-        store = X509.X509_Store()
-        store.add_x509(X509.load_cert(CERTIFICATE_PATH + ca_file_name))
-        x509 = X509.load_cert_string(user_cert)
-        return store.verify_cert(x509)
+        root_cert_attrs = self.decode_certificate_string(root_cert)
+        root_subject = root_cert_attrs['subject']
+        
+        cert_attrs = self.decode_certificate_string(cert_string)
+        cert_issuer = cert_attrs['issuer']
+        
+        if root_subject == cert_issuer:
+            return True
+        return False
+#        store = X509.X509_Store()
+#        store.add_x509(root_cert)
+#        x509 = X509.load_cert_string(cert_string)
+#        return X509.X509.verify(x509)
 
-    def is_certificate_valid(self, user_cert):
-        """
-        This returns if the certificate is valid.
-        """
-        return self.verify_certificate_chain(user_cert)
-
-    def verify_certificate_chain(self, user_cert):
-        """
-        This returns if the certificate is valid.
-        """
-        #cilogon-basic.pem	cilogon-openid.pem	cilogon-silver.pem
-        validity = False
-        for ca_file_name in ['cilogon-basic.pem', 'cilogon-openid.pem', 'cilogon-silver.pem']:
-            if self.is_certificate_descended_from(user_cert, ca_file_name) == 1:
-                validity = True
-                
-        return validity
-
-    def get_certificate_level(self, user_cert):
-        """
-        return what level of trust the certificate comes with
-        """
-        if self.is_certificate_descended_from(user_cert, 'cilogon-openid.pem'):
-            return 'Openid'
-        if self.is_certificate_descended_from(user_cert, 'cilogon-basic.pem'):
-            return 'Basic'
-        if self.is_certificate_descended_from(user_cert, 'cilogon-silver.pem'):
-            return 'Silver'
-        return 'Invalid'
-
-    def is_certificate_within_date_range(self, user_cert):
+    def is_certificate_within_date_range(self, cert_string):
         """
         Test if the current date is covered by the certificates valid within date range.
         """
-        os.environ['TZ'] = 'GMT'
-        time.tzset()
-
-        cert = X509.load_cert_string(user_cert)
+        cert = X509.load_cert_string(cert_string)
         nvb = datetime.datetime.strptime(str(cert.get_not_before()),"%b %d %H:%M:%S %Y %Z")
         nva = datetime.datetime.strptime(str(cert.get_not_after()),"%b %d %H:%M:%S %Y %Z")
-        today = datetime.datetime.today()
+        now = datetime.datetime.utcnow()
         
-        if today < nvb:
+        if now < nvb:
             return False
-        if today > nva:
+        if now > nva:
             return False
         return True
 

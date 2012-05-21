@@ -230,7 +230,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
         self.assertTrue(isinstance(data_set_read_obj, interface.objects.DataSet))
         self.assertTrue(data_set_read_obj.description == "Real-time water data for Choptank River near Greensboro, MD")
-        self.assertTrue(not 'type_' in data_set_read_obj)
+        self.assertTrue('type_' in data_set_read_obj)
 
         # Update DataSet's Description field and write
         data_set_read_obj.description = "Updated Description"
@@ -325,15 +325,15 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # HACK: Both Predicates so that this test works
         from pyon.ion.resource import Predicates
-        Predicates[OWNER_OF] = dict(domain=[RT.UserIdentity], range=[RT.InstrumentDevice, RT.DataSet])
+        Predicates[OWNER_OF] = dict(domain=[RT.ActorIdentity], range=[RT.InstrumentDevice, RT.DataSet])
         Predicates[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
         Predicates[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
 
-        admin_user_id = self._create_resource(RT.UserIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
+        admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
 
         admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Profile')
 
-        other_user_id = self._create_resource(RT.UserIdentity, 'Paul Smithy', description='Other user')
+        other_user_id = self._create_resource(RT.ActorIdentity, 'Paul Smithy', description='Other user')
 
         plat1_obj_id = self._create_resource(RT.PlatformDevice, 'Buoy1', description='My Platform')
 
@@ -412,7 +412,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(sub_assoc2), 1)
         self.assertEquals(set(sub_ids2), set([admin_user_id]))
 
-        sub_ids3, _ = data_store.find_subjects(RT.UserIdentity, OWNER_OF, inst1_obj_id, id_only=True)
+        sub_ids3, _ = data_store.find_subjects(RT.ActorIdentity, OWNER_OF, inst1_obj_id, id_only=True)
         self.assertEquals(len(sub_ids3), 1)
         self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
@@ -425,18 +425,18 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_assoc1), 8)
 
         # Find resources by type
-        res_ids1, res_assoc1 = data_store.find_res_by_type(RT.UserIdentity, id_only=True)
+        res_ids1, res_assoc1 = data_store.find_res_by_type(RT.ActorIdentity, id_only=True)
         self.assertEquals(len(res_ids1), 2)
         self.assertEquals(len(res_assoc1), 2)
         self.assertEquals(set(res_ids1), set([admin_user_id, other_user_id]))
 
-        res_ids1a, res_assoc1a = data_store.find_res_by_type(RT.UserIdentity, id_only=False)
+        res_ids1a, res_assoc1a = data_store.find_res_by_type(RT.ActorIdentity, id_only=False)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
         self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.DRAFT_PRIVATE, LCS.DEPLOYED_AVAILABLE]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_type(RT.UserIdentity, LCS.DEPLOYED_AVAILABLE, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_type(RT.ActorIdentity, LCS.DEPLOYED_AVAILABLE, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))
@@ -455,9 +455,9 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
-        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.UserIdentity, RT.DataSet]))
+        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.ActorIdentity, RT.DataSet]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.DEPLOYED_AVAILABLE, RT.UserIdentity, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.DEPLOYED_AVAILABLE, RT.ActorIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))
@@ -493,7 +493,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(set([o._id for o in res_ids1a]), set([inst2_obj_id]))
         self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.InstrumentDevice]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_name( 'John Doe', RT.UserIdentity, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_name( 'John Doe', RT.ActorIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))

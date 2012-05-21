@@ -110,11 +110,23 @@ def main(opts, *args, **kwargs):
         from pyon.util.config import Config
 
         # Check if user opted to override logging config
+        # Requires re-initializing logging
         if opts.logcfg:
-            from pyon.util.config import logging_conf_paths, initialize_logging
-            # Re-initialize logging
-            logging_conf_paths.append(opts.logcfg)
-            initialize_logging()
+            from pyon.util.config import LOGGING_CFG, logging_conf_paths, read_logging_config, initialize_logging
+            import ast
+            # Dict of config values
+            if '{' in opts.logcfg:
+                try:
+                    eval_value = ast.literal_eval(opts.logcfg)
+                except ValueError:
+                    raise Exception("Value error in logcfg arg '%s'" % opts.logcfg)
+                dict_merge(LOGGING_CFG, eval_value)
+                initialize_logging()
+            # YAML file containing config values
+            else:
+                logging_conf_paths.append(opts.logcfg)
+                read_logging_config()
+                initialize_logging()
 
         # Set that system is not testing. We are running as standalone container
         dict_merge(CFG, {'system':{'testing':False}}, True)
@@ -164,6 +176,22 @@ def main(opts, *args, **kwargs):
             container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
             print "Container UI started ... listening on http://localhost:8080"
 
+        if opts.signalparent:
+            import os
+            import signal
+            print 'Signal parent pid %d that pycc pid %d service start process is complete...' % (os.getppid(), os.getpid())
+            os.kill(os.getppid(), signal.SIGUSR1)
+
+            def is_parent_gone():
+                while os.getppid() != 1:
+                    gevent.sleep(1)
+                print 'Now I am an orphan ... notifying serve_forever to stop'
+                os.kill(os.getpid(), signal.SIGINT)
+            import gevent
+            ipg =gevent.spawn(is_parent_gone)
+            from pyon.util.containers import dict_merge
+            from pyon.public import CFG
+            dict_merge(CFG, {'system':{'watch_parent': ipg}}, True)
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
             from pyon.container.shell_api import get_shell_api
@@ -226,7 +254,7 @@ def parse_args(tokens):
     return args, kwargs
 
 def entry():
-    #proc_types = GreenProcessSupervisor.type_callables.keys()
+    #proc_types = PyonThreadManager.type_callables.keys()
 
     # NOTE: Resist the temptation to add other parameters here! Most container config options
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
@@ -240,6 +268,7 @@ def entry():
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-i', '--immediate', action='store_true', help='Will exit the container if the only procs started are immediate proc types. Sets CFG system.immediate flag.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
+    parser.add_argument('-sp', '--signalparent', action='store_true', help='Signal parent process after service start up complete')
     parser.add_argument('-c', '--config', action='append', type=str, help='Additional config files to load.', default=[])
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()

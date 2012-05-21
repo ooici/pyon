@@ -83,6 +83,16 @@ def is_ion_object(_def):
 
     return False
 
+
+def is_ion_object_dict(obj):
+    try:
+        if "type_" in obj:
+            return True
+    except:
+        pass
+
+    return False
+
 class IonObjectRegistry(object):
     """
     A simple key-value store that stores by name and by definition hash for versioning.
@@ -121,7 +131,8 @@ class IonObjectRegistry(object):
         # include additional client side validation
         if self.validate_setattr:
             def validating_setattr(self, name, value):
-                if name not in self._schema and name != "_id" and name != "_rev":
+                from pyon.core.object import built_in_attrs
+                if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
                 self.__dict__[name] = value
 
@@ -144,6 +155,6 @@ class IonObjectRegistry(object):
             obj = clzz(**keywordargs)
         else:
             obj = clzz(**kwargs)
-            
+
         return obj
 

@@ -9,6 +9,7 @@ from pyon.container.cc import Container
 import signal
 from gevent.event import Event
 from mock import Mock, patch
+from interface.services.icontainer_agent import ContainerAgentClient
 
 @attr('UNIT')
 class TestCC(PyonTestCase):
@@ -30,12 +31,15 @@ class TestCC(PyonTestCase):
 @attr('INT')
 class TestCCInt(IonIntegrationTestCase):
 
+    class ExpectedFailure(StandardError):
+        pass
+
     def setUp(self):
         # we don't want to connect to AMQP or do a pidfile or any of that jazz - just the proc manager please
         self.cc = Container()
         self.cc.proc_manager.start()
         self.cc.stop = Mock()
-        self.cc.stop.side_effect = self.cc.proc_manager.stop()
+        self.cc.stop.side_effect = self.cc.proc_manager.stop
 
     def tearDown(self):
         pass
@@ -52,13 +56,22 @@ class TestCCInt(IonIntegrationTestCase):
 
         # spawn the proc, wait for it to die and kill the container
         def failtarget(*args, **kwargs):
-            raise StandardError("I am supposed to fail!")
+            raise self.ExpectedFailure("I am supposed to fail!")
 
-        self.cc.proc_manager.proc_sup.spawn(('green', failtarget))
+        proc = self.cc.proc_manager.proc_sup.spawn(failtarget)
+        # do not ensure ready - ensure ready will blow up with a container error, on purpose
 
         # wait for the kill signal to happen
         ev.wait(timeout=5)
 
         # verify things got called
         self.cc.stop.assert_called_once_with()
+
+    def test_start_hello(self):
+        # start a service over messaging
+        self._start_container()
+        cc_client = ContainerAgentClient(node=self.container.node, name=self.container.name)
+
+        p = cc_client.spawn_process('hello', 'examples.service.hello_service', 'HelloService')
+
 

@@ -31,9 +31,9 @@ class NegotiateRequestFactory(object):
         return request_object
 
     @classmethod
-    def create_role_request(self,org_id, user_id):
+    def create_role_request(self,org_id, user_id, role_name):
 
-        request_object = IonObject(RT.RoleRequest, name='Role Request', org_id=org_id, user_id=user_id,
+        request_object = IonObject(RT.RoleRequest, name='Role Request', org_id=org_id, user_id=user_id, role_name=role_name,
             status="Initialized", description='%s Role Request at %s' % (user_id, str(now)))
 
         return request_object
@@ -53,6 +53,7 @@ class NegotiateRequest(object):
     def __init__(self,serv_prov):
         self.service_provider = serv_prov
 
+    #Either returns a new request object or throws exceptions if the preconditions specific to the request are not met.
     def open_request(self, request_object):
 
         org_id = request_object.org_id
@@ -64,6 +65,9 @@ class NegotiateRequest(object):
         if neg_obj is not None:
             for pc in neg_obj.pre_condition:
                 pre_condition_met = eval("self."+pc)
+
+                if not pre_condition_met:
+                    raise BadRequest("A precondition for this request has not been satisfied: %s" % pc)
 
         #if no exceptions were thrown evaluating pre-conditions then return request object
         request_object.status = "Open"
@@ -164,11 +168,12 @@ class NegotiateRequest(object):
         return None
 
     def _create_request(self, org_id, user_id, request_object):
-        req_id, _ = self.service_provider.clients.resource_registry.create(request_object)
-        req_obj = self.service_provider.clients.resource_registry.read(req_id)
-        self.service_provider.clients.resource_registry.create_association(org_id, PRED.hasRequest, req_obj)
-        self.service_provider.clients.resource_registry.create_association(user_id, PRED.hasRequest, req_obj)
-        return req_obj
+        req_id, req_rev  = self.service_provider.clients.resource_registry.create(request_object)
+        request_object._id = req_id
+        request_object._rev = req_rev
+        self.service_provider.clients.resource_registry.create_association(org_id, PRED.hasRequest, request_object)
+        self.service_provider.clients.resource_registry.create_association(user_id, PRED.hasRequest, request_object)
+        return request_object
 
     def _delete_request(self, org_id, user_id, request_object):
 
@@ -219,23 +224,19 @@ class NegotiateRequest(object):
             user = self.service_provider.clients.resource_registry.read(user_id)
             return True
         except:
-            raise BadRequest("The user id %s is not registered with the ION system" % (user_id))
-
+            return False
 
     def is_enrolled(self,org_id,user_id):
-        try:
-            ret = self.service_provider.is_enrolled(org_id, user_id)
-            return ret
-        except:
-            raise BadRequest("The user id %s is already enrolled in the specified Org %s" % (user_id, org_id))
-
+        ret = self.service_provider.is_enrolled(org_id, user_id)
+        return ret
 
     def enroll_req_exists(self,org_id,user_id):
 
-        request_list,_ = self.service_provider.clients.resource_registry.find_objects(user_id, PRED.hasRequest, org_id)
+        request_list,_ = self.service_provider.clients.resource_registry.find_objects(user_id, PRED.hasRequest, RT.EnrollmentRequest )
 
-        if len(request_list) > 0 :
-            raise BadRequest("The user id %s already has an outstanding request to enroll with Org %s" % (user_id, org_id))
+        for req in request_list:
+            if req.org_id == org_id and req.status != REQUEST_DENIED and req.status != REQUEST_REJECTED:
+                return True
 
         return False
 

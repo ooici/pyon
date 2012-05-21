@@ -3,7 +3,7 @@ __author__ = 'sphenrie'
 
 
 from pyon.public import Container
-from pyon.net.endpoint import ProcessRPCClient
+#from pyon.ion.endpoint import ProcessRPCClient
 from pyon.util.context import LocalContextMixin
 
 from interface.services.examples.hello.ihello_service  import HelloServiceProcessClient

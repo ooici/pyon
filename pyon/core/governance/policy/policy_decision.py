@@ -46,7 +46,7 @@ class PolicyDecisionPointManager(object):
 
     def __init__(self, *args, **kwargs):
         self.policy_decision_point = dict()
-        self.default_pdp = None
+        self.org_pdp = None
 
         #Adding an not function to XACML
         from pyon.core.governance.policy.xacml.not_function import Not
@@ -63,11 +63,19 @@ class PolicyDecisionPointManager(object):
             return self.policy_decision_point[resource_id]
 
         #If a PDP does not exist for this resource - then return default.
-        if self.default_pdp is None:
+        if self.org_pdp is None:
             #Loads a blank policy set as the default or an unknown resource_policy
-            self.default_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
+            self.org_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
 
-        return self.default_pdp
+        return self.org_pdp
+
+    def load_org_policy_rules(self, rules_text):
+        log.debug("Loading policies for org")
+
+        #Simply create a new PDP object for the service
+        #TODO - make sure this is thread safe with the evaluation that uses it.
+        input_source = StringIO(rules_text)
+        self.org_pdp = PDP.fromPolicySource(input_source, ReaderFactory)
 
 
     def load_policy_rules(self, resource_id, rules_text):

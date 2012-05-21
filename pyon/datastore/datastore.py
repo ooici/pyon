@@ -8,6 +8,7 @@ from pyon.core.exception import BadRequest, NotFound
 from pyon.ion.resource import AT
 from pyon.util.containers import DotDict, get_ion_ts, get_safe
 from pyon.util.log import log
+from pyon.util.arg_check import validate_true
 
 
 class DataStore(object):
@@ -165,7 +166,6 @@ class DataStore(object):
         """
         pass
 
-
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type=AT.H2H):
         """
         Create an association between two IonObjects with a given predicate
@@ -318,7 +318,7 @@ class DatastoreManager(object):
         @param profile  One of known constants determining the use of the store
         @param config  Override config to use
         """
-        assert ds_name, "Must provide ds_name"
+        validate_true(ds_name,'ds_name must be provided')
         if ds_name in self._datastores:
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
             return self._datastores[ds_name]

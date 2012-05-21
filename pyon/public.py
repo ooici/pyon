@@ -27,8 +27,8 @@ __all__ += ['ionprint']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
-from pyon.core.process import PyonProcessError, GreenProcess, GreenProcessSupervisor, PythonProcess
-__all__ += ['PyonProcessError', 'GreenProcess', 'GreenProcessSupervisor', 'PythonProcess']
+from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
+__all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 
 from pyon.core import exception as iex
 __all__ += ['iex']
@@ -36,8 +36,8 @@ __all__ += ['iex']
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessSupervisor, SimpleProcess, StandaloneProcess, ImmediateProcess
-__all__ += ['IonProcessSupervisor', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
+from pyon.ion.process import IonProcessThreadManager, SimpleProcess, StandaloneProcess, ImmediateProcess
+__all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
 
 from pyon.container.cc import Container
 __all__ += ['Container']
@@ -45,14 +45,14 @@ __all__ += ['Container']
 from pyon.service.service import BaseService
 __all__ += ['BaseService']
 
-from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, StreamPublisher, StreamSubscriber, \
-                                ProcessSubscriber, ProcessPublisher, StreamSubscriberRegistrar, StreamPublisherRegistrar
+from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher
+from pyon.ion.stream import StreamPublisher, StreamSubscriber, StreamSubscriberRegistrar, StreamPublisherRegistrar
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
-            'ProcessSubscriber', 'ProcessPublisher', StreamSubscriberRegistrar, StreamPublisherRegistrar]
+            'ProcessSubscriber', 'ProcessPublisher', 'StreamSubscriberRegistrar', 'StreamPublisherRegistrar']
 
-from pyon.ion.resource import ResourceTypes, RT, PredicateType, PRED, AssociationType, AT, LifeCycleStates, LCS, LCE
-__all__ += ['RT', 'PRED', 'AT', 'LCS', 'LCE']
-__all__ += ['ResourceTypes', 'PredicateType', 'AssociationType', 'LifeCycleStates']
+from pyon.ion.resource import ResourceTypes, RT, ObjectTypes, OT,PredicateType, PRED, AssociationType, AT, LifeCycleStates, LCS, LCE
+__all__ += ['RT', 'OT', 'PRED', 'AT', 'LCS', 'LCE']
+__all__ += ['ResourceTypes', 'ObjectTypes', 'PredicateType', 'AssociationType', 'LifeCycleStates']
 
 from pyon.ion.streamproc import StreamProcess
 __all__ += ['StreamProcess']

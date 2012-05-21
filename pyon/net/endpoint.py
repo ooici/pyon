@@ -83,12 +83,6 @@ class EndpointUnit(object):
         log.debug("channel %s" % str(channel))
         self.channel = channel
 
-    # @TODO: is this used?
-    def channel_attached(self):
-        """
-        """
-        log.debug("In EndpointUnit.channel_attached")
-
     def _build_invocation(self, **kwargs):
         """
         Builds an Invocation instance to be used by the interceptor stack.
@@ -181,6 +175,7 @@ class EndpointUnit(object):
                     msg, headers, delivery_tag = self.channel.recv()
                     log.debug("client_recv got a message")
                     log_message(self.channel._send_name , msg, headers, delivery_tag)
+
                     try:
                         self._message_received(msg, headers)
                     finally:
@@ -429,27 +424,27 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._ready_event.set()
 
         while True:
-            log.debug("LEF: %s blocking, waiting for a message" % str(self._recv_name))
+            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
-                newchan = self._chan.accept()
-                msg, headers, delivery_tag = newchan.recv()
+                with self._chan.accept() as newchan:
+                    msg, headers, delivery_tag = newchan.recv()
 
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, msg, headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+                    log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+                    log_message(self._recv_name, msg, headers, delivery_tag)
+
+                    try:
+                        e = self.create_endpoint(existing_channel=newchan)
+                        e._message_received(msg, headers)
+                    except Exception:
+                        log.exception("Unhandled error while handling received message")
+                        raise
+                    finally:
+                        # ALWAYS ACK
+                        newchan.ack(delivery_tag)
 
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
                 break
-
-            try:
-                e = self.create_endpoint(existing_channel=newchan)
-                e._message_received(msg, headers)
-            except Exception:
-                log.exception("Unhandled error while handling received message")
-                raise
-            finally:
-                # ALWAYS ACK
-                newchan.ack(delivery_tag)
 
     def close(self):
         BaseEndpoint.close(self)
@@ -569,6 +564,8 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
+        ts = time.time()
+
         if not self._recv_greenlet:
             self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
             self.channel.start_consume()
@@ -577,14 +574,20 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         self.response_queue = event.AsyncResult()
         self.message_received = lambda m, h: self.response_queue.set((m, h))
 
-        EndpointUnit._send(self, msg, headers=headers)
+        BidirectionalEndpointUnit._send(self, msg, headers=headers)
 
         try:
             result_data, result_headers = self.response_queue.get(timeout=timeout)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
+        finally:
+            elapsed = time.time() - ts
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+                                                                                     headers.get('conv-seq', 'NOSEQ'),
+                                                                                     self.channel._send_name,
+                                                                                     elapsed)
 
-        log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
+        log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
     def _build_header(self, raw_msg):
@@ -882,6 +885,9 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         call to the op we're routing into. This override will handle the return value being sent to the caller.
         """
         result = None
+        response_headers = None
+
+        ts = time.time()
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
         except IonException as ex:
@@ -895,11 +901,17 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             log.debug("Exception message: %s" % ex)
             log.debug("Traceback:\n%s" % tb_output)
             response_headers = self._create_error_response(ex)
+        finally:
+            # REPLIES: propogate protocol, conv-id, conv-seq
+            response_headers['protocol']    = headers.get('protocol', '')
+            response_headers['conv-id']     = headers.get('conv-id', '')
+            response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
-        # REPLIES: propogate protocol, conv-id, conv-seq
-        response_headers['protocol']    = headers.get('protocol', '')
-        response_headers['conv-id']     = headers.get('conv-id', '')
-        response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+            elapsed = time.time() - ts
+            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
+                                                                                      self.channel._recv_name,
+                                                                                      elapsed)
 
         log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
 
@@ -930,9 +942,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
         try:
-            result = ro_meth(**cmd_arg_obj)
+            ######
+            ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
+            ######
+            result              = self._make_routing_call(ro_meth, cmd_arg_obj)
+            response_headers    = { 'status_code': 200, 'error_message': '' }
+            ######
 
-            response_headers = { 'status_code': 200, 'error_message': '' }
         except TypeError as ex:
             log.exception("TypeError while attempting to call routing object's method")
             response_headers = self._create_error_response(ServerError(ex.message))
@@ -944,6 +960,15 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         return {'status_code': ex.get_status_code(),
                 'error_message': str(ex.get_error_message()),
                 'performative':'failure'}
+
+    def _make_routing_call(self, call, op_args):
+        """
+        Calls into the routing object.
+
+        May be overridden at a lower level.
+        """
+        return call(**op_args)
+
 
 class RPCServer(RequestResponseServer):
     endpoint_unit_type = RPCResponseEndpointUnit

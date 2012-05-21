@@ -32,7 +32,6 @@ class TestEvents(IonIntegrationTestCase):
     def tearDown(self):
         for x in self._listens:
             x.kill()
-        self._stop_container()
 
     def _listen(self, sub):
         """

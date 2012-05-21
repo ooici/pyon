@@ -25,6 +25,12 @@ setup(  name = 'pyon',
         keywords = ['ooici','ioncore', 'pyon'],
         packages = find_packages(),
         entry_points = {
+             'nose.plugins.0.10': [
+                 'pycc_plugin=pyon.util.pycc_plugin:PYCC',
+                 'insulate=pyon.util.insulate:Insulate',
+                 'insulateslave=pyon.util.insulate:InsulateSlave',
+                 'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler'
+             ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
                 'control_cc=scripts.control_cc:main',
@@ -34,15 +40,17 @@ setup(  name = 'pyon',
                 ]
             },
         dependency_links = [
-            'http://ooici.net/releases'
+            'http://ooici.net/releases',
+            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
         ],
         test_suite = 'pyon',
+        package_data = {'': ['*.xml']},
         install_requires = [
             # Patched greenlet to work on ARMS
             'greenlet==0.3.1-p1',
             'gevent==0.13.6',
             'simplejson==2.1.6',
-            'msgpack-python==0.1.9',
+            'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
             'pyyaml==3.10',
             'pika==0.9.5',
@@ -59,9 +67,10 @@ setup(  name = 'pyon',
             'ipython==0.11',
             'antlr_python_runtime==3.1.3',
             'readline==6.2.1',
-            'mock',
+            'mock==0.8',
             'ndg-xacml==0.4.0',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
+            'python-gevent-profiler',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',

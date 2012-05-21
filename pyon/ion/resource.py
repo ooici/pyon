@@ -9,6 +9,10 @@ from pyon.core.registry import IonObjectRegistry, getextends, issubtype
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any
 
+# Object Types
+ObjectTypes = DotDict()
+OT = ObjectTypes
+
 # Resource Types
 ResourceTypes = DotDict()
 RT = ResourceTypes
@@ -73,6 +77,12 @@ def load_definitions():
     Make sure global module variable objects are updated, not replaced, because other modules had already
     imported them (BAD).
     """
+    # Resource Types
+    ot_list = getextends('IonObjectBase')
+    ot_list.append('IonObjectBase')
+    ObjectTypes.clear()
+    ObjectTypes.update(zip(ot_list, ot_list))
+
     # Resource Types
     rt_list = getextends('Resource')
     rt_list.append('Resource')

@@ -48,7 +48,7 @@ class StreamProducer(SimpleProcess):
         routing_key = self.CFG.get('stream_producer').get('routing_key')
 
         # Create scoped exchange name
-        XP = '.'.join([bootstrap.sys_name,'science_data'])
+        XP = '.'.join([bootstrap.get_sys_name(),'science_data'])
 
         pub = ProcessPublisher(node=self.container.node, name=(XP,routing_key), process=self)
         num = 1

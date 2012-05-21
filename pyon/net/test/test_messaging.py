@@ -49,7 +49,6 @@ class TestNodeB(PyonTestCase):
 
         # check what happened
         self.assertFalse(chm.close_impl.called)
-        chm.stop_consume.assert_called_once_with()
         self.assertEquals(self._node._pool_map, {})
         self.assertEquals(self._node._pool.get_id(), ourchid)       # should get the same number back from the pool now, ensures we really freed it
         self.assertIn(ourchid, self._node._bidir_pool)
@@ -70,7 +69,6 @@ class TestNodeB(PyonTestCase):
 
         # retest same things as above because it will be removed from existence in the maps
         self.assertFalse(chm.close_impl.called)
-        chm.stop_consume.assert_called_once_with()
         self.assertEquals(self._node._pool_map, {})
 
         # the differing items now:

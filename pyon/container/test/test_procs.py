@@ -9,6 +9,7 @@ from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
+from mock import patch
 
 class FakeContainer(object):
     def __init__(self):
@@ -18,6 +19,14 @@ class FakeContainer(object):
 class SampleProcess(BaseService):
     name = 'sample'
     dependencies = []
+
+class BadProcess(BaseService):
+    name = 'bad'
+    dependencies = []
+
+    def on_quit(self):
+        bad = 3 / 0     # boom
+        return bad
 
 class SampleAgent(ResourceAgent):
     pass
@@ -59,6 +68,25 @@ class TestProcManager(IonIntegrationTestCase):
         config = {'process':{'type':ptype}}
         pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', pcls, config)
         self.assertTrue(pid)
+
+    def test_procmanager_shutdown(self):
+        self.test_procmanager()
+        pm = self.container.proc_manager
+
+        pm.stop()
+
+        self.assertEquals(len(pm.procs), 0)
+
+    def test_procmanager_badquit_shutdown(self):
+        self._start_container()
+
+        pm = self.container.proc_manager
+        pid = pm.spawn_process('badprocess', 'pyon.container.test.test_procs', 'BadProcess', {'process':{'type':'service'}})
+
+        with patch('pyon.service.service.log') as m:
+            pm.stop()
+            self.assertEquals(len(pm.procs), 0)
+            self.assertEquals(m.exception.call_count, 1)
 
 if __name__ == "__main__":
     unittest.main()
