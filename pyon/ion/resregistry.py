@@ -145,8 +145,9 @@ class ResourceRegistry(object):
         owners,assocs = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
         for aid in assocs:
             self.rr_store.delete_association(aid)
-
-        res = self.rr_store.delete(res_obj)
+        res_obj.lcstate = 'RETIRED'
+        self.rr_store.update(res_obj)
+        res = self.rr_store.delete(object_id)
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
