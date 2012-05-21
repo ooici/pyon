@@ -469,7 +469,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         e._recv_greenlet = sentinel.recv_greenlet
         e.channel = Mock()
 
-        self.assertRaises(exception.Timeout, e._send, sentinel.msg, sentinel.headers, timeout=1)
+        self.assertRaises(exception.Timeout, e._send, sentinel.msg, Mock(), timeout=1)
 
     def test_rr_client(self):
         """
@@ -763,6 +763,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e = RPCResponseEndpointUnit(routing_obj=self)
         e.send = Mock()
         e.send.return_value = sentinel.sent
+        e.channel = Mock()
         with patch('pyon.net.endpoint.ResponseEndpointUnit._message_received', new=Mock(side_effect=exception.IonException)):
             retval = e._message_received(sentinel.msg, {})
 

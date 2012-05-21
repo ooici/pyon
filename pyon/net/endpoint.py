@@ -446,31 +446,6 @@ class ListeningBaseEndpoint(BaseEndpoint):
                 log.debug('Channel was closed during LEF.listen')
                 break
 
-
-
-#        while True:
-#            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
-#            try:
-#                newchan = self._chan.accept()
-#                msg, headers, delivery_tag = newchan.recv()
-#
-#                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
-#                log_message(self._recv_name, msg, headers, delivery_tag)
-#
-#            except ChannelClosedError as ex:
-#                log.debug('Channel was closed during LEF.listen')
-#                break
-#
-#            try:
-#                e = self.create_endpoint(existing_channel=newchan)
-#                e._message_received(msg, headers)
-#            except Exception:
-#                log.exception("Unhandled error while handling received message")
-#                raise
-#            finally:
-#                # ALWAYS ACK
-#                newchan.ack(delivery_tag)
-
     def close(self):
         BaseEndpoint.close(self)
         self._chan.close()
@@ -589,6 +564,8 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
+        ts = time.time()
+
         if not self._recv_greenlet:
             self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
             self.channel.start_consume()
@@ -603,8 +580,14 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
             result_data, result_headers = self.response_queue.get(timeout=timeout)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
+        finally:
+            elapsed = time.time() - ts
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+                                                                                     headers.get('conv-seq', 'NOSEQ'),
+                                                                                     self.channel._send_name,
+                                                                                     elapsed)
 
-        log.debug("Got response to our request: %s, headers: %s", result_data, result_headers)
+        log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
     def _build_header(self, raw_msg):
@@ -902,6 +885,9 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         call to the op we're routing into. This override will handle the return value being sent to the caller.
         """
         result = None
+        response_headers = None
+
+        ts = time.time()
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
         except IonException as ex:
@@ -915,11 +901,17 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             log.debug("Exception message: %s" % ex)
             log.debug("Traceback:\n%s" % tb_output)
             response_headers = self._create_error_response(ex)
+        finally:
+            # REPLIES: propogate protocol, conv-id, conv-seq
+            response_headers['protocol']    = headers.get('protocol', '')
+            response_headers['conv-id']     = headers.get('conv-id', '')
+            response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
-        # REPLIES: propogate protocol, conv-id, conv-seq
-        response_headers['protocol']    = headers.get('protocol', '')
-        response_headers['conv-id']     = headers.get('conv-id', '')
-        response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+            elapsed = time.time() - ts
+            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
+                                                                                      self.channel._recv_name,
+                                                                                      elapsed)
 
         log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
 
