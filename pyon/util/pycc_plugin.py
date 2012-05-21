@@ -30,6 +30,7 @@ class PYCC(Plugin):
         self.blames = {'scidata':[], 'state':[], 'directory':[], 'events':[],
                 'resources':[], 'objects':[]}
         self.last_blame = {}
+        self.sysname = None
 
     def options(self, parser, env):
         """Register command line options"""
@@ -51,11 +52,11 @@ class PYCC(Plugin):
         try:
 
             from pyon.public import get_sys_name
-            sysname = get_sys_name()
+            self.sysname = get_sys_name()
 
             # Force datastore loader to use the same sysname
             from ion.processes.bootstrap.datastore_loader import DatastoreLoader
-            DatastoreLoader.clear_datastore(prefix=sysname)
+            DatastoreLoader.clear_datastore(prefix=self.sysname)
 
             def die(signum, frame):
                 # For whatever reason, the parent doesn't die some times
@@ -95,8 +96,8 @@ class PYCC(Plugin):
             signal.signal(signal.SIGUSR1, container_started_cb)
 
             # Make sure the pycc process has the same sysname as the nose
-            ccargs = ['bin/pycc', '--noshell', '-sp', '--system.name=%s' %
-                    sysname,
+            ccargs = ['bin/pycc', '--noshell', '-sp', 'system.name=%s' %
+                    self.sysname,
                     '--logcfg=res/config/logging.pycc.yml',
                     '--rel=%s' % self.rel,  'system.force_clean=False']
             debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
@@ -129,6 +130,8 @@ class PYCC(Plugin):
         them.
         """
         self.container_shutdown()
+        from ion.processes.bootstrap.datastore_loader import DatastoreLoader
+        DatastoreLoader.clear_datastore(prefix=self.sysname)
 
     def container_shutdown(self):
         debug.write('Shut down cc process\n')
