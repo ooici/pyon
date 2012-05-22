@@ -381,6 +381,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         self._ready_event = event.Event()
         self._binding = binding
+        self._chan = None
 
     def _create_channel(self, **kwargs):
         """
@@ -449,6 +450,15 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def close(self):
         BaseEndpoint.close(self)
         self._chan.close()
+
+    def get_stats(self):
+        """
+        Passthrough to channel's get_stats.
+        """
+        if not self._chan:
+            raise EndpointError("No channel attached")
+
+        return self._chan.get_stats()
 
 #
 # PUB/SUB

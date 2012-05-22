@@ -10,7 +10,7 @@ from pyon.core import exception
 from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, RecvChannel, ListenChannel
 from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
-from gevent import event, sleep
+from gevent import event, sleep, spawn
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
 from pyon.util.unit_test import PyonTestCase
@@ -20,6 +20,7 @@ from pyon.container.cc import Container
 from pyon.core.interceptor.interceptor import Invocation
 from pyon.net.transport import NameTrio, BaseTransport
 from pyon.util.sflow import SFlowManager
+from pyon.util.int_test import IonIntegrationTestCase
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
 no_interceptors = {'message_incoming': [],
@@ -337,6 +338,57 @@ class TestListeningBaseEndpoint(PyonTestCase):
         chmock.accept.return_value.__enter__.return_value.recv.assert_called_once_with()
         ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value.__enter__.return_value)
         self.assertEquals(mocklog.exception.call_count, 1)
+
+    def test_get_stats_no_channel(self):
+        ep = ListeningBaseEndpoint()
+        self.assertRaises(EndpointError, ep.get_stats)
+
+    def test_get_stats(self):
+        ep = ListeningBaseEndpoint()
+        ep._chan = Mock(spec=ListenChannel)
+
+        ep.get_stats()
+
+        ep._chan.get_stats.assert_called_once_with()
+
+@attr('INT', group='COI')
+class TestListeningBaseEndpointInt(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+
+    def test_get_stats(self):
+        ep = ListeningBaseEndpoint(node=self.container.node)
+        gl = spawn(ep.listen, binding="test_get_stats")
+
+        ep.get_ready_event().wait(timeout=5)
+
+        gs_res = ep.get_stats()
+        self.assertEquals(gs_res, (0, 1))       # num of messages, num listeners
+
+        ep.close()
+        gl.join(timeout=5)
+
+    def test_get_stats_multiple_on_named_queue(self):
+        ep1 = ListeningBaseEndpoint(node=self.container.node, from_name="test_get_stats_multi")
+        gl1 = spawn(ep1.listen)
+
+        ep2 = ListeningBaseEndpoint(node=self.container.node, from_name="test_get_stats_multi")
+        gl2 = spawn(ep2.listen)
+
+        ep1.get_ready_event().wait(timeout=5)
+        ep2.get_ready_event().wait(timeout=5)
+
+        gs_res1 = ep1.get_stats()
+        self.assertEquals(gs_res1, (0, 2))       # num of messages, num listeners
+
+        gs_res2 = ep2.get_stats()
+        self.assertEquals(gs_res2, (0, 2))       # num of messages, num listeners
+
+        ep1.close()
+        ep2.close()
+        gl1.join(timeout=5)
+        gl2.join(timeout=5)
+
 
 @patch.dict(endpoint.interceptors, no_interceptors, clear=True)
 @attr('UNIT')
