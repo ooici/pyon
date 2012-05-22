@@ -81,9 +81,9 @@ class Container(BaseContainerAgent):
         self.directory = Directory()
 
         config_from_directory = CFG.get_safe("system.config_from_directory", False)
-        from pyon.util.config import Config
-        conf_paths = ['res/config/pyon.local.yml']
-        if not config_from_directory:
+        if config_from_directory:
+            from pyon.util.config import Config
+            conf_paths = ['res/config/pyon.local.yml']
             # Look for and apply any local file config overrides
             local_cfg = Config(conf_paths, ignore_not_found=True).data
             dict_merge(CFG, local_cfg, inplace=True)
