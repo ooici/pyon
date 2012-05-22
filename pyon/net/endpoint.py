@@ -895,7 +895,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         call to the op we're routing into. This override will handle the return value being sent to the caller.
         """
         result = None
-        response_headers = None
+        response_headers = {}
 
         ts = time.time()
         try:
