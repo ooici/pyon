@@ -88,7 +88,10 @@ class DotDict(DotNotationGetItem, dict):
         @brief Returns value of qualified key, such as "system.name" or None if not exists.
                 If default is given, returns the default. No exception thrown.
         """
-        return get_safe(self, qual_key) or default
+        value = get_safe(self, qual_key)
+        if value is None:
+            value = default
+        return value
 
     @classmethod
     def fromkeys(cls, seq, value=None):
