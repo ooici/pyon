@@ -628,6 +628,15 @@ class TestRecvChannel(PyonTestCase):
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
         self.assertTrue(ac.basic_cancel.called)
 
+    def test_get_stats(self):
+        self.ch._amq_chan = sentinel.amq_chan
+        self.ch._transport = Mock()
+        self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
+
+        self.ch.get_stats()
+
+        self.ch._transport.get_stats.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
 class TestPublisherChannel(PyonTestCase):
@@ -789,11 +798,34 @@ class TestListenChannel(PyonTestCase):
         self.assertEquals(ac.close.call_count, 0)
 
 @attr('UNIT')
-class TestSusbcriberChannel(PyonTestCase):
-    """
-    SubscriberChannel is a blank for now
-    """
-    pass
+class TestSubscriberChannel(PyonTestCase):
+
+    def test_close_does_delete_if_anonymous_and_not_auto_delete(self):
+        ch = SubscriberChannel()
+        ch._queue_auto_delete = False
+        ch._destroy_queue = Mock()
+        ch._recv_name = NameTrio(sentinel.exchange, 'amq.gen-ABCD')
+
+        ch.close_impl()
+        ch._destroy_queue.assert_called_once_with()
+
+    def test_close_does_not_delete_if_named(self):
+        ch = SubscriberChannel()
+        ch._queue_auto_delete = False
+        ch._destroy_queue = Mock()
+        ch._recv_name = NameTrio(sentinel.exchange, 'some-named-queue')
+
+        ch.close_impl()
+        self.assertFalse(ch._destroy_queue.called)
+
+    def test_close_does_not_delete_if_anon_but_auto_delete(self):
+        ch = SubscriberChannel()
+        ch._queue_auto_delete = True
+        ch._destroy_queue = Mock()
+        ch._recv_name = NameTrio(sentinel.exchange, 'amq.gen-ABCD')
+
+        ch.close_impl()
+        self.assertFalse(ch._destroy_queue.called)
 
 @attr('UNIT')
 class TestServerChannel(PyonTestCase):

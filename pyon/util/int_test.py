@@ -39,20 +39,12 @@ class IonIntegrationTestCase(unittest.TestCase):
         self._turn_on_queue_auto_delete()
         self._patch_out_diediedie()
         self._patch_out_fail_fast_kill()
-        db_type = os.environ.get('DB_TYPE', None)
-        if not db_type:
-            pass
-        elif db_type == 'MOCK':
-            self._turn_on_mockdb()
-        elif db_type == 'COUCH':
-            self._turn_on_couchdb()
 
         # delete/create any known DBs with names matching our prefix - should be rare
         self._force_clean(True)
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
-            self._turn_on_couchdb()
             self._turn_off_force_clean()
             from ion.processes.bootstrap.datastore_loader import DatastoreLoader
             DatastoreLoader.load_datastore('res/dd')
@@ -134,18 +126,6 @@ class IonIntegrationTestCase(unittest.TestCase):
             mod = servicecls.__module__
             cls = servicecls.__name__
         self.container.spawn_process(servicename, mod, cls, config)
-
-    def _turn_on_couchdb(self):
-        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
-        patcher =patch('pyon.datastore.datastore.DatastoreManager.persistent', True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def _turn_on_mockdb(self):
-        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
-        patcher =patch('pyon.datastore.datastore.DatastoreManager.persistent', False)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def _turn_off_force_clean(self):
         # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()

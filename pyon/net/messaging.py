@@ -28,6 +28,7 @@ class NodeB(amqp.Node):
 
     def __init__(self):
         log.debug("In NodeB.__init__")
+        self.running = False
         self.ready = event.Event()
         self._lock = coros.RLock()
         self._pool = IDPool()
@@ -43,8 +44,27 @@ class NodeB(amqp.Node):
         """
         log.debug("In start_node")
         amqp.Node.start_node(self)
-        self.running = 1
+        self.running = True
         self.ready.set()
+
+    def stop_node(self):
+        """
+        Closes the connection to the broker, cleans up resources held by this node.
+        """
+        log.debug("NodeB.stop_node (running: %s)", self.running)
+
+        if self.running:
+            # clean up pooling before we shut connection
+            self._destroy_pool()
+            self.client.close()
+        self.running = False
+
+    def _destroy_pool(self):
+        """
+        Explicitly deletes pooled queues in this Node.
+        """
+        for chan in self._bidir_pool.itervalues():
+            chan._destroy_queue()
 
     def _new_channel(self, ch_type, ch_number=None, **kwargs):
         """
@@ -108,16 +128,18 @@ class NodeB(amqp.Node):
                 self._bidir_pool.pop(chid)
                 self._pool._ids_free.remove(chid)
 
-def ioloop(connection):
+def ioloop(connection, name=None):
     # Loop until CTRL-C
-    log.debug("In ioloop")
+    if name:
+        name = "NODE-%s" % name
+
     import threading
-    threading.current_thread().name = "NODE"
+    threading.current_thread().name = name or "NODE"
     try:
         # Start our blocking loop
-        log.debug("Before start")
+        log.debug("ioloop: Before start")
         connection.ioloop.start()
-        log.debug("After start")
+        log.debug("ioloop: After start")
 
     except KeyboardInterrupt:
 
@@ -177,7 +199,7 @@ class PyonSelectConnection(SelectConnection):
         log.debug("Marking %d as a bad channel", ch_number)
         self._bad_channel_numbers.add(ch_number)
 
-def make_node(connection_params=None):
+def make_node(connection_params=None, name=None, timeout=None):
     """
     Blocking construction and connection of node.
 
@@ -189,8 +211,8 @@ def make_node(connection_params=None):
     credentials = PlainCredentials(connection_params["username"], connection_params["password"])
     conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
     connection = PyonSelectConnection(conn_parameters , node.on_connection_open)
-    ioloop_process = gevent.spawn(ioloop, connection)
+    ioloop_process = gevent.spawn(ioloop, connection, name=name)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
-    node.ready.wait()
+    node.ready.wait(timeout=timeout)
     return node, ioloop_process
     #return node, ioloop, connection

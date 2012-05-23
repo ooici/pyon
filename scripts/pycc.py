@@ -109,6 +109,11 @@ def main(opts, *args, **kwargs):
         from pyon.util.containers import dict_merge
         from pyon.util.config import Config
 
+        # See if sysname was provided
+        if opts.sysname:
+            from pyon.core import bootstrap
+            bootstrap.set_sys_name(opts.sysname)
+
         # Check if user opted to override logging config
         # Requires re-initializing logging
         if opts.logcfg:
@@ -260,6 +265,7 @@ def entry():
     # should be in the config file (pyon.yml), which can also be specified on the command-line via the extra args
 
     parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('-s', '--sysname', type=str, help='System name')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-m', '--mx', action='store_true', help='Start a management web UI')

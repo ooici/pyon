@@ -25,19 +25,21 @@ class RecordDictionaryTool(object):
     The application user refers to everything in the record dictionary by the unique nick name from the taxonomy.
 
     """
-    def __init__(self,taxonomy, length=None):
+    def __init__(self,taxonomy, shape=None):
         """
         @brief Initialize a new instance of Record Dictionary Tool with a taxonomy and an optional fixed length
         @param taxonomy is an instance of a TaxonomyTool or Taxonomy (IonObject) used in this record dictionary
         @param length is an optional fixed length for the value sequences of this record dictionary
         """
+        if not isinstance(shape, (_NoneType, int, tuple)):
+            raise TypeError('Invalid shape argument, received type "%s"; should be None or int or tuple' % type(shape))
+
 
         self._rd = {}
-        self._len = length
+        self._shp = shape
 
-        if not isinstance(length, (_NoneType, int)):
-            raise TypeError('Invalid length argument, received type "%s"; should be None or int' % type(length))
-
+        if isinstance(self._shp, int):
+            self._shp = (self._shp,)
 
         # hold onto the taxonomy - we need it to build the granule...
 
@@ -68,16 +70,18 @@ class RecordDictionaryTool(object):
         elif isinstance(vals, numpy.ndarray):
             #Otherwise it is a value sequence which should have the correct length
 
-            if vals.ndim != 1:
-                raise ValueError('The rank of a value sequence array in a record dictionary must be 1. Got name "%s" with rank "%d"' % (name, vals.ndim))
+            # Matthew says: Assert only equal shape 5/17/12
 
-            # Set _len if it is None
-            if self._len is None:
-                self._len = len(vals)
+            if vals.ndim == 0:
+                raise ValueError('The rank of a value sequence array in a record dictionary must be greater than zero. Got name "%s" with rank "%d"' % (name, vals.ndim))
+
+            # Set _shp if it is None
+            if self._shp is None:
+                self._shp = vals.shape
 
             # Test new value sequence length
-            if self._len != len(vals):
-                raise ValueError('Invalid value length "%s" for name "%s"; Record dictionary defined length is "%s"' % (len(vals), name, self._len))
+            if self._shp != vals.shape:
+                raise ValueError('Invalid array shape "%s" for name "%s"; Record dictionary defined shape is "%s"' % (vals.shape, name, self._shp))
 
             self._rd[self._tx.get_handle(name)] = vals
 

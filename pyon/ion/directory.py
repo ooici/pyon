@@ -61,9 +61,14 @@ class Directory(object):
 
     def _init(self):
         # determine config flow to follow
+        config_from_directory = CFG.get_safe("system.config_from_directory", False)
+        if config_from_directory:
+            self._load_config()
+            return
+
+        # determine config flow to follow
         auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
         if not auto_bootstrap:
-            self._load_config()
             return
 
         try:

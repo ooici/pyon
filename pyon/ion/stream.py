@@ -134,7 +134,7 @@ class StreamSubscriber(ProcessSubscriber):
         """
         Start consuming from the queue
         """
-        if hasattr(self, '_chan'):
+        if self._chan is not None:
             try:
                 self._chan.start_consume()
             except ChannelError:
@@ -149,7 +149,7 @@ class StreamSubscriber(ProcessSubscriber):
         Stop consuming from the queue
         """
 
-        if hasattr(self, '_chan'):
+        if self._chan is not None:
             self._chan.stop_consume()
         else:
 
@@ -158,7 +158,7 @@ class StreamSubscriber(ProcessSubscriber):
     def close(self):
 
         self.stop()
-        if hasattr(self, '_chan'):
+        if self._chan is not None:
             self._chan.close()
 
             # This does not work - it hangs - why?

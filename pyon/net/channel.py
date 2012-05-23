@@ -451,7 +451,7 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
         assert self._transport
 
-        log.info("Destroying listener for queue %s", self._recv_name)
+        log.info("Destroying queue: %s", self._recv_name)
         self._transport.delete_queue_impl(self._amq_chan,
                                           queue=self._recv_name.queue)
 
@@ -626,6 +626,17 @@ class RecvChannel(BaseChannel):
         self._ensure_amq_chan()
         self._sync_call(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
 
+    def get_stats(self):
+        """
+        Returns a tuple of number of messages, number of consumers for this queue.
+
+        Does not have to be actively listening but must have been setup.
+        """
+        assert self._recv_name and self._recv_name.queue
+        log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
+
+        return self._transport.get_stats(self._amq_chan, queue=self._recv_name.queue)
+
 class PublisherChannel(SendChannel):
     def __init__(self, close_callback=None):
         self._declared = False
@@ -758,7 +769,12 @@ class ListenChannel(RecvChannel):
 
 
 class SubscriberChannel(ListenChannel):
-    pass
+    def close_impl(self):
+        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-"):
+            log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
+            self._destroy_queue()
+
+        ListenChannel.close_impl(self)
 
 class ServerChannel(ListenChannel):
 
