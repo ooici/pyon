@@ -60,6 +60,11 @@ class Directory(object):
         root_id,rev = self.dir_store.create(root_obj, self.orgname)
 
     def _init(self):
+        try:
+            root_de = self.dir_store.read(self.orgname)
+        except NotFound as nf:
+            self._create()
+
         # determine config flow to follow
         config_from_directory = CFG.get_safe("system.config_from_directory", False)
         if config_from_directory:
@@ -70,11 +75,6 @@ class Directory(object):
         auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
         if not auto_bootstrap:
             return
-
-        try:
-            root_de = self.dir_store.read(self.orgname)
-        except NotFound as nf:
-            self._create()
 
         self._assert_existence("/", "Agents",
                 description="Running agents are registered here")
