@@ -113,6 +113,12 @@ def main(opts, *args, **kwargs):
         if opts.sysname:
             from pyon.core import bootstrap
             bootstrap.set_sys_name(opts.sysname)
+        else:
+            if CFG.system.testing:
+                if CFG.system.testing_sysname:
+                    bootstrap.set_sys_name(CFG.system.testing.testing_sysname)
+
+
 
         # Check if user opted to override logging config
         # Requires re-initializing logging
