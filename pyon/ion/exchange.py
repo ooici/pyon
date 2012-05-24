@@ -18,6 +18,7 @@ from interface.services.coi.iresource_registry_service import ResourceRegistrySe
 from pyon.util.config import CFG
 from pyon.ion.resource import RT
 import time
+import socket
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -92,24 +93,28 @@ class ExchangeManager(object):
             log.debug("Starting connection: %s", name)
 
             # start it with a zero timeout so it comes right back to us
-            node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
+            try:
+                node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
 
-            # install a finished handler directly on the ioloop just for this startup period
-            fail_handle = lambda _: handle_failure(name, node)
-            ioloop.link(fail_handle)
+                # install a finished handler directly on the ioloop just for this startup period
+                fail_handle = lambda _: handle_failure(name, node)
+                ioloop.link(fail_handle)
 
-            # wait for the node ready event, with a large timeout just in case
-            node_ready = node.ready.wait(timeout=15)
+                # wait for the node ready event, with a large timeout just in case
+                node_ready = node.ready.wait(timeout=15)
 
-            # remove the finished handler, we don't care about it here
-            ioloop.unlink(fail_handle)
+                # remove the finished handler, we don't care about it here
+                ioloop.unlink(fail_handle)
 
-            # only add to our list if we started successfully
-            if not node.running:
-                ioloop.kill()      # make sure ioloop dead
-            else:
-                self._nodes[name]   = node
-                self._ioloops[name] = ioloop
+                # only add to our list if we started successfully
+                if not node.running:
+                    ioloop.kill()      # make sure ioloop dead
+                else:
+                    self._nodes[name]   = node
+                    self._ioloops[name] = ioloop
+
+            except socket.error as e:
+                log.warn("Could not start connection %s due to socket error, continuing", name)
 
         fail_count = total_count - len(self._nodes)
         if fail_count > 0 or total_count == 0:

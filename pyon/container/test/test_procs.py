@@ -63,6 +63,8 @@ class TestProcManager(IonIntegrationTestCase):
             pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
             self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
+        self.assertEquals(len(pm.procs), 5)     # service, stream_proc, agent, standalone, simple.  NO IMMEDIATE
+
     def _spawnproc(self, pm, ptype, pcls=None):
         pcls = pcls or 'SampleProcess'
         config = {'process':{'type':ptype}}
@@ -88,5 +90,9 @@ class TestProcManager(IonIntegrationTestCase):
             self.assertEquals(len(pm.procs), 0)
             self.assertEquals(m.exception.call_count, 1)
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_immediate_terminate(self):
+        self._start_container()
+
+        self._spawnproc(self.container.proc_manager, 'immediate')
+        self.assertEquals(len(self.container.proc_manager.procs), 0)
+
