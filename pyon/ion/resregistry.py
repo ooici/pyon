@@ -145,8 +145,9 @@ class ResourceRegistry(object):
         owners,assocs = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
         for aid in assocs:
             self.rr_store.delete_association(aid)
-
-        res = self.rr_store.delete(res_obj)
+        res_obj.lcstate = 'RETIRED'
+        self.rr_store.update(res_obj)
+        res = self.rr_store.delete(object_id)
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
@@ -306,6 +307,9 @@ class ResourceRegistry(object):
 
     def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
+
+    def find_associations_mult(self, subjects=[], id_only=False):
+        return self.rr_store.find_associations_mult(subjects=subjects, id_only=id_only)
 
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         if predicate:
