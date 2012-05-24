@@ -45,6 +45,7 @@ from contextlib import contextmanager
 from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
 from pyon.util.fsm import FSM
+import os
 
 class ChannelError(StandardError):
     """
@@ -322,6 +323,11 @@ class SendChannel(BaseChannel):
         exchange    = name.exchange
         routing_key = name.binding    # uses "_queue" if binding not explictly defined
         headers = headers or {}
+
+        if os.environ.get('QUEUE_BLAME', None) is not None:
+            _, testid = os.environ['QUEUE_BLAME'].split(',')
+            headers['QUEUE_BLAME'] = testid
+
         props = BasicProperties(headers=headers)
 
         self._ensure_amq_chan()
@@ -627,6 +633,13 @@ class RecvChannel(BaseChannel):
                                                         queue=queue or '',
                                                         auto_delete=self._queue_auto_delete,
                                                         durable=self._queue_durable)
+
+        if os.environ.get('QUEUE_BLAME', None) is not None:
+            ds_name, testid = os.environ['QUEUE_BLAME'].split(',')
+            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+            ds = CouchDB_DataStore(datastore_name=ds_name)
+            ds.create_doc({'test_id':testid, 'queue_name':queue_name})
+            ds.close()
 
         # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
         if queue_name != self._recv_name.queue:

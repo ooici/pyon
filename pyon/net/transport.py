@@ -13,6 +13,7 @@ __license__ = 'Apache 2.0'
 from pyon.util.log import log
 from gevent.event import AsyncResult
 from contextlib import contextmanager
+import os
 
 class TransportError(StandardError):
     pass
@@ -117,10 +118,18 @@ class AMQPTransport(BaseTransport):
 
     def declare_queue_impl(self, client, queue, durable=False, auto_delete=True):
         log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", client.channel_number, queue, durable, auto_delete)
+        arguments = {}
+
+        if os.environ.get('QUEUE_BLAME', None) is not None:
+            _, testid = os.environ['QUEUE_BLAME'].split(',')
+            arguments.update({'created-by':testid})
+
         frame = self._sync_call(client, client.queue_declare, 'callback',
                                 queue=queue or '',
                                 auto_delete=auto_delete,
-                                durable=durable)
+                                durable=durable,
+                                arguments=arguments)
+
         return frame.method.queue
 
     def delete_queue_impl(self, client, queue, **kwargs):

@@ -28,6 +28,7 @@ setup(  name = 'pyon',
              'nose.plugins.0.10': [
                  'pycc_plugin=pyon.util.pycc_plugin:PYCC',
                  'timer_plugin=pyon.util.timer_plugin:TestTimer',
+                 'queueblame=pyon.util.queueblame_plugin:QueueBlame',
                  'insulate=pyon.util.insulate:Insulate',
                  'insulateslave=pyon.util.insulate:InsulateSlave',
                  'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler'
