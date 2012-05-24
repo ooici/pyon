@@ -9,6 +9,7 @@ import string
 import yaml
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
+import re
 
 
 class IonYamlLoader(yaml.Loader):
@@ -399,17 +400,38 @@ class ObjectModelGenerator:
         field_details = []
         init_lines = []
         first_time = True
+        decorators = ''
+        description = ''
 
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
                 continue
             elif line.startswith('  #'):
-                init_lines.append('      ' + line + '\n')
+                # Check for decorators
+                if len(line) > 3 and line[3].isalpha():
+                    if not decorators:
+                        decorators = '"' + line.strip()[1:] + '"'
+                    else:
+                        decorators = decorators + ', "' + line.strip()[1:] + '"'
+                else:
+                    init_lines.append('  ' + line + '\n')
+                    if not description:
+                        description = line
+                    else:
+                        description = description + ' ' + line
             elif line.startswith('  '):
                 if current_class_def_dict:
                     field = line.split(":")[0].strip()
                     try:
                         value = current_class_def_dict[field]
+                        # Get inline comment
+                        if '#' in line:
+                            dsc = line.split('#',1)[1].strip()
+                            if not description:
+                                description = '#' + dsc
+                            else:
+                                description = description + ' #' + dsc
+                            
                     except KeyError:
                         # Ignore key error because value is nested
                         continue
@@ -440,9 +462,11 @@ class ObjectModelGenerator:
                     fields.append(field)
                     field_details.append((field, value_type, converted_value))
                     if enum_type:
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "'},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
                     else:
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators':[" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
+                    decorators = ''
+                    description = ''
             elif line and line[0].isalpha():
                 if '!enum' in line:
                     continue
@@ -459,6 +483,8 @@ class ObjectModelGenerator:
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
 
+                        for assoc in related_associations:
+                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
                         for assockey in related_associations:
                             assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'",""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'",""), constraints="", description="")
 
@@ -507,7 +533,6 @@ class ObjectModelGenerator:
                         with open(datamodelhtmlfile, 'w') as f:
                             f.write(doc_output)                        
                         
-                    ###class_args_dict[current_class] = {'args': self.args, 'fields': self.fields, 'field_details': self.field_details}
                     self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class}
 
                     for arg in args:
@@ -546,7 +571,6 @@ class ObjectModelGenerator:
                     schema_extended = False
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':','(IonObjectBase')
-                ### self.dataobject_output_text += 'class ' + line + '):\n    def __init__(self'
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
                 self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
 

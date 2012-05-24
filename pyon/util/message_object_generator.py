@@ -1,6 +1,7 @@
 
 import ast
 import os
+import re
 from pyon.core.path import list_files_recursive
 
 
@@ -92,6 +93,8 @@ class MessageObjectGenerator:
 
                 messageobject_output_text += '\n    def __init__(self'
                 current_class_schema = "\n    _schema = {"
+                decorators = ''
+                description = ''
 
                 while index < len(lines) and not lines[index].startswith('    out:'):
                     if lines[index].isspace():
@@ -99,19 +102,40 @@ class MessageObjectGenerator:
                         continue
 
                     line = lines[index].replace('    ', '', 1)
+
+                    # Find decorators and comments
                     if line.startswith('  #'):
-                        init_lines.append('  ' + line + '\n')
+                        # Check for decorators
+                        if len(line) > 3 and line[3].isalpha():
+                            if not decorators:
+                                decorators = '"' + line.strip()[1:] + '"'
+                            else:
+                                decorators = decorators + ', "' + line.strip()[1:] + '"'
+                        else:
+                            init_lines.append('  ' + line + '\n')
+                            if not description:
+                                description = line
+                            else:
+                                description = description + ' ' + line
+
+
                         index += 1
                         continue
+
                     elif line.startswith('  '):
-                        is_required = False
                         field = line.split(":", 1)[0].strip()
                         try:
                             value = line.split(":", 1)[1].strip()
                             if '#' in value:
-                                if '_required' in value:
-                                    is_required = True
+                                dsc = value.split('#',1)[1].strip()
                                 value = value.split('#')[0].strip()
+                                # Get inline comment
+                                if not description:
+                                    description = '#' + re.escape(dsc)
+                                else:
+                                    description = description + ' #' + dsc
+
+
                         except KeyError:
                             # Ignore key error because value is nested
                             index += 1
@@ -152,12 +176,11 @@ class MessageObjectGenerator:
                                 default = value
                         args.append(", ")
                         args.append(field + "=" + value)
-    #                    if is_required:
-    #                        init_lines.append("        if " + field + " is None:\n")
-    #                        init_lines.append("            raise BadRequest('Required parameter " + field + " was not provided')\n")
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'required': " + str(is_required) + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) +  "' },"
                     index += 1
+                    decorators = ''
+                    description = ''
 
                 if len(args) > 0:
                     for arg in args:
@@ -173,7 +196,6 @@ class MessageObjectGenerator:
                 if index < len(lines) and lines[index].startswith('    out:'):
                     args = []
                     init_lines = []
-                    ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
                     messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
                     messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                     messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
@@ -205,10 +227,22 @@ class MessageObjectGenerator:
                                 index += 1
                             break
 
+                            
                         line = line.replace('    ', '', 1)
+
+                        # Add comments and decorators
                         if line.startswith('  #'):
+                            # Check for decorators
+                            if len(line) > 3 and line[3].isalpha():
+                                if not decorators:
+                                    decorators = '"' + line.strip()[1:] + '"'
+                                else:
+                                    decorators = decorators + ', "' + line.strip()[1:] + '"'
+                            else:
+                                init_lines.append('  ' + line + '\n')
                             index += 1
                             continue
+
                         field = line.split(":", 1)[0].strip()
                         try:
                             value = line.split(":", 1)[1].strip()
@@ -256,8 +290,9 @@ class MessageObjectGenerator:
                         args.append(field + "=" + value)
     #                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]}," 
                         index += 1
+                        decorators = ''
 
                     if len(args) > 0:
                         for arg in args:
