@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from pyon.util.arg_check import validate_is_instance
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -18,6 +17,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
+from pyon.util.arg_check import validate_is_instance
 from pyon.core.bootstrap import CFG
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
