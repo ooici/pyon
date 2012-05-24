@@ -17,6 +17,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
+from pyon.util.arg_check import validate_is_instance
 from pyon.core.bootstrap import CFG
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
@@ -407,6 +408,21 @@ class CouchDB_DataStore(DataStore):
             return True
 
         return False
+
+    def find_associations_mult(self, subjects, id_only=False):
+        ds, datastore_name = self._get_datastore()
+        validate_is_instance(subjects, list, 'subjects is not a list of resource_ids')
+        view_args = dict(keys=subjects, include_docs=True)
+        results = self.query_view(self._get_viewname("association","by_bulk"), view_args)
+        ids = list([i['value'] for i in results])
+        assocs = list([i['doc'] for i in results])
+        if id_only:
+            return ids, assocs
+        else:
+            return self.read_mult(ids), assocs
+
+
+
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))
