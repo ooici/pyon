@@ -78,6 +78,14 @@ function(doc) {
     emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
+        },
+        'by_bulk':{
+            'map':"""
+function(doc) {
+  if(doc.type_ == "Association") {
+    emit(doc.s, doc.o);
+  }
+}""",
         }
     },
 

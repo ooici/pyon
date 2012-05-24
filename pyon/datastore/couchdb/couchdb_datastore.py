@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.util.arg_check import validate_is_instance
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -407,6 +408,22 @@ class CouchDB_DataStore(DataStore):
             return True
 
         return False
+
+    def find_associations_mult(self, subjects, id_only=False):
+        ds, datastore_name = self._get_datastore()
+        validate_is_instance(subjects, list, 'subjects is not a list of resource_ids')
+        view_args = dict(keys=subjects)
+        if not id_only:
+            view_args['include_docs'] = True
+        results = self.query_view(self._get_viewname("association","by_bulk"), view_args)
+        ids = list([i['value'] for i in results])
+        if id_only:
+            return ids
+        else:
+            return self.read_mult(ids)
+
+
+
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" % (subject, predicate, object_type, id_only))

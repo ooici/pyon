@@ -308,6 +308,9 @@ class ResourceRegistry(object):
     def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
 
+    def find_associations_mult(self, subjects=[], id_only=False):
+        return self.rr_store.find_associations_mult(subjects=subjects, id_only=id_only)
+
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         if predicate:
             assoc_type = assoc_type or AT.H2H
