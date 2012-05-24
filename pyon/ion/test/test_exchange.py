@@ -145,12 +145,32 @@ class TestExchangeManager(PyonTestCase):
 @attr('INT', group='COI')
 class TestExchangeManagerInt(IonIntegrationTestCase):
 
-    fail_cfg = {
+    fail_bad_user_cfg = {
         'type':'amqp91',
         'host':CFG.server.amqp.host,
         'port':CFG.server.amqp.port,
         'username':'THIS_SHOULD_NOT_EXIST',
         'password':'REALLY_DOESNT_MATTER',
+        'vhost': '/',
+        'heartbeat':30,
+    }
+
+    fail_bad_port_cfg = {
+        'type':'amqp91',
+        'host':CFG.server.amqp.host,
+        'port':CFG.server.amqp.port + 10,
+        'username':CFG.server.amqp.username,
+        'password':CFG.server.amqp.password,
+        'vhost': '/',
+        'heartbeat':30,
+    }
+
+    fail_bad_host_cfg = {
+        'type':'amqp91',
+        'host':'nowaydoesthisexistatall.badtld',
+        'port':CFG.server.amqp.port,
+        'username':CFG.server.amqp.username,
+        'password':CFG.server.amqp.password,
         'vhost': '/',
         'heartbeat':30,
     }
@@ -165,7 +185,7 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertEquals(self.container.node, self.container.ex_manager.default_node)
         self.assertEquals(len(self.container.ex_manager._nodes), 1)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb, 'amqp_fail':fail_cfg}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb, 'amqp_fail':fail_bad_user_cfg}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
     def test_start_stop_with_one_success_and_one_failure(self):
         self._start_container()
 
@@ -173,9 +193,26 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertIn('primary', self.container.ex_manager._nodes)
         self.assertNotIn('secondary', self.container.ex_manager._nodes)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp':fail_cfg}, container=_make_server_cfg())
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb, 'amqp_fail':fail_bad_user_cfg, 'amqp_fail2':fail_bad_port_cfg}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail', thirdly='amqp_fail2'))
+    def test_start_stop_with_one_success_and_multiple_failures(self):
+        self._start_container()
+
+        self.assertEquals(len(self.container.ex_manager._nodes), 1)
+        self.assertIn('primary', self.container.ex_manager._nodes)
+        self.assertNotIn('secondary', self.container.ex_manager._nodes)
+
+    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp':fail_bad_user_cfg}, container=_make_server_cfg())
     def test_start_stop_with_no_connections(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
+
+    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp_bad':fail_bad_port_cfg}, container=_make_server_cfg(primary='amqp_bad'))
+    def test_start_stop_with_bad_port_failure(self):
+        self.assertRaises(ExchangeManagerError, self._start_container)
+
+    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp_bad':fail_bad_host_cfg}, container=_make_server_cfg(primary='amqp_bad'))
+    def test_start_stop_with_bad_host_failure(self):
+        self.assertRaises(ExchangeManagerError, self._start_container)
+
 
 @attr('UNIT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})

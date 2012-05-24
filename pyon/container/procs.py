@@ -124,12 +124,17 @@ class ProcManager(object):
             self._register_process(service_instance, name)
 
             service_instance.errcause = "OK"
-            log.info("AppManager.spawn_process: %s.%s -> pid=%s OK" % (module, cls, process_id))
+            log.info("AppManager.spawn_process: %s.%s -> pid=%s OK", module, cls, process_id)
+
+            if process_type == 'immediate':
+                log.info('Terminating immediate process: %s', service_instance.id)
+                self.terminate_process(service_instance.id)
+
             return service_instance.id
 
         except Exception:
             errcause = service_instance.errcause if service_instance else "instantiating service"
-            log.exception("Error spawning %s %s process (process_id: %s): %s" % (name, process_type, process_id, errcause))
+            log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
             raise
 
     def _spawned_proc_failed(self, gproc):

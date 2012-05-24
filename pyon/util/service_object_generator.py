@@ -413,6 +413,7 @@ class ServiceObjectGenerator :
     def load_mods(self, path, interfaces):
         mod_prefix = string.replace(path, "/", ".")
 
+        encountered_load_error = False
         for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
             if is_pkg:
                 self.load_mods(path+"/"+mod_name, interfaces)
@@ -421,6 +422,7 @@ class ServiceObjectGenerator :
                 try:
                     __import__(mod_qual)
                 except Exception, ex:
+                    encountered_load_error = True
                     print "Import module '%s' failed: %s" % (mod_qual, ex)
                     traceback.print_exc()
                     if not interfaces:
@@ -428,6 +430,8 @@ class ServiceObjectGenerator :
                         print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"
                         print "syntax errors in your code or in the modules your code imports.\n"
 
+        if encountered_load_error:
+            sys.exit(1)
 
 
 
