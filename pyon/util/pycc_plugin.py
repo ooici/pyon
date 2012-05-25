@@ -132,6 +132,8 @@ class PYCC(Plugin):
         self.container_shutdown()
         from ion.processes.bootstrap.datastore_loader import DatastoreLoader
         DatastoreLoader.clear_datastore(prefix=self.sysname)
+        import subprocess
+        subprocess.call(['rm', '-rf', 'res/dd'])
 
     def container_shutdown(self):
         debug.write('Shut down cc process\n')
