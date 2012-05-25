@@ -120,6 +120,7 @@ class GovernanceController(object):
             policy_rules = self.policy_client.get_active_resource_policy_rules(resource_id)
             if self.policy_decision_point_manager is not None:
                 self.policy_decision_point_manager.load_org_policy_rules(policy_rules)
+                self.update_all_resource_policies(resource_id)
         else:
             policy_rules = self.policy_client.get_active_resource_policy_rules(resource_id)
             self.update_resource_policy(resource_id, policy_rules)
@@ -132,3 +133,14 @@ class GovernanceController(object):
             log.debug("Loading policy for resource: %s" % resource_name)
             self.policy_decision_point_manager.load_policy_rules(resource_name, policy_rules)
 
+
+    def update_all_resource_policies(self, org_id):
+
+        #Notify policy decision point of updated rules for all existing service policies
+        if self.policy_decision_point_manager is not None:
+            for res_name in self.policy_decision_point_manager.policy_decision_point:
+                try:
+                    policy_rules = self.policy_client.get_active_service_policy_rules(org_id, res_name)
+                    self.update_resource_policy(res_name, policy_rules)
+                except Exception, e:
+                    log.error(e.message)
