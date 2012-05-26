@@ -110,9 +110,9 @@ class GovernanceController(object):
         resource_type = resource_policy_event.resource_type
         resource_name = resource_policy_event.resource_name
 
-        log.debug("Resource policy modified: %s" % policy_id)
+        log.info("Resource policy modified: %s %s %s" % ( policy_id, resource_id, resource_type))
 
-        if resource_type == 'ServiceDefinition':  #TODO - REDO this to tear services like resources and have a configurable Org bounrady by container
+        if resource_type == 'ServiceDefinition':  #TODO - REDO to have a configurable Org boundary by container
             ion_org = self.org_client.find_org()
             policy_rules = self.policy_client.get_active_service_policy_rules(ion_org._id, resource_name)
             self.update_resource_policy(resource_name, policy_rules)
