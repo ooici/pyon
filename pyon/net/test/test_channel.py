@@ -3,7 +3,6 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-import unittest
 from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
 from gevent import queue, spawn
 from pyon.util.unit_test import PyonTestCase
@@ -15,7 +14,6 @@ from pyon.net.transport import NameTrio, BaseTransport
 from pyon.util.fsm import ExceptionFSM
 from pyon.util.int_test import IonIntegrationTestCase
 import time
-import sys
 from gevent.event import Event
 import Queue as PQueue
 from gevent.queue import Queue
@@ -886,7 +884,6 @@ class TestChannelInt(IonIntegrationTestCase):
             counter = 0
 
             while not self.publish_five.wait(timeout=5):
-                print >>sys.stderr, "PUBLISH 5,", counter
                 p.send('5,' + str(counter))
                 self.five_events.put(counter)
                 counter+=1
@@ -897,7 +894,6 @@ class TestChannelInt(IonIntegrationTestCase):
             counter = 0
 
             while not self.publish_three.wait(timeout=3):
-                print >>sys.stderr, "PUBLISH 3,", counter
                 p.send('3,' + str(counter))
                 self.three_events.put(counter)
                 counter+=1
@@ -907,11 +903,9 @@ class TestChannelInt(IonIntegrationTestCase):
         self.five_events = Queue()
         self.three_events = Queue()
 
-        print >>sys.stderr, "SPAWNING PRODUCERS"
         gl_every_five = spawn(every_five)
         gl_every_three = spawn(every_three)
 
-        print >>sys.stderr, "MAKING RECVER"
         ch = self.container.node.channel(RecvChannel)
         ch._recv_name = NameTrio('test_exchange', 'test_queue')
         ch._queue_auto_delete = False
@@ -924,11 +918,8 @@ class TestChannelInt(IonIntegrationTestCase):
         # do binding to 5 pub only
         ch._bind('routed.5')
 
-        print >>sys.stderr, "WAITING fOR FIRST MESSAGE"
         # wait for one message
         self.five_events.get(timeout=10)
-
-        print >>sys.stderr, "TEST THEM"
 
         # ensure 1 message, 0 consumer
         self.assertTupleEqual((1, 0), ch.get_stats())
@@ -972,7 +963,6 @@ class TestChannelInt(IonIntegrationTestCase):
         time.sleep(0.1)
         m, h, d = ch.recv(timeout=0)
         self.assertTrue(m.startswith('5,'))
-        print >>sys.stderr, "REJECT tHAT PEN", m, h, d
         ch.reject(d, requeue=True)
 
         # rabbit appears to deliver this later on, only when we've got another message in it
@@ -994,7 +984,6 @@ class TestChannelInt(IonIntegrationTestCase):
                 self.assertListEqual(expect, [])
                 break
 
-        print >>sys.stderr, "BIND TO THREE"
         # let's change the binding to the 3 now, empty the testqueue first (artifact of test)
         while not self.three_events.empty():
             self.three_events.get(timeout=0)
@@ -1036,7 +1025,6 @@ class TestChannelInt(IonIntegrationTestCase):
 
         ch.stop_consume()
 
-        print >>sys.stderr, "CLEAN IT"
         # cleanup
         ch._destroy_queue()
         ch.close()
