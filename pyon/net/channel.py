@@ -519,13 +519,13 @@ class RecvChannel(BaseChannel):
         if self._fsm.current_state == self.S_CONSUMING:
             self.stop_consume()
 
-    def recv(self):
+    def recv(self, timeout=None):
         """
         Pulls a message off the queue, will block if there are none.
         Typically done by the EndpointUnit layer. Should ack the message there as it is "taking ownership".
         """
         while True:
-            msg = self._recv_queue.get()
+            msg = self._recv_queue.get(timeout=timeout)
 
             # spin on non-closed messages until we get to what we are waiting for
             if self._should_discard and not isinstance(msg, ChannelShutdownMessage):
@@ -624,7 +624,7 @@ class RecvChannel(BaseChannel):
         """
         log.debug("RecvChannel.reject: %s", delivery_tag)
         self._ensure_amq_chan()
-        self._sync_call(self._amq_chan.basic_reject, 'callback', delivery_tag, requeue=requeue)
+        self._amq_chan.basic_reject(delivery_tag, requeue=requeue)
 
     def get_stats(self):
         """
@@ -636,6 +636,15 @@ class RecvChannel(BaseChannel):
         log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
 
         return self._transport.get_stats(self._amq_chan, queue=self._recv_name.queue)
+
+    def _purge(self):
+        """
+        Purges a queue.
+        """
+        assert self._recv_name and self._recv_name.queue
+        log.debug("RecvChannel.purge: %s", self._recv_name.queue)
+
+        return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
     def __init__(self, close_callback=None):
