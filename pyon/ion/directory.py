@@ -45,54 +45,34 @@ class Directory(object):
         """
         self.dir_store.close()
 
-    def _create(self):
-        """
-        Method which will create the underlying data store and
-        persist an empty Directory object.
-        """
-        # Persist empty Directory object under known name
-        #self.dir_name = bootstrap.get_sys_name()
-        #directory_obj = IonObject('Directory', name=self.dir_name)
-        #dir_id,rev = self.dir_store.create(directory_obj, 'DIR')
-
-        # Persist ROOT Directory object
-        root_obj = DirEntry(parent='', key=self.orgname, attributes=dict(sys_name=bootstrap.get_sys_name()))
-        root_id,rev = self.dir_store.create(root_obj, self.orgname)
-
     def _init(self):
+        # Check for existence of root dir entry.  If not found, call
+        # create to initialize top level dir entries.
         try:
             root_de = self.dir_store.read(self.orgname)
         except NotFound as nf:
             self._create()
 
-        # determine config flow to follow
-        config_from_directory = CFG.get_safe("system.config_from_directory", False)
-        if config_from_directory:
-            self._load_config()
-            return
-
-        # determine config flow to follow
-        auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
-        if not auto_bootstrap:
-            return
+    def _create(self):
+        """
+        Method which will create the underlying data store and
+        persist an empty Directory object.
+        """
+        # Persist ROOT Directory object
+        root_obj = DirEntry(parent='', key=self.orgname, attributes=dict(sys_name=bootstrap.get_sys_name()))
+        root_id,rev = self.dir_store.create(root_obj, self.orgname)
 
         self._assert_existence("/", "Agents",
                 description="Running agents are registered here")
 
-        if not self._assert_existence("/", "Config",
-                description="System configuration is registered here"):
-            if self.is_root:
-                self._register_config()
-                pass
+        self._assert_existence("/", "Config",
+                description="System configuration is registered here")
 
         self._assert_existence("/", "Containers",
                 description="Running containers are registered here")
 
-        if not self._assert_existence("/", "ObjectTypes",
-                description="ObjectTypes are registered here"):
-            if self.is_root:
-                self._register_object_types()
-                pass
+        self._assert_existence("/", "ObjectTypes",
+                description="ObjectTypes are registered here")
 
         self._assert_existence("/", "Org",
                 description="Org specifics are registered here",
@@ -104,16 +84,13 @@ class Directory(object):
         self._assert_existence("/", "ResourceTypes",
                 description="Resource types are registered here")
 
-        if not self._assert_existence("/", "ServiceInterfaces",
-                description="Service interface definitions are registered here"):
-            if self.is_root:
-                self._register_service_definitions()
-                pass
+        self._assert_existence("/", "ServiceInterfaces",
+                description="Service interface definitions are registered here")
 
         self._assert_existence("/", "Services",
                 description="Service instances are registered here")
 
-    def receive_directory_change_event(event_msg, headers):
+    def receive_directory_change_event(self, event_msg, headers):
         # @TODO add support to fold updated config into container config
         pass
 
@@ -327,34 +304,3 @@ class Directory(object):
     # ------------------------------------------
     # Internal methods
 
-    def _register_config(self):
-        self.register("/Config", "CFG", **CFG.copy())
-
-    def _load_config(self):
-        de = self.lookup("/Config/CFG")
-        if not de:
-            raise Conflict("Expected /Config/CFG in directory. Correct Org??")
-        dict_merge(CFG, de, inplace=True)
-
-    def _register_service_definitions(self):
-        from pyon.core.bootstrap import service_registry
-        svc_list = []
-        for svcname, svc in service_registry.services.iteritems():
-            svc_list.append(("/ServiceInterfaces", svcname, {}))
-            #log.debug("Register service: %s" % svcname)
-        self.register_mult(svc_list)
-        log.info("Registered %d services in directory" % len(svc_list))
-
-    def _register_object_types(self):
-        from interface import objects
-        delist = []
-        for cname, cobj in inspect.getmembers(objects, inspect.isclass):
-            if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
-                parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
-                delist.append(("/ObjectTypes", cname, dict(schema=cobj._schema, extends=parentlist)))
-                #log.debug("Register object: %s" % cname)
-        self.register_mult(delist)
-        log.info("Registered %d objects in directory" % len(delist))
-
-    def load_definitions(self):
-        pass
