@@ -591,18 +591,9 @@ class TestRecvChannel(PyonTestCase):
         ac = Mock(spec=pchannel.Channel)
         self.ch._amq_chan = ac
 
-        def side(*args, **kwargs):
-            cb = kwargs.get('callback')
-            cb()
-
-        ac.basic_reject.side_effect = side
-
         self.ch.reject(sentinel.delivery_tag, requeue=True)
 
-        self.assertTrue(ac.basic_reject.called)
-        self.assertIn(sentinel.delivery_tag, ac.basic_reject.call_args[0])
-        self.assertIn('requeue', ac.basic_reject.call_args[1])
-        self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
+        ac.basic_reject.assert_called_once_with(sentinel.delivery_tag, requeue=True)
 
     def test_reset(self):
         self.ch.reset()
