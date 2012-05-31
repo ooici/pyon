@@ -46,7 +46,7 @@ def setup_ipython(shell_api=None):
     def inputhook_gevent():
         try:
             while not stdin_ready():
-                gevent.sleep(0.001)
+                gevent.sleep(0.05)
         except KeyboardInterrupt:
             pass
 
