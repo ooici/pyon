@@ -190,7 +190,7 @@ class CouchDB_DataStore(DataStore):
         try:
             res = ds.save(doc)
         except ResourceConflict:
-            raise BadRequest("Object with id %s already exist", doc["_id"])
+            raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
 
     def create_mult(self, objects, object_ids=None, allow_ids=False):
