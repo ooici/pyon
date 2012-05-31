@@ -116,6 +116,7 @@ def main(opts, *args, **kwargs):
         else:
             if CFG.system.testing:
                 if CFG.system.testing_sysname:
+                    from pyon.core import bootstrap
                     bootstrap.set_sys_name(CFG.system.testing.testing_sysname)
 
 
