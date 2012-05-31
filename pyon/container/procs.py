@@ -388,7 +388,7 @@ class ProcManager(object):
 
     def _start_service_dependencies(self, service_instance):
         service_instance.errcause = "setting service dependencies"
-        log.debug("spawn_process dependencies: %s" % service_instance.dependencies)
+        log.debug("spawn_process dependencies: %s", service_instance.dependencies)
         # TODO: Service dependency != process dependency
         for dependency in service_instance.dependencies:
             client = getattr(service_instance.clients, dependency)
@@ -397,6 +397,12 @@ class ProcManager(object):
             # @TODO: should be in a start_client in RPCClient chain
             client.process  = service_instance
             client.node     = self.container.node
+
+            # ensure that dep actually exists and is running
+            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
+                svc_de = self.container.directory.lookup("/Services/%s" % dependency)
+                if svc_de is None:
+                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
 
     def _service_init(self, service_instance):
         # Init process
