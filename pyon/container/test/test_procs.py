@@ -29,7 +29,7 @@ class BadProcess(BaseService):
         return bad
 
 class SampleAgent(ResourceAgent):
-    pass
+    dependencies = []
 
 @attr('INT',group='p')
 class TestProcManager(IonIntegrationTestCase):
