@@ -77,6 +77,15 @@ class EndpointUnit(object):
 
     channel = None
     _recv_greenlet = None
+    _endpoint = None
+
+    def __init__(self, endpoint):
+        self._endpoint = endpoint
+
+    @property
+    def interceptors(self):
+        assert self._endpoint, "No endpoint attached"
+        return self._endpoint.interceptors
 
     def attach_channel(self, channel):
         log.debug("In EndpointUnit.attach_channel")
