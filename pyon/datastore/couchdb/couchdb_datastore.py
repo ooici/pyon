@@ -220,7 +220,7 @@ class CouchDB_DataStore(DataStore):
         # Update docs.  CouchDB will assign versions to docs.
         db,_ = self._get_datastore()
         res = db.update(docs)
-        if not res or not all([success for success, oid, rev in res]):
+        if not all([success for success, oid, rev in res]):
             errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
             log.error('create_doc_mult had errors. Successful: %s, Errors: %s' % (len(res) - len(errors), "\n".join(errors)))
         else:
