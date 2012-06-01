@@ -46,7 +46,7 @@ class PolicyDecisionPointManager(object):
 
     def __init__(self, *args, **kwargs):
         self.policy_decision_point = dict()
-        self.org_pdp = None
+        self.org_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
 
         #Adding an not function to XACML
         from pyon.core.governance.policy.xacml.not_function import Not
@@ -62,11 +62,8 @@ class PolicyDecisionPointManager(object):
         if self.policy_decision_point.has_key(resource_id):
             return self.policy_decision_point[resource_id]
 
-        #If a PDP does not exist for this resource - then return default.
-        if self.org_pdp is None:
-            #Loads a blank policy set as the default or an unknown resource_policy
-            self.org_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
-
+        #If a PDP does not exist for this resource - then return default -
+        #TODO - replace once Org policy is setup as a boundary
         return self.org_pdp
 
     def load_org_policy_rules(self, rules_text):
@@ -121,7 +118,7 @@ class PolicyDecisionPointManager(object):
 
 
 
-        log.debug("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
+        log.info("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
 
         request = Request()
