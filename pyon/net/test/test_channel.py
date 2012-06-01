@@ -18,6 +18,7 @@ from gevent.event import Event
 import Queue as PQueue
 from gevent.queue import Queue
 from unittest import skip
+from pyon.core import bootstrap
 
 @attr('UNIT')
 class TestBaseChannel(PyonTestCase):
@@ -873,7 +874,7 @@ class TestChannelInt(IonIntegrationTestCase):
 
         def every_five():
             p = self.container.node.channel(PublisherChannel)
-            p._send_name = NameTrio('test_exchange', 'routed.5')
+            p._send_name = NameTrio(bootstrap.get_sys_name(), 'routed.5')
             counter = 0
 
             while not self.publish_five.wait(timeout=5):
@@ -883,7 +884,7 @@ class TestChannelInt(IonIntegrationTestCase):
 
         def every_three():
             p = self.container.node.channel(PublisherChannel)
-            p._send_name = NameTrio('test_exchange', 'routed.3')
+            p._send_name = NameTrio(bootstrap.get_sys_name(), 'routed.3')
             counter = 0
 
             while not self.publish_three.wait(timeout=3):
@@ -900,7 +901,7 @@ class TestChannelInt(IonIntegrationTestCase):
         gl_every_three = spawn(every_three)
 
         ch = self.container.node.channel(RecvChannel)
-        ch._recv_name = NameTrio('test_exchange', 'test_queue')
+        ch._recv_name = NameTrio(bootstrap.get_sys_name(), 'test_queue')
         ch._queue_auto_delete = False
 
         # declare exchange and queue, no binding yet
@@ -983,7 +984,7 @@ class TestChannelInt(IonIntegrationTestCase):
 
         # we have to keep the exchange around - it will likely autodelete.
         ch2 = self.container.node.channel(RecvChannel)
-        ch2.setup_listener(NameTrio("test_exchange", "another_queue"))
+        ch2.setup_listener(NameTrio(bootstrap.get_sys_name(), "another_queue"))
 
 
         ch._destroy_binding()
