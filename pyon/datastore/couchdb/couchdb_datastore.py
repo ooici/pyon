@@ -190,7 +190,7 @@ class CouchDB_DataStore(DataStore):
         try:
             res = ds.save(doc)
         except ResourceConflict:
-            raise BadRequest("Object with id %s already exist", doc["_id"])
+            raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
 
     def create_mult(self, objects, object_ids=None, allow_ids=False):
@@ -218,7 +218,7 @@ class CouchDB_DataStore(DataStore):
                 doc["_id"] = doc.get("_id", None) or uuid4().hex
 
         # Update docs.  CouchDB will assign versions to docs.
-        res = self.server[self.datastore_name].update(docs)
+        res = self._get_datastore().update(docs)
         if not res or not all([success for success, oid, rev in res]):
             errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
             log.error('create_doc_mult had errors. Successful: %s, Errors: %s' % (len(res) - len(errors), "\n".join(errors)))
