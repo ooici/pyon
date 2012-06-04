@@ -22,12 +22,12 @@ def load_config():
             raise Conflict("Expected /Config/CFG in directory. Correct Org??")
         dict_merge(CFG, de, inplace=True)
 
-    # Look for and apply any local file config overrides
-    from pyon.util.config import Config
-    conf_paths = ['res/config/pyon.local.yml']
+        # Look for and apply any local file config overrides
+        from pyon.util.config import Config
+        conf_paths = ['res/config/pyon.local.yml']
 
-    local_cfg = Config(conf_paths, ignore_not_found=True).data
-    dict_merge(CFG, local_cfg, inplace=True)
+        local_cfg = Config(conf_paths, ignore_not_found=True).data
+        dict_merge(CFG, local_cfg, inplace=True)
 
 def bootstrap_object_defs():
     from pyon.container.cc import Container
@@ -56,9 +56,11 @@ def bootstrap_config():
 
     auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
     if auto_bootstrap:
-        Container.instance.directory.register("/Config", "CFG", **CFG.copy())
+        de = Container.instance.directory.lookup("/Config/CFG")
+        if not de:
+            Container.instance.directory.register("/Config", "CFG", **CFG.copy())
 
-        # TODO relocate?
-        bootstrap_object_defs()
-        bootstrap_service_defs()
+            # TODO relocate?
+            bootstrap_object_defs()
+            bootstrap_service_defs()
 
