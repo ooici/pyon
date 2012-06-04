@@ -106,7 +106,7 @@ def main(opts, *args, **kwargs):
         # SIDE EFFECT: The import of pyon.public triggers many module initializers:
         # pyon.core.bootstrap (Config load, logging setup), etc.
         from pyon.public import Container, CFG
-        from pyon.util.containers import dict_merge
+        from pyon.util.containers import dict_merge, get_safe
         from pyon.util.config import Config
 
         # See if sysname was provided
@@ -114,9 +114,10 @@ def main(opts, *args, **kwargs):
             from pyon.core import bootstrap
             bootstrap.set_sys_name(opts.sysname)
         else:
-            if CFG.system.testing:
-                if CFG.system.testing_sysname:
-                    bootstrap.set_sys_name(CFG.system.testing.testing_sysname)
+            if CFG.get_safe("system.testing", False):
+                testing_sysname = CFG.get_safe("system.testing_sysname", None)
+                if testing_sysname:
+                    bootstrap.set_sys_name(testing_sysname)
 
 
 
@@ -140,16 +141,25 @@ def main(opts, *args, **kwargs):
                 initialize_logging()
 
         # Set that system is not testing. We are running as standalone container
-        dict_merge(CFG, {'system':{'testing':False}}, True)
+#        dict_merge(CFG, {'system':{'testing':False}}, True)
 
         # Also set the immediate flag, but only if specified - it is an override
         if opts.immediate:
             dict_merge(CFG, {'system':{'immediate':True}}, True)
 
         # Load any additional config paths and merge them into main config
-        if len(opts.config):
-            ipython_cfg = Config(opts.config)
-            dict_merge(CFG, ipython_cfg.data, True)
+        if opts.config:
+            import ast
+            # Dict of config values
+            if '{' in opts.config:
+                try:
+                    eval_value = ast.literal_eval(opts.config)
+                except ValueError:
+                    raise Exception("Value error in config arg '%s'" % opts.config)
+                dict_merge(CFG, eval_value, True)
+            else:
+                ipython_cfg = Config([opts.config])
+                dict_merge(CFG, ipython_cfg.data, True)
 
         # Create the container instance
         container = Container(*args, **kwargs)
@@ -199,7 +209,7 @@ def main(opts, *args, **kwargs):
                 print 'Now I am an orphan ... notifying serve_forever to stop'
                 os.kill(os.getpid(), signal.SIGINT)
             import gevent
-            ipg =gevent.spawn(is_parent_gone)
+            ipg = gevent.spawn(is_parent_gone)
             from pyon.util.containers import dict_merge
             from pyon.public import CFG
             dict_merge(CFG, {'system':{'watch_parent': ipg}}, True)
@@ -276,12 +286,12 @@ def entry():
     parser.add_argument('-n', '--noshell', action='store_true')
     parser.add_argument('-m', '--mx', action='store_true', help='Start a management web UI')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
-    parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file.')
+    parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file or dict config content.')
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-i', '--immediate', action='store_true', help='Will exit the container if the only procs started are immediate proc types. Sets CFG system.immediate flag.')
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-sp', '--signalparent', action='store_true', help='Signal parent process after service start up complete')
-    parser.add_argument('-c', '--config', action='append', type=str, help='Additional config files to load.', default=[])
+    parser.add_argument('-c', '--config', type=str, help='Additional config files to load or dict config content.', default=[])
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)

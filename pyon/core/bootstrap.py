@@ -7,7 +7,7 @@ from pyon.core.exception import ContainerConfigError, ContainerStartupError
 from pyon.core.registry import IonObjectRegistry
 from pyon.service.service import IonServiceRegistry
 from pyon.util.config import CFG
-from pyon.util.containers import is_basic_identifier
+from pyon.util.containers import is_basic_identifier, get_safe
 import uuid
 
 import os
@@ -59,7 +59,11 @@ def get_sys_name():
     if sys_name:
         return sys_name
 
-    if CFG.system.testing:
+    if CFG.get_safe("system.testing", False):
+        testing_sysname = CFG.get_safe("system.testing_sysname", None)
+        if testing_sysname:
+            set_sys_name(testing_sysname)
+            return testing_sysname
         return testing_sys_name
 
     return default_sys_name
