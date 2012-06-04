@@ -847,7 +847,7 @@ class TestChannelInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
-    @skip('Not working consistently on buildbot')
+    #@skip('Not working consistently on buildbot')
     def test_consume_one_message_at_a_time(self):
         # end to end test for CIDEVCOI-547 requirements
         #    - Process P1 is producing one message every 5 seconds
@@ -900,9 +900,23 @@ class TestChannelInt(IonIntegrationTestCase):
         gl_every_five = spawn(every_five)
         gl_every_three = spawn(every_three)
 
+        def do_cleanups(gl_e5, gl_e3):
+            self.publish_five.set()
+            self.publish_three.set()
+            gl_e5.join(timeout=5)
+            gl_e3.join(timeout=5)
+
+        self.addCleanup(do_cleanups, gl_every_five, gl_every_three)
+
         ch = self.container.node.channel(RecvChannel)
         ch._recv_name = NameTrio(bootstrap.get_sys_name(), 'test_queue')
         ch._queue_auto_delete = False
+
+        def cleanup_channel(thech):
+            thech._destroy_queue()
+            thech.close()
+
+        self.addCleanup(cleanup_channel, ch)
 
         # declare exchange and queue, no binding yet
         ch._declare_exchange(ch._recv_name.exchange)
@@ -986,9 +1000,11 @@ class TestChannelInt(IonIntegrationTestCase):
         ch2 = self.container.node.channel(RecvChannel)
         ch2.setup_listener(NameTrio(bootstrap.get_sys_name(), "another_queue"))
 
-
         ch._destroy_binding()
         ch._bind('routed.3')
+
+        ch2._destroy_queue()
+        ch2.close()
 
         self.three_events.get(timeout=10)
         ch.start_consume()
@@ -998,7 +1014,6 @@ class TestChannelInt(IonIntegrationTestCase):
         m, h, d = ch.recv(timeout=0)
         self.assertTrue(m.startswith('3,'))
         ch.ack(d)
-
 
         # wait for a new 3 to reject
         self.three_events.get(timeout=10)
@@ -1018,19 +1033,5 @@ class TestChannelInt(IonIntegrationTestCase):
         self.assertEquals(m, m2)
 
         ch.stop_consume()
-
-        # cleanup
-        ch._destroy_queue()
-        ch.close()
-        ch2._destroy_queue()
-        ch2.close()
-
-        self.publish_five.set()
-        self.publish_three.set()
-        gl_every_five.join(timeout=5)
-        gl_every_three.join(timeout=5)
-
-
-
 
 
