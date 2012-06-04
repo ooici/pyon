@@ -99,7 +99,8 @@ class PYCC(Plugin):
             ccargs = ['bin/pycc', '--noshell', '-sp', '--sysname=%s' %
                     self.sysname,
                     '--logcfg=res/config/logging.pycc.yml',
-                    '--rel=%s' % self.rel,  'system.force_clean=False']
+                    '--rel=%s' % self.rel,
+                    "--config={'system': {'force_clean': False, 'auto_bootstrap': True}}"]
             debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
             newenv = os.environ.copy()
             po = subprocess.Popen(ccargs, env=newenv, close_fds=True)
