@@ -6,7 +6,7 @@ from pyon.util import log
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer
+from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.util.log import log
 
 
@@ -203,8 +203,26 @@ class ProcessRPCServer(RPCServer):
         return RPCServer.create_endpoint(self, **newkwargs)
 
 
+class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
+    def __init__(self, process=None, **kwargs):
+        ProcessEndpointUnitMixin.__init__(self, process=process)
+        PublisherEndpointUnit.__init__(self, **kwargs)
+
+    def _build_header(self, raw_msg):
+        """
+        Override to direct the calls in _build_header - first the Publisher, then the Process mixin.
+        """
+        header1 = PublisherEndpointUnit._build_header(self, raw_msg)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+
+        header1.update(header2)
+
+        return header1
 
 class ProcessPublisher(Publisher):
+
+    endpoint_unit_type = ProcessPublisherEndpointUnit
+
     def __init__(self, process=None, **kwargs):
         self._process = process
         Publisher.__init__(self, **kwargs)
@@ -214,17 +232,54 @@ class PublisherError(StandardError):
     """
     An exception class for errors in the subscriber
     """
-
-
-
+    pass
 
 class SubscriberError(StandardError):
     """
     An exception class for errors in the subscriber
     """
+    pass
+
+class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpointUnit):
+    def __init__(self, process=None, callback=None, **kwargs):
+        ProcessEndpointUnitMixin.__init__(self, process=process)
+        SubscriberEndpointUnit.__init__(self, callback=callback, **kwargs)
+
+    def _message_received(self, msg, headers):
+        """
+        Message received override.
+
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
+        """
+        ######
+        ###### THIS IS WHERE THE THREAD LOCAL HEADERS CONTEXT IS SET ######
+        ######
+
+        # With the property _routing_call set, as is the case 95% of the time in the Process-level endpoints,
+        # we have to set the call context from the ION process' calling greenlet, as context is greenlet-specific.
+        # This is done in the _make_routing_call override here, passing it the context to be set.
+        # See also IonProcessThread._control_flow.
+
+        with self._process.push_context(headers):
+            return SubscriberEndpointUnit._message_received(self, msg, headers)
+
+    def _build_header(self, raw_msg):
+        """
+        Override to direct the calls in _build_header - first the Subscriber, then the Process mixin.
+        """
+
+        header1 = Subscriber._build_header(self, raw_msg)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+
+        header1.update(header2)
+
+        return header1
 
 
 class ProcessSubscriber(Subscriber):
+
+    endpoint_unit_type = ProcessSubscriberEndpointUnit
+
     def __init__(self, process=None, **kwargs):
         self._process = process
         Subscriber.__init__(self, **kwargs)
