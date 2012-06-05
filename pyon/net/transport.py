@@ -39,6 +39,9 @@ class BaseTransport(object):
     def get_stats(self, client, queue):
         raise NotImplementedError()
 
+    def purge(self, client, queue):
+        raise NotImplementedError()
+
 class AMQPTransport(BaseTransport):
     """
     This is STATELESS. You can make instances of it, but no need to (true singleton).
@@ -150,6 +153,12 @@ class AMQPTransport(BaseTransport):
                                         passive=True)
         return frame.method.message_count, frame.method.consumer_count
 
+    def purge(self, client, queue):
+        """
+        Purges a queue.
+        """
+        log.debug("AMQPTransport.purge: Q %s", queue)
+        self._sync_call(client, client.queue_purge, 'callback', queue=queue)
 
 class NameTrio(object):
     """

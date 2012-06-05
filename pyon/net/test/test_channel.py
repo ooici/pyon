@@ -1,18 +1,24 @@
 #!/usr/bin/env python
-from pyon.util.fsm import ExceptionFSM
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-import unittest
 from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
-from gevent import queue
+from gevent import queue, spawn
 from pyon.util.unit_test import PyonTestCase
 from mock import Mock, sentinel, patch
 from pika import channel as pchannel
 from pika import BasicProperties
 from nose.plugins.attrib import attr
 from pyon.net.transport import NameTrio, BaseTransport
+from pyon.util.fsm import ExceptionFSM
+from pyon.util.int_test import IonIntegrationTestCase
+import time
+from gevent.event import Event
+import Queue as PQueue
+from gevent.queue import Queue
+from unittest import skip
+from pyon.core import bootstrap
 
 @attr('UNIT')
 class TestBaseChannel(PyonTestCase):
@@ -587,18 +593,9 @@ class TestRecvChannel(PyonTestCase):
         ac = Mock(spec=pchannel.Channel)
         self.ch._amq_chan = ac
 
-        def side(*args, **kwargs):
-            cb = kwargs.get('callback')
-            cb()
-
-        ac.basic_reject.side_effect = side
-
         self.ch.reject(sentinel.delivery_tag, requeue=True)
 
-        self.assertTrue(ac.basic_reject.called)
-        self.assertIn(sentinel.delivery_tag, ac.basic_reject.call_args[0])
-        self.assertIn('requeue', ac.basic_reject.call_args[1])
-        self.assertIn(True, ac.basic_reject.call_args[1].itervalues())
+        ac.basic_reject.assert_called_once_with(sentinel.delivery_tag, requeue=True)
 
     def test_reset(self):
         self.ch.reset()
@@ -845,6 +842,196 @@ class TestServerChannel(PyonTestCase):
         self.assertEquals(newch._send_name.exchange, 'one')
         self.assertEquals(newch._send_name.queue, 'two')
 
-if __name__ == "__main__":
-    unittest.main()
+@attr('INT')
+class TestChannelInt(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+
+    @skip('Not working consistently on buildbot')
+    def test_consume_one_message_at_a_time(self):
+        # end to end test for CIDEVCOI-547 requirements
+        #    - Process P1 is producing one message every 5 seconds
+        #    - Process P2 is producing one other message every 3 seconds
+        #    - Process S creates a auto-delete=False queue without a consumer and without a binding
+        #    - Process S binds this queue through a pyon.net or container API call to the topic of process P1
+        #    - Process S waits a bit
+        #    - Process S checks the number of messages in the queue
+        #    - Process S creates a consumer, takes one message off the queue (non-blocking) and destroys the consumer
+        #    - Process S waits a bit (let messages accumulate)
+        #    - Process S creates a consumer, takes a message off and repeates it until no messges are left (without ever blocking) and destroys the consumer
+        #    - Process S waits a bit (let messages accumulate)
+        #    - Process S creates a consumer, takes a message off and repeates it until no messges are left (without ever blocking). Then requeues the last message and destroys the consumer
+        #    - Process S creates a consumer, takes one message off the queue (non-blocking) and destroys the consumer.
+        #    - Process S sends prior message to its queue (note: may be tricky without a subscription to yourself)
+        #    - Process S changes the binding of queue to P1 and P2
+        #    - Process S removes all bindings of queue
+        #    - Process S deletes the queue
+        #    - Process S exists without any residual resources in the broker
+        #    - Process P1 and P1 get terminated without any residual resources in the broker
+        #
+        #    * Show this works with the ACK or no-ACK mode
+        #    * Do the above with semi-abstracted calles (some nicer boilerplate)
+
+        def every_five():
+            p = self.container.node.channel(PublisherChannel)
+            p._send_name = NameTrio(bootstrap.get_sys_name(), 'routed.5')
+            counter = 0
+
+            while not self.publish_five.wait(timeout=5):
+                p.send('5,' + str(counter))
+                self.five_events.put(counter)
+                counter+=1
+
+        def every_three():
+            p = self.container.node.channel(PublisherChannel)
+            p._send_name = NameTrio(bootstrap.get_sys_name(), 'routed.3')
+            counter = 0
+
+            while not self.publish_three.wait(timeout=3):
+                p.send('3,' + str(counter))
+                self.three_events.put(counter)
+                counter+=1
+
+        self.publish_five = Event()
+        self.publish_three = Event()
+        self.five_events = Queue()
+        self.three_events = Queue()
+
+        gl_every_five = spawn(every_five)
+        gl_every_three = spawn(every_three)
+
+        def do_cleanups(gl_e5, gl_e3):
+            self.publish_five.set()
+            self.publish_three.set()
+            gl_e5.join(timeout=5)
+            gl_e3.join(timeout=5)
+
+        self.addCleanup(do_cleanups, gl_every_five, gl_every_three)
+
+        ch = self.container.node.channel(RecvChannel)
+        ch._recv_name = NameTrio(bootstrap.get_sys_name(), 'test_queue')
+        ch._queue_auto_delete = False
+
+        def cleanup_channel(thech):
+            thech._destroy_queue()
+            thech.close()
+
+        self.addCleanup(cleanup_channel, ch)
+
+        # declare exchange and queue, no binding yet
+        ch._declare_exchange(ch._recv_name.exchange)
+        ch._declare_queue(ch._recv_name.queue)
+        ch._purge()
+
+        # do binding to 5 pub only
+        ch._bind('routed.5')
+
+        # wait for one message
+        self.five_events.get(timeout=10)
+
+        # ensure 1 message, 0 consumer
+        self.assertTupleEqual((1, 0), ch.get_stats())
+
+        # start a consumer
+        ch.start_consume()
+        time.sleep(0.1)
+        self.assertEquals(ch._recv_queue.qsize(), 1)       # should have been delivered to the channel, waiting for us now
+
+        # receive one message with instant timeout
+        m, h, d = ch.recv(timeout=0)
+        self.assertEquals(m, "5,0")
+        ch.ack(d)
+
+        # we have no more messages, should instantly fail
+        self.assertRaises(PQueue.Empty, ch.recv, timeout=0)
+
+        # stop consumer
+        ch.stop_consume()
+
+        # wait until next 5 publish event
+        self.five_events.get(timeout=10)
+
+        # start consumer again, empty queue
+        ch.start_consume()
+        time.sleep(0.1)
+        while True:
+            try:
+                m, h, d = ch.recv(timeout=0)
+                self.assertTrue(m.startswith('5,'))
+                ch.ack(d)
+            except PQueue.Empty:
+                ch.stop_consume()
+                break
+
+        # wait for new message
+        self.five_events.get(timeout=10)
+
+        # consume and requeue
+        ch.start_consume()
+        time.sleep(0.1)
+        m, h, d = ch.recv(timeout=0)
+        self.assertTrue(m.startswith('5,'))
+        ch.reject(d, requeue=True)
+
+        # rabbit appears to deliver this later on, only when we've got another message in it
+        # wait for another message publish
+        num = self.five_events.get(timeout=10)
+        self.assertEquals(num, 3)
+        time.sleep(0.1)
+
+        expect = ["5,2", "5,3"]
+        while True:
+            try:
+                m, h, d = ch.recv(timeout=0)
+                self.assertTrue(m.startswith('5,'))
+                self.assertEquals(m, expect.pop(0))
+
+                ch.ack(d)
+            except PQueue.Empty:
+                ch.stop_consume()
+                self.assertListEqual(expect, [])
+                break
+
+        # let's change the binding to the 3 now, empty the testqueue first (artifact of test)
+        while not self.three_events.empty():
+            self.three_events.get(timeout=0)
+
+        # we have to keep the exchange around - it will likely autodelete.
+        ch2 = self.container.node.channel(RecvChannel)
+        ch2.setup_listener(NameTrio(bootstrap.get_sys_name(), "another_queue"))
+
+        ch._destroy_binding()
+        ch._bind('routed.3')
+
+        ch2._destroy_queue()
+        ch2.close()
+
+        self.three_events.get(timeout=10)
+        ch.start_consume()
+        time.sleep(0.1)
+        self.assertEquals(ch._recv_queue.qsize(), 1)
+
+        m, h, d = ch.recv(timeout=0)
+        self.assertTrue(m.startswith('3,'))
+        ch.ack(d)
+
+        # wait for a new 3 to reject
+        self.three_events.get(timeout=10)
+        time.sleep(0.1)
+
+        m, h, d = ch.recv(timeout=0)
+        ch.reject(d, requeue=True)
+
+        # recycle consumption, should get the requeued message right away?
+        ch.stop_consume()
+        ch.start_consume()
+        time.sleep(0.1)
+
+        self.assertEquals(ch._recv_queue.qsize(), 1)
+
+        m2, h2, d2 = ch.recv(timeout=0)
+        self.assertEquals(m, m2)
+
+        ch.stop_consume()
+
 

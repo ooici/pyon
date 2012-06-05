@@ -46,7 +46,7 @@ def setup_ipython(shell_api=None):
     def inputhook_gevent():
         try:
             while not stdin_ready():
-                gevent.sleep(0.001)
+                gevent.sleep(0.05)
         except KeyboardInterrupt:
             pass
 
@@ -117,9 +117,8 @@ def main(opts, *args, **kwargs):
             if CFG.get_safe("system.testing", False):
                 testing_sysname = CFG.get_safe("system.testing_sysname", None)
                 if testing_sysname:
+                    from pyon.core import bootstrap
                     bootstrap.set_sys_name(testing_sysname)
-
-
 
         # Check if user opted to override logging config
         # Requires re-initializing logging

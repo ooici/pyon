@@ -175,7 +175,7 @@ class Directory(object):
             direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
             self.dir_store.create(direntry, dn)
 
-        if self.event_pub:
+        if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
             if parent.startswith("/Config"):
                 self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
                                              origin="Directory")
@@ -228,7 +228,7 @@ class Directory(object):
             entry_old = direntry.attributes
             self.dir_store.delete(direntry)
 
-        if self.event_pub:
+        if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
             if parent.startswith("/Config"):
                 self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
                                              origin="Directory")

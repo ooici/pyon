@@ -24,9 +24,6 @@ class BaseInternalGovernanceInterceptor(Interceptor):
 
 class GovernanceInterceptor(Interceptor):
 
-    def __init__(self, *args, **kwargs):
-       self.governance_controller = None
-
 
     def configure(self, config):
         if "enabled" in config:
@@ -45,10 +42,8 @@ class GovernanceInterceptor(Interceptor):
         else:
             log.debug("GovernanceInterceptor.outgoing: %s", invocation)
 
-        if self.governance_controller is None:
-            self.governance_controller = Container.instance.governance_controller
-
-        self.governance_controller.process_outgoing_message(invocation)
+        if Container.instance.governance_controller is not None:
+            Container.instance.governance_controller.process_outgoing_message(invocation)
 
         return invocation
 
@@ -62,10 +57,8 @@ class GovernanceInterceptor(Interceptor):
         else:
             log.debug("GovernanceInterceptor.incoming: %s", invocation)
 
-        if self.governance_controller is None:
-            self.governance_controller = Container.instance.governance_controller
-
-        self.governance_controller.process_incoming_message(invocation)
+        if Container.instance.governance_controller is not None:
+            Container.instance.governance_controller.process_incoming_message(invocation)
 
         return invocation
 

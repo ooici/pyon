@@ -230,7 +230,10 @@ class NegotiateRequest(object):
         ret = self.service_provider.is_enrolled(org_id, user_id)
         return ret
 
-    def enroll_req_exists(self,org_id,user_id):
+    def is_not_enrolled(self,org_id,user_id):
+        return not self.is_enrolled(org_id,user_id)
+
+    def enroll_req_exist(self,org_id,user_id):
 
         request_list,_ = self.service_provider.clients.resource_registry.find_objects(user_id, PRED.hasRequest, RT.EnrollmentRequest )
 
@@ -239,6 +242,9 @@ class NegotiateRequest(object):
                 return True
 
         return False
+
+    def enroll_req_not_exist(self,org_id,user_id):
+        return not self.enroll_req_exist(org_id,user_id)
 
     def enroll_member(self, org_id,user_id):
         ret = self.service_provider.enroll_member(org_id, user_id)
