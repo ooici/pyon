@@ -847,7 +847,7 @@ class TestChannelInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
-    @skip('Not working consistently on buildbot')
+    #@skip('Not working consistently on buildbot')
     def test_consume_one_message_at_a_time(self):
         # end to end test for CIDEVCOI-547 requirements
         #    - Process P1 is producing one message every 5 seconds
@@ -879,7 +879,6 @@ class TestChannelInt(IonIntegrationTestCase):
 
             while not self.publish_five.wait(timeout=5):
                 p.send('5,' + str(counter))
-                self.five_events.put(counter)
                 counter+=1
 
         def every_three():
@@ -889,7 +888,6 @@ class TestChannelInt(IonIntegrationTestCase):
 
             while not self.publish_three.wait(timeout=3):
                 p.send('3,' + str(counter))
-                self.three_events.put(counter)
                 counter+=1
 
         self.publish_five = Event()
@@ -900,13 +898,51 @@ class TestChannelInt(IonIntegrationTestCase):
         gl_every_five = spawn(every_five)
         gl_every_three = spawn(every_three)
 
-        def do_cleanups(gl_e5, gl_e3):
+        def listen(lch):
+            """
+            The purpose of the this listen method is to trigger waits in code below.
+            By setting up a listener that subscribes to both 3 and 5, and putting received
+            messages into the appropriate gevent-queues client side, we can assume that
+            the channel we're actually testing with get_stats etc has had the message delivered
+            too.
+            """
+            lch._queue_auto_delete = False
+            lch.setup_listener(NameTrio(bootstrap.get_sys_name(), 'alternate_listener'), 'routed.3')
+            lch._bind('routed.5')
+            lch.start_consume()
+
+            while True:
+                try:
+                    with lch.accept() as newchan:
+                        m, h, d = newchan.recv()
+                        count = m.rsplit(',', 1)[-1]
+                        if m.startswith('5,'):
+                            self.five_events.put(int(count))
+                            newchan.ack(d)
+                        elif m.startswith('3,'):
+                            self.three_events.put(int(count))
+                            newchan.ack(d)
+                        else:
+                            raise StandardError("unknown message: %s" % m)
+
+                except ChannelClosedError:
+                    break
+
+        lch = self.container.node.channel(SubscriberChannel)
+        gl_listen = spawn(listen, lch)
+
+        def do_cleanups(gl_e5, gl_e3, gl_l, lch):
             self.publish_five.set()
             self.publish_three.set()
             gl_e5.join(timeout=5)
             gl_e3.join(timeout=5)
 
-        self.addCleanup(do_cleanups, gl_every_five, gl_every_three)
+            lch.stop_consume()
+            lch._destroy_queue()
+            lch.close()
+            gl_listen.join(timeout=5)
+
+        self.addCleanup(do_cleanups, gl_every_five, gl_every_three, gl_listen, lch)
 
         ch = self.container.node.channel(RecvChannel)
         ch._recv_name = NameTrio(bootstrap.get_sys_name(), 'test_queue')
