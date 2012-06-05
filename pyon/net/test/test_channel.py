@@ -906,6 +906,7 @@ class TestChannelInt(IonIntegrationTestCase):
             the channel we're actually testing with get_stats etc has had the message delivered
             too.
             """
+            lch._queue_auto_delete = False
             lch.setup_listener(NameTrio(bootstrap.get_sys_name(), 'alternate_listener'), 'routed.3')
             lch._bind('routed.5')
             lch.start_consume()
