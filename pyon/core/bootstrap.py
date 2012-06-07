@@ -101,10 +101,6 @@ def bootstrap_pyon():
     from pyon.ion import resource
     resource.load_definitions()
 
-    # Load interceptors
-    from pyon.net.endpoint import instantiate_interceptors
-    instantiate_interceptors(CFG.interceptor)
-
     # Services
     service_registry.load_service_mods('interface/services')
     service_registry.build_service_map()

@@ -16,7 +16,6 @@ sentinel_interceptors = {'message_incoming': sentinel.msg_incoming,
                          'process_outgoing': sentinel.proc_outgoing}
 
 @attr('UNIT')
-@patch.dict(endpoint.interceptors, sentinel_interceptors, clear=True)
 class TestProcessEndpointUnitMixin(PyonTestCase):
 
     @patch('pyon.net.endpoint.EndpointUnit.__init__')
@@ -37,7 +36,7 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
     def test__intercept_msg_in(self, mocknpi, mockipi):
         mockipi.return_value = sentinel.inv2
         mocknpi.return_value = sentinel.inv2
-        ep = ProcessEndpointUnitMixin(process=sentinel.proc)
+        ep = ProcessEndpointUnitMixin(process=sentinel.proc, interceptors=sentinel_interceptors)
 
         ep._intercept_msg_in(sentinel.inv)
 
@@ -49,7 +48,7 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
     def test__intercept_msg_out(self, mocknpi, mockipi):
         mockipi.return_value = sentinel.inv2
         mocknpi.return_value = sentinel.inv2
-        ep = ProcessEndpointUnitMixin(process=sentinel.proc)
+        ep = ProcessEndpointUnitMixin(process=sentinel.proc, interceptors=sentinel_interceptors)
 
         ep._intercept_msg_out(sentinel.inv)
 
@@ -191,7 +190,7 @@ class TestProcessRPCResponseEndpointUnit(PyonTestCase):
         procmock = Mock()
         procmock.push_context = MagicMock()
 
-        ep = ProcessRPCResponseEndpointUnit(process=procmock)
+        ep = ProcessRPCResponseEndpointUnit(process=procmock, interceptors={})
         ep._message_received(sentinel.msg, sentinel.headers)
 
         procmock.push_context.assert_called_once_with(sentinel.headers)
