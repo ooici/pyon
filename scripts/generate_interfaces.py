@@ -24,20 +24,25 @@ def main():
     parser.add_argument('-od', '--objectdoc', action='store_true',
                         help='Generate HTML object doc files')
     parser.add_argument('-n', '--sysname', action='store', help='System name')
-    parser.add_argument('-y', '--read_from_yaml_file', action='store_true',
-                        help='Read from YAML files instead of datastore')
+    parser.add_argument('-ry', '--read_from_yaml_file', action='store_true',
+                        help='Read configuration from YAML files instead of datastore - Default')
+    parser.add_argument('-rd', '--read_from_datastore', action='store_true',
+                        help='Read configuration from datastore.')
     opts = parser.parse_args()
     opts.system_name = 'ion_%s' % os.uname()[1].replace('.', '_').lower() \
                         if not opts.sysname else opts.sysname
 
-    model_object = ObjectModelGenerator(system_name=opts.sysname,
+    opts.force = True
+    if not opts.read_from_datastore and not opts.read_from_yaml_file:
+        opts.read_from_yaml_file = True
+    elif opts.read_from_datastore:
+        opts.read_from_yaml_file = False
+    print "Forcing --force, we keep changing generate_interfaces!"
+
+    model_object = ObjectModelGenerator(system_name=opts.system_name,
                     read_from_yaml_file=opts.read_from_yaml_file)
     message_object = MessageObjectGenerator()
     service_object = ServiceObjectGenerator()
-
-    print "Forcing --force, we keep changing generate_interfaces!"
-    opts.force = True
-
     if os.getcwd().endswith('scripts'):
         sys.exit('This script needs to be run from the pyon root.')
     # Create dir
@@ -50,7 +55,6 @@ def main():
         os.unlink(os.path.join(interface_dir, file))
     for file in fnmatch.filter(files, '*.html'):
         os.unlink(os.path.join(interface_dir, file))
-
     open(os.path.join(interface_dir, '__init__.py'), 'w').close()
 
     # Generate objects

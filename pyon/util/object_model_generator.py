@@ -218,6 +218,8 @@ class ObjectModelGenerator:
         else:
             print "Reading definitions from datastore"
             self.data_yaml_text = self.get_object_definition_from_datastore()
+            if not self.data_yaml_text:
+                return ''
             data = self.data_yaml_text + '\n' + self.get_service_definition_from_datastore()
         return data
 
@@ -579,6 +581,10 @@ class ObjectModelGenerator:
         '''
         # Get data from the file
         combined_yaml_text = self.read_yaml_text()
+        if not combined_yaml_text or len(combined_yaml_text) == 0:
+            print "object_model_generator: Error!!! the datastore (or the YAML file) is empty."
+            exit()
+
         # Parse and generate enums first
         self.generate_enums(combined_yaml_text, opts)
         # Add custom constructors so YAML doesn't choke
@@ -593,13 +599,21 @@ class ObjectModelGenerator:
         dir = DirectorySa(sysname=self.system_name)
         entry = dir.find_dir_child_entries('/ObjectTypes')
         for item in entry:
-            data = data + item.value['attributes']['definition'] + '\n'
+            try:
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
         return data
 
     def get_service_definition_from_datastore(self):
         data = ''
         dir = DirectorySa(sysname=self.system_name)
         entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        if not entry:
+            return data
         for item in entry:
-            data = data + item.value['attributes']['definition'] + '\n'
+            try:
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
         return data
