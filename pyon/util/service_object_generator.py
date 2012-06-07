@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-# Ion utility for generating interfaces from object definitions (and vice versa).
+# Ion utility for generating interfaces from object definitions(and vice versa)
 
-__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster@asascience.com>'
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster'
 __license__ = 'Apache 2.0'
 
 import datetime
@@ -21,9 +21,6 @@ from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
 from pyon.util import yaml_ordered_dict
-
-
-
 
 templates = {
       'file':
@@ -203,10 +200,9 @@ html_doc_templates = {
 
 
 # convert to string.Template
-templates          = dict(((k, string.Template(v)) for k, v in templates.iteritems()))
-client_templates   = dict(((k, string.Template(v)) for k, v in client_templates.iteritems()))
+templates = dict(((k, string.Template(v)) for k, v in templates.iteritems()))
+client_templates = dict(((k, string.Template(v)) for k, v in client_templates.iteritems()))
 html_doc_templates = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
-
 
 
 class IonServiceDefinitionError(Exception):
@@ -218,23 +214,18 @@ class IonYamlLoader(yaml.Loader):
     pass
 
 
-
-#
-# Generates services
-#
-class ServiceObjectGenerator :
-
-
+class ServiceObjectGenerator:
+    '''
+     Generates service definitions
+    '''
     object_references = {}
-    enums_by_name     = {}
-    currtime          = str(datetime.datetime.today())
+    enums_by_name = {}
+    currtime = str(datetime.datetime.today())
 
-
-
-    #
-    # Builds class document string
-    #
     def build_class_doc_string(self, base_doc_str, _def_spec):
+        '''
+        Builds class document string
+        '''
         doc_str = base_doc_str
 
         if _def_spec:
@@ -245,11 +236,7 @@ class ServiceObjectGenerator :
                     first_time = False
                 doc_str += "\n    @see " + url
             return doc_str
-            
 
-    #
-    #
-    #
     def _get_default(self, v):
         if type(v) is str:
             if v.startswith("!"):
@@ -270,8 +257,6 @@ class ServiceObjectGenerator :
         else:
             return "None"
 
-
-
     def find_object_reference(self, arg):
         for obj, node in self.object_references.iteritems():
             if node.find(arg) > -1:
@@ -279,39 +264,34 @@ class ServiceObjectGenerator :
 
         return "dict"
 
-
     def build_exception_doc_html(self, _def):
         # Handle case where method has no parameters
         args = []
 
-        for key,val in (_def or {}).iteritems():
+        for key, val in (_def or {}).iteritems():
             args.append(html_doc_templates['exception'].substitute(type=key, description=val))
 
         args_str = ''.join(args)
         return args_str
 
-
     def build_args_doc_html(self, _def):
         # Handle case where method has no parameters
         args = []
 
-        for key,val in (_def or {}).iteritems():
+        for key, val in (_def or {}).iteritems():
             if isinstance(val, datetime.datetime):
-                val="datetime"
-            elif isinstance(val,dict):
-                val=self.find_object_reference(key)
-            elif isinstance(val,list):
-                val="list"
+                val = "datetime"
+            elif isinstance(val, dict):
+                val = self.find_object_reference(key)
+            elif isinstance(val, list):
+                val = "list"
             else:
-                val = str(type(val)).replace("<type '","").replace("'>","")
+                val = str(type(val)).replace("<type '", "").replace("'>", "")
             args.append(html_doc_templates['arg'].substitute(name=key, val=val))
 
         args_str = ''.join(args)
         return args_str
 
-    #
-    #
-    #
     def build_args_doc_string(self, base_doc_str, _def_spec, _def_in, _def_out, _def_throws):
         doc_str = base_doc_str
 
@@ -324,98 +304,87 @@ class ServiceObjectGenerator :
                 doc_str += templates['at_see'].substitute(link=url)
 
         first_time = True
-        for key,val in (_def_in or {}).iteritems():
+        for key, val in (_def_in or {}).iteritems():
             if isinstance(val, basestring):
                 if val.startswith("!"):
                     val = val.strip("!")
                 else:
                     val = 'str'
             elif isinstance(val, datetime.datetime):
-                val="datetime"
-            elif isinstance(val,dict):
-                val= self.find_object_reference(key)
-            elif isinstance(val,list):
-                val="list"
+                val = "datetime"
+            elif isinstance(val, dict):
+                val = self.find_object_reference(key)
+            elif isinstance(val, list):
+                val = "list"
             else:
-                val = str(type(val)).replace("<type '","").replace("'>","")
+                val = str(type(val)).replace("<type '", "").replace("'>", "")
             if first_time:
                 doc_str += '\n'
                 first_time = False
             doc_str += templates['at_param'].substitute(in_name=key, in_type=val)
 
-        for key,val in (_def_out or {}).iteritems():
+        for key, val in (_def_out or {}).iteritems():
             if isinstance(val, basestring):
                 if val.startswith("!"):
                     val = val.strip("!")
                 else:
                     val = 'str'
             elif isinstance(val, datetime.datetime):
-                val="datetime"
-            elif isinstance(val,dict):
-                val=self.find_object_reference(key)
-            elif isinstance(val,list):
-                val="list"
+                val = "datetime"
+            elif isinstance(val, dict):
+                val = self.find_object_reference(key)
+            elif isinstance(val, list):
+                val = "list"
             else:
-                val = str(type(val)).replace("<type '","").replace("'>","")
+                val = str(type(val)).replace("<type '", "").replace("'>", "")
             if first_time:
                 doc_str += '\n'
                 first_time = False
             doc_str += templates['at_return'].substitute(out_name=key, out_type=val)
 
         if _def_throws:
-            for key,val in (_def_throws or {}).iteritems():
+            for key, val in (_def_throws or {}).iteritems():
                 if first_time:
                     doc_str += '\n'
                     first_time = False
                 doc_str += templates['at_throws'].substitute(except_name=key, except_info=val)
         return doc_str
 
-
-
-    #
-    # This method is only used for the tags which represent resource objects in the YAML. It still returns a dict object,
-    # however, it keeps a dict of object names and a reference to the line in the yaml so that it can be found later
-    # for generating HMTL doc. This probably is only a 90% solution
-    #
     def doc_tag_constructor(self, loader, node):
+        '''
+        This method is only used for the tags which represent resource objects in the YAML. It still returns a dict object,
+        however, it keeps a dict of object names and a reference to the line in the yaml so that it can be found later
+        for generating HMTL doc. This probably is only a 90% solution
+        '''
         for key_node, value_node in node.value:
-            print key_node," = ", value_node
+            print key_node, " = ", value_node
 
-        self.object_references[str(node.tag[1:])]=str(node.start_mark)
+        self.object_references[str(node.tag[1:])] = str(node.start_mark)
         return str(node.tag)
 
-
-
-    #
-    # Construct service name from file name
-    #
     def service_name_from_file_name(self, file_name):
+        '''
+        Construct service name from file name
+        '''
         file_name = os.path.basename(file_name).split('.', 1)[0]
         return file_name.title().replace('_', '').replace('-', '')
 
-
-
-
-    #
-    # Finds subtype 
-    #
     def find_subtypes(self, clz):
+        '''
+        Finds subtype
+        '''
         res = []
         for cls in clz.__subclasses__():
-            assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
+            assert hasattr(cls, 'name'), 'Service class must define name value. Service class in error: %s' % cls
             res.append(cls)
         return res
 
-
-    #
-    #
-    #
     def load_mods(self, path, interfaces):
         mod_prefix = string.replace(path, "/", ".")
 
         for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
             if is_pkg:
-                self.load_mods(path+"/"+mod_name, interfaces)
+                self.load_mods(path + "/" + mod_name, interfaces)
             else:
                 mod_qual = "%s.%s" % (mod_prefix, mod_name)
                 try:
@@ -428,14 +397,10 @@ class ServiceObjectGenerator :
                         print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"
                         print "syntax errors in your code or in the modules your code imports.\n"
 
-
-
-
-    #
-    # Generate validation report
-    #
-    def generate_validation_report (self):
-
+    def generate_validation_report(self):
+        '''
+         Generate validation report
+        '''
         validation_results = "Report generated on " + self.currtime + "\n"
         self.load_mods("interface/services", True)
         base_subtypes = self.find_subtypes(BaseService)
@@ -485,11 +450,11 @@ class ServiceObjectGenerator :
                                 added_class_names = True
                                 validation_results += "\nBase service: %s\n" % base_subtype_name
                                 validation_results += "Impl subtype: %s\n" % impl_subtype_name
-                            validation_results +=  "  Method '%s' implementation is out of sync\n" % key
-                            validation_results +=  "    Base: %s\n" % str(base_params)
-                            validation_results +=  "    Impl: %s\n" % str(impl_params)
+                            validation_results += "  Method '%s' implementation is out of sync\n" % key
+                            validation_results += "    Base: %s\n" % str(base_params)
+                            validation_results += "    Impl: %s\n" % str(impl_params)
 
-                if found_error == False:
+                if found_error is False:
                     validation_results += "\nBase service: %s\n" % base_subtype_name
                     validation_results += "Impl subtype: %s\n" % impl_subtype_name
                     validation_results += "  OK\n"
@@ -503,18 +468,15 @@ class ServiceObjectGenerator :
         with open(reportfile, 'w') as f:
             f.write(validation_results)
 
-
-
-
-
-    #
-    # Handle case where method has no parameters
-    #
     def build_args_str(self, _def, include_self=True):
+        '''
+        Handle case where method has no parameters
+        '''
         args = []
-        if include_self: args.append('self')
+        if include_self:
+            args.append('self')
 
-        for key,val in (_def or {}).iteritems():
+        for key, val in (_def or {}).iteritems():
             if isinstance(val, basestring):
                 if val.startswith("!"):
                     val = val.strip("!")
@@ -541,13 +503,7 @@ class ServiceObjectGenerator :
         args_str = ', '.join(args)
         return args_str
 
-
-
-
-    #
-    # Generates service definition
-    #
-    def generate_service (self, interface_file, svc_def, client_defs, opts):
+    def generate_service(self, interface_file, svc_def, client_defs, opts):
         """
         Generates a single service/client/interface definition.
 
@@ -555,34 +511,34 @@ class ServiceObjectGenerator :
         @param  svc_def             Hash of info about service.
         @param  client_defs         Static mapping of service names to their defined clients.
         """
-        service_name    = svc_def['name']
+        service_name = svc_def['name']
         class_docstring = svc_def['docstring']
-        class_spec      = svc_def['spec']
-        dependencies    = svc_def['dependencies']
-        meth_list       = svc_def['methods']
-        interface_name  = svc_def['interface_name']
-        class_name      = self.service_name_from_file_name(interface_name)
+        class_spec = svc_def['spec']
+        dependencies = svc_def['dependencies']
+        meth_list = svc_def['methods']
+        interface_name = svc_def['interface_name']
+        class_name = self.service_name_from_file_name(interface_name)
 
         if service_name is None:
             raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % interface_file)
 
         print 'Generating %40s -> %s' % (interface_name, interface_file)
 
-        methods         = []
-        class_methods   = []
-        client_methods  = []
-        doc_methods     = []
+        methods = []
+        class_methods = []
+        client_methods = []
+        doc_methods = []
 
         for op_name, op_def in meth_list.iteritems():
-            if not op_def: continue
+            if not op_def:
+                continue
 
-            def_docstring, def_spec, def_in, def_out, def_throws  = op_def.get('docstring', "@todo document this interface!!!"), op_def.get('spec', None), op_def.get('in', None), op_def.get('out', None), op_def.get('throws', None)
-
+            def_docstring, def_spec, def_in, def_out, def_throws = op_def.get('docstring', "@todo document this interface!!!"), op_def.get('spec', None), op_def.get('in', None), op_def.get('out', None), op_def.get('throws', None)
             # multiline docstring for method
             docstring_lines = def_docstring.split('\n')
 
             # Annoyingly, we have to hand format the doc strings to introduce
-            # the correct indentation on multi-line strings           
+            # the correct indentation on multi-line strings
             first_time = True
             docstring_formatted = ""
             for i in range(len(docstring_lines)):
@@ -600,15 +556,14 @@ class ServiceObjectGenerator :
             if def_in is not None and 'headers' in def_in:
                 raise StandardError("Reserved argument name 'headers' found in method '%s' of service '%s', please rename" % (op_name, service_name))
 
-            args_str, class_args_str        = self.build_args_str(def_in, False), self.build_args_str(def_in, True)
-            docstring_str                   = templates['methdocstr'].substitute(methoddocstr=self.build_args_doc_string(docstring_formatted, def_spec, def_in, def_out, def_throws))
-            outargs_str                     = '\n        # '.join(yaml.dump(def_out).split('\n'))
+            args_str, class_args_str = self.build_args_str(def_in, False), self.build_args_str(def_in, True)
+            docstring_str = templates['methdocstr'].substitute(methoddocstr=self.build_args_doc_string(docstring_formatted, def_spec, def_in, def_out, def_throws))
+            outargs_str = '\n        # '.join(yaml.dump(def_out).split('\n'))
 
             methods.append(templates['method'].substitute(name=op_name, args=args_str, methoddocstring=docstring_str, outargs=outargs_str))
             class_methods.append(templates['method'].substitute(name=op_name, args=class_args_str, methoddocstring=docstring_str, outargs=outargs_str))
 
             clientobjargs = ''
-
 
             if def_in:
                 all_client_obj_args = []
@@ -618,7 +573,7 @@ class ServiceObjectGenerator :
                         all_client_obj_args.append(client_templates['obj_arg'].substitute(name=k, default=d))
                     else:
                         all_client_obj_args.append(client_templates['obj_arg_no_def'].substitute(name=k))
-                clientobjargs       = ",".join(all_client_obj_args)
+                clientobjargs = ",".join(all_client_obj_args)
 
             # determine object in name: follows <ServiceName>_<MethodName>_in
             req_in_obj_name = "%s_%s_in" % (service_name, op_name)
@@ -634,20 +589,19 @@ class ServiceObjectGenerator :
                 doc_inargs_str = self.build_args_doc_html(def_in)
                 doc_outargs_str = self.build_args_doc_html(def_out)
                 doc_exceptions_str = self.build_exception_doc_html(def_throws)
-                methoddocstring = docstring_formatted.replace("method docstring","")
+                methoddocstring = docstring_formatted.replace("method docstring", "")
                 doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str, exceptions=doc_exceptions_str))
 
-
         # dep client names
-        dep_clients             = [(x, client_defs[x][1]) for x in dependencies]
-        dep_clients_str         = "\n".join(map(lambda x2: templates['dep_client'].substitute(svc=x2[0], clientclass=x2[1]), dep_clients))
-        dep_client_imports_str  = "\n".join([templates['dep_client_imports'].substitute(clientmodule=client_defs[x][0], clientclass=client_defs[x][1]) for x in dependencies])
+        dep_clients = [(x, client_defs[x][1]) for x in dependencies]
+        dep_clients_str = "\n".join(map(lambda x2: templates['dep_client'].substitute(svc=x2[0], clientclass=x2[1]), dep_clients))
+        dep_client_imports_str = "\n".join([templates['dep_client_imports'].substitute(clientmodule=client_defs[x][0], clientclass=client_defs[x][1]) for x in dependencies])
 
-        service_name_str    = templates['svcname'].substitute(name=service_name)
+        service_name_str = templates['svcname'].substitute(name=service_name)
         class_docstring_str = templates['clssdocstr'].substitute(classdocstr=self.build_class_doc_string(class_docstring, class_spec))
-        dependencies_str    = templates['depends'].substitute(namelist=dependencies)
-        methods_str         = ''.join(methods) or '    pass\n'
-        classmethods_str    = ''.join(class_methods)
+        dependencies_str = templates['depends'].substitute(namelist=dependencies)
+        methods_str = ''.join(methods) or '    pass\n'
+        classmethods_str = ''.join(class_methods)
 
         _class = templates['class'].substitute(name=class_name,
                                                classdocstring=class_docstring_str,
@@ -661,56 +615,46 @@ class ServiceObjectGenerator :
                                                                    dep_clients=dep_clients_str)
 
         # this service's client generation
-        _client_methods             = ''.join(client_methods)
-        _client_class               = client_templates['class'].substitute(name=class_name,
-                                                                           clientdocstring='# @todo Fill in client documentation.',
-                                                                           methods=_client_methods)
-        _client_rpcclient           = client_templates['rpcclient'].substitute(name=class_name,
-                                                                               targetname=service_name)
-        _client_processrpc_client   = client_templates['processrpcclient'].substitute(name=class_name,
-                                                                                      targetname=service_name)
-
-        _client                     = client_templates['full'].substitute(client=_client_class,
-                                                                          rpcclient=_client_rpcclient,
-                                                                          processrpcclient=_client_processrpc_client)
-
-        interface_contents          = templates['file'].substitute(dep_client_imports=dep_client_imports_str,
-                                                                   clientsholder=clients_holder_str,
-                                                                   classes=_class,
-                                                                   when_generated=self.currtime,
-                                                                   client=_client)
-
-
+        _client_methods = ''.join(client_methods)
+        _client_class = client_templates['class'].substitute(name=class_name,
+                                                              clientdocstring='# @todo Fill in client documentation.',
+                                                              methods=_client_methods)
+        _client_rpcclient = client_templates['rpcclient'].substitute(name=class_name,
+                                                                     targetname=service_name)
+        _client_processrpc_client = client_templates['processrpcclient'].substitute(name=class_name,
+                                                                                    targetname=service_name)
+        _client = client_templates['full'].substitute(client=_client_class,
+                                                      rpcclient=_client_rpcclient,
+                                                      processrpcclient=_client_processrpc_client)
+        interface_contents = templates['file'].substitute(dep_client_imports=dep_client_imports_str,
+                                                          clientsholder=clients_holder_str,
+                                                          classes=_class,
+                                                          when_generated=self.currtime,
+                                                          client=_client)
 
         with open(interface_file, 'w') as f:
             f.write(interface_contents)
 
-        doc_methods_str    = ''.join(doc_methods)
-        doc_page_contents  = html_doc_templates['confluence_service_page_include'].substitute(name=class_name,methods=doc_methods_str)
+        doc_methods_str = ''.join(doc_methods)
+        doc_page_contents = html_doc_templates['confluence_service_page_include'].substitute(name=class_name, methods=doc_methods_str)
 
         if opts.servicedoc:
             doc_file = interface_file.replace(".py", ".html")
             with open(doc_file, 'w') as f1:
                 f1.write(doc_page_contents)
 
-
-
-
-
-    #
-    # Generates services
-    #
-    def generate (self, opts):
-
+    def generate(self, opts):
+        '''
+        Generates services
+        '''
         service_dir, interface_dir = 'obj/services', 'interface'
-
         data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
-        data_yaml_text  = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
+        data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
         service_yaml_files = list_files_recursive('obj/services', '*.yml')
-        service_yaml_text  = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
-
+        service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
 
         enum_tag = u'!enum'
+
         def enum_constructor(loader, node):
             val_str = str(node.value)
             val_str = val_str[1:-1].strip()
@@ -721,22 +665,19 @@ class ServiceObjectGenerator :
                 return "Enum Name Not Provided"
 
         yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
-
-
         yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
-
-
 
         # Now walk the data model definition yaml files adding the
         # necessary yaml constructors.
         defs = yaml.load_all(data_yaml_text, Loader=IonYamlLoader)
         def_dict = {}
         for def_set in defs:
-            for name,_def in def_set.iteritems():
+            for name, _def in def_set.iteritems():
                 if isinstance(_def, OrderedDict):
                     def_dict[name] = _def
                 tag = u'!%s' % (name)
+
                 def constructor(loader, node):
                     value = node.tag.strip('!')
                     # See if this is an enum ref
@@ -747,6 +688,7 @@ class ServiceObjectGenerator :
                 yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
 
                 xtag = u'!Extends_%s' % (name)
+
                 def extends_constructor(loader, node):
                     if isinstance(node, yaml.MappingNode):
                         value = loader.construct_mapping(node)
@@ -754,18 +696,16 @@ class ServiceObjectGenerator :
                         value = {}
                     return value
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
-
-
-
 
         # Do the same for any data model objects in the service
         # definition files.
         defs = yaml.load_all(service_yaml_text, Loader=IonYamlLoader)
         for def_set in defs:
-            for name,_def in def_set.get('obj', {}).iteritems():
+            for name, _def in def_set.get('obj', {}).iteritems():
                 if isinstance(_def, OrderedDict):
                     def_dict[name] = _def
                 tag = u'!%s' % (name)
+
                 def constructor(loader, node):
                     value = node.tag.strip('!')
                     # See if this is an enum ref
@@ -776,6 +716,7 @@ class ServiceObjectGenerator :
                 yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
 
                 xtag = u'!Extends_%s' % (name)
+
                 def extends_constructor(loader, node):
                     if isinstance(node, yaml.MappingNode):
                         value = loader.construct_mapping(node)
@@ -783,9 +724,6 @@ class ServiceObjectGenerator :
                         value = {}
                     return value
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
-
-
-
 
         yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
         yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
@@ -794,7 +732,7 @@ class ServiceObjectGenerator :
         # in terms of common data objects
         defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
         for def_set in defs:
-            for name,_def in def_set.iteritems():
+            for name, _def in def_set.iteritems():
                 tag = u'!%s' % (name)
                 yaml.add_constructor(tag, self.doc_tag_constructor)
                 xtag = u'!Extends_%s' % (name)
@@ -819,15 +757,17 @@ class ServiceObjectGenerator :
         client_defs = {}
 
         yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
-        
+
         # Generate the new definitions, for now giving each
         # yaml file its own python service
         for root, dirs, files in os.walk(service_dir):
             for filename in fnmatch.filter(files, '*.yml'):
                 yaml_file = os.path.join(root, filename)
                 file_match = yaml_file_re.match(yaml_file)
-                if '.svc_signatures' in filename: continue
-                if file_match is None: continue
+                if '.svc_signatures' in filename:
+                    continue
+                if file_match is None:
+                    continue
 
                 file_path = file_match.group(2)
                 interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
@@ -859,7 +799,7 @@ class ServiceObjectGenerator :
                     m = hashlib.md5()
                     m.update(yaml_text)
                     cur_md5 = m.hexdigest()
-                    
+
                     if yaml_file in svc_signatures and not opts.force:
                         if cur_md5 == svc_signatures[yaml_file]:
                             print "Skipping   %40s (md5 signature match)" % interface_name
@@ -876,7 +816,6 @@ class ServiceObjectGenerator :
                     if not skip_file:
                         svc_signatures[yaml_file] = cur_md5
 
-
                 defs = yaml.load_all(yaml_text)
                 for def_set in defs:
                     # Handle object definitions first; make dummy constructors so tags will parse
@@ -886,18 +825,18 @@ class ServiceObjectGenerator :
                             yaml.add_constructor(tag, self.doc_tag_constructor)
                         continue
 
-                    service_name    = def_set.get('name', None)
+                    service_name = def_set.get('name', None)
                     class_docstring = def_set.get('docstring', "class docstring")
-                    spec            = def_set.get('spec', None)
-                    dependencies    = def_set.get('dependencies', None)
-                    meth_list       = def_set.get('methods', {}) or {}
-                    client_path     = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % self.service_name_from_file_name(interface_name))
+                    spec = def_set.get('spec', None)
+                    dependencies = def_set.get('dependencies', None)
+                    meth_list = def_set.get('methods', {}) or {}
+                    client_path = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % self.service_name_from_file_name(interface_name))
 
                     # format multiline docstring
                     class_docstring_lines = class_docstring.split('\n')
 
                     # Annoyingly, we have to hand format the doc strings to introduce
-                    # the correct indentation on multi-line strings           
+                    # the correct indentation on multi-line strings
                     first_time = True
                     class_docstring_formatted = ""
                     for i in range(len(class_docstring_lines)):
@@ -916,14 +855,14 @@ class ServiceObjectGenerator :
                         if service_name in raw_services:
                             raise StandardError("Duplicate service name found: %s" % service_name)
 
-                        raw_services[service_name] = { 'name'           : service_name,
-                                                       'docstring'      : class_docstring_formatted,
-                                                       'spec'           : spec,
-                                                       'dependencies'   : dependencies,
-                                                       'methods'        : meth_list,
-                                                       'interface_file' : interface_file,
-                                                       'interface_name' : interface_name,
-                                                       'client_path'    : client_path }
+                        raw_services[service_name] = {'name': service_name,
+                                                      'docstring': class_docstring_formatted,
+                                                      'spec': spec,
+                                                      'dependencies': dependencies,
+                                                      'methods': meth_list,
+                                                      'interface_file': interface_file,
+                                                      'interface_name': interface_name,
+                                                      'client_path': client_path}
 
                     # dep capturing (we check cycles when we topologically sort later)
                     if not service_name in service_dep_graph:
@@ -940,7 +879,7 @@ class ServiceObjectGenerator :
         # topological sort of services to make sure we do things in order
         # http://en.wikipedia.org/wiki/Topological_sorting
         sorted_services = []
-        service_set = set([k for k,v in service_dep_graph.iteritems() if len(v) == 0])
+        service_set = set([k for k, v in service_dep_graph.iteritems() if len(v) == 0])
 
         while len(service_set) > 0:
             n = service_set.pop()
@@ -951,7 +890,7 @@ class ServiceObjectGenerator :
                 sorted_services.append((n, raw_services[n]))
 
             # get list of all services that depend on the current service
-            depending_services = [k for k,v in service_dep_graph.iteritems() if n in v]
+            depending_services = [k for k, v in service_dep_graph.iteritems() if n in v]
 
             for depending_service in depending_services:
 
@@ -963,7 +902,7 @@ class ServiceObjectGenerator :
                     service_set.add(depending_service)
 
         # ok, check for any remaining deps that we never found - indicates a cycle
-        remaining_deps = set([k for k,v in service_dep_graph.iteritems() if len(v) > 0])
+        remaining_deps = set([k for k, v in service_dep_graph.iteritems() if len(v) > 0])
         if len(remaining_deps):
             print >> sys.stderr, "**********************************************************************"
             print >> sys.stderr, "Error in dependency resolution: either a cycle or a missing dependency"
@@ -978,7 +917,7 @@ class ServiceObjectGenerator :
         for svc in sorted_services:
             svc_name, raw_def = svc
             self.generate_service(raw_def['interface_file'], raw_def, client_defs, opts)
-            count+=1
+            count += 1
 
         if count > 0 and not opts.dryrun:
 
@@ -1004,9 +943,7 @@ class ServiceObjectGenerator :
                                                             client_imports="\n".join([templates['dep_client_imports'].substitute(clientmodule=x[0], clientclass=x[1]) for x in client_defs.itervalues()])))
             '''
 
-
         self.generate_validation_report()
-
         exitcode = 0
 
         # only exit with 1 if we notice changes, and we specified dryrun
@@ -1014,4 +951,3 @@ class ServiceObjectGenerator :
             exitcode = 1
 
         sys.exit(exitcode)
-
