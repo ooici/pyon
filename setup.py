@@ -49,7 +49,7 @@ setup(  name = 'pyon',
             # Patched greenlet to work on ARMS
             'greenlet==0.3.1-p1',
             'gevent==0.13.6',
-            'simplejson==2.1.6',
+            'simplejson==2.5.2',
             'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
             'pyyaml==3.10',
