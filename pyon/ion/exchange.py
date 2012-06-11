@@ -74,6 +74,8 @@ class ExchangeManager(object):
         self._client    = None
         self._transport = None
 
+        self._default_xs_declared = False
+
     def start(self):
         log.debug("ExchangeManager.start")
 
@@ -128,9 +130,6 @@ class ExchangeManager(object):
 
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
 
-        # Declare root exchange
-        #self.default_xs.ensure_exists(self._get_channel())
-
     def stop(self, *args, **kwargs):
         # ##############
         # HACK HACK HACK
@@ -150,6 +149,9 @@ class ExchangeManager(object):
             self._nodes[name].stop_node()
             self._ioloops[name].kill()
             self._nodes[name].client.ioloop.start()     # loop until connection closes
+
+        # @TODO undeclare root xs??  need to know if last container
+        #self.default_xs.delete()
 
     @property
     def default_node(self):
@@ -352,136 +354,41 @@ class ExchangeManager(object):
         else:
             xn.delete()
 
+    def _ensure_default_declared(self):
+        """
+        Ensures we declared the default exchange space.
+        Needed by most exchange object calls, so each one calls here.
+        """
+        if not self._default_xs_declared:
+            log.debug("ExchangeManager._ensure_default_declared, declaring default xs")
+            self._default_xs_declared = True
+            self.default_xs.declare()
+
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_exchange")
+        self._ensure_default_declared()
         self._transport.declare_exchange_impl(self._client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
     def delete_exchange(self, exchange, **kwargs):
         log.info("ExchangeManager.delete_exchange")
+        self._ensure_default_declared()
         self._transport.delete_exchange_impl(self._client, exchange, **kwargs)
     def declare_queue(self, queue, durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_queue")
+        self._ensure_default_declared()
         return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
     def delete_queue(self, queue, **kwargs):
         log.info("ExchangeManager.delete_queue")
+        self._ensure_default_declared()
         self._transport.delete_queue_impl(self._client, queue, **kwargs)
     def bind(self, exchange, queue, binding):
         log.info("ExchangeManager.bind")
+        self._ensure_default_declared()
         self._transport.bind_impl(self._client, exchange, queue, binding)
     def unbind(self, exchange, queue, binding):
         log.info("ExchangeManager.unbind")
+        self._ensure_default_declared()
         self._transport.unbind_impl(self._client, exchange, queue, binding)
-
-#
-#class ExchangeSpace(object):
-#    ION_DEFAULT_XS = "ioncore"
-#
-#    def __init__(self, name):
-#        assert name, "Invalid XS name %s" % name
-#        name = str(name)
-#        if name.startswith(ION_URN_PREFIX):
-#            name = name[len(ION_URN_PREFIX)+1:]
-#        assert valid_xname(name), "Invalid XS name %s" % name
-#        self.name = name
-#        self.qname = self.build_qname()
-#
-#    def build_qname(self):
-#        qname = "%s:%s:%s" % (ION_URN_PREFIX, bootstrap.sys_name, self.name)
-#        return qname
-#
-#    def build_xname(self):
-#        xname = "%s.ion.xs.%s" % (bootstrap.sys_name, self.name)
-#        return xname
-#
-#    def ensure_exists(self, chan):
-#        xname = self.build_xname()
-#        log.debug("ExchangeSpace.ensure_exists() xname=%s", xname)
-#
-#        blocking_cb(chan.exchange_declare, 'callback', exchange=xname,
-#                                                       type='topic',
-#                                                       durable=False,
-#                                                       auto_delete=True)
-#
-#        log.debug("ExchangeSpace (%s) created", xname)
-#
-#    def delete(self, chan):
-#        xname = self.build_xname()
-#        log.debug("ExchangeSpace.delete, xname: %s", xname)
-#
-#        blocking_cb(chan.exchange_delete, 'callback', exchange=xname)
-#
-#        log.debug("ExchangeSpace (%s) deleted", xname)
-#
-#    def __str__(self):
-#        return self.name
-#
-#    def __repr__(self):
-#        return "ExchangeSpace(%s)" % self.qname
-#
-#class ExchangeName(object):
-#    """
-#    Exchange names have the following format:
-#    urn:ionx:<XS-Name>:<Name>
-#    """
-#    def __init__(self, name, xs=None):
-#        assert name, "Invalid XS name %s" % name
-#        name = str(name)
-#        if name.startswith(ION_URN_PREFIX):
-#            name = name[len(ION_URN_PREFIX)+1:]
-#            xs, name = name.split(":")
-#        assert xs, "XS not given"
-#        assert valid_xname(name), "Invalid XN name %s" % name
-#        self.xs = xs
-#        self.name = str(name)
-#        self.qname = self.build_qname()
-#
-#    def build_qname(self):
-#        qname = "%s:%s:%s:%s" % (ION_URN_PREFIX, bootstrap.sys_name, str(self.xs), self.name)
-#        return qname
-#
-#    def build_xlname(self):
-#        xname = "%s.ion.xs.%s" % (bootstrap.sys_name, self.name)
-#        return xname
-#
-#    def __str__(self):
-#        return self.name
-#
-#    def __repr__(self):
-#        return "ExchangeName(%s)" % self.qname
-#
-#class ExchangePoint(ExchangeName):
-#    XPTYPES = {
-#        'basic':'basic',
-#        'ttree':'ttree',
-#    }
-#    def __init__(self, name, xs=None, xptype=None):
-#        ExchangeName.__init__(self, name, xs)
-#        self.xptype = xptype or 'basic'
-#
-#    def build_xname(self):
-#        xname = "%s.xp.%s" % (self.xs.build_xname(), self.name)
-#        return xname
-#
-#    def ensure_exists(self, chan):
-#
-#        xname = self.build_xname()
-#        log.debug("ExchangePoint.ensure_exists, xname=%s", xname)
-#
-#        blocking_cb(chan.exchange_declare, 'callback', exchange=xname,
-#                                                       type='topic',
-#                                                       durable=False,
-#                                                       auto_delete=True)
-#
-#        log.debug("ExchangePoint (%s) created", xname)
-#
-#    def delete(self, chan):
-#        xname = self.build_xname()
-#        log.debug("ExchangePoint.delete, xname: %s", xname)
-#
-#        blocking_cb(chan.exchange_delete, 'callback', exchange=xname)
-#
-#        log.debug("ExchangePoint (%s) deleted", xname)
-
 
 
 class XOTransport(BaseTransport):
@@ -509,12 +416,6 @@ class XOTransport(BaseTransport):
     def setup_listener(self, binding, default_cb):
         log.debug("XOTransport passing on setup_listener")
         pass
-
-#    # friendly versions?
-#    def declare_exchange(self, exchange, **kwargs):
-#        return self.declare_exchange_impl(None, exchange, **kwargs)
-#
-#        # etc etc
 
 class ExchangeSpace(XOTransport, NameTrio):
 
@@ -547,6 +448,7 @@ class ExchangeName(XOTransport, NameTrio):
 
     _xn_durable     = False
     _xn_auto_delete = True
+    _declared_queue = None
 
     def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
@@ -571,7 +473,8 @@ class ExchangeName(XOTransport, NameTrio):
         return queue
 
     def declare(self):
-        return self.declare_queue_impl(None, self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
+        self._declared_queue = self.declare_queue_impl(None, self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
+        return self._declared_queue
 
     def delete(self):
         self.delete_queue_impl(None, self.queue)
@@ -617,6 +520,8 @@ class ExchangePoint(ExchangeName):
 
     @property
     def queue(self):
+        if self._queue:
+            return self._queue
         return None     # @TODO: correct?
 
     def declare(self):
@@ -638,5 +543,12 @@ class ExchangeNameService(ExchangeName):
 
 class ExchangeNameQueue(ExchangeName):
     xn_type = "XN_QUEUE"
+    @property
     def queue(self):
+        if self._declared_queue:
+            return self._declared_queue
         return None
+
+    def setup_listener(self, binding, default_cb):
+        log.debug("ExchangeQueue.setup_listener: passing on binding")
+

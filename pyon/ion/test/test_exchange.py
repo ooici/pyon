@@ -274,7 +274,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(self.ex_manager.xs_by_name[sentinel.xs], xs)
 
         # should've tried to declare
-        self.ex_manager._transport.declare_exchange_impl.assert_called_once_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xs_with_params(self):
         xs      = self.ex_manager.create_xs(sentinel.xs, exchange_type=sentinel.ex_type, durable=True)
@@ -284,7 +284,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xs._xs_exchange_type, sentinel.ex_type)
 
         # declaration?
-        self.ex_manager._transport.declare_exchange_impl.assert_called_once_with(self.ex_manager._client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
 
     def test_delete_xs(self):
         # need an XS first
@@ -319,7 +319,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xp.exchange, exstr)
 
         # declaration
-        self.ex_manager._transport.declare_exchange_impl.assert_called_once_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xp_with_params(self):
         xp = self.ex_manager.create_xp(sentinel.xp, xptype=sentinel.xptype)

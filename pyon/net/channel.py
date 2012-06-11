@@ -751,7 +751,7 @@ class ListenChannel(RecvChannel):
         self._on_stop_consume(fsm)
 
     @contextmanager
-    def accept(self):
+    def accept(self, timeout=None):
         """
         Context manager method to accept new connections for listening endpoints.
 
@@ -768,7 +768,7 @@ class ListenChannel(RecvChannel):
                     - recv() returns messages in its gqueue, endpoint should ack
         """
         #        self._ensure_amq_chan()
-        m = self.recv()
+        m = self.recv(timeout=timeout)
         ch = self._create_accepted_channel(self._amq_chan, m)
         ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
