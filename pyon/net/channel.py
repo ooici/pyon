@@ -779,7 +779,7 @@ class ListenChannel(RecvChannel):
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-"):
+        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-") and self._transport is AMQPTransport.get_instance():
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 

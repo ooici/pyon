@@ -373,7 +373,7 @@ class ExchangeManager(object):
         log.info("ExchangeManager.delete_exchange")
         self._ensure_default_declared()
         self._transport.delete_exchange_impl(self._client, exchange, **kwargs)
-    def declare_queue(self, queue, durable=False, auto_delete=True):
+    def declare_queue(self, queue, durable=False, auto_delete=False):
         log.info("ExchangeManager.declare_queue")
         self._ensure_default_declared()
         return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
@@ -447,7 +447,7 @@ class ExchangeName(XOTransport, NameTrio):
     xn_type = "XN_BASE"
 
     _xn_durable     = False
-    _xn_auto_delete = True
+    _xn_auto_delete = False
     _declared_queue = None
 
     def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
@@ -478,6 +478,7 @@ class ExchangeName(XOTransport, NameTrio):
 
     def delete(self):
         self.delete_queue_impl(None, self.queue)
+        self._declared_queue = None
 
     def bind(self, binding_key):
         self.bind_impl(None, self.exchange, self.queue, binding_key)
