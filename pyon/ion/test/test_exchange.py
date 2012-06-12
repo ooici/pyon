@@ -17,6 +17,7 @@ from pyon.core.bootstrap import get_sys_name
 from pyon.net.channel import RecvChannel
 from pyon.util.config import CFG
 from pyon.util.containers import DotDict
+import os
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -453,6 +454,7 @@ class TestExchangeObjects(PyonTestCase):
 
 @attr('INT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
+@unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
@@ -477,6 +479,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # did we get back what we expected?
         self.assertEquals(ret, 'BACK:hi there')
+
+        # clean xn up
+        xn.delete()
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
