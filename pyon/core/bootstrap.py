@@ -25,12 +25,6 @@ def assert_environment():
         raise ContainerStartupError("pyon environment assertion failed: res/config directory not found")
     if not os.path.exists("res/config/pyon.yml"):
         raise ContainerStartupError("pyon environment assertion failed: pyon.yml config missing")
-    if not os.path.exists("obj"):
-        raise ContainerStartupError("pyon environment assertion failed: obj/ directory not found")
-    if not os.path.exists("obj/services"):
-        raise ContainerStartupError("pyon environment assertion failed: obj/services directory not found")
-    if not os.path.exists("obj/data"):
-        raise ContainerStartupError("pyon environment assertion failed: obj/data directory not found")
 
 def assert_configuration(config):
     """
