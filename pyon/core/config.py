@@ -37,7 +37,7 @@ def apply_remote_config(system_cfg):
     from pyon.core.bootstrap import get_sys_name
     from pyon.core.exception import Conflict
     from pyon.ion.directory_standalone import DirectoryStandalone
-    directory = DirectoryStandalone(sysname=get_sys_name(), config=bootstrap_config)
+    directory = DirectoryStandalone(sysname=get_sys_name(), config=system_cfg)
 
     de = directory.lookup("/Config/CFG")
     if not de:
@@ -85,6 +85,7 @@ def _bootstrap_service_defs(directory):
     directory.register_mult(svc_list)
 
 def auto_bootstrap_config(bootstrap_config, system_cfg):
+    print "pyon: config: Auto bootstrap CFG into directory"
     from pyon.core.bootstrap import get_sys_name
     from pyon.ion.directory_standalone import DirectoryStandalone
     directory = DirectoryStandalone(sysname=get_sys_name(), config=bootstrap_config)
@@ -93,6 +94,7 @@ def auto_bootstrap_config(bootstrap_config, system_cfg):
         directory.register("/Config", "CFG", **system_cfg.copy())
 
 def auto_bootstrap_interfaces(bootstrap_config):
+    print "pyon: config: Auto bootstrap interfaces into directory"
     from pyon.core.bootstrap import get_sys_name
     from pyon.ion.directory_standalone import DirectoryStandalone
     directory = DirectoryStandalone(sysname=get_sys_name(), config=bootstrap_config)

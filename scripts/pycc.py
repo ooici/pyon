@@ -50,6 +50,7 @@ def entry():
     parser.add_argument('-sp', '--signalparent', action='store_true', help='Signal parent process after service start up complete')
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
+    parser.add_argument('-X', '--no_container', action='store_true', help='Perform pre-initialization steps and stop before starting a container.')
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
@@ -102,9 +103,9 @@ def main(opts, *args, **kwargs):
 
         if opts.config_from_directory:
             # Load minimal bootstrap config if option "config_from_directory"
-            print "pycc: config_from_directory=True: Load minimal bootstrap configuration"
             bootstrap_config = config.read_local_configuration(['res/config/pyon_min_boot.yml'])
             config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
+            print "pycc: config_from_directory=True. Minimal bootstrap configuration:", bootstrap_config
         else:
             # Otherwise: Set to standard set of local config files just so that we have something
             bootstrap_config = pyon_config
@@ -117,12 +118,13 @@ def main(opts, *args, **kwargs):
         # Delete sysname datastores if option "force_clean" is set
         if opts.force_clean:
             from pyon.datastore import clear_couch_util
-            print "pycc: FORCE_CLEAN datastores for sysname=%s" % bootstrap.get_sys_name()
+            print "pycc: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
             clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
         # If auto_bootstrap, load config and interfaces into directory
         # Note: this is idempotent and will not alter anything if this is not the first container to run
         if bootstrap_config.system.auto_bootstrap:
+            print "pycc: auto_bootstrap=True."
             config.auto_bootstrap_config(bootstrap_config, system_cfg=pyon_config)
 
         # Load logging override config if provided. Supports variants literal and path.
@@ -174,6 +176,10 @@ def main(opts, *args, **kwargs):
         # @WARN: This currently imports ALL modules, executing ALL static initializers as side effect!!!!!!!
         if bootstrap_config.system.auto_bootstrap:
             config.auto_bootstrap_interfaces(bootstrap_config)
+
+        if opts.no_container:
+            print "pycc: no_container=True. Stopping here."
+            return None
 
         # Create the container instance
         from pyon.container.cc import Container
@@ -254,6 +260,8 @@ def main(opts, *args, **kwargs):
     container = None
     try:
         container = prepare_container()
+        if container is None:
+            sys.exit(0)
 
         start_container(container)
     except Exception as ex:

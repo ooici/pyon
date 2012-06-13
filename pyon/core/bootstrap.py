@@ -105,7 +105,9 @@ def is_testing():
 
 def set_sys_name(sysname=None):
     global sys_name
+    old_sys_name = sys_name
     sys_name = sysname
+    print "pyon: sys_name changed from '%s' to '%s'" % (old_sys_name, sys_name)
 
 def get_sys_name():
     if sys_name:
@@ -137,8 +139,10 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     """
     This function initializes the core elements of the Pyon framework in a controlled way.
     It does not initialize the ION container or the ION system.
+    @param logging_config_override  A dict to initialize the Python logging subsystem (None loads default files)
+    @param pyon_cfg   A DotDict with the fully loaded pyon configuration to set as CFG (None loads default files)
     """
-    print "pyon: pyon.bootstrap executing..."
+    print "pyon: pyon.bootstrap (bootstrap_pyon) executing..."
 
     # Make sure Pyon is only initialized only once
     global pyon_initialized
@@ -146,7 +150,7 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
         print "pyon: WARNING -- bootstrap_pyon() called again!"
         return
 
-    # ENVIRONMENT. Check we are called like expected
+    # ENVIRONMENT. Check we are called in an expected environment (files, directories, etc)
     assert_environment()
 
     # LOGGING. Initialize logging from config
@@ -159,22 +163,20 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     # CONFIG. Initialize pyon global configuration from local files
     set_config(pyon_cfg)
 
-    from pyon.core.registry import IonObjectRegistry
-    from pyon.service.service import IonServiceRegistry
-
     # OBJECTS. Object and message definitions.
-    global _obj_registry, _service_registry
+    from pyon.core.registry import IonObjectRegistry
+    global _obj_registry
     _obj_registry = IonObjectRegistry()
-    #IonObject = _obj_registry.new
-
-    _obj_registry.validate_setattr = CFG.validate.setattr
 
     # SERVICES. Service definitions
+    from pyon.service.service import IonServiceRegistry
+    global _service_registry
     _service_registry = IonServiceRegistry()
     _service_registry.load_service_mods('interface/services')
     _service_registry.build_service_map()
 
     # INTERCEPTORS.
+    # TODO: Is
     from pyon.net.endpoint import instantiate_interceptors
     instantiate_interceptors(CFG.interceptor)
 
@@ -184,4 +186,3 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
 
     # Set initialized flag
     pyon_initialized = True
-

@@ -108,7 +108,8 @@ class IonObjectRegistry(object):
         for name, clzz in classes:
             message_classes[name] = clzz
 
-
+        from pyon.core.bootstrap import CFG
+        self.validate_setattr = CFG.get_safe('validate.setattr', False)
 
     def new(self, _def, _dict=None, **kwargs):
         """ See get_def() for definition lookup options. """
