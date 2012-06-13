@@ -105,15 +105,16 @@ def main(opts, *args, **kwargs):
             # Load minimal bootstrap config if option "config_from_directory"
             bootstrap_config = config.read_local_configuration(['res/config/pyon_min_boot.yml'])
             config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
+            config.apply_configuration(bootstrap_config, kwargs)
             print "pycc: config_from_directory=True. Minimal bootstrap configuration:", bootstrap_config
         else:
             # Otherwise: Set to standard set of local config files just so that we have something
             bootstrap_config = pyon_config
 
-        # @TODO Remove special case for testing: just use system.name instead as before
-        if bootstrap_config.get_safe("system.testing_sysname", None):
-            testing_sysname = bootstrap_config.get_safe("system.testing_sysname", None)
-            bootstrap.set_sys_name(testing_sysname)
+        # Override sysname from config file or command line
+        if not opts.sysname and bootstrap_config.get_safe("system.name", None):
+            new_sysname = bootstrap_config.get_safe("system.name")
+            bootstrap.set_sys_name(new_sysname)
 
         # Delete sysname datastores if option "force_clean" is set
         if opts.force_clean:

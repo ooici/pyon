@@ -18,7 +18,7 @@ class CouchdbStandalone(object):
         self.database_url = "http://" + self.authentication + self.host + ":" + self.port
         self.server = None
         self.database = None
-        self.database_name = database_name.lower()
+        self.database_name = database_name.lower() if database_name else None
 
         self._connect()
 
