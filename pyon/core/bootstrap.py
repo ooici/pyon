@@ -12,13 +12,23 @@ import pyon
 # @WARN: GLOBAL STATE
 
 # -----------------------------------------------------------------------------
-# Global pyon variables
+# Internal pyon variables
 
 # Is pyon already initialized?
 pyon_initialized = False
 
+# Handle to the object interface registry -- use getter function instead
+_obj_registry = None
+
+# Handle to the service interface registry -- use getter function instead
+_service_registry = None
+
+# -----------------------------------------------------------------------------
+# Global pyon variables
+
 # The global pyon configuration object (DotDict)
-CFG = None
+from pyon.util.containers import DotDict
+CFG = DotDict()
 
 # Is pyon running in non-container testing mode? (Note: pycc will set this to False)
 testing = True
@@ -26,14 +36,9 @@ testing = True
 # Identifies the unique name and namespace of this ION distributed system instance
 sys_name = None
 
-# Handle to the object interface registry
-obj_registry = None
-
-# Handle to the service interface registry
-service_registry = None
-
 # Factory metaclass to create ION objects
-IonObject = None
+def IonObject(*args, **kwargs):
+    return _obj_registry.new(*args, **kwargs)
 
 # Keep the current container instance
 container_instance = None
@@ -73,15 +78,15 @@ def set_config(pyon_cfg=None):
     """
     Initialize pyon global configuration
     """
-    global CFG
     from pyon.core import config
 
     if pyon_cfg:
         # Variant 1: if provided, set pyon_cfg as pyon global CFG
-        CFG = pyon_cfg
+        config.apply_configuration(CFG, pyon_cfg)
     else:
         # Variant 2: default, load standard configuration sequence
-        CFG = config.read_standard_configuration()
+        std_cfg = config.read_standard_configuration()
+        config.apply_configuration(CFG, std_cfg)
 
     assert_configuration(CFG)
 
@@ -119,6 +124,12 @@ def get_sys_name():
 
     return default_sys_name
 
+def get_obj_registry():
+    return _obj_registry
+
+def get_service_registry():
+    return _service_registry
+
 # -----------------------------------------------------------------------------
 
 def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
@@ -151,14 +162,16 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     from pyon.service.service import IonServiceRegistry
 
     # OBJECTS. Object and message definitions.
-    global obj_registry, IonObject, service_registry
-    obj_registry = IonObjectRegistry()
-    IonObject = obj_registry.new
+    global _obj_registry, _service_registry
+    _obj_registry = IonObjectRegistry()
+    #IonObject = _obj_registry.new
+
+    _obj_registry.validate_setattr = CFG.validate.setattr
 
     # SERVICES. Service definitions
-    service_registry = IonServiceRegistry()
-    service_registry.load_service_mods('interface/services')
-    service_registry.build_service_map()
+    _service_registry = IonServiceRegistry()
+    _service_registry.load_service_mods('interface/services')
+    _service_registry.build_service_map()
 
     # INTERCEPTORS.
     from pyon.net.endpoint import instantiate_interceptors

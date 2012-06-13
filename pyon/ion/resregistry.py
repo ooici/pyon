@@ -50,9 +50,9 @@ class ResourceRegistry(object):
             self._register_service_definitions()
 
     def _register_service_definitions(self):
-        from pyon.core.bootstrap import service_registry
+        from pyon.core.bootstrap import get_service_registry
         svc_list = []
-        for svcname, svc in service_registry.services.iteritems():
+        for svcname, svc in get_service_registry().services.iteritems():
             svc_def = ServiceDefinition(name=svcname, definition="")
             svc_list.append(svc_def)
         self._create_mult(svc_list)

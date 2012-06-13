@@ -7,7 +7,6 @@ import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
-from pyon.core.bootstrap import CFG
 from pyon.util.log import log
 
 import interface.objects
@@ -99,10 +98,7 @@ class IonObjectRegistry(object):
     Also includes optional persistence to a document database.
     """
 
-    try:
-        validate_setattr = CFG.validate.setattr
-    except AttributeError:
-        validate_setattr = False
+    validate_setattr = False
 
     def __init__(self):
         classes = inspect.getmembers(interface.objects, inspect.isclass)

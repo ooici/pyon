@@ -3,7 +3,7 @@
 """Integration test base class and utils"""
 
 from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon, service_registry
+from pyon.core.bootstrap import bootstrap_pyon, get_service_registry
 from pyon.core.exception import BadRequest
 from pyon.datastore.datastore import DatastoreManager
 from pyon.event.event import EventRepository
@@ -104,7 +104,7 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._start_service(svc, config=config)
 
             # Create a client
-            clcls = service_registry.services[svc].simple_client
+            clcls = get_service_registry().services[svc].simple_client
             self.clients[svc] = clcls(name=svc, node=self.container.node)
 
         log.debug("Service dependencies started")
@@ -113,10 +113,10 @@ class IonIntegrationTestCase(unittest.TestCase):
         if servicename and not servicecls:
             global scanned_services
             if not scanned_services:
-                service_registry.discover_service_classes()
+                get_service_registry().discover_service_classes()
                 scanned_services = True
-            assert servicename in service_registry.services, "Service %s unknown" % servicename
-            servicecls = service_registry.services[servicename].impl[0]
+            assert servicename in get_service_registry().services, "Service %s unknown" % servicename
+            servicecls = get_service_registry().services[servicename].impl[0]
 
         assert servicecls, "Cannot start service %s" % servicename
 
