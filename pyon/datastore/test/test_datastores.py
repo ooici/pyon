@@ -6,7 +6,6 @@ __license__ = 'Apache 2.0'
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
-from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.resource import RT, PRED, LCS
@@ -22,11 +21,6 @@ BASED_ON = "XBASED_ON"
 
 @attr('UNIT', group='datastore')
 class Test_DataStores(IonIntegrationTestCase):
-
-    def test_non_persistent(self):
-        self._do_test(MockDB_DataStore(datastore_name='ion_test_ds'))
-        
-        self._do_test_views(MockDB_DataStore(datastore_name='ion_test_ds'))
 
     def test_persistent(self):
         import socket

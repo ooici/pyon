@@ -2,23 +2,26 @@
 
 """Exchange management classes."""
 
-__author__ = 'Michael Meisinger'
+__author__ = 'Michael Meisinger, Dave Foster'
 __license__ = 'Apache 2.0'
 
-from pyon.net import messaging
-from pyon.util.log import log
+import time
+import socket
+
 from pyon.core import bootstrap
-from pyon.util.async import blocking_cb
+from pyon.core.bootstrap import CFG
+from pyon.net import messaging
 from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport
+from pyon.util.log import log
+from pyon.util.async import blocking_cb
+from pyon.ion.resource import RT
+
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
 from interface.objects import ExchangePoint as ResExchangePoint
 from interface.services.coi.iexchange_management_service import ExchangeManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
-from pyon.util.config import CFG
-from pyon.ion.resource import RT
-import time
-import socket
+
 
 ION_URN_PREFIX = "urn:ionx"
 
@@ -87,6 +90,8 @@ class ExchangeManager(object):
 
         # Establish connection(s) to broker
         for name, cfgkey in CFG.container.messaging.server.iteritems():
+            if not cfgkey:
+                continue
 
             if cfgkey not in CFG.server:
                 raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, name))

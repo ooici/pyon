@@ -7,7 +7,6 @@ import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
-from pyon.util.config import CFG
 from pyon.util.log import log
 
 import interface.objects
@@ -99,10 +98,7 @@ class IonObjectRegistry(object):
     Also includes optional persistence to a document database.
     """
 
-    try:
-        validate_setattr = CFG.validate.setattr
-    except AttributeError:
-        validate_setattr = False
+    validate_setattr = False
 
     def __init__(self):
         classes = inspect.getmembers(interface.objects, inspect.isclass)
@@ -112,7 +108,8 @@ class IonObjectRegistry(object):
         for name, clzz in classes:
             message_classes[name] = clzz
 
-
+        from pyon.core.bootstrap import CFG
+        self.validate_setattr = CFG.get_safe('validate.setattr', False)
 
     def new(self, _def, _dict=None, **kwargs):
         """ See get_def() for definition lookup options. """

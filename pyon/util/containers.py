@@ -8,6 +8,7 @@ import datetime
 import string
 import time
 import simplejson
+import os
 
 
 class DotNotationGetItem(object):
@@ -354,3 +355,9 @@ def ion_object_encoder(obj):
 def make_json(data):
     result = simplejson.dumps(data, default=ion_object_encoder, indent=2)
     return result
+
+def get_default_sysname():
+    return 'ion_%s' % os.uname()[1].replace('.', '_')
+
+def get_default_container_id():
+    return string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
