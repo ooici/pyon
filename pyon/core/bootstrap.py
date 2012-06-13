@@ -118,11 +118,12 @@ def get_sys_name():
     if is_testing():
         testing_override = CFG.get_safe("system.testing_sysname", None)
         if testing_override:
-            set_sys_name(testing_override)
-            return testing_override
+            testing_sys_name = testing_override
+        set_sys_name(testing_sys_name)
         return testing_sys_name
-
-    return default_sys_name
+    else:
+        set_sys_name(default_sys_name)
+        return default_sys_name
 
 def get_obj_registry():
     return _obj_registry

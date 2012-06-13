@@ -245,9 +245,6 @@ class TestEvents(IonIntegrationTestCase):
 @attr('UNIT',group='datastore')
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
-        if bootstrap.CFG.system.mockdb:
-            raise SkipTest("only works with CouchDB views")
-
         dsm = DatastoreManager()
 
         event_repo = EventRepository(dsm)

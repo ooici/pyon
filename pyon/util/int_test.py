@@ -14,7 +14,6 @@ from pyon.util.log import log
 from mock import patch
 from pyon.public import CFG
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from contextlib import contextmanager
 import unittest
 import os
@@ -155,13 +154,7 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _force_clean(self, recreate=False):
         from pyon.core.bootstrap import get_sys_name
-        from pyon.datastore.datastore import DatastoreManager
-        if DatastoreManager.persistent is None:
-            DatastoreManager.persistent = not CFG.system.mockdb
-        if not DatastoreManager.persistent:
-            datastore = MockDB_DataStore()
-        else:
-            datastore = CouchDB_DataStore()
+        datastore = CouchDB_DataStore()
         dbs = datastore.list_datastores()
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
         try:
