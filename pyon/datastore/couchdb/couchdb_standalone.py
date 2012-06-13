@@ -7,7 +7,7 @@ from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 from uuid import uuid4
 
 
-class CouchdbStandalone:
+class CouchdbStandalone(object):
 
     def __init__(self, database_name=None, host='', port='', username='', password='', config=None):
         self.host = host or config['server']['couchdb']['host']
@@ -18,7 +18,7 @@ class CouchdbStandalone:
         self.database_url = "http://" + self.authentication + self.host + ":" + self.port
         self.server = None
         self.database = None
-        self.database_name = database_name
+        self.database_name = database_name.lower()
 
         self._connect()
 
