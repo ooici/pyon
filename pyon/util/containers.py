@@ -8,7 +8,8 @@ import datetime
 import string
 import time
 import simplejson
-
+import base64
+import uuid
 
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
@@ -354,3 +355,16 @@ def ion_object_encoder(obj):
 def make_json(data):
     result = simplejson.dumps(data, default=ion_object_encoder, indent=2)
     return result
+
+
+#Global utility functions for generating unique names and UUIDs
+# get a UUID - URL safe, Base64
+def get_a_Uuid():
+    r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes)
+    return r_uuid.replace('=', '')
+
+# generate a unique identifier based on a UUID and optional information
+def create_unique_identifier(prefix=''):
+    return prefix + '_' + get_a_Uuid()
+
+
