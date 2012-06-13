@@ -27,11 +27,11 @@ class DirectoryStandalone(object):
             raise Exception("Illegal arguments")
         if not type(parent) is str or not parent.startswith("/"):
             raise Exception("Illegal arguments: parent")
-        dir_name = self._get_directory_name(parent, key)
+        object_id = self._get_directory_name(parent, key)
 
         # Check for entry
-        entry = self.datastore.read(dir_name)
-        doc = self._create_dir_entry(dir_name=dir_name, parent=self._get_directory_name(parent), key=key,
+        entry = self.datastore.read(object_id)
+        doc = self._create_dir_entry(object_id=object_id, parent=self._get_directory_name(parent), key=key,
             attributes=kwargs)
         if entry:
             entry = self._update_dir_entry(doc=entry, parent=self._get_directory_name(parent), key=key,
@@ -48,15 +48,13 @@ class DirectoryStandalone(object):
         if type(entries) not in (list, tuple):
             raise BadRequest("Bad entries type")
         de_list = []
-        deid_list = []
         cur_time = get_ion_ts()
         for parent, key, attrs in entries:
             parent_dn = self._get_directory_name(parent)
-            de = self._create_dir_entry(parent=parent_dn, key=key, attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
-            de_list.append(de)
             dn = self._get_directory_name(parent, key)
-            deid_list.append(dn)
-        self.datastore.create_mult(de_list, deid_list)
+            de = self._create_dir_entry(object_id=dn, parent=parent_dn, key=key, attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
+            de_list.append(de)
+        self.datastore.create_doc_mult(de_list, allow_ids=True)
 
     def _update_dir_entry(self, doc, parent, key, attributes=None, ts_updated=''):
         doc['attributes'] = attributes or {}
@@ -65,9 +63,9 @@ class DirectoryStandalone(object):
         doc['ts_updated'] = ts_updated or get_ion_ts()
         return doc
 
-    def _create_dir_entry(self, dir_name,  parent, key, attributes=None, ts_created='', ts_updated=''):
+    def _create_dir_entry(self, object_id,  parent, key, attributes=None, ts_created='', ts_updated=''):
         doc = {}
-        doc['_id'] = dir_name
+        doc['_id'] = object_id
         doc['type_'] = 'DirEntry'
         doc['attributes'] = attributes or {}
         doc['key'] = key

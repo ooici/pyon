@@ -123,7 +123,7 @@ def main(opts, *args, **kwargs):
         # If auto_bootstrap, load config and interfaces into directory
         # Note: this is idempotent and will not alter anything if this is not the first container to run
         if bootstrap_config.system.auto_bootstrap:
-            config.auto_bootstrap(bootstrap_config, system_cfg=pyon_config)
+            config.auto_bootstrap_config(bootstrap_config, system_cfg=pyon_config)
 
         # Load logging override config if provided. Supports variants literal and path.
         logging_config_override = None
@@ -170,8 +170,10 @@ def main(opts, *args, **kwargs):
             logging_config_override=logging_config_override,
             pyon_cfg=pyon_config)
 
-        from pyon.core.bootstrap import CFG
-        print "CFG", CFG
+        # Auto-bootstrap interfaces
+        # @WARN: This currently imports ALL modules, executing ALL static initializers as side effect!!!!!!!
+        if bootstrap_config.system.auto_bootstrap:
+            config.auto_bootstrap_interfaces(bootstrap_config)
 
         # Create the container instance
         from pyon.container.cc import Container
