@@ -3,22 +3,52 @@
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.exception import ContainerConfigError, ContainerStartupError
-from pyon.core.registry import IonObjectRegistry
-from pyon.service.service import IonServiceRegistry
-from pyon.util.config import CFG
-from pyon.util.containers import is_basic_identifier, get_safe
 import uuid
-
 import os
 
-# THE CODE BELOW EXECUTES ON IMPORT OF THIS MODULE
-# IT BOOTSTRAPS THE PYON ENVIRONMENT
+import pyon
+# NOTE: no other imports inside pyon
 
-# ENVIRONMENT. Check we are started in a proper way.
+# @WARN: GLOBAL STATE
+
+# -----------------------------------------------------------------------------
+# Global pyon variables
+
+# Is pyon already initialized?
+pyon_initialized = False
+
+# The global pyon configuration object (DotDict)
+CFG = None
+
+# Is pyon running in non-container testing mode? (Note: pycc will set this to False)
+testing = True
+
+# Identifies the unique name and namespace of this ION distributed system instance
+sys_name = None
+
+# Handle to the object interface registry
+obj_registry = None
+
+# Handle to the service interface registry
+service_registry = None
+
+# Factory metaclass to create ION objects
+IonObject = None
+
+# Keep the current container instance
+container_instance = None
+
+
+# -----------------------------------------------------------------------------
+# Initialization helper functions
+# NOTE: no static initializers here!!
+
 def assert_environment():
-    """This asserts the mandatory (minimal) execution environment for pyon"""
+    """
+    This asserts the mandatory (minimal) execution environment for pyon
+    """
     import os.path
+    from pyon.core.exception import ContainerStartupError
     if not os.path.exists("res"):
         raise ContainerStartupError("pyon environment assertion failed: res/ directory not found")
     if not os.path.exists("res/config"):
@@ -32,24 +62,41 @@ def assert_environment():
     if not os.path.exists("obj/data"):
         raise ContainerStartupError("pyon environment assertion failed: obj/data directory not found")
 
+def load_logging_config(logging_config_override=None):
+    """
+    Initialize pyon logging system
+    """
+    from pyon.core import log
+    log.configure_logging(pyon.DEFAULT_LOGGING_PATHS, logging_config_override=logging_config_override)
+
+def set_config(pyon_cfg=None):
+    """
+    Initialize pyon global configuration
+    """
+    global CFG
+    from pyon.core import config
+
+    if pyon_cfg:
+        # Variant 1: if provided, set pyon_cfg as pyon global CFG
+        CFG = pyon_cfg
+    else:
+        # Variant 2: default, load standard configuration sequence
+        CFG = config.read_standard_configuration()
+
+    assert_configuration(CFG)
+
 def assert_configuration(config):
     """
-    Checks that configuration is OK
+    Checks that configuration is OK.
+    This is separate so that it can be called after config changes (from directory, command line etc)
     """
+    from pyon.core.exception import ContainerConfigError
+    from pyon.util.containers import is_basic_identifier
     if not is_basic_identifier(config.get_safe("system.root_org", "")):
         raise ContainerConfigError("Config entry 'system.root_org' has illegal value")
 
-assert_environment()
-assert_configuration(CFG)
-
-pyon_initialized = False
-
-# This sets the sys_name.
-# DANGER: Don't import sys_name from here, use get_sys_name() instead.
-# NOTE: This sys_name may be changed by the container later if command line args override
-sys_name = None
-default_sys_name = 'ion_%s' % os.uname()[1].replace('.', '_')
-testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
+def is_testing():
+    return testing
 
 def set_sys_name(sysname=None):
     global sys_name
@@ -59,55 +106,68 @@ def get_sys_name():
     if sys_name:
         return sys_name
 
-    if CFG.get_safe("system.testing", False):
-        testing_sysname = CFG.get_safe("system.testing_sysname", None)
-        if testing_sysname:
-            set_sys_name(testing_sysname)
-            return testing_sysname
+    from pyon.util.containers import get_default_sysname
+    default_sys_name = get_default_sysname()
+    testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
+
+    if is_testing():
+        testing_override = CFG.get_safe("system.testing_sysname", None)
+        if testing_override:
+            set_sys_name(testing_override)
+            return testing_override
         return testing_sys_name
 
     return default_sys_name
 
-# OBJECTS. Object and message definitions.
-# Make a default factory for IonObjects
-obj_registry = IonObjectRegistry()
-IonObject = obj_registry.new
+# -----------------------------------------------------------------------------
 
-# SERVICES. Service definitions
-service_registry = IonServiceRegistry()
-
-# Container instance here to avoid importing Container and cyclic reference
-container_instance = None
-
-def bootstrap_pyon():
+def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     """
-    This function initializes the Pyon framework in a controlled way.
-    Note: It does not initialize the ION container or the ION system.
+    This function initializes the core elements of the Pyon framework in a controlled way.
+    It does not initialize the ION container or the ION system.
     """
-    
-    #Make sure Pyon is only initialized once
+    print "pyon: pyon.bootstrap executing..."
+
+    # Make sure Pyon is only initialized only once
     global pyon_initialized
     if pyon_initialized:
+        print "pyon: WARNING -- bootstrap_pyon() called again!"
         return
 
-    #TODO: Call initialize_logging here
+    # ENVIRONMENT. Check we are called like expected
+    assert_environment()
+
+    # LOGGING. Initialize logging from config
+    load_logging_config(logging_config_override=logging_config_override)
 
     # YAML patch: OrderedDicts instead of dicts
     from pyon.util.yaml_ordered_dict import apply_yaml_patch
-    # OK the following does not work (early enough??)!!!!
-    #apply_yaml_patch()
+    apply_yaml_patch()
 
-    # Resource definitions
-    from pyon.ion import resource
-    resource.load_definitions()
+    # CONFIG. Initialize pyon global configuration from local files
+    set_config(pyon_cfg)
 
-    # Load interceptors
-    from pyon.net.endpoint import instantiate_interceptors
-    instantiate_interceptors(CFG.interceptor)
+    from pyon.core.registry import IonObjectRegistry
+    from pyon.service.service import IonServiceRegistry
 
-    # Services
+    # OBJECTS. Object and message definitions.
+    global obj_registry, IonObject, service_registry
+    obj_registry = IonObjectRegistry()
+    IonObject = obj_registry.new
+
+    # SERVICES. Service definitions
+    service_registry = IonServiceRegistry()
     service_registry.load_service_mods('interface/services')
     service_registry.build_service_map()
 
+    # INTERCEPTORS.
+    from pyon.net.endpoint import instantiate_interceptors
+    instantiate_interceptors(CFG.interceptor)
+
+    # RESOURCES. Load and initialize definitions
+    from pyon.ion import resource
+    resource.load_definitions()
+
     # Set initialized flag
     pyon_initialized = True
+

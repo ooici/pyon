@@ -146,9 +146,11 @@ class InstTimeoutError(IonInstrumentError):
     """
     status_code = 690
 
+# @WARN: GLOBAL STATE
 exception_map = {}
 import inspect
 import sys
+# @WARN: STATIC CODE
 for name, obj in inspect.getmembers(sys.modules[__name__]):
     if inspect.isclass(obj):
         if hasattr(obj, "status_code"):

@@ -7,7 +7,7 @@ import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
-from pyon.util.config import CFG
+from pyon.core.bootstrap import CFG
 from pyon.util.log import log
 
 import interface.objects

@@ -8,9 +8,6 @@ import yaml
 from pyon.util.containers import DotDict, dict_merge
 from pyon.core.exception import ConfigNotFound
 
-import logging.config
-import os
-
 class Config(object):
     """
     YAML-based config loader that supports multiple paths.
@@ -52,39 +49,4 @@ class Config(object):
     def reload(self):
         self.paths_loaded.clear()
         self.load()
-
-# LOGGING. Read the logging config files
-logging_conf_paths = ['res/config/logging.yml', 'res/config/logging.local.yml']
-
-LOGGING_CFG = None
-
-def read_logging_config():
-    global LOGGING_CFG
-    LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
-
-def initialize_logging():
-    # Ensure the logging directories exist
-    for handler in LOGGING_CFG.get('handlers', {}).itervalues():
-        if 'filename' in handler:
-            log_dir = os.path.dirname(handler['filename'])
-            if not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-
-    # if there's no logging config, we can't configure it: the call requires version at a minimum
-    if LOGGING_CFG:
-        logging.config.dictConfig(LOGGING_CFG)
-
-read_logging_config()
-initialize_logging()
-
-# CONFIG. Read global configuration
-conf_paths = ['res/config/pyon.yml']
-CFG = Config(conf_paths, ignore_not_found=True).data
-
-config_from_directory = CFG.get_safe("system.config_from_directory", False)
-if not config_from_directory:
-    local_conf_paths = ['res/config/pyon.local.yml']
-    # Look for and apply any local file config overrides
-    local_cfg = Config(local_conf_paths, ignore_not_found=True).data
-    dict_merge(CFG, local_cfg, inplace=True)
 
