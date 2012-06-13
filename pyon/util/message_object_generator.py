@@ -3,26 +3,30 @@ import ast
 import os
 import re
 from pyon.core.path import list_files_recursive
+from pyon.datastore.datastore_standalone import DirectorySa
 
 enums_by_name = {}
 
 
 class MessageObjectGenerator:
 
-    def generate(self, opts):
-        service_yaml_files = list_files_recursive('obj/services', '*.yml')
+    def __init__(self, system_name=None, read_from_yaml_file=False):
+        self.system_name = system_name
+        self.read_from_yaml_file = read_from_yaml_file
 
-        messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
+    def generate(self, opts):
+        service_yaml_data = self.get_yaml_data()
+        messageobject_output_text = "# Message Objects. Don't edit, it is auto generated file.\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
+        if not service_yaml_data:
+            print "message_model_generator: Error!!! the datastore (or the YAML file) is empty."
+            exit()
 
         # Now process the service definition yaml files to
         # generate message classes for input and return messages.
         # Do this on a per file basis to simplify figuring out
         # when we've reached the end of a service's ops.
-        args = []
-        init_lines = []
-        for yaml_file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path)):
+        for yaml_text in service_yaml_data:
             index = 0
-            yaml_text = yaml_file.read()
             lines = yaml_text.split('\n')
 
             # Find service name
@@ -36,7 +40,6 @@ class MessageObjectGenerator:
 
             current_service_name = lines[index].split(':')[1].strip()
             index += 1
-
             # Find op definitions
             while index < len(lines):
                 if lines[index].startswith('methods:'):
@@ -68,7 +71,6 @@ class MessageObjectGenerator:
                 args = []
                 init_lines = []
                 current_op_name = lines[index].strip(' :')
-                ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
                 messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
@@ -314,3 +316,33 @@ class MessageObjectGenerator:
         print "Writing message model to '" + messagemodelfile + "'"
         with open(messagemodelfile, 'w') as f:
             f.write(messageobject_output_text)
+
+    def get_yaml_data(self):
+        data = []
+        if self.read_from_yaml_file:
+            print "Message object generator: reading definitions from files"
+            service_yaml_files = list_files_recursive('obj/services', '*.yml')
+            for path in service_yaml_files:
+                if os.path.exists(path):
+                    file = open(path, 'r')
+                    data.append(file.read())
+                    file.close()
+        else:
+            print "Message object generator: reading definitions from datastore"
+            data = self.get_service_definition_from_datastore()
+            if not data:
+                data = []
+        return data
+
+    def get_service_definition_from_datastore(self):
+        data = []
+        dir = DirectorySa(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        if not entry:
+            return data
+        for item in entry:
+            try:
+                data.append(item.value['attributes']['definition'] + '\n')
+            except:
+                return ''
+        return data

@@ -41,8 +41,11 @@ def main():
 
     model_object = ObjectModelGenerator(system_name=opts.system_name,
                     read_from_yaml_file=opts.read_from_yaml_file)
-    message_object = MessageObjectGenerator()
-    service_object = ServiceObjectGenerator()
+    message_object = MessageObjectGenerator(system_name=opts.system_name,
+                     read_from_yaml_file=opts.read_from_yaml_file)
+    service_object = ServiceObjectGenerator(system_name=opts.system_name,
+        read_from_yaml_file=opts.read_from_yaml_file)
+
     if os.getcwd().endswith('scripts'):
         sys.exit('This script needs to be run from the pyon root.')
     # Create dir
@@ -60,7 +63,8 @@ def main():
     # Generate objects
     model_object.generate(opts)
     message_object.generate(opts)
-    service_object.generate(opts)
+    exitcode = service_object.generate(opts)
+    sys.exit(exitcode)
 
 if __name__ == '__main__':
     main()

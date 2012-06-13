@@ -20,6 +20,7 @@ import traceback
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
+from pyon.datastore.datastore_standalone import DirectorySa
 from pyon.util import yaml_ordered_dict
 
 templates = {
@@ -221,6 +222,13 @@ class ServiceObjectGenerator:
     object_references = {}
     enums_by_name = {}
     currtime = str(datetime.datetime.today())
+
+    def __init__(self, system_name=None, read_from_yaml_file=False):
+        self.system_name = system_name
+        self.read_from_yaml_file = read_from_yaml_file
+        self.service_definitions_filename = OrderedDict()
+        self.dir = DirectorySa(sysname=self.system_name)
+
 
     def build_class_doc_string(self, base_doc_str, _def_spec):
         '''
@@ -643,17 +651,114 @@ class ServiceObjectGenerator:
             with open(doc_file, 'w') as f1:
                 f1.write(doc_page_contents)
 
+    def get_service_definition_file_path(self, service_dir=None):
+        yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
+        service_definitions_filename = OrderedDict()
+        if self.read_from_yaml_file:
+            for root, dirs, files in os.walk(service_dir):
+                for filename in fnmatch.filter(files, '*yml'):
+                    yaml_file = os.path.join(root, filename)
+                    file_match = yaml_file_re.match(yaml_file)
+                    if '.svc_signatures' in filename:
+                        continue
+                    if file_match is None:
+                        continue
+                    service_definitions_filename[yaml_file] = yaml_file
+            return service_definitions_filename
+        else:
+            for key in self.service_definitions_filename.keys():
+                filename = self.service_definitions_filename[key]
+                file_match = yaml_file_re.match(filename)
+                if '.svc_signatures' in filename:
+                    continue
+                if file_match is None:
+                    continue
+                service_definitions_filename[filename] = filename
+            return service_definitions_filename
+
+    def get_object_definition_from_datastore(self):
+        data = ''
+        dir = DirectorySa(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ObjectTypes')
+        for item in entry:
+            try:
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
+        return data
+
+    def get_service_definition_from_datastore(self):
+        data = ''
+        dir = DirectorySa(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        if not entry:
+            return data
+        for item in entry:
+            try:
+                self.service_definitions_filename[item.value['key']] = item.value['file_path']
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
+        return data
+
+    def get_yaml_text(self, path):
+        '''
+        Get the content of a file or datastore using a path to the data
+        '''
+        if self.read_from_yaml_file:
+            with open(path, 'r') as f:
+                return f.read()
+        else:
+            data = self.dir.lookup_by_path(path)
+            # Return the first item
+            for item in data:
+                return (item.value['attributes']['definition'])
+            return ''
+
+
+    def get_object_definition(self):
+        if self.read_from_yaml_file:
+            data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
+            data = '\n\n'.join((file.read() for file in(open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
+        else:
+            data = self.get_object_definition_from_datastore()
+        return data
+
+    def get_service_definition(self):
+        if self.read_from_yaml_file:
+            print "Service object generator: reading definitions from files"
+            service_yaml_files = list_files_recursive('obj/services', '*.yml')
+            data = '\n\n'.join((file.read() for file in(open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
+        else:
+            print "Service object generator: reading definitions from datastore"
+            data = self.get_service_definition_from_datastore()
+        return data
+
     def generate(self, opts):
         '''
         Generates services
         '''
         service_dir, interface_dir = 'obj/services', 'interface'
-        data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
-        data_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
-        service_yaml_files = list_files_recursive('obj/services', '*.yml')
-        service_yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
-
+        data_yaml_text = self.get_object_definition()
+        service_yaml_text = self.get_service_definition()
         enum_tag = u'!enum'
+
+        #TODO: for testing
+        '''
+        f = open ('service_from_file',  'w')
+        f.write(data_yaml_text + service_yaml_text)
+        f.close()
+
+        self.read_from_yaml_file = False
+        data_yaml_text = self.get_object_definition()
+        service_yaml_text = self.get_service_definition()
+
+        f = open ('service_from_datastore',  'w')
+        f.write(data_yaml_text + service_yaml_text)
+        f.close()
+
+        exit()
+        '''
 
         def enum_constructor(loader, node):
             val_str = str(node.value)
@@ -665,8 +770,8 @@ class ServiceObjectGenerator:
                 return "Enum Name Not Provided"
 
         yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
-        yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
-        yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
+        #yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+        #yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
 
         # Now walk the data model definition yaml files adding the
         # necessary yaml constructors.
@@ -725,8 +830,7 @@ class ServiceObjectGenerator:
                     return value
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
 
-        yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
-        yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
+        yaml_text = data_yaml_text
 
         # Load data yaml files in case services define interfaces
         # in terms of common data objects
@@ -757,22 +861,13 @@ class ServiceObjectGenerator:
         client_defs = {}
 
         yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
-
         # Generate the new definitions, for now giving each
         # yaml file its own python service
-        for root, dirs, files in os.walk(service_dir):
-            for filename in fnmatch.filter(files, '*.yml'):
-                yaml_file = os.path.join(root, filename)
-                file_match = yaml_file_re.match(yaml_file)
-                if '.svc_signatures' in filename:
-                    continue
-                if file_match is None:
-                    continue
-
-                file_path = file_match.group(2)
+        # service_definition_file_path = self.get_service_definition_file_path(service_dir)
+        for yaml_file in self.get_service_definition_file_path(service_dir):
+                file_path = yaml_file_re.match(yaml_file).group(2)
                 interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
                 interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
-
                 parent_dir = os.path.dirname(interface_file)
                 if not os.path.exists(parent_dir):
                     os.makedirs(parent_dir)
@@ -794,8 +889,9 @@ class ServiceObjectGenerator:
                     open(pkg_file, 'w').close()
 
                 skip_file = False
-                with open(yaml_file, 'r') as f:
-                    yaml_text = f.read()
+                yaml_text = self.get_yaml_text(yaml_file)
+                if (yaml_text):
+                    #yaml_text = f.read()
                     m = hashlib.md5()
                     m.update(yaml_text)
                     cur_md5 = m.hexdigest()
@@ -950,4 +1046,5 @@ class ServiceObjectGenerator:
         if count > 0 and opts.dryrun:
             exitcode = 1
 
-        sys.exit(exitcode)
+        return exitcode
+        #sys.exit(exitcode)
