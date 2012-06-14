@@ -7,7 +7,7 @@ from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from examples.service.hello_service import HelloService
 from interface.services.examples.hello.ihello_service import HelloServiceClient
-from pyon.net.endpoint import RPCServer
+from pyon.net.endpoint import RPCServer, Subscriber, Publisher
 from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
@@ -17,7 +17,9 @@ from pyon.core.bootstrap import get_sys_name
 from pyon.net.channel import RecvChannel
 from pyon.util.config import CFG
 from pyon.util.containers import DotDict
+from gevent.queue import Queue
 import os
+import time
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -485,6 +487,97 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
+
+    def test_consume_one_message_at_a_time(self):
+        # see also pyon.net.test.test_channel:TestChannelInt.test_consume_one_message_at_a_time
+
+        pub3 = Publisher(to_name=(self.container.ex_manager.default_xs.exchange, 'routed.3'))
+        pub5 = Publisher(to_name=(self.container.ex_manager.default_xs.exchange, 'routed.5'))
+
+        #
+        # SETUP COMPLETE, BEGIN TESTING OF EXCHANGE OBJECTS
+        #
+
+        xq = self.container.ex_manager.create_xn_queue('random_queue')
+        self.addCleanup(xq.delete)
+
+        # recv'd messages from the subscriber
+        self.recv_queue = Queue()
+
+        sub = Subscriber(from_name=xq, callback=lambda m,h: self.recv_queue.put((m, h)))
+        sub.prepare_listener()
+
+        # publish 10 messages - we're not bound yet, so they'll just dissapear
+        for x in xrange(10):
+            pub3.publish("3,%s" % str(x))
+
+        # no messages yet
+        self.assertFalse(sub.get_one_msg(timeout=0))
+
+        # now, we'll bind the xq
+        xq.bind('routed.3')
+
+        # even tho we are consuming, there are no messages - the previously published ones all dissapeared
+        self.assertFalse(sub.get_one_msg(timeout=0))
+
+        # publish those messages again
+        for x in xrange(10):
+            pub3.publish("3,%s" % str(x))
+
+        # NOW we have messages!
+        for x in xrange(10):
+            self.assertTrue(sub.get_one_msg(timeout=0))
+            m,h = self.recv_queue.get(timeout=0)
+            self.assertEquals(m, "3,%s" % str(x))
+
+        # we've cleared it all
+        self.assertFalse(sub.get_one_msg(timeout=0))
+
+        # bind a wildcard and publish on both
+        xq.bind('routed.*')
+
+        for x in xrange(10):
+            pub3.publish("3,%s" % str(x))
+            pub5.publish("5,%s" % str(x))
+
+        # should get all 20, interleaved
+        for x in xrange(10):
+            self.assertTrue(sub.get_one_msg(timeout=0))
+            m, h = self.recv_queue.get(timeout=0)
+            self.assertEquals(m, "3,%s" % str(x))
+
+            self.assertTrue(sub.get_one_msg(timeout=0))
+            m, h = self.recv_queue.get(timeout=0)
+            self.assertEquals(m, "5,%s" % str(x))
+
+        # add 5 binding, remove all other bindings
+        xq.bind('routed.5')
+        xq.unbind('routed.3')
+        xq.unbind('routed.*')
+
+        # try publishing to 3, shouldn't arrive anymore
+        pub3.publish("3")
+
+        self.assertFalse(sub.get_one_msg(timeout=0))
+
+        # let's turn off the consumer and let things build up a bit
+        sub._chan.stop_consume()
+
+        for x in xrange(10):
+            pub5.publish("5,%s" % str(x))
+
+        # 10 messages in the queue, no consumers
+        self.assertTupleEqual((10, 0), sub._chan.get_stats())
+
+        # drain queue
+        sub._chan.start_consume()
+        time.sleep(1)       # yield to allow delivery
+
+        for x in xrange(10):
+            self.assertTrue(sub.get_one_msg(timeout=0))
+            self.recv_queue.get(timeout=0)
+
+        sub.close()
 
 @attr('INT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})

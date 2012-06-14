@@ -389,6 +389,14 @@ class ExchangeManager(object):
         log.info("ExchangeManager.unbind")
         self._ensure_default_declared()
         self._transport.unbind_impl(self._client, exchange, queue, binding)
+    def get_stats(self, queue):
+        log.info("ExchangeManager.get_stats")
+        self._ensure_default_declared()
+        return self._transport.get_stats(self._client, queue)
+    def purge(self, queue):
+        log.info("ExchangeManager.purge")
+        self._ensure_default_declared()
+        self._transport.purge(self._client, queue)
 
 
 class XOTransport(BaseTransport):
@@ -416,6 +424,12 @@ class XOTransport(BaseTransport):
     def setup_listener(self, binding, default_cb):
         log.debug("XOTransport passing on setup_listener")
         pass
+
+    def get_stats(self, client, queue):
+        return self._exchange_manager.get_stats(queue)
+
+    def purge(self, client, queue):
+        return self._exchange_manager.purge(queue)
 
 class ExchangeSpace(XOTransport, NameTrio):
 
