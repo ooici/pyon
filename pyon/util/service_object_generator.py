@@ -20,7 +20,7 @@ import traceback
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.service.service import BaseService
-from pyon.util import yaml_ordered_dict
+from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
 
 
 

@@ -10,7 +10,7 @@ import couchdb
 from couchdb.client import ViewResults, Row
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
-from pyon.core.bootstrap import obj_registry
+from pyon.core.bootstrap import get_obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
@@ -74,7 +74,7 @@ class CouchDB_DataStore(DataStore):
         # serializers
         self._io_serializer     = IonObjectSerializer()
         # TODO: Not nice to have this class depend on ION objects
-        self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
+        self._io_deserializer   = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
     def close(self):

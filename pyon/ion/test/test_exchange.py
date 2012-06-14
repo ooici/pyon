@@ -15,7 +15,7 @@ from mock import Mock, sentinel, patch, call
 from pyon.net.transport import BaseTransport, TransportError, AMQPTransport
 from pyon.core.bootstrap import get_sys_name
 from pyon.net.channel import RecvChannel
-from pyon.util.config import CFG
+from pyon.core.bootstrap import CFG
 from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os

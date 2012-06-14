@@ -10,6 +10,7 @@ import time
 import simplejson
 import base64
 import uuid
+import os
 
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
@@ -367,4 +368,8 @@ def get_a_Uuid():
 def create_unique_identifier(prefix=''):
     return prefix + '_' + get_a_Uuid()
 
+def get_default_sysname():
+    return 'ion_%s' % os.uname()[1].replace('.', '_')
 
+def get_default_container_id():
+    return string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
