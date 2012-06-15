@@ -537,7 +537,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         xq.bind('routed.*')
 
         for x in xrange(10):
+            time.sleep(0.3)
             pub3.publish("3,%s" % str(x))
+            time.sleep(0.3)
             pub5.publish("5,%s" % str(x))
 
         # should get all 20, interleaved
