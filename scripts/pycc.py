@@ -151,7 +151,6 @@ def main(opts, *args, **kwargs):
             stored_config = pyon_config.copy()
             config.apply_configuration(stored_config, config_override)
             config.apply_configuration(stored_config, command_line_config)
-            print "***** stored", stored_config
             config.auto_bootstrap_config(bootstrap_config, system_cfg=stored_config)
 
         # Determine the final pyon_config
