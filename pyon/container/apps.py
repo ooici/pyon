@@ -31,7 +31,7 @@ class AppManager(object):
             self.stop_app(appdef)
         log.debug("AppManager stopped, OK.")
 
-    def start_rel_from_url(self, rel_url=""):
+    def start_rel_from_url(self, rel_url="", config=None):
         """
         @brief Read the rel file and call start_rel
         """
@@ -39,7 +39,7 @@ class AppManager(object):
 
         try:
             rel = Config([rel_url]).data
-            self.start_rel(rel)
+            self.start_rel(rel,config)
             log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK." % str(rel_url))
             return True
         except ConfigNotFound as cnf:
@@ -50,7 +50,7 @@ class AppManager(object):
 
         return False
 
-    def start_rel(self, rel=None):
+    def start_rel(self, rel=None, config=None):
         """
         @brief Recurse over the rel and start apps defined there.
         Note: apps in a rel file can come in one of 2 forms:
@@ -71,9 +71,7 @@ class AppManager(object):
 
                 if 'config' in rel_app_cfg:
                     # Nest dict modifier and apply config from rel file
-                    config = DictModifier(CFG, rel_app_cfg.config)
-                else:
-                    config = DictModifier(CFG)
+                    config = DictModifier(config, rel_app_cfg.config)
 
                 self.container.spawn_process(name, module, cls, config)
                 self.apps.append(DotDict(type="application", name=name, processapp=rel_app_cfg.processapp))
