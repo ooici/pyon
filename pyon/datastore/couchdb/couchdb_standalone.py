@@ -13,7 +13,7 @@ class CouchdbStandalone(object):
         self.host = host or config['server']['couchdb']['host']
         self.port = str(port or config['server']['couchdb']['port'])
         username = username or config['server']['couchdb']['username'] if config else ''
-        password = username or config['server']['couchdb']['password'] if config else ''
+        password = password or config['server']['couchdb']['password'] if config else ''
         self.authentication = username + ":" + password + "@" if username and password else ""
         self.database_url = "http://" + self.authentication + self.host + ":" + self.port
         self.server = None
