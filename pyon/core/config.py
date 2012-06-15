@@ -19,6 +19,8 @@ def read_local_configuration(conf_paths):
     return pyon_cfg
 
 def apply_configuration(system_cfg, config_override):
+    if not config_override:
+        return
     from pyon.util.containers import dict_merge
     dict_merge(system_cfg, config_override, inplace=True)
 
