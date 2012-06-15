@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from pyon.util.containers import DictModifier, DotDict
+from pyon.util.containers import DictModifier, DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
@@ -72,6 +72,35 @@ class Test_Containers(IonIntegrationTestCase):
 
         with self.assertRaises(AttributeError):
             base.another.chained.pop = 'again should not work'
+
+    def test_is_basic_identifier(self):
+
+        self.assertFalse(is_basic_identifier('abc 123'))
+        self.assertTrue(is_basic_identifier('abc_123'))
+
+    def test_is_valid_identifier(self):
+        self.assertTrue(is_valid_identifier('jhwfjff.ef. hfieo()-ffeh', NORMAL_VALID))
+        self.assertFalse(is_valid_identifier('jhwfjff.ef. hfieo()-ffeh', NORMAL_VALID, ';'))
+
+    def test_make_json(self):
+        j = make_json([{'abc':123, '456': 789.0}, 456.0403, 'now is the time'])
+        self.assertEqual(''.join(j.split()),''.join('''
+        [
+                {
+                "abc": 123,
+                "456": 789.0
+            },
+            456.0403,
+            "now is the time"
+        ]'''.split()))
+
+
+    def test_create_unique_identifier(self):
+        id = create_unique_identifier('abc123')
+        self.assertIn('abc123', id)
+        id = create_unique_identifier()
+        self.assertNotIn('abc123', id)
+
 
 if __name__ == "__main__":
     unittest.main()

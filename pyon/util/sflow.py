@@ -50,12 +50,12 @@ class SFlowManager(object):
         self._gl_counter        = None
         self._conf_last_mod     = None          # last modified time of the conf file
 
-        sflowcfg                = CFG.container.get('sflow', {})
-        self._counter_interval  = sflowcfg.get('counter_interval', 30)          # number of seconds between counter pulses, 0 means don't do it
-        self._hsflowd_addr      = sflowcfg.get("hsflowd_addr", "localhost")     # host where hsflowd is running
-        self._hsflowd_port      = sflowcfg.get("hsflowd_port", 36343)           # udp port on host where hsflowd is listening for json
-        self._hsflowd_conf      = sflowcfg.get("hsflowd_auto_file", "/etc/hsflowd.auto")    # hsflowd auto-conf file, where we poll for updates (only if addr is local)
-        self._trans_sample_rate = sflowcfg.get("trans_sample_rate", 1)          # transaction sample rate, 1 means do everything!
+        sflowcfg                = CFG.get_safe('container.sflow', {})
+        self._counter_interval  = CFG.get_safe('container.sflow.counter_interval', 30)          # number of seconds between counter pulses, 0 means don't do it
+        self._hsflowd_addr      = CFG.get_safe("container.sflow.hsflowd_addr", "localhost")     # host where hsflowd is running
+        self._hsflowd_port      = CFG.get_safe("container.sflow.hsflowd_port", 36343)           # udp port on host where hsflowd is listening for json
+        self._hsflowd_conf      = CFG.get_safe("container.sflow.hsflowd_auto_file", "/etc/hsflowd.auto")    # hsflowd auto-conf file, where we poll for updates (only if addr is local)
+        self._trans_sample_rate = CFG.get_safe("container.sflow.trans_sample_rate", 1)          # transaction sample rate, 1 means do everything!
 
     def start(self):
         log.debug("SFlowManager.start")

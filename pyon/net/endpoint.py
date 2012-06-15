@@ -21,6 +21,7 @@ import time
 
 import traceback
 import sys
+from Queue import Empty
 from pyon.util.sflow import SFlowManager
 
 class EndpointError(StandardError):
@@ -401,8 +402,35 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._chan.setup_listener(name, binding=binding)
 
     def listen(self, binding=None):
-        log.debug("LEF.listen: binding %s", binding)
+        """
+        Main driving method for ListeningBaseEndpoint.
 
+        Meant to be spawned in a greenlet. This method creates/sets up a channel to listen,
+        starts listening, and consumes messages in a loop until the Endpoint is closed.
+        """
+        log.debug("LEF.listen")
+
+        self.prepare_listener(binding=binding)
+
+        # notify any listeners of our readiness
+        self._ready_event.set()
+
+        while True:
+            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+            try:
+                self.get_one_msg()
+            except ChannelClosedError as ex:
+                log.debug('Channel was closed during LEF.listen')
+                break
+
+    def prepare_listener(self, binding=None):
+        """
+        Creates a channel, prepares it, and begins consuming on it.
+
+        Used by listen.
+        """
+
+        log.debug("LEF.prepare_listener: binding %s", binding)
         binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
@@ -419,31 +447,39 @@ class ListeningBaseEndpoint(BaseEndpoint):
             self._setup_listener(self._recv_name, binding=binding)
         self._chan.start_consume()
 
-        # notify any listeners of our readiness
-        self._ready_event.set()
+    def get_one_msg(self, timeout=None):
+        """
+        Retrieves a single message and passes it through an EndpointUnit's message received.
 
-        while True:
-            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
-            try:
-                with self._chan.accept() as newchan:
-                    msg, headers, delivery_tag = newchan.recv()
+        This method will block until a message arrives, or until an optional timeout is reached.
 
-                    log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
-                    log_message(self._recv_name, msg, headers, delivery_tag)
+        @raises ChannelClosedError  If the channel has been closed.
+        @returns                    A boolean indicating if a message was retrieved. Will only be
+                                    false if a timeout is specified.
+        """
+        assert self._chan, "get_one_msg needs a channel setup"
 
-                    try:
-                        e = self.create_endpoint(existing_channel=newchan)
-                        e._message_received(msg, headers)
-                    except Exception:
-                        log.exception("Unhandled error while handling received message")
-                        raise
-                    finally:
-                        # ALWAYS ACK
-                        newchan.ack(delivery_tag)
+        try:
+            with self._chan.accept(timeout=timeout) as newchan:
+                msg, headers, delivery_tag = newchan.recv()
 
-            except ChannelClosedError as ex:
-                log.debug('Channel was closed during LEF.listen')
-                break
+                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+                log_message(self._recv_name, msg, headers, delivery_tag)
+
+                try:
+                    e = self.create_endpoint(existing_channel=newchan)
+                    e._message_received(msg, headers)
+                except Exception:
+                    log.exception("Unhandled error while handling received message")
+                    raise
+                finally:
+                    # ALWAYS ACK
+                    newchan.ack(delivery_tag)
+        except Empty:
+            # only occurs when timeout specified, capture the Empty we get from accept and return False
+            return False
+
+        return True
 
     def close(self):
         BaseEndpoint.close(self)

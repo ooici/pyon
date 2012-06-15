@@ -331,7 +331,7 @@ class TestListeningBaseEndpoint(PyonTestCase):
         chmock.setup_listener.assert_called_once_with(recv_name, binding=sentinel.queue)
         chmock.start_consume.assert_called_once_with()
 
-        chmock.accept.assert_called_once_with()
+        chmock.accept.assert_called_once_with(timeout=None)
         chmock.accept.return_value.__enter__.return_value.recv.assert_called_once_with()
         ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value.__enter__.return_value)
         self.assertEquals(mocklog.exception.call_count, 1)

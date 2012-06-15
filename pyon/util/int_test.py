@@ -3,7 +3,7 @@
 """Integration test base class and utils"""
 
 from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon, service_registry
+from pyon.core.bootstrap import bootstrap_pyon, get_service_registry
 from pyon.core.exception import BadRequest
 from pyon.datastore.datastore import DatastoreManager
 from pyon.event.event import EventRepository
@@ -14,7 +14,6 @@ from pyon.util.log import log
 from mock import patch
 from pyon.public import CFG
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
 from contextlib import contextmanager
 import unittest
 import os
@@ -104,7 +103,7 @@ class IonIntegrationTestCase(unittest.TestCase):
             self._start_service(svc, config=config)
 
             # Create a client
-            clcls = service_registry.services[svc].simple_client
+            clcls = get_service_registry().services[svc].simple_client
             self.clients[svc] = clcls(name=svc, node=self.container.node)
 
         log.debug("Service dependencies started")
@@ -113,10 +112,10 @@ class IonIntegrationTestCase(unittest.TestCase):
         if servicename and not servicecls:
             global scanned_services
             if not scanned_services:
-                service_registry.discover_service_classes()
+                get_service_registry().discover_service_classes()
                 scanned_services = True
-            assert servicename in service_registry.services, "Service %s unknown" % servicename
-            servicecls = service_registry.services[servicename].impl[0]
+            assert servicename in get_service_registry().services, "Service %s unknown" % servicename
+            servicecls = get_service_registry().services[servicename].impl[0]
 
         assert servicecls, "Cannot start service %s" % servicename
 
@@ -155,13 +154,7 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _force_clean(self, recreate=False):
         from pyon.core.bootstrap import get_sys_name
-        from pyon.datastore.datastore import DatastoreManager
-        if DatastoreManager.persistent is None:
-            DatastoreManager.persistent = not CFG.system.mockdb
-        if not DatastoreManager.persistent:
-            datastore = MockDB_DataStore()
-        else:
-            datastore = CouchDB_DataStore()
+        datastore = CouchDB_DataStore()
         dbs = datastore.list_datastores()
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
         try:

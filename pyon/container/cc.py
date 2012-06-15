@@ -1,24 +1,22 @@
 #!/usr/bin/env python
 
-"""
-Capability Container base class
-"""
+"""Capability Container"""
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 import atexit
 import msgpack
 import os
 import signal
-import string
 import traceback
+from contextlib import contextmanager
 
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core import bootstrap
-from pyon.core.bootstrap import CFG, bootstrap_pyon
+from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerError
+from pyon.core.governance.governance_controller import GovernanceController
 from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository, EventPublisher
 from pyon.ion.directory import Directory
@@ -27,25 +25,24 @@ from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.net import messaging
+from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
-from pyon.util.containers import DictModifier, dict_merge
-from pyon.core.governance.governance_controller import GovernanceController
 from pyon.util.sflow import SFlowManager
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
-from contextlib import contextmanager
 
 
 class Container(BaseContainerAgent):
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
-    that do the bulk of the work in the ION system.
+    that do the bulk of the work in the ION system. It also manages connections to the Exchange
+    and the various forms of datastores in the systems.
     """
 
     # Singleton static variables
-    node        = None
+    #node        = None
     id          = None
     name        = None
     pidfile     = None
@@ -58,8 +55,8 @@ class Container(BaseContainerAgent):
 
         self._capabilities = []
 
-        # set id and name (as they are set in base class call)
-        self.id = string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
+        # set container id and cc_agent name (as they are set in base class call)
+        self.id = get_default_container_id()
         self.name = "cc_agent_%s" % self.id
 
         Container.instance = self
@@ -67,11 +64,16 @@ class Container(BaseContainerAgent):
         from pyon.core import bootstrap
         bootstrap.container_instance = self
 
+        log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
+
         # DatastoreManager - controls access to Datastores (both mock and couch backed)
         self.datastore_manager = DatastoreManager()
 
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
+
+        # Keep track of the overrides from the command-line, so they can trump app/rel file data
+        self.spawn_args = kwargs
 
         # Instantiate Directory and self-register
         # Has the additional side effect of either
@@ -79,25 +81,6 @@ class Container(BaseContainerAgent):
         # directory or read the configuration based
         # in the value of the auto_bootstrap setting
         self.directory = Directory()
-
-        from pyon.core.config import load_config, bootstrap_config
-        # Optionally bootstrap config into directory
-        bootstrap_config()
-        # Optionally load config from directory
-        load_config()
-
-        # Now apply any command line config overrides
-        # TODO: Bug: Replacing CFG instance does not work because references are already public. Update directly
-        dict_merge(CFG, kwargs, inplace=True)
-
-        bootstrap.assert_configuration(CFG)
-        log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
-
-        # Keep track of the overrides from the command-line, so they can trump app/rel file data
-        self.spawn_args = kwargs
-
-        # Load object and service registry etc.
-        bootstrap_pyon()
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -118,7 +101,6 @@ class Container(BaseContainerAgent):
         self.sflow_manager = SFlowManager(self)
 
         # Coordinates the container start
-        self._is_started = False
         self._status = "INIT"
 
         # protection for when the container itself is used as a Process for clients

@@ -15,11 +15,8 @@ import_paths.append(__name__)
 from pyon.util.log import log
 __all__ += ['log']
 
-from pyon.util.config import CFG
-__all__ += ['CFG']
-
-from pyon.core.bootstrap import obj_registry, IonObject, get_sys_name
-__all__ += ['obj_registry', 'IonObject', 'get_sys_name']
+from pyon.core.bootstrap import get_obj_registry, IonObject, get_sys_name, CFG
+__all__ += ['get_obj_registry', 'IonObject', 'get_sys_name', 'CFG']
 
 from pyon.core.object import ionprint
 __all__ += ['ionprint']

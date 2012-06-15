@@ -126,10 +126,10 @@ def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
     @param svcs name or list of names of service
     """
-    from pyon.core.bootstrap import service_registry
+    from pyon.core.bootstrap import get_service_registry
 
     if not getattr(svcs, '__iter__', False) and op is not None:
-        svcdef = service_registry.services[svcs]
+        svcdef = get_service_registry().services[svcs]
         print "Service definition for: %s (version %s) operation %s" % (svcs, svcdef.version or 'ND', op)
         print "".join([str(o) for o in svcdef.operations if o.name == op])
         return svcdef
@@ -138,7 +138,7 @@ def svc_defs(svcs=None, op=None):
         if not getattr(svcs, '__iter__', False):
             svcs = (svcs,)
         for svcname in svcs:
-            svcdef = service_registry.services[svcname]
+            svcdef = get_service_registry().services[svcname]
             svcops = "\n     ".join(sorted([o.name for o in svcdef.operations]))
             print "Service definition for: %s (version %s)" % (svcname, svcdef.version or 'ND')
             print "ops: %s" % (svcops)
@@ -147,10 +147,10 @@ def svc_defs(svcs=None, op=None):
     else:
         print "List of defined services"
         print "------------------------"
-        from pyon.core.bootstrap import obj_registry
+        from pyon.core.bootstrap import get_obj_registry
 
-        for svcname in sorted(service_registry.services.keys()):
-            svcdef = service_registry.services[svcname]
+        for svcname in sorted(get_service_registry().services.keys()):
+            svcdef = get_service_registry().services[svcname]
             print "%s %s" % (svcname, svcdef.version)
 
         print "\nType svc_defs('name') or svc_defs(['name1','name2']) for definition"
@@ -160,7 +160,7 @@ def obj_defs(ob=None):
     """Returns object definitions for object name(s)
     @param ob name or list of names of object
     """
-    from pyon.core.bootstrap import obj_registry
+    from pyon.core.bootstrap import get_obj_registry
 
     if ob is not None:
         print "Object definition for: %s\n" % ob
@@ -168,12 +168,12 @@ def obj_defs(ob=None):
         if not getattr(ob, '__iter__', False):
             ob = (ob,)
         for o in ob:
-            print obj_registry.instances_by_name[o]
+            print get_obj_registry().instances_by_name[o]
 
     else:
         print "List of defined objects"
         print "-----------------------"
-        onames = sorted(obj_registry.instances_by_name.keys())
+        onames = sorted(get_obj_registry().instances_by_name.keys())
         print pprint_list(onames, -1, 1, 2)
         print "\nType obj_defs('name') or obj_defs(['name1','name2']) for definition"
 
@@ -181,7 +181,7 @@ def type_defs(ob=None):
     """Returns object type definitions for object name(s)
     @param ob name or list of names of object
     """
-    from pyon.core.bootstrap import obj_registry
+    from pyon.core.bootstrap import get_obj_registry
 
     if ob is not None:
         print "Type definition for: %s\n" % ob
@@ -189,12 +189,12 @@ def type_defs(ob=None):
         if not getattr(ob, '__iter__', False):
             ob = (ob,)
         for o in ob:
-            print obj_registry.type_by_name[o]
+            print get_obj_registry().type_by_name[o]
 
     else:
         print "List of defined objects"
         print "-----------------------"
-        tnames = sorted(obj_registry.type_by_name.keys())
+        tnames = sorted(get_obj_registry().type_by_name.keys())
         print pprint_list(tnames, -1, 1, 2)
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
