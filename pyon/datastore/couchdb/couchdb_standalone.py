@@ -24,6 +24,7 @@ class CouchdbStandalone(object):
 
     def _connect(self):
         try:
+            print "CouchdbStandalone: URL=", self.database_url
             self.server = couchdb.Server(url=self.database_url)
         except Exception as exc:
             raise exc("Couldn't connect to the database: " + self.database_url)

@@ -130,8 +130,10 @@ def main(opts, *args, **kwargs):
             config.apply_configuration(bootstrap_config, command_line_config)
             print "pycc: config_from_directory=True. Minimal bootstrap configuration:", bootstrap_config
         else:
-            # Otherwise: Set to standard set of local config files just so that we have something
-            bootstrap_config = pyon_config
+            # Otherwise: Set to standard set of local config files plus command line overrides
+            bootstrap_config = pyon_config.copy()
+            config.apply_configuration(bootstrap_config, config_override)
+            config.apply_configuration(bootstrap_config, command_line_config)
 
         # Override sysname from config file or command line
         if not opts.sysname and bootstrap_config.get_safe("system.name", None):
