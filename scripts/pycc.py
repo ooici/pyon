@@ -158,6 +158,7 @@ def main(opts, *args, **kwargs):
                     raise Exception("Value error in config arg '%s'" % opts.config)
             else:
                 # Variant 2: List of paths
+                from pyon.util.config import Config
                 config_override = Config([opts.config]).data
                 config.apply_configuration(pyon_config, config_override)
 
