@@ -1,0 +1,17 @@
+protocol BuyBond at bank(role client, role resource_registry) {
+	buy_bonds from client;
+	read to resource_registry;
+	(Account) from resource_registry;
+	choice {
+		(Exception) to resource_registry;}
+	or  {
+	    find_subjects to resource_registry;
+	    (CustomerId) from resource_registry;
+	    exercise(Order) to trade;
+	    (Confirmation) from trade;
+	    choice {
+	    	update to resource_registry;
+	    	(status:string) from resource_registry;
+	    	(status:string) to client;}
+	    or {(status:string) to client;}}
+}
