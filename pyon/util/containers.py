@@ -109,7 +109,9 @@ class DictModifier(DotDict):
             data = DotDict(data)
         elif not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
-        dict.__setattr__(self,'base',base)
+        if base is None:
+            base = DotDict()
+        self['base'] = base
 
         if data is not None:
             self.update(data)

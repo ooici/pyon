@@ -49,14 +49,20 @@ class PYCC(Plugin):
         """Called before any tests are collected or run. Use this to
         perform any setup needed before testing begins.
         """
-        try:
+        # Make sure we initialize pyon before anything in this plugin executes
+        from pyon.core import bootstrap
+        if not bootstrap.pyon_initialized:
+            bootstrap.bootstrap_pyon()
 
-            from pyon.public import get_sys_name
+        try:
+            from pyon.public import get_sys_name, CFG
             self.sysname = get_sys_name()
 
             # Force datastore loader to use the same sysname
-            from ion.processes.bootstrap.datastore_loader import DatastoreLoader
-            DatastoreLoader.clear_datastore(prefix=self.sysname)
+            from pyon.datastore.datastore_admin import DatastoreAdmin
+            self.datastore_admin = DatastoreAdmin(config=CFG)
+
+            self.datastore_admin.clear_datastore(prefix=self.sysname)
 
             def die(signum, frame):
                 # For whatever reason, the parent doesn't die some times
@@ -100,7 +106,7 @@ class PYCC(Plugin):
                     self.sysname,
                     '--logcfg=res/config/logging.pycc.yml',
                     '--rel=%s' % self.rel,
-                    "--config={'system': {'force_clean': False, 'auto_bootstrap': True}}"]
+                    "--config={'system': {'auto_bootstrap': True}}"]
             debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
             newenv = os.environ.copy()
             po = subprocess.Popen(ccargs, env=newenv, close_fds=True)
@@ -112,7 +118,7 @@ class PYCC(Plugin):
             debug.write('Child container is ready...\n')
 
             # Dump datastore
-            DatastoreLoader.dump_datastore(path='res/dd')
+            self.datastore_admin.dump_datastore(path='res/dd')
             debug.write('Dump child container state to file...\n')
 
             # Enable CEI mode for the tests
@@ -131,8 +137,7 @@ class PYCC(Plugin):
         them.
         """
         self.container_shutdown()
-        from ion.processes.bootstrap.datastore_loader import DatastoreLoader
-        DatastoreLoader.clear_datastore(prefix=self.sysname)
+        self.datastore_admin.clear_datastore(prefix=self.sysname)
         import subprocess
         subprocess.call(['rm', '-rf', 'res/dd'])
 
@@ -146,8 +151,7 @@ class PYCC(Plugin):
         os.environ['BLAME'] = test.id()
 
     def afterTest(self, test):
-        from ion.processes.bootstrap.datastore_loader import DatastoreLoader
-        blame = DatastoreLoader.get_blame_objects()
+        blame = self.datastore_admin.get_blame_objects()
         # Having a hard time detecting skips.  Since skipped tests don't
         # clean we should not save duplicate blames...
         if blame != self.last_blame:

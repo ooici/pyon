@@ -439,6 +439,12 @@ class ServiceObjectGenerator :
     # Generate validation report
     #
     def generate_validation_report (self):
+        # WARNING!!!!
+        # At this point, all the code (py files) should be generated. Now we can bootstrap pyon
+        # which reads these py files.
+        # THEN we can load all the modules, which depend on pyon
+        from pyon.core import bootstrap
+        bootstrap.bootstrap_pyon()
 
         validation_results = "Report generated on " + self.currtime + "\n"
         self.load_mods("interface/services", True)

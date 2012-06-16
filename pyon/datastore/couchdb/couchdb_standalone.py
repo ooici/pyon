@@ -53,6 +53,10 @@ class CouchDataStore(object):
 
         self._datastore_cache = {}
 
+        # Just to test existence of the datastore
+        if self.datastore_name:
+            ds, _ = self._get_datastore()
+
     def close(self):
         """
         Close any connections required for this datastore.
@@ -70,14 +74,14 @@ class CouchDataStore(object):
             raise BadRequest("No data store name provided")
 
         if datastore_name in self._datastore_cache:
-            return (self._datastore_cache[datastore_name], datastore_name)
+            return self._datastore_cache[datastore_name], datastore_name
 
         try:
             ds = self.server[datastore_name] #http lookup
             self._datastore_cache[datastore_name] = ds
             return ds, datastore_name
         except ResourceNotFound:
-            raise BadRequest("Data store '%s' does not exist" % datastore_name)
+            raise NotFound("Data store '%s' does not exist" % datastore_name)
         except ValueError:
             raise BadRequest("Data store name '%s' invalid" % datastore_name)
 
@@ -185,7 +189,7 @@ class CouchDataStore(object):
         Persist a new raw doc in the data store. An '_id' and initial
         '_rev' value will be added to the doc.
         """
-        if '_id' in doc:
+        if object_id and '_id' in doc:
             raise BadRequest("Doc must not have '_id'")
         if '_rev' in doc:
             raise BadRequest("Doc must not have '_rev'")
@@ -228,7 +232,7 @@ class CouchDataStore(object):
         Create multiple raw docs.
         Returns list of (Success, Oid, rev)
         """
-        if any(["_id" in doc for doc in docs]):
+        if object_ids and any(["_id" in doc for doc in docs]):
             raise BadRequest("Docs must not have '_id'")
         if any(["_rev" in doc for doc in docs]):
             raise BadRequest("Docs must not have '_rev'")
@@ -316,6 +320,10 @@ class CouchDataStore(object):
     def compact_views(self, design, datastore_name=None):
         ds, datastore_name = self._get_datastore(datastore_name)
         return ds.compact(design)
+
+    def define_profile_views(self, ds_views, datastore_name=None):
+        for design, viewdef in ds_views.iteritems():
+            self.define_views(design, viewdef, datastore_name=datastore_name)
 
     def define_views(self, design, viewdef, datastore_name=None):
         """
