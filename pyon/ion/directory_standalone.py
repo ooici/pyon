@@ -2,9 +2,8 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
-import os
-
-from pyon.datastore.couchdb.couchdb_standalone import CouchdbStandalone
+from pyon.core.exception import NotFound
+from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.util.containers import get_ion_ts, get_default_sysname
 
 
@@ -16,8 +15,8 @@ class DirectoryStandalone(object):
     def __init__(self, sysname=None, orgname=None, config=None):
         self.orgname = orgname or config['system']['root_org'] if config else 'ION' or 'ION'
         sysname = sysname or get_default_sysname()
-        self.database_name  = sysname + "_directory"
-        self.datastore = CouchdbStandalone(database_name=self.database_name, config=config)
+        self.datastore_name  = sysname + "_directory"
+        self.datastore = CouchDataStore(self.datastore_name, config=config)
 
     def register(self, parent, key, **kwargs):
         '''
@@ -30,15 +29,18 @@ class DirectoryStandalone(object):
         object_id = self._get_directory_name(parent, key)
 
         # Check for entry
-        entry = self.datastore.read(object_id)
+        try:
+            entry = self.datastore.read_doc(object_id)
+        except NotFound:
+            entry = None
         doc = self._create_dir_entry(object_id=object_id, parent=self._get_directory_name(parent), key=key,
             attributes=kwargs)
         if entry:
             entry = self._update_dir_entry(doc=entry, parent=self._get_directory_name(parent), key=key,
                 attributes=kwargs)
-            self.datastore.update(entry)
+            self.datastore.update_doc(entry)
         else:
-            self.datastore.write(doc, doc['_id'])
+            self.datastore.save_doc(doc)
 
     def register_mult(self, entries):
         """
@@ -54,7 +56,7 @@ class DirectoryStandalone(object):
             dn = self._get_directory_name(parent, key)
             de = self._create_dir_entry(object_id=dn, parent=parent_dn, key=key, attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
             de_list.append(de)
-        self.datastore.create_doc_mult(de_list, allow_ids=True)
+        self.datastore.create_doc_mult(de_list)
 
     def _update_dir_entry(self, doc, parent, key, attributes=None, ts_updated=''):
         doc['attributes'] = attributes or {}
@@ -90,7 +92,10 @@ class DirectoryStandalone(object):
 
     def lookup(self, qualified_key='/'):
         dn = self._get_directory_name(qualified_key)
-        entry = self.datastore.read(dn)
+        try:
+            entry = self.datastore.read_doc(dn)
+        except NotFound:
+            entry = None
         return entry['attributes'] if entry else None
 
     def find_dir_child_entries(self, parent='/', **kwargs):

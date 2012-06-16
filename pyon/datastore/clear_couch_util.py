@@ -12,7 +12,7 @@
 import sys
 from optparse import OptionParser
 
-from pyon.datastore.couchdb.couchdb_standalone import CouchdbStandalone
+from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 
 
 def main():
@@ -64,7 +64,7 @@ def clear_couch(config, prefix):
         prefix=prefix)
 
 def _clear_couch(host, port, username, password, prefix, verbose=False):
-    db_server = CouchdbStandalone(host=host, port=str(port), username=username, password=password)
+    db_server = CouchDataStore(host=host, port=str(port), username=username, password=password)
 
     if verbose:
         print "clear_couch: Connected to couch server http://%s:%d" % (host, port)
