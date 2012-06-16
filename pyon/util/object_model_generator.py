@@ -11,6 +11,7 @@ import re
 from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.datastore.datastore_standalone import DirectorySa
+import csv
 
 
 class IonYamlLoader(yaml.Loader):
@@ -154,11 +155,11 @@ csv_doc_templates = dict(((k, string.Template(v)) for k, v in csv_doc_templates.
 
 class ObjectModelGenerator:
     data_yaml_text = ''
-    objectattributesrowentries = ""
-    objecttypesrowentries = ""
     dataobject_output_text = ''
     def_dict = {}
     class_args_dict = {}
+    csv_attributes_row_entries = []
+    csv_types_row_entries = []
 
     def __init__(self, system_name=None, read_from_yaml_file=False):
         self.system_name = system_name
@@ -184,25 +185,25 @@ class ObjectModelGenerator:
             f.write(self.dataobject_output_text)
 
         if opts.objectdoc:
-            objecttypecsv_output = csv_doc_templates['object_types_doc'].substitute(rowentries=self.objecttypesrowentries)
             objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
             try:
                 os.unlink(objecttypecsvfile)
             except:
                 pass
             print "Writing object type csv to '" + objecttypecsvfile + "'"
-            with open(objecttypecsvfile, 'w') as f:
-                f.write(objecttypecsv_output)
+            csv_file = csv.writer(open(objecttypecsvfile+'.2', 'wb'), delimiter=',',
+                                  quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerows(self.csv_types_row_entries)
 
-            objectattributecsv_output = csv_doc_templates['object_attributes_doc'].substitute(rowentries=self.objectattributesrowentries)
             objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
             try:
                 os.unlink(objectattrscsvfile)
             except:
                 pass
             print "Writing object attribute csv to '" + objectattrscsvfile + "'"
-            with open(objectattrscsvfile, 'w') as f:
-                f.write(objectattributecsv_output)
+            csv_file = csv.writer(open(objectattrscsvfile+'.2', 'wb'), delimiter=',',
+                                       quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerows(self.csv_attributes_row_entries)
 
     def read_yaml_text(self):
         '''
@@ -305,11 +306,11 @@ class ObjectModelGenerator:
                         self.dataobject_output_text += ", "
                     self.dataobject_output_text += str(i) + ": '" + val + "'"
                     if opts.objectdoc:
-                        self.objectattributesrowentries += csv_doc_templates['object_attributes_row_entry'].substitute(classname=classname, name=val, type='int', default=str(i), description="")
+                        self.csv_attributes_row_entries.append([classname, val, "int", str(i), ""])
                 self.dataobject_output_text += "}\n"
 
                 if opts.objectdoc:
-                    self.objecttypesrowentries += csv_doc_templates['object_types_row_entry'].substitute(classname=classname, type='enum', extends='object', description="")
+                    self.csv_types_row_entries.append([classname, 'enum','object',""])
 
     def add_yaml_constructors(self):
         '''
@@ -395,6 +396,7 @@ class ObjectModelGenerator:
         first_time = True
         decorators = ''
         description = ''
+        csv_description = ''
 
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
@@ -411,8 +413,10 @@ class ObjectModelGenerator:
                     init_lines.append('  ' + line + '\n')
                     if not description:
                         description = line
+                        csv_description = line.strip()
                     else:
                         description = description + ' ' + line
+                        csv_description = csv_description + ' ' + line.strip()
             elif line.startswith('  '):
                 if current_class_def_dict:
                     field = line.split(":")[0].strip()
@@ -423,7 +427,9 @@ class ObjectModelGenerator:
                             dsc = line.split('#', 1)[1].strip()
                             if not description:
                                 description = '#' + dsc
+                                csv_description = dsc
                             else:
+                                csv_description =  csv_description + ' ' + dsc
                                 description = description + ' #' + dsc
                     except KeyError:
                         # Ignore key error because value is nested
@@ -453,13 +459,14 @@ class ObjectModelGenerator:
                             args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
                     fields.append(field)
-                    field_details.append((field, value_type, converted_value))
+                    field_details.append((field, value_type, converted_value, csv_description))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
                     else:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators':[" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
                     decorators = ''
                     description = ''
+                    csv_description = ''
             elif line and line[0].isalpha():
                 if '!enum' in line:
                     continue
@@ -471,7 +478,7 @@ class ObjectModelGenerator:
                         field_details.sort()
                         for field_detail in field_details:
                             attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'), attrcomment="")
-                            self.objectattributesrowentries += csv_doc_templates['object_attributes_row_entry'].substitute(classname=current_class, name=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'), description="")
+                            self.csv_attributes_row_entries.append([current_class, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
                         related_associations = self.lookup_associations(current_class)
                         assoctableentries = ""
@@ -510,8 +517,8 @@ class ObjectModelGenerator:
                             sup = self.class_args_dict[sup]["extends"]
                         super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
 
-                        self.objecttypesrowentries += csv_doc_templates['object_types_row_entry'].substitute(classname=current_class, type=class_type, extends=super_class, description="")
-
+                        csv_description = ''
+                        self.csv_types_row_entries.append([current_class, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
                         doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
 
                         datamodelhtmldir = 'interface/object_html'
