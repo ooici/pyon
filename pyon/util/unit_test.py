@@ -56,6 +56,7 @@ class PyonTestCase(unittest.TestCase):
             setattr(clients, dep_name, mock_service)
             # set self.dep_name for conevenience
             setattr(self, dep_name, mock_service)
+            self.addCleanup(delattr, self, dep_name)
             iface = list(implementedBy(dep_service))[0]
             names_and_methods = iface.namesAndDescriptions()
             for func_name, _ in names_and_methods:
@@ -71,6 +72,7 @@ class PyonTestCase(unittest.TestCase):
             raise unittest.SkipTest('Not implementing an Ion Service')
         from zope.interface.verify import verifyClass
         base_service = self.base_service
+        del self.base_service
         implemented_service = base_service.__subclasses__()[0]
         iface = list(implementedBy(base_service))[0]
         verifyClass(iface, implemented_service)
