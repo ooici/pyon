@@ -604,7 +604,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         if 'timeout' in kwargs and kwargs['timeout'] is not None:
             timeout = kwargs['timeout']
         else:
-            timeout = CFG.endpoint.receive.timeout or 10
+            timeout = CFG.get_safe('endpoint.receive.timeout', 10)
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
@@ -716,7 +716,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         Then performs the transact call if the manager says to do so.
         """
-        if CFG.container.get('sflow', {}).get('enabled', False):
+        if CFG.get_safe('container.sflow.enabled', False):
             sm = self._get_sflow_manager()
             if sm and sm.should_sample:
                 app_name = self._get_sample_name()
