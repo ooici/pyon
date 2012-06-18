@@ -55,7 +55,11 @@ class CouchDataStore(object):
 
         # Just to test existence of the datastore
         if self.datastore_name:
-            ds, _ = self._get_datastore()
+            try:
+                ds, _ = self._get_datastore()
+            except NotFound:
+                self.create_datastore()
+                ds, _ = self._get_datastore()
 
     def close(self):
         """
