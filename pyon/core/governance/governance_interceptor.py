@@ -13,7 +13,16 @@ from pyon.util.log import log
 class BaseInternalGovernanceInterceptor(Interceptor):
 
     def __init__(self, *args, **kwargs):
-        self.governance_controller = Container.instance.governance_controller
+        pass
+
+    @property
+    def governance_controller(self):
+        """
+        Property to get governance controller from Container, if the container exists.
+        """
+        if Container.instance is not None:
+            return Container.instance.governance_controller
+        return None
 
     def outgoing(self, invocation):
         pass
@@ -22,7 +31,7 @@ class BaseInternalGovernanceInterceptor(Interceptor):
         pass
 
 
-class GovernanceInterceptor(Interceptor):
+class GovernanceInterceptor(BaseInternalGovernanceInterceptor):
 
 
     def configure(self, config):
@@ -42,8 +51,8 @@ class GovernanceInterceptor(Interceptor):
         else:
             log.debug("GovernanceInterceptor.outgoing: %s", invocation)
 
-        if Container.instance.governance_controller is not None:
-            Container.instance.governance_controller.process_outgoing_message(invocation)
+        if self.governance_controller is not None:
+            self.governance_controller.process_outgoing_message(invocation)
 
         return invocation
 
@@ -57,8 +66,8 @@ class GovernanceInterceptor(Interceptor):
         else:
             log.debug("GovernanceInterceptor.incoming: %s", invocation)
 
-        if Container.instance.governance_controller is not None:
-            Container.instance.governance_controller.process_incoming_message(invocation)
+        if self.governance_controller is not None:
+            self.governance_controller.process_incoming_message(invocation)
 
         return invocation
 

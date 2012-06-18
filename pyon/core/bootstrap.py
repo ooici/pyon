@@ -171,11 +171,6 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     _service_registry.load_service_mods('interface/services')
     _service_registry.build_service_map()
 
-    # INTERCEPTORS.
-    # TODO: Is
-    from pyon.net.endpoint import instantiate_interceptors
-    instantiate_interceptors(CFG.interceptor)
-
     # RESOURCES. Load and initialize definitions
     from pyon.ion import resource
     resource.load_definitions()
