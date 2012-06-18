@@ -191,8 +191,9 @@ class ObjectModelGenerator:
             except:
                 pass
             print "Writing object type csv to '" + objecttypecsvfile + "'"
-            csv_file = csv.writer(open(objecttypecsvfile+'.2', 'wb'), delimiter=',',
+            csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
                                   quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
             csv_file.writerows(self.csv_types_row_entries)
 
             objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
@@ -201,8 +202,9 @@ class ObjectModelGenerator:
             except:
                 pass
             print "Writing object attribute csv to '" + objectattrscsvfile + "'"
-            csv_file = csv.writer(open(objectattrscsvfile+'.2', 'wb'), delimiter=',',
+            csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
                                        quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
             csv_file.writerows(self.csv_attributes_row_entries)
 
     def read_yaml_text(self):
@@ -491,7 +493,7 @@ class ObjectModelGenerator:
                         # Determine if class is object or resource
                         def get_class_type(clzzname):
                             while clzzname != "IonObjectBase":
-                                if sup == "Resource":
+                                if clzzname == "Resource":
                                     return "resource"
                                 clzzname = self.class_args_dict[clzzname]["extends"]
                             return "object"
