@@ -47,6 +47,7 @@ class PyonTestCase(unittest.TestCase):
         base_service = get_service_registry().get_service_base(service_name)
         # Save it to use in test_verify_service
         self.base_service = base_service
+        self.addCleanup(delattr, self, 'base_service')
         dependencies = base_service.dependencies
         for dep_name in dependencies:
             dep_service = get_service_registry().get_service_base(dep_name)
@@ -72,7 +73,6 @@ class PyonTestCase(unittest.TestCase):
             raise unittest.SkipTest('Not implementing an Ion Service')
         from zope.interface.verify import verifyClass
         base_service = self.base_service
-        del self.base_service
         implemented_service = base_service.__subclasses__()[0]
         iface = list(implementedBy(base_service))[0]
         verifyClass(iface, implemented_service)
