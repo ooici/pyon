@@ -4,7 +4,7 @@ __author__ = 'Seman Said, Michael Meisinger'
 
 from pyon.core.exception import NotFound
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-from pyon.util.containers import get_ion_ts, get_default_sysname
+from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
 
 class DirectoryStandalone(object):
