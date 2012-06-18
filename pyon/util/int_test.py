@@ -36,7 +36,6 @@ class IonIntegrationTestCase(unittest.TestCase):
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
-            self._turn_off_force_clean()
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
@@ -119,12 +118,6 @@ class IonIntegrationTestCase(unittest.TestCase):
             mod = servicecls.__module__
             cls = servicecls.__name__
         self.container.spawn_process(servicename, mod, cls, config)
-
-    def _turn_off_force_clean(self):
-        # Called via pyon.datastore.datastore.DataStoreManager.get_datastore()
-        patcher =patch('pyon.datastore.datastore.DatastoreManager.force_clean', False)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):

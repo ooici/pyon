@@ -89,12 +89,11 @@ def _bootstrap_service_defs(directory):
 def auto_bootstrap_datastores(bootstrap_config):
     from pyon.core.bootstrap import get_sys_name
     from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-    ds = CouchDataStore(config=bootstrap_config)
+    ds = CouchDataStore(config=bootstrap_config, scope=get_sys_name())
     datastores = ['resources','directory']
-    for dsn in datastores:
-        qual_ds_name = ("%s_%s" % (get_sys_name(), dsn)).lower()
-        if not ds.exists_datastore(qual_ds_name):
-            ds.create_datastore(qual_ds_name)
+    for local_dsn in datastores:
+        if not ds.exists_datastore(local_dsn):
+            ds.create_datastore(local_dsn)
             # NOTE: Views are created by containers' DatastoreManager
 
 def auto_bootstrap_config(bootstrap_config, system_cfg):

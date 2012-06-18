@@ -7,9 +7,9 @@ import datetime
 import os
 import os.path
 
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-from pyon.public import CFG, log, iex
+from pyon.public import log, iex
 
 class DatastoreAdmin(object):
 
@@ -40,21 +40,18 @@ class DatastoreAdmin(object):
             dtstr = datetime.datetime.today().strftime('%Y%m%d_%H%M%S')
             path = "res/preload/local/dump_%s" % dtstr
         if ds_name:
-            qual_ds_name = self._get_scoped_name(ds_name)
-            ds = CouchDataStore(qual_ds_name, config=self.config)
-            if ds.exists_datastore(qual_ds_name):
-                self._dump_datastore(path, ds_name, qual_ds_name, clear_dir)
+            ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
+            if ds.exists_datastore(ds_name):
+                self._dump_datastore(path, ds_name, clear_dir)
             else:
                 log.warn("Datastore does not exist")
         else:
-            ds_list = ['resources', 'objects', 'state', 'events',
-                       'directory', 'scidata']
+            ds_list = ['resources', 'objects', 'state', 'events', 'directory', 'scidata']
             for dsn in ds_list:
-                qual_ds_name = self._get_scoped_name(dsn)
-                self._dump_datastore(path, ds_name, qual_ds_name, clear_dir)
+                self._dump_datastore(path, dsn, clear_dir)
 
-    def _dump_datastore(self, outpath_base, out_name, ds_name, clear_dir=True):
-        ds = CouchDataStore(ds_name, config=self.config)
+    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True):
+        ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
         if not ds.exists_datastore(ds_name):
             log.warn("Datastore does not exist: %s" % ds_name)
             return
@@ -62,7 +59,7 @@ class DatastoreAdmin(object):
         if not os.path.exists(outpath_base):
             os.makedirs(outpath_base)
 
-        outpath = "%s/%s" % (outpath_base, out_name)
+        outpath = "%s/%s" % (outpath_base, ds_name)
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         if clear_dir:
@@ -91,9 +88,8 @@ class DatastoreAdmin(object):
 
         if ds_name:
             # Here we expect path to contain YML files for given datastore
-            qual_ds_name = self._get_scoped_name(ds_name)
-            log.info("DatastoreLoader: LOAD datastore=%s" % qual_ds_name)
-            self._load_datastore(path, qual_ds_name, ignore_errors)
+            log.info("DatastoreLoader: LOAD datastore=%s" % ds_name)
+            self._load_datastore(path, ds_name, ignore_errors)
         else:
             # Here we expect path to have subdirs that are named according to logical
             # datastores, e.g. "resources"
@@ -103,11 +99,10 @@ class DatastoreAdmin(object):
                 if not os.path.exists(path):
                     log.warn("Item %s is not a directory" % fp)
                     continue
-                qual_ds_name = self._get_scoped_name(fn)
-                self._load_datastore(fp, qual_ds_name, ignore_errors)
+                self._load_datastore(fp, ds_name, ignore_errors)
 
     def _load_datastore(self, path=None, ds_name=None, ignore_errors=True):
-        ds = CouchDataStore(ds_name, config=self.config)
+        ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
         objects = []
         for fn in os.listdir(path):
             fp = os.path.join(path, fn)
@@ -141,17 +136,22 @@ class DatastoreAdmin(object):
         """
         Clears a datastore or a set of datastores of common prefix
         """
-        ds = CouchDataStore(config=self.config)
+        ds = CouchDataStore(config=self.config, scope=self.sysname)
         if ds_name:
-            qual_ds_name = self._get_scoped_name(ds_name)
-            if ds.exists_datastore(qual_ds_name):
-                ds.delete_datastore(qual_ds_name)
-            elif ds.exists_datastore(ds_name):
+            try:
                 ds.delete_datastore(ds_name)
+            except NotFound:
+                try:
+                    # Try the unscoped version
+                    ds1 = CouchDataStore(config=self.config)
+                    ds1.delete_datastore(ds_name)
+                except NotFound:
+                    pass
         elif prefix:
-            for dsn in ds.list_datastores():
+            ds_noscope = CouchDataStore(config=self.config)
+            for dsn in ds_noscope.list_datastores():
                 if dsn.startswith(prefix):
-                    ds.delete_datastore(dsn)
+                    ds_noscope.delete_datastore(dsn)
         else:
             log.warn("Cannot clear datastore without prefix or datastore name")
 
@@ -161,8 +161,7 @@ class DatastoreAdmin(object):
         for ds_name in ds_list:
             ret_objs = []
             try:
-                qual_ds_name = self._get_scoped_name(ds_name)
-                ds = CouchDataStore(qual_ds_name, config=self.config)
+                ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
                 ret_objs = ds.find_docs_by_view("_all_docs", None, id_only=False)
             except BadRequest:
                 continue
