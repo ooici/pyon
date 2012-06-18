@@ -306,9 +306,9 @@ class Container(BaseContainerAgent):
         with self._push_status("START_REL"):
             return self.app_manager.start_rel(rel=rel)
 
-    def start_rel_from_url(self, rel_url=''):
+    def start_rel_from_url(self, rel_url='',config=None):
         with self._push_status("START_REL_FROM_URL"):
-            return self.app_manager.start_rel_from_url(rel_url=rel_url)
+            return self.app_manager.start_rel_from_url(rel_url=rel_url,config=config)
 
     def _stop_capability(self, capability):
         if capability == "CONTAINER_AGENT":

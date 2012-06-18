@@ -19,6 +19,8 @@ def read_local_configuration(conf_paths):
     return pyon_cfg
 
 def apply_configuration(system_cfg, config_override):
+    if not config_override:
+        return
     from pyon.util.containers import dict_merge
     dict_merge(system_cfg, config_override, inplace=True)
 
@@ -84,6 +86,17 @@ def _bootstrap_service_defs(directory):
         svc_list.append(("/ServiceInterfaces", svcname, {}))
     directory.register_mult(svc_list)
 
+def auto_bootstrap_datastores(bootstrap_config):
+    from pyon.core.bootstrap import get_sys_name
+    from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+    ds = CouchDataStore(config=bootstrap_config)
+    datastores = ['resources','directory']
+    for dsn in datastores:
+        qual_ds_name = ("%s_%s" % (get_sys_name(), dsn)).lower()
+        if not ds.exists_datastore(qual_ds_name):
+            ds.create_datastore(qual_ds_name)
+            # NOTE: Views are created by containers' DatastoreManager
+
 def auto_bootstrap_config(bootstrap_config, system_cfg):
     print "pyon: config: Auto bootstrap CFG into directory"
     from pyon.core.bootstrap import get_sys_name
@@ -100,5 +113,6 @@ def auto_bootstrap_interfaces(bootstrap_config):
     directory = DirectoryStandalone(sysname=get_sys_name(), config=bootstrap_config)
     de = directory.lookup("/ServiceInterfaces")
     if not de:
+        # TODO: Check this and use proper imports here
         _bootstrap_object_defs(directory)
         _bootstrap_service_defs(directory)

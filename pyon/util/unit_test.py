@@ -47,6 +47,7 @@ class PyonTestCase(unittest.TestCase):
         base_service = get_service_registry().get_service_base(service_name)
         # Save it to use in test_verify_service
         self.base_service = base_service
+        self.addCleanup(delattr, self, 'base_service')
         dependencies = base_service.dependencies
         for dep_name in dependencies:
             dep_service = get_service_registry().get_service_base(dep_name)
@@ -56,6 +57,7 @@ class PyonTestCase(unittest.TestCase):
             setattr(clients, dep_name, mock_service)
             # set self.dep_name for conevenience
             setattr(self, dep_name, mock_service)
+            self.addCleanup(delattr, self, dep_name)
             iface = list(implementedBy(dep_service))[0]
             names_and_methods = iface.namesAndDescriptions()
             for func_name, _ in names_and_methods:

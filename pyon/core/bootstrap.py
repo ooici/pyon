@@ -113,17 +113,13 @@ def get_sys_name():
     if sys_name:
         return sys_name
 
-    from pyon.util.containers import get_default_sysname
-    default_sys_name = get_default_sysname()
-    testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
-
     if is_testing():
-        testing_override = CFG.get_safe("system.testing_sysname", None)
-        if testing_override:
-            testing_sys_name = testing_override
+        testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
         set_sys_name(testing_sys_name)
         return testing_sys_name
     else:
+        from pyon.util.containers import get_default_sysname
+        default_sys_name = get_default_sysname()
         set_sys_name(default_sys_name)
         return default_sys_name
 

@@ -109,7 +109,9 @@ class DictModifier(DotDict):
             data = DotDict(data)
         elif not isinstance(base, DotDict):
             raise TypeError("Base must be of type DotDict")
-        dict.__setattr__(self,'base',base)
+        if base is None:
+            base = DotDict()
+        self['base'] = base
 
         if data is not None:
             self.update(data)
@@ -203,6 +205,34 @@ def get_safe(dict_instance, keypath, default=None):
         return obj
     except Exception, ex:
         return default
+
+class SimpleLog(object):
+    """
+    Simple log to STDOUT class for modules that don't want to depend on pyon logging
+    """
+    DEBUG, INFO, WARN, ERROR, CRITICAL = 1, 2, 3, 4, 5
+    def __init__(self, logname=None, loglevel=0):
+        self.logname = logname + ":" if logname else ""
+        self.loglevel = loglevel
+    def debug(self, message, *args):
+        if self.loglevel <= 1:
+            print self.logname, "DEBUG:", message % args
+    def info(self, message, *args):
+        if self.loglevel <= 2:
+            print self.logname, "INFO:", message % args
+    def warn(self, message, *args):
+        if self.loglevel <= 3:
+            print self.logname, "WARN:", message % args
+    def error(self, message, *args):
+        if self.loglevel <= 4:
+            print self.logname, "ERROR:", message % args
+    def critical(self, message, *args):
+        if self.loglevel <= 5:
+            print self.logname, "CRITICAL:", message % args
+    def exception(self, message, *args):
+        if self.loglevel <= 5:
+            # TODO: print exception
+            print self.logname, "EXCEPTION:", message % args
 
 def named_any(name):
     """

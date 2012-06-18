@@ -98,18 +98,42 @@ def main(opts, *args, **kwargs):
         # Trigger any initializing default logic in get_sys_name
         bootstrap.get_sys_name()
 
+        command_line_config = kwargs
+
+        # This holds the minimal configuration used to bootstrap pycc and pyon and connect to datastores.
+        bootstrap_config = None
+
         # This holds the new CFG object for pyon. Build it up in proper sequence and conditions.
         pyon_config = config.read_standard_configuration()
 
+        # Load config override if provided. Supports variants literal and list of paths
+        config_override = None
+        if opts.config:
+            if '{' in opts.config:
+                # Variant 1: Dict of config values
+                try:
+                    eval_value = ast.literal_eval(opts.config)
+                    config_override = eval_value
+                except ValueError:
+                    raise Exception("Value error in config arg '%s'" % opts.config)
+            else:
+                # Variant 2: List of paths
+                from pyon.util.config import Config
+                config_override = Config([opts.config]).data
+
+        # Determine bootstrap_config
         if opts.config_from_directory:
             # Load minimal bootstrap config if option "config_from_directory"
             bootstrap_config = config.read_local_configuration(['res/config/pyon_min_boot.yml'])
             config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
-            config.apply_configuration(bootstrap_config, kwargs)
+            config.apply_configuration(bootstrap_config, config_override)
+            config.apply_configuration(bootstrap_config, command_line_config)
             print "pycc: config_from_directory=True. Minimal bootstrap configuration:", bootstrap_config
         else:
-            # Otherwise: Set to standard set of local config files just so that we have something
-            bootstrap_config = pyon_config
+            # Otherwise: Set to standard set of local config files plus command line overrides
+            bootstrap_config = pyon_config.copy()
+            config.apply_configuration(bootstrap_config, config_override)
+            config.apply_configuration(bootstrap_config, command_line_config)
 
         # Override sysname from config file or command line
         if not opts.sysname and bootstrap_config.get_safe("system.name", None):
@@ -126,7 +150,21 @@ def main(opts, *args, **kwargs):
         # Note: this is idempotent and will not alter anything if this is not the first container to run
         if bootstrap_config.system.auto_bootstrap:
             print "pycc: auto_bootstrap=True."
-            config.auto_bootstrap_config(bootstrap_config, system_cfg=pyon_config)
+            stored_config = pyon_config.copy()
+            config.apply_configuration(stored_config, config_override)
+            config.apply_configuration(stored_config, command_line_config)
+
+            config.auto_bootstrap_datastores(bootstrap_config)
+            config.auto_bootstrap_config(bootstrap_config, system_cfg=stored_config)
+
+        # Determine the final pyon_config
+        # - Start from standard config already set (pyon.yml + local YML files)
+        # - Optionally load config from directory
+        if opts.config_from_directory:
+            config.apply_remote_config(pyon_config)
+        # - Last apply any separate command line config overrides
+        config.apply_configuration(pyon_config, config_override)
+        config.apply_configuration(pyon_config, command_line_config)
 
         # Load logging override config if provided. Supports variants literal and path.
         logging_config_override = None
@@ -141,28 +179,6 @@ def main(opts, *args, **kwargs):
             else:
                 # Variant 2: Value is path to YAML file containing config values
                 pyon.DEFAULT_LOGGING_PATHS.append(opts.logcfg)
-
-        # Optionally load config from directory
-        if opts.config_from_directory:
-            config.apply_remote_config(pyon_config)
-
-        # Load config override if provided. Supports variants literal and list of paths
-        if opts.config:
-            if '{' in opts.config:
-                # Variant 1: Dict of config values
-                try:
-                    eval_value = ast.literal_eval(opts.config)
-                    config_override = eval_value
-                    config.apply_configuration(pyon_config, eval_value)
-                except ValueError:
-                    raise Exception("Value error in config arg '%s'" % opts.config)
-            else:
-                # Variant 2: List of paths
-                config_override = Config([opts.config]).data
-                config.apply_configuration(pyon_config, config_override)
-
-        # Now apply any separate command line config overrides
-        config.apply_configuration(pyon_config, kwargs)
 
         # Also set the immediate flag, but only if specified - it is an override
         if opts.immediate:
@@ -184,7 +200,7 @@ def main(opts, *args, **kwargs):
 
         # Create the container instance
         from pyon.container.cc import Container
-        container = Container(*args, **kwargs)
+        container = Container(*args, **command_line_config)
 
         return container
 
