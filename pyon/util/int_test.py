@@ -3,18 +3,10 @@
 """Integration test base class and utils"""
 
 from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon, get_service_registry
-from pyon.core.exception import BadRequest
-from pyon.datastore.datastore import DatastoreManager
-from pyon.event.event import EventRepository
-from pyon.ion.directory import Directory
-from pyon.ion.state import StateRepository
-from pyon.util.containers import DotDict, dict_merge, DictModifier
+from pyon.core.bootstrap import bootstrap_pyon, get_service_registry, CFG
+from pyon.util.containers import DotDict
 from pyon.util.log import log
 from mock import patch
-from pyon.public import CFG
-from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-from contextlib import contextmanager
 import unittest
 import os
 from gevent import greenlet, spawn
@@ -45,15 +37,12 @@ class IonIntegrationTestCase(unittest.TestCase):
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
             self._turn_off_force_clean()
-            from ion.processes.bootstrap.datastore_loader import DatastoreLoader
-            DatastoreLoader.load_datastore('res/dd')
+            from pyon.datastore.datastore_admin import DatastoreAdmin
+            da = DatastoreAdmin(config=CFG)
+            da.load_datastore('res/dd')
 
         # hack to force_clean on filesystem
-        try:
-            CFG['container']['filesystem']['force_clean']=True
-        except KeyError:
-            CFG['container']['filesystem'] = {}
-            CFG['container']['filesystem']['force_clean'] = True
+        CFG['container']['filesystem'] = {}
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
@@ -153,8 +142,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def _force_clean(self, recreate=False):
-        from pyon.core.bootstrap import get_sys_name
-        datastore = CouchDB_DataStore()
+        from pyon.core.bootstrap import get_sys_name, CFG
+        from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+        datastore = CouchDataStore(config=CFG)
         dbs = datastore.list_datastores()
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
         try:
