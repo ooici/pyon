@@ -419,7 +419,6 @@ class ServiceObjectGenerator:
         # At this point, all the code (py files) should be generated. Now we can bootstrap pyon
         # which reads these py files.
         # THEN we can load all the modules, which depend on pyon
-
         from pyon.core import bootstrap
         bootstrap.bootstrap_pyon()
 

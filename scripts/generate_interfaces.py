@@ -7,9 +7,9 @@ import fnmatch
 import os
 import sys
 import argparse
-from pyon.core.interface.object_model_generator import ObjectModelGenerator
-from pyon.core.interface.message_object_generator import MessageObjectGenerator
-from pyon.core.interface.service_object_generator import ServiceObjectGenerator
+from pyon.core.interfaces.object_model_generator import ObjectModelGenerator
+from pyon.core.interfaces.message_object_generator import MessageObjectGenerator
+from pyon.core.interfaces.service_object_generator import ServiceObjectGenerator
 
 
 def main():
