@@ -42,7 +42,6 @@ class IonIntegrationTestCase(unittest.TestCase):
             da.load_datastore('res/dd')
 
         # hack to force_clean on filesystem
-            # hack to force_clean on filesystem
         try:
             CFG['container']['filesystem']['force_clean'] = True
         except KeyError:

@@ -43,7 +43,7 @@ class DatastoreAdmin(object):
             qual_ds_name = self._get_scoped_name(ds_name)
             ds = CouchDataStore(qual_ds_name, config=self.config)
             if ds.exists_datastore(qual_ds_name):
-                self._dump_datastore(qual_ds_name, path, clear_dir)
+                self._dump_datastore(path, ds_name, qual_ds_name, clear_dir)
             else:
                 log.warn("Datastore does not exist")
         else:
@@ -51,9 +51,9 @@ class DatastoreAdmin(object):
                        'directory', 'scidata']
             for dsn in ds_list:
                 qual_ds_name = self._get_scoped_name(dsn)
-                self._dump_datastore(path, qual_ds_name, clear_dir)
+                self._dump_datastore(path, ds_name, qual_ds_name, clear_dir)
 
-    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True):
+    def _dump_datastore(self, outpath_base, out_name, ds_name, clear_dir=True):
         ds = CouchDataStore(ds_name, config=self.config)
         if not ds.exists_datastore(ds_name):
             log.warn("Datastore does not exist: %s" % ds_name)
@@ -62,7 +62,7 @@ class DatastoreAdmin(object):
         if not os.path.exists(outpath_base):
             os.makedirs(outpath_base)
 
-        outpath = "%s/%s" % (outpath_base, ds_name)
+        outpath = "%s/%s" % (outpath_base, out_name)
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         if clear_dir:
