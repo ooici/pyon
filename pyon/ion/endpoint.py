@@ -6,7 +6,7 @@ from pyon.util import log
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer
+from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer
 from pyon.util.log import log
 
 
@@ -38,7 +38,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         This is a request, so the order should be Message, Process
         """
         inv_one = EndpointUnit._intercept_msg_in(self, inv)
-        inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
+        inv_two = process_interceptors(self.interceptors["process_incoming"] if "process_incoming" in self.interceptors else [], inv_one)
         return inv_two
 
     def _intercept_msg_out(self, inv):
@@ -47,7 +47,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         This is request, so the order should be Process, Message
         """
-        inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        inv_one = process_interceptors(self.interceptors["process_outgoing"] if "process_outgoing" in self.interceptors else [], inv)
         inv_two = EndpointUnit._intercept_msg_out(self, inv_one)
 
         return inv_two

@@ -133,6 +133,9 @@ class ExchangeManager(object):
         self._transport = AMQPTransport.get_instance()
         self._client    = self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
 
+        # load interceptors into each
+        map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
+
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
 
     def stop(self, *args, **kwargs):

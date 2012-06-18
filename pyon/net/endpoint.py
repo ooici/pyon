@@ -24,39 +24,6 @@ import sys
 from Queue import Empty
 from pyon.util.sflow import SFlowManager
 
-
-interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
-
-# Note: This is now called from pyon.core.bootstrap
-def instantiate_interceptors(interceptor_cfg):
-    stack = interceptor_cfg["stack"]
-    defs = interceptor_cfg["interceptors"]
-
-    by_name_dict = {}
-    for type_and_direction in stack:
-        interceptor_names = stack[type_and_direction]
-        for name in interceptor_names:
-            if name in by_name_dict:
-                classinst = by_name_dict[name]
-            else:
-                interceptor_def = defs[name]
-
-                # Instantiate and put in by_name array
-                parts = interceptor_def["class"].split('.')
-                modpath = ".".join(parts[:-1])
-                classname = parts[-1]
-                module = __import__(modpath, fromlist=[classname])
-                classobj = getattr(module, classname)
-                classinst = classobj()
-
-                # Call configure
-                classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
-
-                # Put in by_name_dict for possible re-use
-                by_name_dict[name] = classinst
-
-            interceptors[type_and_direction].append(classinst)
-
 class EndpointError(StandardError):
     pass
 
@@ -78,6 +45,24 @@ class EndpointUnit(object):
 
     channel = None
     _recv_greenlet = None
+    _endpoint = None
+    _interceptors = None
+
+    def __init__(self, endpoint=None, interceptors=None):
+        self._endpoint = endpoint
+        self.interceptors = interceptors
+
+    @property
+    def interceptors(self):
+        if self._interceptors is not None:
+            return self._interceptors
+
+        assert self._endpoint, "No endpoint attached"
+        return self._endpoint.interceptors
+
+    @interceptors.setter
+    def interceptors(self, value):
+        self._interceptors = value
 
     def attach_channel(self, channel):
         log.debug("In EndpointUnit.attach_channel")
@@ -118,7 +103,7 @@ class EndpointUnit(object):
         @param  inv     An Invocation instance.
         @returns        A processed Invocation instance.
         """
-        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+        inv_prime = process_interceptors(self.interceptors["message_incoming"] if "message_incoming" in self.interceptors else [], inv)
         return inv_prime
 
     def message_received(self, msg, headers):
@@ -165,7 +150,7 @@ class EndpointUnit(object):
         @param  inv     An Invocation instance.
         @returns        A processed Invocation instance.
         """
-        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        inv_prime = process_interceptors(self.interceptors["message_outgoing"] if "message_outgoing" in self.interceptors else [], inv)
         return inv_prime
 
     def spawn_listener(self):
@@ -251,6 +236,7 @@ class BaseEndpoint(object):
     # Endpoints
     # TODO: Make weakref or replace entirely
     endpoint_by_name = {}
+    _interceptors = None
 
     def __init__(self, node=None):
 
@@ -291,6 +277,18 @@ class BaseEndpoint(object):
             else:
                 raise EndpointError("Cannot pull node from Container.instance and no node specified")
 
+    @property
+    def interceptors(self):
+        if self._interceptors is not None:
+            return self._interceptors
+
+        assert self.node, "No node attached"
+        return self.node.interceptors
+
+    @interceptors.setter
+    def interceptors(self, value):
+        self._interceptors = value
+
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """
         @param  to_name     Either a string or a 2-tuple of (exchange, name)
@@ -301,7 +299,7 @@ class BaseEndpoint(object):
             self._ensure_node()
             ch = self._create_channel()
 
-        e = self.endpoint_unit_type(**kwargs)
+        e = self.endpoint_unit_type(endpoint=self, **kwargs)
         e.attach_channel(ch)
 
         return e
@@ -542,8 +540,8 @@ class SubscriberEndpointUnit(EndpointUnit):
     """
     @TODO: Should have routing mechanics, possibly shared with other listener endpoint types
     """
-    def __init__(self, callback):
-        EndpointUnit.__init__(self)
+    def __init__(self, callback, **kwargs):
+        EndpointUnit.__init__(self, **kwargs)
         self.set_callback(callback)
 
     def set_callback(self, callback):
@@ -920,7 +918,7 @@ class RPCClient(RequestResponseClient):
 
 class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
-        ResponseEndpointUnit.__init__(self)
+        ResponseEndpointUnit.__init__(self, **kwargs)
         self._routing_obj = routing_obj
         
     def _message_received(self, msg, headers):
