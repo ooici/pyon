@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Ion utility for generating interfaces from object definitions(and vice versa)
+"""Functions for generating Python service interfaces from service definitions"""
 
 __author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster, Seman Said'
 __license__ = 'Apache 2.0'
@@ -18,10 +18,11 @@ import hashlib
 import argparse
 import traceback
 from collections import OrderedDict
+
 from pyon.core.path import list_files_recursive
+from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.service.service import BaseService
 from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
-from pyon.ion.directory_standalone import DirectoryStandalone
 
 templates = {
       'file':
@@ -227,8 +228,307 @@ class ServiceObjectGenerator:
         self.system_name = system_name
         self.read_from_yaml_file = read_from_yaml_file
         self.service_definitions_filename = OrderedDict()
-        self.dir = DirectoryStandalone(sysname=self.system_name)
 
+    def generate(self, opts):
+        '''
+        Generates services
+        '''
+        service_dir, interface_dir = 'obj/services', 'interface'
+        data_yaml_text = self.get_object_definition()
+        service_yaml_text = self.get_service_definition()
+        enum_tag = u'!enum'
+
+        def enum_constructor(loader, node):
+            val_str = str(node.value)
+            val_str = val_str[1:-1].strip()
+            if 'name' in val_str:
+                name_str = val_str.split(',', 1)[0].split('=')[1].strip()
+                return "!" + str(name_str)
+            else:
+                return "Enum Name Not Provided"
+
+        yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
+        #yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
+        #yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
+
+        # Now walk the data model definition yaml files adding the
+        # necessary yaml constructors.
+        defs = yaml.load_all(data_yaml_text, Loader=IonYamlLoader)
+        def_dict = {}
+        for def_set in defs:
+            for name, _def in def_set.iteritems():
+                if isinstance(_def, OrderedDict):
+                    def_dict[name] = _def
+                tag = u'!%s' % (name)
+
+                def constructor(loader, node):
+                    value = node.tag.strip('!')
+                    # See if this is an enum ref
+                    if value in self.enums_by_name:
+                        return {"__IsEnum": True, "value": value + "." + self.enums_by_name[value]["default"], "type": value}
+                    else:
+                        return str(value) + "()"
+                yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+                xtag = u'!Extends_%s' % (name)
+
+                def extends_constructor(loader, node):
+                    if isinstance(node, yaml.MappingNode):
+                        value = loader.construct_mapping(node)
+                    else:
+                        value = {}
+                    return value
+                yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+        # Do the same for any data model objects in the service
+        # definition files.
+        defs = yaml.load_all(service_yaml_text, Loader=IonYamlLoader)
+        for def_set in defs:
+            for name, _def in def_set.get('obj', {}).iteritems():
+                if isinstance(_def, OrderedDict):
+                    def_dict[name] = _def
+                tag = u'!%s' % (name)
+
+                def constructor(loader, node):
+                    value = node.tag.strip('!')
+                    # See if this is an enum ref
+                    if value in self.enums_by_name:
+                        return {"__IsEnum": True, "value": value + "." + self.enums_by_name[value]["default"], "type": value}
+                    else:
+                        return str(value) + "()"
+                yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+
+                xtag = u'!Extends_%s' % (name)
+
+                def extends_constructor(loader, node):
+                    if isinstance(node, yaml.MappingNode):
+                        value = loader.construct_mapping(node)
+                    else:
+                        value = {}
+                    return value
+                yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+
+        yaml_text = data_yaml_text
+
+        # Load data yaml files in case services define interfaces
+        # in terms of common data objects
+        defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
+        for def_set in defs:
+            for name, _def in def_set.iteritems():
+                tag = u'!%s' % (name)
+                yaml.add_constructor(tag, self.doc_tag_constructor)
+                xtag = u'!Extends_%s' % (name)
+                yaml.add_constructor(xtag, lambda loader, node: {})
+
+        svc_signatures = {}
+        sigfile = os.path.join('interface', '.svc_signatures.yml')
+        if os.path.exists(sigfile):
+            with open(sigfile, 'r') as f:
+                cnts = f.read()
+                svc_signatures = yaml.load(cnts)
+
+        count = 0
+
+        # mapping of service name -> { name, docstring, deps, methods }
+        raw_services = {}
+
+        # dependency graph, maps svcs -> deps by service name as a list
+        service_dep_graph = {}
+
+        # completed service client definitions, maps service name -> full module path to find module
+        client_defs = {}
+
+        yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
+        # Generate the new definitions, for now giving each
+        # yaml file its own python service
+        # service_definition_file_path = self.get_service_definition_file_path(service_dir)
+        for yaml_file in self.get_service_definition_file_path(service_dir):
+            file_path = yaml_file_re.match(yaml_file).group(2)
+            interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
+            interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
+            parent_dir = os.path.dirname(interface_file)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+                parent = parent_dir
+                while True:
+                    # Add __init__.py files to parent dirs as necessary
+                    curdir = os.path.split(os.path.abspath(parent))[1]
+                    if curdir == 'services':
+                        break
+                    else:
+                        parent = os.path.split(os.path.abspath(parent))[0]
+
+                        pkg_file = os.path.join(parent, '__init__.py')
+                        if not os.path.exists(pkg_file):
+                            open(pkg_file, 'w').close()
+
+            pkg_file = os.path.join(parent_dir, '__init__.py')
+            if not os.path.exists(pkg_file):
+                open(pkg_file, 'w').close()
+
+            skip_file = False
+            yaml_text = self.get_yaml_text(yaml_file)
+            if (yaml_text):
+                #yaml_text = f.read()
+                m = hashlib.md5()
+                m.update(yaml_text)
+                cur_md5 = m.hexdigest()
+
+                if yaml_file in svc_signatures and not opts.force:
+                    if cur_md5 == svc_signatures[yaml_file]:
+                        print "Skipping   %40s (md5 signature match)" % interface_name
+                        skip_file = True
+                        # do not continue here, we want to read the service deps below
+
+                if opts.dryrun:
+                    count += 1
+                    print "Changed    %40s (needs update)" % interface_name
+                    skip_file = True
+                    # do not continue here, we want to read the service deps below
+
+                # update signature set
+                if not skip_file:
+                    svc_signatures[yaml_file] = cur_md5
+
+            defs = yaml.load_all(yaml_text)
+            for def_set in defs:
+                # Handle object definitions first; make dummy constructors so tags will parse
+                if 'obj' in def_set:
+                    for obj_name in def_set['obj']:
+                        tag = u'!%s' % (obj_name)
+                        yaml.add_constructor(tag, self.doc_tag_constructor)
+                    continue
+
+                service_name = def_set.get('name', None)
+                class_docstring = def_set.get('docstring', "class docstring")
+                spec = def_set.get('spec', None)
+                dependencies = def_set.get('dependencies', None)
+                meth_list = def_set.get('methods', {}) or {}
+                client_path = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % self.service_name_from_file_name(interface_name))
+
+                # format multiline docstring
+                class_docstring_lines = class_docstring.split('\n')
+
+                # Annoyingly, we have to hand format the doc strings to introduce
+                # the correct indentation on multi-line strings
+                first_time = True
+                class_docstring_formatted = ""
+                for i in range(len(class_docstring_lines)):
+                    class_docstring_line = class_docstring_lines[i]
+                    # Potentially remove excess blank line
+                    if class_docstring_line == "" and i == len(class_docstring_lines) - 1:
+                        break
+                    if first_time:
+                        first_time = False
+                    else:
+                        class_docstring_formatted += "\n    "
+                    class_docstring_formatted += class_docstring_line
+
+                # load into raw_services (if we're not skipping)
+                if not skip_file:
+                    if service_name in raw_services:
+                        raise StandardError("Duplicate service name found: %s" % service_name)
+
+                    raw_services[service_name] = {'name': service_name,
+                                                  'docstring': class_docstring_formatted,
+                                                  'spec': spec,
+                                                  'dependencies': dependencies,
+                                                  'methods': meth_list,
+                                                  'interface_file': interface_file,
+                                                  'interface_name': interface_name,
+                                                  'client_path': client_path}
+
+                # dep capturing (we check cycles when we topologically sort later)
+                if not service_name in service_dep_graph:
+                    service_dep_graph[service_name] = set()
+
+                for dep in dependencies:
+                    service_dep_graph[service_name].add(dep)
+
+                # update list of client paths for the client to this service
+                client_defs[service_name] = client_path
+
+        print " About to generate", len(raw_services), "service interfaces"
+
+        # topological sort of services to make sure we do things in order
+        # http://en.wikipedia.org/wiki/Topological_sorting
+        sorted_services = []
+        service_set = set([k for k, v in service_dep_graph.iteritems() if len(v) == 0])
+
+        while len(service_set) > 0:
+            n = service_set.pop()
+
+            # topo sort is over the whole dep tree, but raw_services only contains the stuff we're really generating
+            # so if it doesn't exist in raw_services, don't bother!
+            if n in raw_services:
+                sorted_services.append((n, raw_services[n]))
+
+            # get list of all services that depend on the current service
+            depending_services = [k for k, v in service_dep_graph.iteritems() if n in v]
+
+            for depending_service in depending_services:
+
+                # remove this dep
+                service_dep_graph[depending_service].remove(n)
+
+                # if it has no more deps, add it to the service_set list
+                if len(service_dep_graph[depending_service]) == 0:
+                    service_set.add(depending_service)
+
+        # ok, check for any remaining deps that we never found - indicates a cycle
+        remaining_deps = set([k for k, v in service_dep_graph.iteritems() if len(v) > 0])
+        if len(remaining_deps):
+            print >> sys.stderr, "**********************************************************************"
+            print >> sys.stderr, "Error in dependency resolution: either a cycle or a missing dependency"
+            print >> sys.stderr, "Service -> Conflicting Dependency table:"
+            for k, v in service_dep_graph.iteritems():
+                if len(v) == 0:
+                    continue
+                print >> sys.stderr, "\t", k, "->", ",".join(v)
+            print >> sys.stderr, "**********************************************************************"
+            raise StandardError("Cycle found in dependencies: could not resolve %s" % str(remaining_deps))
+
+        for svc in sorted_services:
+            svc_name, raw_def = svc
+            self.generate_service(raw_def['interface_file'], raw_def, client_defs, opts)
+            count += 1
+
+        if count > 0 and not opts.dryrun:
+
+            # write current svc_signatures
+            print " Writing signature file to", sigfile
+            with open(sigfile, 'w') as f:
+                f.write(yaml.dump(svc_signatures))
+
+            # Load interface base classes
+            self.load_mods("interface/services", True)
+            base_subtypes = self.find_subtypes(BaseService)
+            # Load impl classes
+            self.load_mods("ion", False)
+
+            # write client public file
+            # @TODO: reenable when 'as' directory goes away
+            '''
+            clientfile = os.path.join('interface', 'clients.py')
+            print "Writing public client file to", clientfile
+
+            with open(clientfile, 'w') as f:
+                f.write(templates['client_file'].substitute(when_generated=self.currtime,
+                                                            client_imports="\n".join([templates['dep_client_imports'].substitute(clientmodule=x[0], clientclass=x[1]) for x in client_defs.itervalues()])))
+            '''
+
+        self.generate_validation_report()
+        exitcode = 0
+
+        # only exit with 1 if we notice changes, and we specified dryrun
+        if count > 0 and opts.dryrun:
+            exitcode = 1
+
+        return exitcode
+        #sys.exit(exitcode)
+
+    # -------------------------------------------------------------------------
+    # Helpers
 
     def build_class_doc_string(self, base_doc_str, _def_spec):
         '''
@@ -387,142 +687,10 @@ class ServiceObjectGenerator:
             res.append(cls)
         return res
 
-    def load_mods(self, path, interfaces):
-        mod_prefix = string.replace(path, "/", ".")
-
-        encountered_load_error = False
-        for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
-            if is_pkg:
-                self.load_mods(path + "/" + mod_name, interfaces)
-            else:
-                mod_qual = "%s.%s" % (mod_prefix, mod_name)
-                try:
-                    __import__(mod_qual)
-                except Exception, ex:
-                    encountered_load_error = True
-                    print "Import module '%s' failed: %s" % (mod_qual, ex)
-                    traceback.print_exc()
-                    if not interfaces:
-                        print "Make sure that you have defined an __init__.py in your directory, you have imported the correct service base type"
-                        print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"
-                        print "syntax errors in your code or in the modules your code imports.\n"
-
-        if encountered_load_error:
-            sys.exit(1)
 
 
-    #
-    # Generate validation report
-    #
-    def generate_validation_report (self):
-        # WARNING!!!!
-        # At this point, all the code (py files) should be generated. Now we can bootstrap pyon
-        # which reads these py files.
-        # THEN we can load all the modules, which depend on pyon
-        from pyon.core import bootstrap
-        bootstrap.bootstrap_pyon()
 
-        validation_results = "Report generated on " + self.currtime + "\n"
-        self.load_mods("interface/services", True)
-        base_subtypes = self.find_subtypes(BaseService)
-        self.load_mods("ion", False)
-        self.load_mods("examples", False)
 
-        for base_subtype in base_subtypes:
-            base_subtype_name = base_subtype.__module__ + "." + base_subtype.__name__
-            compare_methods = {}
-            for method_tuple in inspect.getmembers(base_subtype, inspect.ismethod):
-                method_name = method_tuple[0]
-                method = method_tuple[1]
-                # Ignore private methods
-                if method_name.startswith("_"):
-                    continue
-                # Ignore methods not implemented in the class
-                if method_name not in base_subtype.__dict__:
-                    continue
-                compare_methods[method_name] = method
-
-            # Find implementing subtypes of each base interface
-            impl_subtypes = self.find_subtypes(base_subtype)
-            if len(impl_subtypes) == 0:
-                validation_results += "\nBase service: %s \n" % base_subtype_name
-                validation_results += "  No impl subtypes found\n"
-            for impl_subtype in self.find_subtypes(base_subtype):
-                impl_subtype_name = impl_subtype.__module__ + "." + impl_subtype.__name__
-
-                # Compare parameters
-                added_class_names = False
-                found_error = False
-                for key in compare_methods:
-                    if key not in impl_subtype.__dict__:
-                        found_error = True
-                        if not added_class_names:
-                            added_class_names = True
-                            validation_results += "\nBase service: %s\n" % base_subtype_name
-                            validation_results += "Impl subtype: %s\n" % impl_subtype_name
-                        validation_results += "  Method '%s' not implemented\n" % key
-                    else:
-                        base_params = inspect.getargspec(compare_methods[key])
-                        impl_params = inspect.getargspec(impl_subtype.__dict__[key])
-
-                        if base_params != impl_params:
-                            found_error = True
-                            if not added_class_names:
-                                added_class_names = True
-                                validation_results += "\nBase service: %s\n" % base_subtype_name
-                                validation_results += "Impl subtype: %s\n" % impl_subtype_name
-                            validation_results += "  Method '%s' implementation is out of sync\n" % key
-                            validation_results += "    Base: %s\n" % str(base_params)
-                            validation_results += "    Impl: %s\n" % str(impl_params)
-
-                if found_error is False:
-                    validation_results += "\nBase service: %s\n" % base_subtype_name
-                    validation_results += "Impl subtype: %s\n" % impl_subtype_name
-                    validation_results += "  OK\n"
-
-        reportfile = os.path.join('interface', 'validation_report.txt')
-        try:
-            os.unlink(reportfile)
-        except:
-            pass
-        print "Writing validation report to '" + reportfile + "'"
-        with open(reportfile, 'w') as f:
-            f.write(validation_results)
-
-    def build_args_str(self, _def, include_self=True):
-        '''
-        Handle case where method has no parameters
-        '''
-        args = []
-        if include_self:
-            args.append('self')
-
-        for key, val in (_def or {}).iteritems():
-            if isinstance(val, basestring):
-                if val.startswith("!"):
-                    val = val.strip("!")
-                    if val in self.enums_by_name:
-                        # Get default enum value
-                        enum_def = self.enums_by_name[val]
-                        val = "interface.objects." + val + "." + enum_def["default"]
-                    else:
-                        val = "None"
-                else:
-                    val = "'%s'" % (val)
-            elif isinstance(val, datetime.datetime):
-                # TODO: generate the datetime code
-                val = "'%s'" % (val)
-            # For collections, default to an empty collection of the same base type
-            elif isinstance(val, list):
-                val = "None"
-            elif isinstance(val, dict):
-                val = "None"
-            elif isinstance(val, tuple):
-                val = "None"
-            args.append(templates['arg'].substitute(name=key, val=val))
-
-        args_str = ', '.join(args)
-        return args_str
 
     def generate_service(self, interface_file, svc_def, client_defs, opts):
         """
@@ -543,7 +711,7 @@ class ServiceObjectGenerator:
         if service_name is None:
             raise IonServiceDefinitionError("Service definition file %s does not define name attribute" % interface_file)
 
-        print 'Generating %40s -> %s' % (interface_name, interface_file)
+        print ' Generating %40s -> %s' % (interface_name, interface_file)
 
         methods = []
         class_methods = []
@@ -722,6 +890,7 @@ class ServiceObjectGenerator:
             with open(path, 'r') as f:
                 return f.read()
         else:
+            self.dir = DirectoryStandalone(sysname=self.system_name)
             data = self.dir.lookup_by_path(path)
             # Return the first item
             for item in data:
@@ -739,325 +908,146 @@ class ServiceObjectGenerator:
 
     def get_service_definition(self):
         if self.read_from_yaml_file:
-            print "Service object generator: reading definitions from files"
+            print " Service interface generator: reading service definitions from files"
             service_yaml_files = list_files_recursive('obj/services', '*.yml')
             data = '\n\n'.join((file.read() for file in(open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
         else:
-            print "Service object generator: reading definitions from datastore"
+            print " Service interface generator: reading service definitions from datastore"
             data = self.get_service_definition_from_datastore()
         return data
 
-    def generate(self, opts):
+    def build_args_str(self, _def, include_self=True):
         '''
-        Generates services
+        Handle case where method has no parameters
         '''
-        service_dir, interface_dir = 'obj/services', 'interface'
-        data_yaml_text = self.get_object_definition()
-        service_yaml_text = self.get_service_definition()
-        enum_tag = u'!enum'
+        args = []
+        if include_self:
+            args.append('self')
 
-        #TODO: for testing
-        '''
-        f = open ('service_from_file',  'w')
-        f.write(data_yaml_text + service_yaml_text)
-        f.close()
-
-        self.read_from_yaml_file = False
-        data_yaml_text = self.get_object_definition()
-        service_yaml_text = self.get_service_definition()
-
-        f = open ('service_from_datastore',  'w')
-        f.write(data_yaml_text + service_yaml_text)
-        f.close()
-
-        exit()
-        '''
-
-        def enum_constructor(loader, node):
-            val_str = str(node.value)
-            val_str = val_str[1:-1].strip()
-            if 'name' in val_str:
-                name_str = val_str.split(',', 1)[0].split('=')[1].strip()
-                return "!" + str(name_str)
-            else:
-                return "Enum Name Not Provided"
-
-        yaml.add_constructor(enum_tag, enum_constructor, Loader=IonYamlLoader)
-        #yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml'])
-        #yaml_text = '\n\n'.join((file.read() for file in (open(path, 'r') for path in yaml_files if os.path.exists(path))))
-
-        # Now walk the data model definition yaml files adding the
-        # necessary yaml constructors.
-        defs = yaml.load_all(data_yaml_text, Loader=IonYamlLoader)
-        def_dict = {}
-        for def_set in defs:
-            for name, _def in def_set.iteritems():
-                if isinstance(_def, OrderedDict):
-                    def_dict[name] = _def
-                tag = u'!%s' % (name)
-
-                def constructor(loader, node):
-                    value = node.tag.strip('!')
-                    # See if this is an enum ref
-                    if value in self.enums_by_name:
-                        return {"__IsEnum": True, "value": value + "." + self.enums_by_name[value]["default"], "type": value}
+        for key, val in (_def or {}).iteritems():
+            if isinstance(val, basestring):
+                if val.startswith("!"):
+                    val = val.strip("!")
+                    if val in self.enums_by_name:
+                        # Get default enum value
+                        enum_def = self.enums_by_name[val]
+                        val = "interface.objects." + val + "." + enum_def["default"]
                     else:
-                        return str(value) + "()"
-                yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
+                        val = "None"
+                else:
+                    val = "'%s'" % (val)
+            elif isinstance(val, datetime.datetime):
+                # TODO: generate the datetime code
+                val = "'%s'" % (val)
+            # For collections, default to an empty collection of the same base type
+            elif isinstance(val, list):
+                val = "None"
+            elif isinstance(val, dict):
+                val = "None"
+            elif isinstance(val, tuple):
+                val = "None"
+            args.append(templates['arg'].substitute(name=key, val=val))
 
-                xtag = u'!Extends_%s' % (name)
+        args_str = ', '.join(args)
+        return args_str
 
-                def extends_constructor(loader, node):
-                    if isinstance(node, yaml.MappingNode):
-                        value = loader.construct_mapping(node)
-                    else:
-                        value = {}
-                    return value
-                yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
+    #
+    # Generate validation report
+    #
+    def generate_validation_report (self):
+        # WARNING!!!!
+        # At this point, all the code (py files) should be generated. Now we can bootstrap pyon
+        # which reads these py files.
+        # THEN we can load all the modules, which depend on pyon
+        from pyon.core import bootstrap
+        bootstrap.bootstrap_pyon()
 
-        # Do the same for any data model objects in the service
-        # definition files.
-        defs = yaml.load_all(service_yaml_text, Loader=IonYamlLoader)
-        for def_set in defs:
-            for name, _def in def_set.get('obj', {}).iteritems():
-                if isinstance(_def, OrderedDict):
-                    def_dict[name] = _def
-                tag = u'!%s' % (name)
+        validation_results = "Report generated on " + self.currtime + "\n"
+        self.load_mods("interface/services", True)
+        base_subtypes = self.find_subtypes(BaseService)
+        self.load_mods("ion", False)
+        self.load_mods("examples", False)
 
-                def constructor(loader, node):
-                    value = node.tag.strip('!')
-                    # See if this is an enum ref
-                    if value in self.enums_by_name:
-                        return {"__IsEnum": True, "value": value + "." + self.enums_by_name[value]["default"], "type": value}
-                    else:
-                        return str(value) + "()"
-                yaml.add_constructor(tag, constructor, Loader=IonYamlLoader)
-
-                xtag = u'!Extends_%s' % (name)
-
-                def extends_constructor(loader, node):
-                    if isinstance(node, yaml.MappingNode):
-                        value = loader.construct_mapping(node)
-                    else:
-                        value = {}
-                    return value
-                yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
-
-        yaml_text = data_yaml_text
-
-        # Load data yaml files in case services define interfaces
-        # in terms of common data objects
-        defs = yaml.load_all(yaml_text, Loader=IonYamlLoader)
-        for def_set in defs:
-            for name, _def in def_set.iteritems():
-                tag = u'!%s' % (name)
-                yaml.add_constructor(tag, self.doc_tag_constructor)
-                xtag = u'!Extends_%s' % (name)
-                yaml.add_constructor(xtag, lambda loader, node: {})
-
-        svc_signatures = {}
-        sigfile = os.path.join('interface', '.svc_signatures.yml')
-        if os.path.exists(sigfile):
-            with open(sigfile, 'r') as f:
-                cnts = f.read()
-                svc_signatures = yaml.load(cnts)
-
-        count = 0
-
-        # mapping of service name -> { name, docstring, deps, methods }
-        raw_services = {}
-
-        # dependency graph, maps svcs -> deps by service name as a list
-        service_dep_graph = {}
-
-        # completed service client definitions, maps service name -> full module path to find module
-        client_defs = {}
-
-        yaml_file_re = re.compile('(obj)/(.*)[.](yml)')
-        # Generate the new definitions, for now giving each
-        # yaml file its own python service
-        # service_definition_file_path = self.get_service_definition_file_path(service_dir)
-        for yaml_file in self.get_service_definition_file_path(service_dir):
-                file_path = yaml_file_re.match(yaml_file).group(2)
-                interface_base, interface_name = os.path.dirname(file_path), os.path.basename(file_path)
-                interface_file = os.path.join('interface', interface_base, 'i%s.py' % interface_name)
-                parent_dir = os.path.dirname(interface_file)
-                if not os.path.exists(parent_dir):
-                    os.makedirs(parent_dir)
-                    parent = parent_dir
-                    while True:
-                        # Add __init__.py files to parent dirs as necessary
-                        curdir = os.path.split(os.path.abspath(parent))[1]
-                        if curdir == 'services':
-                            break
-                        else:
-                            parent = os.path.split(os.path.abspath(parent))[0]
-
-                            pkg_file = os.path.join(parent, '__init__.py')
-                            if not os.path.exists(pkg_file):
-                                open(pkg_file, 'w').close()
-
-                pkg_file = os.path.join(parent_dir, '__init__.py')
-                if not os.path.exists(pkg_file):
-                    open(pkg_file, 'w').close()
-
-                skip_file = False
-                yaml_text = self.get_yaml_text(yaml_file)
-                if (yaml_text):
-                    #yaml_text = f.read()
-                    m = hashlib.md5()
-                    m.update(yaml_text)
-                    cur_md5 = m.hexdigest()
-
-                    if yaml_file in svc_signatures and not opts.force:
-                        if cur_md5 == svc_signatures[yaml_file]:
-                            print "Skipping   %40s (md5 signature match)" % interface_name
-                            skip_file = True
-                            # do not continue here, we want to read the service deps below
-
-                    if opts.dryrun:
-                        count += 1
-                        print "Changed    %40s (needs update)" % interface_name
-                        skip_file = True
-                        # do not continue here, we want to read the service deps below
-
-                    # update signature set
-                    if not skip_file:
-                        svc_signatures[yaml_file] = cur_md5
-
-                defs = yaml.load_all(yaml_text)
-                for def_set in defs:
-                    # Handle object definitions first; make dummy constructors so tags will parse
-                    if 'obj' in def_set:
-                        for obj_name in def_set['obj']:
-                            tag = u'!%s' % (obj_name)
-                            yaml.add_constructor(tag, self.doc_tag_constructor)
-                        continue
-
-                    service_name = def_set.get('name', None)
-                    class_docstring = def_set.get('docstring', "class docstring")
-                    spec = def_set.get('spec', None)
-                    dependencies = def_set.get('dependencies', None)
-                    meth_list = def_set.get('methods', {}) or {}
-                    client_path = ('.'.join(['interface', interface_base.replace('/', '.'), 'i%s' % interface_name]), '%sProcessClient' % self.service_name_from_file_name(interface_name))
-
-                    # format multiline docstring
-                    class_docstring_lines = class_docstring.split('\n')
-
-                    # Annoyingly, we have to hand format the doc strings to introduce
-                    # the correct indentation on multi-line strings
-                    first_time = True
-                    class_docstring_formatted = ""
-                    for i in range(len(class_docstring_lines)):
-                        class_docstring_line = class_docstring_lines[i]
-                        # Potentially remove excess blank line
-                        if class_docstring_line == "" and i == len(class_docstring_lines) - 1:
-                            break
-                        if first_time:
-                            first_time = False
-                        else:
-                            class_docstring_formatted += "\n    "
-                        class_docstring_formatted += class_docstring_line
-
-                    # load into raw_services (if we're not skipping)
-                    if not skip_file:
-                        if service_name in raw_services:
-                            raise StandardError("Duplicate service name found: %s" % service_name)
-
-                        raw_services[service_name] = {'name': service_name,
-                                                      'docstring': class_docstring_formatted,
-                                                      'spec': spec,
-                                                      'dependencies': dependencies,
-                                                      'methods': meth_list,
-                                                      'interface_file': interface_file,
-                                                      'interface_name': interface_name,
-                                                      'client_path': client_path}
-
-                    # dep capturing (we check cycles when we topologically sort later)
-                    if not service_name in service_dep_graph:
-                        service_dep_graph[service_name] = set()
-
-                    for dep in dependencies:
-                        service_dep_graph[service_name].add(dep)
-
-                    # update list of client paths for the client to this service
-                    client_defs[service_name] = client_path
-
-        print "About to generate", len(raw_services), "services"
-
-        # topological sort of services to make sure we do things in order
-        # http://en.wikipedia.org/wiki/Topological_sorting
-        sorted_services = []
-        service_set = set([k for k, v in service_dep_graph.iteritems() if len(v) == 0])
-
-        while len(service_set) > 0:
-            n = service_set.pop()
-
-            # topo sort is over the whole dep tree, but raw_services only contains the stuff we're really generating
-            # so if it doesn't exist in raw_services, don't bother!
-            if n in raw_services:
-                sorted_services.append((n, raw_services[n]))
-
-            # get list of all services that depend on the current service
-            depending_services = [k for k, v in service_dep_graph.iteritems() if n in v]
-
-            for depending_service in depending_services:
-
-                # remove this dep
-                service_dep_graph[depending_service].remove(n)
-
-                # if it has no more deps, add it to the service_set list
-                if len(service_dep_graph[depending_service]) == 0:
-                    service_set.add(depending_service)
-
-        # ok, check for any remaining deps that we never found - indicates a cycle
-        remaining_deps = set([k for k, v in service_dep_graph.iteritems() if len(v) > 0])
-        if len(remaining_deps):
-            print >> sys.stderr, "**********************************************************************"
-            print >> sys.stderr, "Error in dependency resolution: either a cycle or a missing dependency"
-            print >> sys.stderr, "Service -> Conflicting Dependency table:"
-            for k, v in service_dep_graph.iteritems():
-                if len(v) == 0:
+        for base_subtype in base_subtypes:
+            base_subtype_name = base_subtype.__module__ + "." + base_subtype.__name__
+            compare_methods = {}
+            for method_tuple in inspect.getmembers(base_subtype, inspect.ismethod):
+                method_name = method_tuple[0]
+                method = method_tuple[1]
+                # Ignore private methods
+                if method_name.startswith("_"):
                     continue
-                print >> sys.stderr, "\t", k, "->", ",".join(v)
-            print >> sys.stderr, "**********************************************************************"
-            raise StandardError("Cycle found in dependencies: could not resolve %s" % str(remaining_deps))
+                    # Ignore methods not implemented in the class
+                if method_name not in base_subtype.__dict__:
+                    continue
+                compare_methods[method_name] = method
 
-        for svc in sorted_services:
-            svc_name, raw_def = svc
-            self.generate_service(raw_def['interface_file'], raw_def, client_defs, opts)
-            count += 1
+            # Find implementing subtypes of each base interface
+            impl_subtypes = self.find_subtypes(base_subtype)
+            if len(impl_subtypes) == 0:
+                validation_results += "\nBase service: %s \n" % base_subtype_name
+                validation_results += "  No impl subtypes found\n"
+            for impl_subtype in self.find_subtypes(base_subtype):
+                impl_subtype_name = impl_subtype.__module__ + "." + impl_subtype.__name__
 
-        if count > 0 and not opts.dryrun:
+                # Compare parameters
+                added_class_names = False
+                found_error = False
+                for key in compare_methods:
+                    if key not in impl_subtype.__dict__:
+                        found_error = True
+                        if not added_class_names:
+                            added_class_names = True
+                            validation_results += "\nBase service: %s\n" % base_subtype_name
+                            validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                        validation_results += "  Method '%s' not implemented\n" % key
+                    else:
+                        base_params = inspect.getargspec(compare_methods[key])
+                        impl_params = inspect.getargspec(impl_subtype.__dict__[key])
 
-            # write current svc_signatures
-            print "Writing signature file to", sigfile
-            with open(sigfile, 'w') as f:
-                f.write(yaml.dump(svc_signatures))
+                        if base_params != impl_params:
+                            found_error = True
+                            if not added_class_names:
+                                added_class_names = True
+                                validation_results += "\nBase service: %s\n" % base_subtype_name
+                                validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                            validation_results += "  Method '%s' implementation is out of sync\n" % key
+                            validation_results += "    Base: %s\n" % str(base_params)
+                            validation_results += "    Impl: %s\n" % str(impl_params)
 
-            # Load interface base classes
-            self.load_mods("interface/services", True)
-            base_subtypes = self.find_subtypes(BaseService)
-            # Load impl classes
-            self.load_mods("ion", False)
+                if found_error is False:
+                    validation_results += "\nBase service: %s\n" % base_subtype_name
+                    validation_results += "Impl subtype: %s\n" % impl_subtype_name
+                    validation_results += "  OK\n"
 
-            # write client public file
-            # @TODO: reenable when 'as' directory goes away
-            '''
-            clientfile = os.path.join('interface', 'clients.py')
-            print "Writing public client file to", clientfile
+        reportfile = os.path.join('interface', 'validation_report.txt')
+        try:
+            os.unlink(reportfile)
+        except:
+            pass
+        print " Writing service implementation validation report to '" + reportfile + "'"
+        with open(reportfile, 'w') as f:
+            f.write(validation_results)
 
-            with open(clientfile, 'w') as f:
-                f.write(templates['client_file'].substitute(when_generated=self.currtime,
-                                                            client_imports="\n".join([templates['dep_client_imports'].substitute(clientmodule=x[0], clientclass=x[1]) for x in client_defs.itervalues()])))
-            '''
+    def load_mods(self, path, interfaces):
+        mod_prefix = string.replace(path, "/", ".")
 
-        self.generate_validation_report()
-        exitcode = 0
+        encountered_load_error = False
+        for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
+            if is_pkg:
+                self.load_mods(path + "/" + mod_name, interfaces)
+            else:
+                mod_qual = "%s.%s" % (mod_prefix, mod_name)
+                try:
+                    __import__(mod_qual)
+                except Exception, ex:
+                    encountered_load_error = True
+                    print "Import module '%s' failed: %s" % (mod_qual, ex)
+                    traceback.print_exc()
+                    if not interfaces:
+                        print "Make sure that you have defined an __init__.py in your directory, you have imported the correct service base type"
+                        print "and your module does not have syntax/interpreter errors.  Module load will fail if the interpreter encounters"
+                        print "syntax errors in your code or in the modules your code imports.\n"
 
-        # only exit with 1 if we notice changes, and we specified dryrun
-        if count > 0 and opts.dryrun:
-            exitcode = 1
-
-        return exitcode
-        #sys.exit(exitcode)
+        if encountered_load_error:
+            sys.exit(1)

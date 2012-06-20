@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 
-# Ion utility for generating interfaces from object definitions(and vice versa)
-__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster'
+"""Functions for generating Python object interfaces from object definitions"""
+
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster, Seman Said'
 __license__ = 'Apache 2.0'
 
+from collections import OrderedDict
+import csv
 import os
+import re
 import string
 import yaml
-import re
-from collections import OrderedDict
+
 from pyon.core.path import list_files_recursive
 from pyon.ion.directory_standalone import DirectoryStandalone
-import csv
 
 
 class IonYamlLoader(yaml.Loader):
@@ -146,8 +148,6 @@ ${rowentries}
 'object_attributes_row_entry':
 '''${classname},${name},${type},${default},${description}
 '''
-
-
 }
 
 csv_doc_templates = dict(((k, string.Template(v)) for k, v in csv_doc_templates.iteritems()))
@@ -166,98 +166,67 @@ class ObjectModelGenerator:
         self.read_from_yaml_file = read_from_yaml_file
         self.obj_data = {}
 
-    def write_files(self, opts):
-        """
-        Write object model to object.py file and optionally csv files
-        """
-        datadir = 'interface'
-        if not os.path.exists(datadir):
-            os.makedirs(datadir)
-            open(os.path.join(datadir, '__init__.py'), 'w').close()
+    def generate(self, opts):
+        '''
+        Generate object model
+        '''
+        # Get data from the file
+        combined_yaml_text = self.read_yaml_text()
+        if not combined_yaml_text or len(combined_yaml_text) == 0:
+            print "object_model_generator: Error!!! the datastore (or the YAML file) is empty."
+            exit()
 
-        datamodelfile = os.path.join(datadir, 'objects.py')
-        try:
-            os.unlink(datamodelfile)
-        except:
-            pass
-        print "Writing object model to '" + datamodelfile + "'"
-        with open(datamodelfile, 'w') as f:
-            f.write(self.dataobject_output_text)
-
-        if opts.objectdoc:
-            objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
-            try:
-                os.unlink(objecttypecsvfile)
-            except:
-                pass
-            print "Writing object type csv to '" + objecttypecsvfile + "'"
-            csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
-                                  quotechar='"', quoting=csv.QUOTE_ALL)
-            csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
-            csv_file.writerows(self.csv_types_row_entries)
-
-            objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
-            try:
-                os.unlink(objectattrscsvfile)
-            except:
-                pass
-            print "Writing object attribute csv to '" + objectattrscsvfile + "'"
-            csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
-                                       quotechar='"', quoting=csv.QUOTE_ALL)
-            csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
-            csv_file.writerows(self.csv_attributes_row_entries)
+        # Parse and generate enums first
+        self.generate_enums(combined_yaml_text, opts)
+        # Add custom constructors so YAML doesn't choke
+        self.add_yaml_constructors()
+        # Generate model object classes in the object.py file
+        self.generate_objects(opts)
+        # Write to the objects.py file
+        self.write_files(opts)
 
     def read_yaml_text(self):
         '''
         Gets the data from YAML files or datastore
         '''
         if self.read_from_yaml_file:
-            print "Reading definitions from files"
+            print " Object interface generator: Reading object definitions from files"
             data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
             self.data_yaml_text = '\n\n'.join((file.read() for file in(open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
             service_yaml_files = list_files_recursive('obj/services', '*.yml')
             service_yaml_text = '\n\n'.join((file.read() for file in(open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
             data = self.data_yaml_text + "\n" + service_yaml_text
         else:
-            print "Reading definitions from datastore"
+            print " Object interface generator: Reading object definitions from datastore"
             self.data_yaml_text = self.get_object_definition_from_datastore()
             if not self.data_yaml_text:
                 return ''
             data = self.data_yaml_text + '\n' + self.get_service_definition_from_datastore()
         return data
 
-    def convert_val(self, value):
-        '''
-        Recursively generates right hand value for a class attribute.
-        '''
-        if isinstance(value, list):
-            outline = '['
-            first_time = True
-            for val in value:
-                if first_time:
-                    first_time = False
-                else:
-                    outline += ", "
-                outline += self.convert_val(val)
-            outline += ']'
-        elif isinstance(value, dict) and "__IsEnum" in value:
-            outline = value["value"]
-        elif isinstance(value, OrderedDict):
-            outline = '{'
-            first_time = True
-            for key in value:
-                if first_time:
-                    first_time = False
-                else:
-                    outline += ", "
-                outline += "'" + key + "': " + self.convert_val(value[key])
-            outline += '}'
-        elif isinstance(value, str):
-            outline = "'" + value + "'"
-        else:
-            outline = str(value)
+    def get_object_definition_from_datastore(self):
+        data = ''
+        dir = DirectoryStandalone(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ObjectTypes')
+        for item in entry:
+            try:
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
+        return data
 
-        return outline
+    def get_service_definition_from_datastore(self):
+        data = ''
+        dir = DirectoryStandalone(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        if not entry:
+            return data
+        for item in entry:
+            try:
+                data = data + item.value['attributes']['definition'] + '\n'
+            except:
+                return ''
+        return data
 
     def generate_enums(self, combined_yaml_text, opts):
         '''
@@ -360,21 +329,6 @@ class ObjectModelGenerator:
                         value = {}
                     return value
                 yaml.add_constructor(xtag, extends_constructor, Loader=IonYamlLoader)
-
-    def lookup_associations(self, classname):
-        from pyon.util.config import Config
-        from pyon.util.containers import DotDict
-        Predicates = DotDict()
-        Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
-        output = {}
-        for key in Predicates:
-            domain = str(Predicates[key]["domain"])
-            range = str(Predicates[key]["range"])
-            if classname in domain:
-                output[key] = Predicates[key]
-            if classname in range:
-                output[key] = Predicates[key]
-        return output
 
     def generate_objects(self, opts):
         '''
@@ -584,45 +538,91 @@ class ObjectModelGenerator:
             else:
                 self.dataobject_output_text += current_class_schema + "\n              }\n"
 
-    def generate(self, opts):
+    def lookup_associations(self, classname):
+        from pyon.util.config import Config
+        from pyon.util.containers import DotDict
+        Predicates = DotDict()
+        Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
+        output = {}
+        for key in Predicates:
+            domain = str(Predicates[key]["domain"])
+            range = str(Predicates[key]["range"])
+            if classname in domain:
+                output[key] = Predicates[key]
+            if classname in range:
+                output[key] = Predicates[key]
+        return output
+
+    def convert_val(self, value):
         '''
-        Generate object model
+        Recursively generates right hand value for a class attribute.
         '''
-        # Get data from the file
-        combined_yaml_text = self.read_yaml_text()
-        if not combined_yaml_text or len(combined_yaml_text) == 0:
-            print "object_model_generator: Error!!! the datastore (or the YAML file) is empty."
-            exit()
+        if isinstance(value, list):
+            outline = '['
+            first_time = True
+            for val in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += self.convert_val(val)
+            outline += ']'
+        elif isinstance(value, dict) and "__IsEnum" in value:
+            outline = value["value"]
+        elif isinstance(value, OrderedDict):
+            outline = '{'
+            first_time = True
+            for key in value:
+                if first_time:
+                    first_time = False
+                else:
+                    outline += ", "
+                outline += "'" + key + "': " + self.convert_val(value[key])
+            outline += '}'
+        elif isinstance(value, str):
+            outline = "'" + value + "'"
+        else:
+            outline = str(value)
 
-        # Parse and generate enums first
-        self.generate_enums(combined_yaml_text, opts)
-        # Add custom constructors so YAML doesn't choke
-        self.add_yaml_constructors()
-        # Generate model object classes in the object.py file
-        self.generate_objects(opts)
-        # Write to the objects.py file
-        self.write_files(opts)
+        return outline
 
-    def get_object_definition_from_datastore(self):
-        data = ''
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ObjectTypes')
-        for item in entry:
+    def write_files(self, opts):
+        """
+        Write object model to object.py file and optionally csv files
+        """
+        datadir = 'interface'
+        if not os.path.exists(datadir):
+            os.makedirs(datadir)
+            open(os.path.join(datadir, '__init__.py'), 'w').close()
+
+        datamodelfile = os.path.join(datadir, 'objects.py')
+        try:
+            os.unlink(datamodelfile)
+        except:
+            pass
+        print " Writing object interfaces to '" + datamodelfile + "'"
+        with open(datamodelfile, 'w') as f:
+            f.write(self.dataobject_output_text)
+
+        if opts.objectdoc:
+            objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
             try:
-                data = data + item.value['attributes']['definition'] + '\n'
+                os.unlink(objecttypecsvfile)
             except:
-                return ''
-        return data
+                pass
+            print " Writing object type csv to '" + objecttypecsvfile + "'"
+            csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
+                quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
+            csv_file.writerows(self.csv_types_row_entries)
 
-    def get_service_definition_from_datastore(self):
-        data = ''
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceDefinitions')
-        if not entry:
-            return data
-        for item in entry:
+            objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
             try:
-                data = data + item.value['attributes']['definition'] + '\n'
+                os.unlink(objectattrscsvfile)
             except:
-                return ''
-        return data
+                pass
+            print " Writing object attribute csv to '" + objectattrscsvfile + "'"
+            csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
+                quotechar='"', quoting=csv.QUOTE_ALL)
+            csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
+            csv_file.writerows(self.csv_attributes_row_entries)

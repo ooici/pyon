@@ -1,7 +1,15 @@
+#!/usr/bin/env python
+
+"""Functions for generating Python message interfaces from service definitions"""
+
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster, Seman Said'
+__license__ = 'Apache 2.0'
+
 
 import ast
 import os
 import re
+
 from pyon.core.path import list_files_recursive
 from pyon.ion.directory_standalone import DirectoryStandalone
 
@@ -313,14 +321,14 @@ class MessageObjectGenerator:
             os.unlink(messagemodelfile)
         except:
             pass
-        print "Writing message model to '" + messagemodelfile + "'"
+        print " Writing message interfaces to '" + messagemodelfile + "'"
         with open(messagemodelfile, 'w') as f:
             f.write(messageobject_output_text)
 
     def get_yaml_data(self):
         data = []
         if self.read_from_yaml_file:
-            print "Message object generator: reading definitions from files"
+            print " Message interface generator: reading service definitions from files"
             service_yaml_files = list_files_recursive('obj/services', '*.yml')
             for path in service_yaml_files:
                 if os.path.exists(path):
@@ -328,7 +336,7 @@ class MessageObjectGenerator:
                     data.append(file.read())
                     file.close()
         else:
-            print "Message object generator: reading definitions from datastore"
+            print " Message interface generator: reading service definitions from datastore"
             data = self.get_service_definition_from_datastore()
             if not data:
                 data = []
