@@ -424,7 +424,7 @@ class RecvChannel(BaseChannel):
         For performance reasons, only calls destroy queue. Derived implementations that want to tear down the
         binding should override this method.
         """
-        log.debug('destroy_listener name: %s', name)
+        #log.debug('destroy_listener name: %s', name)
         #self._destroy_binding()
         self._destroy_queue()
 
