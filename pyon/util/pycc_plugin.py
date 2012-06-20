@@ -117,7 +117,7 @@ class PYCC(Plugin):
             debug.write('Child container is ready...\n')
 
             # Dump datastore
-            self.datastore_admin.dump_datastore(path='res/dd')
+            self.datastore_admin.dump_datastore(path='res/dd', compact=True)
             debug.write('Dump child container state to file...\n')
 
             # Enable CEI mode for the tests

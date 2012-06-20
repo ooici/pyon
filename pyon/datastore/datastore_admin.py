@@ -28,13 +28,14 @@ class DatastoreAdmin(object):
             return None
         return ("%s_%s" % (self.sysname, ds_name)).lower()
 
-    def dump_datastore(self, path=None, ds_name=None, clear_dir=True):
+    def dump_datastore(self, path=None, ds_name=None, clear_dir=True, compact=False):
         """
         Dumps CouchDB datastores into a directory as YML files.
         @param ds_name Logical name (such as "resources") of an ION datastore
         @param path Directory to put dumped datastores into (defaults to
                     "res/preload/local/dump_[timestamp]")
         @param clear_dir if True, delete contents of datastore dump dirs
+        @param compact if True, saves all objects in one big YML file
         """
         if not path:
             dtstr = datetime.datetime.today().strftime('%Y%m%d_%H%M%S')
@@ -42,15 +43,15 @@ class DatastoreAdmin(object):
         if ds_name:
             ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
             if ds.exists_datastore(ds_name):
-                self._dump_datastore(path, ds_name, clear_dir)
+                self._dump_datastore(path, ds_name, clear_dir, compact)
             else:
                 log.warn("Datastore does not exist")
         else:
             ds_list = ['resources', 'objects', 'state', 'events', 'directory', 'scidata']
             for dsn in ds_list:
-                self._dump_datastore(path, dsn, clear_dir)
+                self._dump_datastore(path, dsn, clear_dir, compact)
 
-    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True):
+    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True, compact=False):
         ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
         if not ds.exists_datastore(ds_name):
             log.warn("Datastore does not exist: %s" % ds_name)
@@ -67,12 +68,20 @@ class DatastoreAdmin(object):
 
         objs = ds.find_docs_by_view("_all_docs", None, id_only=False)
         numwrites = 0
-        for obj_id, obj_key, obj in objs:
-            # Some object ids have slashes
-            fn = obj_id.replace("/","_")
-            with open("%s/%s.yml" % (outpath, fn), 'w') as f:
-                yaml.dump(obj, f, default_flow_style=False)
-                numwrites += 1
+        if compact:
+            compact_obj = [obj for obj_id, obj_key, obj in objs]
+            compact_obj.insert(0, "COMPACTDUMP")
+            with open("%s/%s_compact.yml" % (outpath, ds_name), 'w') as f:
+                yaml.dump(compact_obj, f, default_flow_style=False)
+            numwrites = len(objs)
+        else:
+            for obj_id, obj_key, obj in objs:
+                # Some object ids have slashes
+                fn = obj_id.replace("/","_")
+                with open("%s/%s.yml" % (outpath, fn), 'w') as f:
+                    yaml.dump(obj, f, default_flow_style=False)
+                    numwrites += 1
+
         log.info("Wrote %s objects to %s" % (numwrites, outpath))
 
     def load_datastore(self, path=None, ds_name=None, ignore_errors=True):
@@ -110,9 +119,10 @@ class DatastoreAdmin(object):
                 with open(fp, 'r') as f:
                     yaml_text = f.read()
                 obj = yaml.load(yaml_text)
-                if "_rev" in obj:
-                    del obj["_rev"]
-                objects.append(obj)
+                if obj and type(obj) is list and obj[0] == "COMPACTDUMP":
+                    objects.extend(obj[1:])
+                else:
+                    objects.append(obj)
             except Exception as ex:
                 if ignore_errors:
                     log.warn("load error id=%s err=%s" % (fn, str(ex)))
@@ -120,6 +130,9 @@ class DatastoreAdmin(object):
                     raise ex
 
         if objects:
+            for obj in objects:
+                if "_rev" in obj:
+                    del obj["_rev"]
             try:
                 res = ds.create_doc_mult(objects)
                 log.info("DatastoreLoader: Loaded %s objects into %s" % (len(res), ds_name))
