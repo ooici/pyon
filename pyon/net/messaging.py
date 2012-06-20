@@ -15,8 +15,10 @@ from pyon.core.bootstrap import CFG
 from pyon.net import amqp
 from pyon.net import channel
 from pyon.util.async import blocking_cb
+from pyon.util.containers import for_name
 from pyon.util.log import log
 from pyon.util.pool import IDPool
+from collections import defaultdict
 
 class NodeB(amqp.Node):
     """
@@ -34,6 +36,8 @@ class NodeB(amqp.Node):
         self._pool = IDPool()
         self._bidir_pool = {}   # maps inactive/active our numbers (from self._pool) to channels
         self._pool_map = {}     # maps active pika channel numbers to our numbers (from self._pool)
+
+        self.interceptors = {}  # endpoint interceptors
 
         amqp.Node.__init__(self)
 
@@ -127,6 +131,35 @@ class NodeB(amqp.Node):
 
                 self._bidir_pool.pop(chid)
                 self._pool._ids_free.remove(chid)
+
+    def setup_interceptors(self, interceptor_cfg):
+        stack = interceptor_cfg["stack"]
+        defs = interceptor_cfg["interceptors"]
+
+        interceptors = defaultdict(list)
+
+        by_name_dict = {}
+        for type_and_direction in stack:
+            interceptor_names = stack[type_and_direction]
+            for name in interceptor_names:
+                if name in by_name_dict:
+                    classinst = by_name_dict[name]
+                else:
+                    interceptor_def = defs[name]
+
+                    # Instantiate and put in by_name array
+                    modpath, classname  = interceptor_def['class'].rsplit('.', 1)
+                    classinst           = for_name(modpath, classname)
+
+                    # Call configure
+                    classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
+
+                    # Put in by_name_dict for possible re-use
+                    by_name_dict[name] = classinst
+
+                interceptors[type_and_direction].append(classinst)
+
+        self.interceptors = dict(interceptors)
 
 def ioloop(connection, name=None):
     # Loop until CTRL-C

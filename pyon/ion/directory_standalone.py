@@ -13,10 +13,10 @@ class DirectoryStandalone(object):
     '''
 
     def __init__(self, sysname=None, orgname=None, config=None):
-        self.orgname = orgname or get_safe(config, 'system.root_org') if config else 'ION' or 'ION'
+        self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
-        self.datastore_name  = sysname + "_directory"
-        self.datastore = CouchDataStore(self.datastore_name, config=config)
+        self.datastore_name  = "directory"
+        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
 
     def register(self, parent, key, **kwargs):
         '''

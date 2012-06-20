@@ -78,7 +78,7 @@ class CouchDB_DataStore(DataStore):
         self._datastore_cache = {}
 
     def close(self):
-        log.info("Closing connection to CouchDB")
+        log.debug("Closing connection to CouchDB")
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
 
@@ -116,7 +116,7 @@ class CouchDB_DataStore(DataStore):
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
-            log.info('Data store %s does not exist' % datastore_name)
+            log.debug('Data store %s does not exist' % datastore_name)
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
 
@@ -168,7 +168,7 @@ class CouchDB_DataStore(DataStore):
 
         # Assign an id to doc (recommended in CouchDB documentation)
         doc["_id"] = object_id or uuid4().hex
-        log.info('Creating new object %s/%s' % (datastore_name, doc["_id"]))
+        log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 
         # Save doc.  CouchDB will assign version to doc.
@@ -262,7 +262,7 @@ class CouchDB_DataStore(DataStore):
 
     def read_doc_mult(self, object_ids, datastore_name=""):
         ds, datastore_name = self._get_datastore(datastore_name)
-        log.info('Reading head version of objects %s/%s' % (datastore_name, object_ids))
+        log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
         docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
         # Check for docs not found
         notfound_list = ['Object with id %s does not exist.' % str(row.key) for row in docs if row.doc is None]

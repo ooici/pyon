@@ -24,39 +24,6 @@ import sys
 from Queue import Empty
 from pyon.util.sflow import SFlowManager
 
-
-interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
-
-# Note: This is now called from pyon.core.bootstrap
-def instantiate_interceptors(interceptor_cfg):
-    stack = interceptor_cfg["stack"]
-    defs = interceptor_cfg["interceptors"]
-
-    by_name_dict = {}
-    for type_and_direction in stack:
-        interceptor_names = stack[type_and_direction]
-        for name in interceptor_names:
-            if name in by_name_dict:
-                classinst = by_name_dict[name]
-            else:
-                interceptor_def = defs[name]
-
-                # Instantiate and put in by_name array
-                parts = interceptor_def["class"].split('.')
-                modpath = ".".join(parts[:-1])
-                classname = parts[-1]
-                module = __import__(modpath, fromlist=[classname])
-                classobj = getattr(module, classname)
-                classinst = classobj()
-
-                # Call configure
-                classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
-
-                # Put in by_name_dict for possible re-use
-                by_name_dict[name] = classinst
-
-            interceptors[type_and_direction].append(classinst)
-
 class EndpointError(StandardError):
     pass
 
@@ -78,10 +45,27 @@ class EndpointUnit(object):
 
     channel = None
     _recv_greenlet = None
+    _endpoint = None
+    _interceptors = None
+
+    def __init__(self, endpoint=None, interceptors=None):
+        self._endpoint = endpoint
+        self.interceptors = interceptors
+
+    @property
+    def interceptors(self):
+        if self._interceptors is not None:
+            return self._interceptors
+
+        assert self._endpoint, "No endpoint attached"
+        return self._endpoint.interceptors
+
+    @interceptors.setter
+    def interceptors(self, value):
+        self._interceptors = value
 
     def attach_channel(self, channel):
-        log.debug("In EndpointUnit.attach_channel")
-        log.debug("channel %s" % str(channel))
+        log.debug("attach_channel %s", str(channel))
         self.channel = channel
 
     def _build_invocation(self, **kwargs):
@@ -118,13 +102,14 @@ class EndpointUnit(object):
         @param  inv     An Invocation instance.
         @returns        A processed Invocation instance.
         """
-        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+        inv_prime = process_interceptors(self.interceptors["message_incoming"] if "message_incoming" in self.interceptors else [], inv)
         return inv_prime
 
     def message_received(self, msg, headers):
         """
         """
-        log.debug("In EndpointUnit.message_received")
+        #log.debug("In EndpointUnit.message_received")
+        pass
 
     def send(self, msg, headers=None, **kwargs):
         """
@@ -146,7 +131,7 @@ class EndpointUnit(object):
         Override this method to get custom behavior of how you want your endpoint unit to operate.
         Kwargs passed into send will be forwarded here. They are not used in this base method.
         """
-        log.debug("In EndpointUnit._send: %s", headers)
+        #log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
                                      message=msg,
@@ -165,17 +150,16 @@ class EndpointUnit(object):
         @param  inv     An Invocation instance.
         @returns        A processed Invocation instance.
         """
-        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        inv_prime = process_interceptors(self.interceptors["message_outgoing"] if "message_outgoing" in self.interceptors else [], inv)
         return inv_prime
 
     def spawn_listener(self):
         def client_recv():
             while True:
                 try:
-                    log.debug("client_recv waiting for a message")
+                    #log.debug("client_recv waiting for a message")
                     msg, headers, delivery_tag = self.channel.recv()
-                    log.debug("client_recv got a message")
-                    log_message(self.channel._send_name , msg, headers, delivery_tag)
+                    log_message("MESSAGE RECV <<< RPC-reply", msg, headers, self.channel._send_name, delivery_tag, is_send=False)
 
                     try:
                         self._message_received(msg, headers)
@@ -190,6 +174,7 @@ class EndpointUnit(object):
         self._recv_greenlet = spawn(client_recv)
 
     def close(self):
+        log.debug('close endpoint')
         if self._recv_greenlet is not None:
             # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
             # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
@@ -208,7 +193,7 @@ class EndpointUnit(object):
         """
         Assembles the headers of a message from the raw message's content.
         """
-        log.debug("EndpointUnit _build_header")
+#        log.debug("EndpointUnit _build_header")
         return {'ts':get_ion_ts()}
 
     def _build_payload(self, raw_msg):
@@ -217,7 +202,7 @@ class EndpointUnit(object):
 
         @TODO will this be used? seems unlikely right now.
         """
-        log.debug("EndpointUnit _build_payload")
+#        log.debug("EndpointUnit _build_payload")
         return raw_msg
 
     def _build_msg(self, raw_msg):
@@ -228,7 +213,7 @@ class EndpointUnit(object):
 
         @returns A 2-tuple of payload, headers
         """
-        log.debug("EndpointUnit _build_msg")
+#        log.debug("EndpointUnit _build_msg")
         header = self._build_header(raw_msg)
         payload = self._build_payload(raw_msg)
 
@@ -251,6 +236,7 @@ class BaseEndpoint(object):
     # Endpoints
     # TODO: Make weakref or replace entirely
     endpoint_by_name = {}
+    _interceptors = None
 
     def __init__(self, node=None):
 
@@ -281,15 +267,27 @@ class BaseEndpoint(object):
         This method is automatically called before accessing the node in both create_endpoint and in
         ListeningBaseEndpoint.listen.
         """
-        log.debug("BaseEndpoint._ensure_node (current: %s)", self.node is not None)
+        #log.debug("BaseEndpoint._ensure_node (current: %s)", self.node is not None)
 
         if not self.node:
             container_instance = self._get_container_instance()
             if container_instance:
-                log.debug("Pulling node from Container.instance")
+                #log.debug("Pulling node from Container.instance")
                 self.node = container_instance.node
             else:
                 raise EndpointError("Cannot pull node from Container.instance and no node specified")
+
+    @property
+    def interceptors(self):
+        if self._interceptors is not None:
+            return self._interceptors
+
+        assert self.node, "No node attached"
+        return self.node.interceptors
+
+    @interceptors.setter
+    def interceptors(self, value):
+        self._interceptors = value
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         """
@@ -301,7 +299,7 @@ class BaseEndpoint(object):
             self._ensure_node()
             ch = self._create_channel()
 
-        e = self.endpoint_unit_type(**kwargs)
+        e = self.endpoint_unit_type(endpoint=self, **kwargs)
         e.attach_channel(ch)
 
         return e
@@ -355,13 +353,6 @@ class SendingBaseEndpoint(BaseEndpoint):
         return BaseEndpoint._create_channel(self, **kwargs)
 
 
-def log_message(recv, msg, headers, delivery_tag=None):
-    """
-    Utility function to print an legible comprehensive summary of a received message.
-    """
-    if getattr(recv, '__iter__', False):
-        recv = ".".join(str(item) for item in recv if item)
-    log.info("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
 
 class ListeningBaseEndpoint(BaseEndpoint):
     """
@@ -410,7 +401,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         Meant to be spawned in a greenlet. This method creates/sets up a channel to listen,
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
-        log.debug("LEF.listen")
+        #log.debug("LEF.listen")
 
         self.prepare_listener(binding=binding)
 
@@ -418,7 +409,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._ready_event.set()
 
         while True:
-            log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+            #log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
                 self.get_one_msg()
             except ChannelClosedError as ex:
@@ -432,7 +423,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         Used by listen.
         """
 
-        log.debug("LEF.prepare_listener: binding %s", binding)
+        #log.debug("LEF.prepare_listener: binding %s", binding)
         binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
@@ -464,9 +455,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         try:
             with self._chan.accept(timeout=timeout) as newchan:
                 msg, headers, delivery_tag = newchan.recv()
-
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+                log_message("MESSAGE RECV >>> RPC-request", msg, headers, self._recv_name, delivery_tag, is_send=False)
 
                 try:
                     e = self.create_endpoint(existing_channel=newchan)
@@ -542,8 +531,8 @@ class SubscriberEndpointUnit(EndpointUnit):
     """
     @TODO: Should have routing mechanics, possibly shared with other listener endpoint types
     """
-    def __init__(self, callback):
-        EndpointUnit.__init__(self)
+    def __init__(self, callback, **kwargs):
+        EndpointUnit.__init__(self, **kwargs)
         self.set_callback(callback)
 
     def set_callback(self, callback):
@@ -582,7 +571,7 @@ class Subscriber(ListeningBaseEndpoint):
         ListeningBaseEndpoint.__init__(self, **kwargs)
 
     def create_endpoint(self, **kwargs):
-        log.debug("Subscriber.create_endpoint override")
+        #log.debug("Subscriber.create_endpoint override")
         return ListeningBaseEndpoint.create_endpoint(self, callback=self._callback, **kwargs)
 
 
@@ -606,9 +595,9 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         if 'timeout' in kwargs and kwargs['timeout'] is not None:
             timeout = kwargs['timeout']
         else:
-            timeout = CFG.endpoint.receive.timeout or 10
+            timeout = CFG.get_safe('endpoint.receive.timeout', 10)
 
-        log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
+        #log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
         ts = time.time()
 
@@ -628,12 +617,12 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
         finally:
             elapsed = time.time() - ts
-            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-                                                                                     headers.get('conv-seq', 'NOSEQ'),
-                                                                                     self.channel._send_name,
-                                                                                     elapsed)
+#            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+#                                                                                     headers.get('conv-seq', 'NOSEQ'),
+#                                                                                     self.channel._send_name,
+#                                                                                     elapsed)
 
-        log.debug("Response data: %s, headers: %s", result_data, result_headers)
+        #log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
     def _build_header(self, raw_msg):
@@ -654,7 +643,7 @@ class RequestResponseClient(SendingBaseEndpoint):
     endpoint_unit_type = RequestEndpointUnit
 
     def request(self, msg, headers=None, timeout=None):
-        log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
+        #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
         try:
             retval, headers = e.send(msg, headers=headers, timeout=timeout)
@@ -690,7 +679,7 @@ class RequestResponseServer(ListeningBaseEndpoint):
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None, **kwargs):
-        log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
+        log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
 
         try:
             res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
@@ -703,7 +692,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         # Check response header
         if res_headers["status_code"] != 200:
-            log.debug("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
+            log.info("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
             self._raise_exception(res_headers["status_code"], res_headers["error_message"])
 
         return res, res_headers
@@ -718,7 +707,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         Then performs the transact call if the manager says to do so.
         """
-        if CFG.container.get('sflow', {}).get('enabled', False):
+        if CFG.get_safe('container.sflow.enabled', False):
             sm = self._get_sflow_manager()
             if sm and sm.should_sample:
                 app_name = self._get_sample_name()
@@ -835,7 +824,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         if str(code) in exception_map:
             raise exception_map[str(code)](message)
         else:
-            log.debug("Raising ServerError")
+            #log.debug("Raising ServerError")
             raise ServerError(message)
 
 class RPCClient(RequestResponseClient):
@@ -920,7 +909,7 @@ class RPCClient(RequestResponseClient):
 
 class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
-        ResponseEndpointUnit.__init__(self)
+        ResponseEndpointUnit.__init__(self, **kwargs)
         self._routing_obj = routing_obj
         
     def _message_received(self, msg, headers):
@@ -943,9 +932,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             tb_output = ""
             for elt in tb_list:
                 tb_output += elt
-            log.debug("Got error response")
-            log.debug("Exception message: %s" % ex)
-            log.debug("Traceback:\n%s" % tb_output)
+            log.info("Got error response: %s\n%s", ex, tb_output)
             response_headers = self._create_error_response(ex)
         finally:
             # REPLIES: propogate protocol, conv-id, conv-seq
@@ -959,14 +946,14 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                                                                                       self.channel._recv_name,
                                                                                       elapsed)
 
-        log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
+        log_message("MESSAGE SEND <<< RPC-reply", result, response_headers, is_send=True)
 
         return self.send(result, response_headers)
 
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
 
-        log.debug("RPCResponseEndpointUnit.message_received\n\tmsg: %s\n\theaders: %s", msg, headers)
+        #log.debug("RPCResponseEndpointUnit.message_received\n\tmsg: %s\n\theaders: %s", msg, headers)
 
         cmd_arg_obj = msg
         cmd_op      = headers.get('op', None)
@@ -1020,7 +1007,7 @@ class RPCServer(RequestResponseServer):
     endpoint_unit_type = RPCResponseEndpointUnit
 
     def __init__(self, service=None, **kwargs):
-        log.debug("In RPCServer.__init__")
+        #log.debug("In RPCServer.__init__")
         self._service = service
         RequestResponseServer.__init__(self, **kwargs)
 
@@ -1028,5 +1015,34 @@ class RPCServer(RequestResponseServer):
         """
         @TODO: push this into RequestResponseServer
         """
-        log.debug("RPCServer.create_endpoint override")
+        #log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
+
+
+
+def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
+    """
+    Utility function to print an legible comprehensive summary of a received message.
+    @NOTE: This is an expensive operation
+    """
+    try:
+        headers = headers or {}
+        _sender = headers.get('sender', '?') + "(" + headers.get('sender-name', '') + ")"
+        _send_hl, _recv_hl = ("###", "") if is_send else ("", "###")
+
+        if recv and getattr(recv, '__iter__', False):
+            recv = ".".join(str(item) for item in recv if item)
+        _recv = headers.get('receiver', '?')
+        _opstat = "op=%s"%headers.get('op', '') if 'op' in headers else "status=%s"%headers.get('status_code', '')
+        try:
+            import msgpack
+            _msg = msgpack.unpackb(msg)
+            _msg = str(_msg)
+        except Exception:
+            _msg = str(msg)
+        _msg = _msg[0:400]+"..." if len(_msg) > 400 else _msg
+        _delivery = "\nDELIVERY: tag=%s"%delivery_tag if delivery_tag else ""
+        log.info("%s: %s%s%s -> %s%s%s %s:\nHEADERS: %s\nCONTENT: %s%s",
+            prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
+    except Exception as ex:
+        log.warning("%s log error: %s", prefix, str(ex))

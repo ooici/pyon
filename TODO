@@ -5,9 +5,8 @@ PACKAGING/CODE:
 
 - Automate versioning and packaging of pyon egg
 - More __str__() output for classes
-- Move directory and datastore code to coi_services if possible
 - Use log.info for relevant output, debug for debug level
-- Rename EndpointFactory -> Endpoint and Endpoint -> Conversation
+- Rename Endpoint -> Conversation
 - More consistent and fewer packages
 - Refactor imports to use pyon.public as much as possible (but not in pyon core modules)
 
@@ -15,27 +14,16 @@ CONTAINER/STARTUP:
 
 - Enhanced shell API
 - Enhanced messaging bookkeeping: ms() more telling
-- Exchange spaces introduced
-- Add event framework
-- Check service implementation against service definition (parameters, order)
 - Error handling improved
-- Fail quick on startup error
-- DualModifierDict for two overrides in order (reference not copy the first one)
-- Check DotDict, DictModifier efficiency and where use
-- Bootstrap mode for container: Directory before started.
+- Check DotDict efficiency and where use
 
 OBJECTS:
 
 - Second look at service YML files (look at WSDL). Methods -> operations, maybe no objects
 - Service default arguments set to {} and [] in base class. Dangerous Python idiom. Set to None? Solutions?
-- List to tuples through msgpack. Long to int (see timestamps). Double to float. (YAML)
-- Object base classes generated.
 
 DATASTORE:
 
-- Datastore does not modify original object on create or update. Do it.
-- Make sure mockdb and couch have the same interface (exceptions returned etc).
-- Efficient find by owner association
 - Find accepting arrays of restrict values (e.g. more than one LCS)
 
 PROCESS/SERVICE:
@@ -44,12 +32,8 @@ PROCESS/SERVICE:
 - System-wide unique process ID
 - Process as instance aggregating one state and multiple endpoints
 - Process (greenlet) accepts messages from endpoints. One greenlet per process; one message at a time.
-- Process ioloop (picking messages and activating on schedule)
 - Process attachment (direct or via container)
-- Optional vs. mandatory service arguments
-- Validate object content vs. service operations
 - Container support for infinite and recurring processes (in on_start)
-- Do not create message processing worker thread in BinderListener by default (use the process ioloop)
 - Extend the BinderListener so that it can dispatch into a list of service classes
 - Change success: True to raised exception
 - Namespace in generated interface clients not clean
@@ -60,26 +44,16 @@ AGENTS/GOVERNANCE:
 
 MESSAGING:
 
-- Use ACKs
 - Messaging properties set in pyon.net
 - Non-AMQP (ZeroMQ, Flask) nodes
-- Local messaging with greenlet handover (one actor)
-- ION endpoints in pyon.ion.endpoint (not pyon.net)
 
 TESTING:
 
-- Switch to nosetests (remove/alias bin/unittest)
-- Log and print in tests: visible on run if desired
 
 OPEN QUESTIONS:
 
-- How to declare mandatory (non null) service parameters?
-- Should we support kwargs in service clients?
-- How to start stream processes?
 
 BUGS (see also Jira project CISWCORE)
 
 - Source path from not the current repo (e.g. pyon/examples not found)
 - Find result does not pass validate interceptor
-- Check IonObject validation vs. extends (does it work?)
-- DictModifier str() does not print full merge

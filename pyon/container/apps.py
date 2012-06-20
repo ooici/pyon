@@ -7,10 +7,9 @@ __author__ = 'Michael Meisinger'
 from zope.interface import providedBy
 from zope.interface import Interface, implements
 
-from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerConfigError, ContainerStartupError, ContainerAppError, ConfigNotFound
+from pyon.core.exception import ContainerAppError, ConfigNotFound
 from pyon.util.config import Config
-from pyon.util.containers import DictModifier, DotDict, named_any
+from pyon.util.containers import DotDict, named_any, dict_merge
 from pyon.util.log import log
 
 
@@ -35,17 +34,17 @@ class AppManager(object):
         """
         @brief Read the rel file and call start_rel
         """
-        log.info("AppManager.start_rel_from_url(rel_url=%s) ..." % str(rel_url))
+        log.info("AppManager.start_rel_from_url(rel_url=%s) ...", rel_url)
 
         try:
             rel = Config([rel_url]).data
-            self.start_rel(rel,config)
-            log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK." % str(rel_url))
+            self.start_rel(rel, config)
+            log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK.", rel_url)
             return True
         except ConfigNotFound as cnf:
-            log.warning("Could not find container deploy file '%s'" % rel_url)
+            log.warning("Could not find container deploy file '%s'", rel_url)
         except Exception as ex:
-            log.exception("Could not start container deploy file '%s'" % rel_url)
+            log.exception("Could not start container deploy file '%s'", rel_url)
             raise ContainerAppError(ex.message)
 
         return False
@@ -56,8 +55,10 @@ class AppManager(object):
         Note: apps in a rel file can come in one of 2 forms:
         1 processapp: In-line defined process to be started as app
         2 app file: Reference to an app definition in an app file
+        If the rel file provides an app config block, it is provided to spawn the process.
+        Any given function config dict is merged on top of this.
         """
-        log.debug("AppManager.start_rel(rel=%s) ..." % str(rel))
+        log.debug("AppManager.start_rel(rel=%s) ...", rel)
 
         if rel is None: rel = {}
 
@@ -69,17 +70,22 @@ class AppManager(object):
                 # Case 1: Rel contains definition of process to start as app
                 name, module, cls = rel_app_cfg.processapp
 
+                rel_cfg = None
                 if 'config' in rel_app_cfg:
-                    # Nest dict modifier and apply config from rel file
-                    config = DictModifier(config, rel_app_cfg.config)
+                    rel_cfg = rel_app_cfg.config.copy()
+                    if config:
+                        dict_merge(rel_cfg, config, inplace=True)
 
-                self.container.spawn_process(name, module, cls, config)
+                self.container.spawn_process(name, module, cls, rel_cfg)
                 self.apps.append(DotDict(type="application", name=name, processapp=rel_app_cfg.processapp))
 
             else:
                 # Case 2: Rel contains reference to app file to start
                 app_file_path = 'res/apps/%s.yml' % (name)
-                self.start_app_from_url(app_file_path, config=rel_app_cfg.get('config', None))
+                rel_cfg = rel_app_cfg.get('config', None)
+                if config:
+                    dict_merge(rel_cfg, config, inplace=True)
+                self.start_app_from_url(app_file_path, config=rel_cfg)
 
     def start_app_from_url(self, app_url="", config=None):
         """
@@ -110,22 +116,18 @@ class AppManager(object):
         log.debug("AppManager.start_app(appdef=%s) ..." % appdef)
 
         appdef = DotDict(appdef)
-        app_config = DictModifier(CFG)
 
         if 'config' in appdef:
-            # Apply config from app file
-            app_file_cfg = DotDict(appdef.config)
-            app_config.update(app_file_cfg)
-
-        if config:
-            # Nest dict modifier and apply config from rel file
-            app_config = DictModifier(app_config, config)
+            app_cfg = appdef.config.copy()
+            if config:
+                dict_merge(app_cfg, config, inplace=True)
+            config = app_cfg
 
         if 'processapp' in appdef:
             # Case 1: Appdef contains definition of process to start
             name, module, cls = appdef.processapp
             try:
-                pid = self.container.spawn_process(name, module, cls, app_config)
+                pid = self.container.spawn_process(name, module, cls, config)
                 appdef._pid = pid
                 self.apps.append(appdef)
             except Exception, ex:

@@ -81,7 +81,6 @@ class DotDict(DotNotationGetItem, dict):
         else:
             self[key] = value
 
-
     def copy(self):
         return DotDict(dict.copy(self))
 
@@ -98,45 +97,6 @@ class DotDict(DotNotationGetItem, dict):
     @classmethod
     def fromkeys(cls, seq, value=None):
         return DotDict(dict.fromkeys(seq, value))
-
-class DictModifier(DotDict):
-    """
-    Subclass of DotDict that allows the sparse overriding of dict values.
-    """
-    def __init__(self, base, data=None):
-        # base should be a dict or DotDict, raise TypeError exception if not
-        if isinstance(data, dict):
-            data = DotDict(data)
-        elif not isinstance(base, DotDict):
-            raise TypeError("Base must be of type DotDict")
-        if base is None:
-            base = DotDict()
-        self['base'] = base
-
-        if data is not None:
-            self.update(data)
-
-    def __getattr__(self, key):
-        try:
-            return DotDict.__getattr__(self, key)
-        except AttributeError, ae:
-            # Delegate to base
-            return getattr(self.base, key)
-
-    def __getitem__(self, key):
-        try:
-            return DotDict.__getitem__(self, key)
-        except KeyError, ke:
-            # Delegate to base
-            return getattr(self.base, key)
-
-    def __str__(self):
-        merged = self.base.copy()
-        merged.update(self)
-        return str(merged)
-
-    def __repr__(self):
-        return self.__str__()
 
 
 class DictDiffer(object):
