@@ -36,6 +36,8 @@ def main():
     '''
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--individual', action='store_true',
+        help='Store files individually.')
     parser.add_argument('-fc', '--force_clean', action='store_true',
         help='Force clean.')
     parser.add_argument("-of", "--object", dest="fobject",
@@ -49,6 +51,9 @@ def main():
 
     # -------------------------------------------------------------------------
     # Store config and interfaces
+
+    # Set global testing flag to False. We are running as standalone script. This is NO TEST.
+    bootstrap.testing = False
 
     # Set sysname if provided in startup argument
     if options.sysname:
@@ -67,7 +72,7 @@ def main():
     # -------------------------------------------------------------------------
     # Store config and interfaces
 
-    ia = InterfaceAdmin(bootstrap.get_sys_name(), options.fobject, options.fservice)
+    ia = InterfaceAdmin(bootstrap.get_sys_name(), options.fobject, options.fservice, store_bulk=not options.individual)
     ia.store_interfaces()
 
 if __name__ == '__main__':
