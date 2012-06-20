@@ -12,6 +12,8 @@ import sys
 import traceback
 from uuid import uuid4
 
+from script_util import parse_args
+
 #
 # WARNING - DO NOT IMPORT GEVENT OR PYON HERE. IMPORTS **MUST** BE DONE IN THE MAIN()
 # DUE TO DAEMONIZATION.
@@ -146,6 +148,9 @@ def main(opts, *args, **kwargs):
             print "pycc: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
             clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
+        from pyon.core.interfaces.interfaces import InterfaceAdmin
+        iadm = InterfaceAdmin(bootstrap.get_sys_name(), config=bootstrap_config)
+
         # If auto_bootstrap, load config and interfaces into directory
         # Note: this is idempotent and will not alter anything if this is not the first container to run
         if bootstrap_config.system.auto_bootstrap:
@@ -153,9 +158,8 @@ def main(opts, *args, **kwargs):
             stored_config = pyon_config.copy()
             config.apply_configuration(stored_config, config_override)
             config.apply_configuration(stored_config, command_line_config)
-
-            config.auto_bootstrap_datastores(bootstrap_config)
-            config.auto_bootstrap_config(bootstrap_config, system_cfg=stored_config)
+            iadm.create_core_datastores()
+            iadm.store_config(stored_config)
 
         # Determine the final pyon_config
         # - Start from standard config already set (pyon.yml + local YML files)
@@ -192,7 +196,7 @@ def main(opts, *args, **kwargs):
         # Auto-bootstrap interfaces
         # @WARN: This currently imports ALL modules, executing ALL static initializers as side effect!!!!!!!
         if bootstrap_config.system.auto_bootstrap:
-            config.auto_bootstrap_interfaces(bootstrap_config)
+            iadm.store_interfaces(store_bulk=True)
 
         if opts.no_container:
             print "pycc: no_container=True. Stopping here."
@@ -358,33 +362,6 @@ def setup_ipython(shell_api=None):
 
     ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
 
-
-def unflatten(dictionary):
-    # From http://stackoverflow.com/questions/6037503/python-unflatten-dict/6037657#6037657
-    resultDict = dict()
-    for key, value in dictionary.iteritems():
-        parts = key.split(".")
-        d = resultDict
-        for part in parts[:-1]:
-            if part not in d:
-                d[part] = dict()
-            d = d[part]
-        d[parts[-1]] = value
-    return resultDict
-
-def parse_args(tokens):
-    """ Exploit yaml's spectacular type inference (and ensure consistency with config files) """
-    args, kwargs = [], {}
-    for token in tokens:
-        token = token.lstrip('-')
-        if '=' in token:
-            key,val = token.split('=', 1)
-            ipython_cfg = unflatten({key: yaml.load(val)})
-            kwargs.update(ipython_cfg)
-        else:
-            args.append(yaml.load(token))
-
-    return args, kwargs
 
 
 # START HERE:

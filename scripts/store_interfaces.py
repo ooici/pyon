@@ -4,13 +4,12 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
-from collections import OrderedDict
 import argparse
 
 import pyon
 from pyon.core import bootstrap, config
 from pyon.core.interfaces.interfaces import InterfaceAdmin
-
+from script_util import parse_args
 
 def main():
     '''
@@ -37,15 +36,17 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--individual', action='store_true',
-        help='Store files individually.')
+            help='Store files individually.')
     parser.add_argument('-fc', '--force_clean', action='store_true',
-        help='Force clean.')
+            help='Force clean.')
     parser.add_argument("-of", "--object", dest="fobject",
-        help="Load object definition from a file")
+            help="Load object definition from a file")
     parser.add_argument("-s", "--sysname", dest="sysname", help="System name")
     parser.add_argument("-sf", "--service", dest="fservice",
-        help="Load service definition from a file")
-    options = parser.parse_args()
+            help="Load service definition from a file")
+
+    options, extra = parser.parse_known_args()
+    args, command_line_config = parse_args(extra)
 
     print "store_configuration: Storing ION config and interfaces in datastore, with options:" , str(options)
 
@@ -62,6 +63,7 @@ def main():
     # Load minimal bootstrap config
     bootstrap_config = config.read_local_configuration(['res/config/pyon_min_boot.yml'])
     config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
+    config.apply_configuration(bootstrap_config, command_line_config)
 
     # Delete sysname datastores if option "force_clean" is set
     if options.force_clean:
@@ -69,11 +71,26 @@ def main():
         print "store_configuration: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
         clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
+
+    # This holds the new CFG object for the system
+    # @TODO: Could add command line --config
+    ion_config = config.read_standard_configuration()
+    config.apply_configuration(ion_config, command_line_config)
+
+
     # -------------------------------------------------------------------------
     # Store config and interfaces
 
-    ia = InterfaceAdmin(bootstrap.get_sys_name(), options.fobject, options.fservice, store_bulk=not options.individual)
-    ia.store_interfaces()
+    iadm = InterfaceAdmin(bootstrap.get_sys_name(), config=bootstrap_config)
+
+    # Make sure core datastores exist
+    iadm.create_core_datastores()
+
+    # Store system CFG properties
+    iadm.store_config(ion_config)
+
+    # Store system interfaces
+    iadm.store_interfaces(options.fobject, options.fservice, store_bulk=not options.individual)
 
 if __name__ == '__main__':
     main()

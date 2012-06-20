@@ -4,11 +4,13 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
+import inspect
 import os
 from collections import OrderedDict
 import argparse
 
 from pyon.core.path import list_files_recursive
+from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
 
 
@@ -19,21 +21,45 @@ class InterfaceAdmin:
 
     DIR_OBJECTTYPES_PATH = "ObjectTypes"
     DIR_SERVICEDEF_PATH = "ServiceDefinitions"
-    DIR_CONFIG_PATH = "ResourceDefinitions"
+    DIR_RESFILES_PATH = "ResourceDefinitions"
+    DIR_CONFIG_PATH = "/Config"
 
-    def __init__(self, sysname, object_definition_file=None,
-                 service_definition_file=None, store_bulk=True):
+    def __init__(self, sysname, config=None):
         self.sysname = sysname
-        self.object_definition_file = object_definition_file
-        self.service_definition_file = service_definition_file
-        self.dir = DirectoryStandalone(sysname=self.sysname)
-        self.store_bulk = store_bulk
-        self.bulk_entries = {}
+        self.config = config
+        self.dir = DirectoryStandalone(sysname=self.sysname, config=config)
 
-    def store_interfaces(self):
+    def create_core_datastores(self):
+        """
+        Main entry point into creating core datastores
+        """
+        ds = CouchDataStore(config=self.config, scope=self.sysname)
+        datastores = ['resources','directory']
+        for local_dsn in datastores:
+            if not ds.exists_datastore(local_dsn):
+                ds.create_datastore(local_dsn)
+                # NOTE: Views are created by containers' DatastoreManager
+
+    def store_config(self, system_cfg):
+        """
+        Main entry point into storing system config
+        """
+        print "Storing system config in datastore..."
+        de = self.dir.lookup(self.DIR_CONFIG_PATH + "/CFG")
+        if de:
+            print "store_interfaces: WARN: Config already exists. Overwrite"
+        self.dir.register(self.DIR_CONFIG_PATH, "CFG", **system_cfg.copy())
+
+    def store_interfaces(self, object_definition_file=None,
+                         service_definition_file=None, store_bulk=True):
         """
         Main entry point into storing interfaces
         """
+        self.object_definition_file = object_definition_file
+        self.service_definition_file = service_definition_file
+        self.store_bulk = store_bulk
+        self.bulk_entries = {}
+
         if self.service_definition_file:
             if os.path.exists(self.service_definition_file):
                 self.load_from_files(self.DIR_SERVICEDEF_PATH,
@@ -58,13 +84,15 @@ class InterfaceAdmin:
             self._register_bulk()
 
     def store_config_files(self):
-        print "\nStoring system config in datastore"
+        if not self.store_bulk:
+            print "\nStoring system res files in datastore..."
         resource_filenames = list_files_recursive('res/config', '*.yml')
-        self.load_from_files(self.DIR_CONFIG_PATH, resource_filenames,
+        self.load_from_files(self.DIR_RESFILES_PATH, resource_filenames,
             self.get_config_file_content)
 
     def store_object_interfaces(self):
-        print "\nStoring object interfaces in datastore..."
+        if not self.store_bulk:
+            print "\nStoring object interfaces in datastore..."
         data_yaml_filenames = list_files_recursive('obj/data', '*.yml',
             ['ion.yml', 'resource.yml',
              'shared.yml'])
@@ -73,15 +101,17 @@ class InterfaceAdmin:
 
     def store_service_interfaces(self):
         service_yaml_filenames = list_files_recursive('obj/services', '*.yml')
-        print "\nStoring service interfaces in datastore..."
+        if not self.store_bulk:
+            print "\nStoring service interfaces in datastore..."
         self.load_from_files(self.DIR_SERVICEDEF_PATH,
             service_yaml_filenames,
             self.get_service_file_content)
 
     def display_header(self):
-        print "--------------------------------------------------------------"
-        print "Key".ljust(40), "Filename".ljust(60)
-        print "--------------------------------------------------------------"
+        if not self.store_bulk:
+            print "--------------------------------------------------------------"
+            print "Key".ljust(40), "Filename".ljust(60)
+            print "--------------------------------------------------------------"
 
     def load_from_files(self, path, filenames, get_file_content_method):
         '''
@@ -91,7 +121,8 @@ class InterfaceAdmin:
         for file_path in filenames:
             content = get_file_content_method(file_path)
             for key in content.keys():
-                print key.ljust(40), file_path.ljust(60)
+                if not self.store_bulk:
+                    print key.ljust(40), file_path.ljust(60)
                 self.store_in_datastore(path, key, content[key], file_path)
 
     def store_in_datastore(self, path, key, content, filename):
@@ -133,8 +164,10 @@ class InterfaceAdmin:
                 exit()
 
     def _register_bulk(self):
+        print "store_interfaces: Storing %s interfaces in datastore (bulk)..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
         res = self.dir.register_mult(entries)
+        print "store_interfaces: Storing interfaces successful"
 
     def get_config_file_content(self, file_path):
         '''
@@ -199,3 +232,39 @@ class InterfaceAdmin:
         #print "******", objs
         return objs
 
+def recursive_strip(scan_obj):
+    """
+    HACK HACK HACK
+    """
+    if type(scan_obj) is dict:
+        for key, value in scan_obj.iteritems():
+            if type(value) not in (str, int, float, bool, dict, list, None):
+                scan_obj[key] = str(value)
+            if type(value) is dict:
+                recursive_strip(value)
+
+def _bootstrap_object_defs(directory):
+    from pyon.core.object import IonObjectBase
+    from interface import objects
+
+    # @TODO: This should use the same code as the load_configuration tool
+    delist = []
+    for cname, cobj in inspect.getmembers(objects, inspect.isclass):
+        if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
+            parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
+            delist.append(("/ObjectTypes", cname, dict(schema=recursive_strip(cobj._schema), extends=parentlist)))
+    directory.register_mult(delist)
+
+def _bootstrap_service_defs(directory):
+    from pyon.service.service import IonServiceRegistry
+
+    # @TODO: This should use the same code as the load_configuration tool
+    # At this time importing everything is THE KILLER
+    service_registry = IonServiceRegistry()
+    service_registry.load_service_mods('interface/services')
+    service_registry.build_service_map()
+
+    svc_list = []
+    for svcname, svc in service_registry.services.iteritems():
+        svc_list.append(("/ServiceInterfaces", svcname, {}))
+    directory.register_mult(svc_list)
