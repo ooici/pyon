@@ -20,6 +20,7 @@ from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os
 import time
+import Queue as PQueue
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -504,7 +505,10 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         # recv'd messages from the subscriber
         self.recv_queue = Queue()
 
-        sub = Subscriber(from_name=xq, callback=lambda m,h: self.recv_queue.put((m, h)))
+        def cb(m, h):
+            raise StandardError("Subscriber callback never gets called back!")
+
+        sub = Subscriber(from_name=xq, callback=cb)
         sub.prepare_listener()
 
         # publish 10 messages - we're not bound yet, so they'll just dissapear
@@ -512,13 +516,13 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
             pub3.publish("3,%s" % str(x))
 
         # no messages yet
-        self.assertFalse(sub.get_one_msg(timeout=0))
+        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
 
         # now, we'll bind the xq
         xq.bind('routed.3')
 
         # even tho we are consuming, there are no messages - the previously published ones all dissapeared
-        self.assertFalse(sub.get_one_msg(timeout=0))
+        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
 
         # publish those messages again
         for x in xrange(10):
@@ -526,12 +530,12 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # NOW we have messages!
         for x in xrange(10):
-            self.assertTrue(sub.get_one_msg(timeout=0))
-            m,h = self.recv_queue.get(timeout=0)
-            self.assertEquals(m, "3,%s" % str(x))
+            mo = sub.get_one_msg(timeout=0)
+            self.assertEquals(mo.body, "3,%s" % str(x))
+            mo.ack()
 
         # we've cleared it all
-        self.assertFalse(sub.get_one_msg(timeout=0))
+        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
 
         # bind a wildcard and publish on both
         xq.bind('routed.*')
@@ -544,13 +548,13 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # should get all 20, interleaved
         for x in xrange(10):
-            self.assertTrue(sub.get_one_msg(timeout=0))
-            m, h = self.recv_queue.get(timeout=0)
-            self.assertEquals(m, "3,%s" % str(x))
+            mo = sub.get_one_msg(timeout=0)
+            self.assertEquals(mo.body, "3,%s" % str(x))
+            mo.ack()
 
-            self.assertTrue(sub.get_one_msg(timeout=0))
-            m, h = self.recv_queue.get(timeout=0)
-            self.assertEquals(m, "5,%s" % str(x))
+            mo = sub.get_one_msg(timeout=0)
+            self.assertEquals(mo.body, "5,%s" % str(x))
+            mo.ack()
 
         # add 5 binding, remove all other bindings
         xq.bind('routed.5')
@@ -560,7 +564,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         # try publishing to 3, shouldn't arrive anymore
         pub3.publish("3")
 
-        self.assertFalse(sub.get_one_msg(timeout=0))
+        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
 
         # let's turn off the consumer and let things build up a bit
         sub._chan.stop_consume()
@@ -576,8 +580,8 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         time.sleep(1)       # yield to allow delivery
 
         for x in xrange(10):
-            self.assertTrue(sub.get_one_msg(timeout=0))
-            self.recv_queue.get(timeout=0)
+            mo = sub.get_one_msg(timeout=0)
+            mo.ack()
 
         sub.close()
 

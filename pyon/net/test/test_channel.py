@@ -723,10 +723,14 @@ class TestListenChannel(PyonTestCase):
         self.ch._amq_chan = sentinel.amq_chan
         self.ch._fsm.current_state = self.ch.S_CONSUMING
 
-        with self.ch.accept() as retch:
-            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
-            cacmock.assert_called_once_with(sentinel.amq_chan, sentinel.msg)
-            retch._recv_queue.put.assert_called_once_with(sentinel.msg)
+        retch = self.ch.accept()
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+        cacmock.assert_called_once_with(sentinel.amq_chan, [sentinel.msg])
+        retch._recv_queue.put.assert_called_once_with(sentinel.msg)
+
+        # we've mocked all the working machinery of accept's return etc, so we must manually exit accept
+        # as if we've ack'd/reject'd
+        self.ch.exit_accept()
 
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_CONSUMING)
 
@@ -747,15 +751,19 @@ class TestListenChannel(PyonTestCase):
         # stub out stop consume reaction
         self.ch._on_stop_consume = Mock()
 
-        with self.ch.accept() as retch:
-            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+        retch = self.ch.accept()
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
 
-            self.ch.close()
+        self.ch.close()
 
-            # ensure nothing close-like got called!
-            self.assertFalse(self.ch.close_impl.called)
-            self.assertFalse(self.ch._on_stop_consume.called)
-            self.assertEquals(self.ch._fsm.current_state, self.ch.S_CLOSING)
+        # ensure nothing close-like got called!
+        self.assertFalse(self.ch.close_impl.called)
+        self.assertFalse(self.ch._on_stop_consume.called)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_CLOSING)
+
+        # we've mocked all the working machinery of accept's return etc, so we must manually exit accept
+        # as if we've ack'd/reject'd
+        self.ch.exit_accept()
 
         self.assertTrue(self.ch.close_impl.called)
         self.assertTrue(self.ch._on_stop_consume.called)
@@ -775,14 +783,18 @@ class TestListenChannel(PyonTestCase):
         # to test stop_consume reaction
         self.ch._on_stop_consume = Mock()
 
-        with self.ch.accept() as retch:
-            self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
+        retch = self.ch.accept()
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
 
-            self.ch.stop_consume()
+        self.ch.stop_consume()
 
-            # we didn't stop consume yet
-            self.assertFalse(self.ch._on_stop_consume.called)
-            self.assertEquals(self.ch._fsm.current_state, self.ch.S_STOPPING)
+        # we didn't stop consume yet
+        self.assertFalse(self.ch._on_stop_consume.called)
+        self.assertEquals(self.ch._fsm.current_state, self.ch.S_STOPPING)
+
+        # we've mocked all the working machinery of accept's return etc, so we must manually exit accept
+        # as if we've ack'd/reject'd
+        self.ch.exit_accept()
 
         self.assertTrue(self.ch._on_stop_consume.called)
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
@@ -831,7 +843,7 @@ class TestServerChannel(PyonTestCase):
         ch = ServerChannel()
 
         # this is not all that great
-        msg = [None, {'reply-to':'one,two'}]
+        msg = [[None, {'reply-to':'one,two'}]]
 
         newch = ch._create_accepted_channel(sentinel.amq_chan, msg)
 
@@ -913,17 +925,17 @@ class TestChannelInt(IonIntegrationTestCase):
 
             while True:
                 try:
-                    with lch.accept() as newchan:
-                        m, h, d = newchan.recv()
-                        count = m.rsplit(',', 1)[-1]
-                        if m.startswith('5,'):
-                            self.five_events.put(int(count))
-                            newchan.ack(d)
-                        elif m.startswith('3,'):
-                            self.three_events.put(int(count))
-                            newchan.ack(d)
-                        else:
-                            raise StandardError("unknown message: %s" % m)
+                    newchan = lch.accept()
+                    m, h, d = newchan.recv()
+                    count = m.rsplit(',', 1)[-1]
+                    if m.startswith('5,'):
+                        self.five_events.put(int(count))
+                        newchan.ack(d)
+                    elif m.startswith('3,'):
+                        self.three_events.put(int(count))
+                        newchan.ack(d)
+                    else:
+                        raise StandardError("unknown message: %s" % m)
 
                 except ChannelClosedError:
                     break
