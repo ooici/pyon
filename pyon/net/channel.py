@@ -700,11 +700,50 @@ class ListenChannel(RecvChannel):
         """
         The type of channel returned by accept.
         """
+        def __init__(self, name=None, binding=None, parent_channel=None, **kwargs):
+            RecvChannel.__init__(self, name=name, binding=binding, **kwargs)
+            self._delivery_tags = set()
+            self._parent_channel = parent_channel
+
         def close_impl(self):
             """
             Do not close underlying amqp channel
             """
             pass
+
+        def recv(self, timeout=None):
+            """
+            Recv override, takes note of delivery tag.
+            """
+            msg = RecvChannel.recv(self, timeout=timeout)
+            self._delivery_tags.add(msg[2])
+            return msg
+
+        def _checkin(self, delivery_tag):
+            """
+            Internal method called by ack/reject to confirm processing of a message.
+
+            When all messages delivered via recv are confirmed via this method, transitions the
+            parent channel out of ACCEPTED.
+            """
+            self._delivery_tags.remove(delivery_tag)
+
+            if len(self._delivery_tags) == 0:
+                self._parent_channel.exit_accept()
+
+        def ack(self, delivery_tag):
+            """
+            Acks a message - broker discards.
+            """
+            RecvChannel.ack(self, delivery_tag)
+            self._checkin(delivery_tag)
+
+        def reject(self, delivery_tag, requeue=False):
+            """
+            Rejects a message - specify requeue=True to requeue for delivery later.
+            """
+            RecvChannel.reject(self, delivery_tag, requeue=requeue)
+            self._checkin(delivery_tag)
 
     def __init__(self, name=None, binding=None, **kwargs):
         RecvChannel.__init__(self, name=name, binding=binding, **kwargs)
@@ -723,7 +762,7 @@ class ListenChannel(RecvChannel):
 
         Can be overridden by derived classes to get custom class types/functionality.
         """
-        ch = self.AcceptedListenChannel()
+        ch = self.AcceptedListenChannel(parent_channel=self)
         ch.attach_underlying_channel(amq_chan)
         return ch
 
@@ -750,36 +789,48 @@ class ListenChannel(RecvChannel):
         """
         self._on_stop_consume(fsm)
 
-    @contextmanager
-    def accept(self, timeout=None):
+    def accept(self, n=1, timeout=None):
         """
-        Context manager method to accept new connections for listening endpoints.
+        Accepts new connections for listening endpoints.
 
-        Defers calls to close during handling of the message, to be called after
-        the context manager returns.
+        Can accept more than one message at at time before it returns a new channel back to the
+        caller. Optionally can specify a timeout - if n messages aren't received in that time,
+        will raise an Empty exception.
 
-        Yields A new channel that can:
-                    - takes a copy of the underlying transport channel
-                    - send() aka reply
-                    - close without closing underlying transport channel
-                    - FUTURE: receive (use a preexisting listening pool), for more complicated patterns
-                              aka AGREE/STATUS/CANCEL
-                    - has the initial received message here put onto its recv gqueue
-                    - recv() returns messages in its gqueue, endpoint should ack
+        Sets the channel in the ACCEPTED state - caller is responsible for acking all messages
+        received on the returned channel in order to put this channel back in the CONSUMING
+        state.
         """
-        #        self._ensure_amq_chan()
-        m = self.recv(timeout=timeout)
-        ch = self._create_accepted_channel(self._amq_chan, m)
-        ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
+        # protect against common issues
+        assert self._fsm.current_state == self.S_CONSUMING, "Channel not in consuming state, cannot accept messages (curstate: %s)" % str(self._fsm.current_state)
+
+        ms = []
+        for x in xrange(n):
+            m = self.recv(timeout=timeout)  # @TODO not correct, timeout is overall
+            ms.append(m)
+
+        ch = self._create_accepted_channel(self._amq_chan, ms)
+        map(ch._recv_queue.put, ms)
+
+        # transition to ACCEPT
         self._fsm.process(self.I_ENTER_ACCEPT)
-        yield ch
+
+        # return the channel
+        return ch
+
+    def exit_accept(self):
+        """
+        Public method for transitioning this channel out of ACCEPTED state.
+
+        Only should be used by a channel created by accept.
+        """
         self._fsm.process(self.I_EXIT_ACCEPT)
 
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-") and self._transport is AMQPTransport.get_instance():
+        if not self._queue_auto_delete and self._recv_name and self._transport is AMQPTransport.get_instance() and self._recv_name.queue.startswith("amq.gen-"):
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 
@@ -791,9 +842,14 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = NameTrio(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
-        ch = self.BidirAcceptChannel()
+        # pull apart msglist to get a reply-to name
+        reply_to_set = set((x[1].get('reply-to') for x in msg))
+        assert len(reply_to_set) == 1, "Differing reply-to addresses seen, unsure how to proceed"
+
+        send_name = NameTrio(tuple(reply_to_set.pop().split(',')))    # @TODO: stringify is not the best
+        ch = self.BidirAcceptChannel(parent_channel=self)
         ch._recv_name = self._recv_name     # for debugging only
         ch.attach_underlying_channel(amq_chan)
         ch.connect(send_name)
         return ch
+

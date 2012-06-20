@@ -79,13 +79,21 @@ class EndpointUnit(object):
 
     def _message_received(self, msg, headers):
         """
-        Entry point for received messages in below channel layer. This method puts the message through
-        the interceptor stack, then funnels the message into the message_received method.
+        Entry point for received messages in below channel layer.
 
         This method should not be overridden unless you are familiar with how the interceptor stack and
         friends work!
         """
-        # interceptor point
+        return self.message_received(msg, headers)
+
+    def intercept_in(self, msg, headers):
+        """
+        Builds an invocation and runs interceptors on it, direction: in.
+
+        This is called manually by the endpoint layer at receiving points (client recv, get_one/listen etc).
+
+        @returns    A 2-tuple of message, headers after going through the interceptors.
+        """
         inv = self._build_invocation(path=Invocation.PATH_IN,
                                      message=msg,
                                      headers=headers)
@@ -93,7 +101,7 @@ class EndpointUnit(object):
         new_msg     = inv_prime.message
         new_headers = inv_prime.headers
 
-        return self.message_received(new_msg, new_headers)
+        return new_msg, new_headers
 
     def _intercept_msg_in(self, inv):
         """
@@ -163,7 +171,8 @@ class EndpointUnit(object):
                     log_message(self.channel._send_name , msg, headers, delivery_tag)
 
                     try:
-                        self._message_received(msg, headers)
+                        nm, nh = self.intercept_in(msg, headers)
+                        self._message_received(nm, nh)
                     finally:
                         # always ack a listener response
                         self.channel.ack(delivery_tag)
@@ -367,6 +376,56 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     channel_type = ListenChannel
 
+    class MessageObject(object):
+        """
+        Received message wrapper.
+
+        Contains a body, headers, and a delivery_tag. Internally used by listen, the
+        standard method used by ListeningBaseEndpoint, but will be returned to you
+        if you use get_one_msg or get_n_msgs. If using the latter, you are responsible
+        for calling ack or reject.
+        """
+        def __init__(self, msgtuple, ch, e):
+            self.channel = ch
+            self.endpoint = e
+
+            self.raw_body, self.raw_headers, self.delivery_tag = msgtuple
+            self.body = None
+            self.headers = None
+
+        def make_body(self):
+            """
+            Runs received raw message through the endpoint's interceptors.
+            """
+            self.body, self.headers = self.endpoint.intercept_in(self.raw_body, self.raw_headers)
+
+        def ack(self):
+            """
+            Passthrough to underlying channel's ack.
+
+            Must call this if using get_one_msg/get_n_msgs.
+            """
+            self.channel.ack(self.delivery_tag)
+
+        def reject(self, requeue=False):
+            """
+            Passthrough to underlying channel's reject.
+
+            Must call this if using get_one_msg/get_n_msgs.
+            """
+            self.channel.reject(self.delivery_tag, requeue=requeue)
+
+        def route(self):
+            """
+            Call default endpoint's _message_received, where business logic takes place.
+
+            For instance, a Subscriber would call the registered callback, or an RPCServer would
+            call the Service's operation.
+
+            You are likely not to use this if using get_one_msg/get_n_msgs.
+            """
+            self.endpoint._message_received(self.body, self.headers)
+
     def __init__(self, node=None, name=None, from_name=None, binding=None):
         BaseEndpoint.__init__(self, node=node)
 
@@ -417,8 +476,15 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         while True:
             log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+
             try:
-                self.get_one_msg()
+                m = self.get_one_msg()
+
+                try:
+                    m.route()       # call default handler
+                finally:
+                    m.ack()
+
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
                 break
@@ -447,39 +513,47 @@ class ListeningBaseEndpoint(BaseEndpoint):
             self._setup_listener(self._recv_name, binding=binding)
         self._chan.start_consume()
 
-    def get_one_msg(self, timeout=None):
+    def _get_n_msgs(self, num=1, timeout=None):
         """
-        Retrieves a single message and passes it through an EndpointUnit's message received.
+        Internal method to accept n messages, create MessageObject wrappers, return them.
 
-        This method will block until a message arrives, or until an optional timeout is reached.
-
-        @raises ChannelClosedError  If the channel has been closed.
-        @returns                    A boolean indicating if a message was retrieved. Will only be
-                                    false if a timeout is specified.
+        INBOUND INTERCEPTORS ARE PROCESSED HERE.
         """
         assert self._chan, "get_one_msg needs a channel setup"
 
-        try:
-            with self._chan.accept(timeout=timeout) as newchan:
-                msg, headers, delivery_tag = newchan.recv()
+        mos = []
+        newch = self._chan.accept(n=num, timeout=timeout)
+        for x in xrange(newch._recv_queue.qsize()):
+            mo = self.MessageObject(newch.recv(), newch, self.create_endpoint(existing_channel=newch))
+            mo.make_body()      # puts through EP interceptors
+            mos.append(mo)
 
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+        return mos
 
-                try:
-                    e = self.create_endpoint(existing_channel=newchan)
-                    e._message_received(msg, headers)
-                except Exception:
-                    log.exception("Unhandled error while handling received message")
-                    raise
-                finally:
-                    # ALWAYS ACK
-                    newchan.ack(delivery_tag)
-        except Empty:
-            # only occurs when timeout specified, capture the Empty we get from accept and return False
-            return False
+    def get_one_msg(self, timeout=None):
+        """
+        Receives one message.
 
-        return True
+        Blocks until one message is received, or the optional timeout is reached.
+
+        @raises ChannelClosedError  If the channel has been closed.
+        @raises Empty               If no messages available when timeout is reached.
+        @returns    A MessageObject.
+        """
+        mos = self._get_n_msgs(num=1, timeout=timeout)
+        assert len(mos) == 1
+        return mos[0]
+
+    def get_n_msgs(self, num, timeout=None):
+        """
+        Receives num messages.
+
+        Blocks until all messages received, or the optional timeout is reached.
+        @raises ChannelClosedError  If the channel has been closed.
+        @raises Empty               If no messages available when timeout is reached.
+        @returns    A list of MessageObjects.
+        """
+        return self._get_n_msgs(num, timeout=timeout)
 
     def close(self):
         BaseEndpoint.close(self)
@@ -920,7 +994,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpointUnit.__init__(self, **kwargs)
         self._routing_obj = routing_obj
-        
+
     def _message_received(self, msg, headers):
         """
         Internal _message_received override.
