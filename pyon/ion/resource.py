@@ -6,8 +6,12 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.registry import IonObjectRegistry, getextends, issubtype
+from pyon.core.bootstrap import IonObject
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any
+
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
+
 
 # Object Types
 ObjectTypes = DotDict()
@@ -274,3 +278,99 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
 
     def _add_constraints(self):
         pass
+
+
+
+class ExtendedResourceContainer(object):
+
+    def __init__(self,serv_prov):
+        self.service_provider = serv_prov
+
+    def create_extended_resource_container(self, extended_resource_type, resource_object):
+        res_container = IonObject(extended_resource_type)
+        res_container._id = resource_object._id
+        res_container.resource = resource_object
+
+        return res_container
+
+    def is_association(self, predicate,  predicate_type, res):
+        for predt in predicate[predicate_type]:
+            if res == predt:
+                return True
+        return False
+
+    def is_association_extension(self, predicate,  predicate_type, res):
+        for predt in predicate[predicate_type]:
+            if res in getextends(predt):
+                return True
+        return False
+
+    #This method figures out appropriate association call based on the Predcicate definitions
+    def find_associations(self, resource,association_predicate):
+
+        objs = list()
+
+        pred = Predicates[association_predicate]
+        if not pred:
+            return objs  #unknown association type so return empty list
+
+        #Need to check through all of these in this order to account for specific vs base class inclusions
+        if self.is_association(pred,'domain',resource.type_ ):
+            objs,_ = self.service_provider.clients.resource_registry.find_objects(resource._id, association_predicate, None, False)
+        elif self.is_association(pred,'range',resource.type_ ):
+            objs,_ = self.service_provider.clients.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+        elif self.is_association_extension(pred,'domain',resource.type_ ):
+            objs,_ = self.service_provider.clients.resource_registry.find_objects(resource._id, association_predicate, None, False)
+        elif self.is_association_extension(pred,'range',resource.type_ ):
+            objs,_ = self.service_provider.clients.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+
+        return objs
+
+
+    #Returns the number of associations for a specific predicate
+    def get_association_count(self, res_container, association_predicate):
+        return len(self.find_associations(res_container.resource, association_predicate))
+
+    #Refactor when object decorators are available
+    def get_associated_resources(self, res_container, resource_field, association_predicate):
+
+        objs = self.find_associations(res_container.resource, association_predicate)
+
+        if objs:
+            if res_container._schema[resource_field]['type'] == 'list':
+                setattr(res_container, resource_field, objs)
+            else:
+                setattr(res_container, resource_field, objs[0])
+
+        return res_container
+
+    #Refactor when object decorators are available
+    def get_owners(self, res_container, resource_field):
+        owners = list()
+
+        actors = self.find_associations(res_container.resource, PRED.hasOwner)
+        for actor in actors:
+            info = self.find_associations(actor, PRED.hasInfo)
+            if info:
+                owners.append(info[0])
+
+        return owners
+
+
+    #This method iterates over the dict of extended field names and associations
+    #Called from within create once decorators are refactored in.
+    def get_extended_associations(self, res_container, ext_associations):
+        if ext_associations is not None:
+            for ext_field in ext_associations:
+                objs = self.find_associations(res_container.resource, ext_associations[ext_field])
+                if objs:
+                    res_container.ext_associations[ext_field] = objs
+                else:
+                    res_container.ext_associations[ext_field] = list()
+
+
+
+
+
+
+
