@@ -227,7 +227,7 @@ class CouchDataStore(object):
             raise BadRequest("Doc must not have '_id'")
         if '_rev' in doc:
             raise BadRequest("Doc must not have '_rev'")
-        return self.save_doc(doc, object_id, datastore_name)
+        return self.save_doc(doc, object_id, datastore_name=datastore_name)
 
     def update_doc(self, doc, datastore_name=None):
         """

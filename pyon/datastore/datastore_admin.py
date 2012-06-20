@@ -99,7 +99,7 @@ class DatastoreAdmin(object):
                 if not os.path.exists(path):
                     log.warn("Item %s is not a directory" % fp)
                     continue
-                self._load_datastore(fp, ds_name, ignore_errors)
+                self._load_datastore(fp, fn, ignore_errors)
 
     def _load_datastore(self, path=None, ds_name=None, ignore_errors=True):
         ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)

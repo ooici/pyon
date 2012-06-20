@@ -102,8 +102,7 @@ class PYCC(Plugin):
             signal.signal(signal.SIGUSR1, container_started_cb)
 
             # Make sure the pycc process has the same sysname as the nose
-            ccargs = ['bin/pycc', '--noshell', '-sp', '--sysname=%s' %
-                    self.sysname,
+            ccargs = ['bin/pycc', '--noshell', '-sp', '--sysname=%s' % self.sysname,
                     '--logcfg=res/config/logging.pycc.yml',
                     '--rel=%s' % self.rel,
                     "--config={'system': {'auto_bootstrap': True}}"]
