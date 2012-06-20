@@ -3,7 +3,6 @@
 """Utility for generating Python interfaces from object and services definitions"""
 
 __author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 import fnmatch
 import os

@@ -36,6 +36,7 @@ setup(  name = 'pyon',
                 'pycc=scripts.pycc:entry',
                 'control_cc=scripts.control_cc:main',
                 'generate_interfaces=scripts.generate_interfaces:main',
+                'store_interfaces=scripts.store_interfaces:main',
                 'json_report=scripts.json_report:main',
                 'clear_couch=pyon.datastore.clear_couch_util:main',
                 ]
