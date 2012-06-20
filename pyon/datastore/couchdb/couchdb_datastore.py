@@ -78,7 +78,7 @@ class CouchDB_DataStore(DataStore):
         self._datastore_cache = {}
 
     def close(self):
-        log.info("Closing connection to CouchDB")
+        log.debug("Closing connection to CouchDB")
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
 
