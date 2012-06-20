@@ -159,8 +159,7 @@ class EndpointUnit(object):
                 try:
                     log.debug("client_recv waiting for a message")
                     msg, headers, delivery_tag = self.channel.recv()
-                    log.debug("client_recv got a message")
-                    log_message(self.channel._send_name , msg, headers, delivery_tag)
+                    log_message("MESSAGE RECV <<< RPC-reply", msg, headers, self.channel._send_name, delivery_tag, is_send=False)
 
                     try:
                         self._message_received(msg, headers)
@@ -353,13 +352,6 @@ class SendingBaseEndpoint(BaseEndpoint):
         return BaseEndpoint._create_channel(self, **kwargs)
 
 
-def log_message(recv, msg, headers, delivery_tag=None):
-    """
-    Utility function to print an legible comprehensive summary of a received message.
-    """
-    if getattr(recv, '__iter__', False):
-        recv = ".".join(str(item) for item in recv if item)
-    log.info("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
 
 class ListeningBaseEndpoint(BaseEndpoint):
     """
@@ -462,9 +454,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         try:
             with self._chan.accept(timeout=timeout) as newchan:
                 msg, headers, delivery_tag = newchan.recv()
-
-                log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
-                log_message(self._recv_name, msg, headers, delivery_tag)
+                log_message("MESSAGE RECV >>> RPC-request", msg, headers, self._recv_name, delivery_tag, is_send=False)
 
                 try:
                     e = self.create_endpoint(existing_channel=newchan)
@@ -688,7 +678,7 @@ class RequestResponseServer(ListeningBaseEndpoint):
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None, **kwargs):
-        log.info("MESSAGE SEND [S->D] RPC: %s" % str(msg))
+        log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
 
         try:
             res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
@@ -957,7 +947,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                                                                                       self.channel._recv_name,
                                                                                       elapsed)
 
-        log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
+        log_message("MESSAGE SEND <<< RPC-reply", result, response_headers, is_send=True)
 
         return self.send(result, response_headers)
 
@@ -1028,3 +1018,32 @@ class RPCServer(RequestResponseServer):
         """
         log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
+
+
+
+def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
+    """
+    Utility function to print an legible comprehensive summary of a received message.
+    @NOTE: This is an expensive operation
+    """
+    try:
+        headers = headers or {}
+        _sender = headers.get('sender', '?') + "(" + headers.get('sender-name', '') + ")"
+        _send_hl, _recv_hl = ("###", "") if is_send else ("", "###")
+
+        if recv and getattr(recv, '__iter__', False):
+            recv = ".".join(str(item) for item in recv if item)
+        _recv = headers.get('receiver', '?')
+        _opstat = "op=%s"%headers.get('op', '') if 'op' in headers else "status=%s"%headers.get('status_code', '')
+        try:
+            import msgpack
+            _msg = msgpack.unpackb(msg)
+            _msg = str(_msg)
+        except Exception:
+            _msg = str(msg)
+        _msg = _msg[0:400]+"..." if len(_msg) > 400 else _msg
+        _delivery = "\nDELIVERY: tag=%s"%delivery_tag if delivery_tag else ""
+        log.info("%s: %s%s%s -> %s%s%s %s:\nHEADERS: %s\nCONTENT: %s%s",
+            prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
+    except Exception as ex:
+        log.info("%s log error: %s", prefix, str(ex))

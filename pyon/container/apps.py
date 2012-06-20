@@ -70,19 +70,22 @@ class AppManager(object):
                 # Case 1: Rel contains definition of process to start as app
                 name, module, cls = rel_app_cfg.processapp
 
+                rel_cfg = None
                 if 'config' in rel_app_cfg:
                     rel_cfg = rel_app_cfg.config.copy()
                     if config:
                         dict_merge(rel_cfg, config, inplace=True)
-                    config = rel_cfg
 
-                self.container.spawn_process(name, module, cls, config)
+                self.container.spawn_process(name, module, cls, rel_cfg)
                 self.apps.append(DotDict(type="application", name=name, processapp=rel_app_cfg.processapp))
 
             else:
                 # Case 2: Rel contains reference to app file to start
                 app_file_path = 'res/apps/%s.yml' % (name)
-                self.start_app_from_url(app_file_path, config=rel_app_cfg.get('config', None))
+                rel_cfg = rel_app_cfg.get('config', None)
+                if config:
+                    dict_merge(rel_cfg, config, inplace=True)
+                self.start_app_from_url(app_file_path, config=rel_cfg)
 
     def start_app_from_url(self, app_url="", config=None):
         """

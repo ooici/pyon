@@ -122,7 +122,7 @@ class ProcManager(object):
             self._register_process(service_instance, name)
 
             service_instance.errcause = "OK"
-            log.info("AppManager.spawn_process: %s.%s -> pid=%s OK", module, cls, process_id)
+            log.info("ProcManager.spawn_process: %s.%s -> pid=%s OK", module, cls, process_id)
 
             if process_type == 'immediate':
                 log.info('Terminating immediate process: %s', service_instance.id)
