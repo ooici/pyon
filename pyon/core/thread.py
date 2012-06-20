@@ -282,7 +282,8 @@ class ThreadManager(object):
 
     def send_heartbeats(self):
         """ TODO: implement heartbeat and monitors """
-        log.debug('lub-dub')
+        #log.debug('lub-dub')
+        pass
 
     def shutdown(self, timeout=30.0):
         """

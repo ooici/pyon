@@ -12,12 +12,12 @@ from zope.interface import implementedBy
 from pyon.agent.agent import ResourceAgent
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerConfigError, BadRequest
-from pyon.ion.endpoint import ProcessRPCServer, ProcessRPCClient, ProcessSubscriber
-from pyon.ion.stream import StreamSubscriberRegistrar, StreamSubscriberRegistrarError, StreamPublisher, StreamPublisherRegistrar
+from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
-from pyon.util.containers import DictModifier, DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
+from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 
 from interface.objects import ProcessStateEnum
@@ -74,48 +74,46 @@ class ProcManager(object):
         # Generate a new process id if not provided
         # TODO: Ensure it is system-wide unique
         process_id =  process_id or "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
-        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s) as pid=%s", name, module, cls, process_id)
+        log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s, config=%s) as pid=%s", name, module, cls, config, process_id)
 
-        if not config:
-            # Use system CFG. It has the command line args in it
-            config = DictModifier(CFG)
-        else:
+        process_cfg = CFG.copy()
+        if config:
             # Use provided config. Must be dict or DotDict
             if not isinstance(config, DotDict):
                 config = DotDict(config)
-            config = DictModifier(CFG, config)
+            dict_merge(process_cfg, config, inplace=True)
             if self.container.spawn_args:
                 # Override config with spawn args
-                dict_merge(config, self.container.spawn_args, inplace=True)
+                dict_merge(process_cfg, self.container.spawn_args, inplace=True)
 
-        #log.debug("spawn_process() pid=%s config=%s", process_id, config)
+        #log.debug("spawn_process() pid=%s process_cfg=%s", process_id, process_cfg)
 
         # PROCESS TYPE. Determines basic process context (messaging, service interface)
         # One of: service, stream_process, agent, simple, immediate
 
         service_cls = named_any("%s.%s" % (module, cls))
-        process_type = get_safe(config, "process.type") or getattr(service_cls, "process_type", "service")
+        process_type = get_safe(process_cfg, "process.type") or getattr(service_cls, "process_type", "service")
 
         service_instance = None
         try:
             # spawn service by type
             if process_type == "service":
-                service_instance = self._spawn_service_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_service_process(process_id, name, module, cls, process_cfg)
 
             elif process_type == "stream_process":
-                service_instance = self._spawn_stream_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_stream_process(process_id, name, module, cls, process_cfg)
 
             elif process_type == "agent":
-                service_instance = self._spawn_agent_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_agent_process(process_id, name, module, cls, process_cfg)
 
             elif process_type == "standalone":
-                service_instance = self._spawn_standalone_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_standalone_process(process_id, name, module, cls, process_cfg)
 
             elif process_type == "immediate":
-                service_instance = self._spawn_immediate_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_immediate_process(process_id, name, module, cls, process_cfg)
 
             elif process_type == "simple":
-                service_instance = self._spawn_simple_process(process_id, name, module, cls, config)
+                service_instance = self._spawn_simple_process(process_id, name, module, cls, process_cfg)
 
             else:
                 raise BadRequest("Unknown process type: %s" % process_type)
