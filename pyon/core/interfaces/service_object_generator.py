@@ -688,10 +688,6 @@ class ServiceObjectGenerator:
         return res
 
 
-
-
-
-
     def generate_service(self, interface_file, svc_def, client_defs, opts):
         """
         Generates a single service/client/interface definition.
@@ -869,18 +865,19 @@ class ServiceObjectGenerator:
         return data
 
     def get_service_definition_from_datastore(self):
-        data = ''
+        fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        entry = dir.find_dir_child_entries('/ServiceInterfaces')
         if not entry:
-            return data
+            return ""
         for item in entry:
             try:
                 self.service_definitions_filename[item.value['key']] = item.value['file_path']
-                data = data + item.value['attributes']['definition'] + '\n'
+                fragments.append(item.value['attributes']['definition'])
             except:
                 return ''
-        return data
+        full_definition = "\n".join(fragments)
+        return full_definition
 
     def get_yaml_text(self, path):
         '''

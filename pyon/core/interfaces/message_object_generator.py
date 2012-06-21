@@ -345,7 +345,7 @@ class MessageObjectGenerator:
     def get_service_definition_from_datastore(self):
         data = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceDefinitions')
+        entry = dir.find_dir_child_entries('/ServiceInterfaces')
         if not entry:
             return data
         for item in entry:

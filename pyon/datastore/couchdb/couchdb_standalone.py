@@ -408,6 +408,9 @@ class CouchDataStore(object):
             view_args['limit'] = limit
         return view_args
 
+    def query(self, map):
+        ds, datastore_name = self._get_datastore()
+        return ds.query(map)
 
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                           id_only=True, **kwargs):

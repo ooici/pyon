@@ -205,28 +205,30 @@ class ObjectModelGenerator:
         return data
 
     def get_object_definition_from_datastore(self):
-        data = ''
+        fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ObjectTypes')
-        for item in entry:
+        entries = dir.find_dir_child_entries('/ObjectTypes')
+        for item in entries:
             try:
-                data = data + item.value['attributes']['definition'] + '\n'
-            except:
+                fragments.append(item.value['attributes']['definition'])
+            except Exception as ex:
                 return ''
-        return data
+        full_definition = "\n".join(fragments)
+        return full_definition
 
     def get_service_definition_from_datastore(self):
-        data = ''
+        fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceDefinitions')
-        if not entry:
-            return data
-        for item in entry:
+        entries = dir.find_dir_child_entries('/ServiceInterfaces')
+        if not entries:
+            return ""
+        for item in entries:
             try:
-                data = data + item.value['attributes']['definition'] + '\n'
+                fragments.append(item.value['attributes']['definition'])
             except:
                 return ''
-        return data
+        full_definition = "\n".join(fragments)
+        return full_definition
 
     def generate_enums(self, combined_yaml_text, opts):
         '''

@@ -100,7 +100,6 @@ class DirectoryStandalone(object):
 
     def find_dir_child_entries(self, parent='/', **kwargs):
         parent_dn = self._get_directory_name(parent)
-        map_fun= "function(doc) { if (doc.parent == '" + parent_dn +"') emit(doc.ts_updated, doc) }"
+        map_fun= "function(doc) { if (doc.parent == '" + parent_dn +"') emit([doc.ts_updated, doc.attributes.ordinal], doc) }"
         results = self.datastore.query(map_fun)
         return results
-

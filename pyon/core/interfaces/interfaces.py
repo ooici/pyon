@@ -19,9 +19,9 @@ class InterfaceAdmin:
     Administrates work with interfaces in the datastore
     """
 
-    DIR_OBJECTTYPES_PATH = "ObjectTypes"
-    DIR_SERVICEDEF_PATH = "ServiceDefinitions"
-    DIR_RESFILES_PATH = "ResourceDefinitions"
+    DIR_OBJECTTYPES_PATH = "/ObjectTypes"
+    DIR_SERVICEDEF_PATH = "/ServiceInterfaces"
+    DIR_RESFILES_PATH = "/Config"
     DIR_CONFIG_PATH = "/Config"
 
     def __init__(self, sysname, config=None):
@@ -51,14 +51,16 @@ class InterfaceAdmin:
         self.dir.register(self.DIR_CONFIG_PATH, "CFG", **system_cfg.copy())
 
     def store_interfaces(self, object_definition_file=None,
-                         service_definition_file=None, store_bulk=True):
+                         service_definition_file=None, store_bulk=True, idempotent=False):
         """
         Main entry point into storing interfaces
         """
         self.object_definition_file = object_definition_file
         self.service_definition_file = service_definition_file
         self.store_bulk = store_bulk
+        self.idempotent = idempotent
         self.bulk_entries = {}
+        self.serial_num = 1
 
         if self.service_definition_file:
             if os.path.exists(self.service_definition_file):
@@ -75,6 +77,11 @@ class InterfaceAdmin:
             else:
                 print "store_interfaces: Error couldn't find the file path\n"
         else:
+            if self.idempotent:
+                de = self.dir.lookup(self.DIR_SERVICEDEF_PATH)
+                if de is not None:
+                    #print "store_interfaces: Interfaces already stored. Ignoring"
+                    return
             # load all files
             self.store_config_files()
             self.store_object_interfaces()
@@ -130,10 +137,10 @@ class InterfaceAdmin:
         Store in datastore
         '''
         if self.store_bulk:
-            if (path, key) not in self.bulk_entries:
-                self.bulk_entries[('/', path)] = {}
+            if ("/", path[1:]) not in self.bulk_entries:
+                self.bulk_entries[("/", path[1:])] = {}
 
-            dir_key = ('/' + path, key)
+            dir_key = (path, key)
             if dir_key in self.bulk_entries:
                 print '\033[91m' "\nLoad Configuration Error!!! Multiple definitions found:\n"
                 print '\033[92m' "Filename:", filename
@@ -143,12 +150,14 @@ class InterfaceAdmin:
                 print '\033[0m'
                 exit()
 
-            self.bulk_entries[dir_key] = dict(file_path=filename, definition=content)
+            self.bulk_entries[dir_key] = dict(file_path=filename, definition=content, ordinal=self.serial_num)
+            self.serial_num += 1
         else:
-            if not self.dir.lookup('/' + path):
-                self.dir.register('/', path)
+            if not self.dir.lookup(path):
+                self.dir.register(path)
 
-            new_entry = self.dir.register('/' + path, key, file_path=filename, definition=content)
+            new_entry = self.dir.register(path, key, file_path=filename, definition=content, ordinal=self.serial_num)
+            self.serial_num += 1
             if new_entry is not None:
                 print '\033[91m' "\nLoad Configuration Error!!! Multiple definitions found:\n"
                 print '\033[92m' "Filename:", filename
@@ -158,7 +167,7 @@ class InterfaceAdmin:
                 print '\033[0m'
                 exit()
 
-            new_entry = self.dir.lookup('/' + path + '/' + key)
+            new_entry = self.dir.lookup(path + '/' + key)
             if content != new_entry['definition']:
                 print '\n\nError adding: ' + key + ' to the directory'
                 exit()
