@@ -4,7 +4,7 @@
 
 from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
-from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
+from pyon.core.exception import ExceptionFactory, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
@@ -65,7 +65,7 @@ class EndpointUnit(object):
         self._interceptors = value
 
     def attach_channel(self, channel):
-        log.debug("attach_channel %s", str(channel))
+#        log.debug("attach_channel %s", str(channel))
         self.channel = channel
 
     def _build_invocation(self, **kwargs):
@@ -167,14 +167,14 @@ class EndpointUnit(object):
                         # always ack a listener response
                         self.channel.ack(delivery_tag)
                 except ChannelClosedError:
-                    log.debug('Channel was closed during client_recv listen loop')
+#                    log.debug('Channel was closed during client_recv listen loop')
                     break
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
         self._recv_greenlet = spawn(client_recv)
 
     def close(self):
-        log.debug('close endpoint')
+#        log.debug('close endpoint')
         if self._recv_greenlet is not None:
             # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
             # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
@@ -413,7 +413,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
             try:
                 self.get_one_msg()
             except ChannelClosedError as ex:
-                log.debug('Channel was closed during LEF.listen')
+#                log.debug('Channel was closed during LEF.listen')
                 break
 
     def prepare_listener(self, binding=None):
@@ -678,6 +678,8 @@ class RequestResponseServer(ListeningBaseEndpoint):
 
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
+    exception_factory = ExceptionFactory()
+
     def _send(self, msg, headers=None, **kwargs):
         log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
 
@@ -693,7 +695,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         # Check response header
         if res_headers["status_code"] != 200:
             log.info("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
-            self._raise_exception(res_headers["status_code"], res_headers["error_message"])
+            raise self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], res)
 
         return res, res_headers
 
@@ -820,13 +822,6 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         return headers
 
-    def _raise_exception(self, code, message):
-        if str(code) in exception_map:
-            raise exception_map[str(code)](message)
-        else:
-            #log.debug("Raising ServerError")
-            raise ServerError(message)
-
 class RPCClient(RequestResponseClient):
     """
     Base RPCClient class.
@@ -922,7 +917,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
 
-        ts = time.time()
+#        ts = time.time()
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
         except IonException as ex:
@@ -933,6 +928,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             for elt in tb_list:
                 tb_output += elt
             log.info("Got error response: %s\n%s", ex, tb_output)
+            result = ex.get_stacks()
             response_headers = self._create_error_response(ex)
         finally:
             # REPLIES: propogate protocol, conv-id, conv-seq
@@ -940,11 +936,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
-            elapsed = time.time() - ts
-            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
-                                                                                      self.channel._recv_name,
-                                                                                      elapsed)
+#            elapsed = time.time() - ts
+#            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+#                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
+#                                                                                      self.channel._recv_name,
+#                                                                                      elapsed)
 
         log_message("MESSAGE SEND <<< RPC-reply", result, response_headers, is_send=True)
 
