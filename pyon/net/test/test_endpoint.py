@@ -7,10 +7,9 @@ import unittest
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
-from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, RecvChannel, ListenChannel
 from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
-from gevent import event, sleep, spawn
+from gevent import event, spawn
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
 from pyon.util.unit_test import PyonTestCase
@@ -27,6 +26,13 @@ no_interceptors = {'message_incoming': [],
                    'message_outgoing': [],
                    'process_incoming': [],
                    'process_outgoing': []}
+
+# simplify send assertions -- can only validate header contents;
+# response may have stacks, the simple mock.assert_called_once_with will fail
+def assert_called_once_with_header(test, mock, expected):
+    test.assertEqual(1, mock.call_count)
+    actual = mock.call_args[0][1]
+    test.assertEqual(expected, actual)
 
 class TestError(StandardError):
     """
@@ -577,16 +583,9 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
             e = RPCRequestEndpointUnit(interceptors={})
             ch = self._setup_mock_channel(status_code=err.status_code, error_message=str(err.status_code))
             e.attach_channel(ch)
+            self.assertRaises(err, e.send, {})
+            self.assertRaises(err, e.send, {})
 
-            self.assertRaises(err, e.send, 'payload')
-
-    def test__raise_exception_known(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertRaises(exception.NotFound, e._raise_exception, 404, "no")
-
-    def test__raise_exception_unknown(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertRaises(exception.ServerError, e._raise_exception, 999, "no")
 
     @patch('pyon.net.endpoint.RequestEndpointUnit._send', Mock(side_effect=exception.Timeout))
     def test_timeout_makes_sflow_sample(self):
@@ -761,8 +760,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e.spawn_listener()
         e._recv_greenlet.join()
 
-        # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':400,
+        assert_called_once_with_header(self, ch.send, {'status_code':400,
                                                'error_message':'Unknown op name: no_exist',
                                                'conv-id': '',
                                                'conv-seq': 2,
@@ -770,7 +768,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                'performative': 'failure',
                                                'language':'ion-r2',
                                                'encoding':'msgpack',
-                                               'format':'NoneType',
+                                               'format':'OrderedDict',
                                                'receiver': ',',
                                                'ts': sentinel.ts,
                                                'reply-by': 'todo'})
@@ -791,7 +789,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e._recv_greenlet.join()
 
         # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':500,
+        assert_called_once_with_header(self, ch.send, {'status_code':500,
                                                'error_message':'simple() got an unexpected keyword argument \'not_named\'',
                                                'conv-id': '',
                                                'conv-seq': 2,
@@ -813,7 +811,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
             retval = e._message_received(sentinel.msg, {})
 
             self.assertEquals(retval, sentinel.sent)
-            e.send.assert_called_once_with(None, {'status_code': -1,
+            assert_called_once_with_header(self, e.send, {'status_code': -1,
                                                   'error_message':'',
                                                   'conv-id': '',
                                                   'conv-seq': 2,
@@ -843,7 +841,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e.spawn_listener()
         e._recv_greenlet.join()
 
-        e.send.assert_called_once_with(None, {'status_code': 401,
+        assert_called_once_with_header(self, e.send, {'status_code': 401,
                                               'error_message': str(sentinel.unauth),
                                               'conv-id': '',
                                               'conv-seq': 2,

@@ -694,8 +694,9 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         # Check response header
         if res_headers["status_code"] != 200:
+            stacks = res if isinstance(res, dict) else None
             log.info("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
-            raise self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], res)
+            raise self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], stacks=stacks)
 
         return res, res_headers
 
