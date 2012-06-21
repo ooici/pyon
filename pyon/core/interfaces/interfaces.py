@@ -154,7 +154,7 @@ class InterfaceAdmin:
             self.serial_num += 1
         else:
             if not self.dir.lookup(path):
-                self.dir.register(path)
+                self.dir.register("/", path[1:])
 
             new_entry = self.dir.register(path, key, file_path=filename, definition=content, ordinal=self.serial_num)
             self.serial_num += 1
