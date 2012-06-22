@@ -47,6 +47,14 @@ class IonIntegrationTestCase(unittest.TestCase):
             CFG['container']['filesystem'] = {}
             CFG['container']['filesystem']['force_clean'] = True
 
+        # hack to clean up the previous pid if it's still there.
+        pidfile = "cc-pid-%d" % os.getpid()
+        log.debug("Cleanup pidfile: %s", pidfile)
+        try:
+            os.remove(pidfile)
+        except Exception, e:
+            log.warn("Pidfile could not be deleted: %s" % str(e))
+
         self.container = None
         self.addCleanup(self._stop_container)
         self.container = Container()
