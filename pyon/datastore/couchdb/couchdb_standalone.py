@@ -27,16 +27,18 @@ class CouchDataStore(object):
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
-    def __init__(self, datastore_name=None, host=None, port=None, username=None, password=None, config=None, newlog=None, **kwargs):
+    def __init__(self, datastore_name=None, host=None, port=None, username=None, password=None,
+                 config=None, newlog=None, scope=None, **kwargs):
         """
         @param datastore_name  Name of datastore within server. Should be scoped by caller with sysname
         @param config  A standard config dict with connection params
+        @param scope  Identifier to prefix the datastore name (e.g. sysname)
         """
         global log
         if newlog:
             log = newlog
 
-        self.datastore_name = datastore_name.lower() if datastore_name else None
+        # Connection
         self.host = host or get_safe(config, 'server.couchdb.host') or 'localhost'
         self.port = port or get_safe(config, 'server.couchdb.port') or 5984
         self.username = username or get_safe(config, 'server.couchdb.username')
@@ -53,9 +55,20 @@ class CouchDataStore(object):
 
         self._datastore_cache = {}
 
+        # Datastore (couch database) handling. Scope with given scope (sysname) and make all lowercase
+        self.scope = scope
+        if self.scope:
+            self.datastore_name = ("%s_%s" % (self.scope, datastore_name)).lower() if datastore_name else None
+        else:
+            self.datastore_name = datastore_name.lower() if datastore_name else None
+
         # Just to test existence of the datastore
         if self.datastore_name:
-            ds, _ = self._get_datastore()
+            try:
+                ds, _ = self._get_datastore()
+            except NotFound:
+                self.create_datastore()
+                ds, _ = self._get_datastore()
 
     def close(self):
         """
@@ -68,16 +81,35 @@ class CouchDataStore(object):
     # -------------------------------------------------------------------------
     # Couch database operations
 
-    def _get_datastore(self, datastore_name=None):
-        datastore_name = datastore_name or self.datastore_name
-        if not datastore_name:
+    def _get_datastore_name(self, datastore_name=None):
+        """
+        Computes a name for the datastore to work on. If name is given, uses the lower case
+        version of this name. If this instance was initialized with a scope, the name is additionally
+        scoped. If no name was given, the instance defaults will be returned.
+        """
+        if datastore_name and self.scope:
+            datastore_name = ("%s_%s" % (self.scope, datastore_name)).lower()
+        elif datastore_name:
+            datastore_name = datastore_name.lower()
+        elif self.datastore_name:
+            datastore_name = self.datastore_name
+        else:
             raise BadRequest("No data store name provided")
+        return datastore_name
+
+    def _get_datastore(self, datastore_name=None):
+        """
+        Returns the couch datastore instance and datastore name.
+        This caches the datastore instance to avoid an explicit lookup to save on http request.
+        The consequence is that if another process deletes the datastore in the meantime, we will fail later.
+        """
+        datastore_name  = self._get_datastore_name(datastore_name)
 
         if datastore_name in self._datastore_cache:
             return self._datastore_cache[datastore_name], datastore_name
 
         try:
-            ds = self.server[datastore_name] #http lookup
+            ds = self.server[datastore_name] # Note: causes http lookup
             self._datastore_cache[datastore_name] = ds
             return ds, datastore_name
         except ResourceNotFound:
@@ -89,8 +121,9 @@ class CouchDataStore(object):
         """
         Create a data store with the given name.  This is
         equivalent to creating a database on a database server.
+        @param datastore_name  Datastore to work on. Will be scoped if scope was provided.
         """
-        datastore_name = datastore_name or self.datastore_name
+        datastore_name  = self._get_datastore_name(datastore_name)
         try:
             self.server.create(datastore_name)
         except PreconditionFailed:
@@ -103,7 +136,7 @@ class CouchDataStore(object):
         Delete the data store with the given name.  This is
         equivalent to deleting a database from a database server.
         """
-        datastore_name = datastore_name or self.datastore_name
+        datastore_name  = self._get_datastore_name(datastore_name)
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
@@ -115,6 +148,7 @@ class CouchDataStore(object):
         """
         List all data stores within this data store server. This is
         equivalent to listing all databases hosted on a database server.
+        Returns scoped names.
         """
         return list(self.server)
 
@@ -135,7 +169,7 @@ class CouchDataStore(object):
         """
         Indicates whether named data store currently exists.
         """
-        datastore_name = datastore_name or self.datastore_name
+        datastore_name  = self._get_datastore_name(datastore_name)
         try:
             ds = self.server[datastore_name]
             return True
@@ -193,7 +227,7 @@ class CouchDataStore(object):
             raise BadRequest("Doc must not have '_id'")
         if '_rev' in doc:
             raise BadRequest("Doc must not have '_rev'")
-        return self.save_doc(doc, object_id, datastore_name)
+        return self.save_doc(doc, object_id, datastore_name=datastore_name)
 
     def update_doc(self, doc, datastore_name=None):
         """
@@ -374,6 +408,9 @@ class CouchDataStore(object):
             view_args['limit'] = limit
         return view_args
 
+    def query(self, map):
+        ds, datastore_name = self._get_datastore()
+        return ds.query(map)
 
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                           id_only=True, **kwargs):

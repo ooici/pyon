@@ -6,8 +6,13 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.registry import IonObjectRegistry, getextends, issubtype
+from pyon.core.bootstrap import IonObject
+from pyon.core.exception import BadRequest, NotFound
 from pyon.util.config import Config
-from pyon.util.containers import DotDict, named_any
+from pyon.util.containers import DotDict, named_any, get_ion_ts
+
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
+
 
 # Object Types
 ObjectTypes = DotDict()
@@ -274,3 +279,195 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
 
     def _add_constraints(self):
         pass
+
+
+
+class ExtendedResourceContainer(object):
+
+    def __init__(self,serv_prov):
+        self.service_provider = serv_prov
+        self.resource_registry = self.service_provider.clients.resource_registry
+
+    def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
+                                           ext_associations=None, ext_exclude=None):
+
+        if not self.service_provider or not self.resource_registry:
+            raise Inconsistent("This class is not initialized properly")
+
+        if extended_resource_type not in getextends(OT.ResourceContainer):
+            raise BadRequest('Requested resource %s is not extended from %s' % ( extended_resource_type, OT.ResourceContainer) )
+
+        if computed_resource_type and computed_resource_type not in getextends(OT.ComputedAttributes):
+            raise BadRequest('Requested resource %s is not extended from %s' % ( computed_resource_type, OT.ComputedAttributes) )
+
+        resource_object = self.resource_registry.read(resource_id)
+        if not resource_object:
+            raise NotFound("Resource %s does not exist" % resource_id)
+
+        res_container = IonObject(extended_resource_type)
+        res_container._id = resource_object._id
+        res_container.resource = resource_object
+
+        self.set_container_field_values(res_container, ext_exclude)
+
+        self.set_computed_attributes(res_container, computed_resource_type, ext_exclude)
+
+        self.set_extended_associations(res_container, ext_associations, ext_exclude)
+
+        res_container.ts_created = get_ion_ts()
+
+        return res_container
+
+    #If there is a specified ComputedAttributes object, then create it and iterate over the fields to set the values
+    def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude):
+
+        if not computed_resource_type or computed_resource_type is None:
+            return
+
+        res_container.computed = IonObject(computed_resource_type)
+
+        self.set_object_field_values(res_container.computed, res_container.resource, ext_exclude)
+
+    #Wrapper method
+    def set_container_field_values(self, res_container, ext_exclude):
+        self.set_object_field_values(res_container, res_container.resource, ext_exclude)
+
+    #Iterate through all of the fields of the resource container object and set accordingly
+    def set_object_field_values(self, obj, resource, ext_exclude):
+
+        for field in obj._schema:
+
+            if ext_exclude is not None and field in ext_exclude:
+                continue
+
+            if self.is_decorator(obj, field, 'AssociationCount'):
+                deco_value = self.get_decorator_value(obj, field, 'Association')
+                if deco_value:
+                    setattr(obj, field, len(self.find_associations(resource, deco_value)))
+
+            elif self.is_decorator(obj, field, 'Association'):
+                deco_value = self.get_decorator_value(obj, field, 'Association')
+                if deco_value:
+                    assoc = self.find_associations(resource, deco_value)
+                    if assoc:
+                        if obj._schema[field]['type'] == 'list':
+                            setattr(obj, field, assoc)
+                        else:
+                            setattr(obj, field, assoc[0])
+
+
+            elif self.is_decorator(obj, field, 'Method'):
+                deco_value = self.get_decorator_value(obj, field, 'Method')
+                if deco_value:
+                    method_name = 'get_' + deco_values[1]
+                else:
+                    method_name = 'get_' + field
+                ret_val = self.execute_method(resource._id, method_name)
+                if ret_val is not None:
+                    setattr(obj, field, ret_val)
+
+
+
+    #This method iterates over the dict of extended field names and associations
+    #Called from within create once decorators are refactored in.
+    def set_extended_associations(self, res_container, ext_associations, ext_exclude):
+        if ext_associations is not None:
+            for ext_field in ext_associations:
+
+                if ext_exclude is not None and ext_field in ext_exclude:
+                    continue
+
+                objs = self.find_associations(res_container.resource, ext_associations[ext_field])
+                if objs:
+                    res_container.ext_associations[ext_field] = objs
+                else:
+                    res_container.ext_associations[ext_field] = list()
+
+
+    #TODO - replace when utility functions are available
+    def is_decorator(self, object, field, decorator):
+        for deco in object._schema[field]['decorators']:
+            if deco.startswith(decorator):
+                return True
+        return False
+
+    #TODO - replace when utility functions are available
+    def get_decorator_value(self, object, field, decorator):
+        for deco in object._schema[field]['decorators']:
+            if deco.startswith(decorator) and deco.find('=') > -1:
+                deco_values = deco.split('=')
+                return deco_values[1]
+
+        return None
+
+    def is_predicate_association(self, predicate,  predicate_type, res):
+        for predt in predicate[predicate_type]:
+            if res == predt:
+                return True
+        return False
+
+    def is_predicate_association_extension(self, predicate,  predicate_type, res):
+        for predt in predicate[predicate_type]:
+            if res in getextends(predt):
+                return True
+        return False
+
+    #This method figures out appropriate association call based on the Predcicate definitions
+    def find_associations(self, resource, association_predicate):
+
+        objs = list()
+
+        pred = Predicates[association_predicate]
+        if not pred:
+            return objs  #unknown association type so return empty list
+
+        #Need to check through all of these in this order to account for specific vs base class inclusions
+        if self.is_predicate_association(pred,'domain',resource.type_ ):
+            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, None, False)
+        elif self.is_predicate_association(pred,'range',resource.type_ ):
+            objs,_ = self.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+        elif self.is_predicate_association_extension(pred,'domain',resource.type_ ):
+            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, None, False)
+        elif self.is_predicate_association_extension(pred,'range',resource.type_ ):
+            objs,_ = self.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+
+        return objs
+
+
+    # This method will dynamically call the specified method. It will look for the method in the current class
+    # and also in the class specified by the service_provider
+    def execute_method(self, resource_id, method_name):
+
+        #First look for the method in the current class
+        func = getattr(self, method_name, None)
+        if func:
+            return func(resource_id)
+        else:
+            func = getattr(self.service_provider, method_name, None)
+            if func:
+                return func(resource_id)
+
+        return None
+
+
+    #Returns a list of the UserInfo associated with all ActorIdentities associated with the specified resource
+    def get_owners(self, resource_id):
+        owners = list()
+
+        actors,_ = self.resource_registry.find_objects(resource_id, PRED.hasOwner, None, False)
+        for actor in actors:
+            info,_ = self.resource_registry.find_objects(actor, PRED.hasInfo, None, False)
+            if info:
+                owners.append(info[0])
+
+        return owners
+
+
+
+
+
+
+
+
+
+

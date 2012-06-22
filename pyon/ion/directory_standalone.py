@@ -15,8 +15,8 @@ class DirectoryStandalone(object):
     def __init__(self, sysname=None, orgname=None, config=None):
         self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
-        self.datastore_name  = sysname + "_directory"
-        self.datastore = CouchDataStore(self.datastore_name, config=config)
+        self.datastore_name  = "directory"
+        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
 
     def register(self, parent, key, **kwargs):
         '''
@@ -100,7 +100,6 @@ class DirectoryStandalone(object):
 
     def find_dir_child_entries(self, parent='/', **kwargs):
         parent_dn = self._get_directory_name(parent)
-        map_fun= "function(doc) { if (doc.parent == '" + parent_dn +"') emit(doc.ts_updated, doc) }"
+        map_fun= "function(doc) { if (doc.parent == '" + parent_dn +"') emit([doc.ts_updated, doc.attributes.ordinal], doc) }"
         results = self.datastore.query(map_fun)
         return results
-

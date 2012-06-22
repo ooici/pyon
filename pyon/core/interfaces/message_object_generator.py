@@ -1,31 +1,40 @@
+#!/usr/bin/env python
+
+"""Functions for generating Python message interfaces from service definitions"""
+
+__author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster, Seman Said'
+__license__ = 'Apache 2.0'
+
 
 import ast
 import os
-from pyon.core.path import list_files_recursive
+import re
 
+from pyon.core.path import list_files_recursive
+from pyon.ion.directory_standalone import DirectoryStandalone
 
 enums_by_name = {}
 
+
 class MessageObjectGenerator:
 
+    def __init__(self, system_name=None, read_from_yaml_file=False):
+        self.system_name = system_name
+        self.read_from_yaml_file = read_from_yaml_file
 
-    def generate (self, opts):
-        service_yaml_files = list_files_recursive('obj/services', '*.yml')
-
-        ### messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonObjectBase\n"
-        messageobject_output_text = "# Message Objects\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
-        current_class_schema = ""
+    def generate(self, opts):
+        service_yaml_data = self.get_yaml_data()
+        messageobject_output_text = "# Message Objects. Don't edit, it is auto generated file.\n\nimport interface.objects\nfrom pyon.core.object import IonMessageObjectBase\n"
+        if not service_yaml_data:
+            print "message_model_generator: Error!!! the datastore (or the YAML file) is empty."
+            exit()
 
         # Now process the service definition yaml files to
         # generate message classes for input and return messages.
         # Do this on a per file basis to simplify figuring out
         # when we've reached the end of a service's ops.
-        args = []
-        init_lines = []
-        for yaml_file in (open(path, 'r') for path in service_yaml_files if os.path.exists(path)):
+        for yaml_text in service_yaml_data:
             index = 0
-            
-            yaml_text = yaml_file.read() 
             lines = yaml_text.split('\n')
 
             # Find service name
@@ -39,7 +48,6 @@ class MessageObjectGenerator:
 
             current_service_name = lines[index].split(':')[1].strip()
             index += 1
-
             # Find op definitions
             while index < len(lines):
                 if lines[index].startswith('methods:'):
@@ -71,7 +79,6 @@ class MessageObjectGenerator:
                 args = []
                 init_lines = []
                 current_op_name = lines[index].strip(' :')
-                ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonObjectBase):\n"
                 messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
@@ -92,6 +99,8 @@ class MessageObjectGenerator:
 
                 messageobject_output_text += '\n    def __init__(self'
                 current_class_schema = "\n    _schema = {"
+                decorators = ''
+                description = ''
 
                 while index < len(lines) and not lines[index].startswith('    out:'):
                     if lines[index].isspace():
@@ -99,19 +108,37 @@ class MessageObjectGenerator:
                         continue
 
                     line = lines[index].replace('    ', '', 1)
+
+                    # Find decorators and comments
                     if line.startswith('  #'):
-                        init_lines.append('  ' + line + '\n')
+                        # Check for decorators
+                        if len(line) > 4 and line.startswith('  #@'):
+                            if not decorators:
+                                decorators = '"' + line.strip()[2:] + '"'
+                            else:
+                                decorators = decorators + ', "' + line.strip()[2:] + '"'
+                        else:
+                            init_lines.append('  ' + line + '\n')
+                            if not description:
+                                description = line
+                            else:
+                                description = description + ' ' + line
+
                         index += 1
                         continue
+
                     elif line.startswith('  '):
-                        is_required = False
                         field = line.split(":", 1)[0].strip()
                         try:
                             value = line.split(":", 1)[1].strip()
                             if '#' in value:
-                                if '_required' in value:
-                                    is_required = True
+                                dsc = value.split('#', 1)[1].strip()
                                 value = value.split('#')[0].strip()
+                                # Get inline comment
+                                if not description:
+                                    description = '#' + re.escape(dsc)
+                                else:
+                                    description = description + ' #' + dsc
                         except KeyError:
                             # Ignore key error because value is nested
                             index += 1
@@ -152,12 +179,11 @@ class MessageObjectGenerator:
                                 default = value
                         args.append(", ")
                         args.append(field + "=" + value)
-    #                    if is_required:
-    #                        init_lines.append("        if " + field + " is None:\n")
-    #                        init_lines.append("            raise BadRequest('Required parameter " + field + " was not provided')\n")
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'required': " + str(is_required) + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "' },"
                     index += 1
+                    decorators = ''
+                    description = ''
 
                 if len(args) > 0:
                     for arg in args:
@@ -173,7 +199,6 @@ class MessageObjectGenerator:
                 if index < len(lines) and lines[index].startswith('    out:'):
                     args = []
                     init_lines = []
-                    ###messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonObjectBase):\n"
                     messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
                     messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                     messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
@@ -204,16 +229,36 @@ class MessageObjectGenerator:
                                     break
                                 index += 1
                             break
-
                         line = line.replace('    ', '', 1)
+
+                        # Add comments and decorators
                         if line.startswith('  #'):
+                            # Check for decorators
+                            if len(line) > 4 and line.startswith('  #@'):
+                                if not decorators:
+                                    decorators = '"' + line.strip()[2:] + '"'
+                                else:
+                                    decorators = decorators + ', "' + line.strip()[2:] + '"'
+                            else:
+                                init_lines.append('  ' + line + '\n')
+                                if not description:
+                                    description = line
+                                else:
+                                    description = description + ' ' + line
                             index += 1
                             continue
+
                         field = line.split(":", 1)[0].strip()
                         try:
                             value = line.split(":", 1)[1].strip()
                             if '#' in value:
+                                dsc = value.split('#', 1)[1].strip()
                                 value = value.split('#')[0].strip()
+                                # Get inline comment
+                                if not description:
+                                    description = '#' + re.escape(dsc)
+                                else:
+                                    description = description + ' #' + dsc
                         except KeyError:
                             # Ignore key error because value is nested
                             index += 1
@@ -254,10 +299,10 @@ class MessageObjectGenerator:
                                 default = value
                         args.append(", ")
                         args.append(field + "=" + value)
-    #                    messageobject_output_text += '        self.' + field + " = kwargs.get('" + field + "', " + value + ")\n"
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + "},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "' },"
                         index += 1
+                        decorators = ''
 
                     if len(args) > 0:
                         for arg in args:
@@ -269,14 +314,43 @@ class MessageObjectGenerator:
                         messageobject_output_text += "):\n"
                         messageobject_output_text += '        pass\n'
                     messageobject_output_text += current_class_schema + "\n              }\n"
-                
+
         datadir = 'interface'
         messagemodelfile = os.path.join(datadir, 'messages.py')
         try:
             os.unlink(messagemodelfile)
         except:
             pass
-        print "Writing message model to '" + messagemodelfile + "'"
+        print " Writing message interfaces to '" + messagemodelfile + "'"
         with open(messagemodelfile, 'w') as f:
             f.write(messageobject_output_text)
 
+    def get_yaml_data(self):
+        data = []
+        if self.read_from_yaml_file:
+            print " Message interface generator: reading service definitions from files"
+            service_yaml_files = list_files_recursive('obj/services', '*.yml')
+            for path in service_yaml_files:
+                if os.path.exists(path):
+                    file = open(path, 'r')
+                    data.append(file.read())
+                    file.close()
+        else:
+            print " Message interface generator: reading service definitions from datastore"
+            data = self.get_service_definition_from_datastore()
+            if not data:
+                data = []
+        return data
+
+    def get_service_definition_from_datastore(self):
+        data = []
+        dir = DirectoryStandalone(sysname=self.system_name)
+        entry = dir.find_dir_child_entries('/ServiceInterfaces')
+        if not entry:
+            return data
+        for item in entry:
+            try:
+                data.append(item.value['attributes']['definition'] + '\n')
+            except:
+                return ''
+        return data

@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from pyon.util.containers import DictModifier, DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID
+from pyon.util.containers import DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
@@ -17,31 +17,6 @@ class Test_Containers(IonIntegrationTestCase):
         dotDict.a = "1"
         self.assertEqual(dotDict.a, "1")
         self.assertTrue('a' in dotDict)
-
-    def test_dict_modifier(self):
-        base = DotDict({"foo": "bar", "bah": "fah"})
-        dict_modifier = DictModifier(base)
-        self.assertEqual(dict_modifier["foo"], "bar")
-
-        top = DotDict({"bah": "lah", "doh": "ray"})
-        dict_modifier.update(top)
-        saved_dict_modifier = dict_modifier
-        self.assertEqual(dict_modifier["foo"], "bar")
-        self.assertEqual(dict_modifier["bah"], "lah")
-        self.assertEqual(dict_modifier["doh"], "ray")
-
-        dict_modifier = DictModifier(dict_modifier)
-        self.assertEqual(dict_modifier["foo"], "bar")
-        self.assertEqual(dict_modifier["bah"], "lah")
-        self.assertEqual(dict_modifier["doh"], "ray")
-        self.assertEqual(dict_modifier.base, saved_dict_modifier)
-
-        top = DotDict({"bah": "trah"})
-        dict_modifier.update(top)
-        saved_dict_modifier = dict_modifier
-        self.assertEqual(dict_modifier["foo"], "bar")
-        self.assertEqual(dict_modifier["bah"], "trah")
-        self.assertEqual(dict_modifier["doh"], "ray")
 
     def test_dotdict_chaining(self):
         base = DotDict({'test':None})

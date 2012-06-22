@@ -12,6 +12,7 @@ from pyon.core.exception import ContainerError
 import time
 import os
 import signal
+from gevent.event import AsyncResult
 
 class PyonThreadError(Exception):
     pass
@@ -146,6 +147,7 @@ class ThreadManager(object):
         self.heartbeat_secs = heartbeat_secs
         self._shutting_down = False
         self._failure_notify_callback = failure_notify_callback
+        self._shutdown_event = AsyncResult()
 
     def _create_thread(self, target=None, **kwargs):
         """
@@ -271,16 +273,24 @@ class ThreadManager(object):
         return [x.get() for x in self.children]
 
     def target(self):
-        # TODO: Implement monitoring and such
-        while True:
-            #self.send_heartbeats()
-            time.sleep(self.heartbeat_secs)
+        try:
+            while not self._shutting_down:
+                self.send_heartbeats()
+                self._shutdown_event.wait(timeout=self.heartbeat_secs)
+        except:
+            log.error('thread died', exc_info=True)
+
+    def send_heartbeats(self):
+        """ TODO: implement heartbeat and monitors """
+        #log.debug('lub-dub')
+        pass
 
     def shutdown(self, timeout=30.0):
         """
         @brief Give child thread "timeout" seconds to shutdown, then forcibly terminate.
         """
-
+        self._shutting_down = True
+        self._shutdown_event.set(True)
         unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
         elapsed = self.join_children(timeout)
         self.stop()

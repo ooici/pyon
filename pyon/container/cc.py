@@ -52,28 +52,25 @@ class Container(BaseContainerAgent):
         BaseContainerAgent.__init__(self, *args, **kwargs)
 
         self._is_started = False
-
-        self._capabilities = []
-
         # set container id and cc_agent name (as they are set in base class call)
         self.id = get_default_container_id()
         self.name = "cc_agent_%s" % self.id
-
-        Container.instance = self
+        self._capabilities = []
 
         from pyon.core import bootstrap
         bootstrap.container_instance = self
+        Container.instance = self
 
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
+
+        # Keep track of the overrides from the command-line, so they can trump app/rel file data
+        self.spawn_args = kwargs
 
         # DatastoreManager - controls access to Datastores (both mock and couch backed)
         self.datastore_manager = DatastoreManager()
 
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
-
-        # Keep track of the overrides from the command-line, so they can trump app/rel file data
-        self.spawn_args = kwargs
 
         # Instantiate Directory and self-register
         # Has the additional side effect of either

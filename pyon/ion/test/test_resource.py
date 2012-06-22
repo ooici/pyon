@@ -4,8 +4,9 @@ __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
 
-
-from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE
+from mock import Mock
+from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT
+from pyon.core.exception import BadRequest
 from pyon.util.unit_test import IonUnitTestCase
 from nose.plugins.attrib import attr
 
@@ -50,3 +51,28 @@ class TestResources(IonUnitTestCase):
                                                                                  LCE.RETIRE: LCS.RETIRED})
 
 #        self.assertEquals(default_workflow.get_predecessors(LCS.DEVELOPED_PRIVATE), {LCS.PLANNED: LCE.DEVELOP})
+
+
+    def test_create_extended_resource_container(self):
+
+        mock_clients = self._create_service_mock('resource_registry')
+
+        self.clients = mock_clients
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+
+        actor_identity = Mock()
+        actor_identity._id = '111'
+        actor_identity.name = "Foo"
+        mock_clients.resource_registry.read.return_value = actor_identity
+
+        with self.assertRaises(BadRequest) as cm:
+            extended_user = extended_resource_handler.create_extended_resource_container(OT.ActorIdentity, '111')
+        self.assertIn( 'Requested resource ActorIdentity is not extended from ResourceContainer',cm.exception.message)
+
+
+        extended_user = extended_resource_handler.create_extended_resource_container(OT.ActorIdentityExtension, '111')
+
+        self.assertEquals(extended_user.resource, actor_identity)
+
+
