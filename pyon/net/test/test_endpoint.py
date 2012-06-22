@@ -584,8 +584,6 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
             ch = self._setup_mock_channel(status_code=err.status_code, error_message=str(err.status_code))
             e.attach_channel(ch)
             self.assertRaises(err, e.send, {})
-            self.assertRaises(err, e.send, {})
-
 
     @patch('pyon.net.endpoint.RequestEndpointUnit._send', Mock(side_effect=exception.Timeout))
     def test_timeout_makes_sflow_sample(self):
