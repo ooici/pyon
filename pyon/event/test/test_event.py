@@ -108,7 +108,7 @@ class TestEvents(IonIntegrationTestCase):
                 ar.set()
 
         sub = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1", callback=cb)
-        sub.activate()
+        sub.start()
 
         pub1 = EventPublisher(event_type="ResourceModifiedEvent")
         pub2 = EventPublisher(event_type="ContainerLifecycleEvent")
@@ -119,7 +119,7 @@ class TestEvents(IonIntegrationTestCase):
         pub1.publish_event(origin="four", sub_type="st1", description="end")
 
         ar.get(timeout=5)
-        sub.deactivate()
+        sub.stop()
 
         res = []
         for x in xrange(self.count):
@@ -140,16 +140,16 @@ class TestEvents(IonIntegrationTestCase):
             return cb
 
         sub0 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1.*", callback=cb_gen(0))
-        sub0.activate()
+        sub0.start()
 
         sub1 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1.a", callback=cb_gen(1))
-        sub1.activate()
+        sub1.start()
 
         sub2 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="*.a", callback=cb_gen(2))
-        sub2.activate()
+        sub2.start()
 
         sub3 = EventSubscriber(event_type="ResourceModifiedEvent", sub_type="st1", callback=cb_gen(3))
-        sub3.activate()
+        sub3.start()
 
         pub1 = EventPublisher(event_type="ResourceModifiedEvent")
 
@@ -168,10 +168,10 @@ class TestEvents(IonIntegrationTestCase):
 
         [res_list[i].ar.get(timeout=5) for i in xrange(3)]
 
-        sub0.deactivate()
-        sub1.deactivate()
-        sub2.deactivate()
-        sub3.deactivate()
+        sub0.stop()
+        sub1.stop()
+        sub2.stop()
+        sub3.stop()
 
         for i in xrange(4):
             res_list[i].res = []

@@ -6,7 +6,7 @@ __license__ = 'Apache 2.0'
 from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
 from gevent import queue, spawn
 from pyon.util.unit_test import PyonTestCase
-from mock import Mock, sentinel, patch
+from mock import Mock, sentinel, patch, MagicMock
 from pika import channel as pchannel
 from pika import BasicProperties
 from nose.plugins.attrib import attr
@@ -730,6 +730,7 @@ class TestListenChannel(PyonTestCase):
         cacmock = Mock()
 
         self.ch.recv = rmock
+        self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
         self.ch._amq_chan = sentinel.amq_chan
         self.ch._fsm.current_state = self.ch.S_ACTIVE
@@ -754,6 +755,7 @@ class TestListenChannel(PyonTestCase):
         cacmock = Mock()
 
         self.ch.recv = rmock
+        self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
         self.ch._amq_chan = sentinel.amq_chan
         self.ch._fsm.current_state = self.ch.S_ACTIVE
@@ -791,6 +793,7 @@ class TestListenChannel(PyonTestCase):
         cacmock = Mock()
 
         self.ch.recv = rmock
+        self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
         self.ch._amq_chan = sentinel.amq_chan
         self.ch._fsm.current_state = self.ch.S_ACTIVE

@@ -497,6 +497,16 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
 
         log.debug("LEF.prepare_listener: binding %s", binding)
+
+        self.initialize(binding=binding)
+        self.activate()
+
+    def initialize(self, binding=None):
+        """
+        Creates a channel and prepares it for use.
+
+        After this, the endpoint is inthe ready state.
+        """
         binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
@@ -511,7 +521,24 @@ class ListeningBaseEndpoint(BaseEndpoint):
             self._chan._recv_name = self._recv_name
         else:
             self._setup_listener(self._recv_name, binding=binding)
+
+    def activate(self):
+        """
+        Begins consuming.
+
+        You must have called initialize first.
+        """
+        assert self._chan
         self._chan.start_consume()
+
+    def deactivate(self):
+        """
+        Stops consuming.
+
+        You must have called initialize and activate first.
+        """
+        assert self._chan
+        self._chan.stop_consume()       # channel will yell at you if this is invalid
 
     def _get_n_msgs(self, num=1, timeout=None):
         """
@@ -519,7 +546,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         INBOUND INTERCEPTORS ARE PROCESSED HERE.
         """
-        assert self._chan, "get_one_msg needs a channel setup"
+        assert self._chan, "get_one_msg needs the endpoint to have been initialized"
 
         mos = []
         newch = self._chan.accept(n=num, timeout=timeout)

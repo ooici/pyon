@@ -21,6 +21,7 @@ from gevent.queue import Queue
 import os
 import time
 import Queue as PQueue
+from gevent.timeout import Timeout
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -509,20 +510,20 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
             raise StandardError("Subscriber callback never gets called back!")
 
         sub = Subscriber(from_name=xq, callback=cb)
-        sub.prepare_listener()
+        sub.initialize()
 
         # publish 10 messages - we're not bound yet, so they'll just dissapear
         for x in xrange(10):
             pub3.publish("3,%s" % str(x))
 
         # no messages yet
-        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
+        self.assertRaises(Timeout, sub.get_one_msg, timeout=0)
 
         # now, we'll bind the xq
         xq.bind('routed.3')
 
         # even tho we are consuming, there are no messages - the previously published ones all dissapeared
-        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
+        self.assertRaises(Timeout, sub.get_one_msg, timeout=0)
 
         # publish those messages again
         for x in xrange(10):
@@ -530,12 +531,12 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # NOW we have messages!
         for x in xrange(10):
-            mo = sub.get_one_msg(timeout=0)
+            mo = sub.get_one_msg(timeout=1)
             self.assertEquals(mo.body, "3,%s" % str(x))
             mo.ack()
 
         # we've cleared it all
-        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
+        self.assertRaises(Timeout, sub.get_one_msg, timeout=0)
 
         # bind a wildcard and publish on both
         xq.bind('routed.*')
@@ -548,11 +549,11 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # should get all 20, interleaved
         for x in xrange(10):
-            mo = sub.get_one_msg(timeout=0)
+            mo = sub.get_one_msg(timeout=1)
             self.assertEquals(mo.body, "3,%s" % str(x))
             mo.ack()
 
-            mo = sub.get_one_msg(timeout=0)
+            mo = sub.get_one_msg(timeout=1)
             self.assertEquals(mo.body, "5,%s" % str(x))
             mo.ack()
 
@@ -564,7 +565,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         # try publishing to 3, shouldn't arrive anymore
         pub3.publish("3")
 
-        self.assertRaises(PQueue.Empty, sub.get_one_msg, timeout=0)
+        self.assertRaises(Timeout, sub.get_one_msg, timeout=0)
 
         # let's turn off the consumer and let things build up a bit
         sub._chan.stop_consume()
@@ -577,10 +578,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # drain queue
         sub._chan.start_consume()
-        time.sleep(1)       # yield to allow delivery
 
         for x in xrange(10):
-            mo = sub.get_one_msg(timeout=0)
+            mo = sub.get_one_msg(timeout=1)
             mo.ack()
 
         sub.close()

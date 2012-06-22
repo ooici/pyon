@@ -405,6 +405,13 @@ class ExchangeManager(object):
         log.info("ExchangeManager.purge")
         self._ensure_default_declared()
         self._transport.purge(self._client, queue)
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        """
+        QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
+        """
+        log.info("ExchangeManager.qos")
+        self._ensure_default_declared()
+        self._transport.qos(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 
 class XOTransport(BaseTransport):
@@ -438,6 +445,14 @@ class XOTransport(BaseTransport):
 
     def purge(self, client, queue):
         return self._exchange_manager.purge(queue)
+
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        """
+        QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
+
+        This means we must pass in the client.
+        """
+        return self._exchange_manager.qos(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 class ExchangeSpace(XOTransport, NameTrio):
 

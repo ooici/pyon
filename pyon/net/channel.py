@@ -352,6 +352,40 @@ class RecvChannel(BaseChannel):
     # consuming flag (consuming is not a state, a property)
     _consuming          = False
 
+    class SizeNotifyQueue(gqueue.Queue):
+        """
+        Custom gevent-safe queue to allow us to be notified when queue reaches a threshold.
+
+        You call a context handler that returns you an AsyncResult you can wait on deterministically.
+        Pass the number of items you want the queue to minimally have.
+        """
+        def __init__(self, *args, **kwargs):
+            self._size_ar = None
+            self._await_number = None
+            gqueue.Queue.__init__(self, *args, **kwargs)
+
+        def _put(self, item):
+            gqueue.Queue._put(self, item)
+            self._check_and_fire()
+
+        def _check_and_fire(self):
+            if self._size_ar is not None and not self._size_ar.ready() and self.qsize() >= self._await_number:
+                self._size_ar.set()
+
+        @contextmanager
+        def await_n(self, n=1):
+            assert self._size_ar == None, "await_n already called, cannot be called twice"
+
+            self._size_ar = AsyncResult()
+            self._await_number = n
+
+            # are we already ready already?
+            self._check_and_fire()      # @TODO: likely a race condition here, slim effect though
+            try:
+                yield self._size_ar
+            finally:
+                self._size_ar = None
+
     def __init__(self, name=None, binding=None, **kwargs):
         """
         Initializer for a recv channel.
@@ -359,7 +393,7 @@ class RecvChannel(BaseChannel):
         You may set the receiving name and binding here if you wish, otherwise they will
         be set when you call setup_listener.
         """
-        self._recv_queue = gqueue.Queue()
+        self._recv_queue = self.SizeNotifyQueue()
 
         # set recv name and binding if given
         assert name is None or isinstance(name, tuple)
@@ -789,13 +823,26 @@ class ListenChannel(RecvChannel):
         state.
         """
 
-        # protect against common issues
-        #assert self._fsm.current_state == self.S_CONSUMING, "Channel not in consuming state, cannot accept messages (curstate: %s)" % str(self._fsm.current_state)
+        assert self._fsm.current_state == self.S_ACTIVE, "Channel must be in active state to accept, currently %s" % str(self._fsm.current_state)
 
-        ms = []
-        for x in xrange(n):
-            m = self.recv(timeout=timeout)  # @TODO not correct, timeout is overall
-            ms.append(m)
+        was_consuming = self._consuming
+
+        if not was_consuming:
+            # tune QOS to get exactly n messages
+            self._transport.qos(self._amq_chan, prefetch_count=n)
+
+            # start consuming
+            self.start_consume()
+
+        with self._recv_queue.await_n(n=n) as ar:
+            log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
+            ar.get(timeout=timeout)
+
+        if not was_consuming:
+            # turn consuming back off if we already were off
+            self.stop_consume()
+
+        ms = [self.recv() for x in xrange(n)]
 
         ch = self._create_accepted_channel(self._amq_chan, ms)
         map(ch._recv_queue.put, ms)
