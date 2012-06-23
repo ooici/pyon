@@ -669,6 +669,7 @@ class Subscriber(ListeningBaseEndpoint):
         """
         @param  callback should be a callable with two args: msg, headers
         """
+        assert callback, "No callback provided"
         self._callback = callback
         ListeningBaseEndpoint.__init__(self, **kwargs)
 

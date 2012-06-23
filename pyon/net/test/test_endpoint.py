@@ -472,6 +472,9 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         self._node = Mock(spec=NodeB)
         self._node.interceptors = {}
 
+    def test_create_sub_without_callback(self):
+        self.assertRaises(AssertionError, Subscriber, node=self._node, from_name="testsub")
+
     def test_create_endpoint(self):
         def mycb(msg, headers):
             return "test"
