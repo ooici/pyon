@@ -824,8 +824,7 @@ class ListenChannel(RecvChannel):
         state.
         """
 
-        # @TODO: re-enable, doens't work with listen loops
-        #assert self._fsm.current_state == self.S_ACTIVE, "Channel must be in active state to accept, currently %s" % str(self._fsm.current_state)
+        assert self._fsm.current_state == self.S_ACTIVE, "Channel must be in active state to accept, currently %s" % str(self._fsm.current_state)
 
         was_consuming = self._consuming
 
