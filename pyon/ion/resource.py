@@ -359,7 +359,7 @@ class ExtendedResourceContainer(object):
             elif self.is_decorator(obj, field, 'Method'):
                 deco_value = self.get_decorator_value(obj, field, 'Method')
                 if deco_value:
-                    method_name = 'get_' + deco_value
+                    method_name = deco_value
                 else:
                     method_name = 'get_' + field
                 ret_val = self.execute_method(resource._id, method_name)
