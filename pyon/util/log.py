@@ -34,7 +34,6 @@ class StackFormatter(logging.Formatter):
     def formatException(self, record):
         type,ex,tb = sys.exc_info()
         # use special exception logging only for IonExceptions with more than one saved stack
-        print 'checking exception type %s and stacks %d' % (ex.__class__.__name__, len(ex.get_stacks()) if isinstance(ex,IonException) else 0)
         if isinstance(ex,IonException) and len(ex.get_stacks())>1:
             return ex.format_stack(**self._format_args)
         else:
@@ -175,7 +174,7 @@ def get_scoped_log(framestoskip=1):
         frame = frame.f_back
         name = frame.f_locals.get('__name__', None)
 
-    logging.setLoggerClass(StackLogger)
+#    logging.setLoggerClass(StackLogger)
     log = get_logger(name) if name else None
     return log
 
