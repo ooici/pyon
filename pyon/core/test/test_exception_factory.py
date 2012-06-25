@@ -28,19 +28,20 @@ class TestExceptionUtils(TestCase):
 
     def testCreateWithStack(self):
         stack = traceback.extract_stack()
-        ex = self.subject.create_exception(553, 'test2 message', {'added': stack})
+        ex = self.subject.create_exception(553, 'test2 message', [('added',stack)])
         self.assertEqual(553, ex.status_code)
         self.assertEqual('test2 message', ex.message)
         d = ex.get_stacks()
-        self.assertTrue('__init__' in d)
-        self.assertTrue('added' in d)
-        self.assertTrue(isinstance(d['__init__'],list))
+        labels = [ label for label,stack in ex.get_stacks() ]
+        self.assertTrue('__init__' in labels)
+        self.assertTrue('added' in labels)
+        self.assertTrue(all(isinstance(stack,list) for label,stack in ex.get_stacks()))
 
     def testToString(self):
         stack = self.get_stack(3)
-        ex = self.subject.create_exception(553, 'test2 message', {'added': stack})
+        ex = self.subject.create_exception(553, 'test2 message', [('added',stack)])
         msg1 = ex.format_stack()
-        msg2 = ex.format_stack(filter=self.show_frame)
+        msg2 = ex.format_stack(formatter=self.custom_stack_format)
         self.assertTrue(len(msg1)>len(msg2))
 
     def get_stack(self, n):
@@ -49,5 +50,7 @@ class TestExceptionUtils(TestCase):
         else:
             return traceback.extract_stack()
 
-    def show_frame(self, label, file, line, caller, code):
-        return label=='__init__'
+    def custom_stack_format(self, label, stack):
+        # does not display label like default formatter
+        for f,l,m,c in stack:
+            yield '%s:%d\t%s'%(f,l,c)

@@ -85,11 +85,9 @@ class EndpointUnit(object):
         friends work!
         """
         # interceptor point
-        inv = self._build_invocation(path=Invocation.PATH_IN,
-                                     message=msg,
-                                     headers=headers)
+        inv = self._build_invocation(path=Invocation.PATH_IN, message=msg, headers=headers)
         inv_prime = self._intercept_msg_in(inv)
-        new_msg     = inv_prime.message
+        new_msg = inv_prime.message
         new_headers = inv_prime.headers
 
         return self.message_received(new_msg, new_headers)
@@ -99,7 +97,7 @@ class EndpointUnit(object):
         Performs interceptions of incoming messages.
         Override this to change what interceptor stack to go through and ordering.
 
-        @param  inv     An Invocation instance.
+        @param inv      An Invocation instance.
         @returns        A processed Invocation instance.
         """
         inv_prime = process_interceptors(self.interceptors["message_incoming"] if "message_incoming" in self.interceptors else [], inv)
@@ -167,7 +165,6 @@ class EndpointUnit(object):
                         # always ack a listener response
                         self.channel.ack(delivery_tag)
                 except ChannelClosedError:
-#                    log.debug('Channel was closed during client_recv listen loop')
                     break
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
@@ -413,7 +410,6 @@ class ListeningBaseEndpoint(BaseEndpoint):
             try:
                 self.get_one_msg()
             except ChannelClosedError as ex:
-#                log.debug('Channel was closed during LEF.listen')
                 break
 
     def prepare_listener(self, binding=None):
@@ -694,9 +690,19 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         # Check response header
         if res_headers["status_code"] != 200:
-            stacks = res if isinstance(res, dict) else None
+            stacks = None
+            if isinstance(res, list):
+                stacks = res
+                # stack information is passed as a list of tuples (label, stack)
+                # default label for new IonException is '__init__',
+                # but change the label of the first remote exception to show RPC invocation.
+                # other stacks would have already had labels updated.
+                new_label = 'remote call to %s' % (res_headers['receiver'])
+                top_stack = stacks[0][1]
+                stacks[0] = (new_label, top_stack)
             log.info("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
-            raise self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], stacks=stacks)
+            ex = self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], stacks=stacks)
+            raise ex
 
         return res, res_headers
 
@@ -907,7 +913,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpointUnit.__init__(self, **kwargs)
         self._routing_obj = routing_obj
-        
+
     def _message_received(self, msg, headers):
         """
         Internal _message_received override.
@@ -928,7 +934,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             tb_output = ""
             for elt in tb_list:
                 tb_output += elt
-            log.info("Got error response: %s\n%s", ex, tb_output)
+            log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
             response_headers = self._create_error_response(ex)
         finally:

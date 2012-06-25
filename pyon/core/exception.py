@@ -16,14 +16,18 @@ import traceback
 import inspect
 import sys
 
+def _default_stack_formatter(label, stack):
+    yield '--- %s ---'%label
+    for f,l,m,c in stack:
+        yield '%s:%d\t%s'%(f,l,c)
 
 class IonException(Exception):
     status_code = -1
 
     def __init__(self, *a, **b):
         super(IonException,self).__init__(*a,**b)
-        self._stacks = OrderedDict()
-        self._stacks['__init__'] = traceback.extract_stack()
+        self._stacks = []
+        self._stacks.append(('__init__', traceback.extract_stack()))
 
     def get_status_code(self):
         return self.status_code
@@ -32,29 +36,26 @@ class IonException(Exception):
         return self.message
 
     def add_stack(self, label, stack):
-        self._stacks[label] = stack
+        self._stacks.append((label, stack))
 
     def get_stacks(self, trim=True):
         return self._stacks
 
-    def format_stack(self, format=(lambda n,f,l,m,c: ('%s:%d\t%s'%(f,l,c)) if f else ('--- %s ---'%n)),
-                           filter=(lambda n,f,l,m,c: True)):
+    # TODO: filter should become an iterator that takes the full stack
+    # TODO: and emits just the frames of interest.  otherwise don't have enough context.
+    def format_stack(self, formatter=_default_stack_formatter):
         """ return a multiline string representation of the stacks in this exception
 
             by default, the string has one section for each stack
             and each section shows the label then each stack element as "file:line code"
 
-            a format and filter function can alter how and which of these lines are printed.
-            both functions should expect None as file,line,caller and code arguments
-            to control if and how the label line is printed.
+            a formatter generator function can alter how and which of these lines are printed.
+            it should take a label and stack (list of tuples) as arguments
+            and yield string lines to be printed.
         """
         lines = []
-        for label, stack in self._stacks.items():
-            if filter(label,None,None,None,None):
-                lines.append('--- ' + label + ' ---')
-            for file,line,caller,code in stack:
-                if filter(label,file,line,caller,code):
-                    lines.append(format(label,file,line,caller,code))
+        for label, stack in self._stacks:
+            lines += formatter(label,stack)
         return '\n'.join(lines)
 
     def __str__(self):
@@ -201,6 +202,6 @@ class ExceptionFactory(object):
         else:
             out = self._default(message)
         if stacks:
-            for label,stack in stacks.items():
+            for label,stack in stacks:
                 out.add_stack(label,stack)
         return out
