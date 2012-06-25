@@ -385,7 +385,7 @@ class ObjectModelGenerator:
                         value = current_class_def_dict[field]
                         # Get inline comment
                         if '#' in line:
-                            dsc = line.split('#', 1)[1].strip()[1:]
+                            dsc = line.split('#', 1)[1].strip()
                             if not description:
                                 description = dsc
                                 csv_description = dsc

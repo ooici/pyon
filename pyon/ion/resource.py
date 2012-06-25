@@ -341,7 +341,7 @@ class ExtendedResourceContainer(object):
                 continue
 
             if self.is_decorator(obj, field, 'AssociationCount'):
-                deco_value = self.get_decorator_value(obj, field, 'Association')
+                deco_value = self.get_decorator_value(obj, field, 'AssociationCount')
                 if deco_value:
                     setattr(obj, field, len(self.find_associations(resource, deco_value)))
 
@@ -359,7 +359,7 @@ class ExtendedResourceContainer(object):
             elif self.is_decorator(obj, field, 'Method'):
                 deco_value = self.get_decorator_value(obj, field, 'Method')
                 if deco_value:
-                    method_name = 'get_' + deco_values[1]
+                    method_name = 'get_' + deco_value
                 else:
                     method_name = 'get_' + field
                 ret_val = self.execute_method(resource._id, method_name)
@@ -386,17 +386,15 @@ class ExtendedResourceContainer(object):
 
     #TODO - replace when utility functions are available
     def is_decorator(self, object, field, decorator):
-        for deco in object._schema[field]['decorators']:
-            if deco.startswith(decorator):
-                return True
+        if object._schema[field]['decorators'].has_key(decorator):
+            return True
+
         return False
 
     #TODO - replace when utility functions are available
     def get_decorator_value(self, object, field, decorator):
-        for deco in object._schema[field]['decorators']:
-            if deco.startswith(decorator) and deco.find('=') > -1:
-                deco_values = deco.split('=')
-                return deco_values[1]
+        if object._schema[field]['decorators'].has_key(decorator):
+            return object._schema[field]['decorators'][decorator]
 
         return None
 
