@@ -42,6 +42,9 @@ class BaseTransport(object):
     def purge(self, client, queue):
         raise NotImplementedError()
 
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        raise NotImplementedError()
+
 class AMQPTransport(BaseTransport):
     """
     This is STATELESS. You can make instances of it, but no need to (true singleton).
@@ -159,6 +162,13 @@ class AMQPTransport(BaseTransport):
         """
         log.debug("AMQPTransport.purge: Q %s", queue)
         self._sync_call(client, client.queue_purge, 'callback', queue=queue)
+
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        """
+        Adjusts quality of service for a channel.
+        """
+        log.debug("AMQPTransport.qos: pf_size %s, pf_count %s, global_ %s", prefetch_size, prefetch_count, global_)
+        self._sync_call(client, client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 class NameTrio(object):
     """
