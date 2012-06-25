@@ -1,5 +1,5 @@
 from pyon.core.interceptor.interceptor import Interceptor
-from pyon.core.bootstrap import obj_registry
+from pyon.core.bootstrap import get_obj_registry
 from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, IonObjectBlameDeserializer, IonObjectBlameSerializer, walk
 from pyon.util.log import log
 
@@ -10,7 +10,7 @@ class CodecInterceptor(Interceptor):
     def __init__(self):
         Interceptor.__init__(self)
         self._io_serializer = IonObjectSerializer()
-        self._io_deserializer = IonObjectDeserializer(obj_registry=obj_registry)
+        self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
 
     def outgoing(self, invocation):
         log.debug("CodecInterceptor.outgoing: %s", invocation)
@@ -40,4 +40,4 @@ class BlameCodecInterceptor(CodecInterceptor):
     def __init__(self):
         Interceptor.__init__(self)
         self._io_serializer = IonObjectBlameSerializer()
-        self._io_deserializer = IonObjectBlameDeserializer(obj_registry=obj_registry)
+        self._io_deserializer = IonObjectBlameDeserializer(obj_registry=get_obj_registry())

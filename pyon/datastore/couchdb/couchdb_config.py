@@ -23,7 +23,7 @@ COUCHDB_CONFIGS = {
         'views': []
     },
     DataStore.DS_PROFILE.SCIDATA:{
-        'views': ['datasets']
+        'views': ['datasets','manifest']
     },
     DataStore.DS_PROFILE.EXAMPLES:{
         'views':['posts']
@@ -291,8 +291,11 @@ function(doc) {
             "map": "/********************************\n * Author: Luke Campbell\n * Description: simple map to order by time\n ********************************/\n \n// If the doc has a time_bounds display it\nfunction get_time(doc) {\n    if(doc.identifiables.time_bounds) {\n        emit([doc.stream_resource_id,doc.identifiables.time_bounds.value_pair[0]],doc._id);\n    }   \n}\nfunction(doc) {\n  get_time(doc);\n}"
         }
 
-
-    
+    },
+    'manifest': {
+        'by_dataset' : {
+            'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, doc.ts_create], doc._id); }'
+        }
     }
 }
 

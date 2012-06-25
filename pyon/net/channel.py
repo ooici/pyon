@@ -116,7 +116,7 @@ class BaseChannel(object):
         """
         Ensures this Channel has been activated with the Node.
         """
-        log.debug("BaseChannel._ensure_amq_chan (current: %s)", self._amq_chan is not None)
+#        log.debug("BaseChannel._ensure_amq_chan (current: %s)", self._amq_chan is not None)
         if not self._amq_chan:
             raise ChannelError("No amq_chan attached")
 
@@ -134,8 +134,8 @@ class BaseChannel(object):
         self._ensure_amq_chan()
         assert self._transport
 
-        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
-                                                                 self._exchange_durable, self._exchange_auto_delete)
+#        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
+#                                                                 self._exchange_durable, self._exchange_auto_delete)
 
         self._transport.declare_exchange_impl(self._amq_chan,
                                               self._exchange,
@@ -311,11 +311,11 @@ class SendChannel(BaseChannel):
         self._exchange = name.exchange
 
     def send(self, data, headers=None):
-        log.debug("SendChannel.send")
+        #log.debug("SendChannel.send")
         self._send(self._send_name, data, headers=headers)
 
     def _send(self, name, data, headers=None):
-        log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, "-", headers)
+        #log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, "-", headers)
         exchange    = name.exchange
         routing_key = name.binding    # uses "_queue" if binding not explictly defined
         headers = headers or {}
@@ -395,14 +395,14 @@ class RecvChannel(BaseChannel):
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
-        log.debug('Setup_listener name: %s', name)
+        log.debug('setup_listener name: %s', name)
         name        = name or self._recv_name
         exchange    = name.exchange
         queue       = name.queue
 
-        log.debug("RecvChannel.setup_listener, exchange %s, queue %s, binding %s", exchange, queue, binding)
+        #log.debug("RecvChannel.setup_listener, exchange %s, queue %s, binding %s", exchange, queue, binding)
         if self._setup_listener_called:
-            log.debug("setup_listener already called for this channel")
+            #log.debug("setup_listener already called for this channel")
             return
 
         # only reset the name if it was passed in
@@ -424,6 +424,7 @@ class RecvChannel(BaseChannel):
         For performance reasons, only calls destroy queue. Derived implementations that want to tear down the
         binding should override this method.
         """
+        #log.debug('destroy_listener name: %s', name)
         #self._destroy_binding()
         self._destroy_queue()
 
@@ -469,7 +470,7 @@ class RecvChannel(BaseChannel):
 
         setup_listener must have been called first.
         """
-        log.debug("RecvChannel._on_start_consume")
+        #log.debug("RecvChannel._on_start_consume")
 
         if self._consumer_tag and self._queue_auto_delete:
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
@@ -494,7 +495,7 @@ class RecvChannel(BaseChannel):
 
         If the queue has auto_delete, this will delete it.
         """
-        log.debug("RecvChannel._on_stop_consume")
+        #log.debug("RecvChannel._on_stop_consume")
 
         if self._queue_auto_delete:
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
@@ -566,11 +567,11 @@ class RecvChannel(BaseChannel):
         # prepend xp name in the queue for anti-clobbering
         if queue and not self._recv_name.exchange in queue:
             queue = ".".join([self._recv_name.exchange, queue])
-            log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
+            #log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
         self._ensure_amq_chan()
 
-        log.debug("RecvChannel._declare_queue: %s", queue)
+        #log.debug("RecvChannel._declare_queue: %s", queue)
         queue_name = self._transport.declare_queue_impl(self._amq_chan,
                                                         queue=queue or '',
                                                         auto_delete=self._queue_auto_delete,
@@ -583,7 +584,7 @@ class RecvChannel(BaseChannel):
         return self._recv_name.queue
 
     def _bind(self, binding):
-        log.debug("RecvChannel._bind: %s", binding)
+        #log.debug("RecvChannel._bind: %s", binding)
         assert self._recv_name and self._recv_name.queue
 
         self._ensure_amq_chan()
@@ -603,7 +604,7 @@ class RecvChannel(BaseChannel):
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
 
-        log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %s", delivery_tag, self._recv_queue.qsize())
+        #log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %s", delivery_tag, self._recv_queue.qsize())
 
         # put body, headers, delivery tag (for acking) in the recv queue
         self._recv_queue.put((body, header_frame.headers, delivery_tag))
@@ -613,7 +614,7 @@ class RecvChannel(BaseChannel):
         Acks a message using the delivery tag.
         Should be called by the EP layer.
         """
-        log.debug("RecvChannel.ack: %s", delivery_tag)
+        #log.debug("RecvChannel.ack: %s", delivery_tag)
         self._ensure_amq_chan()
         self._amq_chan.basic_ack(delivery_tag)
 
@@ -622,7 +623,7 @@ class RecvChannel(BaseChannel):
         Rejects a message using the delivery tag.
         Should be called by the EP layer.
         """
-        log.debug("RecvChannel.reject: %s", delivery_tag)
+        #log.debug("RecvChannel.reject: %s", delivery_tag)
         self._ensure_amq_chan()
         self._amq_chan.basic_reject(delivery_tag, requeue=requeue)
 
@@ -633,7 +634,7 @@ class RecvChannel(BaseChannel):
         Does not have to be actively listening but must have been setup.
         """
         assert self._recv_name and self._recv_name.queue
-        log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
+        #log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
 
         return self._transport.get_stats(self._amq_chan, queue=self._recv_name.queue)
 
@@ -642,7 +643,7 @@ class RecvChannel(BaseChannel):
         Purges a queue.
         """
         assert self._recv_name and self._recv_name.queue
-        log.debug("RecvChannel.purge: %s", self._recv_name.queue)
+        #log.debug("RecvChannel.purge: %s", self._recv_name.queue)
 
         return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
 
@@ -751,7 +752,7 @@ class ListenChannel(RecvChannel):
         self._on_stop_consume(fsm)
 
     @contextmanager
-    def accept(self):
+    def accept(self, timeout=None):
         """
         Context manager method to accept new connections for listening endpoints.
 
@@ -768,7 +769,7 @@ class ListenChannel(RecvChannel):
                     - recv() returns messages in its gqueue, endpoint should ack
         """
         #        self._ensure_amq_chan()
-        m = self.recv()
+        m = self.recv(timeout=timeout)
         ch = self._create_accepted_channel(self._amq_chan, m)
         ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
 
@@ -779,7 +780,7 @@ class ListenChannel(RecvChannel):
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-"):
+        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-") and self._transport is AMQPTransport.get_instance():
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 

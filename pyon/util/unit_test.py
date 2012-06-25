@@ -6,7 +6,7 @@ from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
 from zope.interface import implementedBy
-from pyon.core.bootstrap import IonObject, bootstrap_pyon, service_registry
+from pyon.core.bootstrap import IonObject, bootstrap_pyon, get_service_registry
 
 bootstrap_pyon()
 
@@ -44,18 +44,20 @@ class PyonTestCase(unittest.TestCase):
     def _create_service_mock(self, service_name):
         # set self.clients if not already set
         clients = Mock(name='clients')
-        base_service = service_registry.get_service_base(service_name)
+        base_service = get_service_registry().get_service_base(service_name)
         # Save it to use in test_verify_service
         self.base_service = base_service
+        self.addCleanup(delattr, self, 'base_service')
         dependencies = base_service.dependencies
         for dep_name in dependencies:
-            dep_service = service_registry.get_service_base(dep_name)
+            dep_service = get_service_registry().get_service_base(dep_name)
             # Force mock service to use interface
             mock_service = Mock(name='clients.%s' % dep_name,
                     spec=dep_service)
             setattr(clients, dep_name, mock_service)
             # set self.dep_name for conevenience
             setattr(self, dep_name, mock_service)
+            self.addCleanup(delattr, self, dep_name)
             iface = list(implementedBy(dep_service))[0]
             names_and_methods = iface.namesAndDescriptions()
             for func_name, _ in names_and_methods:

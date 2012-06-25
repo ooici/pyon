@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Force pyyaml to use OrderedDict by default.
 Recipe found at: http://pyyaml.org/attachment/ticket/161/use_ordered_dict.py
@@ -5,6 +7,7 @@ Recipe found at: http://pyyaml.org/attachment/ticket/161/use_ordered_dict.py
 
 import yaml
 import collections
+
 
 def construct_ordered_mapping(self, node, deep=False):
     if not isinstance(node, yaml.MappingNode):
@@ -21,15 +24,11 @@ def construct_ordered_mapping(self, node, deep=False):
         mapping[key] = value
     return mapping
 
-
-
 def construct_yaml_map_with_ordered_dict(self, node):
     data = collections.OrderedDict()
     yield data
     value = self.construct_mapping(node)
     data.update(value)
-
-
 
 def represent_ordered_mapping(self, tag, mapping, flow_style=None):
     value = []
@@ -74,4 +73,3 @@ def apply_yaml_patch():
     yaml.representer.Representer.add_representer(collections.OrderedDict,
         yaml.representer.SafeRepresenter.represent_dict)
 
-apply_yaml_patch()

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from collections import OrderedDict
 
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
@@ -11,14 +12,50 @@ CONFLICT = 409
 SERVER_ERROR = 500
 SERVICE_UNAVAILABLE = 503
 
+import traceback
+import inspect
+import sys
+
+
 class IonException(Exception):
     status_code = -1
+
+    def __init__(self, *a, **b):
+        super(IonException,self).__init__(*a,**b)
+        self._stacks = OrderedDict()
+        self._stacks['__init__'] = traceback.extract_stack()
 
     def get_status_code(self):
         return self.status_code
 
     def get_error_message(self):
         return self.message
+
+    def add_stack(self, label, stack):
+        self._stacks[label] = stack
+
+    def get_stacks(self, trim=True):
+        return self._stacks
+
+    def format_stack(self, format=(lambda n,f,l,m,c: ('%s:%d\t%s'%(f,l,c)) if f else ('--- %s ---'%n)),
+                           filter=(lambda n,f,l,m,c: True)):
+        """ return a multiline string representation of the stacks in this exception
+
+            by default, the string has one section for each stack
+            and each section shows the label then each stack element as "file:line code"
+
+            a format and filter function can alter how and which of these lines are printed.
+            both functions should expect None as file,line,caller and code arguments
+            to control if and how the label line is printed.
+        """
+        lines = []
+        for label, stack in self._stacks.items():
+            if filter(label,None,None,None,None):
+                lines.append('--- ' + label + ' ---')
+            for file,line,caller,code in stack:
+                if filter(label,file,line,caller,code):
+                    lines.append(format(label,file,line,caller,code))
+        return '\n'.join(lines)
 
     def __str__(self):
         return str(self.get_status_code()) + " - " + str(self.get_error_message())
@@ -146,10 +183,24 @@ class InstTimeoutError(IonInstrumentError):
     """
     status_code = 690
 
-exception_map = {}
-import inspect
-import sys
-for name, obj in inspect.getmembers(sys.modules[__name__]):
-    if inspect.isclass(obj):
-        if hasattr(obj, "status_code"):
-            exception_map[str(obj.status_code)] = obj
+
+
+# must appear after ServerError in python module
+class ExceptionFactory(object):
+    def __init__(self, default_type=ServerError):
+        self._default = default_type
+        self._exception_map = {}
+        for name, obj in inspect.getmembers(sys.modules[__name__]):
+            if inspect.isclass(obj):
+                if hasattr(obj, "status_code"):
+                    self._exception_map[str(obj.status_code)] = obj
+    def create_exception(self, code, message, stacks=None):
+        """ build IonException from code, message, and optionally one or more stack traces """
+        if str(code) in self._exception_map:
+            out = self._exception_map[str(code)](message)
+        else:
+            out = self._default(message)
+        if stacks:
+            for label,stack in stacks.items():
+                out.add_stack(label,stack)
+        return out

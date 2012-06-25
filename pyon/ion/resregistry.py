@@ -9,12 +9,12 @@ __license__ = 'Apache 2.0'
 import base64
 
 from pyon.core import bootstrap
+from pyon.core.bootstrap import CFG
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher
 from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
-from pyon.util.config import CFG
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -50,9 +50,9 @@ class ResourceRegistry(object):
             self._register_service_definitions()
 
     def _register_service_definitions(self):
-        from pyon.core.bootstrap import service_registry
+        from pyon.core.bootstrap import get_service_registry
         svc_list = []
-        for svcname, svc in service_registry.services.iteritems():
+        for svcname, svc in get_service_registry().services.iteritems():
             svc_def = ServiceDefinition(name=svcname, definition="")
             svc_list.append(svc_def)
         self._create_mult(svc_list)

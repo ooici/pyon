@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 from uuid import uuid4
 
-from pyon.core.bootstrap import obj_registry
+from pyon.core.bootstrap import get_obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
@@ -25,7 +25,7 @@ class MockDB_DataStore(DataStore):
 
         # serializers
         self._io_serializer     = IonObjectSerializer()
-        self._io_deserializer   = IonObjectDeserializer(obj_registry=obj_registry)
+        self._io_deserializer   = IonObjectDeserializer(obj_registry=get_obj_registry())
 
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:

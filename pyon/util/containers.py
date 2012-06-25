@@ -8,7 +8,9 @@ import datetime
 import string
 import time
 import simplejson
-
+import base64
+import uuid
+import os
 
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
@@ -79,7 +81,6 @@ class DotDict(DotNotationGetItem, dict):
         else:
             self[key] = value
 
-
     def copy(self):
         return DotDict(dict.copy(self))
 
@@ -96,43 +97,6 @@ class DotDict(DotNotationGetItem, dict):
     @classmethod
     def fromkeys(cls, seq, value=None):
         return DotDict(dict.fromkeys(seq, value))
-
-class DictModifier(DotDict):
-    """
-    Subclass of DotDict that allows the sparse overriding of dict values.
-    """
-    def __init__(self, base, data=None):
-        # base should be a dict or DotDict, raise TypeError exception if not
-        if isinstance(data, dict):
-            data = DotDict(data)
-        elif not isinstance(base, DotDict):
-            raise TypeError("Base must be of type DotDict")
-        dict.__setattr__(self,'base',base)
-
-        if data is not None:
-            self.update(data)
-
-    def __getattr__(self, key):
-        try:
-            return DotDict.__getattr__(self, key)
-        except AttributeError, ae:
-            # Delegate to base
-            return getattr(self.base, key)
-
-    def __getitem__(self, key):
-        try:
-            return DotDict.__getitem__(self, key)
-        except KeyError, ke:
-            # Delegate to base
-            return getattr(self.base, key)
-
-    def __str__(self):
-        merged = self.base.copy()
-        merged.update(self)
-        return str(merged)
-
-    def __repr__(self):
-        return self.__str__()
 
 
 class DictDiffer(object):
@@ -201,6 +165,34 @@ def get_safe(dict_instance, keypath, default=None):
         return obj
     except Exception, ex:
         return default
+
+class SimpleLog(object):
+    """
+    Simple log to STDOUT class for modules that don't want to depend on pyon logging
+    """
+    DEBUG, INFO, WARN, ERROR, CRITICAL = 1, 2, 3, 4, 5
+    def __init__(self, logname=None, loglevel=0):
+        self.logname = logname + ":" if logname else ""
+        self.loglevel = loglevel
+    def debug(self, message, *args):
+        if self.loglevel <= 1:
+            print self.logname, "DEBUG:", message % args
+    def info(self, message, *args):
+        if self.loglevel <= 2:
+            print self.logname, "INFO:", message % args
+    def warn(self, message, *args):
+        if self.loglevel <= 3:
+            print self.logname, "WARN:", message % args
+    def error(self, message, *args):
+        if self.loglevel <= 4:
+            print self.logname, "ERROR:", message % args
+    def critical(self, message, *args):
+        if self.loglevel <= 5:
+            print self.logname, "CRITICAL:", message % args
+    def exception(self, message, *args):
+        if self.loglevel <= 5:
+            # TODO: print exception
+            print self.logname, "EXCEPTION:", message % args
 
 def named_any(name):
     """
@@ -354,3 +346,20 @@ def ion_object_encoder(obj):
 def make_json(data):
     result = simplejson.dumps(data, default=ion_object_encoder, indent=2)
     return result
+
+
+#Global utility functions for generating unique names and UUIDs
+# get a UUID - URL safe, Base64
+def get_a_Uuid():
+    r_uuid = base64.urlsafe_b64encode(uuid.uuid4().bytes)
+    return r_uuid.replace('=', '')
+
+# generate a unique identifier based on a UUID and optional information
+def create_unique_identifier(prefix=''):
+    return prefix + '_' + get_a_Uuid()
+
+def get_default_sysname():
+    return 'ion_%s' % os.uname()[1].replace('.', '_')
+
+def get_default_container_id():
+    return string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")

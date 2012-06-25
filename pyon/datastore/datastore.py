@@ -4,9 +4,7 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import get_sys_name
-from pyon.core.exception import BadRequest, NotFound
-from pyon.ion.resource import AT
-from pyon.util.containers import DotDict, get_ion_ts, get_safe
+from pyon.util.containers import DotDict
 from pyon.util.log import log
 from pyon.util.arg_check import validate_true
 
@@ -166,85 +164,6 @@ class DataStore(object):
         """
         pass
 
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type=AT.H2H):
-        """
-        Create an association between two IonObjects with a given predicate
-        """
-        if not subject or not predicate or not obj:
-            raise BadRequest("Association must have all elements set")
-        if type(subject) is str:
-            subject_id = subject
-            subject = self.read(subject_id)
-        else:
-            if "_id" not in subject or "_rev" not in subject:
-                raise BadRequest("Subject id or rev not available")
-            subject_id = subject._id
-        st = type(subject).__name__
-
-        if type(obj) is str:
-            object_id = obj
-            obj = self.read(object_id)
-        else:
-            if "_id" not in obj or "_rev" not in obj:
-                raise BadRequest("Object id or rev not available")
-            object_id = obj._id
-        ot = type(obj).__name__
-
-        assoc_type = assoc_type or AT.H2H
-        if not assoc_type in AT:
-            raise BadRequest("Unsupported assoc_type: %s" % assoc_type)
-
-        # Check that subject and object type are permitted by association definition
-        # Note: Need import here, so that import orders are not screwed up
-        from pyon.core.registry import getextends
-        from pyon.ion.resource import Predicates
-        from pyon.core.bootstrap import IonObject
-
-        try:
-            pt = Predicates.get(predicate)
-        except AttributeError:
-            raise BadRequest("Predicate unknown %s" % predicate)
-        if not st in pt['domain']:
-            found_st = False
-            for domt in pt['domain']:
-                if st in getextends(domt):
-                    found_st = True
-                    break
-            if not found_st:
-                raise BadRequest("Illegal subject type %s for predicate %s" % (st, predicate))
-        if not ot in pt['range']:
-            found_ot = False
-            for rant in pt['range']:
-                if ot in getextends(rant):
-                    found_ot = True
-                    break
-            if not found_ot:
-                raise BadRequest("Illegal object type %s for predicate %s" % (ot, predicate))
-
-        # Finally, ensure this isn't a duplicate
-        assoc_list = self.find_associations(subject, predicate, obj, assoc_type, False)
-        if len(assoc_list) != 0:
-            assoc = assoc_list[0]
-            if assoc_type == AT.H2H:
-                raise BadRequest("Association between %s and %s with predicate %s and type %s already exists" % (subject, obj, predicate, assoc_type))
-            else:
-                if subject._rev == assoc.srv and object._rev == assoc.orv:
-                    raise BadRequest("Association between %s and %s with predicate %s and type %s already exists" % (subject, obj, predicate, assoc_type))
-
-        assoc = IonObject("Association",
-                          at=assoc_type,
-                          s=subject_id, st=st, srv=subject._rev,
-                          p=predicate,
-                          o=object_id, ot=ot, orv=obj._rev,
-                          ts=get_ion_ts())
-        return self.create(assoc)
-
-    def delete_association(self, association=''):
-        """
-        Delete an association between two IonObjects
-        """
-        return self.delete(association)
-
     def find_objects(self, subject, predicate="", object_type="", id_only=False):
         """
         Find objects (or object ids) by association from a given subject or subject id (if str).
@@ -265,27 +184,13 @@ class DataStore(object):
         """
         pass
 
-    def find_associations(self, subject="", predicate="", obj="", assoc_type=AT.H2H, id_only=True):
+    def find_associations(self, subject="", predicate="", obj="", assoc_type='H2H', id_only=True):
         """
         Find associations by subject, predicate, object. Either subject and predicate have
         to be provided or predicate only. Returns either a list of associations or
         a list of association ids.
         """
         pass
-
-    def find_resources(self, restype="", lcstate="", name="", id_only=True):
-        if name:
-            if lcstate:
-                raise BadRequest("find by name does not support lcstate")
-            return self.find_res_by_name(name, restype, id_only)
-        elif restype and lcstate:
-            return self.find_res_by_lcstate(lcstate, restype, id_only)
-        elif restype:
-            return self.find_res_by_type(restype, lcstate, id_only)
-        elif lcstate:
-            return self.find_res_by_lcstate(lcstate, restype, id_only)
-        elif not restype and not lcstate and not name:
-            return self.find_res_by_type(None, None, id_only)
 
     def _preload_create_doc(self, doc):
         """
@@ -296,11 +201,8 @@ class DataStore(object):
 class DatastoreManager(object):
     """
     Container manager for datastore instances.
+    @TODO: Remove caching. This is harmful and no good
     """
-
-    persistent = None
-    force_clean = None
-
     def __init__(self):
         self._datastores = {}
 
@@ -308,54 +210,31 @@ class DatastoreManager(object):
     def get_scoped_name(cls, ds_name):
         return ("%s_%s" % (get_sys_name(), ds_name)).lower()
 
-
     def get_datastore(self, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
         """
         Factory method to get a datastore instance from given name, profile and config.
-        This is the central point to cache these instances, to decide persistent or mock
-        and to force clean the store on first use.
         @param ds_name  Logical name of datastore (will be scoped with sysname)
         @param profile  One of known constants determining the use of the store
         @param config  Override config to use
         """
-        validate_true(ds_name,'ds_name must be provided')
+        validate_true(ds_name, 'ds_name must be provided')
         if ds_name in self._datastores:
             log.debug("get_datastore(): Found instance of store '%s'" % ds_name)
             return self._datastores[ds_name]
 
         scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
-        # Imports here to prevent cyclic module dependency
-        from pyon.core.bootstrap import CFG
-        config = config or CFG
-
-        if self.persistent is None:
-            self.persistent = not bool(get_safe(config, "system.mockdb"))
-        if self.force_clean is None:
-            self.force_clean = bool(get_safe(config, "system.force_clean"))
-
         # Create a datastore instance
-        log.info("get_datastore(): Create instance of store '%s' {persistent=%s, scoped_name=%s}" % (
-            ds_name, self.persistent, scoped_name))
-        new_ds = DatastoreManager.get_datastore_instance(ds_name, self.persistent, profile)
-
-        # Clean the store instance
-        # TBD: Do we really want to do it here? or make it more manual?
-        if self.force_clean:
-            log.info("get_datastore(): Force clean store '%s'" % ds_name)
-            try:
-                new_ds.delete_datastore(scoped_name)
-            except NotFound:
-                pass
+        log.info("get_datastore(): Create instance of store '%s' as database=%s" % (ds_name, scoped_name))
+        new_ds = DatastoreManager.get_datastore_instance(ds_name, profile)
 
         # Create store if not existing
         if not new_ds.datastore_exists(scoped_name):
-            new_ds.create_datastore(scoped_name)
+            new_ds.create_datastore(scoped_name, create_indexes=True, profile=profile)
         else:
-            if self.persistent:
-                # NOTE: This may be expensive if called more than once per container
-                # If views exist and are dropped and recreated
-                new_ds._define_views(profile=profile, keepviews=True)
+            # NOTE: This may be expensive if called more than once per container
+            # If views exist and are dropped and recreated
+            new_ds._define_views(profile=profile, keepviews=True)
 
         # Set a few standard datastore instance fields
         new_ds.local_name = ds_name
@@ -366,23 +245,12 @@ class DatastoreManager(object):
         return new_ds
 
     @classmethod
-    def get_datastore_instance(cls, ds_name, persistent=None, profile=DataStore.DS_PROFILE.BASIC):
+    def get_datastore_instance(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC):
         scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
-        # Imports here to prevent cyclic module dependency
-        from pyon.core.bootstrap import CFG
-        if persistent is None:
-            persistent = not bool(get_safe(CFG, "system.mockdb"))
-
-        # Persistent (CouchDB) or MockDB?
-        if persistent:
-            # Use inline import to prevent circular import dependency
-            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-            new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
-        else:
-            # Use inline import to prevent circular import dependency
-            from pyon.datastore.mockdb.mockdb_datastore import MockDB_DataStore
-            new_ds = MockDB_DataStore(datastore_name=scoped_name)
+        # Use inline import to prevent circular import dependency
+        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+        new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
 
         return new_ds
 
