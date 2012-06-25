@@ -7,7 +7,7 @@ import traceback
 from logging import DEBUG, INFO
 from pyon.util.log import log, StackFormatter
 
-@attr('UNIT')
+@attr('NOTYET')
 class TestExceptionLogging(TestCase):
 
     def custom_stack_format(self, label, stack):
