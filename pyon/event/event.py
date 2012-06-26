@@ -119,9 +119,17 @@ class EventPublisher(Publisher):
         success = self._publish_event(event_msg, origin=origin)
         return success
 
-class EventSubscriber(Subscriber):
+class BaseEventSubscriberMixin(object):
+    """
+    A mixin class for Event subscribers to facilitate inheritance.
 
-    def _topic(self, event_type, origin, sub_type=None, origin_type=None):
+    EventSubscribers must come in both standard and process level versions, which
+    rely on common base code. It is difficult to multiple inherit due to both of 
+    them sharing a base class, so this mixin is preferred.
+    """
+
+    @staticmethod
+    def _topic(event_type, origin, sub_type=None, origin_type=None):
         """
         Builds the topic that this event should be published to.
         If either side of the event_id.origin pair are missing, will subscribe to anything.
@@ -139,20 +147,8 @@ class EventSubscriber(Subscriber):
 
         return "%s.%s.%s.%s" % (event_type, sub_type, origin_type, origin)
 
-    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
-                 sub_type=None, origin_type=None, *args, **kwargs):
-        """
-        Initializer.
-
-        If the queue_name is specified here, the sysname is prefixed automatically to it. This is because
-        named queues are not namespaces to their exchanges, so two different systems on the same broker
-        can cross-pollute messages if a named queue is used.
-
-        Note: an EventSubscriber needs to be closed to free broker resources
-        """
-        self.callback = callback
-        self._cbthread = None
-
+    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None,
+                 sub_type=None, origin_type=None):
         self.event_type = event_type
         self.sub_type = sub_type
         self.origin_type = origin_type
@@ -171,15 +167,31 @@ class EventSubscriber(Subscriber):
                 queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
                 log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
 
-        name = (xp_name, queue_name)
+        # set this name to be picked up by inherited folks
+        self._ev_recv_name = (xp_name, queue_name)
 
-        log.debug("EventPublisher events pattern %s", binding)
+class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
 
-        Subscriber.__init__(self, from_name=name, binding=binding, callback=self._callback, **kwargs)
 
-    def _callback(self, *args, **kwargs):
-        log.info("Event received: args=%s, kwargs=%s" % (args, kwargs))
-        self.callback(*args, **kwargs)
+    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
+                 sub_type=None, origin_type=None, *args, **kwargs):
+        """
+        Initializer.
+
+        If the queue_name is specified here, the sysname is prefixed automatically to it. This is because
+        named queues are not namespaces to their exchanges, so two different systems on the same broker
+        can cross-pollute messages if a named queue is used.
+
+        Note: an EventSubscriber needs to be closed to free broker resources
+        """
+        self._cbthread = None
+
+        BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
+                                          queue_name=queue_name, sub_type=sub_type, origin_type=origin_type)
+
+        log.debug("EventPublisher events pattern %s", self.binding)
+
+        Subscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, **kwargs)
 
     def activate(self):
         """

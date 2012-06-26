@@ -7,6 +7,7 @@ __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.c
 __license__ = 'Apache 2.0'
 
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
+from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
 
 
@@ -171,11 +172,11 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         return header1
 
-    def _make_routing_call(self, call, op_args):
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
         if not self._routing_call:
-            return RPCResponseEndpointUnit._make_routing_call(self, call, op_args)
+            return RPCResponseEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
 
-        ar = self._routing_call(call, op_args, context=self._process.get_context())
+        ar = self._routing_call(call, self._process.get_context(),*op_args, **op_kwargs)
         return ar.get()     # @TODO: timeout?
 
 
@@ -224,9 +225,14 @@ class ProcessPublisher(Publisher):
     endpoint_unit_type = ProcessPublisherEndpointUnit
 
     def __init__(self, process=None, **kwargs):
+        assert process
         self._process = process
         Publisher.__init__(self, **kwargs)
 
+    def create_endpoint(self, *args, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        return Publisher.create_endpoint(self, *args, **newkwargs)
 
 class PublisherError(StandardError):
     """
@@ -241,9 +247,10 @@ class SubscriberError(StandardError):
     pass
 
 class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpointUnit):
-    def __init__(self, process=None, callback=None, **kwargs):
+    def __init__(self, process=None, callback=None, routing_call=None, **kwargs):
         ProcessEndpointUnitMixin.__init__(self, process=process)
         SubscriberEndpointUnit.__init__(self, callback=callback, **kwargs)
+        self._routing_call = routing_call
 
     def _message_received(self, msg, headers):
         """
@@ -275,13 +282,51 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
 
         return header1
 
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
+        if not self._routing_call:
+            return SubscriberEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+
+        ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
+        return ar.get()     # @TODO: timeout?
+
 
 class ProcessSubscriber(Subscriber):
 
     endpoint_unit_type = ProcessSubscriberEndpointUnit
 
-    def __init__(self, process=None, **kwargs):
+    def __init__(self, process=None, routing_call=None, **kwargs):
+        assert process
         self._process = process
+        self._routing_call = routing_call
         Subscriber.__init__(self, **kwargs)
+
+    @property
+    def routing_call(self):
+        return self._routing_call
+
+    @routing_call.setter
+    def routing_call(self, value):
+        self._routing_call = value
+
+    def create_endpoint(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        newkwargs['routing_call'] = self._routing_call
+        return Subscriber.create_endpoint(self, **newkwargs)
+
+#
+# ProcessEventSubscriber
+#
+
+class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
+    def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
+                 sub_type=None, origin_type=None, process=None, routing_call=None, *args, **kwargs):
+
+        BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
+                                          queue_name=queue_name, sub_type=sub_type, origin_type=origin_type)
+
+        log.debug("EventPublisher events pattern %s", self.binding)
+
+        ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
 
 

@@ -82,7 +82,7 @@ class ProcessTest(PyonTestCase):
         p.get_ready_event().wait(timeout=5)
 
         ar = AsyncResult()
-        p._routing_call(ar.set, {'value':sentinel.callarg})
+        p._routing_call(ar.set, None, value=sentinel.callarg)
 
         v = ar.get(timeout=5)
         self.assertEquals(v, sentinel.callarg)
@@ -119,9 +119,9 @@ class ProcessTest(PyonTestCase):
         ar2 = AsyncResult()
         ar3 = AsyncResult()
 
-        p._routing_call(thecall, {'ar':ar3})
-        p._routing_call(thecall, {'ar':ar1})
-        p._routing_call(thecall, {'ar':ar2})
+        p._routing_call(thecall, None, ar=ar3)
+        p._routing_call(thecall, None, ar=ar1)
+        p._routing_call(thecall, None, ar=ar2)
 
         # wait on all the ARs to be set
         ar1.get(timeout=5)

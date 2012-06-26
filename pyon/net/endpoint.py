@@ -545,7 +545,15 @@ class SubscriberEndpointUnit(EndpointUnit):
         EndpointUnit.message_received(self, msg, headers)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
-        self._callback(msg, headers)
+        self._make_routing_call(self._callback, msg, headers)
+
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
+        """
+        Calls into the routing object.
+
+        May be overridden at a lower level.
+        """
+        return call(*op_args, **op_kwargs)
 
 
 class Subscriber(ListeningBaseEndpoint):
@@ -975,7 +983,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             ######
             ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
             ######
-            result              = self._make_routing_call(ro_meth, cmd_arg_obj)
+            result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
             response_headers    = { 'status_code': 200, 'error_message': '' }
             ######
 
@@ -991,13 +999,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                 'error_message': str(ex.get_error_message()),
                 'performative':'failure'}
 
-    def _make_routing_call(self, call, op_args):
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
         """
         Calls into the routing object.
 
         May be overridden at a lower level.
         """
-        return call(**op_args)
+        return call(*op_args, **op_kwargs)
 
 
 class RPCServer(RequestResponseServer):
