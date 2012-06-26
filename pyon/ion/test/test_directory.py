@@ -14,18 +14,25 @@ class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
         dsm = DatastoreManager()
-        directory = Directory(dsm)
+        directory = Directory(datastore_manager=dsm)
 
-        self.addCleanup(directory.dir_store.delete_datastore)
+        #self.addCleanup(directory.dir_store.delete_datastore)
 
-        root = directory.lookup("/")
+        objs = directory.dir_store.list_objects()
+        self.assert_("_design/directory" in objs)
+
+        root = directory.lookup("/DIR")
         self.assert_(root is not None)
 
-        self.assertEquals(directory.register("/","temp"), None)
+        entry = directory.lookup("/temp")
+        self.assert_(entry is None)
+
+        entry_old = directory.register("/","temp")
+        self.assertEquals(entry_old, None)
 
         # Create a node
-        root = directory.lookup("/temp")
-        self.assertEquals(root, {} )
+        entry = directory.lookup("/temp")
+        self.assertEquals(entry, {} )
 
         # The create case
         entry_old = directory.register("/temp", "entry1", foo="awesome")
@@ -51,10 +58,13 @@ class TestDirectory(IonUnitTestCase):
         directory.register("/BranchB", "k", resource_id="rid6")
         directory.register("/BranchB", "l", resource_id="rid7")
         directory.register("/BranchB/k", "m", resource_id="rid7")
+        directory.register("/BranchB/k", "X")
 
         res_list = directory.find_by_value("/", attribute="resource_id", value="rid3")
         self.assertEquals(len(res_list), 1)
-        self.assertEquals(res_list[0][0], "ION/BranchA/Z")
+        self.assertEquals(res_list[0].org, "ION")
+        self.assertEquals(res_list[0].parent, "/BranchA")
+        self.assertEquals(res_list[0].key, "Z")
 
         res_list = directory.find_by_value("/", attribute="resource_id", value="rid34")
         self.assertEquals(len(res_list), 0)
@@ -69,6 +79,24 @@ class TestDirectory(IonUnitTestCase):
         self.assertEquals(len(res_list), 2)
 
         res_list = directory.find_by_value("/BranchB/k", attribute="resource_id", value="rid7")
+        self.assertEquals(len(res_list), 1)
+
+        res_list = directory.find_child_entries("/BranchB/k/m")
+        self.assertEquals(len(res_list), 0)
+
+        res_list = directory.find_child_entries("/BranchB")
+        self.assertEquals(len(res_list), 2)
+
+        res_list = directory.find_child_entries("/BranchB/k/m", direct_only=False)
+        self.assertEquals(len(res_list), 0)
+
+        res_list = directory.find_child_entries("/BranchB", direct_only=False)
+        self.assertEquals(len(res_list), 4)
+
+        res_list = directory.find_by_key("X")
+        self.assertEquals(len(res_list), 2)
+
+        res_list = directory.find_by_key("X", parent="/BranchB")
         self.assertEquals(len(res_list), 1)
 
         directory.close()

@@ -14,6 +14,7 @@ from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher
+from pyon.ion.identifier import create_unique_resource_id
 from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
@@ -71,7 +72,8 @@ class ResourceRegistry(object):
         cur_time = get_ion_ts()
         object.ts_created = cur_time
         object.ts_updated = cur_time
-        res = self.rr_store.create(object)
+        new_res_id = create_unique_resource_id()
+        res = self.rr_store.create(object, new_res_id)
         res_id, rev = res
 
         if actor_id and actor_id != 'anonymous':
@@ -93,7 +95,8 @@ class ResourceRegistry(object):
             resobj.ts_created = cur_time
             resobj.ts_updated = cur_time
 
-        res = self.rr_store.create_mult(res_list)
+        id_list = [create_unique_resource_id() for i in xrange(len(res_list))]
+        res = self.rr_store.create_mult(res_list, id_list)
         res_list = [(rid,rrv) for success,rid,rrv in res]
 
         # TODO: Publish events (skipped, because this is inefficent one by one for a large list
