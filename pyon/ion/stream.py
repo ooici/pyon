@@ -86,6 +86,12 @@ class StreamPublisherRegistrar(object):
 class StreamSubscriber(ProcessSubscriber):
     """
     Data management abstraction of the subscriber endpoint
+
+    By default, routes messages into the attached process' call_process method.
+    You can override this by specifying your own callback, taking a single parameter,
+    the message received.
+
+    Instead of managing your own greenlet, you should be using the IonProcessThread's add_endpoint.
     """
     class NoBindSubscriberChannel(SubscriberChannel):
 
@@ -100,7 +106,6 @@ class StreamSubscriber(ProcessSubscriber):
 
     channel_type = NoBindSubscriberChannel
 
-
     def __init__(self, **kwargs):
         """
         @param name is a tuple (xp, exchange_name)
@@ -108,27 +113,12 @@ class StreamSubscriber(ProcessSubscriber):
         @param Process is the subscribing process
         @param node is cc.node
         """
+        assert "process" in kwargs
         if not kwargs.get('callback', None):
             kwargs = kwargs.copy()
-            kwargs['callback'] = self._callback
-
-        self._routing_call = None
+            kwargs['callback'] = kwargs.get('process').call_process
 
         ProcessSubscriber.__init__(self, **kwargs)
-
-    @property
-    def routing_call(self):
-        return self._routing_call
-
-    @routing_call.setter
-    def routing_call(self, value):
-        self._routing_call = value
-
-    def _callback(self, m, h):
-        """
-        Built-in Subscriber callback to route a call into process context.
-        """
-        self._routing_call(self._process.call_process, {'packet':m})
 
     def start(self):
         """
@@ -142,7 +132,6 @@ class StreamSubscriber(ProcessSubscriber):
 
         else:
             self.gl = spawn(self.listen)
-
 
     def stop(self):
         """

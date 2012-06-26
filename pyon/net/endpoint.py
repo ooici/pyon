@@ -97,7 +97,7 @@ class EndpointUnit(object):
                                      message=msg,
                                      headers=headers)
         inv_prime = self._intercept_msg_in(inv)
-        new_msg     = inv_prime.message
+        new_msg = inv_prime.message
         new_headers = inv_prime.headers
 
         return new_msg, new_headers
@@ -107,7 +107,7 @@ class EndpointUnit(object):
         Performs interceptions of incoming messages.
         Override this to change what interceptor stack to go through and ordering.
 
-        @param  inv     An Invocation instance.
+        @param inv      An Invocation instance.
         @returns        A processed Invocation instance.
         """
         inv_prime = process_interceptors(self.interceptors["message_incoming"] if "message_incoming" in self.interceptors else [], inv)
@@ -176,7 +176,6 @@ class EndpointUnit(object):
                         # always ack a listener response
                         self.channel.ack(delivery_tag)
                 except ChannelClosedError:
-#                    log.debug('Channel was closed during client_recv listen loop')
                     break
 
         # @TODO: spawn should be configurable to maybe the proc_sup in the container?
@@ -478,7 +477,6 @@ class ListeningBaseEndpoint(BaseEndpoint):
                     m.ack()
 
             except ChannelClosedError as ex:
-#                log.debug('Channel was closed during LEF.listen')
                 break
 
     def prepare_listener(self, binding=None):
@@ -648,7 +646,15 @@ class SubscriberEndpointUnit(EndpointUnit):
         EndpointUnit.message_received(self, msg, headers)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
-        self._callback(msg, headers)
+        self._make_routing_call(self._callback, msg, headers)
+
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
+        """
+        Calls into the routing object.
+
+        May be overridden at a lower level.
+        """
+        return call(*op_args, **op_kwargs)
 
 
 class Subscriber(ListeningBaseEndpoint):
@@ -796,9 +802,19 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         # Check response header
         if res_headers["status_code"] != 200:
-            stacks = res if isinstance(res, dict) else None
+            stacks = None
+            if isinstance(res, list):
+                stacks = res
+                # stack information is passed as a list of tuples (label, stack)
+                # default label for new IonException is '__init__',
+                # but change the label of the first remote exception to show RPC invocation.
+                # other stacks would have already had labels updated.
+                new_label = 'remote call to %s' % (res_headers['receiver'])
+                top_stack = stacks[0][1]
+                stacks[0] = (new_label, top_stack)
             log.info("RPCRequestEndpointUnit received an error (%d): %s", res_headers['status_code'], res_headers['error_message'])
-            raise self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], stacks=stacks)
+            ex = self.exception_factory.create_exception(res_headers["status_code"], res_headers["error_message"], stacks=stacks)
+            raise ex
 
         return res, res_headers
 
@@ -1030,7 +1046,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             tb_output = ""
             for elt in tb_list:
                 tb_output += elt
-            log.info("Got error response: %s\n%s", ex, tb_output)
+            log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
             response_headers = self._create_error_response(ex)
         finally:
@@ -1077,7 +1093,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             ######
             ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
             ######
-            result              = self._make_routing_call(ro_meth, cmd_arg_obj)
+            result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
             response_headers    = { 'status_code': 200, 'error_message': '' }
             ######
 
@@ -1093,13 +1109,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                 'error_message': str(ex.get_error_message()),
                 'performative':'failure'}
 
-    def _make_routing_call(self, call, op_args):
+    def _make_routing_call(self, call, *op_args, **op_kwargs):
         """
         Calls into the routing object.
 
         May be overridden at a lower level.
         """
-        return call(**op_args)
+        return call(*op_args, **op_kwargs)
 
 
 class RPCServer(RequestResponseServer):

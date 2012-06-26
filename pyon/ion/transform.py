@@ -40,7 +40,7 @@ class TransformBase(StreamProcess):
     def callback(self):
         pass
 
-    def call_process(self, packet):
+    def call_process(self, packet, headers=None):
         try:
             self.process(packet)
         except Exception as e:

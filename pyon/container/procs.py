@@ -136,7 +136,7 @@ class ProcManager(object):
             raise
 
     def _spawned_proc_failed(self, gproc):
-        log.error("ProcManager._spawned_proc_failed: %s", gproc)
+        log.error("ProcManager._spawned_proc_failed: %s, %s", gproc, gproc.exception)
 
         # for now - don't worry about the mapping, if we get a failure, just kill the container.
         # leave the mapping in place for potential expansion later.
@@ -163,9 +163,6 @@ class ProcManager(object):
         Attach to service queue with service definition, attach to service pid
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
-        self._service_init(service_instance)
-
-        self._service_start(service_instance)
 
         listen_name = get_safe(config, "process.listen_name") or service_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
@@ -193,6 +190,9 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
+        self._service_init(service_instance)
+        self._service_start(service_instance)
+
         # Directory registration
         self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
         self.container.directory.register_safe("/Services/%s" % listen_name, service_instance.id)
@@ -207,10 +207,6 @@ class ProcManager(object):
         Attach to subscription queue with process function.
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
-        self._service_init(service_instance)
-
-        # Start the service
-        self._service_start(service_instance)
 
         listen_name = get_safe(config, "process.listen_name") or name
 
@@ -238,6 +234,9 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
+        self._service_init(service_instance)
+        self._service_start(service_instance)
+
         return service_instance
 
     # -----------------------------------------------------------------
@@ -256,14 +255,6 @@ class ProcManager(object):
         if resource_id:
             service_instance.resource_id = resource_id
 
-        # Now call the on_init of the agent.
-        self._service_init(service_instance)
-
-        if not service_instance.resource_id:
-            log.warn("New agent pid=%s has no resource_id set" % process_id)
-
-        self._service_start(service_instance)
-
         rsvc = ProcessRPCServer(node=self.container.node,
             from_name=service_instance.id,
             service=service_instance,
@@ -280,6 +271,14 @@ class ProcManager(object):
 
         # set service's reference to process
         service_instance._process = proc
+
+        # Now call the on_init of the agent.
+        self._service_init(service_instance)
+
+        if not service_instance.resource_id:
+            log.warn("New agent pid=%s has no resource_id set" % process_id)
+
+        self._service_start(service_instance)
 
         # Directory registration
         caps = service_instance.get_capabilities()
@@ -303,10 +302,6 @@ class ProcManager(object):
         Attach to service pid.
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
-        self._service_init(service_instance)
-
-        self._service_start(service_instance)
-
         rsvc = ProcessRPCServer(node=self.container.node,
             from_name=service_instance.id,
             service=service_instance,
@@ -324,6 +319,9 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
+        self._service_init(service_instance)
+        self._service_start(service_instance)
+
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
@@ -339,7 +337,6 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         self._service_init(service_instance)
-
         self._service_start(service_instance)
 
         # Add publishers if any...
