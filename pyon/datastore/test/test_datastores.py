@@ -8,6 +8,7 @@ from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.ion.identifier import create_unique_resource_id
 from pyon.ion.resource import RT, PRED, LCS
 from nose.plugins.attrib import attr
 from unittest import SkipTest
@@ -522,7 +523,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))
-        res_obj_res = self.data_store.create(res_obj)
+        res_obj_res = self.data_store.create(res_obj, create_unique_resource_id())
         res_obj._id = res_obj_res[0]
         self.resources[name] = res_obj
         return res_obj_res[0]
