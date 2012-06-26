@@ -854,28 +854,31 @@ class ServiceObjectGenerator:
             return service_definitions_filename
 
     def get_object_definition_from_datastore(self):
-        data = ''
+        fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ObjectTypes')
-        for item in entry:
+        entries = dir.find_child_entries('/ObjectTypes')
+        for item in entries:
             try:
-                data = data + item.value['attributes']['definition'] + '\n'
+                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
             except:
                 return ''
-        return data
+        fragments = [item for ordinal, item in sorted(fragments)]
+        full_definition = "\n".join(fragments)
+        return full_definition
 
     def get_service_definition_from_datastore(self):
         fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceInterfaces')
-        if not entry:
+        entries = dir.find_child_entries('/ServiceInterfaces')
+        if not entries:
             return ""
-        for item in entry:
+        for item in entries:
             try:
                 self.service_definitions_filename[item.value['key']] = item.value['file_path']
-                fragments.append(item.value['attributes']['definition'])
+                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
             except:
                 return ''
+        fragments = [item for ordinal, item in sorted(fragments)]
         full_definition = "\n".join(fragments)
         return full_definition
 
