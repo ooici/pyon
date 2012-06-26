@@ -216,6 +216,6 @@ class ResourceAgentClient(ResourceAgentProcessClient):
             if len(agent_procs) > 1:
                 log.warn("Inconsistency: More than one agent registered for resource_id=%s: %s" % (
                     resource_id, agent_procs))
-            agent_id = bootstrap.container_instance.directory._get_key(agent_procs[0][0])
+            agent_id = bootstrap.container_instance.directory._get_key(agent_procs[0].key)
             return str(agent_id)
         return None
