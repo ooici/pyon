@@ -405,8 +405,17 @@ class CouchDB_DataStore(DataStore):
     def delete_association(self, association=''):
         """
         Delete an association between two IonObjects
+        @param association  Association object, association id or 3-list of [subject, predicate, object]
         """
-        return self.delete(association)
+        if type(association) in (list, tuple) and len(association) == 3:
+            subject, predicate, obj = association
+            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, obj=obj, id_only=True)
+            success = True
+            for aid in assoc_id_list:
+                success = success and self.delete(aid)
+            return success
+        else:
+            return self.delete(association)
 
     def _get_viewname(self, design, name):
         return "_design/%s/_view/%s" % (design, name)

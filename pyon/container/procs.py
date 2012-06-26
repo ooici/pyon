@@ -49,7 +49,7 @@ class ProcManager(object):
         log.debug("ProcManager starting ...")
         self.proc_sup.start()
 
-        # Register container
+        # Register container as resource object
         cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
         self.cc_id, _ = self.container.resource_registry.create(cc_obj)
 
@@ -179,6 +179,7 @@ class ProcManager(object):
 
         listen_name = get_safe(config, "process.listen_name") or service_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
+        service_instance._proc_listen_name = listen_name
 
         # Service RPC endpoint
         rsvc1 = ProcessRPCServer(node=self.container.node,
@@ -203,14 +204,6 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
-        # Registration of Service
-        service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=service_instance.name)
-        if service_list:
-            service_instance._proc_svc_id = service_list[0]._id
-        else:
-            svc_obj = Service(name=service_instance.name, exchange_name=listen_name)
-            service_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
-
         return service_instance
 
     # -----------------------------------------------------------------
@@ -227,6 +220,7 @@ class ProcManager(object):
         self._service_start(service_instance)
 
         listen_name = get_safe(config, "process.listen_name") or name
+        service_instance._proc_listen_name = listen_name
 
         service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name)
@@ -295,15 +289,6 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
-        # Directory registration
-        caps = service_instance.get_capabilities()
-        self.container.directory.register("/Agents", service_instance.id,
-            **dict(name=service_instance._proc_name,
-                container=service_instance.container.id,
-                resource_id=service_instance.resource_id,
-                agent_id=service_instance.agent_id,
-                def_id=service_instance.agent_def_id,
-                capabilities=caps))
         if not service_instance.resource_id:
             log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
 
@@ -412,8 +397,8 @@ class ProcManager(object):
 
             # ensure that dep actually exists and is running
             if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
-                svc_de = self.container.directory.lookup("/Services/%s" % dependency)
-                if svc_de is None:
+                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
+                if not svc_de:
                     raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
 
     def _service_init(self, service_instance):
@@ -439,68 +424,118 @@ class ProcManager(object):
             setattr(service_instance, name, pub)
 
     def _register_process(self, service_instance, name):
-        # Add to local process dict
+        """
+        Performs all actions related to registering the new process in the system.
+        Also performs process type specific registration, such as for services and agents
+        """
+        # Add process instance to container's process dict
         self.procs_by_name[name] = service_instance
         self.procs[service_instance.id] = service_instance
 
-        # Add to directory
+        # Add Process to resource registry
+        # Note: In general the Process resource should be created by the CEI PD, but not all processes are CEI
+        # processes. How to deal with this?
         service_instance.errcause = "registering"
-        proc_obj = Process(name=service_instance.id, label=name)
+        proc_obj = Process(name=service_instance.id, label=name, proctype=service_instance._proc_type)
         proc_id, _ = self.container.resource_registry.create(proc_obj)
         service_instance._proc_res_id = proc_id
 
+        # Associate process with container resource
         self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
 
-        # Associate service with new process
+        # Process type specific registration
+        # TODO: Factor out into type specific handler functions
         if service_instance._proc_type == "service":
+            # Registration of SERVICE process: in resource registry
+            service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=service_instance.name)
+            if service_list:
+                service_instance._proc_svc_id = service_list[0]._id
+            else:
+                # We are starting the first process of a service instance
+                # TODO: This should be created by the HA Service agent in the future
+                svc_obj = Service(name=service_instance.name, exchange_name=service_instance._proc_listen_name)
+                service_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
+
+                # Create association to service definition resource
+                svcdef_list, _ = self.container.resource_registry.find_resources(restype="ServiceDefinition",
+                    name=service_instance.name)
+                if svcdef_list:
+                    self.container.resource_registry.create_association(service_instance._proc_svc_id,
+                        "hasServiceDefinition", svcdef_list[0]._id)
+                else:
+                    log.error("Cannot find ServiceDefinition resource for %s", service_instance.name)
+
             self.container.resource_registry.create_association(service_instance._proc_svc_id, "hasProcess", proc_id)
 
+        elif service_instance._proc_type == "agent":
+            # Registration of AGENT process: in Directory
+            caps = service_instance.get_capabilities()
+            self.container.directory.register("/Agents", service_instance.id,
+                **dict(name=service_instance._proc_name,
+                    container=service_instance.container.id,
+                    resource_id=service_instance.resource_id,
+                    agent_id=service_instance.agent_id,
+                    def_id=service_instance.agent_def_id,
+                    capabilities=caps))
+
+        # Trigger a real-time event. At this time, everything persistent has to be completed and consistent.
         self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
-                                               origin=service_instance.id, origin_type="ContainerProcess",
-                                               sub_type="SPAWN",
-                                               container_id=self.container.id,
-                                               process_type=service_instance._proc_type, process_name=service_instance._proc_name,
-                                               state=ProcessStateEnum.SPAWN)
+            origin=service_instance.id,
+            origin_type="ContainerProcess",
+            sub_type="SPAWN",
+            container_id=self.container.id,
+            process_type=service_instance._proc_type,
+            process_name=service_instance._proc_name,
+            state=ProcessStateEnum.SPAWN)
 
     def terminate_process(self, process_id):
+        """
+        Terminates a process and all its resources. Termination is graceful with timeout.
+        """
         service_instance = self.procs.get(process_id, None)
         if not service_instance:
             raise BadRequest("Cannot terminate. Process id='%s' unknown on container id='%s'" % (
                                         process_id, self.container.id))
 
+        # Give the process notice to quit doing stuff.
         service_instance.quit()
 
-        # terminate IonProcessThread (may not have one, i.e. simple process)
+        # Terminate IonProcessThread (may not have one, i.e. simple process)
         if service_instance._process:
             service_instance._process.notify_stop()
             service_instance._process.stop()
 
-        del self.procs[process_id]
+        self._unregister_process(process_id, service_instance)
 
+        # Send out real-time notice that process was terminated. At this point, everything persistent
+        # has to be consistent.
+        self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
+            origin=service_instance.id, origin_type="ContainerProcess",
+            sub_type="TERMINATE",
+            container_id=self.container.id,
+            process_type=service_instance._proc_type, process_name=service_instance._proc_name,
+            state=ProcessStateEnum.TERMINATE)
 
-        if "_proc_res_id" in service_instance:
-            if "_proc_svc_id" in service_instance:
-                self.container.resource_registry.delete_association(service_instance._proc_svc_id, "hasProcess", service_instance._proc_res_id)
-
-            self.container.resource_registry.delete(service_instance._proc_res_id)
-
-        self.container.directory.unregister_safe("/Containers/%s/Processes" % self.container.id,
-                service_instance.id)
-
+    def _unregister_process(self, process_id, service_instance):
         # Cleanup for specific process types
         if service_instance._proc_type == "service":
-            listen_name = get_safe(service_instance.CFG, "process.listen_name", service_instance.name)
-            self.container.directory.unregister_safe("/Services/%s" % listen_name, service_instance.id)
-            remaining_workers = self.container.directory.find_child_entries("/Services/%s" % listen_name)
-            if remaining_workers and len(remaining_workers) == 2:
-                self.container.directory.unregister_safe("/Services", listen_name)
+            self.container.resource_registry.delete_association([service_instance._proc_svc_id,
+                "hasProcess", service_instance._proc_res_id])
+
+            # Check if this is the last process for this service and do auto delete service resources here
+            svcproc_list, _ = self.container.resource_registry.find_objects(service_instance._proc_svc_id,
+                "hasProcess", "Process", id_only=True)
+            if not svcproc_list:
+                self.container.resource_registry.delete(service_instance._proc_svc_id)
 
         elif service_instance._proc_type == "agent":
             self.container.directory.unregister_safe("/Agents", service_instance.id)
 
-        self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
-                                            origin=service_instance.id, origin_type="ContainerProcess",
-                                            sub_type="TERMINATE",
-                                            container_id=self.container.id,
-                                            process_type=service_instance._proc_type, process_name=service_instance._proc_name,
-                                            state=ProcessStateEnum.TERMINATE)
+        # Remove process registration in resource registry
+        self.container.resource_registry.delete_association([self.cc_id, "hasProcess", service_instance._proc_res_id])
+        self.container.resource_registry.delete(service_instance._proc_res_id)
+
+        # Remove internal registration in container
+        del self.procs[process_id]
+        #print "**********", self.procs_by_name
+        #del self.procs_by_name[service_instance.name]
