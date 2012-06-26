@@ -10,8 +10,8 @@ __author__ = 'Michael Meisinger'
 from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
-from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerConfigError, BadRequest
+from pyon.core.bootstrap import CFG, IonObject
+from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessThreadManager
@@ -20,7 +20,7 @@ from pyon.service.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 
-from interface.objects import ProcessStateEnum
+from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
 class ProcManager(object):
     def __init__(self, container):
@@ -48,6 +48,11 @@ class ProcManager(object):
     def start(self):
         log.debug("ProcManager starting ...")
         self.proc_sup.start()
+
+        # Register container
+        cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
+        self.cc_id, _ = self.container.resource_registry.create(cc_obj)
+
         log.debug("ProcManager started, OK.")
 
     def stop(self):
@@ -61,6 +66,11 @@ class ProcManager(object):
 
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
+
+        # Remove Resource registration
+        self.container.resource_registry.delete(self.cc_id)
+        # TODO: Check associations to processes
+
         log.debug("ProcManager stopped, OK.")
 
     def spawn_process(self, name=None, module=None, cls=None, config=None, process_id=None):
@@ -193,9 +203,13 @@ class ProcManager(object):
         # set service's reference to process
         service_instance._process = proc
 
-        # Directory registration
-        self.container.directory.register_safe("/Services", listen_name, interface=service_instance.name)
-        self.container.directory.register_safe("/Services/%s" % listen_name, service_instance.id)
+        # Registration of Service
+        service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=service_instance.name)
+        if service_list:
+            service_instance._proc_svc_id = service_list[0]._id
+        else:
+            svc_obj = Service(name=service_instance.name, exchange_name=listen_name)
+            service_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
 
         return service_instance
 
@@ -431,8 +445,15 @@ class ProcManager(object):
 
         # Add to directory
         service_instance.errcause = "registering"
-        self.container.directory.register_safe("/Containers/%s/Processes" % self.container.id,
-                                               service_instance.id, name=name)
+        proc_obj = Process(name=service_instance.id, label=name)
+        proc_id, _ = self.container.resource_registry.create(proc_obj)
+        service_instance._proc_res_id = proc_id
+
+        self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
+
+        # Associate service with new process
+        if service_instance._proc_type == "service":
+            self.container.resource_registry.create_association(service_instance._proc_svc_id, "hasProcess", proc_id)
 
         self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
                                                origin=service_instance.id, origin_type="ContainerProcess",
@@ -456,6 +477,13 @@ class ProcManager(object):
 
         del self.procs[process_id]
 
+
+        if "_proc_res_id" in service_instance:
+            if "_proc_svc_id" in service_instance:
+                self.container.resource_registry.delete_association(service_instance._proc_svc_id, "hasProcess", service_instance._proc_res_id)
+
+            self.container.resource_registry.delete(service_instance._proc_res_id)
+
         self.container.directory.unregister_safe("/Containers/%s/Processes" % self.container.id,
                 service_instance.id)
 
@@ -463,7 +491,7 @@ class ProcManager(object):
         if service_instance._proc_type == "service":
             listen_name = get_safe(service_instance.CFG, "process.listen_name", service_instance.name)
             self.container.directory.unregister_safe("/Services/%s" % listen_name, service_instance.id)
-            remaining_workers = self.container.directory.find_entries("/Services/%s" % listen_name)
+            remaining_workers = self.container.directory.find_child_entries("/Services/%s" % listen_name)
             if remaining_workers and len(remaining_workers) == 2:
                 self.container.directory.unregister_safe("/Services", listen_name)
 

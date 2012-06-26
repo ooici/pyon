@@ -69,14 +69,11 @@ class Container(BaseContainerAgent):
         # DatastoreManager - controls access to Datastores (both mock and couch backed)
         self.datastore_manager = DatastoreManager()
 
+        # TODO: Do not start a capability here. Symmetric start/stop
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
-        # Instantiate Directory and self-register
-        # Has the additional side effect of either
-        # bootstrapping the configuration into the
-        # directory or read the configuration based
-        # in the value of the auto_bootstrap setting
+        # Instantiate Directory
         self.directory = Directory()
 
         # Create this Container's specific ExchangeManager instance
@@ -137,15 +134,11 @@ class Container(BaseContainerAgent):
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
-        # Self-register with Directory
-        self.directory.register("/Containers", self.id, cc_agent=self.name)
-        self.directory.register("/Containers/%s" % self.id, "Processes")
         self._capabilities.append("DIRECTORY")
 
         # Event repository
         self.event_repository = EventRepository()
         self.event_pub = EventPublisher()
-
         self._capabilities.append("EVENT_REPOSITORY")
 
         # Local resource registry
@@ -333,10 +326,6 @@ class Container(BaseContainerAgent):
             self.resource_registry.close()
 
         elif capability == "DIRECTORY":
-            # Unregister from directory
-            self.directory.unregister_safe("/Containers/%s" % self.id, "Processes")
-            self.directory.unregister_safe("/Containers", self.id)
-
             # Close directory (possible CouchDB connection)
             self.directory.close()
 

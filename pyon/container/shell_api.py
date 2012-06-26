@@ -203,7 +203,7 @@ def lsdir(qname='/', truncate=True):
     @param qname the directory node (must start with '/')
     """
     ds = container.directory
-    delist = ds.find_entries(qname)
+    delist = ds.find_child_entries(qname)
     detable = [(str(de._id), str(de.attributes)) for de in delist]
 
     if len(detable) == 0:
