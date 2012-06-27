@@ -1,8 +1,5 @@
-from pyon.core.bootstrap import IonObject
 from pyon.datastore.pool import Pool
-from pyon.ion.resource import RT
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.datastore.couchdb.id_factory import IDFactory, SaltedTimeIDFactory
 from nose.plugins.attrib import attr
 
 @attr('UNIT', group='datastore')

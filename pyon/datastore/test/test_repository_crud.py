@@ -22,7 +22,7 @@ class TestCouchStore(IonIntegrationTestCase):
                 pass
 
     def test_crud_obj(self):
-        """ crud operations using objects where possible """
+        """ crud operations using an object where possible """
         obj = IonObject(RT.InstrumentDevice, name='SBE37IMDevice', description="SBE37IMDevice", serial_number="12345" )
         success,id,ex = self.repo.insert('sample', obj)
         self.assertTrue(success)
@@ -47,7 +47,7 @@ class TestCouchStore(IonIntegrationTestCase):
 
 
     def test_crud_ids(self):
-        """ crud operations using objects where possible """
+        """ crud operations using an id where possible """
         obj = IonObject(RT.InstrumentDevice, name='SBE37IMDevice', description="SBE37IMDevice", serial_number="12345" )
         success,id,ex = self.repo.insert('sample', obj)
         self.assertTrue(success)
@@ -71,7 +71,7 @@ class TestCouchStore(IonIntegrationTestCase):
         self.assertTrue(success)
 
     def test_crud_list_obj(self):
-        """ crud operations using objects where possible """
+        """ crud batch operations using lists of objects where possible """
         obj1 = IonObject(RT.InstrumentDevice, name='SBE37IMDevice', description="SBE37IMDevice", serial_number="12345" )
         obj2 = IonObject(RT.Observatory, name='mount spaghetti', description='covered with snow')
         objs = [obj1,obj2]
@@ -119,7 +119,7 @@ class TestCouchStore(IonIntegrationTestCase):
 
 
     def test_crud_list_ids(self):
-        """ crud operations using objects where possible """
+        """ crud batch operations using lists of ids where possible """
         obj1 = IonObject(RT.InstrumentDevice, name='SBE37IMDevice', description="SBE37IMDevice", serial_number="12345" )
         obj2 = IonObject(RT.Observatory, name='mount spaghetti', description='covered with snow')
         objs = [obj1,obj2]
@@ -165,15 +165,18 @@ class TestCouchStore(IonIntegrationTestCase):
 #        self.assertFalse(tuples[0][0]) -- couch will allow second delete operation!
         self.assertTrue(tuples[1][0], msg='failed: '+str(tuples[1][2]) +'\nobj: ' + repr(obj5.__dict__))
 
-    def test_expected_errors(self):
+    def test_expected_exceptions(self):
+        """ test uses that are expected to throw exceptions (and probably need code fixes) """
         obj1 = IonObject(RT.InstrumentDevice, name='SBE37IMDevice', description="SBE37IMDevice", serial_number="12345")
 
+        # invalid name for repository
         try:
             self.repo.insert('bad name', obj1)
             self.fail('should fail')
         except:
             pass
 
+        # invalid argument types
         try:
             self.repo.insert('sample', None)
             self.fail('should fail')
@@ -186,13 +189,20 @@ class TestCouchStore(IonIntegrationTestCase):
         except:
             pass
 
-
-        success,id,ex = self.repo.insert('sample', obj1)
+        # cannot reinsert with same id
+        _,id,__ = self.repo.insert('sample', obj1)
         _,__,obj2 = self.repo.read('sample', id)
         try:
             success,_,__ = self.repo.insert('sample', obj2)
             self.fail('should not succeed')
         except:
             pass
-        self.assertFalse(success)
+
+        # cannot insert with _rev
+        obj1._rev = obj2._rev
+        try:
+            success,_,__ = self.repo.insert('sample', obj1)
+            self.fail('should not succeed')
+        except:
+            pass
 

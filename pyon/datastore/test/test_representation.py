@@ -2,7 +2,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.datastore.representation import IonSerializerDictionaryRepresentation
 from pyon.ion.resource import RT
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.datastore.couchdb.id_factory import IDFactory, SaltedTimeIDFactory
+from pyon.datastore.id_factory import SaltedTimeIDFactory
 from nose.plugins.attrib import attr
 
 @attr('UNIT', group='datastore')
