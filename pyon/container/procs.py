@@ -427,6 +427,8 @@ class ProcManager(object):
         Also performs process type specific registration, such as for services and agents
         """
         # Add process instance to container's process dict
+        if name in self.procs_by_name:
+            log.warn("Process name already registered in container: %s" % name)
         self.procs_by_name[name] = service_instance
         self.procs[service_instance.id] = service_instance
 
@@ -434,12 +436,16 @@ class ProcManager(object):
         # Note: In general the Process resource should be created by the CEI PD, but not all processes are CEI
         # processes. How to deal with this?
         service_instance.errcause = "registering"
-        proc_obj = Process(name=service_instance.id, label=name, proctype=service_instance._proc_type)
-        proc_id, _ = self.container.resource_registry.create(proc_obj)
-        service_instance._proc_res_id = proc_id
 
-        # Associate process with container resource
-        self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
+        if service_instance._proc_type != "immediate":
+            proc_obj = Process(name=service_instance.id, label=name, proctype=service_instance._proc_type)
+            proc_id, _ = self.container.resource_registry.create(proc_obj)
+            service_instance._proc_res_id = proc_id
+
+            # Associate process with container resource
+            self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
+        else:
+            service_instance._proc_res_id = None
 
         # Process type specific registration
         # TODO: Factor out into type specific handler functions
@@ -530,10 +536,13 @@ class ProcManager(object):
             self.container.directory.unregister_safe("/Agents", service_instance.id)
 
         # Remove process registration in resource registry
-        self.container.resource_registry.delete_association([self.cc_id, "hasProcess", service_instance._proc_res_id])
-        self.container.resource_registry.delete(service_instance._proc_res_id)
+        if service_instance._proc_res_id:
+            self.container.resource_registry.delete_association([self.cc_id, "hasProcess", service_instance._proc_res_id])
+            self.container.resource_registry.delete(service_instance._proc_res_id)
 
         # Remove internal registration in container
         del self.procs[process_id]
-        #print "**********", self.procs_by_name
-        #del self.procs_by_name[service_instance.name]
+        if service_instance.name in self.procs_by_name:
+            del self.procs_by_name[service_instance.name]
+        else:
+            log.warn("Process name %s not in local registry", service_instance.name)
