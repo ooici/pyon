@@ -7,11 +7,9 @@ __license__ = 'Apache 2.0'
 
 from pyon.core.registry import IonObjectRegistry, getextends, issubtype
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import BadRequest, NotFound
+from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
-
-from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 
 # Object Types
@@ -460,7 +458,7 @@ class ExtendedResourceContainer(object):
 
         return list() # If not found then return empty list
 
-    #This method figures out appropriate association call based on the Predcicate definitions
+    #This method figures out appropriate association call based on the predicate definitions
     def find_associations(self, resource, association_predicate, associated_resource=None):
 
         objs = list()
