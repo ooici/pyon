@@ -359,7 +359,7 @@ class ExtendedResourceContainer(object):
 
                 #Handle any fields that are declared to get their values from local methods
                 if decorator == 'Method':
-                    deco_value = self.get_decorator_value(obj, field, decorator)
+                    deco_value = obj.get_decorator_value(field, decorator)
                     if deco_value:
                         method_name = deco_value
                     else:
@@ -375,7 +375,7 @@ class ExtendedResourceContainer(object):
 
                 #If the decorator is a valid association, then get any associated objects
                 elif self.is_association_predicate(decorator):
-                    deco_value = self.get_decorator_value(obj, field, decorator)
+                    deco_value = obj.get_decorator_value(field, decorator)
                     assoc = self.find_associations(resource, decorator, deco_value)
                     self.set_field_associations(obj, field, assoc)
 
@@ -419,20 +419,6 @@ class ExtendedResourceContainer(object):
                 else:
                     res_container.ext_associations[ext_field] = list()
 
-
-    #TODO - replace when utility functions are available
-    def is_decorator(self, object, field, decorator):
-        if object._schema[field]['decorators'].has_key(decorator):
-            return True
-
-        return False
-
-    #TODO - replace when utility functions are available
-    def get_decorator_value(self, object, field, decorator):
-        if object._schema[field]['decorators'].has_key(decorator):
-            return object._schema[field]['decorators'][decorator]
-
-        return None
 
     def is_predicate_association(self, predicate,  predicate_type, res):
         for predt in predicate[predicate_type]:
