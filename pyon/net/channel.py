@@ -646,6 +646,8 @@ class RecvChannel(BaseChannel):
         exchange = method_frame.exchange
         routing_key = method_frame.routing_key
 
+        header_frame.headers.update({'routing_key':routing_key})
+
         #log.debug("RecvChannel._on_deliver, tag: %s, cur recv_queue len %s", delivery_tag, self._recv_queue.qsize())
 
         # put body, headers, delivery tag (for acking) in the recv queue
