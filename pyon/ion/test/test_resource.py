@@ -5,7 +5,8 @@ __author__ = 'Michael Meisinger'
 from unittest import SkipTest
 
 from mock import Mock
-from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT
+from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest
 from pyon.util.unit_test import IonUnitTestCase
 from nose.plugins.attrib import attr
@@ -75,4 +76,13 @@ class TestResources(IonUnitTestCase):
 
         self.assertEquals(extended_user.resource, actor_identity)
 
+        obj = IonObject(OT.TestExtendedResource)
+        list_objs = ['123', '456', '789']
+        extended_resource_handler.set_field_associations(obj, 'policies', list_objs)
+        extended_resource_handler.set_field_associations(obj, 'policy_count', list_objs)
+        extended_resource_handler.set_field_associations(obj, 'resource_object', list_objs)
+
+        self.assertEquals(obj.policies, list_objs)
+        self.assertEquals(obj.policy_count, 3)
+        self.assertEquals(obj.resource_object, '123')
 

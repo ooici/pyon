@@ -33,6 +33,10 @@ AssociationType = DotDict()
 AssociationType.update(zip(AssociationTypes, AssociationTypes))
 AT = AssociationType
 
+#Compound Associations
+CompoundAssociations = DotDict()
+
+
 # Life cycle states
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
@@ -48,6 +52,11 @@ def get_predicate_type_list():
     Predicates.clear()
     Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
     return Predicates.keys()
+
+def get_compound_associations_list():
+    CompoundAssociations.clear()
+    CompoundAssociations.update(Config(["res/config/associations.yml"]).data['CompoundAssociations'])
+    return CompoundAssociations.keys()
 
 def initialize_res_lcsms():
     """
@@ -98,6 +107,9 @@ def load_definitions():
     pt_list = get_predicate_type_list()
     PredicateType.clear()
     PredicateType.update(zip(pt_list, pt_list))
+
+    # Compound Associations
+    get_compound_associations_list()
 
     # Life cycle states
     initialize_res_lcsms()
@@ -284,9 +296,12 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
 
 class ExtendedResourceContainer(object):
 
-    def __init__(self,serv_prov):
+    def __init__(self,serv_prov, res_registry=None):
         self.service_provider = serv_prov
-        self.resource_registry = self.service_provider.clients.resource_registry
+        if res_registry is None:
+            self.resource_registry = self.service_provider.clients.resource_registry
+        else:
+            self.resource_registry = res_registry
 
     def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
                                            ext_associations=None, ext_exclude=None):
@@ -337,39 +352,62 @@ class ExtendedResourceContainer(object):
 
         for field in obj._schema:
 
+            #Skip any fields that were specifically to be excluded
             if ext_exclude is not None and field in ext_exclude:
                 continue
 
-            if self.is_decorator(obj, field, 'AssociationCount'):
-                deco_value = self.get_decorator_value(obj, field, 'AssociationCount')
-                if deco_value:
-                    setattr(obj, field, len(self.find_associations(resource, deco_value)))
+            #Iterate over all of the decorators for the field
+            for decorator in obj._schema[field]['decorators']:
 
-            elif self.is_decorator(obj, field, 'Association'):
-                deco_value = self.get_decorator_value(obj, field, 'Association')
-                if deco_value:
-                    assoc = self.find_associations(resource, deco_value)
-                    if assoc:
-                        if obj._schema[field]['type'] == 'list':
-                            setattr(obj, field, assoc)
-                        else:
-                            setattr(obj, field, assoc[0])
+                #Handle any fields that are declared to get their values from local methods
+                if decorator == 'Method':
+                    deco_value = self.get_decorator_value(obj, field, decorator)
+                    if deco_value:
+                        method_name = deco_value
+                    else:
+                        method_name = 'get_' + field
+                    ret_val = self.execute_method(resource._id, method_name)
+                    if ret_val is not None:
+                        setattr(obj, field, ret_val)
+
+                #Handle compound association chains
+                elif self.is_compound_association(decorator):
+                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator) )
+                    self.set_field_associations(obj, field,  assoc)
+
+                #If the decorator is a valid association, then get any associated objects
+                elif self.is_association_predicate(decorator):
+                    deco_value = self.get_decorator_value(obj, field, decorator)
+                    assoc = self.find_associations(resource, decorator, deco_value)
+                    self.set_field_associations(obj, field, assoc)
+
+    #Helper function for walking a chain of predicates
+    def walk_associations(self, object, predicates, index=0):
+        ret_list = list()
+        assoc = self.find_associations(object, predicates[index])
+        for obj in assoc:
+            if index+1 == len(predicates):
+                return obj
+            else:
+                ret_obj = self.walk_associations(obj, predicates, index+1)
+                if index == 0:
+                    ret_list.append(ret_obj)
+
+        return ret_list
 
 
-            elif self.is_decorator(obj, field, 'Method'):
-                deco_value = self.get_decorator_value(obj, field, 'Method')
-                if deco_value:
-                    method_name = deco_value
-                else:
-                    method_name = 'get_' + field
-                ret_val = self.execute_method(resource._id, method_name)
-                if ret_val is not None:
-                    setattr(obj, field, ret_val)
+    #Helper method for setting the field value based on the decorator association
+    def set_field_associations(self, obj, field, assoc):
+        if assoc:
+            if obj._schema[field]['type'] == 'list':
+                setattr(obj, field, assoc)
+            elif obj._schema[field]['type'] == 'int':
+                setattr(obj, field, len(assoc))
+            else:
+                setattr(obj, field, assoc[0])
 
 
-
-    #This method iterates over the dict of extended field names and associations
-    #Called from within create once decorators are refactored in.
+    #This method iterates over the dict of extended field names and associations dynamically passed in
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         if ext_associations is not None:
             for ext_field in ext_associations:
@@ -410,24 +448,41 @@ class ExtendedResourceContainer(object):
                 return True
         return False
 
+    def is_association_predicate(self, association):
+        return Predicates.has_key(association)
+
+    def is_compound_association(self, association):
+        return CompoundAssociations.has_key(association)
+
+    def get_compound_association_predicates(self, association):
+        if CompoundAssociations.has_key(association):
+            return CompoundAssociations[association]['predicates']
+
+        return list() # If not found then return empty list
+
     #This method figures out appropriate association call based on the Predcicate definitions
-    def find_associations(self, resource, association_predicate):
+    def find_associations(self, resource, association_predicate, associated_resource=None):
 
         objs = list()
 
+        #First validate the association predicate
         pred = Predicates[association_predicate]
         if not pred:
             return objs  #unknown association type so return empty list
 
+        #Resource Registry finds take a None if not set
+        if associated_resource == '':
+            associated_resource = None
+
         #Need to check through all of these in this order to account for specific vs base class inclusions
         if self.is_predicate_association(pred,'domain',resource.type_ ):
-            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, None, False)
+            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
         elif self.is_predicate_association(pred,'range',resource.type_ ):
-            objs,_ = self.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+            objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
         elif self.is_predicate_association_extension(pred,'domain',resource.type_ ):
-            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, None, False)
+            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
         elif self.is_predicate_association_extension(pred,'range',resource.type_ ):
-            objs,_ = self.resource_registry.find_subjects(None,association_predicate, resource._id, False )
+            objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
 
         return objs
 
@@ -446,20 +501,6 @@ class ExtendedResourceContainer(object):
                 return func(resource_id)
 
         return None
-
-
-    #Returns a list of the UserInfo associated with all ActorIdentities associated with the specified resource
-    def get_owners(self, resource_id):
-        owners = list()
-
-        actors,_ = self.resource_registry.find_objects(resource_id, PRED.hasOwner, None, False)
-        for actor in actors:
-            info,_ = self.resource_registry.find_objects(actor, PRED.hasInfo, None, False)
-            if info:
-                owners.append(info[0])
-
-        return owners
-
 
 
 
