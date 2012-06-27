@@ -122,5 +122,8 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource, instrument_device)
         self.assertEquals(len(extended_res.owners),1)
 
-
+        #Test field exclusion
+        extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123',ext_exclude=['owners'])
+        self.assertEquals(extended_res.resource, instrument_device)
+        self.assertEquals(len(extended_res.owners),0)
 
