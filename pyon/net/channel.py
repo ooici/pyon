@@ -359,9 +359,6 @@ class RecvChannel(BaseChannel):
         You call a context handler that returns you an AsyncResult you can wait on deterministically.
         Pass the number of items you want the queue to minimally have.
         """
-
-        _size_ar = None
-
         def __init__(self, abort_hook, *args, **kwargs):
             self._abort_hook = abort_hook
             self._size_ar = None

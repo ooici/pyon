@@ -479,7 +479,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_recv(self):
         # replace recv_queue with a mock obj
-        rqmock = Mock(spec=RecvChannel.SizeNotifyQueue)
+        rqmock = Mock(spec=queue.Queue)
         self.ch._recv_queue = rqmock
 
         rqmock.get.return_value = sentinel.recv
@@ -492,7 +492,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_recv_shutdown(self):
         # replace recv_queue with a mock obj
-        rqmock = Mock(spec=RecvChannel.SizeNotifyQueue)
+        rqmock = Mock(spec=queue.Queue)
         self.ch._recv_queue = rqmock
 
         rqmock.get.return_value = ChannelShutdownMessage()
@@ -506,7 +506,7 @@ class TestRecvChannel(PyonTestCase):
 
         # no auto stop consuming, no auto delete of queue without recv_name set
         # should have a shutdown message inserted
-        mockrq = Mock(spec=RecvChannel.SizeNotifyQueue)
+        mockrq = Mock(spec=queue.Queue)
         self.ch._recv_queue = mockrq
 
         self.ch.close_impl()
@@ -579,7 +579,7 @@ class TestRecvChannel(PyonTestCase):
         h.headers = { 'this_exists': sentinel.exists }
 
         # use a mock for the recv queue
-        rqmock = Mock(spec=RecvChannel.SizeNotifyQueue)
+        rqmock = Mock(spec=queue.Queue)
         self.ch._recv_queue = rqmock
 
         # now we can call!
