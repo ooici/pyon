@@ -46,7 +46,7 @@ class GovernanceController(object):
             self.initialize_from_config(config)
 
             self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.policy_event_callback)
-            self.resource_policy_event_subscriber.start()
+            self.resource_policy_event_subscriber.activate()
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
@@ -82,7 +82,7 @@ class GovernanceController(object):
         log.debug("GovernanceController stopping ...")
 
         if self.resource_policy_event_subscriber is not None:
-            self.resource_policy_event_subscriber.stop()
+            self.resource_policy_event_subscriber.deactivate()
 
 
     def process_incoming_message(self,invocation):
