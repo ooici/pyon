@@ -34,7 +34,8 @@ class InterfaceAdmin:
         Main entry point into creating core datastores
         """
         ds = CouchDataStore(config=self.config, scope=self.sysname)
-        datastores = ['resources','directory']
+        datastores = ['resources']
+        # @TODO: Add more and make sure they are created with proper indexes
         for local_dsn in datastores:
             if not ds.exists_datastore(local_dsn):
                 ds.create_datastore(local_dsn)
@@ -241,39 +242,75 @@ class InterfaceAdmin:
         #print "******", objs
         return objs
 
-def recursive_strip(scan_obj):
-    """
-    HACK HACK HACK
-    """
-    if type(scan_obj) is dict:
-        for key, value in scan_obj.iteritems():
-            if type(value) not in (str, int, float, bool, dict, list, None):
-                scan_obj[key] = str(value)
-            if type(value) is dict:
-                recursive_strip(value)
 
-def _bootstrap_object_defs(directory):
-    from pyon.core.object import IonObjectBase
-    from interface import objects
+#def recursive_strip(scan_obj):
+#    """
+#    HACK HACK HACK
+#    """
+#    if type(scan_obj) is dict:
+#        for key, value in scan_obj.iteritems():
+#            if type(value) not in (str, int, float, bool, dict, list, None):
+#                scan_obj[key] = str(value)
+#            if type(value) is dict:
+#                recursive_strip(value)
+#
+#def _bootstrap_object_defs(directory):
+#    from pyon.core.object import IonObjectBase
+#    from interface import objects
+#
+#    # @TODO: This should use the same code as the load_configuration tool
+#    delist = []
+#    for cname, cobj in inspect.getmembers(objects, inspect.isclass):
+#        if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
+#            parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
+#            delist.append(("/ObjectTypes", cname, dict(schema=recursive_strip(cobj._schema), extends=parentlist)))
+#    directory.register_mult(delist)
+#
+#def _bootstrap_service_defs(directory):
+#    from pyon.service.service import IonServiceRegistry
+#
+#    # @TODO: This should use the same code as the load_configuration tool
+#    # At this time importing everything is THE KILLER
+#    service_registry = IonServiceRegistry()
+#    service_registry.load_service_mods('interface/services')
+#    service_registry.build_service_map()
+#
+#    svc_list = []
+#    for svcname, svc in service_registry.services.iteritems():
+#        svc_list.append(("/ServiceInterfaces", svcname, {}))
+#    directory.register_mult(svc_list)
+#
+#def change_config():
+#    if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
+#        if parent.startswith("/Config"):
+#            self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
+#                origin="Directory")
+"""
+        self._assert_existence("/", "Agents",
+            description="Running agents are registered here")
 
-    # @TODO: This should use the same code as the load_configuration tool
-    delist = []
-    for cname, cobj in inspect.getmembers(objects, inspect.isclass):
-        if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
-            parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
-            delist.append(("/ObjectTypes", cname, dict(schema=recursive_strip(cobj._schema), extends=parentlist)))
-    directory.register_mult(delist)
+        self._assert_existence("/", "Config",
+            description="System configuration is registered here")
 
-def _bootstrap_service_defs(directory):
-    from pyon.service.service import IonServiceRegistry
+        self._assert_existence("/", "Containers",
+            description="Running containers are registered here")
 
-    # @TODO: This should use the same code as the load_configuration tool
-    # At this time importing everything is THE KILLER
-    service_registry = IonServiceRegistry()
-    service_registry.load_service_mods('interface/services')
-    service_registry.build_service_map()
+        self._assert_existence("/", "ObjectTypes",
+            description="ObjectTypes are registered here")
 
-    svc_list = []
-    for svcname, svc in service_registry.services.iteritems():
-        svc_list.append(("/ServiceInterfaces", svcname, {}))
-    directory.register_mult(svc_list)
+        self._assert_existence("/", "Org",
+            description="Org specifics are registered here",
+            is_root=self.is_root)
+
+        self._assert_existence("/Org", "Resources",
+            description="Shared Org resources are registered here")
+
+        self._assert_existence("/", "ResourceTypes",
+            description="Resource types are registered here")
+
+        self._assert_existence("/", "ServiceInterfaces",
+            description="Service interface definitions are registered here")
+
+        self._assert_existence("/", "Services",
+            description="Service instances are registered here")
+"""

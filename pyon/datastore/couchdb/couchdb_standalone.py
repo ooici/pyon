@@ -355,7 +355,9 @@ class CouchDataStore(object):
         ds, datastore_name = self._get_datastore(datastore_name)
         return ds.compact(design)
 
-    def define_profile_views(self, ds_views, datastore_name=None):
+    def define_profile_views(self, profile, datastore_name=None):
+        from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
+        ds_views = get_couchdb_views(profile)
         for design, viewdef in ds_views.iteritems():
             self.define_views(design, viewdef, datastore_name=datastore_name)
 
@@ -448,9 +450,9 @@ class CouchDataStore(object):
             rows = view
 
         if id_only:
-            res_rows = [(row['id'],row['key'], None) for row in rows]
+            res_rows = [(row['id'], row['key'], row.get('value', None)) for row in rows]
         else:
-            res_rows = [(row['id'],row['key'],row['doc']) for row in rows]
+            res_rows = [(row['id'], row['key'], row['doc']) for row in rows]
 
         log.info("find_docs_by_view() found %s objects" % (len(res_rows)))
         return res_rows

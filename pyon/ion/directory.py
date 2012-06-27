@@ -1,188 +1,164 @@
 #!/usr/bin/env python
 
-"""Directory is a frontend to a system-wide directory datastore, where system config and definitions live."""
+"""Directory is fronting a system-wide directory datastore containing system config and registrations."""
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-import inspect
-
 from pyon.core import bootstrap
-from pyon.core.bootstrap import IonObject, CFG
+from pyon.core.bootstrap import CFG
 from pyon.core.exception import Conflict, NotFound, BadRequest
-from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher, EventSubscriber
+from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.log import log
-from pyon.util.containers import get_ion_ts, dict_merge
+from pyon.util.containers import get_ion_ts
 
 from interface.objects import DirEntry
 
 
 class Directory(object):
     """
-    Class that uses a data store to provide a directory lookup mechanism.
+    Class that uses a datastore to provide a directory lookup mechanism.
+    Terms:
+      directory: instance of a Directory, representing entries within one Org. A tree of entries.
+      path: parent+key (= qualified name of an entry). All paths start with '/'
+      entry: node in the directory tree with a name (key) and parent path, holding arbitrary attributes
+      key: local name of an entry
     """
 
-    def __init__(self, datastore_manager=None, orgname=None):
+    def __init__(self, orgname=None, datastore_manager=None, events_enabled=False):
         # Get an instance of datastore configured as directory.
-        # May be persistent or mock, forced clean, with indexes
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
-        self.dir_store = datastore_manager.get_datastore("directory", DataStore.DS_PROFILE.DIRECTORY)
+        self.dir_store = datastore_manager.get_datastore(DataStore.DS_DIRECTORY)
 
         self.orgname = orgname or CFG.system.root_org
         self.is_root = (self.orgname == CFG.system.root_org)
 
+        self.events_enabled = events_enabled
         self.event_pub = None
         self.event_sub = None
 
-        self._init()
-        self._init_change_notification()
+        # Create directory root entry (for current org) if not existing
+        root_de = self.register("/", "DIR", sys_name=bootstrap.get_sys_name())
+        if root_de is None:
+            # We created this directory just now
+            pass
+
+        if self.events_enabled:
+            # init change event publisher
+            self.event_pub = EventPublisher()
+
+            # Register to receive directory changes
+            self.event_sub = EventSubscriber(event_type="ContainerConfigModifiedEvent",
+                origin="Directory",
+                callback=self.receive_directory_change_event)
 
     def close(self):
         """
-        Pass-through method to close the underlying datastore.
+        Close directory and all resources including datastore and event listener.
         """
+        if self.event_sub:
+            self.event_sub.deactivate()
         self.dir_store.close()
 
-    def _init(self):
-        # Check for existence of root dir entry.  If not found, call
-        # create to initialize top level dir entries.
-        try:
-            root_de = self.dir_store.read(self.orgname)
-        except NotFound as nf:
-            self._create()
-
-    def _create(self):
+    def _get_path(self, parent, key):
         """
-        Method which will create the underlying data store and
-        persist an empty Directory object.
+        Returns the qualified directory path for a directory entry.
         """
-        # Persist ROOT Directory object
-        root_obj = DirEntry(parent='', key=self.orgname, attributes=dict(sys_name=bootstrap.get_sys_name()))
-        root_id,rev = self.dir_store.create(root_obj, self.orgname)
-
-        self._assert_existence("/", "Agents",
-                description="Running agents are registered here")
-
-        self._assert_existence("/", "Config",
-                description="System configuration is registered here")
-
-        self._assert_existence("/", "Containers",
-                description="Running containers are registered here")
-
-        self._assert_existence("/", "ObjectTypes",
-                description="ObjectTypes are registered here")
-
-        self._assert_existence("/", "Org",
-                description="Org specifics are registered here",
-                is_root=self.is_root)
-
-        self._assert_existence("/Org", "Resources",
-                description="Shared Org resources are registered here")
-
-        self._assert_existence("/", "ResourceTypes",
-                description="Resource types are registered here")
-
-        self._assert_existence("/", "ServiceInterfaces",
-                description="Service interface definitions are registered here")
-
-        self._assert_existence("/", "Services",
-                description="Service instances are registered here")
-
-    def receive_directory_change_event(self, event_msg, headers):
-        # @TODO add support to fold updated config into container config
-        pass
-
-    def _init_change_notification(self):
-                
-        # init change event publisher
-        self.event_pub = EventPublisher()
-        
-        # Register to receive directory changes
-        self.event_sub = EventSubscriber(event_type="ContainerConfigModifiedEvent",
-                                         origin="Directory",
-                                         callback=self.receive_directory_change_event)
-
-    def _get_dn(self, parent, key=None, org=None):
-        """
-        Returns the distinguished name (= name qualified with org name) for a directory
-        path (parent only) or entry (parent + key). Uses the instance org name by default
-        if no other org name is specified.
-        """
-        org = org or self.orgname
-        if parent == '/':
-            return "%s/%s" % (org, key) if key is not None else org
+        if parent == "/":
+            return parent + key
         elif parent.startswith("/"):
-            return "%s%s/%s" % (org, parent,key) if key is not None else "%s%s" % (org, parent)
+            return parent + "/" + key
         else:
-            raise BadRequest("Illegal directory parent: %s" % parent)
+            raise BadRequest("Illegal parent: %s" % parent)
 
-    def _get_key(self, qname):
-        parent_dn, key = qname.rsplit("/", 1)
+    def _get_key(self, path):
+        """
+        Returns the key from a qualified directory path
+        """
+        parent, key = path.rsplit("/", 1)
         return key
 
-    def _assert_existence(self, parent, key, **kwargs):
+    def _create_dir_entry(self, parent, key, orgname=None, ts=None, attributes=None):
         """
-        Make sure an entry is in the directory.
-        @retval True if entry existed
+        Standard way to create a DirEntry object (without persisting it)
         """
-        dn = self._get_dn(parent, key)
-        direntry = self._safe_read(dn)
-        existed = bool(direntry)
-        if not direntry:
-            cur_time = get_ion_ts()
-            parent_dn = self._get_dn(parent)
-            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
-            # TODO: This may fail because of concurrent create
-            self.dir_store.create(direntry, dn)
-        return existed
+        orgname = orgname or self.orgname
+        ts = ts or get_ion_ts()
+        attributes = attributes if attributes is not None else {}
+        de = DirEntry(org=orgname, parent=parent, key=key, attributes=attributes, ts_created=ts, ts_updated=ts)
+        return de
 
-    def _safe_read(self, key):
-        try:
-            res = self.dir_store.read(key)
-            return res
-        except NotFound:
-            return None
-        except BadRequest:
-            return None
-
-
-    def register(self, parent, key, **kwargs):
+    def _read_by_path(self, path, orgname=None):
         """
-        Add/replace an entry to directory below a parent node.
-        Note: Does not merge the attribute values of the entry if existing
+        Given a qualified path, find entry in directory and return DirEntry
+        object or None if not found
+        """
+        if path is None:
+            raise BadRequest("Illegal arguments")
+        orgname = orgname or self.orgname
+        parent, key = path.rsplit("/", 1)
+        parent = parent or "/"
+        find_key = [orgname, key, parent]
+        view_res = self.dir_store.find_by_view('directory', 'by_key', key=find_key, id_only=True, convert_doc=True)
+
+        match = [doc for docid, index, doc in view_res]
+        if len(match) > 1:
+            raise Inconsistent("More than one directory entry found for key %s" % path)
+        elif match:
+            return match[0]
+        return None
+
+    def lookup(self, parent, key=None, return_entry=False):
+        """
+        Read entry residing in directory at parent node level.
+        """
+        path = self._get_path(parent, key) if key else parent
+        direntry = self._read_by_path(path)
+        if return_entry:
+            return direntry
+        else:
+            return direntry.attributes if direntry else None
+
+    def register(self, parent, key, create_only=False, **kwargs):
+        """
+        Add/replace an entry within directory, below a parent node or "/".
+        Note: Replaces (not merges) the attribute values of the entry if existing
+        @param create_only  If True, does not change an existing entry
+        @retval  DirEntry if previously existing
         """
         if not (parent and key):
             raise BadRequest("Illegal arguments")
         if not type(parent) is str or not parent.startswith("/"):
             raise BadRequest("Illegal arguments: parent")
 
-        dn = self._get_dn(parent, key)
-        log.debug("Directory.add(%s): %s" % (dn, kwargs))
+        dn = self._get_path(parent, key)
+        log.debug("Directory.register(%s): %s", dn, kwargs)
 
         entry_old = None
-        direntry = self._safe_read(dn)
         cur_time = get_ion_ts()
-        if direntry:
+        # Must read existing entry by path to make sure to not create path twice
+        direntry = self._read_by_path(dn)
+        if direntry and create_only:
+            # We only wanted to make sure entry exists. Do not change
+            return direntry
+        elif direntry:
             entry_old = direntry.attributes
             direntry.attributes = kwargs
-            direntry.ts_updated=cur_time
+            direntry.ts_updated = cur_time
             # TODO: This may fail because of concurrent update
             self.dir_store.update(direntry)
         else:
-            parent_dn = self._get_dn(parent)
-            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
-            self.dir_store.create(direntry, dn)
-
-        if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
-            if parent.startswith("/Config"):
-                self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
-                                             origin="Directory")
+            direntry = self._create_dir_entry(parent, key, attributes=kwargs, ts=cur_time)
+            self.dir_store.create(direntry, create_unique_directory_id())
 
         return entry_old
 
     def register_safe(self, parent, key, **kwargs):
+        """
+        Use this method to protect caller from any form of directory register error
+        """
         try:
             return self.register(parent, key, **kwargs)
         except Exception as ex:
@@ -196,44 +172,29 @@ class Directory(object):
         if type(entries) not in (list, tuple):
             raise BadRequest("Bad entries type")
         de_list = []
-        deid_list = []
         cur_time = get_ion_ts()
         for parent, key, attrs in entries:
-            parent_dn = self._get_dn(parent)
-            de = DirEntry(parent=parent_dn, key=key, attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
-            de_list.append(de)
-            dn = self._get_dn(parent, key)
-            deid_list.append(dn)
+            direntry = self._create_dir_entry(parent, key, attributes=attrs, ts=cur_time)
+            de_list.append(direntry)
+        deid_list = [create_unique_directory_id() for i in xrange(len(de_list))]
         self.dir_store.create_mult(de_list, deid_list)
 
-    def lookup(self, qualified_key='/'):
+    def unregister(self, parent, key=None, return_entry=False):
         """
-        Read entry residing in directory at parent node level.
+        Remove entry from directory.
+        Returns attributes of deleted DirEntry
         """
-        log.debug("Reading content at path %s" % qualified_key)
-        dn = self._get_dn(qualified_key)
-        direntry = self._safe_read(dn)
-        return direntry.attributes if direntry else None
+        path = self._get_path(parent, key) if key else parent
+        log.debug("Removing content at path %s" % path)
 
-    def unregister(self, parent, key):
-        """
-        Remove entry residing in directory at parent node level.
-        """
-        dn = self._get_dn(parent, key)
-        log.debug("Removing content at path %s" % dn)
-
-        entry_old = None
-        direntry = self._safe_read(dn)
+        direntry = self._read_by_path(path)
         if direntry:
-            entry_old = direntry.attributes
             self.dir_store.delete(direntry)
 
-        if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
-            if parent.startswith("/Config"):
-                self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
-                                             origin="Directory")
-
-        return entry_old
+        if direntry and not return_entry:
+            return direntry.attributes
+        else:
+            return direntry
 
     def unregister_safe(self, parent, key):
         try:
@@ -241,61 +202,68 @@ class Directory(object):
         except Exception as ex:
             log.exception("Error unregistering key=%s/%s" % (parent, key))
 
-    def find_entries(self, qname='/'):
-        if not type(qname) is str or not qname.startswith("/"):
-            raise BadRequest("Illegal argument qname: qname=%s" % qname)
+    def find_child_entries(self, parent='/', direct_only=True, **kwargs):
+        """
+        Return all child entries (ordered by path) for the given parent path.
+        Does not return the parent itself. Optionally returns child of child entries.
+        Additional kwargs are applied to constrain the search results (limit, descending, skip).
+        @param parent  Path to parent (must start with "/")
+        @param direct_only  If False, includes child of child entries
+        @retval  A list of DirEntry objects for the matches
+        """
+        if not type(parent) is str or not parent.startswith("/"):
+            raise BadRequest("Illegal argument parent: %s" % parent)
+        if direct_only:
+            start_key = [self.orgname, parent, 0]
+            end_key = [self.orgname, parent]
+            res = self.dir_store.find_by_view('directory', 'by_parent',
+                start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
+        else:
+            path = parent[1:].split("/")
+            start_key = [self.orgname, path, 0]
+            end_key = [self.orgname, list(path) + ["ZZZZZZ"]]
+            res = self.dir_store.find_by_view('directory', 'by_path',
+                start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        delist = self.dir_store.find_dir_entries(qname)
-        return delist
-
-    def find_child_entries(self, parent='/', **kwargs):
-        parent_dn = self._get_dn(parent)
-        start_key = [parent_dn]
-        res = self.dir_store.find_by_view('directory', 'by_parent',
-            start_key=start_key, end_key=list(start_key), id_only=False, **kwargs)
-
-        match = [doc for qname, index, doc in res]
+        match = [doc for docid, indexkey, doc in res]
         return match
 
-    def remove_child_entries(self, parent, delete_parent=False):
-        pass
-
-    def find_by_key(self, subtree='/', key=None, **kwargs):
+    def find_by_key(self, key=None, parent='/', **kwargs):
         """
-        Returns a tuple (qname, attributes) for each directory entry that matches the
-        given key name.
+        Returns a list of DirEntry for each directory entry that matches the given key name.
+        If a parent is provided, only checks in this parent and all subtree.
+        These entries are in the same org's directory but have different parents.
         """
         if key is None:
             raise BadRequest("Illegal arguments")
-        if subtree is None:
+        if parent is None:
             raise BadRequest("Illegal arguments")
-        subtree_dn = self._get_dn(subtree)
-        start_key = [key]
-        if subtree is not None:
-            start_key.append(subtree_dn)
+        start_key = [self.orgname, key, parent]
+        end_key = [self.orgname, key, parent+"ZZZZZZ"]
         res = self.dir_store.find_by_view('directory', 'by_key',
-            start_key=start_key, end_key=start_key, id_only=False, **kwargs)
+            start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        match = [(qname, doc.attributes) for qname, index, doc in res]
+        match = [doc for docid, indexkey, doc in res]
         return match
 
     def find_by_value(self, subtree='/', attribute=None, value=None, **kwargs):
         """
-        Returns a tuple (qname, attributes) for each directory entry that has an attribute
-        with the given value.
+        Returns a list of DirEntry with entries that have an attribute with the given value.
         """
         if attribute is None:
             raise BadRequest("Illegal arguments")
         if subtree is None:
             raise BadRequest("Illegal arguments")
-        subtree_dn = self._get_dn(subtree)
-        start_key = [attribute, value, subtree_dn]
-        end_key = [attribute, value, subtree_dn+"ZZZZZZ"]
+        start_key = [self.orgname, attribute, value, subtree]
+        end_key = [self.orgname, attribute, value, subtree+"ZZZZZZ"]
         res = self.dir_store.find_by_view('directory', 'by_attribute',
-                        start_key=start_key, end_key=end_key, id_only=False, **kwargs)
+                        start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        match = [(qname, doc.attributes) for qname, index, doc in res]
+        match = [doc for docid, indexkey, doc in res]
         return match
+
+    def remove_child_entries(self, parent, delete_parent=False):
+        pass
 
     # ------------------------------------------
     # Specific directory entry methods
@@ -303,4 +271,25 @@ class Directory(object):
 
     # ------------------------------------------
     # Internal methods
+
+    def _assert_existence(self, parent, key, **kwargs):
+        """
+        Make sure an entry is in the directory.
+        @retval True if entry existed
+        """
+        dn = self._get_path(parent, key)
+        direntry = self._safe_read(dn)
+        existed = bool(direntry)
+        if not direntry:
+            cur_time = get_ion_ts()
+            parent_dn = self._get_path(parent)
+            direntry = DirEntry(parent=parent_dn, key=key, attributes=kwargs, ts_created=cur_time, ts_updated=cur_time)
+            # TODO: This may fail because of concurrent create
+            self.dir_store.create(direntry, dn)
+        return existed
+
+    def receive_directory_change_event(self, event_msg, headers):
+        # @TODO add support to fold updated config into container config
+        pass
+
 

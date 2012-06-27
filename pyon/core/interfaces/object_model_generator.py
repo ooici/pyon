@@ -207,26 +207,28 @@ class ObjectModelGenerator:
     def get_object_definition_from_datastore(self):
         fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_dir_child_entries('/ObjectTypes')
+        entries = dir.find_child_entries('/ObjectTypes')
         for item in entries:
             try:
-                fragments.append(item.value['attributes']['definition'])
+                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
             except Exception as ex:
                 return ''
+        fragments = [item for ordinal, item in sorted(fragments)]
         full_definition = "\n".join(fragments)
         return full_definition
 
     def get_service_definition_from_datastore(self):
         fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_dir_child_entries('/ServiceInterfaces')
+        entries = dir.find_child_entries('/ServiceInterfaces')
         if not entries:
             return ""
         for item in entries:
             try:
-                fragments.append(item.value['attributes']['definition'])
+                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
             except:
                 return ''
+        fragments = [item for ordinal, item in sorted(fragments)]
         full_definition = "\n".join(fragments)
         return full_definition
 

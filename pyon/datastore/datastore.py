@@ -11,12 +11,26 @@ from pyon.util.arg_check import validate_true
 
 class DataStore(object):
     """
-    Think of this class as a database server.
-    Every instance is a different schema.
-    Every type of ION object is a table
+    Common utilities for datastores
     """
+    # Constants for common datastore names
+    DS_RESOURCES = "resources"
+    DS_OBJECTS = "objects"
+    DS_EVENTS = "events"
+    DS_DIRECTORY = DS_RESOURCES
+    DS_STATE = "state"
+
+    # Enumeration of index profiles for datastores
     DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
+
+    # Maps common datastore logical names to index profiles
+    DS_PROFILE_MAPPING = {
+        DS_RESOURCES: DS_PROFILE.RESOURCES,
+        DS_OBJECTS: DS_PROFILE.OBJECTS,
+        DS_EVENTS: DS_PROFILE.EVENTS,
+        DS_STATE: DS_PROFILE.STATE,
+    }
 
     def close(self):
         """
@@ -210,7 +224,7 @@ class DatastoreManager(object):
     def get_scoped_name(cls, ds_name):
         return ("%s_%s" % (get_sys_name(), ds_name)).lower()
 
-    def get_datastore(self, ds_name, profile=DataStore.DS_PROFILE.BASIC, config=None):
+    def get_datastore(self, ds_name, profile=None, config=None):
         """
         Factory method to get a datastore instance from given name, profile and config.
         @param ds_name  Logical name of datastore (will be scoped with sysname)
@@ -224,8 +238,10 @@ class DatastoreManager(object):
 
         scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
+        profile = profile or DataStore.DS_PROFILE_MAPPING.get(ds_name, DataStore.DS_PROFILE.BASIC)
+
         # Create a datastore instance
-        log.info("get_datastore(): Create instance of store '%s' as database=%s" % (ds_name, scoped_name))
+        log.info("get_datastore(): Create instance of store '%s' as database=%s (profile=%s)" % (ds_name, scoped_name, profile))
         new_ds = DatastoreManager.get_datastore_instance(ds_name, profile)
 
         # Create store if not existing

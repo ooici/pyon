@@ -347,14 +347,16 @@ class MessageObjectGenerator:
         return data
 
     def get_service_definition_from_datastore(self):
-        data = []
+        fragments = []
         dir = DirectoryStandalone(sysname=self.system_name)
-        entry = dir.find_dir_child_entries('/ServiceInterfaces')
-        if not entry:
-            return data
-        for item in entry:
+        entries = dir.find_child_entries('/ServiceInterfaces')
+        if not entries:
+            return ''
+        for item in entries:
             try:
-                data.append(item.value['attributes']['definition'] + '\n')
+                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
             except:
                 return ''
-        return data
+        fragments = [item for ordinal, item in sorted(fragments)]
+        full_definition = "\n".join(fragments)
+        return full_definition

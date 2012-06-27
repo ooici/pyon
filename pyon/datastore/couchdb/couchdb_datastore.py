@@ -15,6 +15,7 @@ from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
+from pyon.ion.identifier import create_unique_association_id
 from pyon.ion.resource import CommonResourceLifeCycleSM, AT
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
@@ -399,13 +400,22 @@ class CouchDB_DataStore(DataStore):
             p=predicate,
             o=object_id, ot=ot, orv=obj._rev,
             ts=get_ion_ts())
-        return self.create(assoc)
+        return self.create(assoc, create_unique_association_id())
 
     def delete_association(self, association=''):
         """
         Delete an association between two IonObjects
+        @param association  Association object, association id or 3-list of [subject, predicate, object]
         """
-        return self.delete(association)
+        if type(association) in (list, tuple) and len(association) == 3:
+            subject, predicate, obj = association
+            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, obj=obj, id_only=True)
+            success = True
+            for aid in assoc_id_list:
+                success = success and self.delete(aid)
+            return success
+        else:
+            return self.delete(association)
 
     def _get_viewname(self, design, name):
         return "_design/%s/_view/%s" % (design, name)
@@ -731,28 +741,12 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_dir_entries(self, qname):
-        log.debug("find_dir_entries(qname=%s)", qname)
-        if not str(qname).startswith('/'):
-            raise BadRequest("Illegal directory qname=%s" % qname)
-        ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("directory","by_path"))
-        key = str(qname).split('/')[1:]
-        endkey = list(key)
-        endkey.append(END_MARKER)
-        if qname == '/': del endkey[0]
-        rows = view[key:endkey]
-        res_entries = [self._persistence_dict_to_ion_object(row.value) for row in rows]
-        log.debug("find_dir_entries() found %s objects", len(res_entries))
-        return res_entries
-
     def find_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                            id_only=True, convert_doc=True, **kwargs):
         """
         @brief Generic find function using an defined index
-        @retval Returns a list of triples: (att_id, index_row, Attachment object or none)
+        @retval Returns a list of triples: (object _id, index key, Document/object or None)
         """
-        log.debug("find_by_view(%s/%s)",design_name, view_name)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
@@ -765,15 +759,15 @@ class CouchDB_DataStore(DataStore):
         view = ds.view(view_doc, **view_args)
         if key is not None:
             rows = view[key]
-            log.info("find_by_view(): key=%s" % key)
+            log.info("find_by_view(%s): key=%s", view_doc, key)
         elif keys:
             rows = view
-            log.info("find_by_view(): keys=%s" % keys)
+            log.info("find_by_view(%s): keys=%s", view_doc, str(keys))
         elif start_key and end_key:
             startkey = start_key or []
             endkey = list(end_key) or []
             endkey.append(END_MARKER)
-            log.info("find_by_view(): start_key=%s to end_key=%s" % (startkey, endkey))
+            log.info("find_by_view(%s): start_key=%s to end_key=%s", view_doc, startkey, endkey)
             if view_args.get('descending', False):
                 rows = view[endkey:startkey]
             else:
@@ -782,7 +776,10 @@ class CouchDB_DataStore(DataStore):
             rows = view
 
         if id_only:
-            res_rows = [(row['id'],row['key'], None) for row in rows]
+            if convert_doc:
+                res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['value'])) for row in rows]
+            else:
+                res_rows = [(row['id'],row['key'],row['value']) for row in rows]
         else:
             if convert_doc:
                 res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['doc'])) for row in rows]

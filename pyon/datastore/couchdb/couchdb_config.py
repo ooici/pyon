@@ -4,42 +4,40 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 
-from pyon.datastore.datastore import DataStore
+# NOTE: CANNOT import DataStore here!!!
 
 COUCHDB_CONFIGS = {
-    DataStore.DS_PROFILE.OBJECTS:{
+    "OBJECTS":{
         'views': ['object','association','attachment']
     },
-    DataStore.DS_PROFILE.RESOURCES:{
-        'views': ['resource','association','attachment']
+    "RESOURCES":{
+        'views': ['resource','directory','association','attachment']
     },
-    DataStore.DS_PROFILE.DIRECTORY:{
-        'views': ['directory','association']
-    },
-    DataStore.DS_PROFILE.EVENTS:{
+    "EVENTS":{
         'views': ['event']
     },
-    DataStore.DS_PROFILE.STATE:{
+    "STATE":{
         'views': []
     },
-    DataStore.DS_PROFILE.SCIDATA:{
+    "SCIDATA":{
         'views': ['datasets','manifest']
     },
-    DataStore.DS_PROFILE.EXAMPLES:{
+    "EXAMPLES":{
         'views':['posts']
     },
-    DataStore.DS_PROFILE.BASIC:{
+    "BASIC":{
         'views': []
     },
 }
 
 COUCHDB_VIEWS = {
+    # -------------------------------------------------------------------------
     # Association (triple) related views
     'association':{
         'by_sub':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit([doc.s, doc.p, doc.ot, doc.o], doc);
   }
 }""",
@@ -47,7 +45,7 @@ function(doc) {
         'by_obj':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit([doc.o, doc.p, doc.st, doc.s], doc);
   }
 }""",
@@ -56,7 +54,7 @@ function(doc) {
         'by_ids':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
@@ -65,7 +63,7 @@ function(doc) {
         'by_id':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
     emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
@@ -74,7 +72,7 @@ function(doc) {
         'by_pred':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
@@ -82,13 +80,14 @@ function(doc) {
         'by_bulk':{
             'map':"""
 function(doc) {
-  if(doc.type_ == "Association") {
+  if(doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
     emit(doc.s, doc.o);
   }
 }""",
         }
     },
 
+    # -------------------------------------------------------------------------
     # Pure ION object related views
     # Every object has a type and ID
     'object':{
@@ -100,18 +99,20 @@ function(doc) {
         },
     },
 
+    # -------------------------------------------------------------------------
     # Attachment objects
     'attachment':{
         'by_resource':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.type_=="Attachment") {
+  if (doc._id.indexOf("ion$asc")==0 && doc.type_ && doc.type_=="Attachment") {
     emit([doc.object_id, doc.ts_created], null);
   }
 }""",
         }
     },
 
+    # -------------------------------------------------------------------------
     # Resource ION object related views
     # Resources have a type, life cycle state and name
     # Note: the name in the indexes leads to a sort by name
@@ -119,7 +120,7 @@ function(doc) {
         'by_type':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.type_!="Association") {
+  if (doc._id.indexOf("ion$res")==0 && doc.type_) {
     emit([doc.type_, doc.lcstate, doc.name], null);
   }
 }""",
@@ -134,7 +135,7 @@ function(doc) {
         'by_lcstate':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.type_!="Association") {
+  if (doc._id.indexOf("ion$res")==0 && doc.type_ && doc.type_!="Association") {
     emit([0, doc.lcstate, doc.type_, doc.name], null);
     if (doc.lcstate != undefined && doc.lcstate != "") {
       if (doc.lcstate.lastIndexOf("DRAFT",0)!=0 && doc.lcstate != "RETIRED") {
@@ -152,7 +153,7 @@ function(doc) {
         'by_name':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.type_!="Association") {
+  if (doc._id.indexOf("ion$res")==0 && doc.type_ && doc.type_!="Association") {
     emit([doc.name, doc.type_, doc.lcstate], null);
   }
 }""",
@@ -165,36 +166,37 @@ function(doc) {
         'by_path':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "DirEntry") {
+  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
     levels = doc.parent.split('/');
-    if (doc.parent == "") levels.pop();
+    levels.splice(0, 1);
+    if (doc.parent == "/") levels.splice(0, 1);
     levels.push(doc.key);
-    emit(levels, doc);
+    emit([doc.org, levels], doc);
   }
 }""",
         },
         'by_key':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "DirEntry") {
-    emit([doc.key, doc.parent], doc);
+  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+    emit([doc.org, doc.key, doc.parent], doc);
   }
 }""",
         },
         'by_parent':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "DirEntry") {
-    emit([doc.parent, doc.key], doc);
+  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+    emit([doc.org, doc.parent, doc.key], doc);
   }
 }""",
         },
         'by_attribute':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "DirEntry") {
+  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
     for (var attr in doc.attributes) {
-      emit([attr, doc.attributes[attr], doc.parent], doc);
+      emit([doc.org, attr, doc.attributes[attr], doc.parent], doc);
     }
   }
 }""",

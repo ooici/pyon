@@ -56,7 +56,11 @@ class TestCCIntProcs(IonIntegrationTestCase):
     def setUp(self):
         # we don't want to connect to AMQP or do a pidfile or any of that jazz - just the proc manager please
         self.cc = Container()
+        self.cc.resource_registry = Mock()
+        self.cc.resource_registry.create.return_value=["ID","rev"]
+
         self.cc.proc_manager.start()
+
         self.cc.stop = Mock()
         self.cc.stop.side_effect = self.cc.proc_manager.stop
 

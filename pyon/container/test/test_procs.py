@@ -3,18 +3,19 @@
 __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
+from mock import Mock, patch
 
 from pyon.agent.agent import ResourceAgent
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
-from mock import patch
 
 class FakeContainer(object):
     def __init__(self):
         self.id = "containerid"
         self.node = None
+        self.name = "containername"
 
 class SampleProcess(BaseService):
     name = 'sample'
@@ -34,11 +35,14 @@ class BadProcess(BaseService):
 class SampleAgent(ResourceAgent):
     dependencies = []
 
-@attr('INT',group='p')
+@attr('INT')
 class TestProcManager(IonIntegrationTestCase):
 
     def test_procmanager_iso(self):
         fakecc = FakeContainer()
+        fakecc.resource_registry = Mock()
+        fakecc.resource_registry.create.return_value=["ID","rev"]
+
         pm = ProcManager(fakecc)
         self.assertTrue(hasattr(fakecc, "spawn_process"))
         pm.start()

@@ -5,6 +5,8 @@ import yaml
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 
+import yaml
+
 
 def parse_args(tokens):
     """
