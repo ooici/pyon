@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import yaml
 
 """Utilities for working with Pyon independent scripts"""
 

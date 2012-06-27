@@ -118,6 +118,19 @@ class IonObjectBase(object):
         for key in other.__dict__:
             setattr(self, key, other.__dict__[key])
 
+
+    def is_decorator(self, field, decorator):
+        if self._schema[field]['decorators'].has_key(decorator):
+            return True
+
+        return False
+
+    def get_decorator_value(self, field, decorator):
+        if self._schema[field]['decorators'].has_key(decorator):
+            return self._schema[field]['decorators'][decorator]
+
+        return None
+
 class IonMessageObjectBase(IonObjectBase):
     pass
     

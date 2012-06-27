@@ -7,10 +7,9 @@ import unittest
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
 from pyon.core import exception
-from pyon.net import endpoint
 from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, RecvChannel, ListenChannel
 from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
-from gevent import event, sleep, spawn
+from gevent import event, spawn
 from pyon.net.messaging import NodeB
 from pyon.service.service import BaseService
 from pyon.util.unit_test import PyonTestCase
@@ -28,10 +27,17 @@ no_interceptors = {'message_incoming': [],
                    'process_incoming': [],
                    'process_outgoing': []}
 
+# simplify send assertions -- can only validate header contents;
+# response may have stacks, the simple mock.assert_called_once_with will fail
+def assert_called_once_with_header(test, mock, expected):
+    test.assertEqual(1, mock.call_count)
+    actual = mock.call_args[0][1]
+    test.assertEqual(expected, actual)
+
 class TestError(StandardError):
     """
-    Newly defined error, used for side effects in Mock tests.
-    """
+Newly defined error, used for side effects in Mock tests.
+"""
     pass
 
 @attr('UNIT')
@@ -91,16 +97,16 @@ class TestEndpointUnit(PyonTestCase):
     def test_build_msg(self):
         fakemsg = {'fake':'content'}
         msg = self._endpoint_unit._build_msg(fakemsg)
-#        self.assertTrue(isinstance(msg, dict))
-#        self.assertTrue(msg.has_key('header'))
-#        self.assertTrue(msg.has_key('payload'))
-#        self.assertTrue(isinstance(msg['header'], dict))
-#        self.assertEquals(fakemsg, msg['payload'])
+    # self.assertTrue(isinstance(msg, dict))
+    # self.assertTrue(msg.has_key('header'))
+    # self.assertTrue(msg.has_key('payload'))
+    # self.assertTrue(isinstance(msg['header'], dict))
+    # self.assertEquals(fakemsg, msg['payload'])
 
     def test__message_received(self):
         self._endpoint_unit._build_invocation = Mock()
         self._endpoint_unit._intercept_msg_in = Mock()
-        self._endpoint_unit.message_received  = Mock()
+        self._endpoint_unit.message_received = Mock()
         self._endpoint_unit.message_received.return_value = sentinel.msg_return
 
 
@@ -109,8 +115,8 @@ class TestEndpointUnit(PyonTestCase):
         self.assertEquals(retval, sentinel.msg_return)
 
         self._endpoint_unit._build_invocation.assert_called_once_with(path=Invocation.PATH_IN,
-                                                                      message=sentinel.msg,
-                                                                      headers=sentinel.headers)
+            message=sentinel.msg,
+            headers=sentinel.headers)
         self.assertTrue(self._endpoint_unit._intercept_msg_in.called)
         self.assertTrue(self._endpoint_unit.message_received.called)
 
@@ -140,13 +146,13 @@ class TestBaseEndpoint(PyonTestCase):
 
         ch.connect("exist")
         ch.connect.assert_called_once_with('exist')
-        
+
         e.close()
 
     def test_create_endpoint_kwarg(self):
         """
-        Make sure our kwarg gets set.
-        """
+Make sure our kwarg gets set.
+"""
 
         class OptEndpointUnit(EndpointUnit):
             def __init__(self, opt=None, **kwargs):
@@ -360,7 +366,7 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         ep.get_ready_event().wait(timeout=5)
 
         gs_res = ep.get_stats()
-        self.assertEquals(gs_res, (0, 1))       # num of messages, num listeners
+        self.assertEquals(gs_res, (0, 1)) # num of messages, num listeners
 
         ep.close()
         gl.join(timeout=5)
@@ -376,10 +382,10 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         ep2.get_ready_event().wait(timeout=5)
 
         gs_res1 = ep1.get_stats()
-        self.assertEquals(gs_res1, (0, 2))       # num of messages, num listeners
+        self.assertEquals(gs_res1, (0, 2)) # num of messages, num listeners
 
         gs_res2 = ep2.get_stats()
-        self.assertEquals(gs_res2, (0, 2))       # num of messages, num listeners
+        self.assertEquals(gs_res2, (0, 2)) # num of messages, num listeners
 
         ep1.close()
         ep2.close()
@@ -428,18 +434,18 @@ class TestPublisher(PyonTestCase):
 
 class RecvMockMixin(object):
     """
-    Helper mixin to get a properly mocked receiving channel into several tests.
-    """
+Helper mixin to get a properly mocked receiving channel into several tests.
+"""
     def _setup_mock_channel(self, ch_type=BidirClientChannel, status_code=200, error_message="no problem", value="bidirmsg", op=None):
         """
-        Sets up a mocked channel, ready for fake bidir communication.
+Sets up a mocked channel, ready for fake bidir communication.
 
-        @param  ch_type         Channel type the mock should spec to.
-        @param  status_code     The status code of the operation, relevant only for RR comms.
-        @param  error_message   The error message of the operation, relevant only for RR comms.
-        @param  op              The op name, relevant only for RR comms.
-        @param  value           The msg body to be returned.
-        """
+@param ch_type Channel type the mock should spec to.
+@param status_code The status code of the operation, relevant only for RR comms.
+@param error_message The error message of the operation, relevant only for RR comms.
+@param op The op name, relevant only for RR comms.
+@param value The msg body to be returned.
+"""
         ch = MagicMock(spec=ch_type())
         # set a return value for recv so we get an immediate response
         vals = [(value, {'status_code':status_code, 'error_message':error_message, 'op': op}, sentinel.delivery_tag)]
@@ -519,7 +525,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
 
     def test_rr_client(self):
         """
-        """
+"""
         rr = RequestResponseClient(node=self._node, to_name="rr")
         rr.node.channel.return_value = self._setup_mock_channel()
         rr.node.interceptors = {}
@@ -534,8 +540,8 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
 
 class ISimpleInterface(Interface):
     """
-    Defines a simple interface for testing rpc client/servers.
-    """
+Defines a simple interface for testing rpc client/servers.
+"""
     def simple(one='', two=''):
         pass
 
@@ -566,7 +572,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
         e.attach_channel(ch)
 
         ret, heads = e.send("rpc call")
-        self.assertEquals(ret, 'bidirmsg')      # we just get payload back due to success RPC code 200
+        self.assertEquals(ret, 'bidirmsg') # we just get payload back due to success RPC code 200
 
         e.close()
 
@@ -577,16 +583,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
             e = RPCRequestEndpointUnit(interceptors={})
             ch = self._setup_mock_channel(status_code=err.status_code, error_message=str(err.status_code))
             e.attach_channel(ch)
-
-            self.assertRaises(err, e.send, 'payload')
-
-    def test__raise_exception_known(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertRaises(exception.NotFound, e._raise_exception, 404, "no")
-
-    def test__raise_exception_unknown(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertRaises(exception.ServerError, e._raise_exception, 999, "no")
+            self.assertRaises(err, e.send, {})
 
     @patch('pyon.net.endpoint.RequestEndpointUnit._send', Mock(side_effect=exception.Timeout))
     def test_timeout_makes_sflow_sample(self):
@@ -607,7 +604,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 
     def test__get_sflow_manager_with_container(self):
         Container.instance = None
-        c = Container()     # ensure an instance
+        c = Container() # ensure an instance
         e = RPCRequestEndpointUnit(interceptors={})
         self.assertEquals(e._get_sflow_manager(), c.sflow_manager)
 
@@ -627,17 +624,17 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
         samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads)
 
         self.assertEquals(samp, {
-                                    'app_name'  :   sentinel.name,
-                                    'op'        :   'theservice.remove_femur',
-                                    'attrs'     :   {'conv-id': sentinel.conv_id, 'service': 'theservice'},
-                                    'status_descr' : "Ok",
-                                    'status'    :   '0',
-                                    'req_bytes' :   len('msg'),
-                                    'resp_bytes':   len('response'),
-                                    'uS'        :   999000,     # it's in microseconds!
-                                    'initiator' :   sentinel.sender,
-                                    'target'    :   sentinel.receiver
-                                })
+            'app_name' : sentinel.name,
+            'op' : 'theservice.remove_femur',
+            'attrs' : {'conv-id': sentinel.conv_id, 'service': 'theservice'},
+            'status_descr' : "Ok",
+            'status' : '0',
+            'req_bytes' : len('msg'),
+            'resp_bytes': len('response'),
+            'uS' : 999000, # it's in microseconds!
+            'initiator' : sentinel.sender,
+            'target' : sentinel.receiver
+        })
 
     def test__build_sample_uses_last_name_for_op(self):
         e = RPCRequestEndpointUnit(interceptors={})
@@ -724,8 +721,8 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
     def simple(self, named=None):
         """
-        The endpoint will fire its received message into here.
-        """
+The endpoint will fire its received message into here.
+"""
         self._ar.set(named)
 
     def test_endpoint_receive(self):
@@ -761,19 +758,18 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e.spawn_listener()
         e._recv_greenlet.join()
 
-        # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':400,
-                                               'error_message':'Unknown op name: no_exist',
-                                               'conv-id': '',
-                                               'conv-seq': 2,
-                                               'protocol':'',
-                                               'performative': 'failure',
-                                               'language':'ion-r2',
-                                               'encoding':'msgpack',
-                                               'format':'NoneType',
-                                               'receiver': ',',
-                                               'ts': sentinel.ts,
-                                               'reply-by': 'todo'})
+        assert_called_once_with_header(self, ch.send, {'status_code':400,
+                                                       'error_message':'Unknown op name: no_exist',
+                                                       'conv-id': '',
+                                                       'conv-seq': 2,
+                                                       'protocol':'',
+                                                       'performative': 'failure',
+                                                       'language':'ion-r2',
+                                                       'encoding':'msgpack',
+                                                       'format':'list',
+                                                       'receiver': ',',
+                                                       'ts': sentinel.ts,
+                                                       'reply-by': 'todo'})
 
     @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
     def test_recv_bad_kwarg(self):
@@ -791,18 +787,18 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e._recv_greenlet.join()
 
         # test to make sure send got called with our error
-        ch.send.assert_called_once_with(None, {'status_code':500,
-                                               'error_message':'simple() got an unexpected keyword argument \'not_named\'',
-                                               'conv-id': '',
-                                               'conv-seq': 2,
-                                               'protocol':'',
-                                               'performative': 'failure',
-                                               'language':'ion-r2',
-                                               'encoding':'msgpack',
-                                               'format':'NoneType',
-                                               'receiver': ',',
-                                               'ts': sentinel.ts,
-                                               'reply-by': 'todo'})
+        assert_called_once_with_header(self, ch.send, {'status_code':500,
+                                                       'error_message':'simple() got an unexpected keyword argument \'not_named\'',
+                                                       'conv-id': '',
+                                                       'conv-seq': 2,
+                                                       'protocol':'',
+                                                       'performative': 'failure',
+                                                       'language':'ion-r2',
+                                                       'encoding':'msgpack',
+                                                       'format':'NoneType',
+                                                       'receiver': ',',
+                                                       'ts': sentinel.ts,
+                                                       'reply-by': 'todo'})
 
     def test__message_received_interceptor_exception(self):
         e = RPCResponseEndpointUnit(routing_obj=self)
@@ -813,17 +809,17 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
             retval = e._message_received(sentinel.msg, {})
 
             self.assertEquals(retval, sentinel.sent)
-            e.send.assert_called_once_with(None, {'status_code': -1,
-                                                  'error_message':'',
-                                                  'conv-id': '',
-                                                  'conv-seq': 2,
-                                                  'protocol':'',
-                                                  'performative': 'failure'})
+            assert_called_once_with_header(self, e.send, {'status_code': -1,
+                                                          'error_message':'',
+                                                          'conv-id': '',
+                                                          'conv-seq': 2,
+                                                          'protocol':'',
+                                                          'performative': 'failure'})
 
     def error_op(self):
         """
-        Routing method for next test, raises an IonException.
-        """
+Routing method for next test, raises an IonException.
+"""
         raise exception.Unauthorized(sentinel.unauth)
 
     def test__message_received_error_in_op(self):
@@ -843,12 +839,12 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         e.spawn_listener()
         e._recv_greenlet.join()
 
-        e.send.assert_called_once_with(None, {'status_code': 401,
-                                              'error_message': str(sentinel.unauth),
-                                              'conv-id': '',
-                                              'conv-seq': 2,
-                                              'protocol':'',
-                                              'performative':'failure'})
+        assert_called_once_with_header(self, e.send, {'status_code': 401,
+                                                      'error_message': str(sentinel.unauth),
+                                                      'conv-id': '',
+                                                      'conv-seq': 2,
+                                                      'protocol':'',
+                                                      'performative':'failure'})
 
     def test_message_received_dict(self):
         rout_obj = Mock()
@@ -898,4 +894,3 @@ class TestRPCServer(PyonTestCase, RecvMockMixin):
 
 if __name__ == "__main__":
     unittest.main()
-    

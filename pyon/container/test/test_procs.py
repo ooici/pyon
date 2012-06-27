@@ -21,6 +21,9 @@ class SampleProcess(BaseService):
     name = 'sample'
     dependencies = []
 
+    def call_process(self, *args, **kwargs):
+        pass
+
 class BadProcess(BaseService):
     name = 'bad'
     dependencies = []

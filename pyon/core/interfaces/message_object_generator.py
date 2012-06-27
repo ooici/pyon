@@ -113,16 +113,20 @@ class MessageObjectGenerator:
                     if line.startswith('  #'):
                         # Check for decorators
                         if len(line) > 4 and line.startswith('  #@'):
+                            dec = line.strip()[2:].split("=")
+                            key = dec[0]
+                            value = dec[1] if len(dec) == 2 else ""
+                            # Add it to the decorator list
                             if not decorators:
-                                decorators = '"' + line.strip()[2:] + '"'
+                                decorators = '"' + key  + '":"' + value + '"'
                             else:
-                                decorators = decorators + ', "' + line.strip()[2:] + '"'
+                                decorators = decorators + ', "' + key + '":"' + value + '"'
                         else:
                             init_lines.append('  ' + line + '\n')
                             if not description:
-                                description = line
+                                description = line.strip()[1:]
                             else:
-                                description = description + ' ' + line
+                                description = description + ' ' + line.strip()[1:]
 
                         index += 1
                         continue
@@ -132,13 +136,13 @@ class MessageObjectGenerator:
                         try:
                             value = line.split(":", 1)[1].strip()
                             if '#' in value:
-                                dsc = value.split('#', 1)[1].strip()
+                                dsc = value.split('#', 1)[1].strip()[1:]
                                 value = value.split('#')[0].strip()
                                 # Get inline comment
                                 if not description:
-                                    description = '#' + re.escape(dsc)
+                                    description = dsc
                                 else:
-                                    description = description + ' #' + dsc
+                                    description = description + ' ' + dsc
                         except KeyError:
                             # Ignore key error because value is nested
                             index += 1
@@ -180,7 +184,7 @@ class MessageObjectGenerator:
                         args.append(", ")
                         args.append(field + "=" + value)
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "' },"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "' },"
                     index += 1
                     decorators = ''
                     description = ''
@@ -242,9 +246,9 @@ class MessageObjectGenerator:
                             else:
                                 init_lines.append('  ' + line + '\n')
                                 if not description:
-                                    description = line
+                                    description = line.strip()[1:]
                                 else:
-                                    description = description + ' ' + line
+                                    description = description + ' ' + line.strip()[1:]
                             index += 1
                             continue
 
@@ -256,9 +260,9 @@ class MessageObjectGenerator:
                                 value = value.split('#')[0].strip()
                                 # Get inline comment
                                 if not description:
-                                    description = '#' + re.escape(dsc)
+                                    description = dsc
                                 else:
-                                    description = description + ' #' + dsc
+                                    description = description + ' ' + dsc
                         except KeyError:
                             # Ignore key error because value is nested
                             index += 1

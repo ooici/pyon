@@ -364,18 +364,21 @@ class ObjectModelGenerator:
             elif line.startswith('  #'):
                 # Check for decorators tag
                 if len(line) > 4 and line.startswith('  #@'):
+                    dec = line.strip()[2:].split("=")
+                    key = dec[0]
+                    value = dec[1] if len(dec) == 2 else ""
                     # Add it to the decorator list
                     if not decorators:
-                        decorators = '"' + line.strip()[2:] + '"'
+                        decorators = '"' + key  + '":"' + value + '"'
                     else:
-                        decorators = decorators + ', "' + line.strip()[2:] + '"'
+                        decorators = decorators + ', "' + key + '":"' + value + '"'
                 else:
                     init_lines.append('  ' + line + '\n')
                     if not description:
-                        description = line
+                        description = line.strip()[1:]
                         csv_description = line.strip()
                     else:
-                        description = description + ' ' + line
+                        description = description + ' ' + line.strip()[1:]
                         csv_description = csv_description + ' ' + line.strip()
             elif line.startswith('  '):
                 if current_class_def_dict:
@@ -386,11 +389,11 @@ class ObjectModelGenerator:
                         if '#' in line:
                             dsc = line.split('#', 1)[1].strip()
                             if not description:
-                                description = '#' + dsc
+                                description = dsc
                                 csv_description = dsc
                             else:
+                                description = description + ' ' + dsc
                                 csv_description =  csv_description + ' ' + dsc
-                                description = description + ' #' + dsc
                     except KeyError:
                         # Ignore key error because value is nested
                         continue
@@ -421,9 +424,9 @@ class ObjectModelGenerator:
                     fields.append(field)
                     field_details.append((field, value_type, converted_value, csv_description))
                     if enum_type:
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     else:
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators':[" + decorators + "]" + ", 'description': '" + re.escape(description) + "'},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators':{" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     decorators = ''
                     description = ''
                     csv_description = ''

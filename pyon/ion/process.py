@@ -69,7 +69,7 @@ class IonProcessThread(PyonThread):
         # wait on control flow loop!
         ct.get()
 
-    def _routing_call(self, call, callargs, context=None):
+    def _routing_call(self, call, context, *callargs, **callkwargs):
         """
         Endpoints call into here to synchronize across the entire IonProcess.
 
@@ -85,7 +85,10 @@ class IonProcessThread(PyonThread):
         """
         ar = AsyncResult()
 
-        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, context))
+        if len(callargs) == 0 and len(callkwargs) == 0:
+            log.warn("_routing_call got no arguments for the call %s, check your call's parameters", call)
+
+        self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, callkwargs, context))
         return ar
 
     def _control_flow(self):
@@ -103,25 +106,26 @@ class IonProcessThread(PyonThread):
         created at scheduling time is set with the result of the call.
         """
         for calltuple in self._ctrl_queue:
-            calling_gl, ar, call, callargs, context = calltuple
-            log.debug("control_flow making call: %s %s (has context: %s)", call, callargs, context is not None)
+            calling_gl, ar, call, callargs, callkwargs, context = calltuple
+            log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
 
             res = None
             try:
                 with self.service.push_context(context):
-                    res = call(**callargs)
+                    res = call(*callargs, **callkwargs)
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.
 
                 # try decorating the args of the exception with the true traceback
                 # this should be reported by ThreadManager._child_failed
-                exc = PyonThreadTraceback("True traceback captured by IonProcessThread' _control_flow:\n\n" + traceback.format_exc())
+                exc = PyonThreadTraceback("IonProcessThread _control_flow caught an exception (call: %s, *args %s, **kwargs %s, context %s)\nTrue traceback captured by IonProcessThread' _control_flow:\n\n%s" % (call, callargs, callkwargs, context, traceback.format_exc()))
                 e.args = e.args + (exc,)
 
                 calling_gl.kill(exception=e, block=False)
 
             ar.set(res)
+
 
     def _notify_stop(self):
         """
