@@ -359,7 +359,8 @@ class RecvChannel(BaseChannel):
         You call a context handler that returns you an AsyncResult you can wait on deterministically.
         Pass the number of items you want the queue to minimally have.
         """
-        def __init__(self, *args, **kwargs):
+        def __init__(self, abort_hook, *args, **kwargs):
+            self._abort_hook = abort_hook
             self._size_ar = None
             self._await_number = None
             gqueue.Queue.__init__(self, *args, **kwargs)
@@ -369,7 +370,7 @@ class RecvChannel(BaseChannel):
             self._check_and_fire()
 
         def _check_and_fire(self):
-            if self._size_ar is not None and not self._size_ar.ready() and self.qsize() >= self._await_number:
+            if self._size_ar is not None and not self._size_ar.ready() and (self._abort_hook() or self.qsize() >= self._await_number):
                 self._size_ar.set()
 
         @contextmanager
@@ -393,7 +394,7 @@ class RecvChannel(BaseChannel):
         You may set the receiving name and binding here if you wish, otherwise they will
         be set when you call setup_listener.
         """
-        self._recv_queue = self.SizeNotifyQueue()
+        self._recv_queue = self.SizeNotifyQueue(self._get_should_discard)
 
         # set recv name and binding if given
         assert name is None or isinstance(name, tuple)
@@ -579,6 +580,12 @@ class RecvChannel(BaseChannel):
         """
         return self._fsm.current_state == self.S_CLOSED
 
+    def _get_should_discard(self):
+        """
+        Internal helper to turn property into callable, used by recv_queue hook.
+        """
+        return self._should_discard
+
     def close_impl(self):
         """
         Close implementation override.
@@ -589,6 +596,11 @@ class RecvChannel(BaseChannel):
         log.debug("RecvChannel.close_impl (%s)", self.get_channel_id())
 
         self._recv_queue.put(ChannelShutdownMessage())
+
+        # abort anyone currently trying to await_n
+        if self._recv_queue._size_ar is not None:
+            log.debug("close_impl: aborting await_n")
+            self._recv_queue._size_ar.set()
 
         BaseChannel.close_impl(self)
 
@@ -756,6 +768,12 @@ class ListenChannel(RecvChannel):
             When all messages delivered via recv are confirmed via this method, transitions the
             parent channel out of ACCEPTED.
             """
+            if not delivery_tag in self._delivery_tags:
+                log.warn("MISSING DTAG: %s", delivery_tag)
+                import traceback
+                traceback.print_stack()
+                return
+
             self._delivery_tags.remove(delivery_tag)
 
             if len(self._delivery_tags) == 0:
@@ -829,7 +847,7 @@ class ListenChannel(RecvChannel):
 
         was_consuming = self._consuming
 
-        if not was_consuming:
+        if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
             self._transport.qos(self._amq_chan, prefetch_count=n)
 
