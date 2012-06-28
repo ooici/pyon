@@ -193,23 +193,23 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
 
         Subscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, **kwargs)
 
-    def activate(self):
+    def start(self):
         """
         Pass in a subscriber here, this will make it listen in a background greenlet.
         """
-        assert not self._cbthread, "activate called twice on EventSubscriber"
+        assert not self._cbthread, "start called twice on EventSubscriber"
         gl = spawn(self.listen)
         self._cbthread = gl
         self._ready_event.wait(timeout=5)
-        log.info("EventSubscriber activated. Event pattern=%s" % self.binding)
+        log.info("EventSubscriber started. Event pattern=%s" % self.binding)
         return gl
 
-    def deactivate(self):
+    def stop(self):
         self.close()
         self._cbthread.join(timeout=5)
         self._cbthread.kill()
         self._cbthread = None
-        log.info("EventSubscriber deactivated. Event pattern=%s" % self.binding)
+        log.info("EventSubscriber stopped. Event pattern=%s" % self.binding)
 
 class EventRepository(object):
     """
@@ -286,12 +286,12 @@ class EventGate(EventSubscriber):
         EventSubscriber.__init__(self, *args, callback=self.trigger_cb, **kwargs)
 
     def trigger_cb(self, event):
-        self.deactivate()
+        self.stop()
         self.gate.set()
 
     def await(self, timeout=None):
         self.gate = gevent_event.Event()
-        self.activate()
+        self.start()
         return self.gate.wait(timeout)
 
     def check_or_await(self):
