@@ -5,12 +5,15 @@
 __author__ = 'Michael Meisinger'
 
 import uuid
-from pyon.util.containers import create_unique_identifier
+#from pyon.util.containers import create_unique_identifier
 
 RES_PREFIX = "ion$res"
 ASSOC_PREFIX = "ion$asc"
 DIR_PREFIX = "ion$dir"
 EVENT_PREFIX = "ion$evt"
+
+def create_unique_identifier(prefix):
+    return uuid.uuid4().hex
 
 def create_unique_resource_id():
     return create_unique_identifier(RES_PREFIX)

@@ -34,18 +34,20 @@ COUCHDB_VIEWS = {
     # -------------------------------------------------------------------------
     # Association (triple) related views
     'association':{
+        # Subject to object lookup (for range queries)
         'by_sub':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if (doc.type_ == "Association") {
     emit([doc.s, doc.p, doc.ot, doc.o], doc);
   }
 }""",
         },
+        # Object to subject lookup (for range queries)
         'by_obj':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if (doc.type_ == "Association") {
     emit([doc.o, doc.p, doc.st, doc.s], doc);
   }
 }""",
@@ -54,7 +56,7 @@ function(doc) {
         'by_ids':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if (doc.type_ == "Association") {
     emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
@@ -63,7 +65,7 @@ function(doc) {
         'by_id':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if (doc.type_ == "Association") {
     emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
     emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
   }
@@ -72,15 +74,16 @@ function(doc) {
         'by_pred':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if (doc.type_ == "Association") {
     emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
   }
 }""",
         },
+        # Subject to object lookup (for multi key queries)
         'by_bulk':{
             'map':"""
 function(doc) {
-  if(doc._id.indexOf("ion$asc")==0 && doc.type_ == "Association") {
+  if(doc.type_ == "Association") {
     emit(doc.s, doc.o);
   }
 }""",
@@ -105,7 +108,7 @@ function(doc) {
         'by_resource':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$asc")==0 && doc.type_ && doc.type_=="Attachment") {
+  if (doc.type_ == "Attachment") {
     emit([doc.object_id, doc.ts_created], null);
   }
 }""",
@@ -120,7 +123,7 @@ function(doc) {
         'by_type':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$res")==0 && doc.type_) {
+  if (doc.type_ && doc.lcstate && doc.name) {
     emit([doc.type_, doc.lcstate, doc.name], null);
   }
 }""",
@@ -135,7 +138,7 @@ function(doc) {
         'by_lcstate':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$res")==0 && doc.type_ && doc.type_!="Association") {
+  if (doc.type_ && doc.lcstate && doc.name) {
     emit([0, doc.lcstate, doc.type_, doc.name], null);
     if (doc.lcstate != undefined && doc.lcstate != "") {
       if (doc.lcstate.lastIndexOf("DRAFT",0)!=0 && doc.lcstate != "RETIRED") {
@@ -153,7 +156,7 @@ function(doc) {
         'by_name':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$res")==0 && doc.type_ && doc.type_!="Association") {
+  if (doc.type_ && doc.lcstate && doc.name) {
     emit([doc.name, doc.type_, doc.lcstate], null);
   }
 }""",
@@ -166,7 +169,7 @@ function(doc) {
         'by_path':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+  if (doc.type_ == "DirEntry") {
     levels = doc.parent.split('/');
     levels.splice(0, 1);
     if (doc.parent == "/") levels.splice(0, 1);
@@ -178,7 +181,7 @@ function(doc) {
         'by_key':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+  if (doc.type_ == "DirEntry") {
     emit([doc.org, doc.key, doc.parent], doc);
   }
 }""",
@@ -186,7 +189,7 @@ function(doc) {
         'by_parent':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+  if (doc.type_ == "DirEntry") {
     emit([doc.org, doc.parent, doc.key], doc);
   }
 }""",
@@ -194,7 +197,7 @@ function(doc) {
         'by_attribute':{
             'map':"""
 function(doc) {
-  if (doc._id.indexOf("ion$dir")==0 && doc.type_ == "DirEntry") {
+  if (doc.type_ == "DirEntry") {
     for (var attr in doc.attributes) {
       emit([doc.org, attr, doc.attributes[attr], doc.parent], doc);
     }
