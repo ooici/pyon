@@ -311,8 +311,9 @@ class SendChannel(BaseChannel):
         self._exchange = name.exchange
 
     def send(self, data, headers=None):
-        log.debug("SendChannel.send")
+        log.debug("SendChannel.send: Sending start")
         self._send(self._send_name, data, headers=headers)
+        log.debug("SendChannel.send: Sending end")
 
     def _send(self, name, data, headers=None):
         log.debug("SendChannel._send\n\tname: %s\n\tdata: %s\n\theaders: %s", name, "-", headers)
@@ -416,6 +417,7 @@ class RecvChannel(BaseChannel):
         self._bind(binding)
 
         self._setup_listener_called = True
+        return NameTrio(exchange, queue, binding)
 
     def destroy_listener(self):
         """
@@ -775,6 +777,26 @@ class ListenChannel(RecvChannel):
         self._fsm.process(self.I_ENTER_ACCEPT)
         yield ch
         self._fsm.process(self.I_EXIT_ACCEPT)
+
+
+class BidirChannel(ListenChannel, SendChannel):
+    pass
+
+class BidirChannel(ListenChannel, SendChannel):
+    observer = None
+    def attach_observer(self, c):
+        print 'Attach observer called!'
+        self.observer = c
+    def _on_deliver(self, chan, method_frame, header_frame, body):
+        print 'Observer is: %s' %(self.observer)
+        print 'BidirChannel._on_deliver, before ListenChannel._on_deliver'
+        ListenChannel._on_deliver(self, chan, method_frame, header_frame, body)
+        print 'BidirChannel._on_deliver, after ListenChannel._on_deliver'
+        print 'Observer is: %s' %(self.observer)
+        if self.observer:
+            print 'Call observer'
+            self.observer(self, body)
+            print 'After observer is called'
 
 
 class SubscriberChannel(ListenChannel):
