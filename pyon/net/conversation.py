@@ -1,4 +1,5 @@
 import uuid
+import collections
 from gevent import coros
 from pyon.core.exception import IonException
 from pyon.util.log import log
@@ -16,27 +17,37 @@ class ConversationError(IonException):
 class PrincipalError(IonException):
     pass
 
+
 def enum(**enums):
     return type('Enum', (), enums)
+
+def get_control_msg_type(header):
+    if (header.has_key('conv-msg-type')):
+        return header['conv-msg-type'] & MSG_TYPE_MASKS.CONTROL
+    else: raise ConversationError('conv-msg-type in not set in the message header')
+
+def get_in_session_msg_type(header):
+    if (header.has_key('conv-msg-type')):
+        return header['conv-msg-type'] & MSG_TYPE_MASKS.IN_SESSION
+    else: raise ConversationError('conv-msg-type in not set in the message header')
 
 # @TODO: Do we need CLOSE ???
 MSG_TYPE = enum(TRANSMIT = 1, INVITE=8, ACCEPT=16, REJECT = 24)
 MSG_TYPE_MASKS = enum(IN_SESSION = 7, CONTROL= 56)
+
+
 class Conversation(object):
-    # mapping between role and channels
-    _conv_table = {}
+    _conv_table = {} # mapping between role and private channels
+    _invitation_table = {} # mapping between role and public channels (principals)
     _is_originator = False
-    _invitation_table = {}
     _conv_id = None
     _self_role = None
     _protocol = None
     _chan = None
     _next_control_msg_type = 0
     _recv_queues = {}
-    _next_control_msg_type= 0
     _recv_greenlet = None
     inviter_role = None
-
 
     """_buil_conv specific variables"""
     conv_id_counter = 0
@@ -75,15 +86,17 @@ class Conversation(object):
         self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
             header = {}
-            header.setdefault('conv-msg-type', MSG_TYPE.INVITE)
+            header['conv-msg-type'] =  MSG_TYPE.INVITE
             header = self._build_invitation_header(header, to_role)
             self._send(to_role_addr, "", header)
 
     def send_ack(self, to_role, msg):
         header = {}
         to_role_addr = self._get_from_conv_table(to_role)
-        header = self._build_ack_header(header, to_role, to_role_addr)
-        self._send(to_role_addr, msg, header)
+        header['conv-msg-type']  = MSG_TYPE.ACCEPT
+        header = self._build_control_header(header, to_role, to_role_addr)
+        self._send(to_role, to_role_addr, msg, header)
+        self._next_control_msg_type = 0
 
     def send(self, to_role, msg):
         if self._is_originator and not to_role in self._conv_table:
@@ -102,26 +115,20 @@ class Conversation(object):
         print 'In Conversation.recv'
         return self._recv_queues[from_role].get()
 
-    def _add_to_conv_table(self, to_role, to_role_addr):
-        print 'Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s' %(to_role, to_role_addr)
-        self._recv_queues.setdefault(to_role, gqueue.Queue())
-        if to_role in self._conv_table and isinstance(self._conv_table[to_role], AsyncResult):
-            self._conv_table[to_role].set(to_role_addr)
-        else: self._conv_table.setdefault(to_role, to_role_addr)
+    def close(self):
+        if self._recv_greenlet is not None:
+            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+            # @TODO: remove spawn_listener altogether.
+            self._chan._recv_queue.put(ChannelShutdownMessage())
+            self._recv_greenlet.join(timeout=2)
+            self._recv_greenlet.kill()      # he's dead, jim
 
-    def _get_from_conv_table(self, to_role):
-        print "In._get_from_conv_table"
-        if to_role not in self._conv_table:
-            print "to_role %s not in conv_table" %to_role
-            self._conv_table.setdefault(to_role, AsyncResult())
-
-        if isinstance(self._conv_table[to_role], AsyncResult):
-            # @TODO. Need timeout for the AsyncResult
-            print "Wait on the Async Result"
-            to_role_addr = self._conv_table[to_role].get()
-            print "get the Async Result, value is:%s" %to_role_addr
-            self._conv_table[to_role] = to_role_addr
-        return self._conv_table[to_role]
+        if self._chan is not None:
+            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
+            # we may end up having a duplicate, but I think logically it would never be a problem.
+            # still, need to clean this up.
+            self._chan.close()
 
     def _spawn_listener(self, role, base_role_addr):
         def listen():
@@ -130,11 +137,10 @@ class Conversation(object):
             print 'Conversation.spawn_listener:role_addr: %s' %(role_addr)
             self._add_to_conv_table(role, role_addr)
             self._chan.start_consume()
-            while True: self.on_msg_deliver_handler()
+            while True: self._on_msg_deliver_handler()
         self._recv_greenlet = spawn(listen)
 
-
-    def on_msg_deliver_handler(self):
+    def _on_msg_deliver_handler(self):
         print 'in Conversation.on_msg_deliver_handler'
         msg, header, delivery_tag =  self._chan.recv()
         self._on_msg_received(msg, header)
@@ -145,7 +151,7 @@ class Conversation(object):
         control_msg_type = get_control_msg_type(header)
         in_session_msg_type = get_in_session_msg_type(header)
         if control_msg_type == MSG_TYPE.ACCEPT:
-            # @TODO:Fix: reply-to should be renamed to sender-addr
+            # @TODO-Fix: reply-to should be renamed to sender-addr
             self._add_to_conv_table(header['sender-role'], NameTrio(tuple([x.strip() for x in header['reply-to'].split(',')])))
         elif control_msg_type == MSG_TYPE.REJECT:
             exception_msg = 'Invitation rejected by role %s on address %s'\
@@ -160,6 +166,59 @@ class Conversation(object):
 
         if in_session_msg_type == MSG_TYPE.TRANSMIT:
             self._recv_queues[header['sender-role']].put((msg, header))
+
+    def _invite_and_send(self, to_role, msg, header = None, to_role_addr = None):
+        log.debug("In _invite_and_send for msg: %s", msg)
+
+        if to_role_addr:
+            self._invitation_table[to_role] =  (to_role_addr, False)
+        elif to_role in self._invitation_table:
+            to_role_addr, _ = self._invitation_table.get(to_role)
+        else:
+            log.debug('No address found for role %s', to_role)
+            raise ConversationError('No receiver-addr specified')
+
+        if not header: header = dict()
+        header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
+        to_role_addr, _ = self._invitation_table.get(to_role)
+        self._invitation_table[to_role] = (to_role_addr, True)
+        header = self._build_control_header(header, to_role, to_role_addr)
+        print 'before sending: Role_addr: %s, Msg: %s, Header: %s' %(to_role_addr, msg, header)
+        self._send(to_role, to_role_addr, msg, header)
+
+    def _send_in_session_msg(self, to_role, msg, header = None):
+        log.debug("In _send_in_session_msg: %s", msg)
+        if not header: header = {}
+        log.debug("In _send for msg: %s", msg)
+        to_role_addr = self._get_from_conv_table(to_role)
+        header['conv-msg-type']  = MSG_TYPE.TRANSMIT
+        if (self._next_control_msg_type == MSG_TYPE.ACCEPT):
+            header['conv-msg-type']  = header.get(['conv-msg-type'], 0) | MSG_TYPE.ACCEPT
+            header = self._build_control_header(header, to_role, to_role_addr)
+            self._next_control_msg_type = 0
+        self._send(to_role, to_role_addr, msg, header)
+
+    def _send(self, to_role, to_role_addr, msg, header = None):
+        print 'In Conversation._send, to_role_addr is: %s, msg is:%s, header is: %s' %(to_role_addr, msg, header)
+        header = self._build_conv_header(header, to_role, to_role_addr)
+        self._chan.connect(to_role_addr)
+        self._chan.send(msg, header)
+
+    #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
+    def _build_conv_header(self, header, to_role, to_role_addr):
+        #@TODO shell we rename this to receiver-addr?
+        header['receiver'] = "%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
+        header['sender-role'] = self._self_role
+        header['receiver-role'] = to_role
+        header['conv-id'] = self._conv_id
+        header['conv-seq'] = 1 # @TODO: Not done, How to track it: per role, per conversation ???
+        header['protocol'] = self._protocol
+        return header
+
+    def _build_control_header(self, header, to_role, to_role_addr):
+        reply_to = self._get_from_conv_table(self._self_role)
+        header['reply-to'] = "%s,%s" %(reply_to.exchange, reply_to.queue)
+        return header
 
     # TODO: Why we need the counter here?. This is a copy from endpoint.py, it should be changed
     def _build_conv_id(self):
@@ -183,111 +242,24 @@ class Conversation(object):
 
         return "%s-%d" % (Conversation._conv_id_root, Conversation.conv_id_counter)
 
+    def _add_to_conv_table(self, to_role, to_role_addr):
+        print 'Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s' %(to_role, to_role_addr)
+        self._recv_queues.setdefault(to_role, gqueue.Queue())
+        if to_role in self._conv_table and isinstance(self._conv_table[to_role], AsyncResult):
+            self._conv_table[to_role].set(to_role_addr)
+        else: self._conv_table[to_role] = to_role_addr
 
-    def _invite_and_send(self, to_role, msg, header = None, to_role_addr = None):
-        log.debug("In _invite_and_send for msg: %s", msg)
+    def _get_from_conv_table(self, to_role):
+        print "In._get_from_conv_table"
+        self._conv_table.setdefault(to_role, AsyncResult())
+        if isinstance(self._conv_table[to_role], AsyncResult):
+            # @TODO. Need timeout for the AsyncResult
+            print "Wait on the Async Result"
+            to_role_addr = self._conv_table[to_role].get()
+            print "get the Async Result, value is:%s" %to_role_addr
+            self._conv_table[to_role] = to_role_addr
+        return self._conv_table[to_role]
 
-        if to_role_addr: self._invitation_table.setdefault(to_role, (to_role_addr, False))
-        elif to_role in self._invitation_table:
-            to_role_addr, status = self._invitation_table.get(to_role)
-        else:
-            log.debug('No address found for role %s', to_role)
-            raise ConversationError('No receiver-addr specified')
-
-        if not header: header = dict()
-        header.setdefault('conv-msg-type', MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT)
-        header = self._build_invitation_header(header, to_role)
-        print 'before sending: Role_addr: %s, Msg: %s, Header: %s' %(to_role_addr, msg, header)
-        self._invitation_table[to_role] = (to_role_addr, True)
-        self._send(to_role_addr, msg, header)
-
-
-    def _send_in_session_msg(self, to_role, msg, header = None):
-        log.debug("In _send_in_session_msg: %s", msg)
-        if not header: header = {}
-        log.debug("In _send for msg: %s", msg)
-        to_role_addr = self._get_from_conv_table(to_role)
-        header = self._build_conversation_header(header, to_role, to_role_addr)
-        self._send(to_role_addr, msg, header)
-
-    def _send(self, to_role_addr, msg, header = None):
-        print 'In Conversation._send, to_role_addr is: %s, msg is:%s, header is: %s' %(to_role_addr, msg, header)
-        header = self._build_required_header(header)
-        self._chan.connect(to_role_addr)
-        self._chan.send(msg, header)
-
-    def _build_conversation_header(self, header, to_role, to_role_addr = None):
-        header.setdefault('sender-role', self._self_role)
-        header.setdefault('receiver-role', to_role)
-        header.setdefault('receiver-addr', "%s,%s" %(to_role_addr.exchange, to_role_addr.queue))
-        header.setdefault('conv-msg-type', self._next_control_msg_type |MSG_TYPE.TRANSMIT)
-        print 'Next control msg type is: %s' %(self._next_control_msg_type)
-        if (self._next_control_msg_type == MSG_TYPE.ACCEPT):
-            # Set the address, Note that this is part of the conversation table
-            reply_to = self._get_from_conv_table(self._self_role)
-            print 'reply-to is: %s' %(reply_to)
-            header.setdefault('reply-to', "%s,%s" %(reply_to.exchange, reply_to.queue))
-            self._next_control_msg_type = 0
-        return header
-
-    def _build_ack_header(self, header, to_role, to_role_addr = None):
-        header.setdefault('sender-role', self._self_role)
-        header.setdefault('receiver-role', to_role)
-        header.setdefault('receiver-addr', "%s,%s" %(to_role_addr.exchange, to_role_addr.queue))
-        header.setdefault('conv-msg-type', MSG_TYPE.ACCEPT)
-        print 'Next control msg type is: %s' %(self._next_control_msg_type)
-        reply_to = self._get_from_conv_table(self._self_role)
-        header.setdefault('reply-to', "%s,%s" %(reply_to.exchange, reply_to.queue))
-        self._next_control_msg_type = 0
-        return header
-
-    def _build_required_header(self, header):
-        header.setdefault('conv-id', self._conv_id)
-        header.setdefault('protocol', self._protocol)
-        return header
-
-    def _build_invitation_header(self, header, to_role):
-        #############################conversation table############################
-        header.setdefault('sender-role', self._self_role)
-        reply_to = self._get_from_conv_table(self._self_role)
-        header.setdefault('reply-to', "%s,%s" %(reply_to.exchange, reply_to.queue))
-        ###########################################################################
-        header.setdefault('receiver-role', to_role) # do we need that
-        to_role_addr, _ = self._invitation_table.get(to_role)
-        header.setdefault('receiver-addr', "%s,%s" %(to_role_addr.exchange, to_role_addr.queue)) #do we need that
-        header.setdefault('conv-msg-type', MSG_TYPE.INVITE |MSG_TYPE.TRANSMIT)
-        return header
-
-    def close(self):
-        if self._recv_greenlet is not None:
-            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-            # @TODO: remove spawn_listener altogether.
-            self._chan._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=2)
-            self._recv_greenlet.kill()      # he's dead, jim
-
-        if self._chan is not None:
-            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
-            # we may end up having a duplicate, but I think logically it would never be a problem.
-            # still, need to clean this up.
-            self._chan.close()
-
-
-# meant to be overriden by the derived classes
-    def _check_invitation(self, msg):
-        return True
-
-
-def get_control_msg_type(header):
-    if (header.has_key('conv-msg-type')):
-        return header['conv-msg-type'] & MSG_TYPE_MASKS.CONTROL
-    else: raise ConversationError('conv-msg-type in not set in the message header')
-
-def get_in_session_msg_type(header):
-    if (header.has_key('conv-msg-type')):
-        return header['conv-msg-type'] & MSG_TYPE_MASKS.IN_SESSION
-    else: raise ConversationError('conv-msg-type in not set in the message header')
 
 class Principal(object):
     # mapping between conv_id and conversation instance
@@ -326,6 +298,20 @@ class Principal(object):
                 log.debug('Channel was closed during LEF.listen')
         self._recv_greenlet = spawn(listen)
 
+    def stop_listening(self):
+        if self._recv_greenlet is not None:
+            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+            # @TODO: remove spawn_listener altogether.
+            self._chan._recv_queue.put(ChannelShutdownMessage())
+            self._recv_greenlet.join(timeout=2)
+            self._recv_greenlet.kill()      # he's dead, jim
+
+        if self._chan is not None:
+            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
+            # we may end up having a duplicate, but I think logically it would never be a problem.
+            # still, need to clean this up.
+            self._chan.close()
 
     def get_invitation(self, protocol = None, auto_reply = False):
         # Here we should iterate while we find the protocol that is matched
@@ -352,7 +338,7 @@ class Principal(object):
         c.join(header['receiver-role'], NameTrio(self.name.exchange)) # new channel will be generated based on the name
         c._on_msg_received(msg, header)
         print '_accept_invitation: Conversation added to the list'
-        self._conversations.setdefault(header['conv-id'], c)
+        self._conversations[header['conv-id']] = c
         self._recv_queue.put(c)
 
     def _reject_invitation(self, msg, header):
@@ -361,24 +347,10 @@ class Principal(object):
     def _check_invitation(self, msg, header):
         return True
 
-    def stop_listening(self):
-        if self._recv_greenlet is not None:
-            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-            # @TODO: remove spawn_listener altogether.
-            self._chan._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=2)
-            self._recv_greenlet.kill()      # he's dead, jim
-
-        if self._chan is not None:
-            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
-            # we may end up having a duplicate, but I think logically it would never be a problem.
-            # still, need to clean this up.
-            self._chan.close()
 
 class ConversationOriginator(Principal):
     def start_conversation(self, protocol, role):
         c = Conversation.create(self.node, protocol)
         c.join(role, self.name, is_originator = True) # join will generate new private channel based on the name
-        self._conversations.setdefault(c._conv_id, c)
+        self._conversations[c._conv_id] = c
         return c
