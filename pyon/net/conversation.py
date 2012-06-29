@@ -88,10 +88,11 @@ class Conversation(object):
     def send(self, to_role, msg):
         if self._is_originator and not to_role in self._conv_table:
             _, is_invited  = self._invitation_table.get(to_role)
+            print 'Is_invited:%s'  %is_invited
             if is_invited:
                 self._send_in_session_msg(to_role, msg)
             else:
-                self._invite_and_send(to_role, msg, to_role_addr)
+                self._invite_and_send(to_role, msg)
         else:
             self._send_in_session_msg(to_role, msg)
         #log.error('The role %s does not exists', to_role)
@@ -117,8 +118,7 @@ class Conversation(object):
         if isinstance(self._conv_table[to_role], AsyncResult):
             # @TODO. Need timeout for the AsyncResult
             print "Wait on the Async Result"
-            async_result = self._conv_table[to_role].get()
-            to_role_addr =  async_result.get()
+            to_role_addr = self._conv_table[to_role].get()
             print "get the Async Result, value is:%s" %to_role_addr
             self._conv_table[to_role] = to_role_addr
         return self._conv_table[to_role]
@@ -198,8 +198,9 @@ class Conversation(object):
         header.setdefault('conv-msg-type', MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT)
         header = self._build_invitation_header(header, to_role)
         print 'before sending: Role_addr: %s, Msg: %s, Header: %s' %(to_role_addr, msg, header)
+        self._invitation_table[to_role] = (to_role_addr, True)
         self._send(to_role_addr, msg, header)
-        self._invitation_table.setdefault(to_role, (to_role_addr, True))
+
 
     def _send_in_session_msg(self, to_role, msg, header = None):
         log.debug("In _send_in_session_msg: %s", msg)
