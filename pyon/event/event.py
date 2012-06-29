@@ -21,6 +21,8 @@ from interface.objects import Event
 EVENTS_XP = "pyon.events"
 EVENTS_XP_TYPE = "topic"
 
+PERSIST_ON_PUBLISH = False
+
 def get_events_exchange_point():
     return "%s.%s" % (bootstrap.get_sys_name(), EVENTS_XP)
 
@@ -96,7 +98,7 @@ class EventPublisher(Publisher):
 
         try:
             # store published event but only if we specified an event_repo
-            if self.event_repo:
+            if PERSIST_ON_PUBLISH and self.event_repo:
                 self.event_repo.put_event(event_msg)
         except Exception as ex:
             log.exception("Failed to store published event '%s'" % (event_msg))
@@ -148,14 +150,17 @@ class BaseEventSubscriberMixin(object):
         return "%s.%s.%s.%s" % (event_type, sub_type, origin_type, origin)
 
     def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None,
-                 sub_type=None, origin_type=None):
+                 sub_type=None, origin_type=None, pattern=None):
         self.event_type = event_type
         self.sub_type = sub_type
         self.origin_type = origin_type
         self.origin = origin
 
         xp_name = xp_name or get_events_exchange_point()
-        binding = self._topic(event_type, origin, sub_type, origin_type)
+        if pattern:
+            binding = pattern
+        else:
+            binding = self._topic(event_type, origin, sub_type, origin_type)
         self.binding = binding
 
         # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
@@ -172,9 +177,10 @@ class BaseEventSubscriberMixin(object):
 
 class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
 
+    ALL_EVENTS = "#"
 
     def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
-                 sub_type=None, origin_type=None, *args, **kwargs):
+                 sub_type=None, origin_type=None, pattern=None, *args, **kwargs):
         """
         Initializer.
 
@@ -187,7 +193,7 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread = None
 
         BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
-                                          queue_name=queue_name, sub_type=sub_type, origin_type=origin_type)
+                                          queue_name=queue_name, sub_type=sub_type, origin_type=origin_type, pattern=pattern)
 
         log.debug("EventPublisher events pattern %s", self.binding)
 
@@ -230,10 +236,22 @@ class EventRepository(object):
         self.event_store.close()
 
     def put_event(self, event):
-        log.debug("Store event persistently %s" % event)
+        log.debug("Store event persistently %s", event)
         if not isinstance(event, Event):
             raise BadRequest("event must be type Event, not %s" % type(event))
         return self.event_store.create(event)
+
+    def put_events(self, events):
+        log.info("Store %s events persistently", len(events))
+        if type(events) is not list:
+            raise BadRequest("events must be type list, not %s" % type(events))
+        if not all([isinstance(event, Event) for event in events]):
+            raise BadRequest("events must all be type Event")
+
+        if events:
+            return self.event_store.create_mult(events)
+        else:
+            return None
 
     def get_event(self, event_id):
         log.debug("Retrieving persistent event for id=%s" % event_id)
