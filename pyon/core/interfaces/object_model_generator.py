@@ -11,6 +11,7 @@ import os
 import re
 import string
 import yaml
+import cgi
 
 from pyon.core.path import list_files_recursive
 from pyon.ion.directory_standalone import DirectoryStandalone
@@ -38,7 +39,7 @@ html_doc_templates = {
     <h3>Class Details</h3>
     <div class='table-wrap'>
       <table class='confluenceTable'>
-        <tr>
+        <tr style="padding:5px">
           <th class='confluenceTh'> Object Type: </th>
           <td class='confluenceTd'>${classname}</td>
         </tr>
@@ -66,6 +67,7 @@ html_doc_templates = {
           <th class='confluenceTh'> Name </th>
           <th class='confluenceTh'> Type </th>
           <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Decorators </th>
           <th class='confluenceTh'> Description </th>
         </tr>
         ${attrtableentries}
@@ -102,7 +104,8 @@ ${super_class_attr_tables}
           <td class='confluenceTd'>${attrname}</td>
           <td class='confluenceTd'>${type}</td>
           <td class='confluenceTd'>${default}</td>
-          <td class='confluenceTd'> ${attrcomment} </td>
+          <td class='confluenceTd'>${decorators}</td>
+          <td class='confluenceTd'>${attrcomment}</td>
         </tr>''',
 'association_table_entry':
 '''<tr>
@@ -122,6 +125,7 @@ ${super_class_attr_tables}
           <th class='confluenceTh'> Name </th>
           <th class='confluenceTh'> Type </th>
           <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Decorators </th>
           <th class='confluenceTh'> Description </th>
         </tr>
         ${superclassattrtableentries}
@@ -361,6 +365,7 @@ class ObjectModelGenerator:
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
                 continue
+
             elif line.startswith('  #'):
                 # Check for decorators tag
                 if len(line) > 4 and line.startswith('  #@'):
@@ -422,7 +427,7 @@ class ObjectModelGenerator:
                             args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
                     fields.append(field)
-                    field_details.append((field, value_type, converted_value, csv_description))
+                    field_details.append((field, value_type, converted_value, csv_description, decorators))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     else:
@@ -440,7 +445,8 @@ class ObjectModelGenerator:
                         attrtableentries = ""
                         field_details.sort()
                         for field_detail in field_details:
-                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'), attrcomment="")
+                            att_comments = cgi.escape(field_detail[3].strip(' ,#').replace('#',''))
+                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'),decorators=cgi.escape(field_detail[4]), attrcomment=att_comments)
                             self.csv_attributes_row_entries.append([current_class, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
                         related_associations = self.lookup_associations(current_class)
@@ -467,15 +473,16 @@ class ObjectModelGenerator:
                             sup_class_type = get_class_type(sup)
                             anchor = ""
                             if sup_class_type == "resource":
-                                anchor = '<a href="Resource+Spec+for+' + sup + '">' + sup + '</a>'
+                                anchor = '<a href=' + sup + '.html>' + sup + '</a>'
                             else:
-                                anchor = '<a href="Object+Spec+for+' + sup + '">' + sup + '</a>'
+                                anchor = '<a href=' + sup + '.html>' + sup + '</a>'
                             super_classes += anchor + ', '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
                             for fld_detail in fld_details:
-                                superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), attrcomment="")
+                                att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#',''))
+                                superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]), attrcomment=att_comments)
                             super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=anchor, superclassattrtableentries=superclassattrtableentries)
                             sup = self.class_args_dict[sup]["extends"]
                         super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
