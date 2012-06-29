@@ -8,11 +8,11 @@ from pyon.net.conversation import ConversationOriginator, Conversation, Principa
 
 def buyer_app():
     node, ioloop_process = messaging.make_node()
-    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue25'))
+    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue26'))
     print 'Create originator'
     c = originator.start_conversation('protocol', 'buyer')
     print 'Start conversation'
-    c.invite('seller', NameTrio('seller', 'seller_queue65'))
+    c.invite('seller', NameTrio('seller', 'seller_queue66'))
     print 'invite'
     c.send('seller', 'Hello1')
     print 'It is send'
@@ -30,7 +30,7 @@ def buyer_app():
 
 def seller_app():
     node, ioloop_process = messaging.make_node()
-    local = Principal(node, NameTrio('seller', 'seller_queue65'))
+    local = Principal(node, NameTrio('seller', 'seller_queue66'))
     print 'Create principal'
     local.spawn_listener()
     print 'Start listen'
