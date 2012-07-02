@@ -130,17 +130,17 @@ ${super_class_attr_tables}
     <div class='table-wrap'>
       <table class='confluenceTable'>
         <tr>
-          <th class='confluenceTh'> Name </th>
-          <th class='confluenceTh'> Type </th>
-          <th class='confluenceTh'> Default </th>
-          <th class='confluenceTh'> Decorators </th>
-          <th class='confluenceTh'> Description </th>
+          <th class='confluenceTh'>Name</th>
+          <th class='confluenceTh'>Type</th>
+          <th class='confluenceTh'>Default</th>
+          <th class='confluenceTh'>Decorators</th>
+          <th class='confluenceTh'>Description</th>
         </tr>
         ${superclassattrtableentries}
       </table>
     </div>
   </div>
-</div>'''
+</div>''',
 }
 
 html_doc_templates = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
@@ -159,7 +159,7 @@ ${rowentries}
 ''',
 'object_attributes_row_entry':
 '''${classname},${name},${type},${default},${description}
-'''
+''',
 }
 
 csv_doc_templates = dict(((k, string.Template(v)) for k, v in csv_doc_templates.iteritems()))
@@ -462,7 +462,7 @@ class ObjectModelGenerator:
                 if first_time:
                     first_time = False
                 else:
-                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment}
+                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators':""}
                     for arg in args:
                         self.dataobject_output_text += arg
                     self.dataobject_output_text += "):\n"
@@ -531,7 +531,8 @@ class ObjectModelGenerator:
                 attrtableentries += html_doc_templates['attribute_table_entry'].substitute(
                     attrname=field_detail[0], type=field_detail[1].replace("'", '"'),
                     default=field_detail[2].replace("'", '"'),
-                    decorators=cgi.escape(field_detail[4]), attrcomment=att_comments)
+                    decorators=cgi.escape(field_detail[4]),
+                    attrcomment=att_comments)
                 self.csv_attributes_row_entries.append([objname, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
             related_associations = self._lookup_associations(objname)
@@ -558,16 +559,31 @@ class ObjectModelGenerator:
                 fld_details.sort()
                 for fld_detail in fld_details:
                     att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#',''))
-                    superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]), attrcomment=att_comments)
-                super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=anchor, superclassattrtableentries=superclassattrtableentries)
+                    superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(
+                        attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'),
+                        default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]),
+                        attrcomment=att_comments)
+                super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(
+                    super_class_name=anchor,
+                    superclassattrtableentries=superclassattrtableentries)
                 sup = self.class_args_dict[sup]["extends"]
             super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
+
+            for okey, oval in self.class_args_dict.iteritems():
+                if oval['extends'] == objname:
+                    otype = self._get_class_type(okey)
+                    if otype == "resource":
+                        sub_classes += '<a href="Resource+Spec+for+' + okey + '.html">' + okey + '</a>' + ', '
+                    else:
+                        sub_classes += '<a href="Object+Spec+for+' + okey + '.html">' + okey + '</a>' + ', '
+            if sub_classes:
+                sub_classes = sub_classes[:-2]
 
             csv_description = objschema['description']
             self.csv_types_row_entries.append([objname, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
             doc_output = html_doc_templates['obj_doc'].substitute(
                 classname=objname, baseclasses=super_classes, subclasses=sub_classes,
-                classcomment=cgi.escape(objschema["description"]), decorators="",
+                classcomment=cgi.escape(objschema["description"]), decorators=objschema["decorators"],
                 attrtableentries=attrtableentries,
                 super_class_attr_tables=super_class_attribute_tables,
                 assoctableentries=assoctableentries)
