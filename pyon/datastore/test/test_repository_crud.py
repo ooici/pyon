@@ -1,14 +1,19 @@
+#!/usr/bin/env python
+
+from nose.plugins.attrib import attr
+from unittest import SkipTest
+
 from pyon.core.bootstrap import IonObject
 from pyon.datastore.couchdb.couch_pool import CouchDBPoolDict
 from pyon.datastore.id_factory import SaltedTimeIDFactory
 from pyon.datastore.repository import Repository
 from pyon.ion.resource import RT
 from pyon.util.int_test import IonIntegrationTestCase
-from nose.plugins.attrib import attr
 
 @attr('INT', group='datastore')
 class TestCouchStore(IonIntegrationTestCase):
     def setUp(self):
+        raise SkipTest("Skip until test works with non-localhost")
         id_factory = SaltedTimeIDFactory()
         self.pools = CouchDBPoolDict(prefix='testcouchstore'+id_factory.create_id().lower(), can_create=True, must_create=True)
         self.repo = Repository(self.pools)
