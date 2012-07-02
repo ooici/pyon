@@ -11,6 +11,7 @@ import os
 import re
 import string
 import yaml
+import cgi
 
 from pyon.core.path import list_files_recursive
 from pyon.ion.directory_standalone import DirectoryStandalone
@@ -38,7 +39,7 @@ html_doc_templates = {
     <h3>Class Details</h3>
     <div class='table-wrap'>
       <table class='confluenceTable'>
-        <tr>
+        <tr style="padding:5px">
           <th class='confluenceTh'> Object Type: </th>
           <td class='confluenceTd'>${classname}</td>
         </tr>
@@ -66,6 +67,7 @@ html_doc_templates = {
           <th class='confluenceTh'> Name </th>
           <th class='confluenceTh'> Type </th>
           <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Decorators </th>
           <th class='confluenceTh'> Description </th>
         </tr>
         ${attrtableentries}
@@ -102,7 +104,8 @@ ${super_class_attr_tables}
           <td class='confluenceTd'>${attrname}</td>
           <td class='confluenceTd'>${type}</td>
           <td class='confluenceTd'>${default}</td>
-          <td class='confluenceTd'> ${attrcomment} </td>
+          <td class='confluenceTd'>${decorators}</td>
+          <td class='confluenceTd'>${attrcomment}</td>
         </tr>''',
 'association_table_entry':
 '''<tr>
@@ -122,6 +125,7 @@ ${super_class_attr_tables}
           <th class='confluenceTh'> Name </th>
           <th class='confluenceTh'> Type </th>
           <th class='confluenceTh'> Default </th>
+          <th class='confluenceTh'> Decorators </th>
           <th class='confluenceTh'> Description </th>
         </tr>
         ${superclassattrtableentries}
@@ -357,10 +361,12 @@ class ObjectModelGenerator:
         decorators = ''
         description = ''
         csv_description = ''
+        class_comment = ''
 
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
                 continue
+
             elif line.startswith('  #'):
                 # Check for decorators tag
                 if len(line) > 4 and line.startswith('  #@'):
@@ -422,7 +428,7 @@ class ObjectModelGenerator:
                             args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
                     fields.append(field)
-                    field_details.append((field, value_type, converted_value, csv_description))
+                    field_details.append((field, value_type, converted_value, csv_description, decorators))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     else:
@@ -430,8 +436,15 @@ class ObjectModelGenerator:
                     decorators = ''
                     description = ''
                     csv_description = ''
-            elif line and line[0].isalpha():
+            elif line and (line[0].isalpha() or line.startswith("#")):
                 if '!enum' in line:
+                    continue
+                if line.startswith('#'):
+                    dsc = line.strip()[1:]
+                    if not class_comment:
+                        class_comment = dsc
+                    else:
+                        class_comment = class_comment + ' - ' + dsc
                     continue
                 if first_time:
                     first_time = False
@@ -440,7 +453,8 @@ class ObjectModelGenerator:
                         attrtableentries = ""
                         field_details.sort()
                         for field_detail in field_details:
-                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'), attrcomment="")
+                            att_comments = cgi.escape(field_detail[3].strip(' ,#').replace('#',''))
+                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'),decorators=cgi.escape(field_detail[4]), attrcomment=att_comments)
                             self.csv_attributes_row_entries.append([current_class, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
                         related_associations = self.lookup_associations(current_class)
@@ -467,22 +481,24 @@ class ObjectModelGenerator:
                             sup_class_type = get_class_type(sup)
                             anchor = ""
                             if sup_class_type == "resource":
-                                anchor = '<a href="Resource+Spec+for+' + sup + '">' + sup + '</a>'
+                                anchor = '<a href=' + sup + '.html>' + sup + '</a>'
                             else:
-                                anchor = '<a href="Object+Spec+for+' + sup + '">' + sup + '</a>'
+                                anchor = '<a href=' + sup + '.html>' + sup + '</a>'
                             super_classes += anchor + ', '
                             fld_details = self.class_args_dict[sup]["field_details"]
                             superclassattrtableentries = ""
                             fld_details.sort()
                             for fld_detail in fld_details:
-                                superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), attrcomment="")
+                                att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#',''))
+                                superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]), attrcomment=att_comments)
                             super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=anchor, superclassattrtableentries=superclassattrtableentries)
                             sup = self.class_args_dict[sup]["extends"]
                         super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
 
                         csv_description = ''
                         self.csv_types_row_entries.append([current_class, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
-                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment=cgi.escape(current_class_comment), attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+                        current_class_comment = ''
 
                         datamodelhtmldir = 'interface/object_html'
                         if not os.path.exists(datamodelhtmldir):
@@ -532,7 +548,10 @@ class ObjectModelGenerator:
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
-                self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
+                class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'")+ "\n    '''" if class_comment else ''
+                self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n    def __init__(self"
+                current_class_comment = class_comment
+                class_comment = ''
         if len(args) > 0:
             for arg in args:
                 self.dataobject_output_text += arg
