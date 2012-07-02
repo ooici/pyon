@@ -161,9 +161,10 @@ class DatastoreAdmin(object):
                 except NotFound:
                     pass
         elif prefix:
+            prefix = prefix.lower()
             ds_noscope = CouchDataStore(config=self.config)
             for dsn in ds_noscope.list_datastores():
-                if dsn.startswith(prefix):
+                if dsn.lower().startswith(prefix):
                     ds_noscope.delete_datastore(dsn)
         else:
             log.warn("Cannot clear datastore without prefix or datastore name")

@@ -74,7 +74,7 @@ def _clear_couch(host, port, username, password, prefix, verbose=False):
     ignored_num = 0
     for db_name in db_list:
 
-        if (prefix == '*' and not db_name.startswith('_')) or db_name.startswith(prefix):
+        if (prefix == '*' and not db_name.startswith('_')) or db_name.lower().startswith(prefix.lower()):
             db_server.delete_datastore(db_name)
             print 'clear_couch: Dropped couch database: %s' % db_name
 
