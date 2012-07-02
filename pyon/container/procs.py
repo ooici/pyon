@@ -2,15 +2,13 @@
 
 """Part of the container that manages ION processes etc."""
 
-from pyon.core import exception
-from pyon.ion.streamproc import StreamProcess
-from pyon.util.async import spawn, join
-
 __author__ = 'Michael Meisinger'
 
+import time
 from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
+from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
@@ -22,6 +20,7 @@ from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_s
 from pyon.util.log import log
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
+
 
 class ProcManager(object):
     def __init__(self, container):
@@ -59,18 +58,34 @@ class ProcManager(object):
     def stop(self):
         log.debug("ProcManager stopping ...")
 
+        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+        stats1 = CouchDB_DataStore._stats.get_stats()
+
         # Call quit on procs to give them ability to clean up
         # @TODO terminate_process is not gl-safe
 #        gls = map(lambda k: spawn(self.terminate_process, k), self.procs.keys())
 #        join(gls)
-        map(self.terminate_process, self.procs.keys())
+        procs_list = sorted(self.procs.values(), key=lambda proc: proc._proc_start_time, reverse=True)
+
+        for proc in procs_list:
+            self.terminate_process(proc.id)
 
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
 
+        if self.procs:
+            log.warn("ProcManager procs not empty: %s", self.procs)
+        if self.procs_by_name:
+            log.warn("ProcManager procs_by_name not empty: %s", self.procs_by_name)
+
         # Remove Resource registration
-        self.container.resource_registry.delete(self.cc_id)
+        self.container.resource_registry.delete(self.cc_id, del_associations=True)
         # TODO: Check associations to processes
+
+        stats2 = CouchDB_DataStore._stats.get_stats()
+
+        stats3 = CouchDB_DataStore._stats.diff_stats(stats2, stats1)
+        log.debug("Datastore stats difference during stop(): %s", stats3)
 
         log.debug("ProcManager stopped, OK.")
 
@@ -375,6 +390,7 @@ class ProcManager(object):
         service_instance.container = self.container
         service_instance.CFG = config
         service_instance._proc_name = name
+        service_instance._proc_start_time = time.time()
 
         # start service dependencies (RPC clients)
         self._start_service_dependencies(service_instance)
@@ -521,28 +537,25 @@ class ProcManager(object):
             state=ProcessStateEnum.TERMINATE)
 
     def _unregister_process(self, process_id, service_instance):
+        # Remove process registration in resource registry
+        if service_instance._proc_res_id:
+            self.container.resource_registry.delete(service_instance._proc_res_id, del_associations=True)
+
         # Cleanup for specific process types
         if service_instance._proc_type == "service":
-            self.container.resource_registry.delete_association([service_instance._proc_svc_id,
-                "hasProcess", service_instance._proc_res_id])
-
             # Check if this is the last process for this service and do auto delete service resources here
             svcproc_list, _ = self.container.resource_registry.find_objects(service_instance._proc_svc_id,
                 "hasProcess", "Process", id_only=True)
             if not svcproc_list:
-                self.container.resource_registry.delete(service_instance._proc_svc_id)
+                self.container.resource_registry.delete(service_instance._proc_svc_id, del_associations=True)
 
         elif service_instance._proc_type == "agent":
             self.container.directory.unregister_safe("/Agents", service_instance.id)
 
-        # Remove process registration in resource registry
-        if service_instance._proc_res_id:
-            self.container.resource_registry.delete_association([self.cc_id, "hasProcess", service_instance._proc_res_id])
-            self.container.resource_registry.delete(service_instance._proc_res_id)
 
         # Remove internal registration in container
         del self.procs[process_id]
-        if service_instance.name in self.procs_by_name:
-            del self.procs_by_name[service_instance.name]
+        if service_instance._proc_name in self.procs_by_name:
+            del self.procs_by_name[service_instance._proc_name]
         else:
             log.warn("Process name %s not in local registry", service_instance.name)

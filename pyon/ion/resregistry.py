@@ -118,7 +118,7 @@ class ResourceRegistry(object):
             raise BadRequest("The object_ids parameter is empty")
         return self.rr_store.read_mult(object_ids)
 
-    def update(self, object=None):
+    def update(self, object):
         if object is None:
             raise BadRequest("Object not present")
         if not hasattr(object, "_id") or not hasattr(object, "_rev"):
@@ -139,18 +139,23 @@ class ResourceRegistry(object):
 
         return self.rr_store.update(object)
 
-    def delete(self, object_id=''):
+    def retire(self, resource_id):
+        """
+        This is the official "delete" for resource objects: they are set to RETIRED lcstate
+        """
+        self.set_lifecycle_state(resource_id, "RETIRED")
+
+    def delete(self, object_id='', del_associations=False):
         res_obj = self.read(object_id)
         if not res_obj:
             raise NotFound("Resource %s does not exist" % object_id)
 
-        # Delete all owner users.
-        owners,assocs = self.rr_store.find_objects(object_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
-        for aid in assocs:
-            self.rr_store.delete_association(aid)
+        if not del_associations:
+            self._delete_owners(object_id)
+
         res_obj.lcstate = 'RETIRED'
         self.rr_store.update(res_obj)
-        res = self.rr_store.delete(object_id)
+        res = self.rr_store.delete(object_id, del_associations=del_associations)
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
@@ -158,6 +163,12 @@ class ResourceRegistry(object):
                                      mod_type=ResourceModificationType.DELETE)
 
         return res
+
+    def _delete_owners(self, resource_id):
+        # Delete all owner users.
+        owners,assocs = self.rr_store.find_objects(resource_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
+        for aid in assocs:
+            self.rr_store.delete_association(aid)
 
     def execute_lifecycle_transition(self, resource_id='', transition_event=''):
         res_obj = self.read(resource_id)

@@ -56,7 +56,7 @@ def entry():
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
-    print "pycc: ION Container starter with options:" , str(opts)
+    print "pycc: ION Container starter with command line options:" , str(opts)
 
     if opts.daemon:
         # TODO: The daemonizing code may need to be moved inside the Container class (so it happens per-process)

@@ -13,7 +13,7 @@ import unittest
 import numpy
 from nose.plugins.attrib import attr
 from pyon.ion.granule.taxonomy import TaxyTool
-from pyon.ion.granule.granule import build_granule
+from pyon.ion.granule.granule import build_granule, combine_granules
 from pyon.ion.granule.record_dictionary import RecordDictionaryTool
 
 
@@ -76,3 +76,22 @@ class GranuleTestCase(unittest.TestCase):
             else:
                 self.assertEquals(v._rd, rdt[k]._rd)
 
+    def test_combine_granule(self):
+        tt = TaxyTool()
+        tt.add_taxonomy_set('a')
+
+        rdt = RecordDictionaryTool(tt)
+        rdt['a'] = numpy.array([1,2,3])
+
+        granule1 = build_granule('test',tt,rdt)
+
+        rdt = RecordDictionaryTool(tt)
+        rdt['a'] = numpy.array([4,5,6])
+        
+        granule2 = build_granule('test',tt,rdt)
+
+        granule3 = combine_granules(granule1,granule2)
+
+        rdt = RecordDictionaryTool.load_from_granule(granule3)
+
+        self.assertTrue(numpy.allclose(rdt['a'],numpy.array([1,2,3,4,5,6])))

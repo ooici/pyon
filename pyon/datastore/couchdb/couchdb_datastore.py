@@ -20,6 +20,7 @@ from pyon.ion.resource import CommonResourceLifeCycleSM, AT
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.containers import get_ion_ts
+from pyon.util.stats import StatsCounter
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
 # prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
@@ -49,6 +50,8 @@ class CouchDB_DataStore(DataStore):
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
+    _stats = StatsCounter()
+
     def __init__(self, host=None, port=None, datastore_name='prototype', options="", profile=DataStore.DS_PROFILE.BASIC):
         log.debug('__init__(host=%s, port=%s, datastore_name=%s, options=%s)', host, port, datastore_name, options)
         self.host = host or CFG.server.couchdb.host
@@ -175,24 +178,12 @@ class CouchDB_DataStore(DataStore):
         # Save doc.  CouchDB will assign version to doc.
         try:
             res = ds.save(doc)
+            self._count(create=1)
         except ResourceConflict:
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
         id, version = res
         return (id, version)
-
-
-    def _preload_create_doc(self, doc):
-        ds, datastore_name = self._get_datastore()
-        log.debug('Preloading object %s/%s', datastore_name, doc["_id"])
-        log.debug('create doc contents: %s', doc)
-
-        # Save doc.  CouchDB will assign version to doc.
-        try:
-            res = ds.save(doc)
-        except ResourceConflict:
-            raise BadRequest("Object with id %s already exist" % doc["_id"])
-        log.debug('Create result: %s', str(res))
 
     def create_mult(self, objects, object_ids=None, allow_ids=False):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
@@ -221,6 +212,7 @@ class CouchDB_DataStore(DataStore):
         # Update docs.  CouchDB will assign versions to docs.
         db,_ = self._get_datastore()
         res = db.update(docs)
+        self._count(create_mult_call=1, create_mult_obj=len(docs))
         if not all([success for success, oid, rev in res]):
             errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
             log.error('create_doc_mult had errors. Successful: %s, Errors: %s' % (len(res) - len(errors), "\n".join(errors)))
@@ -251,6 +243,7 @@ class CouchDB_DataStore(DataStore):
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         log.debug('read doc contents: %s', doc)
+        self._count(read=1)
         return doc
 
     def read_mult(self, object_ids, datastore_name=""):
@@ -271,6 +264,7 @@ class CouchDB_DataStore(DataStore):
             raise NotFound("\n".join(notfound_list))
 
         doc_list = [row.doc.copy() for row in docs]
+        self._count(read_mult_call=1, read_mult_obj=len(doc_list))
         return doc_list
     
     def update(self, obj, datastore_name=""):
@@ -288,6 +282,7 @@ class CouchDB_DataStore(DataStore):
         log.debug('update doc contents: %s', doc)
         try:
             res = ds.save(doc)
+            self._count(update=1)
         except ResourceConflict:
             raise Conflict('Object not based on most current version')
         log.debug('Update result: %s', str(res))
@@ -298,7 +293,7 @@ class CouchDB_DataStore(DataStore):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
             raise BadRequest("Obj param is not instance of IonObjectBase or string id")
         if type(obj) is str:
-            self.delete_doc(obj, datastore_name=datastore_name)
+            self.delete_doc(obj, datastore_name=datastore_name, del_associations=del_associations)
         else:
             if '_id' not in obj:
                 raise BadRequest("Doc must have '_id'")
@@ -313,9 +308,10 @@ class CouchDB_DataStore(DataStore):
 
         if del_associations:
             assoc_ids = self.find_associations(anyobj=doc_id, id_only=True)
-            for aid in assoc_ids:
-                self.delete(aid, datastore_name=datastore_name)
-            log.debug("Deleted %n associations for object %s", len(assoc_ids), doc_id)
+            self.delete_doc_mult(assoc_ids)
+#            for aid in assoc_ids:
+#                self.delete(aid, datastore_name=datastore_name)
+#            log.info("Deleted %n associations for object %s", len(assoc_ids), doc_id)
 
         elif self._is_in_association(doc_id, datastore_name):
             log.warn("XXXXXXX Attempt to delete object %s that still has associations" % doc_id)
@@ -326,8 +322,20 @@ class CouchDB_DataStore(DataStore):
                 del ds[doc_id]
             else:
                 ds.delete(doc)
+            self._count(delete=1)
         except ResourceNotFound:
             raise NotFound('Object with id %s does not exist.' % doc_id)
+
+    def delete_mult(self, object_ids, datastore_name=None):
+        return self.delete_doc_mult(object_ids, datastore_name)
+
+    def delete_doc_mult(self, object_ids, datastore_name=None):
+        ds, datastore_name = self._get_datastore(datastore_name)
+        obj_list = self.read_doc_mult(object_ids, datastore_name=datastore_name)
+        for obj in obj_list:
+            obj['_deleted'] = True
+        self.create_doc_mult(obj_list, allow_ids=True)
+        self._count(delete_mult_call=1, delete_mult_obj=len(obj_list))
 
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type='H2H'):
         """
@@ -400,6 +408,7 @@ class CouchDB_DataStore(DataStore):
             p=predicate,
             o=object_id, ot=ot, orv=obj._rev,
             ts=get_ion_ts())
+        self._count(create_assoc=1)
         return self.create(assoc, create_unique_association_id())
 
     def delete_association(self, association=''):
@@ -413,8 +422,10 @@ class CouchDB_DataStore(DataStore):
             success = True
             for aid in assoc_id_list:
                 success = success and self.delete(aid)
+            self._count(delete_assoc=1)
             return success
         else:
+            self._count(delete_assoc=1)
             return self.delete(association)
 
     def _get_viewname(self, design, name):
@@ -486,7 +497,7 @@ class CouchDB_DataStore(DataStore):
 
         assoc_ids = self.find_associations(anyobj=obj_id, id_only=True, limit=1)
         if assoc_ids:
-            log.debug("Object found as object in associations: First is %s", assoc_ids)
+            log.debug("Object found as object in associations: %s", assoc_ids)
             return True
 
         return False
@@ -501,6 +512,7 @@ class CouchDB_DataStore(DataStore):
         results = self.query_view(self._get_viewname("association","by_bulk"), view_args)
         ids = [i['value'] for i in results]
         assocs = [i['doc'] for i in results]
+        self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
         if id_only:
             return ids, assocs
         else:
@@ -535,6 +547,7 @@ class CouchDB_DataStore(DataStore):
 
         obj_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
         obj_ids = [assoc.o for assoc in obj_assocs]
+        self._count(find_objects_call=1, find_objects_obj=len(obj_assocs))
 
         log.debug("find_objects() found %s objects", len(obj_ids))
         if id_only:
@@ -572,6 +585,7 @@ class CouchDB_DataStore(DataStore):
 
         sub_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
         sub_ids = [assoc.s for assoc in sub_assocs]
+        self._count(find_subjects_call=1, find_subjects_obj=len(sub_assocs))
 
         log.debug("find_subjects() found %s subjects", len(sub_ids))
         if id_only:
@@ -647,6 +661,7 @@ class CouchDB_DataStore(DataStore):
         else:
             assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
         log.debug("find_associations() found %s associations", len(assocs))
+        self._count(find_assocs_call=1, find_assocs_obj=len(assocs))
         return assocs
 
     def find_resources(self, restype="", lcstate="", name="", id_only=True):
@@ -681,6 +696,7 @@ class CouchDB_DataStore(DataStore):
 
         res_assocs = [dict(type=row['key'][0], lcstate=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_type() found %s objects", len(res_assocs))
+        self._count(find_res_by_type_call=1, find_res_by_type_obj=len(res_assocs))
         if id_only:
             res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
@@ -712,6 +728,7 @@ class CouchDB_DataStore(DataStore):
             res_assocs = [dict(lcstate=row['key'][1], type=row['key'][2], name=row['key'][3], id=row.id) for row in rows]
 
         log.debug("find_res_by_lcstate() found %s objects", len(res_assocs))
+        self._count(find_res_by_lcstate_call=1, find_res_by_lcstate_obj=len(res_assocs))
         if id_only:
             res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
@@ -734,6 +751,7 @@ class CouchDB_DataStore(DataStore):
 
         res_assocs = [dict(name=row['key'][0], type=row['key'][1], lcstate=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_name() found %s objects", len(res_assocs))
+        self._count(find_res_by_name_call=1, find_res_by_name_obj=len(res_assocs))
         if id_only:
             res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)
@@ -785,6 +803,8 @@ class CouchDB_DataStore(DataStore):
                 res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['doc'])) for row in rows]
             else:
                 res_rows = [(row['id'],row['key'],row['doc']) for row in rows]
+
+        self._count(find_by_view_call=1, find_by_view_obj=len(res_rows))
 
         log.info("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
@@ -893,3 +913,6 @@ class CouchDB_DataStore(DataStore):
         #-------------------------------
         return doc
 
+    def _count(self, datastore=None, **kwargs):
+        datastore = datastore or self.datastore_name
+        self._stats.count(namespace=datastore, **kwargs)

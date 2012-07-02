@@ -58,7 +58,7 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(evmsg.description, "hello")
         self.assertAlmostEquals(int(evmsg.ts_created), int(get_ion_ts()), delta=5000)
 
-    def test_pub_with_event_repo(self):
+    def Xtest_pub_with_event_repo(self):
         pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)
         pub.publish_event(origin="specifics", description="hallo")
 
