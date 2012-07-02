@@ -361,6 +361,7 @@ class ObjectModelGenerator:
         decorators = ''
         description = ''
         csv_description = ''
+        class_comment = ''
 
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
@@ -435,8 +436,15 @@ class ObjectModelGenerator:
                     decorators = ''
                     description = ''
                     csv_description = ''
-            elif line and line[0].isalpha():
+            elif line and (line[0].isalpha() or line.startswith("#")):
                 if '!enum' in line:
+                    continue
+                if line.startswith('#'):
+                    dsc = line.strip()[1:]
+                    if not class_comment:
+                        class_comment = dsc
+                    else:
+                        class_comment = class_comment + ' - ' + dsc
                     continue
                 if first_time:
                     first_time = False
@@ -489,7 +497,8 @@ class ObjectModelGenerator:
 
                         csv_description = ''
                         self.csv_types_row_entries.append([current_class, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
-                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment=cgi.escape(current_class_comment), attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
+                        current_class_comment = ''
 
                         datamodelhtmldir = 'interface/object_html'
                         if not os.path.exists(datamodelhtmldir):
@@ -539,7 +548,10 @@ class ObjectModelGenerator:
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
-                self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
+                class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'")+ "\n    '''" if class_comment else ''
+                self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n    def __init__(self"
+                current_class_comment = class_comment
+                class_comment = ''
         if len(args) > 0:
             for arg in args:
                 self.dataobject_output_text += arg
