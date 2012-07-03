@@ -172,10 +172,9 @@ class PolicyDecisionPointManager(object):
         if response is None:
             log.debug('response from PDP contains nothing, so not authorized')
             return Decision.DENY_STR
-        else:
-            for result in response.results:
-                if str(result.decision) == Decision.DENY_STR:
-                    break
+
+        for result in response.results:
+            if result.decision == Decision.DENY_STR:
+                break
 
         return result.decision
-    

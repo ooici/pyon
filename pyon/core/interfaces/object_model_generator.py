@@ -11,6 +11,7 @@ import os
 import re
 import string
 import yaml
+import cgi
 
 from pyon.core.path import list_files_recursive
 from pyon.ion.directory_standalone import DirectoryStandalone
@@ -38,16 +39,24 @@ html_doc_templates = {
     <h3>Class Details</h3>
     <div class='table-wrap'>
       <table class='confluenceTable'>
-        <tr>
-          <th class='confluenceTh'> Object Type: </th>
+        <tr style="padding:5px">
+          <th class='confluenceTh'>Object Type:</th>
           <td class='confluenceTd'>${classname}</td>
         </tr>
         <tr>
-          <th class='confluenceTh'> Base Types: </th>
+          <th class='confluenceTh'>Base Types:</th>
           <td class='confluenceTd'>${baseclasses}</td>
         </tr>
         <tr>
-          <th class='confluenceTh'> Description: </th>
+          <th class='confluenceTh'>Sub Types:</th>
+          <td class='confluenceTd'>${subclasses}</td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'>Decorators:</th>
+          <td class='confluenceTd'>${decorators} </td>
+        </tr>
+        <tr>
+          <th class='confluenceTh'>Description:</th>
           <td class='confluenceTd'>${classcomment} </td>
         </tr>
       </table>
@@ -63,10 +72,11 @@ html_doc_templates = {
     <div class='table-wrap'>
       <table class='confluenceTable'>
         <tr>
-          <th class='confluenceTh'> Name </th>
-          <th class='confluenceTh'> Type </th>
-          <th class='confluenceTh'> Default </th>
-          <th class='confluenceTh'> Description </th>
+          <th class='confluenceTh'>Name</th>
+          <th class='confluenceTh'>Type</th>
+          <th class='confluenceTh'>Default</th>
+          <th class='confluenceTh'>Decorators</th>
+          <th class='confluenceTh'>Description</th>
         </tr>
         ${attrtableentries}
       </table>
@@ -83,11 +93,11 @@ ${super_class_attr_tables}
     <div class='table-wrap'>
       <table class='confluenceTable'>
         <tr>
-          <th class='confluenceTh'> Subject </th>
-          <th class='confluenceTh'> Predicate </th>
-          <th class='confluenceTh'> Object </th>
-          <th class='confluenceTh'> Constraints </th>
-          <th class='confluenceTh'> Description </th>
+          <th class='confluenceTh'>Subject</th>
+          <th class='confluenceTh'>Predicate</th>
+          <th class='confluenceTh'>Object</th>
+          <th class='confluenceTh'>Constraints</th>
+          <th class='confluenceTh'>Description</th>
         </tr>
         ${assoctableentries}
       </table>
@@ -102,7 +112,8 @@ ${super_class_attr_tables}
           <td class='confluenceTd'>${attrname}</td>
           <td class='confluenceTd'>${type}</td>
           <td class='confluenceTd'>${default}</td>
-          <td class='confluenceTd'> ${attrcomment} </td>
+          <td class='confluenceTd'>${decorators}</td>
+          <td class='confluenceTd'>${attrcomment}</td>
         </tr>''',
 'association_table_entry':
 '''<tr>
@@ -119,16 +130,17 @@ ${super_class_attr_tables}
     <div class='table-wrap'>
       <table class='confluenceTable'>
         <tr>
-          <th class='confluenceTh'> Name </th>
-          <th class='confluenceTh'> Type </th>
-          <th class='confluenceTh'> Default </th>
-          <th class='confluenceTh'> Description </th>
+          <th class='confluenceTh'>Name</th>
+          <th class='confluenceTh'>Type</th>
+          <th class='confluenceTh'>Default</th>
+          <th class='confluenceTh'>Decorators</th>
+          <th class='confluenceTh'>Description</th>
         </tr>
         ${superclassattrtableentries}
       </table>
     </div>
   </div>
-</div>'''
+</div>''',
 }
 
 html_doc_templates = dict(((k, string.Template(v)) for k, v in html_doc_templates.iteritems()))
@@ -147,7 +159,7 @@ ${rowentries}
 ''',
 'object_attributes_row_entry':
 '''${classname},${name},${type},${default},${description}
-'''
+''',
 }
 
 csv_doc_templates = dict(((k, string.Template(v)) for k, v in csv_doc_templates.iteritems()))
@@ -165,6 +177,7 @@ class ObjectModelGenerator:
         self.system_name = system_name
         self.read_from_yaml_file = read_from_yaml_file
         self.obj_data = {}
+        self._associations = None
 
     def generate(self, opts):
         '''
@@ -184,6 +197,9 @@ class ObjectModelGenerator:
         self.generate_objects(opts)
         # Write to the objects.py file
         self.write_files(opts)
+        # Generate the HTML files related
+        if opts.objectdoc:
+            self.generate_object_specs()
 
     def read_yaml_text(self):
         '''
@@ -347,6 +363,7 @@ class ObjectModelGenerator:
         current_class_def_dict = None
         schema_extended = False
         current_class_schema = ""
+        current_class_comment = ""
         current_class = ""
         super_class = "IonObjectBase"
         args = []
@@ -357,10 +374,12 @@ class ObjectModelGenerator:
         decorators = ''
         description = ''
         csv_description = ''
+        class_comment = ''
 
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
                 continue
+
             elif line.startswith('  #'):
                 # Check for decorators tag
                 if len(line) > 4 and line.startswith('  #@'):
@@ -422,7 +441,7 @@ class ObjectModelGenerator:
                             args.append(field + "=" + converted_value)
                             init_lines.append('        self.' + field + " = " + field + "\n")
                     fields.append(field)
-                    field_details.append((field, value_type, converted_value, csv_description))
+                    field_details.append((field, value_type, converted_value, csv_description, decorators))
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     else:
@@ -430,71 +449,20 @@ class ObjectModelGenerator:
                     decorators = ''
                     description = ''
                     csv_description = ''
-            elif line and line[0].isalpha():
+            elif line and (line[0].isalpha() or line.startswith("#")):
                 if '!enum' in line:
+                    continue
+                if line.startswith('#'):
+                    dsc = line[1:].strip()
+                    if not class_comment:
+                        class_comment = dsc
+                    else:
+                        class_comment = class_comment + ' ' + dsc
                     continue
                 if first_time:
                     first_time = False
                 else:
-                    if opts.objectdoc:
-                        attrtableentries = ""
-                        field_details.sort()
-                        for field_detail in field_details:
-                            attrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=field_detail[0], type=field_detail[1].replace("'", '"'), default=field_detail[2].replace("'", '"'), attrcomment="")
-                            self.csv_attributes_row_entries.append([current_class, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
-
-                        related_associations = self.lookup_associations(current_class)
-                        assoctableentries = ""
-
-                        for assoc in related_associations:
-                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=assoc[0], predicate=assoc[1], object=assoc[2], constraints="", description="")
-                        for assockey in related_associations:
-                            assoctableentries += html_doc_templates['association_table_entry'].substitute(subject=str(related_associations[assockey]["domain"]).replace("'", ""), predicate=assockey, object=str(related_associations[assockey]["range"]).replace("'", ""), constraints="", description="")
-
-                        # Determine if class is object or resource
-                        def get_class_type(clzzname):
-                            while clzzname != "IonObjectBase":
-                                if clzzname == "Resource":
-                                    return "resource"
-                                clzzname = self.class_args_dict[clzzname]["extends"]
-                            return "object"
-
-                        super_classes = ""
-                        sup = super_class
-                        super_class_attribute_tables = ""
-                        class_type = get_class_type(sup)
-                        while sup != "IonObjectBase":
-                            sup_class_type = get_class_type(sup)
-                            anchor = ""
-                            if sup_class_type == "resource":
-                                anchor = '<a href="Resource+Spec+for+' + sup + '">' + sup + '</a>'
-                            else:
-                                anchor = '<a href="Object+Spec+for+' + sup + '">' + sup + '</a>'
-                            super_classes += anchor + ', '
-                            fld_details = self.class_args_dict[sup]["field_details"]
-                            superclassattrtableentries = ""
-                            fld_details.sort()
-                            for fld_detail in fld_details:
-                                superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'), default=fld_detail[2].replace("'", '"'), attrcomment="")
-                            super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(super_class_name=anchor, superclassattrtableentries=superclassattrtableentries)
-                            sup = self.class_args_dict[sup]["extends"]
-                        super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
-
-                        csv_description = ''
-                        self.csv_types_row_entries.append([current_class, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
-                        doc_output = html_doc_templates['obj_doc'].substitute(classname=current_class, baseclasses=super_classes, classcomment="", attrtableentries=attrtableentries, super_class_attr_tables=super_class_attribute_tables, assoctableentries=assoctableentries)
-
-                        datamodelhtmldir = 'interface/object_html'
-                        if not os.path.exists(datamodelhtmldir):
-                            os.makedirs(datamodelhtmldir)
-                        datamodelhtmlfile = os.path.join(datamodelhtmldir, current_class + ".html")
-                        try:
-                            os.unlink(datamodelhtmlfile)
-                        except:
-                            pass
-                        with open(datamodelhtmlfile, 'w') as f:
-                            f.write(doc_output)
-                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class}
+                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators':""}
                     for arg in args:
                         self.dataobject_output_text += arg
                     self.dataobject_output_text += "):\n"
@@ -532,7 +500,10 @@ class ObjectModelGenerator:
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
-                self.dataobject_output_text += "class " + line + "):\n\n    def __init__(self"
+                class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'")+ "\n    '''" if class_comment else ''
+                self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n    def __init__(self"
+                current_class_comment = class_comment
+                class_comment = ''
         if len(args) > 0:
             for arg in args:
                 self.dataobject_output_text += arg
@@ -545,25 +516,143 @@ class ObjectModelGenerator:
             else:
                 self.dataobject_output_text += current_class_schema + "\n              }\n"
 
-    def lookup_associations(self, classname):
+    def generate_object_specs(self):
+        datamodelhtmldir = 'interface/object_html'
+        if not os.path.exists(datamodelhtmldir):
+            os.makedirs(datamodelhtmldir)
+
+        for objname, objschema in self.class_args_dict.iteritems():
+            field_details = objschema["field_details"]
+            super_class = objschema["extends"]
+            attrtableentries = ""
+            field_details.sort()
+            for field_detail in field_details:
+                att_comments = cgi.escape(field_detail[3].strip(' ,#').replace('#',''))
+                attrtableentries += html_doc_templates['attribute_table_entry'].substitute(
+                    attrname=field_detail[0], type=field_detail[1].replace("'", '"'),
+                    default=field_detail[2].replace("'", '"'),
+                    decorators=cgi.escape(field_detail[4]),
+                    attrcomment=att_comments)
+                self.csv_attributes_row_entries.append([objname, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
+
+            related_associations = self._lookup_associations(objname)
+            assoctableentries = "".join([html_doc_templates['association_table_entry'].substitute(
+                subject=str(assocval["domain"]).replace("'", ""),
+                predicate=assockey,
+                object=str(assocval["range"]).replace("'", ""),
+                description=str(assocval["docstring"]).replace("'", ""),
+                constraints=str(assocval.get("cardinality", "n,n"))) for assockey, assocval in related_associations.iteritems()])
+
+            super_classes = ""
+            sub_classes = ""
+            sup = super_class
+            super_class_attribute_tables = ""
+            class_type = self._get_class_type(sup)
+            while sup != "IonObjectBase":
+                sup_class_type = self._get_class_type(sup)
+                if sup_class_type == "resource":
+                    anchor = '<a href="Resource+Spec+for+' + sup + '.html">' + sup + '</a>'
+                else:
+                    anchor = '<a href="Object+Spec+for+' + sup + '.html">' + sup + '</a>'
+                super_classes += anchor + ', '
+                fld_details = self.class_args_dict[sup]["field_details"]
+                superclassattrtableentries = ""
+                fld_details.sort()
+                for fld_detail in fld_details:
+                    att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#',''))
+                    superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(
+                        attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'),
+                        default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]),
+                        attrcomment=att_comments)
+                super_class_attribute_tables += html_doc_templates['super_class_attribute_table'].substitute(
+                    super_class_name=anchor,
+                    superclassattrtableentries=superclassattrtableentries)
+                sup = self.class_args_dict[sup]["extends"]
+            super_classes += '<a href="Object+Spec+for+IonObjectBase">IonObjectBase</a>'
+
+            for okey, oval in self.class_args_dict.iteritems():
+                if oval['extends'] == objname:
+                    otype = self._get_class_type(okey)
+                    if otype == "resource":
+                        sub_classes += '<a href="Resource+Spec+for+' + okey + '.html">' + okey + '</a>' + ', '
+                    else:
+                        sub_classes += '<a href="Object+Spec+for+' + okey + '.html">' + okey + '</a>' + ', '
+            if sub_classes:
+                sub_classes = sub_classes[:-2]
+
+            csv_description = objschema['description']
+            self.csv_types_row_entries.append([objname, class_type, super_class, csv_description.strip(' ,#').replace('#','')])
+            doc_output = html_doc_templates['obj_doc'].substitute(
+                classname=objname, baseclasses=super_classes, subclasses=sub_classes,
+                classcomment=cgi.escape(objschema["description"]), decorators=objschema["decorators"],
+                attrtableentries=attrtableentries,
+                super_class_attr_tables=super_class_attribute_tables,
+                assoctableentries=assoctableentries)
+
+            datamodelhtmlfile = os.path.join(datamodelhtmldir, objname + ".html")
+            try:
+                os.unlink(datamodelhtmlfile)
+            except:
+                pass
+            with open(datamodelhtmlfile, 'w') as f:
+                f.write(doc_output)
+
+
+        datadir = 'interface'
+        objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
+        try:
+            os.unlink(objecttypecsvfile)
+        except:
+            pass
+        print " Writing object type csv to '" + objecttypecsvfile + "'"
+        csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
+            quotechar='"', quoting=csv.QUOTE_ALL)
+        csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
+        csv_file.writerows(self.csv_types_row_entries)
+
+        objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
+        try:
+            os.unlink(objectattrscsvfile)
+        except:
+            pass
+        print " Writing object attribute csv to '" + objectattrscsvfile + "'"
+        csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
+            quotechar='"', quoting=csv.QUOTE_ALL)
+        csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
+        csv_file.writerows(self.csv_attributes_row_entries)
+
+    def _lookup_associations(self, classname):
+        """
+        Returns dict of associations for given object type (not base types)
+        """
         from pyon.util.config import Config
         from pyon.util.containers import DotDict
-        Predicates = DotDict()
-        Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
+        if not self._associations:
+            self._associations = DotDict()
+            assoc_defs = Config(["res/config/associations.yml"]).data['AssociationDefinitions']
+            self._associations.update((ad['predicate'], ad) for ad in assoc_defs)
         output = {}
-        for key in Predicates:
-            domain = str(Predicates[key]["domain"])
-            range = str(Predicates[key]["range"])
-            if classname in domain:
-                output[key] = Predicates[key]
-            if classname in range:
-                output[key] = Predicates[key]
+        for key in self._associations:
+            domain = str(self._associations[key]["domain"])
+            range = str(self._associations[key]["range"])
+            if classname in domain or classname in range:
+                output[key] = self._associations[key]
         return output
 
+    # Determine if class is object or resource or event
+    def _get_class_type(self, clzzname):
+        while clzzname != "IonObjectBase":
+            if clzzname == "Resource":
+                return "resource"
+            elif clzzname == "Event":
+                return "event"
+            clzzname = self.class_args_dict[clzzname]["extends"]
+        return "object"
+
     def convert_val(self, value):
-        '''
+        """
         Recursively generates right hand value for a class attribute.
-        '''
+        """
         if isinstance(value, list):
             outline = '['
             first_time = True
@@ -611,25 +700,3 @@ class ObjectModelGenerator:
         with open(datamodelfile, 'w') as f:
             f.write(self.dataobject_output_text)
 
-        if opts.objectdoc:
-            objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
-            try:
-                os.unlink(objecttypecsvfile)
-            except:
-                pass
-            print " Writing object type csv to '" + objecttypecsvfile + "'"
-            csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
-                quotechar='"', quoting=csv.QUOTE_ALL)
-            csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
-            csv_file.writerows(self.csv_types_row_entries)
-
-            objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
-            try:
-                os.unlink(objectattrscsvfile)
-            except:
-                pass
-            print " Writing object attribute csv to '" + objectattrscsvfile + "'"
-            csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
-                quotechar='"', quoting=csv.QUOTE_ALL)
-            csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
-            csv_file.writerows(self.csv_attributes_row_entries)
