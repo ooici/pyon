@@ -63,8 +63,6 @@ class IonIntegrationTestCase(unittest.TestCase):
         # For integration tests, if class variable "service_dependencies" exists
         self._start_dependencies()
 
-        if CFG.get_safe('system.elasticsearch'):
-            self.addCleanup(self._clean_es)
 
     def _stop_container(self):
         if self.container:
@@ -164,48 +162,4 @@ class IonIntegrationTestCase(unittest.TestCase):
 
         finally:
             datastore.close()
-
-    def _clean_es(self):
-        from pyon.core.bootstrap import get_sys_name
-        import elasticpy as ep
-        indexes = [ 
-            '%s_sites_index' % get_sys_name().lower()           ,
-            '%s_agents_index' % get_sys_name().lower()          ,
-            '%s_agents_instance_index' % get_sys_name().lower() ,
-            '%s_devices_index' % get_sys_name().lower()         ,
-            '%s_models_index' % get_sys_name().lower()          ,
-            '%s_data_products_index' % get_sys_name().lower()   ,
-            '%s_searches_and_catalogs' % get_sys_name().lower() ,
-            '%s_users_index' % get_sys_name().lower()           ,
-            '%s_resources_index' % get_sys_name().lower() ,
-            '%s_events_index'    % get_sys_name().lower()
-        ]
-
-        es_host = CFG.get_safe('server.elasticsearch.host', 'localhost')
-        es_port = CFG.get_safe('server.elasticsearch.port', '9200')
-        es = ep.ElasticSearch(
-            host=es_host,
-            port=es_port,
-            timeout=10
-        )
-        for index in indexes:
-            self._es_call(es.river_couchdb_delete,index)
-            self._es_call(es.index_delete,index)
-
-
-    @staticmethod
-    def _es_call(es, *args, **kwargs):
-        from gevent.event import AsyncResult
-        from gevent import Timeout
-        from gevent import spawn as gspawn
-        import pyon.core.exception as exceptions
-        res = AsyncResult()
-        def async_call(es, *args, **kwargs):
-            res.set(es(*args,**kwargs))
-        gspawn(async_call,es,*args,**kwargs)
-        try:
-            retval = res.get(timeout=10)
-        except Timeout:
-            raise exceptions.Timeout("Call to ElasticSearch timed out.")
-        return retval
 
