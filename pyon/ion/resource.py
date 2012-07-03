@@ -48,7 +48,11 @@ lcs_workflows = {}
 
 def get_predicate_type_list():
     Predicates.clear()
-    Predicates.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
+    assoc_defs = Config(["res/config/associations.yml"]).data['AssociationDefinitions']
+    for ad in assoc_defs:
+        if ad['predicate'] in Predicates:
+            raise Inconsistent('Predicate %s defined multiple times in associations.yml' % ad['predicate'])
+        Predicates[ad['predicate']] = ad
     return Predicates.keys()
 
 def get_compound_associations_list():

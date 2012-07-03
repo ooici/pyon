@@ -536,11 +536,12 @@ class ObjectModelGenerator:
                 self.csv_attributes_row_entries.append([objname, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
             related_associations = self._lookup_associations(objname)
-            assoctableentries = "".join([html_doc_templates['association_table_entry'].
-                                         substitute(subject=str(assocval["domain"]).replace("'", ""),
+            assoctableentries = "".join([html_doc_templates['association_table_entry'].substitute(
+                subject=str(assocval["domain"]).replace("'", ""),
                 predicate=assockey,
                 object=str(assocval["range"]).replace("'", ""),
-                constraints="", description="") for assockey, assocval in related_associations.iteritems()])
+                description=str(assocval["docstring"]).replace("'", ""),
+                constraints=str(assocval.get("cardinality", "n,n"))) for assockey, assocval in related_associations.iteritems()])
 
             super_classes = ""
             sub_classes = ""
@@ -628,7 +629,8 @@ class ObjectModelGenerator:
         from pyon.util.containers import DotDict
         if not self._associations:
             self._associations = DotDict()
-            self._associations.update(Config(["res/config/associations.yml"]).data['PredicateTypes'])
+            assoc_defs = Config(["res/config/associations.yml"]).data['AssociationDefinitions']
+            self._associations.update((ad['predicate'], ad) for ad in assoc_defs)
         output = {}
         for key in self._associations:
             domain = str(self._associations[key]["domain"])

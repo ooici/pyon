@@ -21,7 +21,7 @@ class ObjectTest(IonIntegrationTestCase):
         obj = self.registry.new('SampleObject')
         
         self.assertEqual(obj.name, '')
-        self.assertEqual(obj.time, "2011-07-27T02:59:43.1Z")
+        self.assertEqual(obj.time, "1341269890404")
 
     def test_validate(self):
         obj = self.registry.new('SampleObject')
