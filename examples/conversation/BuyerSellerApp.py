@@ -8,21 +8,11 @@ from pyon.net.conversation import ConversationOriginator, Conversation, Principa
 
 def buyer_app():
     node, ioloop_process = messaging.make_node()
-    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue26'))
-    print 'Create originator'
+    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue42'))
     c = originator.start_conversation('protocol', 'buyer')
-    print 'Start conversation'
-    c.invite('seller', NameTrio('seller', 'seller_queue66'))
-    print 'invite'
+    c.invite('seller', NameTrio('seller', 'seller_queue82'))
     c.send('seller', 'Hello1')
-    print 'It is send'
-    #msg, header =  c.recv('seller')
-    #print 'Msg received: %s' %(msg)
-    print 'Now I will send'
-    #for i in range(0, 10):
-    c.send('seller', 'Hello%s' %1)
-    print 'Done with sending'
-    #for i in range(0, 10):
+    c.send('seller', 'Hello%s' %2)
     msg, header = c.recv('seller')
     print 'Msg received: %s' %(msg)
     c.close()
@@ -30,22 +20,16 @@ def buyer_app():
 
 def seller_app():
     node, ioloop_process = messaging.make_node()
-    local = Principal(node, NameTrio('seller', 'seller_queue66'))
-    print 'Create principal'
+    local = Principal(node, NameTrio('seller', 'seller_queue82'))
     local.spawn_listener()
-    print 'Start listen'
-    c  = local.get_invitation(auto_reply= True)
-    print 'get Invitation'
+    conv, msg, header  = local.get_invitation()
+    c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    #c.send('buyer', 'I am joining')
-    print 'Msg received: %s' %(msg)
-    #for i in range(0, 10):
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    #for i in range(0, 10):
-    c.send('buyer', 'Hello%s' %2)
-    c.close()
+    c.send('buyer', 'Hello%s' %3)
+    c.close() # should do some cleaning
     local.stop_listening()
 
 
