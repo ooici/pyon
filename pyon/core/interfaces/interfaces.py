@@ -44,7 +44,7 @@ class InterfaceAdmin:
         for local_dsn in datastores:
             if not ds.exists_datastore(local_dsn):
                 ds.create_datastore(local_dsn)
-                # NOTE: Views are created by containers' DatastoreManager
+                # NOTE: Views and other datastores are created by containers' DatastoreManager
 
     def store_config(self, system_cfg):
         """
@@ -73,14 +73,13 @@ class InterfaceAdmin:
             self.store_service_interfaces(file=service_definition_file)
         else:
             if self.idempotent:
-                de = self.rr.find_by_type("ServiceDefinition", limit=1)
+                de = self.rr.find_by_type("ServiceDefinition", id_only=True, limit=1)
                 if de:
                     #print "store_interfaces: Interfaces already stored. Ignoring"
                     return
-            # load all definitions
+            # load all files
             self.store_object_interfaces()
             self.store_service_interfaces()
-
             self.store_config_files()
 
         self._register_bulk()
@@ -167,20 +166,10 @@ class InterfaceAdmin:
                 self.bulk_entries[(self.DIR_RESFILES_PATH, key)] = dict(file_path=file_path, definition=objs[key])
 
     def _create_object_type(self, name, definition, definition_order):
-        return dict(type_="ObjectType", name=name, description="",
-            definition=definition, definition_order=definition_order,
-            definition_type="ion_obj_yml_1", object_type=1, object_version=1)
+        return dict(type_="ObjectType", name=name, definition=definition, definition_order=definition_order)
 
     def _create_service_definition(self, name, definition, namespace):
-        return dict(type_="ServiceDefinition", name=name, description="",
-            definition=definition, namespace=namespace,
-            definition_type="ion_svc_yml_1", operations=[])
-
-    def _create_resource_type(self, name):
-        return dict(type_="ResourceType", name=name, description="")
-
-    def _create_association(self, subid, pred, objid):
-        return dict(type_="Association", s=subid)
+        return dict(type_="ServiceDefinition", name=name, definition=definition, namespace=namespace)
 
     def _register_bulk(self):
         print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
@@ -193,30 +182,6 @@ class InterfaceAdmin:
         self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"
-
-
-    def initialize_ion_system_core(self):
-        new_resources = []
-        # ION org
-        ion_org = self._create_org()
-        new_resources.append(ion_org)
-
-        # ION exchange space
-        ion_xs = None
-
-        # ION actor
-        actor_name = get_safe(self.config, "system.system_actor", "ionsystem")
-        sys_actor = self._create_actor_identity(actor_name, "ION System Agent")
-        new_resources.append(sys_actor)
-
-        print "store_interfaces: Initializing %s core system resources in registry..." % len(new_resources)
-        res = self.rr.create_mult(new_resources)
-
-    def _create_org(self, name, desc):
-        return dict(type_="Org", name=name, description=desc)
-
-    def _create_actor_identity(self, name):
-        return dict(type_="ActorIdentity", name=name)
 
 #
 #def change_config():
@@ -233,6 +198,9 @@ class InterfaceAdmin:
 
         self._assert_existence("/", "Containers",
             description="Running containers are registered here")
+
+        self._assert_existence("/", "ObjectTypes",
+            description="ObjectTypes are registered here")
 
         self._assert_existence("/", "Org",
             description="Org specifics are registered here",
