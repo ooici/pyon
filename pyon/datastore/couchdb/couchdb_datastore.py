@@ -412,7 +412,7 @@ class CouchDB_DataStore(DataStore):
             p=predicate,
             o=object_id, ot=ot, orv=obj._rev,
             ts=get_ion_ts())
-        self._count(create_assoc=1)
+        self._count(_create_assoc=1)
         return self.create(assoc, create_unique_association_id())
 
     def delete_association(self, association=''):
@@ -426,10 +426,10 @@ class CouchDB_DataStore(DataStore):
             success = True
             for aid in assoc_id_list:
                 success = success and self.delete(aid)
-            self._count(delete_assoc=1)
+            self._count(_delete_assoc=1)
             return success
         else:
-            self._count(delete_assoc=1)
+            self._count(_delete_assoc=1)
             return self.delete(association)
 
     def _get_viewname(self, design, name):

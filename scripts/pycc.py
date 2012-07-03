@@ -197,7 +197,7 @@ def main(opts, *args, **kwargs):
         # Auto-bootstrap interfaces
         # @WARN: This currently imports ALL modules, executing ALL static initializers as side effect!!!!!!!
         if bootstrap_config.system.auto_bootstrap:
-            iadm.store_interfaces(store_bulk=True, idempotent=True)
+            iadm.store_interfaces(idempotent=True)
 
         if opts.no_container:
             print "pycc: no_container=True. Stopping here."

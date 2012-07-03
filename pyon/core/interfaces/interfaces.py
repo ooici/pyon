@@ -45,10 +45,11 @@ class InterfaceAdmin:
         """
         Main entry point into storing system config
         """
-        print "Storing system config in datastore..."
         de = self.dir.lookup(self.DIR_CONFIG_PATH + "/CFG")
         if de:
-            print "store_interfaces: WARN: Config already exists. Overwrite"
+            #print "store_interfaces: WARN: Config already exists. Overwrite"
+            return
+        print "store_interfaces: Storing system config in directory..."
         self.dir.register(self.DIR_CONFIG_PATH, "CFG", **system_cfg.copy())
 
     def store_interfaces(self, object_definition_file=None,
@@ -67,8 +68,8 @@ class InterfaceAdmin:
             self.store_service_interfaces(file=service_definition_file)
         else:
             if self.idempotent:
-                de = self.dir.lookup(self.DIR_SERVICEDEF_PATH)
-                if de is not None:
+                de = self.rr.find_by_type("ServiceDefinition", limit=1)
+                if de:
                     #print "store_interfaces: Interfaces already stored. Ignoring"
                     return
             # load all files
@@ -166,11 +167,11 @@ class InterfaceAdmin:
         return dict(type_="ServiceDefinition", name=name, definition=definition, namespace=namespace)
 
     def _register_bulk(self):
-        print "store_interfaces: Storing %s entries in directory (bulk)..." % len(self.bulk_entries)
+        print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
         res = self.dir.register_mult(entries)
 
-        print "store_interfaces: Storing %s resources in registry (bulk)..." % len(self.bulk_resources)
+        print "store_interfaces: Storing %s resources in registry..." % len(self.bulk_resources)
         res = self.rr.create_mult(self.bulk_resources)
 
         print "store_interfaces: Storing interfaces successful"

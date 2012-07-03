@@ -107,11 +107,14 @@ class ResourceRegistryStandalone(object):
             ts=get_ion_ts())
         return self.datastore.create_doc(assoc, create_unique_association_id())
 
-    def find_by_type(self, restype, **kwargs):
+    def find_by_type(self, restype, id_only=False, **kwargs):
         start_key = [restype]
         end_key = [restype]
         res = self.datastore.find_docs_by_view('resource', 'by_type',
-            start_key=start_key, end_key=end_key, id_only=False, **kwargs)
+            start_key=start_key, end_key=end_key, id_only=id_only, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        if id_only:
+            match = [docid for docid, indexkey, doc in res]
+        else:
+            match = [doc for docid, indexkey, doc in res]
         return match

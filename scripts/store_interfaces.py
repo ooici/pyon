@@ -46,7 +46,7 @@ def main():
     options, extra = parser.parse_known_args()
     args, command_line_config = parse_args(extra)
 
-    print "store_configuration: Storing ION config and interfaces in datastore, with options:" , str(options)
+    print "store_interfaces: Storing ION config and interfaces in datastore, with options:" , str(options)
 
     # -------------------------------------------------------------------------
     # Store config and interfaces
@@ -66,7 +66,7 @@ def main():
     # Delete sysname datastores if option "force_clean" is set
     if options.force_clean:
         from pyon.datastore import clear_couch_util
-        print "store_configuration: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
+        print "store_interfaces: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
         clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
 

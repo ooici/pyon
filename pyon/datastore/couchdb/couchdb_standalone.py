@@ -420,7 +420,7 @@ class CouchDataStore(object):
         @brief Generic find function using an defined index
         @retval Returns a list of triples: (att_id, index_row, Attachment object or none)
         """
-        log.debug("find_docs_by_view(%s/%s)",design_name, view_name)
+        #log.debug("find_docs_by_view(%s/%s)",design_name, view_name)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
@@ -433,15 +433,15 @@ class CouchDataStore(object):
         view = ds.view(view_doc, **view_args)
         if key is not None:
             rows = view[key]
-            log.info("find_docs_by_view(): key=%s" % key)
+            #log.info("find_docs_by_view(): key=%s" % key)
         elif keys:
             rows = view
-            log.info("find_docs_by_view(): keys=%s" % keys)
+            #log.info("find_docs_by_view(): keys=%s" % keys)
         elif start_key and end_key:
             startkey = start_key or []
             endkey = list(end_key) or []
             endkey.append(END_MARKER)
-            log.info("find_docs_by_view(): start_key=%s to end_key=%s" % (startkey, endkey))
+            #log.info("find_docs_by_view(): start_key=%s to end_key=%s" % (startkey, endkey))
             if view_args.get('descending', False):
                 rows = view[endkey:startkey]
             else:
@@ -454,5 +454,5 @@ class CouchDataStore(object):
         else:
             res_rows = [(row['id'], row['key'], row['doc']) for row in rows]
 
-        log.info("find_docs_by_view() found %s objects" % (len(res_rows)))
+        #log.info("find_docs_by_view() found %s objects" % (len(res_rows)))
         return res_rows

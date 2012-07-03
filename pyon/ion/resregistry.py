@@ -34,8 +34,6 @@ class ResourceRegistry(object):
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
-        self._init()
-
         self.event_pub = EventPublisher()
 
     def close(self):
@@ -43,21 +41,6 @@ class ResourceRegistry(object):
         Pass-through method to close the underlying datastore.
         """
         self.rr_store.close()
-
-    def _init(self):
-        res_list,_ = self.find_resources(RT.ServiceDefinition, id_only=True)
-        auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
-        if not res_list and auto_bootstrap:
-            self._register_service_definitions()
-
-    def _register_service_definitions(self):
-        from pyon.core.bootstrap import get_service_registry
-        svc_list = []
-        for svcname, svc in get_service_registry().services.iteritems():
-            svc_def = ServiceDefinition(name=svcname, definition="")
-            svc_list.append(svc_def)
-        self._create_mult(svc_list)
-        log.info("Created %d ServiceDefinition resources" % len(svc_list))
 
     def create(self, object=None, actor_id=None):
         if object is None:
