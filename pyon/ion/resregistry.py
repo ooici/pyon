@@ -113,7 +113,7 @@ class ResourceRegistry(object):
 
         return self.rr_store.read(object_id, rev_id)
 
-    def read_mult(self, object_ids=[]):
+    def read_mult(self, object_ids=None):
         if not object_ids:
             raise BadRequest("The object_ids parameter is empty")
         return self.rr_store.read_mult(object_ids)

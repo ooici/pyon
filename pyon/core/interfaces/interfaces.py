@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Script to store configuration and interfaces into the directory"""
+"""Script to store configuration and interfaces into the directory and resource registry"""
 
 __author__ = 'Seman Said, Michael Meisinger'
 
@@ -12,6 +12,7 @@ import argparse
 from pyon.core.path import list_files_recursive
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
+from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
 
 
 class InterfaceAdmin:
@@ -19,8 +20,6 @@ class InterfaceAdmin:
     Administrates work with interfaces in the datastore
     """
 
-    DIR_OBJECTTYPES_PATH = "/ObjectTypes"
-    DIR_SERVICEDEF_PATH = "/ServiceInterfaces"
     DIR_RESFILES_PATH = "/Config"
     DIR_CONFIG_PATH = "/Config"
 
@@ -28,6 +27,7 @@ class InterfaceAdmin:
         self.sysname = sysname
         self.config = config
         self.dir = DirectoryStandalone(sysname=self.sysname, config=config)
+        self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=config)
 
     def create_core_datastores(self):
         """
@@ -52,31 +52,19 @@ class InterfaceAdmin:
         self.dir.register(self.DIR_CONFIG_PATH, "CFG", **system_cfg.copy())
 
     def store_interfaces(self, object_definition_file=None,
-                         service_definition_file=None, store_bulk=True, idempotent=False):
+                         service_definition_file=None, idempotent=False):
         """
         Main entry point into storing interfaces
         """
-        self.object_definition_file = object_definition_file
-        self.service_definition_file = service_definition_file
-        self.store_bulk = store_bulk
         self.idempotent = idempotent
         self.bulk_entries = {}
+        self.bulk_resources = []
         self.serial_num = 1
 
-        if self.service_definition_file:
-            if os.path.exists(self.service_definition_file):
-                self.load_from_files(self.DIR_SERVICEDEF_PATH,
-                    [self.service_definition_file],
-                    self.get_service_file_content)
-            else:
-                print "store_interfaces: Error couldn't find the file path\n"
-        elif self.object_definition_file:
-            if os.path.exists(self.object_definition_file):
-                self.load_from_files(self.DIR_OBJECTTYPES_PATH,
-                    [self.object_definition_file],
-                    self.get_object_file_content())
-            else:
-                print "store_interfaces: Error couldn't find the file path\n"
+        if object_definition_file:
+            self.store_object_interfaces(file=object_definition_file)
+        elif service_definition_file:
+            self.store_service_interfaces(file=service_definition_file)
         else:
             if self.idempotent:
                 de = self.dir.lookup(self.DIR_SERVICEDEF_PATH)
@@ -84,163 +72,108 @@ class InterfaceAdmin:
                     #print "store_interfaces: Interfaces already stored. Ignoring"
                     return
             # load all files
-            self.store_config_files()
             self.store_object_interfaces()
             self.store_service_interfaces()
+            self.store_config_files()
 
-        if self.store_bulk:
-            self._register_bulk()
+        self._register_bulk()
+
+    def store_object_interfaces(self, file=None):
+        #print "\nStoring object interfaces in datastore..."
+        if file and os.path.exists(file):
+            self._load_object_files([file])
+        elif file:
+            print "store_interfaces: Error couldn't find the file path\n"
+        else:
+            data_yaml_filenames = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
+            self._load_object_files(data_yaml_filenames)
+
+    def _load_object_files(self, filenames):
+        serial_num = 1
+        for file_path in filenames:
+            objs = OrderedDict()
+            class_content = ''
+
+            # Open and read data model definition file
+            with open(file_path, 'r') as f:
+                file_content_str = f.read()
+
+            first_time = True
+            for line in file_content_str.split('\n'):
+                if len(line) > 0 and (line[0].isalpha()):
+                    if not first_time:
+                        objs[classname] = class_content
+                        class_content = ""
+                    else:
+                        first_time = False
+                    classname = line.split(':')[0]
+                    class_content += line + "\n"
+                else:
+                    class_content += line + "\n"
+            objs[classname] = class_content
+
+            for key in objs.keys():
+                obj_type = self._create_object_type(key, objs[key], serial_num)
+                self.bulk_resources.append(obj_type)
+                serial_num += 1
+
+    def store_service_interfaces(self, file=None):
+        #print "\nStoring service interfaces in datastore..."
+        if file and os.path.exists(file):
+            self._load_service_files([file])
+        elif file:
+            print "store_interfaces: Error couldn't find the file path\n"
+        else:
+            service_yaml_filenames = list_files_recursive('obj/services', '*.yml')
+            self._load_service_files(service_yaml_filenames)
+
+    def _load_service_files(self, filenames):
+        for file_path in filenames:
+            objs = {}
+            with open(file_path, 'r') as f:
+                file_content_str = f.read()
+            for line in file_content_str.split('\n'):
+                if line[:5] == "name:":
+                    key = line.split()[1]
+                    objs[key] = file_content_str
+
+            if not objs:
+                print "\n\n=====ERROR===== Can't find object name for: ", file_path
+
+            for key in objs.keys():
+                svc_def = self._create_service_definition(key, objs[key], file_path)
+                self.bulk_resources.append(svc_def)
 
     def store_config_files(self):
-        if not self.store_bulk:
-            print "\nStoring system res files in datastore..."
+        #print "\nStoring system res files in datastore..."
         resource_filenames = list_files_recursive('res/config', '*.yml')
-        self.load_from_files(self.DIR_RESFILES_PATH, resource_filenames,
-            self.get_config_file_content)
+        self._load_config_files(resource_filenames)
 
-    def store_object_interfaces(self):
-        if not self.store_bulk:
-            print "\nStoring object interfaces in datastore..."
-        data_yaml_filenames = list_files_recursive('obj/data', '*.yml',
-            ['ion.yml', 'resource.yml',
-             'shared.yml'])
-        self.load_from_files(self.DIR_OBJECTTYPES_PATH, data_yaml_filenames,
-            self.get_object_file_content)
-
-    def store_service_interfaces(self):
-        service_yaml_filenames = list_files_recursive('obj/services', '*.yml')
-        if not self.store_bulk:
-            print "\nStoring service interfaces in datastore..."
-        self.load_from_files(self.DIR_SERVICEDEF_PATH,
-            service_yaml_filenames,
-            self.get_service_file_content)
-
-    def display_header(self):
-        if not self.store_bulk:
-            print "--------------------------------------------------------------"
-            print "Key".ljust(40), "Filename".ljust(60)
-            print "--------------------------------------------------------------"
-
-    def load_from_files(self, path, filenames, get_file_content_method):
-        '''
-        Gets file content and load it to datastore
-        '''
-        self.display_header()
+    def _load_config_files(self, filenames):
         for file_path in filenames:
-            content = get_file_content_method(file_path)
-            for key in content.keys():
-                if not self.store_bulk:
-                    print key.ljust(40), file_path.ljust(60)
-                self.store_in_datastore(path, key, content[key], file_path)
+            with open(file_path, 'r') as f:
+                file_content_str = f.read()
+            objs = {}
+            objs[os.path.basename(file_path)] = file_content_str
 
-    def store_in_datastore(self, path, key, content, filename):
-        '''
-        Store in datastore
-        '''
-        if self.store_bulk:
-            if ("/", path[1:]) not in self.bulk_entries:
-                self.bulk_entries[("/", path[1:])] = {}
+            for key in objs.keys():
+                self.bulk_entries[(self.DIR_RESFILES_PATH, key)] = dict(file_path=file_path, definition=objs[key])
 
-            dir_key = (path, key)
-            if dir_key in self.bulk_entries:
-                print '\033[91m' "\nLoad Configuration Error!!! Multiple definitions found:\n"
-                print '\033[92m' "Filename:", filename
-                print '\033[91m', content
-                print '\033[92m' "\nPrevious definition:"
-                print '\033[91m', self.bulk_entries[dir_key]['definition']
-                print '\033[0m'
-                exit()
+    def _create_object_type(self, name, definition, definition_order):
+        return dict(type_="ObjectType", name=name, definition=definition, definition_order=definition_order)
 
-            self.bulk_entries[dir_key] = dict(file_path=filename, definition=content, ordinal=self.serial_num)
-            self.serial_num += 1
-        else:
-            if not self.dir.lookup(path):
-                self.dir.register("/", path[1:])
-
-            new_entry = self.dir.register(path, key, file_path=filename, definition=content, ordinal=self.serial_num)
-            self.serial_num += 1
-            if new_entry is not None:
-                print '\033[91m' "\nLoad Configuration Error!!! Multiple definitions found:\n"
-                print '\033[92m' "Filename:", filename
-                print '\033[91m', content
-                print '\033[92m' "\nPrevious definition:"
-                print '\033[91m', new_entry['attributes']['definition']
-                print '\033[0m'
-                exit()
-
-            new_entry = self.dir.lookup(path + '/' + key)
-            if content != new_entry['definition']:
-                print '\n\nError adding: ' + key + ' to the directory'
-                exit()
+    def _create_service_definition(self, name, definition, namespace):
+        return dict(type_="ServiceDefinition", name=name, definition=definition, namespace=namespace)
 
     def _register_bulk(self):
-        print "store_interfaces: Storing %s interfaces in datastore (bulk)..." % len(self.bulk_entries)
+        print "store_interfaces: Storing %s entries in directory (bulk)..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
         res = self.dir.register_mult(entries)
+
+        print "store_interfaces: Storing %s resources in registry (bulk)..." % len(self.bulk_resources)
+        res = self.rr.create_mult(self.bulk_resources)
+
         print "store_interfaces: Storing interfaces successful"
-
-    def get_config_file_content(self, file_path):
-        '''
-            Read file content from res/config and returns dict with key
-            equals to filename and value equals to file content
-        '''
-        with open(file_path, 'r') as f:
-            file_content_str = f.read()
-        objs = {}
-        objs[os.path.basename(file_path)] = file_content_str
-
-        return objs
-
-    def get_object_file_content(self, file_path):
-        '''
-            Return dict with key equal to classname and value equal to text
-            representation of class definition
-        '''
-        file_content_str = ""
-        objs = OrderedDict()
-        class_content = ''
-
-        # Open and read data model definition file
-        with open(file_path, 'r') as f:
-            file_content_str = f.read()
-
-        first_time = True
-        for line in file_content_str.split('\n'):
-            #if len(line) == 0:
-            #    continue
-            #if line == "---":
-            #    continue
-            if len(line) > 0 and (line[0].isalpha()):
-                if not first_time:
-                    objs[classname] = class_content
-                    class_content = ""
-                else:
-                    first_time = False
-                classname = line.split(':')[0]
-                class_content += line + "\n"
-            else:
-                class_content += line + "\n"
-        objs[classname] = class_content
-
-        #print "******", objs
-        return objs
-
-    def get_service_file_content(self, file_path):
-        file_content_str = ""
-        key = ""
-        objs = {}
-        with open(file_path, 'r') as f:
-            file_content_str = f.read()
-        for line in file_content_str.split('\n'):
-            if line[:5] == "name:":
-                key = line.split()[1]
-                objs[key] = file_content_str
-
-        if not objs:
-            print "\n\n=====ERROR===== Can't find object name for: ", file_path
-
-        #print "******", objs
-        return objs
 
 
 #def recursive_strip(scan_obj):

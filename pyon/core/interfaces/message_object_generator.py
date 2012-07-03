@@ -11,7 +11,7 @@ import os
 import re
 
 from pyon.core.path import list_files_recursive
-from pyon.ion.directory_standalone import DirectoryStandalone
+from pyon.core.interfaces.interface_util import get_service_definition_from_datastore
 
 enums_by_name = {}
 
@@ -341,22 +341,7 @@ class MessageObjectGenerator:
                     file.close()
         else:
             print " Message interface generator: reading service definitions from datastore"
-            data = self.get_service_definition_from_datastore()
+            data = get_service_definition_from_datastore(self.system_name)
             if not data:
                 data = []
         return data
-
-    def get_service_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ServiceInterfaces')
-        if not entries:
-            return ''
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition

@@ -35,8 +35,6 @@ def main():
     '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--individual', action='store_true',
-            help='Store files individually.')
     parser.add_argument('-fc', '--force_clean', action='store_true',
             help='Force clean.')
     parser.add_argument("-of", "--object", dest="fobject",
@@ -90,7 +88,7 @@ def main():
     iadm.store_config(ion_config)
 
     # Store system interfaces
-    iadm.store_interfaces(options.fobject, options.fservice, store_bulk=not options.individual)
+    iadm.store_interfaces(options.fobject, options.fservice)
 
 if __name__ == '__main__':
     main()

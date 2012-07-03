@@ -14,8 +14,7 @@ import yaml
 import cgi
 
 from pyon.core.path import list_files_recursive
-from pyon.ion.directory_standalone import DirectoryStandalone
-
+from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
 
 class IonYamlLoader(yaml.Loader):
     """ For ION-specific overrides of YAML loading behavior. """
@@ -214,39 +213,11 @@ class ObjectModelGenerator:
             data = self.data_yaml_text + "\n" + service_yaml_text
         else:
             print " Object interface generator: Reading object definitions from datastore"
-            self.data_yaml_text = self.get_object_definition_from_datastore()
+            self.data_yaml_text = get_object_definition_from_datastore(self.system_name)
             if not self.data_yaml_text:
                 return ''
-            data = self.data_yaml_text + '\n' + self.get_service_definition_from_datastore()
+            data = self.data_yaml_text + '\n' + get_service_definition_from_datastore(self.system_name)
         return data
-
-    def get_object_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ObjectTypes')
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except Exception as ex:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
-
-    def get_service_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ServiceInterfaces')
-        if not entries:
-            return ""
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
 
     def generate_enums(self, combined_yaml_text, opts):
         '''
