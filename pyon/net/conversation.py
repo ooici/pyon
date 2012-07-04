@@ -1,6 +1,8 @@
 import uuid
 import collections
-from pyon.core import bootstrap
+import time
+from gevent.timeout import Timeout
+from pyon.core import bootstrap, exception
 from gevent import coros
 from pyon.core.exception import IonException
 from pyon.util.log import log
@@ -12,6 +14,8 @@ from gevent.event import AsyncResult
 from pyon.util.async import spawn, switch
 #@TODO: Fix this, the interceptors should be local, Conversation should not import endpoint
 from endpoint import interceptors, log_message
+#@TODO: RPC specific import, should be removed
+from pyon.core.bootstrap import CFG
 
 #@TODO: Add log.debug to all methods, can we do geenral on class level, except for typing it in every method?
 #@TODO: How to manage **kwargs???
@@ -404,7 +408,9 @@ class Principal(object):
            self._name = NameTrio(bootstrap.get_sys_name(), self._name)
        return self._name
 
-    #@TODO: In the endpoint.py implemenattion channel is decoupled from the spawn listener
+    #@TODO: In the endpoint.py implemenataion channel is decoupled from the spawn listener
+    #@TODO: Do we need to spawn here? listen() method for all listeners is started in the thread_manager (in the process.py)
+    # so may be we need to provide only listen and leave the upper level to take care of spawning?
     def spawn_listener(self, source_name = None):
        def listen():
            name = source_name or self.name
@@ -489,3 +495,93 @@ class ConversationOriginator(Principal):
 # OOI specific (Container Specific) conversations
 #######################################################################################################################
 
+
+#######################################################################################################################
+# RPC generic code
+#######################################################################################################################
+
+# Might be part of some hierarchy
+# What is missing, how to set specific headers???
+# header[performative] = 'request' ???
+# also language, encoding, format, reply-by
+
+class RPCClient(object):
+    """
+    Note: maybe we need RPCConversation and RPCOriginator, RPCPrincipal, they will return RPCClientEndpoint and RPCServerEndpoint
+    """
+    _name = None
+    _node = None
+    _server_name = None
+    # Will be nice to have
+    # combine requestresponseClient.request and RequestEndpointUnit._send
+
+
+    def __init__(self, node, base_name, server_name):
+        self.node = node
+        self.name = base_name
+        self.server_name = server_name
+
+    def request(self, msg, header = None, **kwargs):
+        # could have a specified timeout in kwargs
+        if 'timeout' in kwargs and kwargs['timeout'] is not None:
+            timeout = kwargs['timeout']
+        else:
+            timeout = CFG.endpoint.receive.timeout or 10
+
+        log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
+
+        ts = time.time()
+        local = ConversationOriginator(self.node, self.name)
+        c = local.start_conversation('rpc', 'client')
+        c.invite('server', NameTrio('server', self._server_name))
+        c.send('server', 'Hello1')
+        try:
+            result_data, result_headers = c.receive('server')
+        except Timeout:
+            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
+        finally:
+            elapsed = time.time() - ts
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", header.get('conv-id', 'NOCONVID'),
+                header.get('conv-seq', 'NOSEQ'),
+                self._server_addr,
+                elapsed)
+        log.debug("Response data: %s, headers: %s", result_data, result_headers)
+        return result_data, result_headers
+
+    def buy_bonds(self, msg):
+        header = {}
+        header['op'] = 'buy_bonds'
+        return self.request(msg, header)
+
+# Again, headers are missing
+# This is indeed listener, and should be started in the process.py
+# create_errro_response and make_routing_call are still missing
+#@TODO: Headers are not set and _service is not called
+class RPCServer(object):
+    node = None
+    name = None
+    _service = None
+
+    def __init__(self, node, name, service = None):
+        self.node = node
+        self.name = name
+        self._service = service
+
+    def listen(self):
+        local = Principal(self.node, self.name)
+        local.spawn_listener()
+        conv, msg, header  = local.get_invitation()
+        c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
+        msg, header = c.recv('client')
+        self.process_msg()
+        c.send('client')
+
+    def process_msg(self, msg, header):
+        if header['op'] == self._service:
+            print 'Correct call. The message is:%s' %(msg)
+        else:
+            print 'I do not support this call:%s' % (header['op'])
+
+"""
+So OOI specific RPCServer will hold a routing_object and will override process_msg to call the routing_obj (_service)
+"""
