@@ -1,14 +1,21 @@
 import uuid
 import collections
+from pyon.core import bootstrap
 from gevent import coros
 from pyon.core.exception import IonException
 from pyon.util.log import log
 from pyon.net.transport import NameTrio, BaseTransport
 from pyon.net.channel import BidirChannel, ChannelClosedError, ChannelShutdownMessage
+from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from gevent import queue as gqueue
 from gevent.event import AsyncResult
 from pyon.util.async import spawn, switch
+#@TODO: Fix this, the interceptors should be local, Conversation should not import endpoint
+from endpoint import interceptors, log_message
 
+#@TODO: Add log.debug to all methods, can we do geenral on class level, except for typing it in every method?
+#@TODO: How to manage **kwargs???
+#@TODO: Add @param and @returns to all methods
 
 class ConversationError(IonException):
     pass
@@ -100,6 +107,7 @@ class Conversation(object):
                 Conversation._conv_id_root = str(uuid.uuid4())[0:6]
 
                 # try to get the real one from the container, but do it safely
+                #@ TODO: tooo OOI specific, move it to OOIConversation derived class
                 try:
                     from pyon.container.cc import Container
                     if Container.instance and Container.instance.id:
@@ -108,6 +116,7 @@ class Conversation(object):
                     pass
 
         return "%s-%d" % (Conversation._conv_id_root, Conversation.conv_id_counter)
+
 
 class ConversationEndpoint(object):
     _invitation_table = {} # mapping between role and public channels (principals)
@@ -169,6 +178,8 @@ class ConversationEndpoint(object):
         self._send(to_role, to_role_addr, msg, header)
         self._next_control_msg_type = 0
 
+    #@TODO: Shell we add **kwargs???, why we need them
+    # @TODO: Pass User Headers
     def send(self, to_role, msg):
         if self._is_originator and not self._conv.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
@@ -184,7 +195,10 @@ class ConversationEndpoint(object):
 
     def recv(self, from_role = None):
         print 'In Conversation.recv'
-        return self._recv_queues[from_role].get()
+        msg, header = self._recv_queues[from_role].get()
+        #@TODO: When to fuel the message through the intercept stack, when the msg is requested or when it is received?
+        msg, header = self._intercept_msg_in(msg, header)
+        return msg, header
 
     def close(self):
         if self._recv_greenlet is not None:
@@ -201,6 +215,8 @@ class ConversationEndpoint(object):
             # still, need to clean this up.
             self._chan.close()
 
+    #@TODO: Do we need only one instance of a channel
+    # We ahve preserved the logging from BaseEndpoint._spawn_listener
     def _spawn_listener(self, role, base_role_addr):
         def listen():
             print 'Conversation._spawn_listener'
@@ -208,14 +224,26 @@ class ConversationEndpoint(object):
             print 'Conversation.spawn_listener:role_addr: %s' %(role_addr)
             self._conv[role] = role_addr # this will block if there is no role in the _conv table, IS IT BAD???
             self._chan.start_consume()
-            while True: self._on_msg_deliver_handler()
+            while True:
+                try:
+                    log.debug("ConversationEndpoint_listen waiting for a message")
+                    msg, header, delivery_tag =  self._chan.recv()
+                    log.debug("ConversationEndpoint_listen got a message")
+                    log_message(role_addr , msg, header, delivery_tag)
+                    try:
+                        self._on_msg_received(msg, header)
+                    finally:
+                        # always ack listener response
+                        self._chan.ack(delivery_tag)
+                except ChannelClosedError:
+                    log.debug('Channel was closed during listen loop')
+                    break
         self._recv_greenlet = spawn(listen)
 
     def _on_msg_deliver_handler(self):
         print 'in Conversation.on_msg_deliver_handler'
-        msg, header, delivery_tag =  self._chan.recv()
-        self._on_msg_received(msg, header)
-        self._chan.ack(delivery_tag)
+
+
 
     def _on_msg_received(self, msg, header):
         print 'in Conversation._on_msg_received'
@@ -270,9 +298,14 @@ class ConversationEndpoint(object):
             self._next_control_msg_type = 0
         self._send(to_role, to_role_addr, msg, header)
 
+    #@ Shell we add general build_header meant for overriding and general build_payload ???
     def _send(self, to_role, to_role_addr, msg, header = None):
         print 'In Conversation._send, to_role_addr is: %s, msg is:%s, header is: %s' %(to_role_addr, msg, header)
+        # @TODO: Shell we combine build_header and _build_conv_header ???
         header = self._build_conv_header(header, to_role, to_role_addr)
+        header = self._build_header(header)
+        msg = self._build_payload(msg)
+        msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
         self._chan.send(msg, header)
 
@@ -292,6 +325,59 @@ class ConversationEndpoint(object):
         header['reply-to'] = "%s,%s" %(reply_to.exchange, reply_to.queue)
         return header
 
+    #Copy from endpoint.py, EndpointUnit
+    def _intercept_msg_in(self, msg, header):
+        """
+        Performs interceptions of incoming messages.
+        Override this to change what interceptor stack to go through and ordering.
+
+        @param  inv     An Invocation instance.
+        @returns        A processed Invocation instance.
+        """
+        inv = self._build_invocation(path=Invocation.PATH_IN,
+            message=msg, headers=header)
+
+        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+
+        return inv_prime.message, nv_prime.headers
+
+    #Copy from endpoint.py, EndpointUnit
+    def _intercept_msg_out(self, msg, header):
+        """
+        Performs interceptions of outgoing messages.
+        Override this to change what interceptor stack to go through and ordering.
+
+        @returns        message and header after being intercepted.
+        """
+
+        inv = self._build_invocation(path=Invocation.PATH_OUT,
+                    message=msg, headers=header)
+        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+
+        return inv_prime.message, nv_prime.headers
+
+    #Copy from endpoint.py, EndpointUnit
+    def _build_invocation(self, **kwargs):
+        """
+        Builds an Invocation instance to be used by the interceptor stack.
+        This method exists so we can override it in derived classes (ex with a process).
+        """
+        inv = Invocation(**kwargs)
+        return inv
+
+    def _build_header(self, header):
+        """
+        Override this method to set any custom settings
+        """
+        return header
+
+    def _build_payload(self, msg):
+        """
+        Override this method to change the payload
+        """
+        return msg
+
+
 class Principal(object):
     # mapping between conv_id and conversation instance
     _conversations = {}
@@ -299,97 +385,107 @@ class Principal(object):
     _recv_greenlet = None
     _chan = None
     # keep the connection (AMQP)
+    #@TODO: ensure node, may be by providing default broker connection
     node = None
     _name = None
 
     def __init__(self, node, name = None):
-        self.node = node
-        self._name = name
+       self.node = node
+       self._name = name
 
 
     @property
     def base_name(self):
-        return self._name.exchange
+       return self.name.exchange
 
     @property
     def name(self):
-        return self._name
+       if not instance(self._name, NameTrio):
+           self._name = NameTrio(bootstrap.get_sys_name(), self._name)
+       return self._name
 
-
+    #@TODO: In the endpoint.py implemenattion channel is decoupled from the spawn listener
     def spawn_listener(self, source_name = None):
-        def listen():
-            name = source_name or self.name
-            self._chan = self.node.channel(BidirChannel)
-            if name and isinstance(name, NameTrio):
-                print 'In listen: before setup_listener'
-                self._chan.setup_listener(name)
-            else:
-                log.debug('Principal.name is not correct: %s', name)
-                raise PrincipalError('Principal.name is not correct: %s', name)
+       def listen():
+           name = source_name or self.name
+           #@TODO: Should we have separate create_channel method?, do we need kwargs for creating a channel,
+           # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
+           self._chan = self.node.channel(BidirChannel)
+           if name and isinstance(name, NameTrio):
+               print 'In listen: before setup_listener'
+               self._chan.setup_listener(name)
+           else:
+               log.debug('Principal.name is not correct: %s', name)
+               raise PrincipalError('Principal.name is not correct: %s', name)
 
-            self._chan.start_consume()
-            try:
-                with self._chan.accept() as newchan:
-                    print 'Before receiving invitation msg'
-                    msg, header, delivery_tag = newchan.recv()
-                    print 'After receiving invitation msg: %s, %s' %(msg, header)
-                    newchan.ack(delivery_tag)
-                    self._recv_invitation(msg, header)
-            except ChannelClosedError as ex:
-                log.debug('Channel was closed during LEF.listen')
-        self._recv_greenlet = spawn(listen)
+           self._chan.start_consume()
+           try:
+               with self._chan.accept() as newchan:
+                   print 'Before receiving invitation msg'
+                   msg, header, delivery_tag = newchan.recv()
+                   print 'After receiving invitation msg: %s, %s' %(msg, header)
+                   newchan.ack(delivery_tag)
+                   self._recv_invitation(msg, header)
+           except ChannelClosedError as ex:
+               log.debug('Channel was closed during LEF.listen')
+       self._recv_greenlet = spawn(listen)
 
     def stop_listening(self):
-        if self._recv_greenlet is not None:
-            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-            # @TODO: remove spawn_listener altogether.
-            self._chan._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=2)
-            self._recv_greenlet.kill()      # he's dead, jim
+       if self._recv_greenlet is not None:
+           # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+           # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+           # @TODO: remove spawn_listener altogether.
+           self._chan._recv_queue.put(ChannelShutdownMessage())
+           self._recv_greenlet.join(timeout=2)
+           self._recv_greenlet.kill()      # he's dead, jim
 
-        if self._chan is not None:
-            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
-            # we may end up having a duplicate, but I think logically it would never be a problem.
-            # still, need to clean this up.
-            self._chan.close()
+       if self._chan is not None:
+           # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
+           # we may end up having a duplicate, but I think logically it would never be a problem.
+           # still, need to clean this up.
+           self._chan.close()
 
     def get_invitation(self, protocol = None):
-        # Here we should iterate while we find the protocol that is matched
-        print 'Wait to get an invitation'
-        return self._recv_queue.get() # this returns a conversations
-        #if auto_reply:
-        #    c.send_ack(c.inviter_role, 'I am joining')
-        #return c
+       # Here we should iterate while we find the protocol that is matched
+       print 'Wait to get an invitation'
+       return self._recv_queue.get() # this returns a conversations
+       #if auto_reply:
+       #    c.send_ack(c.inviter_role, 'I am joining')
+       #return c
 
     def accept_invitation(self, c, msg, header, auto_reply = False):
-        endpoint = ConversationEndpoint(self.node)
-        endpoint.accept(msg, header, c, self.base_name, auto_reply)
-        self._conversations[c.id] = c
-        return endpoint
+       endpoint = ConversationEndpoint(self.node)
+       endpoint.accept(msg, header, c, self.base_name, auto_reply)
+       self._conversations[c.id] = c
+       return endpoint
 
     def _recv_invitation(self, msg, header):
-        control_msg_type = get_control_msg_type(header)
-        if control_msg_type == MSG_TYPE.INVITE:
+       control_msg_type = get_control_msg_type(header)
+       if control_msg_type == MSG_TYPE.INVITE:
 
-            c = Conversation(header['protocol'], header['conv-id'])
-            print '_accept_invitation: Conversation added to the list'
-            #self._conversations[header['conv-id']] = c
-            self._recv_queue.put((c, msg, header))
-            #else: raise ConversationError('Reject invitation is not supported yet.')
+           c = Conversation(header['protocol'], header['conv-id'])
+           print '_accept_invitation: Conversation added to the list'
+           #self._conversations[header['conv-id']] = c
+           self._recv_queue.put((c, msg, header))
+           #else: raise ConversationError('Reject invitation is not supported yet.')
 
     def reject_invitation(self, msg, header):
-        pass
+       pass
 
     def check_invitation(self, msg, header):
-        return True
-
+       return True
 
 
 class ConversationOriginator(Principal):
     def start_conversation(self, protocol, role):
-        c = Conversation(protocol)
-        endpoint = ConversationEndpoint(self.node)
-        endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
-        self._conversations[c.id] = c
-        return endpoint
+       c = Conversation(protocol)
+       endpoint = ConversationEndpoint(self.node)
+       endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
+       self._conversations[c.id] = c
+       return endpoint
+
+
+#######################################################################################################################
+# OOI specific (Container Specific) conversations
+#######################################################################################################################
+
