@@ -14,6 +14,10 @@ class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
         dsm = DatastoreManager()
+        ds = dsm.get_datastore("resources")
+        ds.delete_datastore()
+        ds.create_datastore()
+
         directory = Directory(datastore_manager=dsm)
 
         #self.addCleanup(directory.dir_store.delete_datastore)
