@@ -24,6 +24,10 @@ class ResourceRegistryStandalone(object):
         except NotFound:
             self.datastore.define_profile_views("RESOURCES")
 
+    def close(self):
+        self.datastore.close()
+        self.datastore = None
+
     def create(self, object=None, actor_id=None, lcstate=None):
         if object is None:
             raise BadRequest("Object not present")

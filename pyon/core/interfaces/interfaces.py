@@ -13,7 +13,7 @@ from pyon.core.path import list_files_recursive
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
-
+from pyon.util.containers import get_safe
 
 class InterfaceAdmin:
     """
@@ -29,13 +29,18 @@ class InterfaceAdmin:
         self.dir = DirectoryStandalone(sysname=self.sysname, config=config)
         self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=config)
 
+    def close(self):
+        self.dir.close()
+        self.dir = None
+        self.rr.close()
+        self.rr = None
+
     def create_core_datastores(self):
         """
         Main entry point into creating core datastores
         """
         ds = CouchDataStore(config=self.config, scope=self.sysname)
         datastores = ['resources']
-        # @TODO: Add more and make sure they are created with proper indexes
         for local_dsn in datastores:
             if not ds.exists_datastore(local_dsn):
                 ds.create_datastore(local_dsn)
@@ -170,49 +175,38 @@ class InterfaceAdmin:
         print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
         res = self.dir.register_mult(entries)
+        self.bulk_entries = {}
 
         print "store_interfaces: Storing %s resources in registry..." % len(self.bulk_resources)
         res = self.rr.create_mult(self.bulk_resources)
+        self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"
 
 
-#def recursive_strip(scan_obj):
-#    """
-#    HACK HACK HACK
-#    """
-#    if type(scan_obj) is dict:
-#        for key, value in scan_obj.iteritems():
-#            if type(value) not in (str, int, float, bool, dict, list, None):
-#                scan_obj[key] = str(value)
-#            if type(value) is dict:
-#                recursive_strip(value)
-#
-#def _bootstrap_object_defs(directory):
-#    from pyon.core.object import IonObjectBase
-#    from interface import objects
-#
-#    # @TODO: This should use the same code as the load_configuration tool
-#    delist = []
-#    for cname, cobj in inspect.getmembers(objects, inspect.isclass):
-#        if issubclass(cobj, IonObjectBase) and cobj != IonObjectBase:
-#            parentlist = [parent.__name__ for parent in cobj.__mro__ if parent.__name__ not in ['IonObjectBase','object']]
-#            delist.append(("/ObjectTypes", cname, dict(schema=recursive_strip(cobj._schema), extends=parentlist)))
-#    directory.register_mult(delist)
-#
-#def _bootstrap_service_defs(directory):
-#    from pyon.service.service import IonServiceRegistry
-#
-#    # @TODO: This should use the same code as the load_configuration tool
-#    # At this time importing everything is THE KILLER
-#    service_registry = IonServiceRegistry()
-#    service_registry.load_service_mods('interface/services')
-#    service_registry.build_service_map()
-#
-#    svc_list = []
-#    for svcname, svc in service_registry.services.iteritems():
-#        svc_list.append(("/ServiceInterfaces", svcname, {}))
-#    directory.register_mult(svc_list)
+    def initialize_ion_system_core(self):
+        new_resources = []
+        # ION org
+        ion_org = self._create_org()
+        new_resources.append(ion_org)
+
+        # ION exchange space
+        ion_xs = None
+
+        # ION actor
+        actor_name = get_safe(self.config, "system.system_actor", "ionsystem")
+        sys_actor = self._create_actor_identity(actor_name, "ION System Agent")
+        new_resources.append(sys_actor)
+
+        print "store_interfaces: Initializing %s core system resources in registry..." % len(new_resources)
+        res = self.rr.create_mult(new_resources)
+
+    def _create_org(self, name, desc):
+        return dict(type_="Org", name=name, description=desc)
+
+    def _create_actor_identity(self, name):
+        return dict(type_="ActorIdentity", name=name)
+
 #
 #def change_config():
 #    if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
