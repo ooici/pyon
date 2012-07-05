@@ -103,21 +103,25 @@ class TestEndpointUnit(PyonTestCase):
     # self.assertTrue(isinstance(msg['header'], dict))
     # self.assertEquals(fakemsg, msg['payload'])
 
-    def test__message_received(self):
+    def test_intercept_in(self):
         self._endpoint_unit._build_invocation = Mock()
         self._endpoint_unit._intercept_msg_in = Mock()
-        self._endpoint_unit.message_received = Mock()
-        self._endpoint_unit.message_received.return_value = sentinel.msg_return
 
+        self._endpoint_unit.intercept_in(sentinel.msg, sentinel.headers)
+
+        self._endpoint_unit._build_invocation.assert_called_once_with(path=Invocation.PATH_IN,
+                                                                      message=sentinel.msg,
+                                                                      headers=sentinel.headers)
+        self.assertTrue(self._endpoint_unit._intercept_msg_in.called)
+
+    def test__message_received(self):
+        self._endpoint_unit.message_received  = Mock()
+        self._endpoint_unit.message_received.return_value = sentinel.msg_return
 
         retval = self._endpoint_unit._message_received(sentinel.msg, sentinel.headers)
 
         self.assertEquals(retval, sentinel.msg_return)
 
-        self._endpoint_unit._build_invocation.assert_called_once_with(path=Invocation.PATH_IN,
-            message=sentinel.msg,
-            headers=sentinel.headers)
-        self.assertTrue(self._endpoint_unit._intercept_msg_in.called)
         self.assertTrue(self._endpoint_unit.message_received.called)
 
 @attr('UNIT')
@@ -314,13 +318,13 @@ class TestListeningBaseEndpoint(PyonTestCase):
 
         chmock.setup_listener.assert_called_once_with(ep._recv_name, binding=sentinel.queue)
 
-    @patch('pyon.net.endpoint.log')
-    def test_listen_exception_in_handling(self, mocklog):
+    def test_listen_exception_in_handling(self):
 
         # make a listen loop that will return one message (to blow up in processing)
         chmock = MagicMock(spec=ListenChannel)
-        chmock.accept.return_value.__enter__.return_value = Mock()
-        chmock.accept.return_value.__enter__.return_value.recv = Mock(return_value=(sentinel.msg, sentinel.headers, sentinel.delivery_tag))
+        chmock.accept.return_value = Mock()
+        chmock.accept.return_value.recv = Mock(return_value=(sentinel.msg, sentinel.headers, sentinel.delivery_tag))
+        chmock.accept.return_value._recv_queue.qsize.return_value = 1
 
         nodemock = Mock(spec=NodeB)
         nodemock.channel.return_value = chmock
@@ -332,15 +336,15 @@ class TestListeningBaseEndpoint(PyonTestCase):
         # make msg received error out!
         ep.create_endpoint = Mock(return_value=Mock(spec=EndpointUnit))
         ep.create_endpoint.return_value._message_received.side_effect = TestError
+        ep.create_endpoint.return_value.intercept_in.return_value = (sentinel.msg, sentinel.headers)
 
         self.assertRaises(TestError, ep.listen)
         chmock.setup_listener.assert_called_once_with(recv_name, binding=sentinel.queue)
         chmock.start_consume.assert_called_once_with()
 
-        chmock.accept.assert_called_once_with(timeout=None)
-        chmock.accept.return_value.__enter__.return_value.recv.assert_called_once_with()
-        ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value.__enter__.return_value)
-        self.assertEquals(mocklog.exception.call_count, 1)
+        chmock.accept.assert_called_once_with(n=1, timeout=None)
+        chmock.accept.return_value.recv.assert_called_once_with()
+        ep.create_endpoint.assert_called_once_with(existing_channel=chmock.accept.return_value)
 
     def test_get_stats_no_channel(self):
         ep = ListeningBaseEndpoint()
@@ -468,9 +472,6 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         self._node = Mock(spec=NodeB)
         self._node.interceptors = {}
 
-    def test_create_sub_without_callback(self):
-        self.assertRaises(AssertionError, Subscriber, node=self._node, from_name="testsub")
-
     def test_create_endpoint(self):
         def mycb(msg, headers):
             return "test"
@@ -491,7 +492,7 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         sub.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return itself when accepted
-        listen_channel_mock.accept.return_value.__enter__.return_value = listen_channel_mock
+        listen_channel_mock.accept.return_value = listen_channel_mock
 
         # we're ready! call listen
         sub.listen()
@@ -880,7 +881,7 @@ class TestRPCServer(PyonTestCase, RecvMockMixin):
         rpcs.node.channel.return_value = listen_channel_mock
 
         # tell our channel to return a mocked handler channel when accepted (listen() implementation detail)
-        listen_channel_mock.accept.return_value.__enter__.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue, op="simple")
+        listen_channel_mock.accept.return_value = self._setup_mock_channel(ch_type=ServerChannel.BidirAcceptChannel, value=cvalue, op="simple")
 
         rpcs.listen()
 

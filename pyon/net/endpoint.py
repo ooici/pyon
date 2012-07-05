@@ -78,19 +78,29 @@ class EndpointUnit(object):
 
     def _message_received(self, msg, headers):
         """
-        Entry point for received messages in below channel layer. This method puts the message through
-        the interceptor stack, then funnels the message into the message_received method.
+        Entry point for received messages in below channel layer.
 
         This method should not be overridden unless you are familiar with how the interceptor stack and
         friends work!
         """
-        # interceptor point
-        inv = self._build_invocation(path=Invocation.PATH_IN, message=msg, headers=headers)
+        return self.message_received(msg, headers)
+
+    def intercept_in(self, msg, headers):
+        """
+        Builds an invocation and runs interceptors on it, direction: in.
+
+        This is called manually by the endpoint layer at receiving points (client recv, get_one/listen etc).
+
+        @returns    A 2-tuple of message, headers after going through the interceptors.
+        """
+        inv = self._build_invocation(path=Invocation.PATH_IN,
+                                     message=msg,
+                                     headers=headers)
         inv_prime = self._intercept_msg_in(inv)
         new_msg = inv_prime.message
         new_headers = inv_prime.headers
 
-        return self.message_received(new_msg, new_headers)
+        return new_msg, new_headers
 
     def _intercept_msg_in(self, inv):
         """
@@ -160,7 +170,8 @@ class EndpointUnit(object):
                     log_message("MESSAGE RECV <<< RPC-reply", msg, headers, self.channel._send_name, delivery_tag, is_send=False)
 
                     try:
-                        self._message_received(msg, headers)
+                        nm, nh = self.intercept_in(msg, headers)
+                        self._message_received(nm, nh)
                     finally:
                         # always ack a listener response
                         self.channel.ack(delivery_tag)
@@ -357,6 +368,70 @@ class ListeningBaseEndpoint(BaseEndpoint):
     """
     channel_type = ListenChannel
 
+    class MessageObject(object):
+        """
+        Received message wrapper.
+
+        Contains a body, headers, and a delivery_tag. Internally used by listen, the
+        standard method used by ListeningBaseEndpoint, but will be returned to you
+        if you use get_one_msg or get_n_msgs. If using the latter, you are responsible
+        for calling ack or reject.
+
+        make_body calls the endpoint's interceptor incoming stack - this may potentially
+        raise an IonException in normal program flow. If this happens, the body/headers
+        attributes will remain None and the error attribute will be set. Calling route()
+        will be a no-op, but ack/reject work.
+        """
+        def __init__(self, msgtuple, ch, e):
+            self.channel = ch
+            self.endpoint = e
+
+            self.raw_body, self.raw_headers, self.delivery_tag = msgtuple
+            self.body = None
+            self.headers = None
+            self.error = None
+
+        def make_body(self):
+            """
+            Runs received raw message through the endpoint's interceptors.
+            """
+            try:
+                self.body, self.headers = self.endpoint.intercept_in(self.raw_body, self.raw_headers)
+            except IonException as ex:
+                log.info("MessageObject.make_body raised an error: \n%s", traceback.format_exc(ex))
+                self.error = ex
+
+        def ack(self):
+            """
+            Passthrough to underlying channel's ack.
+
+            Must call this if using get_one_msg/get_n_msgs.
+            """
+            self.channel.ack(self.delivery_tag)
+
+        def reject(self, requeue=False):
+            """
+            Passthrough to underlying channel's reject.
+
+            Must call this if using get_one_msg/get_n_msgs.
+            """
+            self.channel.reject(self.delivery_tag, requeue=requeue)
+
+        def route(self):
+            """
+            Call default endpoint's _message_received, where business logic takes place.
+
+            For instance, a Subscriber would call the registered callback, or an RPCServer would
+            call the Service's operation.
+
+            You are likely not to use this if using get_one_msg/get_n_msgs.
+            """
+            if self.error is not None:
+                log.info("Refusing to route a MessageObject with an error")
+                return
+
+            self.endpoint._message_received(self.body, self.headers)
+
     def __init__(self, node=None, name=None, from_name=None, binding=None):
         BaseEndpoint.__init__(self, node=node)
 
@@ -407,10 +482,17 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         while True:
             #log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
+            m = None
             try:
-                self.get_one_msg()
+                m = self.get_one_msg()
+                m.route()       # call default handler
+
             except ChannelClosedError as ex:
                 break
+            finally:
+                # ChannelClosedError will go into here too, so make sure we have a message object to ack with
+                if m is not None:
+                    m.ack()
 
     def prepare_listener(self, binding=None):
         """
@@ -420,6 +502,16 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
 
         #log.debug("LEF.prepare_listener: binding %s", binding)
+
+        self.initialize(binding=binding)
+        self.activate()
+
+    def initialize(self, binding=None):
+        """
+        Creates a channel and prepares it for use.
+
+        After this, the endpoint is inthe ready state.
+        """
         binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
@@ -434,39 +526,76 @@ class ListeningBaseEndpoint(BaseEndpoint):
             self._chan._recv_name = self._recv_name
         else:
             self._setup_listener(self._recv_name, binding=binding)
+
+    def activate(self):
+        """
+        Begins consuming.
+
+        You must have called initialize first.
+        """
+        assert self._chan
         self._chan.start_consume()
+
+    def deactivate(self):
+        """
+        Stops consuming.
+
+        You must have called initialize and activate first.
+        """
+        assert self._chan
+        self._chan.stop_consume()       # channel will yell at you if this is invalid
+
+    def _get_n_msgs(self, num=1, timeout=None):
+        """
+        Internal method to accept n messages, create MessageObject wrappers, return them.
+
+        INBOUND INTERCEPTORS ARE PROCESSED HERE. If the Interceptor stack throws an IonException,
+        the response will be sent immediatly and the MessageObject returned to you will not have
+        body/headers set and will have error set. You should expect to check body/headers or error.
+        """
+        assert self._chan, "get_one_msg needs the endpoint to have been initialized"
+
+        mos = []
+        newch = self._chan.accept(n=num, timeout=timeout)
+        for x in xrange(newch._recv_queue.qsize()):
+            mo = self.MessageObject(newch.recv(), newch, self.create_endpoint(existing_channel=newch))
+            mo.make_body()      # puts through EP interceptors
+            mos.append(mo)
+            log_message("MESSAGE RECV >>> RPC-request", mo.raw_body, mo.raw_headers, self._recv_name, mo.delivery_tag, is_send=False)
+
+        return mos
 
     def get_one_msg(self, timeout=None):
         """
-        Retrieves a single message and passes it through an EndpointUnit's message received.
+        Receives one message.
 
-        This method will block until a message arrives, or until an optional timeout is reached.
+        Blocks until one message is received, or the optional timeout is reached.
+
+        INBOUND INTERCEPTORS ARE PROCESSED HERE. If the Interceptor stack throws an IonException,
+        the response will be sent immediatly and the MessageObject returned to you will not have
+        body/headers set and will have error set. You should expect to check body/headers or error.
 
         @raises ChannelClosedError  If the channel has been closed.
-        @returns                    A boolean indicating if a message was retrieved. Will only be
-                                    false if a timeout is specified.
+        @raises Timeout             If no messages available when timeout is reached.
+        @returns                    A MessageObject.
         """
-        assert self._chan, "get_one_msg needs a channel setup"
+        mos = self._get_n_msgs(num=1, timeout=timeout)
+        return mos[0]
 
-        try:
-            with self._chan.accept(timeout=timeout) as newchan:
-                msg, headers, delivery_tag = newchan.recv()
-                log_message("MESSAGE RECV >>> RPC-request", msg, headers, self._recv_name, delivery_tag, is_send=False)
+    def get_n_msgs(self, num, timeout=None):
+        """
+        Receives num messages.
 
-                try:
-                    e = self.create_endpoint(existing_channel=newchan)
-                    e._message_received(msg, headers)
-                except Exception:
-                    log.exception("Unhandled error while handling received message")
-                    raise
-                finally:
-                    # ALWAYS ACK
-                    newchan.ack(delivery_tag)
-        except Empty:
-            # only occurs when timeout specified, capture the Empty we get from accept and return False
-            return False
+        INBOUND INTERCEPTORS ARE PROCESSED HERE. If the Interceptor stack throws an IonException,
+        the response will be sent immediatly and the MessageObject returned to you will not have
+        body/headers set and will have error set. You should expect to check body/headers or error.
 
-        return True
+        Blocks until all messages received, or the optional timeout is reached.
+        @raises ChannelClosedError  If the channel has been closed.
+        @raises Timeout             If no messages available when timeout is reached.
+        @returns                    A list of MessageObjects.
+        """
+        return self._get_n_msgs(num, timeout=timeout)
 
     def close(self):
         BaseEndpoint.close(self)
@@ -570,7 +699,6 @@ class Subscriber(ListeningBaseEndpoint):
         """
         @param  callback should be a callable with two args: msg, headers
         """
-        assert callback, "No callback provided"
         self._callback = callback
         ListeningBaseEndpoint.__init__(self, **kwargs)
 
@@ -921,6 +1049,34 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpointUnit.__init__(self, **kwargs)
         self._routing_obj = routing_obj
+
+    def intercept_in(self, msg, headers):
+        """
+        ERR This is wrong
+        """
+
+        try:
+            new_msg, new_headers = ResponseEndpointUnit.intercept_in(self, msg, headers)
+            return new_msg, new_headers
+        except IonException as ex:
+            (exc_type, exc_value, exc_traceback) = sys.exc_info()
+            tb_list = traceback.extract_tb(sys.exc_info()[2])
+            tb_list = traceback.format_list(tb_list)
+            tb_output = ""
+            for elt in tb_list:
+                tb_output += elt
+            log.debug("server exception being passed to client", exc_info=True)
+            result = ex.get_stacks()
+            response_headers = self._create_error_response(ex)
+
+            response_headers['protocol']    = headers.get('protocol', '')
+            response_headers['conv-id']     = headers.get('conv-id', '')
+            response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+
+            self.send(result, response_headers)
+
+            # reraise for someone else to catch
+            raise
 
     def _message_received(self, msg, headers):
         """
