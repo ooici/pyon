@@ -630,18 +630,17 @@ class Publisher(SendingBaseEndpoint):
         SendingBaseEndpoint.__init__(self, **kwargs)
 
     def publish(self, msg, to_name=None):
+        if to_name is not None:
+            if not isinstance(to_name, NameTrio):
+                to_name = NameTrio(bootstrap.get_sys_name(), to_name)   # ensure NT before
 
-        ep = None
-        if not to_name:
-            # @TODO: needs thread safety
-            if not self._pub_ep:
-                self._pub_ep = self.create_endpoint(self._send_name)
-            ep = self._pub_ep
-        else:
-            ep = self.create_endpoint(to_name)
+        if self._pub_ep is None or (to_name is not None and self._pub_ep.channel._send_name.exchange != to_name.exchange):
+            self._pub_ep = self.create_endpoint(to_name or self._send_name)
 
-        ep.send(msg)
-        return ep
+        if to_name is not None:
+            self._pub_ep.channel.connect(to_name)
+
+        self._pub_ep.send(msg)
 
     def close(self):
         """
