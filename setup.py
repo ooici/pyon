@@ -72,6 +72,7 @@ setup(  name = 'pyon',
             'ndg-xacml==0.5.1',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
             'python-gevent-profiler',
+            'lxml==2.3.4',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
