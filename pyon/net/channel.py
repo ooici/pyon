@@ -878,7 +878,10 @@ class ListenChannel(RecvChannel):
 
         if not was_consuming:
             # turn consuming back off if we already were off
-            self.stop_consume()
+            if not self._queue_auto_delete:
+                self.stop_consume()
+            else:
+                log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
 
         ms = [self.recv() for x in xrange(n)]
 
