@@ -246,6 +246,9 @@ class TestEvents(IonIntegrationTestCase):
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
         dsm = DatastoreManager()
+        ds = dsm.get_datastore("events")
+        ds.delete_datastore()
+        ds.create_datastore()
 
         event_repo = EventRepository(dsm)
         event_repo1 = EventRepository(dsm)

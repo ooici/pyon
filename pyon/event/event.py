@@ -38,7 +38,7 @@ class EventPublisher(Publisher):
 
         @param  event_type  The name of the event type object
         @param  xp          Exchange (AMQP) name, can be none, will use events default.
-\       """
+        """
 
         self.event_type = event_type
 
@@ -90,8 +90,7 @@ class EventPublisher(Publisher):
         log.debug("Publishing event message to %s", to_name)
 
         try:
-            ep = self.publish(event_msg, to_name=to_name)
-            ep.close()
+            self.publish(event_msg, to_name=to_name)
         except Exception as ex:
             log.exception("Failed to publish event '%s'" % (event_msg))
             return False

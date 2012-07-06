@@ -42,6 +42,9 @@ class BaseTransport(object):
     def purge(self, client, queue):
         raise NotImplementedError()
 
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        raise NotImplementedError()
+
 class AMQPTransport(BaseTransport):
     """
     This is STATELESS. You can make instances of it, but no need to (true singleton).
@@ -101,7 +104,7 @@ class AMQPTransport(BaseTransport):
 
 
     def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_exchange_impl: %s, T %s, D %s, AD %s", exchange, exchange_type, durable, auto_delete)
+        log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", client.channel_number, exchange, exchange_type, durable, auto_delete)
         self._sync_call(client, client.exchange_declare, 'callback',
                                              exchange=exchange,
                                              type=exchange_type,
@@ -109,11 +112,11 @@ class AMQPTransport(BaseTransport):
                                              auto_delete=auto_delete)
 
     def delete_exchange_impl(self, client, exchange, **kwargs):
-        log.debug("AMQPTransport.delete_exchange_impl: %s", exchange)
+        log.debug("AMQPTransport.delete_exchange_impl(%s): %s", client.channel_number, exchange)
         self._sync_call(client, client.exchange_delete, 'callback', exchange=exchange)
 
     def declare_queue_impl(self, client, queue, durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_queue_impl: %s, D %s, AD %s", queue, durable, auto_delete)
+        log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", client.channel_number, queue, durable, auto_delete)
         frame = self._sync_call(client, client.queue_declare, 'callback',
                                 queue=queue or '',
                                 auto_delete=auto_delete,
@@ -121,18 +124,18 @@ class AMQPTransport(BaseTransport):
         return frame.method.queue
 
     def delete_queue_impl(self, client, queue, **kwargs):
-        log.debug("AMQPTransport.delete_queue_impl: %s", queue)
+        log.debug("AMQPTransport.delete_queue_impl(%s): %s", client.channel_number, queue)
         self._sync_call(client, client.queue_delete, 'callback', queue=queue)
 
     def bind_impl(self, client, exchange, queue, binding):
-        log.debug("AMQPTransport.bind_impl: EX %s, Q %s, B %s", exchange, queue, binding)
+        log.debug("AMQPTransport.bind_impl(%s): EX %s, Q %s, B %s", client.channel_number, exchange, queue, binding)
         self._sync_call(client, client.queue_bind, 'callback',
                                         queue=queue,
                                         exchange=exchange,
                                         routing_key=binding)
 
     def unbind_impl(self, client, exchange, queue, binding):
-        log.debug("AMQPTransport.unbind_impl: EX %s, Q %s, B %s", exchange, queue, binding)
+        log.debug("AMQPTransport.unbind_impl(%s): EX %s, Q %s, B %s", client.channel_number, exchange, queue, binding)
         self._sync_call(client, client.queue_unbind, 'callback', queue=queue,
                                                      exchange=exchange,
                                                      routing_key=binding)
@@ -147,7 +150,7 @@ class AMQPTransport(BaseTransport):
         """
         Gets a tuple of number of messages, number of consumers on a queue.
         """
-        log.debug("AMQPTransport.get_stats: Q %s", queue)
+        log.debug("AMQPTransport.get_stats(%s): Q %s", client.channel_number, queue)
         frame = self._sync_call(client, client.queue_declare, 'callback',
                                         queue=queue or '',
                                         passive=True)
@@ -157,8 +160,15 @@ class AMQPTransport(BaseTransport):
         """
         Purges a queue.
         """
-        log.debug("AMQPTransport.purge: Q %s", queue)
+        log.debug("AMQPTransport.purge(%s): Q %s", client.channel_number, queue)
         self._sync_call(client, client.queue_purge, 'callback', queue=queue)
+
+    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        """
+        Adjusts quality of service for a channel.
+        """
+        log.debug("AMQPTransport.qos(%s): pf_size %s, pf_count %s, global_ %s", client.channel_number, prefetch_size, prefetch_count, global_)
+        self._sync_call(client, client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 class NameTrio(object):
     """
