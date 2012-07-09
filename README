@@ -37,6 +37,9 @@ For Mac, use homebrew
       - libevent: Install with package manager
       - libyaml: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh
       - couchdb: Make sure to have the appropriate version
+- Install libxml2
+  > Mac should already have libxml2 installed as part of the developer toolkit, if it's not or you're running an older version you can use homebrew to install it
+  > Linux may have to install libxml2 using your preferred package manager. Be sure to install the development package libxml2-dev or libxml2-devel
 
 * python packages and environment management:
 - pip
