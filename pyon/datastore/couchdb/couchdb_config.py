@@ -299,7 +299,7 @@ function(doc) {
     },
     'manifest': {
         'by_dataset' : {
-            'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, doc.ts_create], doc._id); }'
+            'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, i], doc._id); }'
         }
     }
 }
