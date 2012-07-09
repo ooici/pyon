@@ -862,14 +862,14 @@ class ListenChannel(RecvChannel):
         state.
         """
 
-        # @TODO: re-enable, doens't work with listen loops
-        #assert self._fsm.current_state == self.S_ACTIVE, "Channel must be in active state to accept, currently %s" % str(self._fsm.current_state)
+        assert self._fsm.current_state in [self.S_ACTIVE, self.S_CLOSED], "Channel must be in active/closed state to accept, currently %s (forget to ack messages?)" % str(self._fsm.current_state)
 
         was_consuming = self._consuming
 
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
-            self._transport.qos(self._amq_chan, prefetch_count=n)
+            if not self._queue_auto_delete:
+                self._transport.qos(self._amq_chan, prefetch_count=n)
 
             # start consuming
             self.start_consume()
