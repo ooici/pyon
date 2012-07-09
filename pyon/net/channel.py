@@ -709,14 +709,16 @@ class RecvChannel(BaseChannel):
 
 class PublisherChannel(SendChannel):
     def __init__(self, close_callback=None):
-        self._declared = False
         SendChannel.__init__(self, close_callback=close_callback)
 
     def send(self, data, headers=None):
-        if not self._declared:
-            assert self._send_name and self._send_name.exchange
-            self._declare_exchange(self._send_name.exchange)
-            self._declared = True
+        """
+        Send override that ensures the exchange is declared, always.
+
+        Avoids the auto-delete exchange problem in integration tests with Publishers.
+        """
+        assert self._send_name and self._send_name.exchange
+        self._declare_exchange(self._send_name.exchange)
         SendChannel.send(self, data, headers=headers)
 
 class BidirClientChannel(SendChannel, RecvChannel):

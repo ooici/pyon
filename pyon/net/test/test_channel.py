@@ -655,7 +655,6 @@ class TestPublisherChannel(PyonTestCase):
 
     def test_init(self, mocksendchannel):
         pubchan = PublisherChannel()
-        self.assertFalse(pubchan._declared)
 
     def test_send_no_name(self, mocksendchannel):
         pubchan = PublisherChannel()
@@ -672,13 +671,6 @@ class TestPublisherChannel(PyonTestCase):
 
         depmock.assert_called_once_with(sentinel.xp)
         mocksendchannel.send.assert_called_once_with(pubchan, sentinel.data, headers=None)
-        self.assertTrue(pubchan._declared)
-
-        # call send again, to show declare is not called again
-        pubchan.send(sentinel.data2)
-        depmock.assert_called_once_with(sentinel.xp)
-        self.assertEquals(mocksendchannel.send.call_count, 2)
-        mocksendchannel.send.assert_called_with(pubchan, sentinel.data2, headers=None)
 
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
