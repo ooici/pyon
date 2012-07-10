@@ -408,7 +408,6 @@ class RecvChannel(BaseChannel):
         self._recv_binding = binding
 
         self._setup_listener_called = False
-        self._discard_incoming = False
 
         BaseChannel.__init__(self, **kwargs)
 
@@ -509,8 +508,6 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_start_consume")
 
-        self._discard_incoming = False
-
         if self._consumer_tag and self._queue_auto_delete:
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
@@ -537,8 +534,6 @@ class RecvChannel(BaseChannel):
         If the queue has auto_delete, this will delete it.
         """
         #log.debug("RecvChannel._on_stop_consume")
-
-        self._discard_incoming = True
 
         if self._queue_auto_delete:
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
@@ -589,7 +584,7 @@ class RecvChannel(BaseChannel):
         This method's existence is an implementation detail, to be overridden by derived classes
         that may define different closed or closing states.
         """
-        return self._discard_incoming or self._fsm.current_state == self.S_CLOSED
+        return self._fsm.current_state == self.S_CLOSED
 
     def _get_should_discard(self):
         """
@@ -840,7 +835,7 @@ class ListenChannel(RecvChannel):
         This method's existence is an implementation detail, to be overridden by derived classes
         that may define different closed or closing states.
         """
-        return self._discard_incoming or self._fsm.current_state == self.S_CLOSED or self._fsm.current_state == self.S_CLOSING
+        return self._fsm.current_state == self.S_CLOSED or self._fsm.current_state == self.S_CLOSING
 
     def _on_close_while_accepted(self, fsm):
         """
