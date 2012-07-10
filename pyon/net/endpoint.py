@@ -553,7 +553,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         the response will be sent immediatly and the MessageObject returned to you will not have
         body/headers set and will have error set. You should expect to check body/headers or error.
         """
-        assert self._chan, "get_one_msg needs the endpoint to have been initialized"
+        assert self._chan, "_get_n_msgs: needs the endpoint to have been initialized"
 
         mos = []
         newch = self._chan.accept(n=num, timeout=timeout)
