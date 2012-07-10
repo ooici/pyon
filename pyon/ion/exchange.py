@@ -213,7 +213,7 @@ class ExchangeManager(object):
         if CFG.container.get('exchange', {}).get('auto_register', False):
             # ok now make sure it's in the directory
             service_list, _ = self.container.resource_registry.find_resources(restype="Service", name='exchange_management')
-            if service_list is not None:
+            if service_list is not None and len(service_list) > 0:
                 if not self.org_id:
                     # find the default Org
                     org_ids = self._rr_client.find_resources(RT.Org, id_only=True)
