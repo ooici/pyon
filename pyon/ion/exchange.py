@@ -585,7 +585,7 @@ class ExchangeNameQueue(ExchangeName):
     def queue(self):
         if self._declared_queue:
             return self._declared_queue
-        return None
+        return ExchangeName.queue.fget(self)
 
     def setup_listener(self, binding, default_cb):
         log.debug("ExchangeQueue.setup_listener: passing on binding")
