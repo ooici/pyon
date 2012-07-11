@@ -49,8 +49,8 @@ setup(  name = 'pyon',
         package_data = {'': ['*.xml']},
         install_requires = [
             # Patched greenlet to work on ARMS
-            'greenlet==0.3.1-p1',
-            'gevent==0.13.6',
+            'greenlet==0.4.0',
+            'gevent==0.13.7',
             'simplejson==2.1.6',
             'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
