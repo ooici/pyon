@@ -188,6 +188,18 @@ class ExchangeManager(object):
 
         return ret
 
+    def cleanup_xos(self):
+        """
+        Iterates the list of Exchange Objects and deletes them.
+
+        Typically used for test cleanup.
+        """
+        for _, xn in self.xn_by_name.iteritems():
+            xn.delete()
+
+        for _, xs in self.xs_by_name.iteritems():
+            xs.delete()
+
     def _get_xs_obj(self, name=ION_ROOT_XS):
         """
         Gets a resource-registry represented XS, either via cache or RR request.
@@ -517,11 +529,19 @@ class ExchangeName(XOTransport, NameTrio):
         self.delete_queue_impl(None, self.queue)
         self._declared_queue = None
 
-    def bind(self, binding_key):
-        self.bind_impl(None, self.exchange, self.queue, binding_key)
+    def bind(self, binding_key, xs_or_xp=None):
+        exchange = self.exchange
+        if xs_or_xp is not None:
+            exchange = xs_or_xp.exchange
 
-    def unbind(self, binding_key):
-        self.unbind_impl(None, self.exchange, self.queue, binding_key)
+        self.bind_impl(None, exchange, self.queue, binding_key)
+
+    def unbind(self, binding_key, xs_or_xp=None):
+        exchange = self.exchange
+        if xs_or_xp is not None:
+            exchange = xs_or_xp.exchange
+
+        self.unbind_impl(None, exchange, self.queue, binding_key)
 
     def setup_listener(self, binding, default_cb):
         log.debug("ExchangeName.setup_listener: B %s", binding)

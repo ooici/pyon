@@ -703,8 +703,6 @@ class RecvChannel(BaseChannel):
         return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
-    def __init__(self, close_callback=None):
-        SendChannel.__init__(self, close_callback=close_callback)
 
     def send(self, data, headers=None):
         """

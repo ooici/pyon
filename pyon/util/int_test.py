@@ -63,6 +63,8 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _stop_container(self):
         if self.container:
+            # destroy any created XO in the process of a test
+            self.container.ex_manager.cleanup_xos()
             self.container.stop()
             self.container = None
         self._force_clean()         # deletes only
