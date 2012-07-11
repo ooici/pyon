@@ -36,9 +36,6 @@ class InterfaceAdminTest(IonIntegrationTestCase):
         entries = self.dir.lookup('/Config/CFG')
         self.assertTrue(entries)
 
-    def test_store_config(self):
-        self.assertEqual(12, 12)
-
     def test_store_interfaces(self):
         self.iadm.store_interfaces()
         entries = self.dir.find_child_entries('/ObjectTypes')
