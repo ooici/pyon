@@ -41,12 +41,15 @@ class TransformStreamListener(TransformStreamProcess):
             self.subscribers.append(subscriber)
             self.greenlets.append(spawn(subscriber.listen))
 
-    def recv_packet(self, packet, stream_id):
+    def recv_packet(self, msg, headers):
         raise NotImplementedError('Method recv_packet not implemented')
 
     def on_quit(self):
         for subscriber in self.subscribers:
             subscriber.close()
+
+        for greenlet in self.greenlets:
+            greenlet.join(timeout=10)
 
 class TransformStreamPublisher(TransformStreamProcess):
 
@@ -68,21 +71,23 @@ class TransformStreamPublisher(TransformStreamProcess):
         for publisher in self.publishers:
             publisher.close()
 
+        for greenlet in self.greenlets:
+            greenlet.join(timeout=10)
+
 class TransformEventListener(TransformEventProcess):
 
     def on_start(self):
         event_type = self.CFG.get_safe('process.event_type', '')
 
-        self.greenlets = []
-
         self.listener = EventSubscriber(event_type=event_type, callback=self.process_event)
-        self.greenlets.append(spawn(self.listener.listen))
+        self.greenlet = spawn(self.listener.listen)
 
     def process_event(self):
         raise NotImplementedError('Method process_event not implemented')
 
     def on_quit(self):
         self.listener.close()
+        self.greenlet.join(timeout=10)
 
 class TransformEventPublisher(TransformEventProcess):
 
@@ -102,3 +107,9 @@ class TransformDatasetProcess(TransformBase):
 
 class TransformDataProcess(TransformStreamListener, TransformStreamPublisher):
     pass
+
+class TransformAlgorithm():
+
+    @staticmethod
+    def execute(*args, **kwargs):
+        raise NotImplementedError('Method execute not implemented')
