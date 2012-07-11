@@ -6,11 +6,11 @@ from pyon.net import messaging
 from pyon.net import conversation
 from pyon.net.conversation import ConversationOriginator, Conversation, Principal
 
-def buyer_app():
-    node, ioloop_process = messaging.make_node()
-    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue42'))
+node, ioloop_process = messaging.make_node()
+def buyer_app(queue_name):
+    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue46'))
     c = originator.start_conversation('protocol', 'buyer')
-    c.invite('seller', NameTrio('seller', 'seller_queue82'))
+    c.invite('seller', NameTrio('seller', queue_name))
     c.send('seller', 'Hello1')
     c.send('seller', 'Hello%s' %2)
     msg, header = c.recv('seller')
@@ -18,9 +18,8 @@ def buyer_app():
     c.close()
     originator.stop_listening()
 
-def seller_app():
-    node, ioloop_process = messaging.make_node()
-    local = Principal(node, NameTrio('seller', 'seller_queue82'))
+def seller_app(queue_name):
+    local = Principal(node, NameTrio('seller', queue_name))
     local.spawn_listener()
     conv, msg, header  = local.get_invitation()
     c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
