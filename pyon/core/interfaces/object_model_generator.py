@@ -392,7 +392,7 @@ class ObjectModelGenerator:
                     else:
                         decorators = decorators + ', "' + key + '":"' + value + '"'
                 else:
-                    init_lines.append('  ' + line + '\n')
+                    init_lines.append('      ' + line + '\n')
                     if not description:
                         description = line.strip()[1:]
                         csv_description = line.strip()

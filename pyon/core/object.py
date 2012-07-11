@@ -4,6 +4,7 @@ __author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
 __license__ = 'Apache 2.0'
 
 import os
+import re
 import inspect
 from collections import OrderedDict, Mapping, Iterable
 import pprint
@@ -36,39 +37,51 @@ class IonObjectBase(object):
         Named _validate instead of validate because the data may have a field named "validate".
         """
         fields, schema = self.__dict__, self._schema
+        
+        # Check for extra fields not defined in the schema
         extra_fields = fields.viewkeys() - schema.viewkeys() - built_in_attrs
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
+
+        required_decorator = 'Required'
+        content_type_decorator = 'ContentType'
+        content_count_decorator = 'ContentCount'
+        value_range_decorator = 'ValueRange'
+        value_pattern_decorator = 'ValuePattern'
+
+        # Check required field criteria met
+        for key in schema:
+            if 'decorators' in schema[key] and required_decorator in schema[key]['decorators']:
+                if not key in fields or fields[key] is None:
+                    raise AttributeError('Required value "%s" not set' % key)
+
+        # Check each attribute
         for key in fields.iterkeys():
             if key in built_in_attrs:
                 continue
-            field_val, schema_val = fields[key], schema[key]
-            if type(field_val).__name__ != schema_val['type']:
 
-                if field_val is None and schema_val['required'] == True:
-                    raise AttributeError('Required parameter "%s" not set' % key)
+            schema_val = schema[key]
+
+            # Correct any float or long types that got downgraded to int
+            if isinstance(fields[key], int):
+                if schema_val['type'] == 'float':
+                    fields[key] = float(fields[key])
+                elif schema_val['type'] == 'long':
+                    fields[key] = long(fields[key])
+
+            # argh, annoying work around for OrderedDict vs dict issue
+            if type(fields[key]) == dict and schema_val['type'] == 'OrderedDict':
+                fields[key] = OrderedDict(fields[key])
+
+            # Basic type checking
+            field_val = fields[key]
+            if type(field_val).__name__ != schema_val['type']:
 
                 # if the schema doesn't define a type, we can't very well validate it
                 if schema_val['type'] == 'NoneType':
                     continue
 
-                # Special handle numeric types.  Allow int to be
-                # passed for long and float.  Auto convert to the
-                # right type.
-                if isinstance(field_val, int):
-                    if schema_val['type'] == 'float':
-                        fields[key] = float(fields[key])
-                        continue
-                    elif schema_val['type'] == 'long':
-                        fields[key] = long(fields[key])
-                        continue
-
-                # argh, annoying work around for OrderedDict vs dict issue
-                if type(field_val) == dict and schema_val['type'] == 'OrderedDict':
-                     fields[key] = OrderedDict(field_val)
-                     continue
-
-                # optional fields ok?
+                # Already checked for required above.  Assume optional and continue
                 if field_val is None:
                     continue
 
@@ -76,14 +89,47 @@ class IonObjectBase(object):
                 if isinstance(field_val, IonObjectBase) and schema_val['type'] == 'OrderedDict':
                     continue
 
+                if not key in fields or fields[key] is None:
+                    raise AttributeError('Required value "%s" not set' % key)
+
+                # Check for inheritance
+                for typ in type(field_val).__bases__:
+                    if typ.__name__ == schema_val['type']:
+                        continue
+
                 # TODO work around for msgpack issue
                 if type(field_val) == tuple and schema_val['type'] == 'list':
                     continue
 
                 raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
                                      (type(fields[key]), key, schema_val['type']))
+
+            if type(field_val).__name__ == 'str':
+                if value_pattern_decorator in schema[key]['decorators']:
+                    self.check_string_pattern_match(key, field_val, schema[key]['decorators'][value_pattern_decorator])
+
+            if type(field_val).__name__ in ['int', 'float', 'long']:
+                if value_range_decorator in schema[key]['decorators']:
+                    self.check_numeric_value_range(key, field_val, schema[key]['decorators'][value_range_decorator])
+
+            if schema_val['type'] == 'list':
+                if 'decorators' in schema[key]:
+                    if content_type_decorator in schema[key]['decorators']:
+                        self.check_collection_content(key, field_val, schema[key]['decorators'][content_type_decorator])
+                    if content_count_decorator in schema[key]['decorators']:
+                        self.check_collection_length(key, field_val, schema[key]['decorators'][content_count_decorator])
+
+            if schema_val['type'] == 'dict' or schema_val['type'] == 'OrderedDict':
+                if 'decorators' in schema[key]:
+                    if content_type_decorator in schema[key]['decorators']:
+                        self.check_collection_content(key, field_val.values(), schema[key]['decorators'][content_type_decorator])
+                    if content_count_decorator in schema[key]['decorators']:
+                        self.check_collection_length(key, field_val.values(), schema[key]['decorators'][content_count_decorator])
+
+            
             if isinstance(field_val, IonObjectBase):
                 field_val._validate()
+
             # Next validate only IonObjects found in child collections. Other than that, don't validate collections.
             # Note that this is non-recursive; only for first-level collections.
             elif isinstance(field_val, Mapping):
@@ -130,6 +176,54 @@ class IonObjectBase(object):
             return self._schema[field]['decorators'][decorator]
 
         return None
+
+    # Decorator validation methods
+
+    def check_string_pattern_match(self, key, value, pattern):
+        m = re.match(pattern, value)
+
+        if not m:
+            raise AttributeError('Invalid value pattern %s for field "%s", should match regular expression %s' %
+                (value, key, pattern))
+
+    def check_numeric_value_range(self, key, value, value_range):
+        if ',' in value_range:
+            min = eval(value_range.split(',')[0].strip())
+            max = eval(value_range.split(',')[1].strip())
+        else:
+            min = max = eval(value_range.split(',')[0].strip())
+
+        if value < min or value > max:
+            raise AttributeError('Invalid value %s for field "%s", should be between %d and %d' %
+                (str(value), key, min, max))
+
+    def check_collection_content(self, key, list_values, content_types):
+        split_content_types = []
+        if ',' in content_types:
+            split_content_types = content_types.split(',')
+        else:
+            split_content_types.add(content_types)
+
+        for value in list_values:
+            match_found = False
+            for content_type in split_content_types:
+                if type(value).__name__ == content_type.strip():
+                    match_found = True
+                    break
+            if not match_found:
+                raise AttributeError('Invalid value type in collection field "%s", should be one of "%s"' %
+                    (key, content_types))
+
+    def check_collection_length(self, key, list_values, length):
+        if ',' in length:
+            min = int(length.split(',')[0].strip())
+            max = int(length.split(',')[1].strip())
+        else:
+            min = max = int(length.split(',')[0].strip())
+
+        if len(list_values) < min or len(list_values) > max:
+            raise AttributeError('Invalid value length for collection field "%s", should be between %d and %d' %
+                (key, min, max))
 
 class IonMessageObjectBase(IonObjectBase):
     pass
