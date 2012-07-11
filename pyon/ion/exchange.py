@@ -11,7 +11,7 @@ import socket
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.net import messaging
-from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport
+from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport, TransportError
 from pyon.util.log import log
 from pyon.util.async import blocking_cb
 from pyon.ion.resource import RT
@@ -194,11 +194,14 @@ class ExchangeManager(object):
 
         Typically used for test cleanup.
         """
-        for _, xn in self.xn_by_name.iteritems():
-            xn.delete()
 
-        for _, xs in self.xs_by_name.iteritems():
-            xs.delete()
+        for d in [self.xn_by_name, self.xs_by_name]:
+            while len(d):
+                xoname, xo = d.popitem()
+                try:
+                    xo.delete()
+                except TransportError as ex:
+                    log.warn("Could not delete XO (%s) in cleanup_xos: %s", xoname, ex)
 
     def _get_xs_obj(self, name=ION_ROOT_XS):
         """
@@ -588,7 +591,27 @@ class ExchangePoint(ExchangeName):
     def delete(self):
         self.delete_exchange_impl(None, self.exchange)
 
+    def create_route(self, name):
+        """
+        Returns an ExchangePointRoute used for sending messages to an exchange point.
+        """
+        return ExchangePointRoute(self._exchange_manager, name, self)
 
+class ExchangePointRoute(ExchangeName):
+    """
+    Used for sending messages to an exchange point via a Publisher.
+
+    This object is created via ExchangePoint.create_route
+    """
+
+    def __init__(self, exchange_manager, name, xp):
+        ExchangeName.__init__(self, exchange_manager, name, xp)     # xp goes to xs param
+
+    def declare(self):
+        raise StandardError("ExchangePointRoute does not support declare")
+
+    def delete(self):
+        raise StandardError("ExchangePointRoute does not support delete")
 
 class ExchangeNameProcess(ExchangeName):
     xn_type = "XN_PROCESS"

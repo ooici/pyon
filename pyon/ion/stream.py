@@ -56,12 +56,12 @@ class StreamPublisherRegistrar(object):
         # Call the pubsub service to register the exchange name as a publisher for this stream
         stream_route = self.pubsub_client.register_producer(self.exchange_name, stream_id)
 
-        # create an XP
+        # create an XP and XPRoute
         xp = self.container.ex_manager.create_xp(self.xp_base)
-        xp._binding = stream_route.routing_key      # @TODO cleanup
+        xpr = xp.create_route(stream_route.routing_key)
 
         # Create the Stream publisher, ready to publish messages to the stream
-        return StreamPublisher(to_name=xp, process=self.process, node=self.container.node)
+        return StreamPublisher(to_name=xpr, process=self.process, node=self.container.node)
 
 
 class StreamSubscriber(ProcessSubscriber):
