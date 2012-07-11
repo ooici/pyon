@@ -195,9 +195,9 @@ def main(opts, *args, **kwargs):
             pyon_cfg=pyon_config)
 
         # Auto-bootstrap interfaces
-        # @WARN: This currently imports ALL modules, executing ALL static initializers as side effect!!!!!!!
         if bootstrap_config.system.auto_bootstrap:
             iadm.store_interfaces(idempotent=True)
+            iadm.initialize_ion_system_core()
 
         if opts.no_container:
             print "pycc: no_container=True. Stopping here."

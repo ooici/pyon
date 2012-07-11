@@ -77,9 +77,10 @@ class InterfaceAdmin:
                 if de:
                     #print "store_interfaces: Interfaces already stored. Ignoring"
                     return
-            # load all files
+            # load all definitions
             self.store_object_interfaces()
             self.store_service_interfaces()
+
             self.store_config_files()
 
         self._register_bulk()
@@ -166,10 +167,20 @@ class InterfaceAdmin:
                 self.bulk_entries[(self.DIR_RESFILES_PATH, key)] = dict(file_path=file_path, definition=objs[key])
 
     def _create_object_type(self, name, definition, definition_order):
-        return dict(type_="ObjectType", name=name, definition=definition, definition_order=definition_order)
+        return dict(type_="ObjectType", name=name, description="",
+            definition=definition, definition_order=definition_order,
+            definition_type="ion_obj_yml_1", object_type=1, object_version=1)
 
     def _create_service_definition(self, name, definition, namespace):
-        return dict(type_="ServiceDefinition", name=name, definition=definition, namespace=namespace)
+        return dict(type_="ServiceDefinition", name=name, description="",
+            definition=definition, namespace=namespace,
+            definition_type="ion_svc_yml_1", operations=[])
+
+    def _create_resource_type(self, name):
+        return dict(type_="ResourceType", name=name, description="")
+
+    def _create_association(self, subid, pred, objid):
+        return dict(type_="Association", s=subid)
 
     def _register_bulk(self):
         print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
@@ -222,9 +233,6 @@ class InterfaceAdmin:
 
         self._assert_existence("/", "Containers",
             description="Running containers are registered here")
-
-        self._assert_existence("/", "ObjectTypes",
-            description="ObjectTypes are registered here")
 
         self._assert_existence("/", "Org",
             description="Org specifics are registered here",
