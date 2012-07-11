@@ -13,7 +13,7 @@
 # Make monkey-patching work with debuggers and unittests by detecting already-imported modules
 # TODO: Move this into a module that third parties can use
 import sys
-if 'pydevd' in sys.modules or 'unittest' in sys.modules or 'nose' in sys.modules:
+if 'pydevd' in sys.modules:
     # The order matters
     monkey_list = ['os', 'time', 'thread', 'socket', 'select', 'ssl', 'httplib']
     for monkey in monkey_list:
