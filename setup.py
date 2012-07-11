@@ -48,7 +48,6 @@ setup(  name = 'pyon',
         test_suite = 'pyon',
         package_data = {'': ['*.xml']},
         install_requires = [
-            # Patched greenlet to work on ARMS
             'greenlet==0.4.0',
             'gevent==0.13.7',
             'simplejson==2.1.6',
@@ -72,6 +71,7 @@ setup(  name = 'pyon',
             'ndg-xacml==0.5.1',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
             'python-gevent-profiler',
+            'lxml==2.3.4', # Fails to compile on Linux ??!??
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',

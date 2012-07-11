@@ -76,6 +76,12 @@ class NodeB(amqp.Node):
         """
         chan = ch_type(**kwargs)
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
+        if amq_chan is None:
+            log.error("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s", ch_number)
+            import traceback
+            traceback.print_stack()
+            raise StandardError("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s" % ch_number)
+
         chan.on_channel_open(amq_chan)
         return chan
 

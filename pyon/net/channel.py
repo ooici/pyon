@@ -198,6 +198,9 @@ class BaseChannel(object):
             amq_chan = self._amq_chan
             amq_chan.close()
 
+            # set to None now so nothing else tries to use the channel during the callback
+            self._amq_chan = None
+
             # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
             # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
             # up for Pika here so we don't goof up when reusing a channel number.
@@ -349,10 +352,46 @@ class RecvChannel(BaseChannel):
     _consumer_exclusive = False
     _consumer_no_ack    = False     # endpoint layers do the acking as they call recv()
 
-    # RecvChannel specific FSM states, inputs
-    S_CONSUMING         = 'CONSUMING'
-    I_START_CONSUME     = 'START_CONSUME'
-    I_STOP_CONSUME      = 'STOP_CONSUME'
+    # consuming flag (consuming is not a state, a property)
+    _consuming          = False
+
+    class SizeNotifyQueue(gqueue.Queue):
+        """
+        Custom gevent-safe queue to allow us to be notified when queue reaches a threshold.
+
+        You call a context handler that returns you an AsyncResult you can wait on deterministically.
+        Pass the number of items you want the queue to minimally have.
+        """
+
+        _size_ar = None
+
+        def __init__(self, abort_hook, *args, **kwargs):
+            self._abort_hook = abort_hook
+            self._size_ar = None
+            self._await_number = None
+            gqueue.Queue.__init__(self, *args, **kwargs)
+
+        def _put(self, item):
+            gqueue.Queue._put(self, item)
+            self._check_and_fire()
+
+        def _check_and_fire(self):
+            if self._size_ar is not None and not self._size_ar.ready() and (self._abort_hook() or self.qsize() >= self._await_number):
+                self._size_ar.set()
+
+        @contextmanager
+        def await_n(self, n=1):
+            assert self._size_ar == None, "await_n already called, cannot be called twice"
+
+            self._size_ar = AsyncResult()
+            self._await_number = n
+
+            # are we already ready already?
+            self._check_and_fire()      # @TODO: likely a race condition here, slim effect though
+            try:
+                yield self._size_ar
+            finally:
+                self._size_ar = None
 
     def __init__(self, name=None, binding=None, **kwargs):
         """
@@ -361,7 +400,7 @@ class RecvChannel(BaseChannel):
         You may set the receiving name and binding here if you wish, otherwise they will
         be set when you call setup_listener.
         """
-        self._recv_queue = gqueue.Queue()
+        self._recv_queue = self.SizeNotifyQueue(self._get_should_discard)
 
         # set recv name and binding if given
         assert name is None or isinstance(name, tuple)
@@ -372,11 +411,6 @@ class RecvChannel(BaseChannel):
         self._discard_incoming = False
 
         BaseChannel.__init__(self, **kwargs)
-
-        # setup RecvChannel specific state transitions
-        self._fsm.add_transition(self.I_START_CONSUME, self.S_ACTIVE, self._on_start_consume, self.S_CONSUMING)
-        self._fsm.add_transition(self.I_STOP_CONSUME, self.S_CONSUMING, self._on_stop_consume, self.S_ACTIVE)
-        self._fsm.add_transition(self.I_CLOSE, self.S_CONSUMING, self._on_close_while_consume, self.S_CLOSED)
 
     def setup_listener(self, name=None, binding=None):
         """
@@ -463,9 +497,11 @@ class RecvChannel(BaseChannel):
 
         setup_listener must have been called first.
         """
-        self._fsm.process(self.I_START_CONSUME)
+        if not self._consuming:
+            self._consuming = True
+            self._on_start_consume()
 
-    def _on_start_consume(self, fsm):
+    def _on_start_consume(self):
         """
         Starts consuming messages.
 
@@ -490,9 +526,11 @@ class RecvChannel(BaseChannel):
 
         If the queue has auto_delete, this will delete it.
         """
-        self._fsm.process(self.I_STOP_CONSUME)
+        if self._consuming:
+            self._on_stop_consume()
+            self._consuming = False
 
-    def _on_stop_consume(self, fsm):
+    def _on_stop_consume(self):
         """
         Stops consuming messages.
 
@@ -522,8 +560,7 @@ class RecvChannel(BaseChannel):
 
         If consuming, stops it. Otherwise, no-op.
         """
-        if self._fsm.current_state == self.S_CONSUMING:
-            self.stop_consume()
+        self.stop_consume()
 
     def recv(self, timeout=None):
         """
@@ -554,6 +591,12 @@ class RecvChannel(BaseChannel):
         """
         return self._discard_incoming or self._fsm.current_state == self.S_CLOSED
 
+    def _get_should_discard(self):
+        """
+        Internal helper to turn property into callable, used by recv_queue hook.
+        """
+        return self._should_discard
+
     def close_impl(self):
         """
         Close implementation override.
@@ -564,6 +607,14 @@ class RecvChannel(BaseChannel):
         log.debug("RecvChannel.close_impl (%s)", self.get_channel_id())
 
         self._recv_queue.put(ChannelShutdownMessage())
+
+        # if we were consuming, we aren't anymore
+        self.stop_consume()
+
+        # abort anyone currently trying to await_n
+        if self._recv_queue._size_ar is not None:
+            log.debug("close_impl: aborting await_n")
+            self._recv_queue._size_ar.set()
 
         BaseChannel.close_impl(self)
 
@@ -642,6 +693,7 @@ class RecvChannel(BaseChannel):
         """
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
+        self._ensure_amq_chan()
 
         return self._transport.get_stats(self._amq_chan, queue=self._recv_name.queue)
 
@@ -651,19 +703,22 @@ class RecvChannel(BaseChannel):
         """
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.purge: %s", self._recv_name.queue)
+        self._ensure_amq_chan()
 
         return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
     def __init__(self, close_callback=None):
-        self._declared = False
         SendChannel.__init__(self, close_callback=close_callback)
 
     def send(self, data, headers=None):
-        if not self._declared:
-            assert self._send_name and self._send_name.exchange
-            self._declare_exchange(self._send_name.exchange)
-            self._declared = True
+        """
+        Send override that ensures the exchange is declared, always.
+
+        Avoids the auto-delete exchange problem in integration tests with Publishers.
+        """
+        assert self._send_name and self._send_name.exchange
+        self._declare_exchange(self._send_name.exchange)
         SendChannel.send(self, data, headers=headers)
 
 class BidirClientChannel(SendChannel, RecvChannel):
@@ -698,7 +753,6 @@ class ListenChannel(RecvChannel):
     """
 
     # States, Inputs for ListenChannel FSM
-    S_STOPPING      = 'STOPPING'
     S_CLOSING       = 'CLOSING'
     S_ACCEPTED      = 'ACCEPTED'
     I_ENTER_ACCEPT  = 'ENTER_ACCEPT'
@@ -708,22 +762,65 @@ class ListenChannel(RecvChannel):
         """
         The type of channel returned by accept.
         """
+        def __init__(self, name=None, binding=None, parent_channel=None, **kwargs):
+            RecvChannel.__init__(self, name=name, binding=binding, **kwargs)
+            self._delivery_tags = set()
+            self._parent_channel = parent_channel
+
         def close_impl(self):
             """
             Do not close underlying amqp channel
             """
             pass
 
+        def recv(self, timeout=None):
+            """
+            Recv override, takes note of delivery tag.
+            """
+            msg = RecvChannel.recv(self, timeout=timeout)
+            self._delivery_tags.add(msg[2])
+            return msg
+
+        def _checkin(self, delivery_tag):
+            """
+            Internal method called by ack/reject to confirm processing of a message.
+
+            When all messages delivered via recv are confirmed via this method, transitions the
+            parent channel out of ACCEPTED.
+            """
+            if not delivery_tag in self._delivery_tags:
+                log.warn("MISSING DTAG: %s", delivery_tag)
+                import traceback
+                traceback.print_stack()
+                return
+
+            self._delivery_tags.remove(delivery_tag)
+
+            if len(self._delivery_tags) == 0:
+                self._parent_channel.exit_accept()
+
+        def ack(self, delivery_tag):
+            """
+            Acks a message - broker discards.
+            """
+            RecvChannel.ack(self, delivery_tag)
+            self._checkin(delivery_tag)
+
+        def reject(self, delivery_tag, requeue=False):
+            """
+            Rejects a message - specify requeue=True to requeue for delivery later.
+            """
+            RecvChannel.reject(self, delivery_tag, requeue=requeue)
+            self._checkin(delivery_tag)
+
     def __init__(self, name=None, binding=None, **kwargs):
         RecvChannel.__init__(self, name=name, binding=binding, **kwargs)
 
         # setup ListenChannel specific state transitions
-        self._fsm.add_transition(self.I_ENTER_ACCEPT,   self.S_CONSUMING,   None, self.S_ACCEPTED)
-        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_ACCEPTED,    None, self.S_CONSUMING)
+        self._fsm.add_transition(self.I_ENTER_ACCEPT,   self.S_ACTIVE,      None, self.S_ACCEPTED)
+        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_ACCEPTED,    None, self.S_ACTIVE)
         self._fsm.add_transition(self.I_CLOSE,          self.S_ACCEPTED,    None, self.S_CLOSING)
         self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_CLOSING,     self._on_close_while_accepted,  self.S_CLOSED)
-        self._fsm.add_transition(self.I_STOP_CONSUME,   self.S_ACCEPTED,    None, self.S_STOPPING)
-        self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_STOPPING,    self._on_stop_consume_while_accepted, self.S_ACTIVE)
 
     def _create_accepted_channel(self, amq_chan, msg):
         """
@@ -731,7 +828,7 @@ class ListenChannel(RecvChannel):
 
         Can be overridden by derived classes to get custom class types/functionality.
         """
-        ch = self.AcceptedListenChannel()
+        ch = self.AcceptedListenChannel(parent_channel=self)
         ch.attach_underlying_channel(amq_chan)
         return ch
 
@@ -749,45 +846,68 @@ class ListenChannel(RecvChannel):
         """
         Handles the delayed closing of a channel after the accept context has been exited.
         """
-        self._on_stop_consume(fsm)
+        self.stop_consume()
         self._on_close(fsm)
 
-    def _on_stop_consume_while_accepted(self, fsm):
+    def accept(self, n=1, timeout=None):
         """
-        Handles the delayed consumer stop of a channel after the accept context has been exited.
+        Accepts new connections for listening endpoints.
+
+        Can accept more than one message at at time before it returns a new channel back to the
+        caller. Optionally can specify a timeout - if n messages aren't received in that time,
+        will raise an Empty exception.
+
+        Sets the channel in the ACCEPTED state - caller is responsible for acking all messages
+        received on the returned channel in order to put this channel back in the CONSUMING
+        state.
         """
-        self._on_stop_consume(fsm)
 
-    @contextmanager
-    def accept(self, timeout=None):
-        """
-        Context manager method to accept new connections for listening endpoints.
+        assert self._fsm.current_state in [self.S_ACTIVE, self.S_CLOSED], "Channel must be in active/closed state to accept, currently %s (forget to ack messages?)" % str(self._fsm.current_state)
 
-        Defers calls to close during handling of the message, to be called after
-        the context manager returns.
+        was_consuming = self._consuming
 
-        Yields A new channel that can:
-                    - takes a copy of the underlying transport channel
-                    - send() aka reply
-                    - close without closing underlying transport channel
-                    - FUTURE: receive (use a preexisting listening pool), for more complicated patterns
-                              aka AGREE/STATUS/CANCEL
-                    - has the initial received message here put onto its recv gqueue
-                    - recv() returns messages in its gqueue, endpoint should ack
-        """
-        #        self._ensure_amq_chan()
-        m = self.recv(timeout=timeout)
-        ch = self._create_accepted_channel(self._amq_chan, m)
-        ch._recv_queue.put(m)       # prime our recieved message here, should be acked by EP layer
+        if not self._should_discard and not was_consuming:
+            # tune QOS to get exactly n messages
+            if not self._queue_auto_delete:
+                self._transport.qos(self._amq_chan, prefetch_count=n)
 
+            # start consuming
+            self.start_consume()
+
+        with self._recv_queue.await_n(n=n) as ar:
+            log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
+            ar.get(timeout=timeout)
+
+        if not was_consuming:
+            # turn consuming back off if we already were off
+            if not self._queue_auto_delete:
+                self.stop_consume()
+            else:
+                log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
+
+        ms = [self.recv() for x in xrange(n)]
+
+        ch = self._create_accepted_channel(self._amq_chan, ms)
+        map(ch._recv_queue.put, ms)
+
+        # transition to ACCEPT
         self._fsm.process(self.I_ENTER_ACCEPT)
-        yield ch
+
+        # return the channel
+        return ch
+
+    def exit_accept(self):
+        """
+        Public method for transitioning this channel out of ACCEPTED state.
+
+        Only should be used by a channel created by accept.
+        """
         self._fsm.process(self.I_EXIT_ACCEPT)
 
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._recv_name.queue.startswith("amq.gen-") and self._transport is AMQPTransport.get_instance():
+        if not self._queue_auto_delete and self._recv_name and self._transport is AMQPTransport.get_instance() and self._recv_name.queue.startswith("amq.gen-"):
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 
@@ -799,9 +919,14 @@ class ServerChannel(ListenChannel):
         pass
 
     def _create_accepted_channel(self, amq_chan, msg):
-        send_name = NameTrio(tuple(msg[1].get('reply-to').split(',')))    # @TODO: stringify is not the best
-        ch = self.BidirAcceptChannel()
+        # pull apart msglist to get a reply-to name
+        reply_to_set = set((x[1].get('reply-to') for x in msg))
+        assert len(reply_to_set) == 1, "Differing reply-to addresses seen, unsure how to proceed"
+
+        send_name = NameTrio(tuple(reply_to_set.pop().split(',')))    # @TODO: stringify is not the best
+        ch = self.BidirAcceptChannel(parent_channel=self)
         ch._recv_name = self._recv_name     # for debugging only
         ch.attach_underlying_channel(amq_chan)
         ch.connect(send_name)
         return ch
+

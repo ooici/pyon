@@ -314,7 +314,11 @@ class CouchDB_DataStore(DataStore):
 #            log.info("Deleted %n associations for object %s", len(assoc_ids), doc_id)
 
         elif self._is_in_association(doc_id, datastore_name):
-            log.warn("XXXXXXX Attempt to delete object %s that still has associations" % doc_id)
+            bad_doc = self.read(doc_id)
+            if doc:
+                log.warn("XXXXXXX Attempt to delete %s object %s that still has associations" % (bad_doc.type_, doc_id))
+            else:
+                log.warn("XXXXXXX Attempt to delete object %s that still has associations" % doc_id)
 #           raise BadRequest("Object cannot be deleted until associations are broken")
 
         try:

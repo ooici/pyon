@@ -31,17 +31,15 @@ class TestEvents(IonIntegrationTestCase):
 
     def tearDown(self):
         for x in self._listens:
-            x.kill()
+            x.stop()
 
     def _listen(self, sub):
         """
         Pass in a subscriber here, this will make it listen in a background greenlet.
         """
-        gl = spawn(sub.listen)
-        self._listens.append(gl)
+        sub.start()
+        self._listens.append(sub)
         sub._ready_event.wait(timeout=5)
-
-        return gl
 
     def test_pub_and_sub(self):
         ar = event.AsyncResult()
@@ -246,6 +244,9 @@ class TestEvents(IonIntegrationTestCase):
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
         dsm = DatastoreManager()
+        ds = dsm.get_datastore("events")
+        ds.delete_datastore()
+        ds.create_datastore()
 
         event_repo = EventRepository(dsm)
         event_repo1 = EventRepository(dsm)
