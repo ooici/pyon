@@ -48,11 +48,11 @@ class PolicyDecisionPointManager(object):
         self.policy_decision_point = dict()
         self.org_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
 
-        #Adding an not function to XACML
-        from pyon.core.governance.policy.xacml.not_function import Not
-        from pyon.core.governance.policy.xacml.and_function import And
-        functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
-        functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
+        #No longer need this cause these were added to the XACML engine library, but left here for historical purposes.
+        #from pyon.core.governance.policy.xacml.not_function import Not
+        #from pyon.core.governance.policy.xacml.and_function import And
+        #functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
+        #functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
 
 
     #Return a compiled policy indexed by the specified resource_id
