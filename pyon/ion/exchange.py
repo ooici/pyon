@@ -74,7 +74,6 @@ class ExchangeManager(object):
         self._nodes     = {}
         self._ioloops   = {}
 
-        self._client    = None
         self._transport = None
 
         self._default_xs_declared = False
@@ -131,7 +130,6 @@ class ExchangeManager(object):
             log.warn("Some nodes could not be started, ignoring for now")   # @TODO change when ready
 
         self._transport = AMQPTransport.get_instance()
-        self._client    = self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
 
         # load interceptors into each
         map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
@@ -195,13 +193,20 @@ class ExchangeManager(object):
         Typically used for test cleanup.
         """
 
-        for d in [self.xn_by_name, self.xs_by_name]:
-            while len(d):
-                xoname, xo = d.popitem()
-                try:
-                    xo.delete()
-                except TransportError as ex:
-                    log.warn("Could not delete XO (%s) in cleanup_xos: %s", xoname, ex)
+        while len(self.xn_by_name):
+            xn = self.xn_by_name.values()[0]
+            if isinstance(xn, ExchangePoint):   # @TODO ugh
+                self.delete_xp(xn)
+            else:
+                self.delete_xn(xn)
+
+        while len(self.xs_by_name):
+            xs = self.xs_by_name.values()[0]
+            self.delete_xs(xs)
+
+        # reset xs map to initial state
+        self._default_xs_declared = False
+        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
 
     def _get_xs_obj(self, name=ION_ROOT_XS):
         """
@@ -225,7 +230,7 @@ class ExchangeManager(object):
         Has the side effect of bootstrapping the org_id and default_xs's id/rev from the RR.
         Therefore, cannot be a property.
         """
-        if CFG.container.get('exchange', {}).get('auto_register', False):
+        if CFG.get_safe('container.exchange.auto_register', False):
             # ok now make sure it's in the directory
             service_list, _ = self.container.resource_registry.find_resources(restype="Service", name='exchange_management')
             if service_list is not None and len(service_list) > 0:
@@ -242,6 +247,15 @@ class ExchangeManager(object):
 
         return False
 
+    @property
+    def _client(self):
+        """
+        Gets a functioning version of a raw Pika channel to speak to the broker.
+
+        Lazy-loads and re-makes itself if the channel has failed for any reason.
+        """
+        return self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
+
     def _get_channel(self, node):
         """
         Get a raw channel to be used by all the ensure_exists methods.
@@ -249,7 +263,7 @@ class ExchangeManager(object):
         assert self.container
 
         # @TODO: needs lock, but so do all these methods
-        if not self._chan:
+        if not self._chan or (self._chan and self._chan.closing is not None):
             self._chan = blocking_cb(node.client.channel, 'on_open_callback')
 
         return self._chan
@@ -279,7 +293,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xs: %s", xs)
 
         name = xs._exchange     # @TODO this feels wrong
-        del self.xs_by_name[name]
+        self.xs_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
+                                        # so delete in the safest way possible
+                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xs")
@@ -287,7 +303,10 @@ class ExchangeManager(object):
             self._ems_client.delete_exchange_space(xso._id)
             del self._xs_cache[name]
         else:
-            xs.delete()
+            try:
+                xs.delete()
+            except TransportError as ex:
+                log.warn("Could not delete XS (%s): %s", name, ex)
 
     def create_xp(self, name, xs=None, use_ems=True, **kwargs):
         log.debug("ExchangeManager.create_xp: %s", name)
@@ -311,7 +330,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xp: name=%s", 'TODO') #xp.build_xname())
 
         name = xp._exchange # @TODO: not right
-        del self.xn_by_name[name]
+        self.xn_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
+                                        # so delete in the safest way possible
+                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xp")
@@ -323,7 +344,10 @@ class ExchangeManager(object):
             xpo_id = xpo_ids[0][0]
             self._ems_client.delete_exchange_point(xpo_id)
         else:
-            xp.delete()
+            try:
+                xp.delete()
+            except TransportError as ex:
+                log.warn("Could not delete XP (%s): %s", name, ex)
 
     def _create_xn(self, xn_type, name, xs=None, use_ems=True, **kwargs):
         xs = xs or self.default_xs
@@ -362,7 +386,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xn: name=%s", "TODO") #xn.build_xlname())
 
         name = xn._queue                # @TODO feels wrong
-        del self.xn_by_name[name]
+        self.xn_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
+                                        # so delete in the safest way possible
+                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xn")
@@ -375,7 +401,10 @@ class ExchangeManager(object):
 
             self._ems_client.undeclare_exchange_name(xno_id)        # "canonical name" currently understood to be RR id
         else:
-            xn.delete()
+            try:
+                xn.delete()
+            except TransportError as ex:
+                log.warn("Could not delete XN (%s): %s", name, ex)
 
     def _ensure_default_declared(self):
         """
