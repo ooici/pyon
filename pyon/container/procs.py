@@ -18,6 +18,7 @@ from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
+from pyon.ion.resource import RT, PRED
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -52,6 +53,14 @@ class ProcManager(object):
         # Register container as resource object
         cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
         self.cc_id, _ = self.container.resource_registry.create(cc_obj)
+
+        #Create an association to an Org object if not the rot ION org and only if found
+        if CFG.container.org_name and CFG.container.org_name != CFG.system.root_org:
+            org,_ = self.container.resource_registry.find_resources(restype=RT.Org,name=CFG.container.org_name, id_only=True )
+            if org:
+                self.container.resource_registry.create_association(org[0],PRED.hasResource, self.cc_id)  #TODO - replace with proper association
+
+
 
         log.debug("ProcManager started, OK.")
 
