@@ -193,15 +193,17 @@ class ExchangeManager(object):
         Typically used for test cleanup.
         """
 
-        while len(self.xn_by_name):
-            xn = self.xn_by_name.values()[0]
+        xns = self.xn_by_name.values()  # copy as we're removing as we go
+
+        for xn in xns:
             if isinstance(xn, ExchangePoint):   # @TODO ugh
                 self.delete_xp(xn)
             else:
                 self.delete_xn(xn)
 
-        while len(self.xs_by_name):
-            xs = self.xs_by_name.values()[0]
+        xss = self.xs_by_name.values()
+
+        for xs in xss:
             self.delete_xs(xs)
 
         # reset xs map to initial state
@@ -418,7 +420,7 @@ class ExchangeManager(object):
 
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        log.info("ExchangeManager.declare_exchange")
+        log.info("ExchangeManager.declare_exchange %s", exchange)
         self._ensure_default_declared()
         self._transport.declare_exchange_impl(self._client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
     def delete_exchange(self, exchange, **kwargs):
