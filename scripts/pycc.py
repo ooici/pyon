@@ -197,7 +197,6 @@ def main(opts, *args, **kwargs):
         # Auto-bootstrap interfaces
         if bootstrap_config.system.auto_bootstrap:
             iadm.store_interfaces(idempotent=True)
-            iadm.initialize_ion_system_core()
 
         if opts.no_container:
             print "pycc: no_container=True. Stopping here."

@@ -6,26 +6,30 @@ from mock import patch
 import unittest
 import os
 from gevent import greenlet, spawn
-import sys
 
 from pyon.container.cc import Container
 from pyon.core import bootstrap
 from pyon.core.bootstrap import bootstrap_pyon, CFG
+from pyon.core.interfaces.interfaces import InterfaceAdmin
 from pyon.util.containers import DotDict
 from pyon.util.log import log
 
-# This is the only place where code is executed once before any integration test
-# is run.
-def initialize_ion_int_tests():
-    # Bootstrap pyon CFG, logging and object/resource interfaces
-    bootstrap_pyon()
+
+def pre_initialize_ion():
     # Do necessary system initialization
     # Make sure this happens only once
     iadm = InterfaceAdmin(bootstrap.get_sys_name(), config=CFG)
     iadm.create_core_datastores()
     #iadm.store_config(CFG)
     iadm.store_interfaces(idempotent=True)
-    iadm.initialize_ion_system_core()
+
+# This is the only place where code is executed once before any integration test
+# is run.
+def initialize_ion_int_tests():
+    # Bootstrap pyon CFG, logging and object/resource interfaces
+    bootstrap_pyon()
+    if bootstrap.is_testing():
+        pre_initialize_ion()
 
 initialize_ion_int_tests()
 
@@ -45,11 +49,18 @@ class IonIntegrationTestCase(unittest.TestCase):
         self._patch_out_diediedie()
         self._patch_out_fail_fast_kill()
 
+        bootstrap.testing_fast = True
+        # delete/create any known DBs with names matching our prefix - should be rare
+        self._force_clean(True)
+
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
+        else:
+            # We cannot live without pre-initialized datastores and resource objects
+            pre_initialize_ion()
 
         # hack to force_clean on filesystem
         try:
@@ -71,23 +82,17 @@ class IonIntegrationTestCase(unittest.TestCase):
         self.container = Container()
         self.container.start()
 
-        # For integration tests, if class variable "service_dependencies" exists
-        self._start_dependencies()
+        bootstrap.testing_fast = False
 
 
     def _stop_container(self):
+        bootstrap.testing_fast = True
         if self.container:
-            # destroy any created XO in the process of a test
-            try:
-                self.container.ex_manager.cleanup_xos()
-            except Exception as ex:
-                # to stderr so it stands out!
-                print >>sys.stderr, "\nCleanup XOs caused an exception:", ex
-
             self.container.stop()
             self.container = None
-        self._force_clean()         # deletes only
-
+        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
+            self._force_clean()         # deletes only
+        bootstrap.testing_fast = False
 
     def _turn_on_queue_auto_delete(self):
         patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
@@ -102,12 +107,6 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher = patch('pyon.core.thread.shutdown_or_die')
         patcher.start()
         self.addCleanup(patcher.stop)
-
-    def _start_dependencies(self):
-        """
-        Starts the services declared in the class or instance variable "service_dependencies"
-        """
-        self.clients = DotDict()
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
