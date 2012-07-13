@@ -508,7 +508,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_start_consume")
 
-        if self._consumer_tag and self._queue_auto_delete:
+        if self._consumer_tag and (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
         self._ensure_amq_chan()
@@ -535,7 +535,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_stop_consume")
 
-        if self._queue_auto_delete:
+        if self._queue_auto_delete and self._transport is AMQPTransport.get_instance():
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
         self._ensure_amq_chan()
@@ -861,7 +861,7 @@ class ListenChannel(RecvChannel):
 
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
-            if not self._queue_auto_delete:
+            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
                 self._transport.qos(self._amq_chan, prefetch_count=n)
 
             # start consuming
@@ -873,7 +873,7 @@ class ListenChannel(RecvChannel):
 
         if not was_consuming:
             # turn consuming back off if we already were off
-            if not self._queue_auto_delete:
+            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
                 self.stop_consume()
             else:
                 log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")

@@ -435,7 +435,7 @@ class ExchangeManager(object):
         self._ensure_default_declared()
         return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
     def delete_queue(self, queue, **kwargs):
-        log.info("ExchangeManager.delete_queue")
+        log.info("ExchangeManager.delete_queue %s", queue)
         self._ensure_default_declared()
         self._transport.delete_queue_impl(self._client, queue, **kwargs)
     def bind(self, exchange, queue, binding):
