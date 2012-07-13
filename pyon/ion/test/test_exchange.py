@@ -225,7 +225,14 @@ class TestExchangeObjects(PyonTestCase):
     def setUp(self):
         self.ex_manager = ExchangeManager(Mock())
         self.ex_manager._transport  = Mock(BaseTransport)
-        self.ex_manager._client     = Mock()
+
+        # mock out _client, which is a property, to return a sentinel
+        propmock = Mock()
+        propmock.__get__ = Mock(return_value=sentinel.client)
+        patcher = patch.object(ExchangeManager, '_client', propmock)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
         # all exchange level operations are patched out via the _transport
 
     def test_exchange_by_name(self):
@@ -279,7 +286,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(self.ex_manager.xs_by_name[sentinel.xs], xs)
 
         # should've tried to declare
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xs_with_params(self):
         xs      = self.ex_manager.create_xs(sentinel.xs, exchange_type=sentinel.ex_type, durable=True)
@@ -289,7 +296,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xs._xs_exchange_type, sentinel.ex_type)
 
         # declaration?
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
 
     def test_delete_xs(self):
         # need an XS first
@@ -303,13 +310,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.delete_me, self.ex_manager.xs_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(self.ex_manager._client, exstr)
-
-    def test_delete_xs_without_creating_it_first(self):
-        xsmock = Mock(ExchangeSpace)
-        xsmock._exchange = sentinel.fake
-
-        self.assertRaises(KeyError, self.ex_manager.delete_xs, xsmock)
+        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
 
     def test_create_xp(self):
         xp      = self.ex_manager.create_xp(sentinel.xp)
@@ -324,7 +325,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xp.exchange, exstr)
 
         # declaration
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(self.ex_manager._client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xp_with_params(self):
         xp = self.ex_manager.create_xp(sentinel.xp, xptype=sentinel.xptype)
@@ -354,13 +355,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.xp, self.ex_manager.xn_by_name)
 
         # deletion
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(self.ex_manager._client, exstr)
-
-    def test_delete_xp_without_creating_it_first(self):
-        xpmock = Mock(ExchangePoint)
-        xpmock._exchange = sentinel.delete_me
-
-        self.assertRaises(KeyError, self.ex_manager.delete_xp, xpmock)
+        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
 
     def test__create_xn_unknown_type(self):
         self.assertRaises(StandardError, self.ex_manager._create_xn, sentinel.unknown)
@@ -393,7 +388,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertIn(xn, self.ex_manager.xn_by_xs[ION_ROOT_XS])
 
         # declaration
-        self.ex_manager._transport.declare_queue_impl.assert_called_once(self.ex_manager._client, qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
+        self.ex_manager._transport.declare_queue_impl.assert_called_once(sentinel.client, qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
 
     def test_create_xn_process(self):
         xn = self.ex_manager.create_xn_process('procname')
@@ -431,7 +426,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn('procname', self.ex_manager.xn_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_queue_impl.assert_called_once_with(self.ex_manager._client, qstr)
+        self.ex_manager._transport.delete_queue_impl.assert_called_once_with(sentinel.client, qstr)
 
     def test_xn_setup_listener(self):
         xn      = self.ex_manager.create_xn_service('servicename')
@@ -439,21 +434,21 @@ class TestExchangeObjects(PyonTestCase):
 
         xn.setup_listener(sentinel.binding, None)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(self.ex_manager._client, xn.exchange, qstr, sentinel.binding)
+        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, qstr, sentinel.binding)
 
     def test_xn_bind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.bind(sentinel.bind)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(self.ex_manager._client, xn.exchange, xn.queue, sentinel.bind)
+        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
 
     def test_xn_unbind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.unbind(sentinel.bind)
 
-        self.ex_manager._transport.unbind_impl.assert_called_once_with(self.ex_manager._client, xn.exchange, xn.queue, sentinel.bind)
+        self.ex_manager._transport.unbind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
 
 
 @attr('INT', group='exchange')
