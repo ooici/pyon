@@ -204,7 +204,8 @@ class ExchangeManager(object):
         xss = self.xs_by_name.values()
 
         for xs in xss:
-            self.delete_xs(xs)
+            if not (xs == self.default_xs and not self._default_xs_declared):
+                self.delete_xs(xs)
 
         # reset xs map to initial state
         self._default_xs_declared = False
@@ -421,7 +422,9 @@ class ExchangeManager(object):
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_exchange %s", exchange)
-        self._ensure_default_declared()
+        if exchange != ION_ROOT_XS:
+            # don't allow recursion!
+            self._ensure_default_declared()
         self._transport.declare_exchange_impl(self._client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
     def delete_exchange(self, exchange, **kwargs):
         log.info("ExchangeManager.delete_exchange")
