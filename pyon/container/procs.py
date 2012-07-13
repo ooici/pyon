@@ -243,7 +243,7 @@ class ProcManager(object):
         listen_name = get_safe(config, "process.listen_name") or name
         service_instance._proc_listen_name = listen_name
 
-        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
+        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, container=self.container)
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name)
 
         # Add publishers if any...
@@ -436,7 +436,7 @@ class ProcManager(object):
         service_instance.start()
 
     def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
-        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, node=self.container.node)
+        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, container=self.container)
 
         publisher_streams = publisher_streams or {}
 

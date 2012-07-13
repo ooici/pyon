@@ -10,6 +10,7 @@ from mock import patch
 import unittest
 import os
 from gevent import greenlet, spawn
+import sys
 
 # Make this call more deterministic in time.
 bootstrap_pyon()
@@ -63,6 +64,13 @@ class IonIntegrationTestCase(unittest.TestCase):
 
     def _stop_container(self):
         if self.container:
+            # destroy any created XO in the process of a test
+            try:
+                self.container.ex_manager.cleanup_xos()
+            except Exception as ex:
+                # to stderr so it stands out!
+                print >>sys.stderr, "\nCleanup XOs caused an exception:", ex
+
             self.container.stop()
             self.container = None
         self._force_clean()         # deletes only
