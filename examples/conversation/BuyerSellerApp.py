@@ -4,43 +4,40 @@ from pyon.net.transport import NameTrio
 from pyon.net import channel
 from pyon.net import messaging
 from pyon.net import conversation
-from pyon.net.conversation import ConversationOriginator, Conversation, Principal
+from pyon.net.conversation import Conversation, Principal,InitiatorPrincipal, GuestPrincipal
 
 node, ioloop_process = messaging.make_node()
 def buyer_app(queue_name):
     #principal initialisation
-    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue'))
+    customer = InitiatorPrincipal(node, NameTrio('buyer', 'buyer_queue'))
 
     # conversation bootstrapping
-    c = originator.start_conversation('buyer_seller', 'buyer')
-    c.invite('seller', NameTrio('seller', queue_name))
+    c = customer.start_conversation(protocol = 'buyer_seller', role ='buyer')
+    c.invite(to_role = 'seller', to_role_addr = NameTrio('seller', queue_name))
 
     #interactions
-    c.send('seller', 'Hello1')
-    c.send('seller', 'Hello2')
+    c.send('seller', 'I will send you a request shortly. Please wait for me.')
+    c.send('seller', 'How expensive is War and Piece?')
     msg, header = c.recv('seller')
     print 'Msg received: %s' % (msg)
 
     #cleaning
-    c.close()
-    originator.stop_listening()
+    customer.stop_conversation()
 
 def seller_app(queue_name):
     #principal initialisation
-    local = Principal(node, NameTrio('seller', queue_name))
-    local.spawn_listener()
+    stock_provider = GuestPrincipal(node, NameTrio('seller', queue_name))
+    stock_provider.start_listening()
 
     #joining a conversation (bootstrapping)
-    conv, msg, header  = local.get_invitation()
-    c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
+    conv, msg, header  = stock_provider.get_invitation()
+    c = stock_provider.accept_invitation(conv, msg, header, auto_reply = 'True')
 
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    c.send('buyer', 'Hello3')
+    c.send('buyer', '3000 pounds')
 
-    #cleaning
-    c.close()
-    local.stop_listening()
+    stock_provider.stop_listening()
