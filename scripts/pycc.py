@@ -147,6 +147,7 @@ def main(opts, *args, **kwargs):
             from pyon.datastore import clear_couch_util
             print "pycc: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
             clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
+            pyon_config.container.filesystem.force_clean=True
 
         from pyon.core.interfaces.interfaces import InterfaceAdmin
         iadm = InterfaceAdmin(bootstrap.get_sys_name(), config=bootstrap_config)
