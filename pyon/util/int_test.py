@@ -29,9 +29,9 @@ def initialize_ion_int_tests():
     # Bootstrap pyon CFG, logging and object/resource interfaces
     bootstrap_pyon()
     if bootstrap.is_testing():
+        IonIntegrationTestCase._force_clean(False)
         pre_initialize_ion()
 
-initialize_ion_int_tests()
 
 
 class IonIntegrationTestCase(unittest.TestCase):
@@ -128,7 +128,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _force_clean(self, recreate=False):
+    @classmethod
+    def _force_clean(cls, recreate=False):
         from pyon.core.bootstrap import get_sys_name, CFG
         from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
         datastore = CouchDataStore(config=CFG)
@@ -143,3 +144,4 @@ class IonIntegrationTestCase(unittest.TestCase):
         finally:
             datastore.close()
 
+initialize_ion_int_tests()
