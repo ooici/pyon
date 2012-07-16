@@ -12,6 +12,8 @@ from pyon.ion.endpoint import ProcessPublisher, ProcessSubscriber, PublisherErro
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
 from pyon.util.async import  spawn
+from pyon.util.arg_check import validate_is_instance
+from pyon.ion.exchange import ExchangePoint
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.core import bootstrap
 from pyon.util.log import log
@@ -187,6 +189,7 @@ class StreamSubscriberRegistrar(object):
 
 class SimpleStreamPublisher(Publisher):
     def __init__(self,exchange_point, stream_id):
+        validate_is_instance(exchange_point,ExchangePoint)
         self.stream_id = stream_id
         self.exchange_point = exchange_point
         super(SimpleStreamPublisher,self).__init__()
@@ -194,12 +197,12 @@ class SimpleStreamPublisher(Publisher):
     def publish(self, msg, stream_id=''):
         if not stream_id:
             stream_id = self.stream_id
-        return super(SimpleStreamPublisher,self).publish(msg,to_name=(self.exchange_point, '%s.data' % stream_id))
+        return super(SimpleStreamPublisher,self).publish(msg,to_name=self.exchange_point.create_route('%s.data' % stream_id))
 
     @classmethod
     def new_publisher(cls,container,exchange_point,stream_id):
         xp = container.ex_manager.create_xp(exchange_point)
-        return cls(xp.exchange,stream_id)
+        return cls(xp,stream_id)
 
 class SimpleStreamSubscriber(Subscriber):
     def __init__(self,*args, **kwargs):
@@ -219,3 +222,4 @@ class SimpleStreamSubscriber(Subscriber):
     def new_subscriber(cls, container, exchange_name, callback):
         xn = container.ex_manager.create_xn_queue(exchange_name)
         return cls(name=xn, callback=callback)
+
