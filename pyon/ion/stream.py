@@ -7,12 +7,16 @@ __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.c
 __license__ = 'Apache 2.0'
 
 from pyon.core.bootstrap import CFG, IonObject
+from pyon.core.exception import BadRequest
 from pyon.ion.endpoint import ProcessPublisher, ProcessSubscriber, PublisherError
+from pyon.net.endpoint import Publisher, Subscriber
 from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
 from pyon.util.async import  spawn
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.core import bootstrap
 from pyon.util.log import log
+
+import gevent
 
 
 class StreamPublisher(ProcessPublisher):
@@ -181,4 +185,37 @@ class StreamSubscriberRegistrar(object):
 
         return StreamSubscriber(from_name=xn, process=self.process, callback=callback, node=self.container.node)
 
+class SimpleStreamPublisher(Publisher):
+    def __init__(self,exchange_point, stream_id):
+        self.stream_id = stream_id
+        self.exchange_point = exchange_point
+        super(SimpleStreamPublisher,self).__init__()
 
+    def publish(self, msg, stream_id=''):
+        if not stream_id:
+            stream_id = self.stream_id
+        return super(SimpleStreamPublisher,self).publish(msg,to_name=(self.exchange_point, '%s.data' % stream_id))
+
+    @classmethod
+    def new_publisher(cls,container,exchange_point,stream_id):
+        xp = container.ex_manager.create_xp(exchange_point)
+        return cls(xp.exchange,stream_id)
+
+class SimpleStreamSubscriber(Subscriber):
+    def __init__(self,*args, **kwargs):
+        self.started = False
+        super(SimpleStreamSubscriber,self).__init__(*args,**kwargs)
+    def start(self):
+        self.started = True
+        self.greenlet = gevent.spawn(self.listen)
+    def stop(self):
+        if not self.started:
+            raise BadRequest('Can\'t stop a subscriber that hasn\'t started.')
+
+        self.close()
+        self.greenlet.join(timeout=10)
+        self.started = False
+    @classmethod
+    def new_subscriber(cls, container, exchange_name, callback):
+        xn = container.ex_manager.create_xn_queue(exchange_name)
+        return cls(name=xn, callback=callback)
