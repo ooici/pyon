@@ -172,8 +172,10 @@ class Container(BaseContainerAgent):
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
+        cleanup = lambda _: self.proc_manager._cleanup_method(self.name)
+
         # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self)
+        proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self, cleanup_method=cleanup)
         self.proc_manager.proc_sup.ensure_ready(proc)
         self._capabilities.append("CONTAINER_AGENT")
 
