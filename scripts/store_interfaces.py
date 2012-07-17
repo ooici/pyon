@@ -90,5 +90,7 @@ def main():
     # Store system interfaces
     iadm.store_interfaces(options.fobject, options.fservice)
 
+    iadm.close()
+
 if __name__ == '__main__':
     main()

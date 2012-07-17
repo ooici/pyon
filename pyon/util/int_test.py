@@ -11,7 +11,6 @@ from pyon.container.cc import Container
 from pyon.core import bootstrap
 from pyon.core.bootstrap import bootstrap_pyon, CFG
 from pyon.core.interfaces.interfaces import InterfaceAdmin
-from pyon.util.containers import DotDict
 from pyon.util.log import log
 
 
@@ -22,6 +21,7 @@ def pre_initialize_ion():
     iadm.create_core_datastores()
     #iadm.store_config(CFG)
     iadm.store_interfaces(idempotent=True)
+    iadm.close()
 
 # This is the only place where code is executed once before any integration test
 # is run.

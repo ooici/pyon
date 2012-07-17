@@ -9,7 +9,7 @@ from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
 from pyon.core import exception
-from pyon.core.bootstrap import CFG, IonObject
+from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
@@ -19,6 +19,8 @@ from pyon.service.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
+from pyon.net.channel import RecvChannel
+from pyon.net.transport import NameTrio
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -190,6 +192,17 @@ class ProcManager(object):
 
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
+
+    def _cleanup_method(self, queue_name):
+        """
+        Common method to be passed to each spawned ION process to clean up their process-queue.
+
+        @TODO Leaks implementation detail, should be using XOs
+        """
+        ch = self.container.node.channel(RecvChannel)
+        ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
+        ch._destroy_queue()
+
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
     def _spawn_service_process(self, process_id, name, module, cls, config):
@@ -213,11 +226,16 @@ class ProcManager(object):
             from_name=service_instance.id,
             service=service_instance,
             process=service_instance)
+
+        # cleanup method to delete process queue
+        cleanup = lambda _: self._cleanup_method(service_instance.id)
+
         # Start an ION process with the right kind of endpoint factory
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc1, rsvc2],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, service_instance.id)))
 
         # map gproc to service_instance
@@ -255,10 +273,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc, sub],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
 
         # map gproc to service_instance
@@ -293,10 +315,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -331,10 +357,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_standalone_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -419,10 +449,12 @@ class ProcManager(object):
             client.node     = self.container.node
 
             # ensure that dep actually exists and is running
-            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
-                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
-                if not svc_de:
-                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
+            # MM: commented out - during startup (init actually), we don't need to check for service dependencies
+            # MM: TODO: split on_init from on_start; start consumer in on_start; check for full queues on restart
+#            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
+#                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
+#                if not svc_de:
+#                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
 
     def _service_init(self, service_instance):
         # Init process
@@ -531,7 +563,7 @@ class ProcManager(object):
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
         if service_instance._process:
-            service_instance._process.notify_stop()
+            #service_instance._process.notify_stop()
             service_instance._process.stop()
 
         self._unregister_process(process_id, service_instance)
