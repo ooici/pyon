@@ -28,12 +28,18 @@ class InterfaceAdmin:
         self.config = config
         self.dir = DirectoryStandalone(sysname=self.sysname, config=config)
         self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=config)
+        self._closed = False
 
     def close(self):
         self.dir.close()
         self.dir = None
         self.rr.close()
         self.rr = None
+        self._closed = True
+
+    def __del__(self):
+        if not self._closed:
+            print "WARNING: Call close() on InterfaceAdmin (and datastores)"
 
     def create_core_datastores(self):
         """
@@ -73,7 +79,7 @@ class InterfaceAdmin:
             self.store_service_interfaces(file=service_definition_file)
         else:
             if self.idempotent:
-                de = self.rr.find_by_type("ServiceDefinition", id_only=True, limit=1)
+                de = self.rr.find_by_type("ServiceDefinition", id_only=True)
                 if de:
                     #print "store_interfaces: Interfaces already stored. Ignoring"
                     return
