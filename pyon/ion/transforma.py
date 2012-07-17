@@ -16,7 +16,6 @@ from pyon.event.event import EventSubscriber, EventPublisher
 from pyon.util.log import log
 
 class TransformBase(SimpleProcess):
-
     def on_start(self):
         super(TransformBase,self).on_start()
 
