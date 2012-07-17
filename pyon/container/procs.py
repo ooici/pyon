@@ -193,15 +193,18 @@ class ProcManager(object):
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
 
-    def _cleanup_method(self, queue_name):
+    def _cleanup_method(self, queue_name, ep=None):
         """
         Common method to be passed to each spawned ION process to clean up their process-queue.
 
         @TODO Leaks implementation detail, should be using XOs
         """
-        ch = self.container.node.channel(RecvChannel)
-        ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
-        ch._destroy_queue()
+        if not ep._chan._queue_auto_delete:
+            # only need to delete if AMQP didn't handle it for us already!
+            # @TODO this will not work with XOs (future)
+            ch = self.container.node.channel(RecvChannel)
+            ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
+            ch._destroy_queue()
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
@@ -228,7 +231,7 @@ class ProcManager(object):
             process=service_instance)
 
         # cleanup method to delete process queue
-        cleanup = lambda _: self._cleanup_method(service_instance.id)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc2)
 
         # Start an ION process with the right kind of endpoint factory
         proc = self.proc_sup.spawn(name=service_instance.id,
@@ -274,7 +277,7 @@ class ProcManager(object):
             process=service_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(service_instance.id)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
@@ -316,7 +319,7 @@ class ProcManager(object):
             process=service_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(service_instance.id)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
@@ -358,7 +361,7 @@ class ProcManager(object):
             process=service_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(service_instance.id)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
