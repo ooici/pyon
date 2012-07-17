@@ -449,10 +449,12 @@ class ProcManager(object):
             client.node     = self.container.node
 
             # ensure that dep actually exists and is running
-            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
-                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
-                if not svc_de:
-                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
+            # MM: commented out - during startup (init actually), we don't need to check for service dependencies
+            # MM: TODO: split on_init from on_start; start consumer in on_start; check for full queues on restart
+#            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
+#                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
+#                if not svc_de:
+#                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
 
     def _service_init(self, service_instance):
         # Init process
