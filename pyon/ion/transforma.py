@@ -14,6 +14,7 @@ from pyon.net.endpoint import Subscriber, Publisher
 from pyon.event.event import EventSubscriber, EventPublisher
 
 from pyon.util.log import log
+from pyon.ion.stream import SimpleStreamPublisher, SimpleStreamSubscriber
 
 class TransformBase(SimpleProcess):
     def on_start(self):
@@ -28,64 +29,30 @@ class TransformEventProcess(TransformBase):
 class TransformStreamListener(TransformStreamProcess):
 
     def on_start(self):
-        self.queue_name = self.CFG.get_safe('process.queue_name','')
+        self.queue_name = self.CFG.get_safe('process.queue_name',self.id)
 
         # @TODO: queue_name is really exchange_name, rename
-        xn = self.container.ex_manager.create_xn_queue(self.queue_name)
-
-        self.subscriber = Subscriber(name=xn, callback=self.recv_packet)
-        self.greenlet = spawn(self.subscriber.listen)
-
-        ## Assign a list of streams available
-        #self.streams = self.CFG.get_safe('process.subscriber_streams',[])
-        #log.warn('TransformStreamListener.on_start()')
-        #self.subscribers = []
-        #self.greenlets = []
-        #for stream in self.streams:
-        #    subscriber = Subscriber(name=stream, callback=self.recv_packet)
-        #    self.subscribers.append(subscriber)
-        #    self.greenlets.append(spawn(subscriber.listen))
+        self.subscriber = SimpleStreamSubscriber.new_subscriber(self.container, self.queue_name, self.recv_packet)
+        self.subscriber.start()
 
     def recv_packet(self, msg, headers):
         raise NotImplementedError('Method recv_packet not implemented')
 
     def on_quit(self):
-#        for subscriber in self.subscribers:
-#            subscriber.close()
-#
-#        for greenlet in self.greenlets:
-#            greenlet.join(timeout=10)
-        self.subscriber.close()
-        self.greenlet.join(timeout=10)
+        self.subscriber.stop()
 
 class TransformStreamPublisher(TransformStreamProcess):
 
     def on_start(self):
         self.exchange_point = self.CFG.get_safe('process.exchange_point', '')
 
-        xp = self.container.ex_manager.create_xp(self.exchange_point)
-
-        self.publisher = Publisher()
-#        # Assign a list of streams available
-#        self.streams = self.CFG.get_safe('process.publish_streams',[])
-#        log.warn('TransformStreamPublisher.on_start()')
-#        self.publishers = []
-#        #self.greenlets = []
-#        for stream in self.streams:
-#            publisher = Publisher(name=(get_sys_name(), stream), node=self.container.node)
-#            self.publishers.append(publisher)
-#            #self.greenlets.append(spawn(publisher.publish))
+        self.publisher = SimpleStreamPublisher.new_publisher(self.container,self.exchange_point,'')
 
     def publish(self, msg, to_name):
         raise NotImplementedError('Method publish not implemented')
 
     def on_quit(self):
         self.publisher.close()
-#        for publisher in self.publishers:
-#            publisher.close()
-
-        #for greenlet in self.greenlets:
-        #    greenlet.join(timeout=10)
 
 class TransformEventListener(TransformEventProcess):
 
