@@ -154,7 +154,7 @@ class ConversationEndpoint(object):
         if auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
 
-    def invite(self, to_role, to_role_addr, merge_with_first_send = True):
+    def invite(self, to_role, to_role_addr, merge_with_first_send = False):
         self._invitation_table.setdefault(to_role, (to_role_addr, False))
         self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
@@ -442,7 +442,6 @@ class Principal(object):
            self._recv_greenlet.join(timeout=1)
            self._recv_greenlet.kill()      # he's dead, jim
 
-
     def get_invitation(self, protocol = None):
        # Here we should iterate while we find the protocol that is matched
        print 'Wait to get an invitation'
@@ -451,18 +450,24 @@ class Principal(object):
        #    c.send_ack(c.inviter_role, 'I am joining')
        #return c
 
-    def accept_invitation(self, c, msg, header, auto_reply = False):
+    def accept_invitation(self, invitation, merge_with_first_send = False):
+       (c, msg, header) =  invitation
        endpoint = ConversationEndpoint(self.node)
-       endpoint.accept(msg, header, c, self.base_name, auto_reply)
-       self._conversations[c.id] = c
+       endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
+       role = header['receiver-role']
+       self._conversations[c.id] = endpoint
        return endpoint
+
+    def accept_next_invitation(self, merge_with_first_send = False):
+        invitation = self.get_invitation()
+        return self.accept_invitation(invitation, merge_with_first_send = False)
+
 
     def _recv_invitation(self, msg, header):
        control_msg_type = get_control_msg_type(header)
        if control_msg_type == MSG_TYPE.INVITE:
            c = Conversation(header['protocol'], header['conv-id'])
            print '_accept_invitation: Conversation added to the list'
-           #self._conversations[header['conv-id']] = c
            self._recv_queue.put((c, msg, header))
            #else: raise ConversationError('Reject invitation is not supported yet.')
 
@@ -472,6 +477,8 @@ class Principal(object):
     def check_invitation(self, msg, header):
        return True
 
+class GuestPrincipal(Principal):
+    pass
 
 #######################################################################################################################
 # OOI specific (Container Specific) conversations
@@ -494,10 +501,11 @@ class RPCClient(object):
     # Will be nice to have
     # combine requestresponseClient.request and RequestEndpointUnit._send
     s = 0
-    def __init__(self, node, base_name, server_name):
+    def __init__(self, node, base_name, server_name, rpc_conversation = None):
         self.node = node
         self.name = base_name
         self.server_name = server_name
+        self.rpc_conv = rpc_conversation or RPCConversation()
 
     def request(self, msg, header = None, **kwargs):
         # could have a specified timeout in kwargs
@@ -509,12 +517,12 @@ class RPCClient(object):
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
         ts = time.time()
-        local = ConversationOriginator(self.node, self.name)
-        c = local.start_conversation('rpc', 'client')
-        c.invite('server', self.server_name)
-        c.send('server', 'Hello%s'%self.s)
+        local = InitiatorPrincipal(self.node, self.name)
+        c = local.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
+        c.invite(self.rpc_conv.server_role, self.server_name)
+        c.send(self.rpc_conv.server_role, msg)
         try:
-            result_data, result_headers = c.recv('server')
+            result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
         finally:
@@ -523,8 +531,7 @@ class RPCClient(object):
                 header.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
-            c.close()
-            local.stop_listening()
+            local.stop_conversation()
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         self.s+=1
         return result_data, result_headers
@@ -541,20 +548,21 @@ class RPCClient(object):
 #@TODO: Headers are not set and _service is not called
 class RPCServer(object):
 
-    def __init__(self, node, name, service = None):
+    def __init__(self, node, name, service = None, rpc_conversation = None):
         self.node = node
         self.name = name
         self._service = service
+        self.rpc_conv = rpc_conversation or RPCConversation()
 
     def listen(self):
             local = Principal(self.node, self.name)
-            local.spawn_listener()
+            local.start_listening()
             while True:
                 conv, msg, header  = local.get_invitation()
                 c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
-                msg, header = c.recv('client')
+                msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
-                c.send('client', reply)
+                c.send(self.rpc_conv.client_role, reply)
 
     def process_msg(self, msg, header):
         if header.setdefault('op', '') == self._service:
@@ -574,7 +582,8 @@ class BankClient(RPCClient):
     def __init__(self, node, base_name, server_name):
         self.role = 'bankclient'
         self.protocol = 'buyer_seller'
-        RPCClient.__init__(node, base_name, server_name)
+        self.rpc_conv = RPCConversation(self.protocol, 'bank', 'client')
+        RPCClient.__init__(node, base_name, server_name, 'buy_bonds', rpc_conv)
 
     def buy_bonds(self, msg):
         header = {}
@@ -585,6 +594,7 @@ class BankService(RPCServer):
     def __init__(self, node, name):
         self.role = 'bankserver'
         self.protocol = 'buyer_seller'
+        self.rpc_conv = RPCConversation(self.protocol, 'bank', 'client')
         RPCServer.__init__(node, name, 'buy_bonds')
 
     def process_msg(self, msg, header):
@@ -595,3 +605,22 @@ class BankService(RPCServer):
             msg = 'I do not support this call:%s' % (header['op'])
             print msg
         return msg
+
+class RPCConversation(object):
+    def __init__(self, protocol = None, server_role = None, client_role = None):
+        self.protocol = protocol or 'rpc'
+        self.server_role = server_role or 'server'
+        self.client_role = client_role or 'client'
+
+
+class PrincipalName(object):
+    def __init__(self, namespace, name):
+        self.name = NameTrio(namespace, name)
+
+    @property
+    def name(self):
+        return self._name
+
+    @protocol.setter
+    def name(self, value):
+        self._name = value

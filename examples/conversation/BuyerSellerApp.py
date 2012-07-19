@@ -4,43 +4,41 @@ from pyon.net.transport import NameTrio
 from pyon.net import channel
 from pyon.net import messaging
 from pyon.net import conversation
-from pyon.net.conversation import ConversationOriginator, Conversation, Principal
+from pyon.net.conversation import Conversation, Principal,PrincipalName
 
 node, ioloop_process = messaging.make_node()
-def buyer_app(queue_name):
+def buyer_app(service_provider_name):
     #principal initialisation
-    originator = Principal(node, NameTrio('rumi-PC', 'buyer_queue'))
-
+    customer = Principal(node, PrincipalName(namespace = 'rumi-PC',
+                                               name = 'rumi'))
     # conversation bootstrapping
-    c = originator.start_conversation('buyer_seller_protocol', 'buyer')
-    c.invite('seller', NameTrio('seller', queue_name))
+    c = customer.start_conversation(protocol = 'buyer_seller_protocol',
+                                      role = 'buyer')
+
+    c.invite('seller', PrincipalName(namespace = 'stephen-PC',
+                                     name = service_provider_name,
+                                     merge_with_first_send = True))
 
     #interactions
-    c.send('seller', 'Hello1')
-    c.send('seller', 'Hello2')
+    c.send('seller', 'I will send you a request shortly. Please wait for me.')
+    c.send('seller', 'How expensive is War and Peace?')
     msg, header = c.recv('seller')
     print 'Msg received: %s' % (msg)
 
-    #cleaning
     c.close()
-    originator.terminate()
+    customer.terminate()
 
-def seller_app(queue_name):
-    #principal initialisation
-    local = Principal(node, NameTrio('seller', queue_name))
-    local.start_listening()
-
-    #joining a conversation (bootstrapping)
-    conv, msg, header  = local.get_invitation()
-    c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
+def seller_app(service_provider_name):
+    service_provider = Principal(node, PrincipalName(namespace = 'stephen-PC',
+                                                   name = service_provider_name))
+    service_provider.start_listening()
+    c = service_provider.accept_invitation(merge_with_first_send = True)
 
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    msg, header = c.recv('buyer', {'Hello3'})
+    msg, header = c.recv('buyer', {'Hello'})
     print 'Msg received: %s' %(msg)
-    c.send('buyer', 'Hello3')
-
-    #cleaning
+    c.send('buyer', '3000 pounds')
     c.close()
-    local.terminate()
+    service_provider.terminate()
