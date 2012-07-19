@@ -2,7 +2,7 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
-from pyon.core.exception import NotFound
+from pyon.core.exception import NotFound, BadRequest, Inconsistent
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 
 from pyon.ion.identifier import create_unique_directory_id
