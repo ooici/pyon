@@ -134,8 +134,9 @@ class BaseChannel(object):
         self._ensure_amq_chan()
         assert self._transport
 
-        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
-                                                                 self._exchange_durable, self._exchange_auto_delete)
+        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s",
+                  self._exchange, self._exchange_type,
+                  self._exchange_durable, self._exchange_auto_delete)
 
         self._transport.declare_exchange_impl(self._amq_chan,
                                               self._exchange,
@@ -252,7 +253,8 @@ class BaseChannel(object):
         logmeth = log.debug
         if not (code == 0 or code == 200):
             logmeth = log.error
-        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.get_channel_id(), code, text)
+        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s",
+                self.get_channel_id(), code, text)
 
         # remove amq_chan so we don't try to use it again
         # (all?) calls are protected via _ensure_amq_chan, which raise a ChannelError if you try to do anything with it.
@@ -325,10 +327,10 @@ class SendChannel(BaseChannel):
         self._ensure_amq_chan()
 
         self._amq_chan.basic_publish(exchange=exchange, #todo
-                                routing_key=routing_key, #todo
-                                body=data,
-                                properties=props,
-                                immediate=False, #todo
+                                     routing_key=routing_key, #todo
+                                     body=data,
+                                     properties=props,
+                                     immediate=False, #todo
                                 mandatory=False) #todo
 
 class RecvChannel(BaseChannel):

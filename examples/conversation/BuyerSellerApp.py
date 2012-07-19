@@ -9,10 +9,10 @@ from pyon.net.conversation import ConversationOriginator, Conversation, Principa
 node, ioloop_process = messaging.make_node()
 def buyer_app(queue_name):
     #principal initialisation
-    originator = ConversationOriginator(node, NameTrio('buyer', 'buyer_queue'))
+    originator = Principal(node, NameTrio('rumi-PC', 'buyer_queue'))
 
     # conversation bootstrapping
-    c = originator.start_conversation('buyer_seller', 'buyer')
+    c = originator.start_conversation('buyer_seller_protocol', 'buyer')
     c.invite('seller', NameTrio('seller', queue_name))
 
     #interactions
@@ -23,12 +23,12 @@ def buyer_app(queue_name):
 
     #cleaning
     c.close()
-    originator.stop_listening()
+    originator.terminate()
 
 def seller_app(queue_name):
     #principal initialisation
     local = Principal(node, NameTrio('seller', queue_name))
-    local.spawn_listener()
+    local.start_listening()
 
     #joining a conversation (bootstrapping)
     conv, msg, header  = local.get_invitation()
@@ -37,10 +37,10 @@ def seller_app(queue_name):
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    msg, header = c.recv('buyer')
+    msg, header = c.recv('buyer', {'Hello3'})
     print 'Msg received: %s' %(msg)
     c.send('buyer', 'Hello3')
 
     #cleaning
     c.close()
-    local.stop_listening()
+    local.terminate()
