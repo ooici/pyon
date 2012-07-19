@@ -449,18 +449,18 @@ class ExchangeManager(object):
     def get_stats(self, queue):
         log.info("ExchangeManager.get_stats")
         self._ensure_default_declared()
-        return self._transport.get_stats(self._client, queue)
+        return self._transport.get_stats_impl(self._client, queue)
     def purge(self, queue):
         log.info("ExchangeManager.purge")
         self._ensure_default_declared()
-        self._transport.purge(self._client, queue)
+        self._transport.purge_impl(self._client, queue)
     def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         """
         QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
         """
         log.info("ExchangeManager.qos")
         self._ensure_default_declared()
-        self._transport.qos(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
+        self._transport.qos_impl(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 
 class XOTransport(BaseTransport):
@@ -489,13 +489,13 @@ class XOTransport(BaseTransport):
         log.debug("XOTransport passing on setup_listener")
         pass
 
-    def get_stats(self, client, queue):
+    def get_stats_impl(self, client, queue):
         return self._exchange_manager.get_stats(queue)
 
-    def purge(self, client, queue):
+    def purge_impl(self, client, queue):
         return self._exchange_manager.purge(queue)
 
-    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+    def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         """
         QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
 
@@ -586,6 +586,11 @@ class ExchangeName(XOTransport, NameTrio):
         # make sure we've bound (idempotent action)
         self.bind(binding)
 
+    def get_stats(self):
+        return self.get_stats_impl(None, self.queue)
+
+    def purge(self):
+        return self.purge_impl(None, self.queue)
 
 class ExchangePoint(ExchangeName):
     """
@@ -630,6 +635,12 @@ class ExchangePoint(ExchangeName):
         Returns an ExchangePointRoute used for sending messages to an exchange point.
         """
         return ExchangePointRoute(self._exchange_manager, name, self)
+
+    def get_stats(self):
+        raise NotImplementedError("get_stats not implemented for XP")
+
+    def purge(self):
+        raise NotImplementedError("purge not implemented for XP")
 
 class ExchangePointRoute(ExchangeName):
     """

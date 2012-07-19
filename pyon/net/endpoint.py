@@ -545,6 +545,18 @@ class ListeningBaseEndpoint(BaseEndpoint):
         assert self._chan
         self._chan.stop_consume()       # channel will yell at you if this is invalid
 
+    def get_stats(self):
+        """
+        Returns a tuple of the form (# ready messages, # of consumers).
+
+        This endpoint must have been initialized in order to have a valid queue
+        to work on.
+
+        Passes down to the channel layer to get this info.
+        """
+        assert self._chan
+        return self._chan.get_stats()
+
     def _get_n_msgs(self, num=1, timeout=None):
         """
         Internal method to accept n messages, create MessageObject wrappers, return them.
@@ -596,6 +608,21 @@ class ListeningBaseEndpoint(BaseEndpoint):
         @returns                    A list of MessageObjects.
         """
         return self._get_n_msgs(num, timeout=timeout)
+
+    def get_all_msgs(self, timeout=None):
+        """
+        Receives all available messages on the queue.
+
+        WARNING: If the queue is not exclusive, there is a possibility this method behaves incorrectly.
+        You should always pass a timeout to this method.
+
+        Blocks until all messages received, or the optional timeout is reached.
+        @raises ChannelClosedError  If the channel has been closed.
+        @raises Timeout             If no messages available when timeout is reached.
+        @returns                    A list of MessageObjects.
+        """
+        n, _ = self.get_stats()
+        return self._get_n_msgs(n, timeout=timeout)
 
     def close(self):
         BaseEndpoint.close(self)

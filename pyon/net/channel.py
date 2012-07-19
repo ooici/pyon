@@ -690,7 +690,7 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
         self._ensure_amq_chan()
 
-        return self._transport.get_stats(self._amq_chan, queue=self._recv_name.queue)
+        return self._transport.get_stats_impl(self._amq_chan, queue=self._recv_name.queue)
 
     def _purge(self):
         """
@@ -700,7 +700,7 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel.purge: %s", self._recv_name.queue)
         self._ensure_amq_chan()
 
-        return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
+        return self._transport.purge_impl(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
 
@@ -862,7 +862,7 @@ class ListenChannel(RecvChannel):
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
             if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
-                self._transport.qos(self._amq_chan, prefetch_count=n)
+                self._transport.qos_impl(self._amq_chan, prefetch_count=n)
 
             # start consuming
             self.start_consume()

@@ -36,13 +36,13 @@ class BaseTransport(object):
     def setup_listener(self, binding, default_cb):
         raise NotImplementedError()
 
-    def get_stats(self, client, queue):
+    def get_stats_impl(self, client, queue):
         raise NotImplementedError()
 
-    def purge(self, client, queue):
+    def purge_impl(self, client, queue):
         raise NotImplementedError()
 
-    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+    def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         raise NotImplementedError()
 
 class AMQPTransport(BaseTransport):
@@ -146,28 +146,28 @@ class AMQPTransport(BaseTransport):
         """
         return default_cb(self, binding)
 
-    def get_stats(self, client, queue):
+    def get_stats_impl(self, client, queue):
         """
         Gets a tuple of number of messages, number of consumers on a queue.
         """
-        log.debug("AMQPTransport.get_stats(%s): Q %s", client.channel_number, queue)
+        log.debug("AMQPTransport.get_stats_impl(%s): Q %s", client.channel_number, queue)
         frame = self._sync_call(client, client.queue_declare, 'callback',
                                         queue=queue or '',
                                         passive=True)
         return frame.method.message_count, frame.method.consumer_count
 
-    def purge(self, client, queue):
+    def purge_impl(self, client, queue):
         """
         Purges a queue.
         """
-        log.debug("AMQPTransport.purge(%s): Q %s", client.channel_number, queue)
+        log.debug("AMQPTransport.purge_impl(%s): Q %s", client.channel_number, queue)
         self._sync_call(client, client.queue_purge, 'callback', queue=queue)
 
-    def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+    def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         """
         Adjusts quality of service for a channel.
         """
-        log.debug("AMQPTransport.qos(%s): pf_size %s, pf_count %s, global_ %s", client.channel_number, prefetch_size, prefetch_count, global_)
+        log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", client.channel_number, prefetch_size, prefetch_count, global_)
         self._sync_call(client, client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
 class NameTrio(object):
