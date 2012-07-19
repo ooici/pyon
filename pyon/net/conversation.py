@@ -183,9 +183,16 @@ class ConversationEndpoint(object):
         else:
             self._send_in_session_msg(to_role, msg)
 
-    def recv(self, from_role = None):
-        msg, header = self._recv_queues[from_role].get()
+    def recv(self, from_role = None, labels = None):
+        (msg, header) = self._recv_queues[from_role].get()
+        print 'receive:%s'%header
+        if labels:
+            while 'op' not in header or header['op'] not in labels:
+                self._recv_queues[from_role].put((msg, header))
+                msg, header = self._recv_queues[from_role].get()
         #@TODO: When to fuel the message through the intercept stack, when the msg is requested or when it is received??
+        else:self._recv_queues[from_role].keys()[0].get()
+
         msg, header = self._intercept_msg_in(msg, header)
         return msg, header
 
@@ -416,6 +423,14 @@ class Principal(object):
     def stop_listening(self):
         [conv_endpoint.close() for conv_endpoint  in self._conversations.values()]
 
+    def start_conversation(self, protocol, role):
+        c = Conversation(protocol)
+        endpoint = ConversationEndpoint(self.node)
+        endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
+        self._conversations[c.id] = c
+        return endpoint
+
+    def terminate(self):
         if self._chan:
             # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
             # we may end up having a duplicate, but I think logically it would never be a problem.
@@ -458,20 +473,6 @@ class Principal(object):
 
     def check_invitation(self, msg, header):
        return True
-
-class GuestPrincipal(Principal):
-    pass
-
-class InitiatorPrincipal(Principal):
-    def start_conversation(self, protocol, role):
-       c = Conversation(protocol)
-       endpoint = ConversationEndpoint(self.node)
-       endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
-       self._conversations[c.id] = endpoint
-       return endpoint
-    def stop_conversation(self):
-        Principal.stop_listening(self)
-
 
 #######################################################################################################################
 # OOI specific (Container Specific) conversations

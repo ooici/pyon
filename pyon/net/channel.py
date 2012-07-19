@@ -156,7 +156,7 @@ class BaseChannel(object):
         self._exchange = exchange
         assert self._exchange
         assert self._transport
-
+        
         with self._ensure_amq_chan():
 
 #           log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
@@ -290,7 +290,8 @@ class BaseChannel(object):
         logmeth = log.debug
         if not (code == 0 or code == 200):
             logmeth = log.error
-        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.get_channel_id(), code, text)
+        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s",
+                self.get_channel_id(), code, text)
 
         # make callback to user event if we've closed
         if self._close_event is not None:
@@ -379,7 +380,6 @@ class SendChannel(BaseChannel):
                                     properties=props,
                                     immediate=False, #todo
                                     mandatory=False) #todo
-
 class RecvChannel(BaseChannel):
     """
     A channel that can only receive.

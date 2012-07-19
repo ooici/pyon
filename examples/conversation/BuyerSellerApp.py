@@ -9,11 +9,11 @@ from pyon.net.conversation import Conversation, Principal,InitiatorPrincipal, Gu
 node, ioloop_process = messaging.make_node()
 def buyer_app(queue_name):
     #principal initialisation
-    customer = InitiatorPrincipal(node, NameTrio('buyer', 'buyer_queue'))
+    originator = Principal(node, NameTrio('rumi-PC', 'buyer_queue'))
 
     # conversation bootstrapping
-    c = customer.start_conversation(protocol = 'buyer_seller', role ='buyer')
-    c.invite(to_role = 'seller', to_role_addr = NameTrio('seller', queue_name))
+    c = originator.start_conversation('buyer_seller_protocol', 'buyer')
+    c.invite('seller', NameTrio('seller', queue_name))
 
     #interactions
     c.send('seller', 'I will send you a request shortly. Please wait for me.')
@@ -26,8 +26,8 @@ def buyer_app(queue_name):
 
 def seller_app(queue_name):
     #principal initialisation
-    stock_provider = GuestPrincipal(node, NameTrio('seller', queue_name))
-    stock_provider.start_listening()
+    local = Principal(node, NameTrio('seller', queue_name))
+    local.start_listening()
 
     #joining a conversation (bootstrapping)
     conv, msg, header  = stock_provider.get_invitation()
@@ -36,8 +36,10 @@ def seller_app(queue_name):
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    msg, header = c.recv('buyer')
+    msg, header = c.recv('buyer', {'Hello3'})
     print 'Msg received: %s' %(msg)
     c.send('buyer', '3000 pounds')
 
-    stock_provider.stop_listening()
+    #cleaning
+    c.close()
+    local.terminate()
