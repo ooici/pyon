@@ -12,6 +12,7 @@ from pyon.util.log import log
 import interface.objects
 import interface.messages
 
+enum_classes = {}
 model_classes = {}
 message_classes = {}
 
@@ -38,6 +39,9 @@ def issubtype(obj_type, base_type):
         return base_cls in obj_cls.__mro__
 
     return False
+
+def isenum(clzz_name):
+    return clzz_name in enum_classes
 
 def get_message_class_parm_type(service_name, service_operation, parameter, in_out):
     """
@@ -103,7 +107,10 @@ class IonObjectRegistry(object):
     def __init__(self):
         classes = inspect.getmembers(interface.objects, inspect.isclass)
         for name, clzz in classes:
-            model_classes[name] = clzz
+            if clzz.__bases__[0].__name__ == "IonEnum":
+                enum_classes[name] = clzz
+            else:
+                model_classes[name] = clzz
         classes = inspect.getmembers(interface.messages, inspect.isclass)
         for name, clzz in classes:
             message_classes[name] = clzz

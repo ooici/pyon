@@ -75,6 +75,10 @@ class IonObjectBase(object):
 
             # Basic type checking
             field_val = fields[key]
+            if 'decorators' in schema_val:
+                log.debug("Validating %s: %s: %s: %s" % (key, schema_val["type"], schema_val["decorators"], str(field_val)))
+            else:
+                log.debug("Validating %s: %s: %s" % (key, schema_val["type"], str(field_val)))
             if type(field_val).__name__ != schema_val['type']:
 
                 # if the schema doesn't define a type, we can't very well validate it
@@ -93,44 +97,63 @@ class IonObjectBase(object):
                     raise AttributeError('Required value "%s" not set' % key)
 
                 # Check for inheritance
-                for typ in type(field_val).__bases__:
-                    if typ.__name__ == schema_val['type']:
+                if self.check_inheritance_chain(type(field_val), schema_val['type'])
+                    continue
+
+                # Check enum types
+                from pyon.core.registry import enum_classes
+                if isinstance(field_val, int) and schema_val['type'] in enum_classes:
+                    if field_val not in enum_classes(schema_val['type'])._str_map:
+                        raise AttributeError('Invalid enum value "%d" for field "%s.%s", should be between 1 and %d' %
+                                     (fields[key], type(self).__name__, key, len(enum_classes(schema_val['type'])._str_map)))
+                    else:
                         continue
 
                 # TODO work around for msgpack issue
                 if type(field_val) == tuple and schema_val['type'] == 'list':
                     continue
 
-                raise AttributeError('Invalid type "%s" for field "%s", should be "%s"' %
-                                     (type(fields[key]), key, schema_val['type']))
+                # TODO remove this at some point
+                if isinstance(field_val,IonObjectBase) and schema_val['type'] == 'dict':
+                    log.warn('TODO: Please convert generic dict attribute type to abstract type for field "%s.%s"' % (type(self).__name__, key))
+                    continue
+
+                # Special case check for ION object being passed where default type is dict or str
+                if 'decorators' in schema_val:
+                    if content_type_decorator in schema_val['decorators']:
+                        if isinstance(field_val, IonObjectBase) and schema_val['type'] == 'dict' or schema_val['type'] == 'str':
+                            self.check_content(key, field_val, schema_val['decorators'][content_type_decorator])
+                            continue
+
+                raise AttributeError('Invalid type "%s" for field "%s.%s", should be "%s"' %
+                                     (type(fields[key]), type(self).__name__, key, schema_val['type']))
 
             if type(field_val).__name__ == 'str':
-                if value_pattern_decorator in schema[key]['decorators']:
-                    self.check_string_pattern_match(key, field_val, schema[key]['decorators'][value_pattern_decorator])
+                if value_pattern_decorator in schema_val['decorators']:
+                    self.check_string_pattern_match(key, field_val, schema_val['decorators'][value_pattern_decorator])
 
             if type(field_val).__name__ in ['int', 'float', 'long']:
-                if value_range_decorator in schema[key]['decorators']:
-                    self.check_numeric_value_range(key, field_val, schema[key]['decorators'][value_range_decorator])
+                if value_range_decorator in schema_val['decorators']:
+                    self.check_numeric_value_range(key, field_val, schema_val['decorators'][value_range_decorator])
 
-            if schema_val['type'] == 'list':
-                if 'decorators' in schema[key]:
-                    if content_type_decorator in schema[key]['decorators']:
-                        self.check_collection_content(key, field_val, schema[key]['decorators'][content_type_decorator])
-                    if content_count_decorator in schema[key]['decorators']:
-                        self.check_collection_length(key, field_val, schema[key]['decorators'][content_count_decorator])
-
-            if schema_val['type'] == 'dict' or schema_val['type'] == 'OrderedDict':
-                if 'decorators' in schema[key]:
-                    if content_type_decorator in schema[key]['decorators']:
-                        self.check_collection_content(key, field_val.values(), schema[key]['decorators'][content_type_decorator])
-                    if content_count_decorator in schema[key]['decorators']:
-                        self.check_collection_length(key, field_val.values(), schema[key]['decorators'][content_count_decorator])
-
+            if 'decorators' in schema_val:
+                if content_type_decorator in schema_val['decorators']:
+                    if schema_val['type'] == 'list':
+                        self.check_collection_content(key, field_val, schema_val['decorators'][content_type_decorator])
+                    elif schema_val['type'] == 'dict' or schema_val['type'] == 'OrderedDict':
+                        self.check_collection_content(key, field_val.values(), schema_val['decorators'][content_type_decorator])
+                    else:
+                        self.check_content(key, field_val, schema_val['decorators'][content_type_decorator])
+                if content_count_decorator in schema_val['decorators']:
+                    if schema_val['type'] == 'list':
+                        self.check_collection_length(key, field_val, schema_val['decorators'][content_count_decorator])
+                    if schema_val['type'] == 'dict' or schema_val['type'] == 'OrderedDict':
+                        self.check_collection_length(key, field_val.values(), schema_val['decorators'][content_count_decorator])
             
             if isinstance(field_val, IonObjectBase):
                 field_val._validate()
 
-            # Next validate only IonObjects found in child collections. Other than that, don't validate collections.
+            # Next validate only IonObjects found in child collections.
             # Note that this is non-recursive; only for first-level collections.
             elif isinstance(field_val, Mapping):
                 for subkey in field_val:
@@ -183,8 +206,8 @@ class IonObjectBase(object):
         m = re.match(pattern, value)
 
         if not m:
-            raise AttributeError('Invalid value pattern %s for field "%s", should match regular expression %s' %
-                (value, key, pattern))
+            raise AttributeError('Invalid value pattern %s for field "%s.%s", should match regular expression %s' %
+                (value, type(self).__name__, key, pattern))
 
     def check_numeric_value_range(self, key, value, value_range):
         if ',' in value_range:
@@ -194,15 +217,27 @@ class IonObjectBase(object):
             min = max = eval(value_range.split(',')[0].strip())
 
         if value < min or value > max:
-            raise AttributeError('Invalid value %s for field "%s", should be between %d and %d' %
-                (str(value), key, min, max))
+            raise AttributeError('Invalid value %s for field "%s.%s", should be between %d and %d' %
+                (str(value), type(self).__name__, key, min, max))
+
+    def check_inheritance_chain(self, typ, expected_type):
+
+        for baseclz in typ.__bases__:
+            if baseclz.__name__ == expected_type.strip():
+                return True
+            if baseclz.__name__ == "object":
+                return False
+            else:
+                val = self.check_inheritance_chain(baseclz,expected_type)
+                return val
+        return False
 
     def check_collection_content(self, key, list_values, content_types):
         split_content_types = []
         if ',' in content_types:
             split_content_types = content_types.split(',')
         else:
-            split_content_types.add(content_types)
+            split_content_types.append(content_types)
 
         for value in list_values:
             match_found = False
@@ -210,9 +245,33 @@ class IonObjectBase(object):
                 if type(value).__name__ == content_type.strip():
                     match_found = True
                     break
+                # Check for inheritance
+                if check_inheritance_chain(type(value), content_type):
+                    match_found = True
+                    break
+
             if not match_found:
-                raise AttributeError('Invalid value type in collection field "%s", should be one of "%s"' %
-                    (key, content_types))
+                raise AttributeError('Invalid value type %s in collection field "%s.%s", should be one of "%s"' %
+                    (str(list_values), type(self).__name__, key, content_types))
+
+    def check_content(self, key, value, content_types):
+        split_content_types = []
+        if ',' in content_types:
+            split_content_types = content_types.split(',')
+        else:
+            split_content_types.append(content_types)
+        print "split_content_types: " + str(split_content_types)
+
+        for content_type in split_content_types:
+            if type(value).__name__ == content_type.strip():
+                return
+
+            # Check for inheritance
+            if self.check_inheritance_chain(type(value), content_type)
+                return
+
+        raise AttributeError('Invalid value type %s in field "%s.%s", should be one of "%s"' %
+                (str(value), type(self).__name__, key, content_types))
 
     def check_collection_length(self, key, list_values, length):
         if ',' in length:
@@ -222,8 +281,8 @@ class IonObjectBase(object):
             min = max = int(length.split(',')[0].strip())
 
         if len(list_values) < min or len(list_values) > max:
-            raise AttributeError('Invalid value length for collection field "%s", should be between %d and %d' %
-                (key, min, max))
+            raise AttributeError('Invalid value length for collection field "%s.%s", should be between %d and %d' %
+                (type(self).__name__, key, min, max))
 
 class IonMessageObjectBase(IonObjectBase):
     pass

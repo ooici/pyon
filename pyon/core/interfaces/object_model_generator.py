@@ -258,7 +258,9 @@ class ObjectModelGenerator:
         self.dataobject_output_text = "#!/usr/bin/env python\n\n"
         self.dataobject_output_text += "#\n# This file is auto generated\n#\n\n"
         self.dataobject_output_text += "from pyon.core.object import IonObjectBase\n"
-        self.dataobject_output_text += "#\n# Enums\n"
+        self.dataobject_output_text += "#\n# Enums\n\n"
+        self.dataobject_output_text += "class IonEnum(object):\n"
+        self.dataobject_output_text += "    pass\n"
 
         for line in combined_yaml_text.split('\n'):
             if '!enum ' in line:
@@ -282,7 +284,7 @@ class ObjectModelGenerator:
                 assert name_val not in enums_by_name, "enum with type name %s redefined" % name_val
                 enums_by_name[name_val] = {"values": value_val, "default": default_val}
 
-                self.dataobject_output_text += "\nclass " + name_val + "(object):\n"
+                self.dataobject_output_text += "\nclass " + name_val + "(IonEnum):\n"
                 for i, val in enumerate(value_val, 1):
                     self.dataobject_output_text += "    " + val + " = " + str(i) + "\n"
                 self.dataobject_output_text += "    _value_map = {"
