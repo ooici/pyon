@@ -111,13 +111,13 @@ def get_sys_name():
     if sys_name:
         return sys_name
 
-#    if CFG.get_safe("system.name"):
-#        # If CFG is already loaded and system.name is set use it
-#        cfg_sys_name = CFG.get_safe("system.name")
-#        set_sys_name(cfg_sys_name)
-#        return cfg_sys_name
-#    elif is_testing():
-    if is_testing():
+    if CFG.get_safe("system.name"):
+        # If CFG is already loaded and system.name is set use it
+        cfg_sys_name = CFG.get_safe("system.name")
+        set_sys_name(cfg_sys_name)
+        return cfg_sys_name
+    elif is_testing():
+#    if is_testing():
         # If no sysname is specified and we are testing, create a unique one
         testing_sys_name = "ion_test_%s" % str(uuid.uuid4())[0:6]
         set_sys_name(testing_sys_name)

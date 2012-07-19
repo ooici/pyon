@@ -34,8 +34,6 @@ class ResourceRegistry(object):
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
-        self._init()
-
         self.event_pub = EventPublisher()
 
     def close(self):
@@ -43,21 +41,6 @@ class ResourceRegistry(object):
         Pass-through method to close the underlying datastore.
         """
         self.rr_store.close()
-
-    def _init(self):
-        res_list,_ = self.find_resources(RT.ServiceDefinition, id_only=True)
-        auto_bootstrap = CFG.get_safe("system.auto_bootstrap", False)
-        if not res_list and auto_bootstrap:
-            self._register_service_definitions()
-
-    def _register_service_definitions(self):
-        from pyon.core.bootstrap import get_service_registry
-        svc_list = []
-        for svcname, svc in get_service_registry().services.iteritems():
-            svc_def = ServiceDefinition(name=svcname, definition="")
-            svc_list.append(svc_def)
-        self._create_mult(svc_list)
-        log.info("Created %d ServiceDefinition resources" % len(svc_list))
 
     def create(self, object=None, actor_id=None):
         if object is None:
@@ -113,7 +96,7 @@ class ResourceRegistry(object):
 
         return self.rr_store.read(object_id, rev_id)
 
-    def read_mult(self, object_ids=[]):
+    def read_mult(self, object_ids=None):
         if not object_ids:
             raise BadRequest("The object_ids parameter is empty")
         return self.rr_store.read_mult(object_ids)
@@ -200,18 +183,20 @@ class ResourceRegistry(object):
             raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
 
         res_obj = self.read(resource_id)
-        restype = res_obj._get_type()
-        restype_workflow = get_restype_lcsm(restype)
-        if not restype_workflow:
-            raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+        if target_lcstate != "RETIRED":
+            restype = res_obj._get_type()
+            restype_workflow = get_restype_lcsm(restype)
+            if not restype_workflow:
+                raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
-        # Check that target state is allowed
-        old_state = res_obj.lcstate
-        if not target_lcstate in restype_workflow.get_successors(res_obj.lcstate).values():
-            raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, res_obj.lcstate))
+            # Check that target state is allowed
+            old_state = res_obj.lcstate
+            if not target_lcstate in restype_workflow.get_successors(res_obj.lcstate).values():
+                raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, res_obj.lcstate))
 
         res_obj.lcstate = target_lcstate
         res_obj.ts_updated = get_ion_ts()
+
         updres = self.rr_store.update(res_obj)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",

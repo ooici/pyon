@@ -8,14 +8,14 @@ __license__ = 'Apache 2.0'
 from collections import OrderedDict
 import csv
 import os
+import os.path
 import re
 import string
 import yaml
 import cgi
 
 from pyon.core.path import list_files_recursive
-from pyon.ion.directory_standalone import DirectoryStandalone
-
+from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
 
 class IonYamlLoader(yaml.Loader):
     """ For ION-specific overrides of YAML loading behavior. """
@@ -214,39 +214,11 @@ class ObjectModelGenerator:
             data = self.data_yaml_text + "\n" + service_yaml_text
         else:
             print " Object interface generator: Reading object definitions from datastore"
-            self.data_yaml_text = self.get_object_definition_from_datastore()
+            self.data_yaml_text = get_object_definition_from_datastore(self.system_name)
             if not self.data_yaml_text:
                 return ''
-            data = self.data_yaml_text + '\n' + self.get_service_definition_from_datastore()
+            data = self.data_yaml_text + '\n' + get_service_definition_from_datastore(self.system_name)
         return data
-
-    def get_object_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ObjectTypes')
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except Exception as ex:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
-
-    def get_service_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ServiceInterfaces')
-        if not entries:
-            return ""
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
 
     def generate_enums(self, combined_yaml_text, opts):
         '''
@@ -299,7 +271,7 @@ class ObjectModelGenerator:
                         self.dataobject_output_text += ", "
                     self.dataobject_output_text += str(i) + ": '" + val + "'"
                     if opts.objectdoc:
-                        self.csv_attributes_row_entries.append([classname, val, "int", str(i), ""])
+                        self.csv_attributes_row_entries.append(["", classname, val, "", "int", str(i), ""])
                 self.dataobject_output_text += "}\n"
 
                 if opts.objectdoc:
@@ -519,6 +491,8 @@ class ObjectModelGenerator:
                 self.dataobject_output_text += current_class_schema + "\n              }\n"
 
     def generate_object_specs(self):
+        print " Object interface generator: Generating additional object specs in HTML and CSV"
+
         datamodelhtmldir = 'interface/object_html'
         if not os.path.exists(datamodelhtmldir):
             os.makedirs(datamodelhtmldir)
@@ -535,7 +509,7 @@ class ObjectModelGenerator:
                     default=field_detail[2].replace("'", '"'),
                     decorators=cgi.escape(field_detail[4]),
                     attrcomment=att_comments)
-                self.csv_attributes_row_entries.append([objname, field_detail[0], field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
+                self.csv_attributes_row_entries.append(["", objname, field_detail[0], "", field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
             related_associations = self._lookup_associations(objname)
             assoctableentries = "".join([html_doc_templates['association_table_entry'].substitute(
@@ -609,7 +583,7 @@ class ObjectModelGenerator:
         print " Writing object type csv to '" + objecttypecsvfile + "'"
         csv_file = csv.writer(open(objecttypecsvfile, 'wb'), delimiter=',',
             quotechar='"', quoting=csv.QUOTE_ALL)
-        csv_file.writerow(["ObjectTypeName", "type", "extends", "description"])
+        csv_file.writerow(["object type", "object class", "extends", "description"])
         csv_file.writerows(self.csv_types_row_entries)
 
         objectattrscsvfile = os.path.join(datadir, 'objectattrs.csv')
@@ -617,10 +591,32 @@ class ObjectModelGenerator:
             os.unlink(objectattrscsvfile)
         except:
             pass
+        obj_types = {}
+        for row in self.csv_types_row_entries:
+            obj_types[row[0]] = row[1]
+        for row in self.csv_attributes_row_entries:
+            row[0] = obj_types.get(row[1], "")
+        # The following was requested by Karen S: Need to associate a persistent identifier for a known
+        # object type, attribute name combination
+        objattr_ids = {}
+        objid_filename = "res/config/object_attribute_ids.csv"
+        try:
+            if os.path.exists(objid_filename):
+                with open(objid_filename, "rU") as csvfile:
+                    idreader = csv.DictReader(csvfile, delimiter=',')
+                    for row in idreader:
+                        oname, aname, refid = row['YML Resource Type'], row['YML Name'], row['__pk_ResourceAttribute_ID']
+                        objattr_ids[(oname, aname)] = refid
+
+                for row in self.csv_attributes_row_entries:
+                    row[3] = objattr_ids.get((row[1], row[2]), "")
+        except Exception as ex:
+            print "ERROR reading object/attribute mapping file", objid_filename, ex
+
         print " Writing object attribute csv to '" + objectattrscsvfile + "'"
         csv_file = csv.writer(open(objectattrscsvfile, 'wb'), delimiter=',',
             quotechar='"', quoting=csv.QUOTE_ALL)
-        csv_file.writerow(["ObjectTypeName", "attribute name", "attribute type", "attribute default", "description"])
+        csv_file.writerow(["object class", "object type", "attribute name", "ref id", "attribute type", "attribute default", "description"])
         csv_file.writerows(self.csv_attributes_row_entries)
 
     def _lookup_associations(self, classname):

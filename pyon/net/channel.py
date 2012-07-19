@@ -408,7 +408,6 @@ class RecvChannel(BaseChannel):
         self._recv_binding = binding
 
         self._setup_listener_called = False
-        self._discard_incoming = False
 
         BaseChannel.__init__(self, **kwargs)
 
@@ -509,9 +508,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_start_consume")
 
-        self._discard_incoming = False
-
-        if self._consumer_tag and self._queue_auto_delete:
+        if self._consumer_tag and (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
         self._ensure_amq_chan()
@@ -538,9 +535,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_stop_consume")
 
-        self._discard_incoming = True
-
-        if self._queue_auto_delete:
+        if self._queue_auto_delete and self._transport is AMQPTransport.get_instance():
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
         self._ensure_amq_chan()
@@ -589,7 +584,7 @@ class RecvChannel(BaseChannel):
         This method's existence is an implementation detail, to be overridden by derived classes
         that may define different closed or closing states.
         """
-        return self._discard_incoming or self._fsm.current_state == self.S_CLOSED
+        return self._fsm.current_state == self.S_CLOSED
 
     def _get_should_discard(self):
         """
@@ -708,8 +703,6 @@ class RecvChannel(BaseChannel):
         return self._transport.purge(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
-    def __init__(self, close_callback=None):
-        SendChannel.__init__(self, close_callback=close_callback)
 
     def send(self, data, headers=None):
         """
@@ -840,7 +833,7 @@ class ListenChannel(RecvChannel):
         This method's existence is an implementation detail, to be overridden by derived classes
         that may define different closed or closing states.
         """
-        return self._discard_incoming or self._fsm.current_state == self.S_CLOSED or self._fsm.current_state == self.S_CLOSING
+        return self._fsm.current_state == self.S_CLOSED or self._fsm.current_state == self.S_CLOSING
 
     def _on_close_while_accepted(self, fsm):
         """
@@ -868,7 +861,7 @@ class ListenChannel(RecvChannel):
 
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
-            if not self._queue_auto_delete:
+            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
                 self._transport.qos(self._amq_chan, prefetch_count=n)
 
             # start consuming
@@ -880,7 +873,7 @@ class ListenChannel(RecvChannel):
 
         if not was_consuming:
             # turn consuming back off if we already were off
-            if not self._queue_auto_delete:
+            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
                 self.stop_consume()
             else:
                 log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")

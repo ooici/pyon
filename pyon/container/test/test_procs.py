@@ -78,6 +78,8 @@ class TestProcManager(IonIntegrationTestCase):
         pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', pcls, config)
         self.assertTrue(pid)
 
+        return pid
+
     def test_procmanager_shutdown(self):
         self.test_procmanager()
         pm = self.container.proc_manager
@@ -101,5 +103,14 @@ class TestProcManager(IonIntegrationTestCase):
         self._start_container()
 
         self._spawnproc(self.container.proc_manager, 'immediate')
+        self.assertEquals(len(self.container.proc_manager.procs), 0)
+
+    def test_terminate_process(self):
+        self._start_container()
+
+        pid = self._spawnproc(self.container.proc_manager, 'service')
+
+        self.container.terminate_process(pid)
+
         self.assertEquals(len(self.container.proc_manager.procs), 0)
 

@@ -24,6 +24,10 @@ class DirectoryStandalone(object):
         except NotFound:
             self.datastore.define_profile_views("RESOURCES")
 
+    def close(self):
+        self.datastore.close()
+        self.datastore = None
+
     def _get_path(self, parent, key):
         """
         Returns the qualified directory path for a directory entry.

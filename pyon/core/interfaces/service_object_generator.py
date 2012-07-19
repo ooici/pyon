@@ -20,7 +20,7 @@ import traceback
 from collections import OrderedDict
 
 from pyon.core.path import list_files_recursive
-from pyon.ion.directory_standalone import DirectoryStandalone
+from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
 from pyon.service.service import BaseService
 from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
 
@@ -853,35 +853,6 @@ class ServiceObjectGenerator:
                 service_definitions_filename[filename] = filename
             return service_definitions_filename
 
-    def get_object_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ObjectTypes')
-        for item in entries:
-            try:
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
-
-    def get_service_definition_from_datastore(self):
-        fragments = []
-        dir = DirectoryStandalone(sysname=self.system_name)
-        entries = dir.find_child_entries('/ServiceInterfaces')
-        if not entries:
-            return ""
-        for item in entries:
-            try:
-                self.service_definitions_filename[item.value['key']] = item.value['file_path']
-                fragments.append((item['attributes'].get('ordinal', 0), item['attributes']['definition']))
-            except:
-                return ''
-        fragments = [item for ordinal, item in sorted(fragments)]
-        full_definition = "\n".join(fragments)
-        return full_definition
-
     def get_yaml_text(self, path):
         '''
         Get the content of a file or datastore using a path to the data
@@ -903,7 +874,7 @@ class ServiceObjectGenerator:
             data_yaml_files = list_files_recursive('obj/data', '*.yml', ['ion.yml', 'resource.yml', 'shared.yml'])
             data = '\n\n'.join((file.read() for file in(open(path, 'r') for path in data_yaml_files if os.path.exists(path))))
         else:
-            data = self.get_object_definition_from_datastore()
+            data = get_object_definition_from_datastore(self.system_name)
         return data
 
     def get_service_definition(self):
@@ -913,7 +884,7 @@ class ServiceObjectGenerator:
             data = '\n\n'.join((file.read() for file in(open(path, 'r') for path in service_yaml_files if os.path.exists(path))))
         else:
             print " Service interface generator: reading service definitions from datastore"
-            data = self.get_service_definition_from_datastore()
+            data = get_service_definition_from_datastore(self.system_name)
         return data
 
     def build_args_str(self, _def, include_self=True):

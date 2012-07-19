@@ -37,6 +37,9 @@ def main():
     print "generate_interfaces: Create directories and cleaning up..."
     opts.system_name = opts.sysname or get_default_sysname()
 
+    from pyon.core import bootstrap
+    bootstrap.testing = False
+
     opts.force = True
     if not opts.read_from_datastore and not opts.read_from_yaml_file:
         opts.read_from_yaml_file = True

@@ -85,6 +85,7 @@ def _clear_couch(host, port, username, password, prefix, verbose=False):
             ignored_num += 1
     print 'clear_couch: Ignored %s existing databases' % ignored_num
 
+    db_server.close()
 
 if __name__ == '__main__':
     main()

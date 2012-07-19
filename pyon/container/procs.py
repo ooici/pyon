@@ -9,7 +9,7 @@ from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
 from pyon.core import exception
-from pyon.core.bootstrap import CFG, IonObject
+from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
@@ -18,6 +18,9 @@ from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
+from pyon.ion.resource import RT, PRED
+from pyon.net.channel import RecvChannel
+from pyon.net.transport import NameTrio
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -52,6 +55,14 @@ class ProcManager(object):
         # Register container as resource object
         cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
         self.cc_id, _ = self.container.resource_registry.create(cc_obj)
+
+        #Create an association to an Org object if not the rot ION org and only if found
+        if CFG.container.org_name and CFG.container.org_name != CFG.system.root_org:
+            org,_ = self.container.resource_registry.find_resources(restype=RT.Org,name=CFG.container.org_name, id_only=True )
+            if org:
+                self.container.resource_registry.create_association(org[0],PRED.hasResource, self.cc_id)  #TODO - replace with proper association
+
+
 
         log.debug("ProcManager started, OK.")
 
@@ -181,6 +192,20 @@ class ProcManager(object):
 
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
+
+    def _cleanup_method(self, queue_name, ep=None):
+        """
+        Common method to be passed to each spawned ION process to clean up their process-queue.
+
+        @TODO Leaks implementation detail, should be using XOs
+        """
+        if not ep._chan._queue_auto_delete:
+            # only need to delete if AMQP didn't handle it for us already!
+            # @TODO this will not work with XOs (future)
+            ch = self.container.node.channel(RecvChannel)
+            ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
+            ch._destroy_queue()
+
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
     def _spawn_service_process(self, process_id, name, module, cls, config):
@@ -204,11 +229,16 @@ class ProcManager(object):
             from_name=service_instance.id,
             service=service_instance,
             process=service_instance)
+
+        # cleanup method to delete process queue
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc2)
+
         # Start an ION process with the right kind of endpoint factory
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc1, rsvc2],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, service_instance.id)))
 
         # map gproc to service_instance
@@ -234,7 +264,7 @@ class ProcManager(object):
         listen_name = get_safe(config, "process.listen_name") or name
         service_instance._proc_listen_name = listen_name
 
-        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, node=self.container.node)
+        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, container=self.container)
         sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name)
 
         # Add publishers if any...
@@ -246,10 +276,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc, sub],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
 
         # map gproc to service_instance
@@ -284,10 +318,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -322,10 +360,14 @@ class ProcManager(object):
             service=service_instance,
             process=service_instance)
 
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
+
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
                                    listeners=[rsvc],
-                                   proc_name=service_instance._proc_name)
+                                   proc_name=service_instance._proc_name,
+                                   cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_standalone_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -410,10 +452,12 @@ class ProcManager(object):
             client.node     = self.container.node
 
             # ensure that dep actually exists and is running
-            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
-                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
-                if not svc_de:
-                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
+            # MM: commented out - during startup (init actually), we don't need to check for service dependencies
+            # MM: TODO: split on_init from on_start; start consumer in on_start; check for full queues on restart
+#            if service_instance.name != 'bootstrap' or (service_instance.name == 'bootstrap' and service_instance.CFG.level == dependency):
+#                svc_de = self.container.resource_registry.find_resources(restype="Service", name=dependency, id_only=True)
+#                if not svc_de:
+#                    raise ContainerConfigError("Dependency for service %s not running: %s" % (service_instance.name, dependency))
 
     def _service_init(self, service_instance):
         # Init process
@@ -427,7 +471,7 @@ class ProcManager(object):
         service_instance.start()
 
     def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
-        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, node=self.container.node)
+        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, container=self.container)
 
         publisher_streams = publisher_streams or {}
 
@@ -522,7 +566,7 @@ class ProcManager(object):
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
         if service_instance._process:
-            service_instance._process.notify_stop()
+            #service_instance._process.notify_stop()
             service_instance._process.stop()
 
         self._unregister_process(process_id, service_instance)

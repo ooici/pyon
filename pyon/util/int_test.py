@@ -2,19 +2,37 @@
 
 """Integration test base class and utils"""
 
-from pyon.container.cc import Container
-from pyon.core.bootstrap import bootstrap_pyon, get_service_registry, CFG
-from pyon.util.containers import DotDict
-from pyon.util.log import log
 from mock import patch
 import unittest
 import os
 from gevent import greenlet, spawn
 
-# Make this call more deterministic in time.
-bootstrap_pyon()
+from pyon.container.cc import Container
+from pyon.core import bootstrap
+from pyon.core.bootstrap import bootstrap_pyon, CFG
+from pyon.core.interfaces.interfaces import InterfaceAdmin
+from pyon.util.log import log
 
-scanned_services = False
+
+def pre_initialize_ion():
+    # Do necessary system initialization
+    # Make sure this happens only once
+    iadm = InterfaceAdmin(bootstrap.get_sys_name(), config=CFG)
+    iadm.create_core_datastores()
+    #iadm.store_config(CFG)
+    iadm.store_interfaces(idempotent=True)
+    iadm.close()
+
+# This is the only place where code is executed once before any integration test
+# is run.
+def initialize_ion_int_tests():
+    # Bootstrap pyon CFG, logging and object/resource interfaces
+    bootstrap_pyon()
+    if bootstrap.is_testing():
+        IonIntegrationTestCase._force_clean(False)
+        pre_initialize_ion()
+
+
 
 class IonIntegrationTestCase(unittest.TestCase):
     """
@@ -31,6 +49,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         self._patch_out_diediedie()
         self._patch_out_fail_fast_kill()
 
+        bootstrap.testing_fast = True
         # delete/create any known DBs with names matching our prefix - should be rare
         self._force_clean(True)
 
@@ -39,6 +58,9 @@ class IonIntegrationTestCase(unittest.TestCase):
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
+        else:
+            # We cannot live without pre-initialized datastores and resource objects
+            pre_initialize_ion()
 
         # hack to force_clean on filesystem
         try:
@@ -60,17 +82,17 @@ class IonIntegrationTestCase(unittest.TestCase):
         self.container = Container()
         self.container.start()
 
-        # For integration tests, if class variable "service_dependencies" exists
-        self._start_dependencies()
+        bootstrap.testing_fast = False
 
 
     def _stop_container(self):
+        bootstrap.testing_fast = True
         if self.container:
             self.container.stop()
             self.container = None
         if os.environ.get('CEI_LAUNCH_TEST', None) is None:
             self._force_clean()         # deletes only
-
+        bootstrap.testing_fast = False
 
     def _turn_on_queue_auto_delete(self):
         patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
@@ -85,48 +107,6 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher = patch('pyon.core.thread.shutdown_or_die')
         patcher.start()
         self.addCleanup(patcher.stop)
-
-    def _start_dependencies(self):
-        """
-        Starts the services declared in the class or instance variable "service_dependencies"
-        """
-        self.clients = DotDict()
-        svc_deps = getattr(self, "service_dependencies", {})
-        log.debug("Starting service dependencies. Number=%s" % len(svc_deps))
-        if not svc_deps:
-            return
-        for svc in svc_deps:
-            config = None
-            if type(svc) in (tuple, list):
-                config = svc[1]
-                svc = svc[0]
-
-            # Start the service
-            self._start_service(svc, config=config)
-
-            # Create a client
-            clcls = get_service_registry().services[svc].simple_client
-            self.clients[svc] = clcls(name=svc, node=self.container.node)
-
-        log.debug("Service dependencies started")
-
-    def _start_service(self, servicename, servicecls=None, config=None):
-        if servicename and not servicecls:
-            global scanned_services
-            if not scanned_services:
-                get_service_registry().discover_service_classes()
-                scanned_services = True
-            assert servicename in get_service_registry().services, "Service %s unknown" % servicename
-            servicecls = get_service_registry().services[servicename].impl[0]
-
-        assert servicecls, "Cannot start service %s" % servicename
-
-        if type(servicecls) is str:
-            mod, cls = servicecls.rsplit('.', 1)
-        else:
-            mod = servicecls.__module__
-            cls = servicecls.__name__
-        self.container.spawn_process(servicename, mod, cls, config)
 
     def _patch_out_start_rel(self):
         def start_rel_from_url(*args, **kwargs):
@@ -148,7 +128,8 @@ class IonIntegrationTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _force_clean(self, recreate=False):
+    @classmethod
+    def _force_clean(cls, recreate=False):
         from pyon.core.bootstrap import get_sys_name, CFG
         from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
         datastore = CouchDataStore(config=CFG)
@@ -163,3 +144,4 @@ class IonIntegrationTestCase(unittest.TestCase):
         finally:
             datastore.close()
 
+initialize_ion_int_tests()

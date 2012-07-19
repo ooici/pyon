@@ -35,8 +35,6 @@ def main():
     '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--individual', action='store_true',
-            help='Store files individually.')
     parser.add_argument('-fc', '--force_clean', action='store_true',
             help='Force clean.')
     parser.add_argument("-of", "--object", dest="fobject",
@@ -48,7 +46,7 @@ def main():
     options, extra = parser.parse_known_args()
     args, command_line_config = parse_args(extra)
 
-    print "store_configuration: Storing ION config and interfaces in datastore, with options:" , str(options)
+    print "store_interfaces: Storing ION config and interfaces in datastore, with options:" , str(options)
 
     # -------------------------------------------------------------------------
     # Store config and interfaces
@@ -68,7 +66,7 @@ def main():
     # Delete sysname datastores if option "force_clean" is set
     if options.force_clean:
         from pyon.datastore import clear_couch_util
-        print "store_configuration: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
+        print "store_interfaces: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
         clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
 
@@ -90,7 +88,9 @@ def main():
     iadm.store_config(ion_config)
 
     # Store system interfaces
-    iadm.store_interfaces(options.fobject, options.fservice, store_bulk=not options.individual)
+    iadm.store_interfaces(options.fobject, options.fservice)
+
+    iadm.close()
 
 if __name__ == '__main__':
     main()

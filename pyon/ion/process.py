@@ -18,11 +18,27 @@ class IonProcessThread(PyonThread):
     Form the base of an ION process.
     """
 
-    def __init__(self, target=None, listeners=None, name=None, service=None, **kwargs):
+    def __init__(self, target=None, listeners=None, name=None, service=None, cleanup_method=None, **kwargs):
+        """
+        Constructs an ION process.
+
+        You don't create one of these directly, the IonProcessThreadManager run by a container does this for
+        you via the ProcManager interface. Call the container's spawn_process method and this method will run.
+
+        @param  target          A callable to run in the PyonThread. If None (typical), will use the target method
+                                defined in this class.
+        @param  listeners       A list of listening endpoints attached to this thread.
+        @param  name            The name of this ION process.
+        @param  service         An instance of the BaseService derived class which contains the business logic for
+                                an ION process.
+        @param  cleanup_method  An optional callable to run when the process is stopping. Runs after all other
+                                notify_stop calls have run. Should take one param, this instance.
+        """
         self._startup_listeners = listeners or []
         self.listeners          = []
         self.name               = name
         self.service            = service
+        self._cleanup_method    = cleanup_method
 
         self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
         self._ctrl_queue        = Queue()
@@ -142,6 +158,10 @@ class IonProcessThread(PyonThread):
         self.thread_manager.wait_children(30)
 
         PyonThread._notify_stop(self)
+
+        # run the cleanup method if we have one
+        if self._cleanup_method is not None:
+            self._cleanup_method(self)
 
     def get_ready_event(self):
         """
