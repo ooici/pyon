@@ -9,11 +9,14 @@ from pyon.net.conversation import Conversation, Principal,InitiatorPrincipal, Gu
 node, ioloop_process = messaging.make_node()
 def buyer_app(queue_name):
     #principal initialisation
-    originator = Principal(node, NameTrio('rumi-PC', 'buyer_queue'))
-
+    customer = Principal(node, NameTrio('rumi-PC',
+                                        'rumi'))
     # conversation bootstrapping
-    c = originator.start_conversation('buyer_seller_protocol', 'buyer')
-    c.invite('seller', NameTrio('seller', queue_name))
+    c = customer.start_conversation(protocol = 'buyer_seller_protocol',
+                                    role = 'buyer')
+
+    c.invite('seller', NameTrio('stephen-PC',service_provider_name),
+                       merge_with_first_send = True)
 
     #interactions
     c.send('seller', 'I will send you a request shortly. Please wait for me.')
@@ -24,22 +27,19 @@ def buyer_app(queue_name):
     #cleaning
     customer.stop_conversation()
 
-def seller_app(queue_name):
-    #principal initialisation
-    local = Principal(node, NameTrio('seller', queue_name))
-    local.start_listening()
+def seller_app(service_provider_name):
+    service_provider = Principal(node, NameTrio('stephen-PC',
+                                                service_provider_name))
+    service_provider.start_listening()
+    c = service_provider.accept_next_invitation(merge_with_first_send = True)
 
-    #joining a conversation (bootstrapping)
-    conv, msg, header  = stock_provider.get_invitation()
-    c = stock_provider.accept_invitation(conv, msg, header, auto_reply = 'True')
 
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
-    msg, header = c.recv('buyer', {'Hello3'})
+    msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)
     c.send('buyer', '3000 pounds')
 
-    #cleaning
     c.close()
     local.terminate()

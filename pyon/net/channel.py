@@ -156,7 +156,7 @@ class BaseChannel(object):
         self._exchange = exchange
         assert self._exchange
         assert self._transport
-        
+
         with self._ensure_amq_chan():
 
 #           log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,

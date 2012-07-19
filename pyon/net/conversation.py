@@ -56,8 +56,7 @@ class Conversation(object):
     def __init__(self, protocol, cid = None):
         self._conv_table = {}
         self.protocol = protocol
-        if cid: self._conv_id = cid
-        else:   self._conv_id = self._build_conv_id()
+        self._id = cid if cid else self._build_conv_id()
 
     @property
     def protocol(self):
@@ -159,8 +158,9 @@ class ConversationEndpoint(object):
         self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
             header = {}
+            to_role_addr = self._conv[to_role]
             header['conv-msg-type'] =  MSG_TYPE.INVITE
-            header = self._build_invitation_header(header, to_role)
+            header = self._build_control_header(header, to_role, to_role_addr)
             self._send(to_role_addr, "", header)
 
     def send_ack(self, to_role, msg):
@@ -173,26 +173,20 @@ class ConversationEndpoint(object):
 
     #@TODO: Shell we add **kwargs???, why we need them
     #@TODO: We should pass User h, this version do not support
-    def send(self, to_role, msg):
+    def send(self, to_role, msg, op = None):
+        header = {'op' : op} if op else {}
         if self._is_originator and not self._conv.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
-                self._send_in_session_msg(to_role, msg)
+                self._send_in_session_msg(to_role, msg, header)
             else:
-                self._invite_and_send(to_role, msg)
+                self._invite_and_send(to_role, msg, header)
         else:
-            self._send_in_session_msg(to_role, msg)
+            self._send_in_session_msg(to_role, msg, header)
 
-    def recv(self, from_role = None, labels = None):
+    def recv(self, from_role = None):
         (msg, header) = self._recv_queues[from_role].get()
         print 'receive:%s'%header
-        if labels:
-            while 'op' not in header or header['op'] not in labels:
-                self._recv_queues[from_role].put((msg, header))
-                msg, header = self._recv_queues[from_role].get()
-        #@TODO: When to fuel the message through the intercept stack, when the msg is requested or when it is received??
-        else:self._recv_queues[from_role].keys()[0].get()
-
         msg, header = self._intercept_msg_in(msg, header)
         return msg, header
 
@@ -269,7 +263,7 @@ class ConversationEndpoint(object):
             log.debug('No address found for role %s', to_role)
             raise ConversationError('No receiver-addr specified')
 
-        if not header: header = dict()
+        if not header: header = {}
         header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_addr, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_addr, True)
@@ -427,7 +421,8 @@ class Principal(object):
         c = Conversation(protocol)
         endpoint = ConversationEndpoint(self.node)
         endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
-        self._conversations[c.id] = c
+        self._conversations[c.id] = endpoint
+        print 'Conversation id is: %s' %c.id
         return endpoint
 
     def terminate(self):
@@ -459,6 +454,10 @@ class Principal(object):
        role = header['receiver-role']
        self._conversations[c.id] = endpoint
        return endpoint
+
+    def accept_next_invitation(self, merge_with_first_send = False):
+        invitation = self.get_invitation()
+        return self.accept_invitation(invitation, merge_with_first_send)
 
     def _recv_invitation(self, msg, header):
        control_msg_type = get_control_msg_type(header)
@@ -500,8 +499,9 @@ class RPCClient(object):
         self.name = base_name
         self.server_name = server_name
         self.rpc_conv = rpc_conversation or RPCConversation()
+        self.principal = Principal(self.node, self.name)
 
-    def request(self, msg, header = None, **kwargs):
+    def request(self, msg, op = None, **kwargs):
         # could have a specified timeout in kwargs
         if 'timeout' in kwargs and kwargs['timeout'] is not None:
             timeout = kwargs['timeout']
@@ -511,25 +511,26 @@ class RPCClient(object):
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
         ts = time.time()
-        local = InitiatorPrincipal(self.node, self.name)
-        c = local.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
-        c.invite(self.rpc_conv.server_role, self.server_name)
-        c.send(self.rpc_conv.server_role, msg)
+
+        c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
+        c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
+        c.send(self.rpc_conv.server_role, msg, op)
         try:
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
         finally:
             elapsed = time.time() - ts
-            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", header.get('conv-id', 'NOCONVID'),
-                header.get('conv-seq', 'NOSEQ'),
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", result_headers.get('conv-id', 'NOCONVID'),
+                     result_headers.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
-            local.stop_conversation()
+            c.close()
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
-        self.s+=1
         return result_data, result_headers
 
+    def terminate(self):
+        self.principal.terminate()
     def buy_bonds(self, msg):
         header = {}
         header['op'] = 'buy_bonds'
@@ -552,56 +553,29 @@ class RPCServer(object):
             local = Principal(self.node, self.name)
             local.start_listening()
             while True:
-                conv, msg, header  = local.get_invitation()
-                c = local.accept_invitation(conv, msg, header, auto_reply = 'True')
+                #inv  = local.get_invitation()
+                c = local.accept_next_invitation(merge_with_first_send = True)
                 msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
                 c.send(self.rpc_conv.client_role, reply)
 
     def process_msg(self, msg, header):
-        if header.setdefault('op', '') == self._service:
-            msg =  'Correct call. The message is:%s' %(msg)
-            print msg
-        else:
-            msg = 'I do not support this call:%s' % (header['op'])
-            print msg
-        return msg
-
-
-###############################
-#Example usage
-###############################
-class BankClient(RPCClient):
-
-    def __init__(self, node, base_name, server_name):
-        self.role = 'bankclient'
-        self.protocol = 'buyer_seller'
-        self.rpc_conv = RPCConversation(self.protocol, 'bank', 'client')
-        RPCClient.__init__(node, base_name, server_name, 'buy_bonds', rpc_conv)
-
-    def buy_bonds(self, msg):
-        header = {}
-        header['op'] = 'buy_bonds'
-        return self.request(msg, header)
-
-class BankService(RPCServer):
-    def __init__(self, node, name):
-        self.role = 'bankserver'
-        self.protocol = 'buyer_seller'
-        self.rpc_conv = RPCConversation(self.protocol, 'bank', 'client')
-        RPCServer.__init__(node, name, 'buy_bonds')
-
-    def process_msg(self, msg, header):
-        if header.setdefault('op', '') == self._service:
-            msg =  'Correct call. The message is:%s' %(msg)
-            print msg
-        else:
-            msg = 'I do not support this call:%s' % (header['op'])
-            print msg
-        return msg
+        return ''
 
 class RPCConversation(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
         self.protocol = protocol or 'rpc'
         self.server_role = server_role or 'server'
         self.client_role = client_role or 'client'
+
+class PrincipalName(object):
+    def __init__(self, namespace, name):
+        self.name = NameTrio(namespace, name)
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
