@@ -12,7 +12,7 @@ import sys
 if sys.platform == 'darwin':
     os.environ['C_INCLUDE_PATH'] = '/usr/local/include'
 
-version = '0.1.5-dev'
+version = '0.1.5'
 
 setup(  name = 'pyon',
         version = version,
