@@ -6,11 +6,7 @@
 @description: New Implementation for TransformBase class
 '''
 
-from gevent import spawn
-
-from pyon.core.bootstrap import get_sys_name
 from pyon.ion.process import SimpleProcess
-from pyon.net.endpoint import Subscriber, Publisher
 from pyon.event.event import EventSubscriber, EventPublisher
 
 from pyon.util.log import log
@@ -31,7 +27,6 @@ class TransformStreamListener(TransformStreamProcess):
     def on_start(self):
         self.queue_name = self.CFG.get_safe('process.queue_name',self.id)
 
-        # @TODO: queue_name is really exchange_name, rename
         self.subscriber = SimpleStreamSubscriber.new_subscriber(self.container, self.queue_name, self.recv_packet)
         self.subscriber.start()
 
@@ -46,7 +41,7 @@ class TransformStreamPublisher(TransformStreamProcess):
     def on_start(self):
         self.exchange_point = self.CFG.get_safe('process.exchange_point', '')
 
-        self.publisher = SimpleStreamPublisher.new_publisher(self.container,self.exchange_point,'')
+        self.publisher = SimpleStreamPublisher.new_publisher(self.container, self.exchange_point,'')
 
     def publish(self, msg, to_name):
         raise NotImplementedError('Method publish not implemented')
@@ -87,7 +82,6 @@ class TransformDatasetProcess(TransformBase):
 class TransformDataProcess(TransformStreamListener, TransformStreamPublisher):
 
     def on_start(self):
-        log.warn('TransformDataProcess.on_start()')
         TransformStreamListener.on_start(self)
         TransformStreamPublisher.on_start(self)
 
