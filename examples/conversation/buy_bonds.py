@@ -8,7 +8,7 @@ from pyon.net.conversation import Conversation, Principal,PrincipalName
 
 node, ioloop_process = messaging.make_node()
 
-def bank_app(service_provider_name):
+def bank_client_app(service_provider_name):
     #principal initialisation
     participant = Principal(node, NameTrio('rumi-PC',
                                            'rumi'))
@@ -21,14 +21,14 @@ def bank_app(service_provider_name):
                                      merge_with_first_send = True)
 
     #interactions
-    c.send('bank_server', 'I will send you a request shortly. Please wait for me.', 'buy_bonds')
+    c.send('bank_server', 'I will send you a request shortly. Please wait for me.', {'op':'buy_bonds'})
     msg, header = c.recv('bank_server')
     print 'Msg received: %s' % (msg)
 
     c.close()
     participant.terminate()
 
-def bank_client(service_provider_name):
+def bank_service_app(service_provider_name):
     #principal initialisation
     participant = Principal(node, NameTrio('stephen-PC',
                                            service_provider_name))
@@ -37,6 +37,7 @@ def bank_client(service_provider_name):
 
     #interactions
     msg, header = c.recv('bank_client')
-    if (header['op'] == 'buy_bonds'):
+    print 'msg received: %s, %s' %(msg, header)
+    if header['op'] == 'buy_bonds':
         c.send('bank_client', 'The market is closed today. Sorry!!!')
     participant.terminate()

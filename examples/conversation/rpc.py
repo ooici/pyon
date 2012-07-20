@@ -8,11 +8,11 @@ from pyon.net.conversation import Conversation, Principal, RPCServer, RPCClient,
 
 node, ioloop_process = messaging.make_node()
 
-def run_server(bank_name):
+def server_app(bank_name):
     server  = BankService(node, name = NameTrio('london', bank_name), service = 'buy_bonds')
     server.listen()
 
-def run_client(bank_name):
+def client_app(bank_name):
     client = BankClient(node, NameTrio('rumi'),
                         server_name = NameTrio('london', bank_name))
     client.buy_bonds('Ihu from buy_bonds')
@@ -27,7 +27,7 @@ class BankClient(RPCClient):
         RPCClient.__init__(self, node, base_name, server_name, self.rpc_conv)
 
     def buy_bonds(self, msg):
-        return RPCClient.request(self, msg, 'buy_bonds')
+        return RPCClient.request(self, msg, {'op':'buy_bonds'})
 
 
 class BankService(RPCServer):

@@ -6,6 +6,7 @@ from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import ExceptionFactory, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
+from pyon.net import conversation
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -450,10 +451,11 @@ class ListeningBaseEndpoint(BaseEndpoint):
         Meant to be spawned in a greenlet. This method creates/sets up a channel to listen,
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
+
         #log.debug("LEF.listen")
-
         self.prepare_listener(binding=binding)
-
+        #@TODO: change
+        #conv_rpc_server.listen()
         # notify any listeners of our readiness
         self._ready_event.set()
 
@@ -463,7 +465,6 @@ class ListeningBaseEndpoint(BaseEndpoint):
             try:
                 m = self.get_one_msg()
                 m.route()       # call default handler
-
             except ChannelClosedError as ex:
                 break
             finally:
@@ -1070,7 +1071,9 @@ class RPCClient(RequestResponseClient):
         assert headers is None or isinstance(headers, dict)
         headers = headers or {}
         headers['op'] = op
-
+        #@TODO: change
+        #conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'), self._send_name)
+        #return conv_rpc_client.request(msg, header=headers, timeout=timeout)
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 
