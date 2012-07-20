@@ -1,3 +1,5 @@
+from Queue import Empty
+from _socket import timeout
 import uuid
 import collections
 import time
@@ -13,14 +15,60 @@ from gevent import queue as gqueue
 from gevent.event import AsyncResult
 from pyon.util.async import spawn, switch
 #@TODO: Fix this, the interceptors should be local, Conversation should not import endpoint
-from endpoint import interceptors, log_message
 #@TODO: RPC specific import, should be removed
 from pyon.core.bootstrap import CFG
 
 #@TODO: Add log.debug to all methods, can we do geenral on class level, except for typing it in every method?
 #@TODO: How to manage **kwargs???
 #@TODO: Add @param and @returns to all methods
-#@TODO: Queuest should be auto deleted
+#@TODO: Queues should be auto deleted
+
+######################################################################
+# Copy from endpoint.py
+######################################################################
+interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
+
+# Note: This is now called from pyon.core.bootstrap
+def instantiate_interceptors(interceptor_cfg):
+    stack = interceptor_cfg["stack"]
+    defs = interceptor_cfg["interceptors"]
+
+    by_name_dict = {}
+    for type_and_direction in stack:
+        interceptor_names = stack[type_and_direction]
+        for name in interceptor_names:
+            if name in by_name_dict:
+                classinst = by_name_dict[name]
+            else:
+                interceptor_def = defs[name]
+
+                # Instantiate and put in by_name array
+                parts = interceptor_def["class"].split('.')
+                modpath = ".".join(parts[:-1])
+                classname = parts[-1]
+                module = __import__(modpath, fromlist=[classname])
+                classobj = getattr(module, classname)
+                classinst = classobj()
+
+                # Call configure
+                classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
+
+                # Put in by_name_dict for possible re-use
+                by_name_dict[name] = classinst
+
+            interceptors[type_and_direction].append(classinst)
+
+
+def log_message(recv, msg, headers, delivery_tag=None):
+    """
+    Utility function to print an legible comprehensive summary of a received message.
+    """
+    if getattr(recv, '__iter__', False):
+        recv = ".".join(str(item) for item in recv if item)
+    log.info("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
+
+######################################################################
+######################################################################
 
 class ConversationError(IonException):
     pass
@@ -46,7 +94,6 @@ def get_in_session_msg_type(header):
 # @TODO: Do we need CLOSE ???
 MSG_TYPE = enum(TRANSMIT = 1, INVITE=8, ACCEPT=16, REJECT = 24)
 MSG_TYPE_MASKS = enum(IN_SESSION = 7, CONTROL= 56)
-
 
 class Conversation(object):
     conv_id_counter = 0
@@ -117,7 +164,6 @@ class Conversation(object):
 
         return "%s-%d" % (Conversation._conv_id_root, Conversation.conv_id_counter)
 
-
 class ConversationEndpoint(object):
 
     def __init__(self, node):
@@ -127,7 +173,6 @@ class ConversationEndpoint(object):
         self._is_originator = False
         self._next_control_msg_type = 0
         self._recv_queues = {}
-
 
     @property
     def conv(self):
@@ -173,8 +218,8 @@ class ConversationEndpoint(object):
 
     #@TODO: Shell we add **kwargs???, why we need them
     #@TODO: We should pass User h, this version do not support
-    def send(self, to_role, msg, op = None):
-        header = {'op' : op} if op else {}
+    def send(self, to_role, msg, header = None):
+        header = header if header else {}
         if self._is_originator and not self._conv.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
@@ -286,7 +331,7 @@ class ConversationEndpoint(object):
     def _send(self, to_role, to_role_addr, msg, header = None):
         # @TODO: Shell we combine build_header and _build_conv_header ???
         header = self._build_conv_header(header, to_role, to_role_addr)
-        header = self._build_header(header)
+        header = self._build_header(msg, header)
         msg = self._build_payload(msg)
         msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
@@ -295,7 +340,7 @@ class ConversationEndpoint(object):
     #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
     def _build_conv_header(self, header, to_role, to_role_addr):
         #@TODO shell we rename this to receiver-addr?
-        header['receiver'] = "%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
+        header['receiver'] = "%s,%s,%s" %(to_role_addr.exchange, to_role_addr.queue, 'hello') #do we need that
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['conv-id'] = self._conv.id
@@ -348,10 +393,15 @@ class ConversationEndpoint(object):
         inv = Invocation(**kwargs)
         return inv
 
-    def _build_header(self, header):
+    def _build_header(self, msg, header):
         """
         Override this method to set any custom settings
         """
+        header['language'] = 'ion-r2'
+        header['encoding'] = 'msgpack'
+        header['format']   = msg.__class__.__name__    # hmm
+        header['reply-by'] = 'todo'                        # clock sync is a problem
+
         return header
 
     def _build_payload(self, msg):
@@ -359,7 +409,6 @@ class ConversationEndpoint(object):
         Override this method to change the payload
         """
         return msg
-
 
 class Principal(object):
     # keep the connection (AMQP)
@@ -492,7 +541,6 @@ class RPCClient(object):
     """
     # Will be nice to have
     # combine requestresponseClient.request and RequestEndpointUnit._send
-    s = 0
     def __init__(self, node, base_name, server_name, rpc_conversation = None):
         self.node = node
         self.name = base_name
@@ -500,7 +548,7 @@ class RPCClient(object):
         self.rpc_conv = rpc_conversation or RPCConversation()
         self.principal = Principal(self.node, self.name)
 
-    def request(self, msg, op = None, **kwargs):
+    def request(self, msg, header , **kwargs):
         # could have a specified timeout in kwargs
         if 'timeout' in kwargs and kwargs['timeout'] is not None:
             timeout = kwargs['timeout']
@@ -513,7 +561,7 @@ class RPCClient(object):
 
         c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
-        c.send(self.rpc_conv.server_role, msg, op)
+        c.send(self.rpc_conv.server_role, msg, header)
         try:
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
@@ -547,16 +595,32 @@ class RPCServer(object):
         self.name = name
         self._service = service
         self.rpc_conv = rpc_conversation or RPCConversation()
+        self.principal = Principal(self.node, self.name)
 
     def listen(self):
-            local = Principal(self.node, self.name)
-            local.start_listening()
+            self.principal.start_listening()
             while True:
-                #inv  = local.get_invitation()
-                c = local.accept_next_invitation(merge_with_first_send = True)
+                self.get_one_msg()
+
+    def get_one_msg(self):
+        try:
+            c = self.principal.accept_next_invitation(merge_with_first_send = True)
+            #log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
+            #log_message(self._recv_name, msg, headers, delivery_tag)
+            try:
                 msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
                 c.send(self.rpc_conv.client_role, reply)
+            except Exception:
+                log.exception("Unhandled error while handling received message")
+                raise
+            finally:
+                c.close()
+        except Empty:
+            # only occurs when timeout specified, capture the Empty we get from accept and return False
+            return False
+
+        return True
 
     def process_msg(self, msg, header):
         return ''
@@ -566,7 +630,6 @@ class RPCConversation(object):
         self.protocol = protocol or 'rpc'
         self.server_role = server_role or 'server'
         self.client_role = client_role or 'client'
-
 
 class PrincipalName(object):
     def __init__(self, namespace, name):

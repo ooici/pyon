@@ -33,7 +33,6 @@ from pyon.util.sflow import SFlowManager
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
 
-
 class Container(BaseContainerAgent):
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services

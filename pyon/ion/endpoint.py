@@ -202,8 +202,6 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
-
-
 class ProcessPublisher(Publisher):
     def __init__(self, process=None, **kwargs):
         self._process = process

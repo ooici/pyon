@@ -6,6 +6,7 @@ from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import exception_map, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
+from pyon.net import conversation
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -411,16 +412,23 @@ class ListeningBaseEndpoint(BaseEndpoint):
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
         log.debug("LEF.listen")
-
+        #@TODO: change
+        #conv_rpc_server = conversation.RPCServer(self.node, self._recv_name)
         self.prepare_listener(binding=binding)
-
+        #@TODO: change
+        #conv_rpc_server.listen()
         # notify any listeners of our readiness
         self._ready_event.set()
 
         while True:
             log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
+                # RPCResponseEndpointUnit
                 self.get_one_msg()
+                #@TODO: change
+                #e = self.create_endpoint()
+                #conv_rpc_server.process_msg = lambda m, h: e.message_received(self, m, h)
+                #conv_rpc_server.get_one_msg()
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
                 break
@@ -914,7 +922,9 @@ class RPCClient(RequestResponseClient):
         assert headers is None or isinstance(headers, dict)
         headers = headers or {}
         headers['op'] = op
-
+        #@TODO: change
+        #conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'), self._send_name)
+        #return conv_rpc_client.request(msg, header=headers, timeout=timeout)
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 
