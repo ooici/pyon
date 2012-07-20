@@ -97,7 +97,7 @@ class IonObjectBase(object):
                     raise AttributeError('Required value "%s" not set' % key)
 
                 # Check for inheritance
-                if self.check_inheritance_chain(type(field_val), schema_val['type'])
+                if self.check_inheritance_chain(type(field_val), schema_val['type']):
                     continue
 
                 # Check enum types
@@ -267,7 +267,7 @@ class IonObjectBase(object):
                 return
 
             # Check for inheritance
-            if self.check_inheritance_chain(type(value), content_type)
+            if self.check_inheritance_chain(type(value), content_type):
                 return
 
         raise AttributeError('Invalid value type %s in field "%s.%s", should be one of "%s"' %
