@@ -13,7 +13,7 @@ def bank_client_app(service_provider_name):
     participant = Principal(node, NameTrio('rumi-PC',
                                            'rumi'))
     # conversation bootstrapping
-    c = participant.start_conversation(protocol = 'buy_bond',
+    c = participant.start_conversation(protocol = 'buy_bonds',
                                        role = 'bank_client')
 
     c.invite('bank_server', NameTrio('stephen-PC',
