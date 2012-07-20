@@ -454,8 +454,12 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         #log.debug("LEF.listen")
         self.prepare_listener(binding=binding)
+        log.debug("LEF.listen")
         #@TODO: change
-        #conv_rpc_server.listen()
+        conv_rpc_server = conversation.RPCServer(self.node, self._recv_name)
+        #self.prepare_listener(binding=binding)
+        #@TODO: change
+        conv_rpc_server.listen()
         # notify any listeners of our readiness
         self._ready_event.set()
 
@@ -465,6 +469,14 @@ class ListeningBaseEndpoint(BaseEndpoint):
             try:
                 m = self.get_one_msg()
                 m.route()       # call default handler
+
+                # RPCResponseEndpointUnit
+                #self.get_one_msg()
+                #@TODO: change
+                #e = self.create_endpoint()
+                #conv_rpc_server.attach_endpoint_unit(e)
+                #conv_rpc_server.process_msg = lambda m, h: e.message_received(m, h)
+                #conv_rpc_server.get_one_msg()
             except ChannelClosedError as ex:
                 break
             finally:
@@ -807,8 +819,12 @@ class RequestResponseClient(SendingBaseEndpoint):
     def request(self, msg, headers=None, timeout=None):
         #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
+        conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
+                                                 self._send_name, endpoint_unit = e)
+
         try:
-            retval, headers = e.send(msg, headers=headers, timeout=timeout)
+            #retval, headers = e.send(msg, headers=headers, timeout=timeout)
+            retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
         finally:
             # always close, even if endpoint raised a logical exception
             e.close()
@@ -824,8 +840,9 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
-            headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
+        #@TODO:Fixes
+        #if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+        #    headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
         headers['format']       = raw_msg.__class__.__name__    # hmm
@@ -1072,8 +1089,6 @@ class RPCClient(RequestResponseClient):
         headers = headers or {}
         headers['op'] = op
         #@TODO: change
-        #conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'), self._send_name)
-        #return conv_rpc_client.request(msg, header=headers, timeout=timeout)
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 

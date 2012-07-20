@@ -173,6 +173,7 @@ class ConversationEndpoint(object):
         self._is_originator = False
         self._next_control_msg_type = 0
         self._recv_queues = {}
+        self.endpoint_unit = None
 
     @property
     def conv(self):
@@ -370,10 +371,14 @@ class ConversationEndpoint(object):
         @param  inv     An Invocation instance.
         @returns        A processed Invocation instance.
         """
+
         inv = self._build_invocation(path=Invocation.PATH_IN,
             message=msg, headers=header)
 
-        inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
+        if self.endpoint_unit:
+            inv_prime = self.endpoint_unit._intercept_msg_in(inv)
+        else:
+            inv_prime = process_interceptors(interceptors["message_incoming"] if "message_incoming" in interceptors else [], inv)
 
         return inv_prime.message, inv_prime.headers
 
@@ -386,11 +391,16 @@ class ConversationEndpoint(object):
         @returns        message and header after being intercepted.
         """
 
+
         inv = self._build_invocation(path=Invocation.PATH_OUT,
                     message=msg, headers=header)
-        inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
+        if self.endpoint_unit:
+            inv_prime = self.endpoint_unit._intercept_msg_out(inv)
+        else:
+            inv_prime = process_interceptors(interceptors["message_outgoing"] if "message_outgoing" in interceptors else [], inv)
 
         return inv_prime.message, inv_prime.headers
+
 
     #Copy from endpoint.py, EndpointUnit
     def _build_invocation(self, **kwargs):
@@ -398,13 +408,18 @@ class ConversationEndpoint(object):
         Builds an Invocation instance to be used by the interceptor stack.
         This method exists so we can override it in derived classes (ex with a process).
         """
-        inv = Invocation(**kwargs)
+        if self.endpoint_unit:
+            inv = self.endpoint_unit._build_invocation(**kwargs)
+        else: inv = Invocation(**kwargs)
         return inv
 
     def _build_header(self, msg, header):
         """
         Override this method to set any custom settings
         """
+        if self.endpoint_unit:
+            header.update(self.endpoint_unit._build_header(msg))
+
         header['language'] = 'ion-r2'
         header['encoding'] = 'msgpack'
         header['format']   = msg.__class__.__name__    # hmm
@@ -417,6 +432,9 @@ class ConversationEndpoint(object):
         Override this method to change the payload
         """
         return msg
+
+    def attach_endpoint_unit(self, endpoint_unit):
+        self.endpoint_unit = endpoint_unit
 
 class Principal(object):
     # keep the connection (AMQP)
@@ -540,12 +558,14 @@ class RPCClient(object):
     """
     # Will be nice to have
     # combine requestresponseClient.request and RequestEndpointUnit._send
-    def __init__(self, node, base_name, server_name, rpc_conversation = None):
+    def __init__(self, node, base_name, server_name,
+                 rpc_conversation = None, endpoint_unit = None):
         self.node = node
         self.name = base_name
         self.server_name = server_name
         self.rpc_conv = rpc_conversation or RPCConversation()
         self.principal = Principal(self.node, self.name)
+        self.endpoint_unit = endpoint_unit
 
     def request(self, msg, header , **kwargs):
         # could have a specified timeout in kwargs
@@ -559,6 +579,7 @@ class RPCClient(object):
         ts = time.time()
 
         c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
+        c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
         c.send(self.rpc_conv.server_role, msg, header)
         try:
@@ -577,9 +598,6 @@ class RPCClient(object):
 
     def terminate(self):
         self.principal.terminate()
-    def buy_bonds(self, msg):
-        header = {'op' :'buy_bonds'}
-        return self.request(msg, header)
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
 #@TODO: Headers are not set and _service is not called
@@ -589,23 +607,27 @@ class RPCServer(object):
     This is indeed listener, and should be started in the process.py
     create_errro_response and make_routing_call are still missing
     """
-    def __init__(self, node, name, service = None, rpc_conversation = None):
+    def __init__(self, node, name, service = None, rpc_conversation = None, endpoint_unit = None):
         self.node = node
         self.name = name
         self._service = service
         self.rpc_conv = rpc_conversation or RPCConversation()
         self.principal = Principal(self.node, self.name)
+        self.endpoint_unit = endpoint_unit
 
     def listen(self):
             self.principal.start_listening()
-            while True:
-                self.get_one_msg()
+
+    def attach_endpoint_unit(self, endpoint_unit):
+        self.endpoint_unit = endpoint_unit
 
     def get_one_msg(self):
         try:
             c = self.principal.accept_next_invitation(merge_with_first_send = True)
             #log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
             #log_message(self._recv_name, msg, headers, delivery_tag)
+            if self.endpoint_unit:
+                c.attach_endpoint_unit(self.endpoint_unit)
             try:
                 msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
