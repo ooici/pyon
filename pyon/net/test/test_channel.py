@@ -643,7 +643,16 @@ class TestRecvChannel(PyonTestCase):
 
         self.ch.get_stats()
 
-        self.ch._transport.get_stats.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+        self.ch._transport.get_stats_impl.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+
+    def test_purge(self):
+        self.ch._amq_chan = sentinel.amq_chan
+        self.ch._transport = Mock()
+        self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
+
+        self.ch._purge()
+
+        self.ch._transport.purge_impl.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
 
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')

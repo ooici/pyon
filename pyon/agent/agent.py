@@ -73,7 +73,7 @@ class ResourceAgent(BaseResourceAgent):
                 # TODO: Distinguish application vs. uncaught exception
                 cmd_res.status = getattr(ex, 'status_code', -1)
                 cmd_res.result = str(ex)
-                log.info("Agent command %s failed with trace=%s" % (command.command, traceback.format_exc()))
+                log.warn("Agent command %s failed with trace=%s" % (command.command, traceback.format_exc()))
         else:
             log.info("Agent command not supported: %s" % (command.command))
             ex = iex.NotFound("Command not supported: %s" % command.command)
