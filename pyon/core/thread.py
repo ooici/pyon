@@ -239,6 +239,12 @@ class ThreadManager(object):
 
         for proc in self.children:
 
+            # if a child thread has already exited, we don't need to wait on anything - 
+            # it's already good to go and can be considered joined. Otherwise we will likely
+            # double call notify_stop which is a bad thing.
+            if proc.proc.dead:
+                continue
+
             time_elapsed = time.time() - time_start
             if timeout is not None:
                 time_remaining = timeout - time_elapsed

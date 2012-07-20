@@ -556,6 +556,7 @@ class ProcManager(object):
         """
         Terminates a process and all its resources. Termination is graceful with timeout.
         """
+        log.debug("terminate_process: %s", process_id)
         service_instance = self.procs.get(process_id, None)
         if not service_instance:
             raise BadRequest("Cannot terminate. Process id='%s' unknown on container id='%s'" % (
@@ -566,7 +567,7 @@ class ProcManager(object):
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
         if service_instance._process:
-            #service_instance._process.notify_stop()
+            service_instance._process.notify_stop()
             service_instance._process.stop()
 
         self._unregister_process(process_id, service_instance)
