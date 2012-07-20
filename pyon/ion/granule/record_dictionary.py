@@ -57,6 +57,8 @@ class RecordDictionaryTool(object):
         """
         result = cls(TaxyTool(g.taxonomy))
         result._rd = g.record_dictionary
+        if result._rd.has_key(0):
+            result._shp = result._rd[0].shape
         return result
 
     def __setitem__(self, name, vals):
