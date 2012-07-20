@@ -100,7 +100,7 @@ class Conversation(object):
 
     def __init__(self, protocol, cid = None):
         self._conv_table = {}
-        self.protocol = protocol
+        self._protocol = protocol
         self._id = cid if cid else self._build_conv_id()
 
     @property
@@ -115,8 +115,8 @@ class Conversation(object):
     def id(self):
         return self._id
 
-    @protocol.setter
-    def protocol(self, value):
+    @id.setter
+    def idl(self, value):
         self._id = value
 
     def __getitem__(self, to_role):
