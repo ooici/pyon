@@ -1,10 +1,6 @@
-from gevent import spawn
-from gevent import queue as gqueue
 from pyon.net.transport import NameTrio
-from pyon.net import channel
 from pyon.net import messaging
-from pyon.net import conversation
-from pyon.net.conversation import Conversation, Principal,InitiatorPrincipal, GuestPrincipal
+from pyon.net.conversation import Principal
 
 node, ioloop_process = messaging.make_node()
 def buyer_app(queue_name):

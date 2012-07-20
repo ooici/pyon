@@ -1,19 +1,17 @@
 from Queue import Empty
-from _socket import timeout
 import uuid
-import collections
 import time
 from gevent.timeout import Timeout
 from pyon.core import bootstrap, exception
 from gevent import coros
 from pyon.core.exception import IonException
 from pyon.util.log import log
-from pyon.net.transport import NameTrio, BaseTransport
+from pyon.net.transport import NameTrio
 from pyon.net.channel import BidirChannel, ListenChannel, ChannelClosedError, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from gevent import queue as gqueue
 from gevent.event import AsyncResult
-from pyon.util.async import spawn, switch
+from pyon.util.async import spawn
 #@TODO: Fix this, the interceptors should be local, Conversation should not import endpoint
 #@TODO: RPC specific import, should be removed
 from pyon.core.bootstrap import CFG
@@ -117,7 +115,7 @@ class Conversation(object):
     def id(self):
         return self._id
 
-    @id.setter
+    @protocol.setter
     def protocol(self, value):
         self._id = value
 
@@ -133,7 +131,7 @@ class Conversation(object):
         return self._conv_table[to_role]
 
     def __setitem__(self, to_role, to_role_addr):
-        print 'Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s' %(to_role, to_role_addr)
+        print "Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s" %(to_role, to_role_addr)
         if to_role in self._conv_table and isinstance(self._conv_table[to_role], AsyncResult):
             self._conv_table[to_role].set(to_role_addr)
         else: self._conv_table[to_role] = to_role_addr
@@ -164,12 +162,14 @@ class Conversation(object):
 
         return "%s-%d" % (Conversation._conv_id_root, Conversation.conv_id_counter)
 
+
 class ConversationEndpoint(object):
 
     def __init__(self, node):
         log.debug("In Conversation.__init__")
         self.node = node
-        self._invitation_table = {} # mapping between role and public channels (principals)
+        # mapping between role and public channels (principals)
+        self._invitation_table = {}
         self._is_originator = False
         self._next_control_msg_type = 0
         self._recv_queues = {}
@@ -179,12 +179,13 @@ class ConversationEndpoint(object):
         return self._conv
 
     @conv.setter
-    def protocol(self, value):
+    def conv(self, value):
         self._conv = value
 
-    """principal_addrs is addressable entity for that role (etc. NameTrio)"""
     # @TODO: Should we have existing channel
     def join(self, role, base_name, conversation , is_originator = False):
+        """principal_addrs is addressable entity for that role (etc. NameTrio)"""
+
         self._conv = conversation
         self._self_role = role
         self._is_originator = is_originator
@@ -192,13 +193,17 @@ class ConversationEndpoint(object):
         self._spawn_listener(role, base_name)
 
     def accept(self, inv_msg, inv_header, c, base_name, auto_reply = False):
-        # @TODO: Fix that, nameTrio is too AMQP specific. better have short and long name for principal
+        #@TODO: Fix that, nameTrio is too AMQP specific. better have short and long name for principal
         self.join(inv_header['receiver-role'], base_name, c)
         self._on_msg_received(inv_msg, inv_header)
         if auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
 
-    def invite(self, to_role, to_role_addr, merge_with_first_send = True):
+
+    def invite(self, to_role, to_role_addr, merge_with_first_send = False):
+        """
+
+        """
         self._invitation_table.setdefault(to_role, (to_role_addr, False))
         self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
@@ -252,8 +257,10 @@ class ConversationEndpoint(object):
             self._recv_greenlet.kill()      # he's dead, jim
 
     #@TODO: Do we need only one instance of a channel
-    # We have preserved the logging from BaseEndpoint._spawn_listener
     def _spawn_listener(self, role, base_role_addr):
+        """
+        We have preserved the logging from BaseEndpoint._spawn_listener
+        """
         def listen():
             recv_chan = self.node.channel(ListenChannel)
             role_addr = recv_chan.setup_listener(NameTrio(base_role_addr))
@@ -284,9 +291,11 @@ class ConversationEndpoint(object):
             self._conv[sender_role] = NameTrio(tuple([x.strip() for x in header['reply-to'].split(',')]))
             if control_msg_type == MSG_TYPE.INVITE:
                 self.inviter_role = sender_role
-                # Note that if the message type is invite you need to accept it,
-                # conversation endpoint is an endpoint that is in a conevrsation. Only principals can accept/reject
-                # @TODO: really need FSM mechanism here, optherwise it is so ugly :(
+
+                #Note that if the message type is invite you need to accept it,
+                #conversation endpoint is an endpoint that is in a conevrsation. Only
+                #principals can accept/reject
+                #@TODO: really need FSM mechanism here, optherwise it is so ugly :(
                 self._next_control_msg_type = MSG_TYPE.ACCEPT
         elif control_msg_type == MSG_TYPE.REJECT:
             exception_msg = 'Invitation rejected by role %s on address %s'\
@@ -305,7 +314,7 @@ class ConversationEndpoint(object):
         elif to_role in self._invitation_table:
             to_role_addr, _ = self._invitation_table.get(to_role)
         else:
-            log.debug('No address found for role %s', to_role)
+            log.debug("No address found for role %s", to_role)
             raise ConversationError('No receiver-addr specified')
 
         if not header: header = {}
@@ -321,15 +330,14 @@ class ConversationEndpoint(object):
         log.debug("In _send for msg: %s", msg)
         to_role_addr = self._conv[to_role]
         header['conv-msg-type']  = MSG_TYPE.TRANSMIT
-        if (self._next_control_msg_type == MSG_TYPE.ACCEPT):
+        if self._next_control_msg_type == MSG_TYPE.ACCEPT:
             header['conv-msg-type']  = header.get(['conv-msg-type'], 0) | MSG_TYPE.ACCEPT
             header = self._build_control_header(header, to_role, to_role_addr)
             self._next_control_msg_type = 0
         self._send(to_role, to_role_addr, msg, header)
 
-    #@ Shell we add general build_header meant for overriding and general build_payload ???
+    #@TODO: Shell we combine build_header and _build_conv_header ?
     def _send(self, to_role, to_role_addr, msg, header = None):
-        # @TODO: Shell we combine build_header and _build_conv_header ???
         header = self._build_conv_header(header, to_role, to_role_addr)
         header = self._build_header(msg, header)
         msg = self._build_payload(msg)
@@ -490,17 +498,12 @@ class Principal(object):
            self._recv_greenlet.kill()      # he's dead, jim
 
     def get_invitation(self, protocol = None):
-       # Here we should iterate while we find the protocol that is matched
        print 'Wait to get an invitation'
        return self._recv_queue.get() # this returns a conversations
-       #if auto_reply:
-       #    c.send_ack(c.inviter_role, 'I am joining')
-       #return c
 
     def accept_invitation(self, c, msg, header, auto_reply = False):
        endpoint = ConversationEndpoint(self.node)
-       endpoint.accept(msg, header, c, self.base_name, auto_reply)
-       role = header['receiver-role']
+       endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
        self._conversations[c.id] = endpoint
        return endpoint
 
@@ -530,11 +533,6 @@ class Principal(object):
 #######################################################################################################################
 # RPC generic code
 #######################################################################################################################
-
-# Might be part of some hierarchy
-# What is missing, how to set specific headers???
-# header[performative] = 'request' ???
-# also language, encoding, format, reply-by
 
 class RPCClient(object):
     """
@@ -566,11 +564,11 @@ class RPCClient(object):
         try:
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
-            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
+            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.name)))
         finally:
             elapsed = time.time() - ts
-            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", result_headers.get('conv-id', 'NOCONVID'),
-                     result_headers.get('conv-seq', 'NOSEQ'),
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", header.get('conv-id', 'NOCONVID'),
+                     header.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
             c.close()
@@ -580,17 +578,17 @@ class RPCClient(object):
     def terminate(self):
         self.principal.terminate()
     def buy_bonds(self, msg):
-        header = {}
-        header['op'] = 'buy_bonds'
+        header = {'op' :'buy_bonds'}
         return self.request(msg, header)
 
-# Again, headers are missing
-# This is indeed listener, and should be started in the process.py
-# create_errro_response and make_routing_call are still missing
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
 #@TODO: Headers are not set and _service is not called
 class RPCServer(object):
-
+    """
+    Again, headers are missing
+    This is indeed listener, and should be started in the process.py
+    create_errro_response and make_routing_call are still missing
+    """
     def __init__(self, node, name, service = None, rpc_conversation = None):
         self.node = node
         self.name = name

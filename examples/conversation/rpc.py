@@ -1,10 +1,6 @@
-from gevent import spawn
-from gevent import queue as gqueue
 from pyon.net.transport import NameTrio
-from pyon.net import channel
 from pyon.net import messaging
-from pyon.net import conversation
-from pyon.net.conversation import Conversation, Principal, RPCServer, RPCClient, PrincipalName, RPCConversation
+from pyon.net.conversation import RPCServer, RPCClient, RPCConversation
 
 node, ioloop_process = messaging.make_node()
 
