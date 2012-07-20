@@ -126,7 +126,7 @@ class ResourceRegistry(object):
         """
         This is the official "delete" for resource objects: they are set to RETIRED lcstate
         """
-        self.set_lifecycle_state(resource_id, "RETIRED")
+        self.set_lifecycle_state(resource_id, LCS.RETIRED)
 
     def delete(self, object_id='', del_associations=False):
         res_obj = self.read(object_id)
@@ -136,7 +136,7 @@ class ResourceRegistry(object):
         if not del_associations:
             self._delete_owners(object_id)
 
-        res_obj.lcstate = 'RETIRED'
+        res_obj.lcstate = LCS.RETIRED
         self.rr_store.update(res_obj)
         res = self.rr_store.delete(object_id, del_associations=del_associations)
 
@@ -183,14 +183,14 @@ class ResourceRegistry(object):
             raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
 
         res_obj = self.read(resource_id)
-        if target_lcstate != "RETIRED":
+        old_state = res_obj.lcstate
+        if target_lcstate != LCS.RETIRED:
             restype = res_obj._get_type()
             restype_workflow = get_restype_lcsm(restype)
             if not restype_workflow:
                 raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
             # Check that target state is allowed
-            old_state = res_obj.lcstate
             if not target_lcstate in restype_workflow.get_successors(res_obj.lcstate).values():
                 raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, res_obj.lcstate))
 
