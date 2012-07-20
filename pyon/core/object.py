@@ -246,7 +246,7 @@ class IonObjectBase(object):
                     match_found = True
                     break
                 # Check for inheritance
-                if check_inheritance_chain(type(value), content_type):
+                if self.check_inheritance_chain(type(value), content_type):
                     match_found = True
                     break
 
