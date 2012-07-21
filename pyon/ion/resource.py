@@ -374,7 +374,8 @@ class ExtendedResourceContainer(object):
 
                 #Handle compound association chains
                 elif self.is_compound_association(decorator):
-                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator) )
+                    deco_value = obj.get_decorator_value(field, decorator)
+                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator), deco_value )
                     self.set_field_associations(obj, field,  assoc)
 
                 #If the decorator is a valid association, then get any associated objects
@@ -384,14 +385,15 @@ class ExtendedResourceContainer(object):
                     self.set_field_associations(obj, field, assoc)
 
     #Helper function for walking a chain of predicates
-    def walk_associations(self, object, predicates, index=0):
+    def walk_associations(self, object, predicates, deco_value=None, index=0):
         ret_list = list()
-        assoc = self.find_associations(object, predicates[index])
+        assoc = self.find_associations(object, predicates[index], deco_value)
         for obj in assoc:
             if index+1 == len(predicates):
                 return obj
             else:
-                ret_obj = self.walk_associations(obj, predicates, index+1)
+                #Only pass in the decorator filter value at the first level
+                ret_obj = self.walk_associations(obj, predicates, None, index+1)
                 if index == 0:
                     ret_list.append(ret_obj)
 
@@ -465,10 +467,21 @@ class ExtendedResourceContainer(object):
         #Need to check through all of these in this order to account for specific vs base class inclusions
         if self.is_predicate_association(pred,'domain',resource.type_ ):
             objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+
+            #If no objects were found, try finding as subjects just in case.
+            if not objs:
+                self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+
         elif self.is_predicate_association(pred,'range',resource.type_ ):
             objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+
         elif self.is_predicate_association_extension(pred,'domain',resource.type_ ):
             objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+
+            #If no objects were found, try finding as subjects just in case.
+            if not objs:
+                objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+
         elif self.is_predicate_association_extension(pred,'range',resource.type_ ):
             objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
 
