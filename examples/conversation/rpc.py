@@ -7,11 +7,16 @@ node, ioloop_process = messaging.make_node()
 def server_app(bank_name):
     server  = BankService(node, name = NameTrio('london', bank_name), service = 'buy_bonds')
     server.listen()
+    try:
+        while True:
+            server.get_one_msg()
+    except:
+        server.terminate()
 
-def client_app(bank_name):
+def client_app(bank_name, msg = 'Ihu from buy_bonds'):
     client = BankClient(node, NameTrio('rumi'),
                         server_name = NameTrio('london', bank_name))
-    client.buy_bonds('Ihu from buy_bonds')
+    client.buy_bonds(msg)
 
 
 class BankClient(RPCClient):
@@ -24,6 +29,7 @@ class BankClient(RPCClient):
 
     def buy_bonds(self, msg):
         return RPCClient.request(self, msg, {'op':'buy_bonds'})
+
 
 
 class BankService(RPCServer):
