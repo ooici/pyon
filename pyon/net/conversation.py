@@ -238,6 +238,12 @@ class ConversationEndpoint(object):
         (msg, header) = self._recv_queues[from_role].get()
         print 'receive:%s'%header
         msg, header = self._intercept_msg_in(msg, header)
+        log.info("""\n
+        ----------------Receiving message:-----------------------------------------------
+        Message is: %s \n from %s to %s
+        Header is: =%s  \n
+        ----------------------------------------------------------------------------------
+        """, msg, from_role, self._self_role, header)
         return msg, header
 
     def close(self):
@@ -343,6 +349,12 @@ class ConversationEndpoint(object):
         msg = self._build_payload(msg)
         msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
+        log.info("""\n
+        ----------------Sending message:-----------------------------------------------
+        Message is: %s from %s to %s
+        Header is: =%s  \n
+        ----------------------------------------------------------------------------------
+        """, msg, self._self_role, to_role, header)
         self._chan.send(msg, header)
 
     #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
@@ -520,6 +532,11 @@ class Principal(object):
        endpoint = ConversationEndpoint(self.node)
        endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
        self._conversations[c.id] = endpoint
+       log.info("""\n
+        ----------------Accepting invitation:-----------------------------------------------
+        Header is: =%s  \n
+        ----------------------------------------------------------------------------------
+        """, header)
        return endpoint
 
     def accept_next_invitation(self, merge_with_first_send = False):
@@ -577,7 +594,8 @@ class RPCClient(object):
         ts = time.time()
 
         c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
-        c.attach_endpoint_unit(self.endpoint_unit)
+        if self.endpoint_unit:
+            c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
         c.send(self.rpc_conv.server_role, msg, header)
         try:
@@ -630,6 +648,9 @@ class RPCServer(object):
                 msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
                 c.send(self.rpc_conv.client_role, reply)
+                if msg == 'quit':
+                    c.close()
+                    self.principal.terminate()
             except Exception:
                 log.exception("Unhandled error while handling received message")
                 raise
