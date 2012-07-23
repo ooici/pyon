@@ -59,10 +59,10 @@ class FileSystem(object):
             if not FileSystem._sandbox(FileSystem.FS_DIRECTORY[k]):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
             if not os.path.exists(FS_DIRECTORY[k]):
-                log.debug('Making path: %s', FS_DIRECTORY[k])
+                log.info('Making path: %s', FS_DIRECTORY[k])
                 os.makedirs(FileSystem.FS_DIRECTORY[k])
             elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
-                log.debug('Removing %s' % FS_DIRECTORY[k])
+                log.info('Removing %s' % FS_DIRECTORY[k])
                 shutil.rmtree(FS_DIRECTORY[k])
                 os.makedirs(FileSystem.FS_DIRECTORY[k])
 
