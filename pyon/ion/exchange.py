@@ -267,7 +267,10 @@ class ExchangeManager(object):
 
         # @TODO: needs lock, but so do all these methods
         if not self._chan or (self._chan and self._chan.closing is not None):
-            self._chan = blocking_cb(node.client.channel, 'on_open_callback')
+
+            # if you want to play with node internals, you have to play nice with the node.. needs the lock!
+            with node._lock:
+                self._chan = blocking_cb(node.client.channel, 'on_open_callback')
 
         return self._chan
 
