@@ -50,8 +50,6 @@ class IonIntegrationTestCase(unittest.TestCase):
         self._patch_out_fail_fast_kill()
 
         bootstrap.testing_fast = True
-        # delete/create any known DBs with names matching our prefix - should be rare
-        self._force_clean(True)
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
             self._patch_out_start_rel()
@@ -90,8 +88,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
-        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
-            self._force_clean()         # deletes only
+        self._force_clean()         # deletes only
         bootstrap.testing_fast = False
 
     def _turn_on_queue_auto_delete(self):

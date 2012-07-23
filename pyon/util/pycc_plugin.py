@@ -120,6 +120,9 @@ class PYCC(Plugin):
             self.datastore_admin.dump_datastore(path='res/dd', compact=True)
             debug.write('Dump child container state to file...\n')
 
+            # Clean again to make sure the first nosetest starts on a clean
+            # slate
+            self.datastore_admin.clear_datastore(prefix=self.sysname)
             # Enable CEI mode for the tests
             os.environ['CEI_LAUNCH_TEST'] = '1'
 
