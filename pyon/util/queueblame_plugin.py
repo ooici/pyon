@@ -5,10 +5,10 @@ class QueueBlame(Plugin):
 
     def __init__(self):
         Plugin.__init__(self)
-        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+        from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
         import uuid
         self.ds_name = "queueblame-%s" % str(uuid.uuid4())[0:6]
-        self.ds = CouchDB_DataStore(datastore_name=self.ds_name)
+        self.ds = CouchDataStore(datastore_name=self.ds_name)
 
         from collections import defaultdict
         self.queues_by_test = defaultdict(lambda: defaultdict(dict))
@@ -29,8 +29,7 @@ class QueueBlame(Plugin):
         self._queueblame_trim       = options.queueblame_trim
 
     def begin(self):
-        self.ds.create_datastore(create_indexes=False)
-
+        pass
 
     def finalize(self, result):
         self.ds.delete_datastore()

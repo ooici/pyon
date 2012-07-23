@@ -634,13 +634,6 @@ class RecvChannel(BaseChannel):
                                                         auto_delete=self._queue_auto_delete,
                                                         durable=self._queue_durable)
 
-        if os.environ.get('QUEUE_BLAME', None) is not None:
-            ds_name, testid = os.environ['QUEUE_BLAME'].split(',')
-            from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-            ds = CouchDB_DataStore(datastore_name=ds_name)
-            ds.create_doc({'test_id':testid, 'queue_name':queue_name})
-            ds.close()
-
         # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
         if queue_name != self._recv_name.queue:
             self._recv_name = NameTrio(self._recv_name.exchange, queue_name, self._recv_name.binding)

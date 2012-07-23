@@ -121,7 +121,7 @@ class AMQPTransport(BaseTransport):
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
-            _, testid = os.environ['QUEUE_BLAME'].split(',')
+            ds_name, testid = os.environ['QUEUE_BLAME'].split(',')
             arguments.update({'created-by':testid})
 
         frame = self._sync_call(client, client.queue_declare, 'callback',
@@ -129,6 +129,12 @@ class AMQPTransport(BaseTransport):
                                 auto_delete=auto_delete,
                                 durable=durable,
                                 arguments=arguments)
+
+        if os.environ.get('QUEUE_BLAME', None) is not None:
+            from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+            ds = CouchDataStore(datastore_name=ds_name)
+            ds.create_doc({'test_id':testid, 'queue_name':frame.method.queue})
+            ds.close()
 
         return frame.method.queue
 
