@@ -62,7 +62,7 @@ class FileSystem(object):
                 log.info('Making path: %s', FS_DIRECTORY[k])
                 os.makedirs(FileSystem.FS_DIRECTORY[k])
             elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
-                log.info('Removing %s' % FS_DIRECTORY[k])
+                log.info('Removing %s' , FS_DIRECTORY[k])
                 shutil.rmtree(FS_DIRECTORY[k])
                 os.makedirs(FileSystem.FS_DIRECTORY[k])
 
