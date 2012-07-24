@@ -250,6 +250,8 @@ class ProcManager(object):
         self._service_init(service_instance)
         self._service_start(service_instance)
 
+        proc.start_listeners()
+
         return service_instance
 
     # -----------------------------------------------------------------
@@ -294,6 +296,8 @@ class ProcManager(object):
 
         self._service_init(service_instance)
         self._service_start(service_instance)
+
+        proc.start_listeners()
 
         return service_instance
 
@@ -342,6 +346,8 @@ class ProcManager(object):
 
         self._service_start(service_instance)
 
+        proc.start_listeners()
+
         if not service_instance.resource_id:
             log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
 
@@ -382,6 +388,8 @@ class ProcManager(object):
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
+
+        proc.start_listeners()
 
         return service_instance
 

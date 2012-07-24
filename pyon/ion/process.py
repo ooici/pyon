@@ -75,10 +75,6 @@ class IonProcessThread(PyonThread):
         if self.name:
             threading.current_thread().name = self.name
 
-        # spawn all listeners in startup listeners (from initializer, or added later)
-        for listener in self._startup_listeners:
-            self.add_endpoint(listener)
-
         # spawn control flow loop
         ct = self.thread_manager.spawn(self._control_flow)
 
@@ -142,6 +138,26 @@ class IonProcessThread(PyonThread):
 
             ar.set(res)
 
+    def start_listeners(self):
+        """
+        This is called from procs.
+        """
+
+        # spawn all listeners in startup listeners (from initializer, or added later)
+        for listener in self._startup_listeners:
+            self.add_endpoint(listener)
+
+        ev = Event()
+
+        def allready(ev):
+            waitall([x.get_ready_event() for x in self.listeners])
+            ev.set()
+
+        spawn(allready, ev)
+
+        ev.wait(timeout=10)
+
+
 
     def _notify_stop(self):
         """
@@ -168,12 +184,17 @@ class IonProcessThread(PyonThread):
         Returns an Event that is set when all the listeners in this Process are running.
         """
         ev = Event()
+        ev.set()
+
+        return ev
+        """
         def allready(ev):
             waitall([x.get_ready_event() for x in self.listeners])
             ev.set()
 
         spawn(allready, ev)
         return ev
+        """
 
 class IonProcessThreadManager(PyonThreadManager):
 
