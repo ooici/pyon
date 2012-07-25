@@ -142,9 +142,9 @@ def fmt_usage_stanza(root, verb):
         text += " {0} {1} {2}\n".format(verb, k, fmt_args(root[k]))
     return text
 
-parser = OptionParser(usage=make_usage())
 
 def make_parser():
+    parser = OptionParser(usage=make_usage())
     parser.add_option("-H", "--host", dest="hostname", default="localhost",
                       help="connect to host HOST [default: %default]",
                       metavar="HOST")
@@ -175,6 +175,7 @@ def make_parser():
     parser.add_option("--bash-completion", action="store_true",
                       dest="bash_completion", default=False,
                       help="Print bash completion script")
+    return parser
 
 def assert_usage(expr, error):
     if not expr:
@@ -189,7 +190,7 @@ def column_sort_key(col):
         return (2, col)
 
 def main():
-    make_parser()
+    parser = make_parser()
     (options, args) = parser.parse_args()
     if options.bash_completion:
         print_bash_completion()
