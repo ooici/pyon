@@ -41,7 +41,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
             if self.governance_controller is not None:
-                ret = self.governance_controller.policy_decision_point_manager.check_policies(invocation)
+                ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
             log.debug("Policy Decision: " + str(ret))
 

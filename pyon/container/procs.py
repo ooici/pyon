@@ -172,6 +172,20 @@ class ProcManager(object):
             log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
             raise
 
+    def list_running_process(self, process_type=''):
+        '''
+        Returns a list of the running ION processes in the container or filtered by the process_type
+        '''
+        ret = list()
+        for (name,p) in self.procs.iteritems():
+            if process_type and p.process_type != process_type:
+                continue
+
+            ret.append(p)
+
+        return ret
+
+
     def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s, %s", gproc, gproc.exception)
 
