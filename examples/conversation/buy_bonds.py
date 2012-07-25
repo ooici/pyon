@@ -1,12 +1,12 @@
 from pyon.net.transport import NameTrio
 from pyon.net import messaging
-from pyon.net.conversation import Principal
+from pyon.net.conversation import Participant
 
 node, ioloop_process = messaging.make_node()
 
 def bank_client_app(service_provider_name):
     #principal initialisation
-    participant = Principal(node, NameTrio('rumi-PC',
+    participant = Participant(node, NameTrio('rumi-PC',
                                            'rumi'))
     # conversation bootstrapping
     c = participant.start_conversation(protocol = 'buy_bonds',
@@ -21,12 +21,12 @@ def bank_client_app(service_provider_name):
     msg, header = c.recv('bank_server')
     print 'Msg received: %s' % (msg)
 
-    c.close()
+    c.stop_conversation()
     participant.terminate()
 
 def bank_service_app(service_provider_name):
     #principal initialisation
-    participant = Principal(node, NameTrio('stephen-PC',
+    participant = Participant(node, NameTrio('stephen-PC',
                                            service_provider_name))
     participant.start_listening()
     c = participant.accept_next_invitation(merge_with_first_send = True)
@@ -36,4 +36,5 @@ def bank_service_app(service_provider_name):
     print 'msg received: %s, %s' %(msg, header)
     if header['op'] == 'buy_bonds':
         c.send('bank_client', 'The market is closed today. Sorry!!!')
+    c.stop_conversation()
     participant.terminate()

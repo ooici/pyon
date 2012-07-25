@@ -26,6 +26,40 @@ from Queue import Empty
 from pyon.util.sflow import SFlowManager
 from types import MethodType
 
+
+#TODOL Check whether instantiate_interceptors shoudl stay here.
+interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
+
+# Note: This is now called from pyon.core.bootstrap
+def instantiate_interceptors(interceptor_cfg):
+    stack = interceptor_cfg["stack"]
+    defs = interceptor_cfg["interceptors"]
+
+    by_name_dict = {}
+    for type_and_direction in stack:
+        interceptor_names = stack[type_and_direction]
+        for name in interceptor_names:
+            if name in by_name_dict:
+                classinst = by_name_dict[name]
+            else:
+                interceptor_def = defs[name]
+
+                # Instantiate and put in by_name array
+                parts = interceptor_def["class"].split('.')
+                modpath = ".".join(parts[:-1])
+                classname = parts[-1]
+                module = __import__(modpath, fromlist=[classname])
+                classobj = getattr(module, classname)
+                classinst = classobj()
+
+                # Call configure
+                classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
+
+                # Put in by_name_dict for possible re-use
+                by_name_dict[name] = classinst
+
+            interceptors[type_and_direction].append(classinst)
+
 class EndpointError(StandardError):
     pass
 
@@ -95,8 +129,8 @@ class EndpointUnit(object):
         @returns    A 2-tuple of message, headers after going through the interceptors.
         """
         inv = self._build_invocation(path=Invocation.PATH_IN,
-                                     message=msg,
-                                     headers=headers)
+            message=msg,
+            headers=headers)
         inv_prime = self._intercept_msg_in(inv)
         new_msg = inv_prime.message
         new_headers = inv_prime.headers
@@ -146,8 +180,8 @@ class EndpointUnit(object):
         #log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                     message=msg,
-                                     headers=headers)
+            message=msg,
+            headers=headers)
         inv_prime = self._intercept_msg_out(inv)
         new_msg = inv_prime.message
         new_headers = inv_prime.headers
@@ -228,11 +262,11 @@ class BaseEndpoint(object):
 
         self.node = node
 
-#        # @TODO: MOVE THIS
-#        if name in self.endpoint_by_name:
-#            self.endpoint_by_name[name].append(self)
-#        else:
-#            self.endpoint_by_name[name] = [self]
+    #        # @TODO: MOVE THIS
+    #        if name in self.endpoint_by_name:
+    #            self.endpoint_by_name[name].append(self)
+    #        else:
+    #            self.endpoint_by_name[name] = [self]
 
     @classmethod
     def _get_container_instance(cls):
@@ -455,11 +489,11 @@ class ListeningBaseEndpoint(BaseEndpoint):
         #log.debug("LEF.listen")
         self.prepare_listener(binding=binding)
         log.debug("LEF.listen")
-        #@TODO: change
-        conv_rpc_server = conversation.RPCServer(self.node, self._recv_name)
-        #self.prepare_listener(binding=binding)
-        #@TODO: change
-        conv_rpc_server.listen()
+        if CFG.endpoint.conversation_enabled:
+            conv_rpc_server = conversation.RPCServer(self.node, self._recv_name)
+            conv_rpc_server.listen()
+        else:
+            self.prepare_listener(binding=binding)
         # notify any listeners of our readiness
         self._ready_event.set()
 
@@ -477,6 +511,14 @@ class ListeningBaseEndpoint(BaseEndpoint):
                 #conv_rpc_server.attach_endpoint_unit(e)
                 #conv_rpc_server.process_msg = lambda m, h: e.message_received(m, h)
                 #conv_rpc_server.get_one_msg()
+
+                e = self.create_endpoint()
+                #if CFG.endpoint.conversation_enabled:
+                #    conv_rpc_server.attach_endpoint_unit(e)
+                #    conv_rpc_server.process_msg = lambda m, h: e.message_received(m, h)
+                #    conv_rpc_server.get_one_msg()
+                #else:
+                self.get_one_msg()
             except ChannelClosedError as ex:
                 break
             finally:
@@ -819,15 +861,20 @@ class RequestResponseClient(SendingBaseEndpoint):
     def request(self, msg, headers=None, timeout=None):
         #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
-        conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
-                                                 self._send_name, endpoint_unit = e)
-
-        try:
-            #retval, headers = e.send(msg, headers=headers, timeout=timeout)
-            retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
-        finally:
-            # always close, even if endpoint raised a logical exception
-            e.close()
+        if CFG.endpoint.conversation-enabled:
+            conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
+                                                     self._send_name, endpoint_unit = e)
+            try:
+                retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
+            finally:
+                # always close, even if endpoint raised a logical exception
+                conv_rpc_client.stop_conversation()
+        else:
+            try:
+                retval, headers = e.send(msg, headers=headers, timeout=timeout)
+            finally:
+                # always close, even if endpoint raised a logical exception
+                e.close()
         return retval
 
 class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
@@ -840,7 +887,7 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        #@TODO:Fixes
+        #@TODO:Conversation Fixes. Uncomment this code
         #if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
         #    headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
@@ -1027,22 +1074,22 @@ class RPCClient(RequestResponseClient):
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
             self._define_interface(iface)
-#        elif isinstance(iface, IonServiceDefinition):
-#            self._define_svcdef(iface)
+        #        elif isinstance(iface, IonServiceDefinition):
+        #            self._define_svcdef(iface)
 
         RequestResponseClient.__init__(self, **kwargs)
 
-#    def _define_svcdef(self, svc_def):
-#        """
-#        Defines an RPCClient's attributes from an IonServiceDefinition.
-#        """
-#        for meth in svc_def.operations:
-#            name        = meth.op_name
-#            in_obj      = meth.def_in
-#            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
-#            doc         = meth.__doc__
-#
-#            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
+    #    def _define_svcdef(self, svc_def):
+    #        """
+    #        Defines an RPCClient's attributes from an IonServiceDefinition.
+    #        """
+    #        for meth in svc_def.operations:
+    #            name        = meth.op_name
+    #            in_obj      = meth.def_in
+    #            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
+    #            doc         = meth.__doc__
+    #
+    #            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
 
     def _define_interface(self, iface):
         """
@@ -1088,7 +1135,6 @@ class RPCClient(RequestResponseClient):
         assert headers is None or isinstance(headers, dict)
         headers = headers or {}
         headers['op'] = op
-        #@TODO: change
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 
@@ -1265,4 +1311,3 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
             prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
     except Exception as ex:
         log.warning("%s log error: %s", prefix, str(ex))
-

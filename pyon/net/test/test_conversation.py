@@ -16,7 +16,7 @@ import Queue as PQueue
 from gevent.queue import Queue
 from unittest import skip
 from pyon.core import bootstrap
-from pyon.net.conversation import Conversation, ConversationEndpoint, Principal
+from pyon.net.conversation import Conversation, ConversationEndpoint, Participant
 from gevent.event import AsyncResult
 from pyon.net.messaging import NodeB
 
@@ -110,7 +110,7 @@ class TestPrincipal(PyonTestCase):
         self.node = Mock(spec = NodeB)
         self.name_exchange, self.name_queue = 'rumi-exchange', 'rumi-queue'
         self.name = NameTrio(self.name_exchange, self.name_queue)
-        self.principal = Principal(self.node, self.name)
+        self.principal = Participant(self.node, self.name)
 
     def test_start_conversation(self):
         protocol = 'test_protocol'
