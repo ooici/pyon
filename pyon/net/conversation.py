@@ -325,7 +325,7 @@ class ConversationEndpoint(object):
             raise ConversationError('No receiver-addr specified')
 
         if not header: header = {}
-        header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
+        header['conv-msg-type'] = header.get(['conv-msg-type'], 0) | MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_addr, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_addr, True)
         header = self._build_control_header(header, to_role, to_role_addr)
@@ -361,7 +361,7 @@ class ConversationEndpoint(object):
     #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
     def _build_conv_header(self, header, to_role, to_role_addr):
         #@TODO shell we rename this to receiver-addr?
-        header['receiver'] = "%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
+        header['receiver'] = "%s,%s,%s" %(to_role_addr.exchange, to_role_addr.queue, 'hello') #do we need that
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['conv-id'] = self._conv.id
