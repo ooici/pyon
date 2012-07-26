@@ -105,11 +105,11 @@ class Conversation(object):
 
     @property
     def protocol(self):
-        return self._protocol
+         return self._protocol
 
     @protocol.setter
     def protocol(self, value):
-        self._protocol = value
+         self._protocol = value
 
     @property
     def id(self):
@@ -306,7 +306,7 @@ class ConversationEndpoint(object):
                 self._next_control_msg_type = MSG_TYPE.ACCEPT
         elif control_msg_type == MSG_TYPE.REJECT:
             exception_msg = 'Invitation rejected by role %s on address %s'\
-            %(header['sender-role'], header['reply-to'])
+                             %(header['sender-role'], header['reply-to'])
             log.exception(exception_msg)
             raise ConversationError(exception_msg)
 
@@ -325,7 +325,7 @@ class ConversationEndpoint(object):
             raise ConversationError('No receiver-addr specified')
 
         if not header: header = {}
-        header['conv-msg-type'] = header.get(['conv-msg-type'], 0) | MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
+        header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_addr, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_addr, True)
         header = self._build_control_header(header, to_role, to_role_addr)
@@ -361,7 +361,7 @@ class ConversationEndpoint(object):
     #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
     def _build_conv_header(self, header, to_role, to_role_addr):
         #@TODO shell we rename this to receiver-addr?
-        header['receiver'] = "%s,%s,%s" %(to_role_addr.exchange, to_role_addr.queue, 'hello') #do we need that
+        header['receiver'] = "%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['conv-id'] = self._conv.id
@@ -405,7 +405,7 @@ class ConversationEndpoint(object):
 
 
         inv = self._build_invocation(path=Invocation.PATH_OUT,
-            message=msg, headers=header)
+                    message=msg, headers=header)
         if self.endpoint_unit:
             inv_prime = self.endpoint_unit._intercept_msg_out(inv)
         else:
@@ -435,7 +435,7 @@ class ConversationEndpoint(object):
         header['language'] = 'ion-r2'
         header['encoding'] = 'msgpack'
         header['format']   = msg.__class__.__name__    # hmm
-        header['reply-by'] = 'todo'                    # clock sync is a problem
+        header['reply-by'] = 'todo'                        # clock sync is a problem
 
         return header
 
@@ -453,53 +453,53 @@ class Participant(object):
     #@TODO: ensure node, may be by providing default broker connection
 
     def __init__(self, node, name = None):
-        self.node = node
-        self._name = name
-        self._conversations = {}
-        self._recv_queue = gqueue.Queue()
-        self._chan = None
-        self._recv_greenlet = None
+       self.node = node
+       self._name = name
+       self._conversations = {}
+       self._recv_queue = gqueue.Queue()
+       self._chan = None
+       self._recv_greenlet = None
 
 
     @property
     def base_name(self):
-        return self.name.exchange
+       return self.name.exchange
 
     @property
     def name(self):
-        if not isinstance(self._name, NameTrio):
-            self._name = NameTrio(bootstrap.get_sys_name(), self._name)
-        return self._name
+       if not isinstance(self._name, NameTrio):
+           self._name = NameTrio(bootstrap.get_sys_name(), self._name)
+       return self._name
 
     #@TODO: In the endpoint.py implemenataion channel is decoupled from the spawn listener
     #@TODO: Do we need to spawn here? listen() method for all listeners is started in the thread_manager (in the process.py)
     # so may be we need to provide only listen and leave the upper level to take care of spawning?
     def start_listening(self, source_name = None):
-        def listen():
-            name = source_name or self.name
-            #@TODO: Should we have separated create_channel method?, do we need kwargs for creating a channel,
-            # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
-            self._chan = self.node.channel(ListenChannel)
-            if name and isinstance(name, NameTrio):
-                print 'In listen: before setup_listener'
-                self._chan.setup_listener(name)
-            else:
-                log.debug('Principal.name is not correct: %s', name)
-                raise PrincipalError('Principal.name is not correct: %s', name)
+       def listen():
+           name = source_name or self.name
+           #@TODO: Should we have separated create_channel method?, do we need kwargs for creating a channel,
+           # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
+           self._chan = self.node.channel(ListenChannel)
+           if name and isinstance(name, NameTrio):
+               print 'In listen: before setup_listener'
+               self._chan.setup_listener(name)
+           else:
+               log.debug('Principal.name is not correct: %s', name)
+               raise PrincipalError('Principal.name is not correct: %s', name)
 
-            self._chan.start_consume()
-            while True:
-                try:
-                    with self._chan.accept() as newchan:
-                        print 'Before receiving invitation msg'
-                        msg, header, delivery_tag = newchan.recv()
-                        print 'After receiving invitation msg: %s, %s' %(msg, header)
-                        newchan.ack(delivery_tag)
-                        self._recv_invitation(msg, header)
-                except ChannelClosedError as ex:
-                    log.debug('Channel was closed during LEF.listen')
-                    break
-        self._recv_greenlet = spawn(listen)
+           self._chan.start_consume()
+           while True:
+               try:
+                   with self._chan.accept() as newchan:
+                       print 'Before receiving invitation msg'
+                       msg, header, delivery_tag = newchan.recv()
+                       print 'After receiving invitation msg: %s, %s' %(msg, header)
+                       newchan.ack(delivery_tag)
+                       self._recv_invitation(msg, header)
+               except ChannelClosedError as ex:
+                   log.debug('Channel was closed during LEF.listen')
+                   break
+       self._recv_greenlet = spawn(listen)
 
     def stop_listening(self):
         [conv_endpoint.close() for conv_endpoint  in self._conversations.values()]
@@ -513,6 +513,8 @@ class Participant(object):
         return endpoint
 
     def terminate(self):
+        #@TODO: Fix that
+        #[c.stop_conversation() for c  in self._conversations]
         if self._chan:
             # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
             # we may end up having a duplicate, but I think logically it would never be a problem.
@@ -520,46 +522,46 @@ class Participant(object):
             self._chan.close()
 
         if self._recv_greenlet:
-            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-            # @TODO: remove spawn_listener altogether.
-            self._chan._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=1)
-            self._recv_greenlet.kill()      # he's dead, jim
+           # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+           # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+           # @TODO: remove spawn_listener altogether.
+           self._chan._recv_queue.put(ChannelShutdownMessage())
+           self._recv_greenlet.join(timeout=1)
+           self._recv_greenlet.kill()      # he's dead, jim
 
     def get_invitation(self, protocol = None):
-        print 'Wait to get an invitation'
-        return self._recv_queue.get() # this returns a conversations
+       print 'Wait to get an invitation'
+       return self._recv_queue.get() # this returns a conversations
 
     def accept_invitation(self, invitation, merge_with_first_send = False):
-        (c, msg, header) =  invitation
-        endpoint = ConversationEndpoint(self.node)
-        endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
-        self._conversations[c.id] = endpoint
-        log.info("""\n
+       (c, msg, header) =  invitation
+       endpoint = ConversationEndpoint(self.node)
+       endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
+       self._conversations[c.id] = endpoint
+       log.info("""\n
         ----------------Accepting invitation:-----------------------------------------------
         Header is: =%s  \n
         ----------------------------------------------------------------------------------
         """, header)
-        return endpoint
+       return endpoint
 
     def accept_next_invitation(self, merge_with_first_send = False):
         invitation = self.get_invitation()
         return self.accept_invitation(invitation, merge_with_first_send)
 
     def _recv_invitation(self, msg, header):
-        control_msg_type = get_control_msg_type(header)
-        if control_msg_type == MSG_TYPE.INVITE:
-            c = Conversation(header['protocol'], header['conv-id'])
-            print '_accept_invitation: Conversation added to the list'
-            self._recv_queue.put((c, msg, header))
-            #else: raise ConversationError('Reject invitation is not supported yet.')
+       control_msg_type = get_control_msg_type(header)
+       if control_msg_type == MSG_TYPE.INVITE:
+           c = Conversation(header['protocol'], header['conv-id'])
+           print '_accept_invitation: Conversation added to the list'
+           self._recv_queue.put((c, msg, header))
+           #else: raise ConversationError('Reject invitation is not supported yet.')
 
     def reject_invitation(self, msg, header):
-        pass
+       pass
 
     def check_invitation(self, msg, header):
-        return True
+       return True
 
 #######################################################################################################################
 # OOI specific (Container Specific) conversations
@@ -608,14 +610,14 @@ class RPCClient(object):
         finally:
             elapsed = time.time() - ts
             log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", header.get('conv-id', 'NOCONVID'),
-                header.get('conv-seq', 'NOSEQ'),
+                     header.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
             c.stop_conversation()
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
-    def stop_conversation(self):
+    def close(self):
         self.principal.terminate()
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
@@ -635,7 +637,7 @@ class RPCServer(object):
         self.endpoint_unit = endpoint_unit
 
     def listen(self):
-        self.principal.start_listening()
+            self.principal.start_listening()
 
     def attach_endpoint_unit(self, endpoint_unit):
         self.endpoint_unit = endpoint_unit
@@ -652,7 +654,6 @@ class RPCServer(object):
                 reply = self.process_msg(msg, header)
                 c.send(self.rpc_conv.client_role, reply)
                 if msg == 'quit':
-                    c.stop_conversation()
                     self.principal.terminate()
             except Exception:
                 log.exception("Unhandled error while handling received message")
