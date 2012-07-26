@@ -16,6 +16,9 @@ from pyon.util.log import log
 from pyon.util.async import blocking_cb
 from pyon.ion.resource import RT
 
+import requests
+import json
+
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
 from interface.objects import ExchangePoint as ResExchangePoint
@@ -421,6 +424,83 @@ class ExchangeManager(object):
             log.debug("ExchangeManager._ensure_default_declared, declaring default xs")
             self._default_xs_declared = True
             self.default_xs.declare()
+
+    def list_exchanges(self):
+        url = self._get_management_url("exchanges", "%2f")
+        raw_exchanges = self._call_management(url)
+
+        exchanges = [x['name'] for x in raw_exchanges]
+
+        return exchanges
+
+    def list_queues(self, name=None):
+        url = self._get_management_url("queues", "%2f")
+        raw_queues = self._call_management(url)
+
+        nl = lambda x: (name is None) or (name is not None and name in x)
+
+        queues = [x['name'] for x in raw_queues if nl(x['name'])]
+
+        return queues
+
+    def list_bindings(self, exchange=None, queue=None):
+        url = self._get_management_url("bindings", "%2f")
+        raw_binds = self._call_management(url)
+
+        ql = lambda x: (queue is None) or (queue is not None and queue in x)
+        el = lambda x: (exchange is None) or (exchange is not None and exchange in x)
+
+        binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['destination_type'] == 'queue' and x['source'] != '' and ql(x['destination']) and el(x['source'])]
+        return binds
+
+    def list_bindings_for_queue(self, queue):
+        url = self._get_management_url("queues", "%2f", queue, "bindings")
+        raw_binds = self._call_management(url)
+
+        binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['source'] != '']
+        return binds
+
+    def list_bindings_for_exchange(self, exchange):
+        url = self._get_management_url("exchanges", "%2f", exchange, "bindings", "source")
+        raw_binds = self._call_management(url)
+
+        binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['source'] != '']
+        return binds
+
+    def delete_binding(self, exchange, queue, binding_prop_key):
+        # have to urlencode the %, even though it is already urlencoded - rabbit needs this.
+        url = self._get_management_url("bindings", "%2f", "e", exchange, "q", queue, binding_prop_key.replace("%", "%25"))
+        self._call_management_delete(url)
+
+        return True
+
+    def delete_binding_tuple(self, binding_tuple):
+        return self.delete_binding(binding_tuple[0], binding_tuple[1], binding_tuple[3])
+
+    def _get_management_url(self, *feats):
+        node = self._nodes.get('priviledged', self._nodes.values()[0])
+        host = node.client.parameters.host
+
+        url = "http://%s:55672/api/%s" % (host, "/".join(feats))
+
+        return url
+
+    def _call_management(self, url):
+        log.debug("Calling rabbit API management (GET): %s", url)
+        r = requests.get(url, auth=("guest", "guest"))
+
+        r.raise_for_status()
+
+        return json.loads(r.content)
+
+    def _call_management_delete(self, url):
+        log.debug("Calling rabbit API management (DELETE): %s", url)
+
+        r = requests.delete(url, auth=("guest", "guest"))
+
+        r.raise_for_status()
+
+        return r
 
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):

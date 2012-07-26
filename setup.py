@@ -74,6 +74,7 @@ setup(  name = 'pyon',
             'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
             'python-gevent-profiler',
             'lxml==2.3.4', # Fails to compile on Linux ??!??
+            'requests==0.13.3',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
