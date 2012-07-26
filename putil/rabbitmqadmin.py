@@ -207,8 +207,8 @@ def output(s):
     print maybe_utf8(s, sys.stdout)
 
 def die(s):
-    sys.stderr.write(maybe_utf8("*** {0}".format(s), sys.stderr))
-    exit(1)
+    sys.stderr.write(maybe_utf8("*** Rabbitmqadmin error: {0}\n".format(s), sys.stderr))
+    raise Exception("*** Rabbitmqadmin error:  {0}\n".format(s))
 
 def maybe_utf8(s, stream):
     if stream.isatty():
