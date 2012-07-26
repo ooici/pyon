@@ -145,7 +145,7 @@ class GovernanceController(object):
 
 
     def update_service_policy(self, service_name):
-        if self.policy_decision_point_manager is not None:
+        if self.policy_decision_point_manager is not None and self.container.proc_manager.is_local_service_process(service_name):
             rules = self.policy_client.get_active_service_access_policy_rules(service_name, CFG.container.org_name)
             self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
 
