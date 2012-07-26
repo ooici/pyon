@@ -861,7 +861,7 @@ class RequestResponseClient(SendingBaseEndpoint):
     def request(self, msg, headers=None, timeout=None):
         #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
-        if CFG.endpoint.conversation-enabled:
+        if CFG.endpoint.conversation_enabled:
             conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
                                                      self._send_name, endpoint_unit = e)
             try:

@@ -361,7 +361,7 @@ class ConversationEndpoint(object):
     #@TODO: We do not set reply-to, except for invite and accept ??? Is that correct.
     def _build_conv_header(self, header, to_role, to_role_addr):
         #@TODO shell we rename this to receiver-addr?
-        header['receiver'] = "%s,%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
+        header['receiver'] = "%s,%s" %(to_role_addr.exchange, to_role_addr.queue) #do we need that
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['conv-id'] = self._conv.id
@@ -615,7 +615,7 @@ class RPCClient(object):
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
-    def terminate(self):
+    def stop_conversation(self):
         self.principal.terminate()
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
