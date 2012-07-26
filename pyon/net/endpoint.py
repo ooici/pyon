@@ -25,6 +25,7 @@ import sys
 from Queue import Empty
 from pyon.util.sflow import SFlowManager
 
+
 interceptors = {"message_incoming": [], "message_outgoing": [], "process_incoming": [], "process_outgoing": []}
 
 # Note: This is now called from pyon.core.bootstrap
@@ -102,8 +103,8 @@ class EndpointUnit(object):
         """
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_IN,
-            message=msg,
-            headers=headers)
+                                     message=msg,
+                                     headers=headers)
         inv_prime = self._intercept_msg_in(inv)
         new_msg     = inv_prime.message
         new_headers = inv_prime.headers
@@ -149,8 +150,8 @@ class EndpointUnit(object):
         log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
         inv = self._build_invocation(path=Invocation.PATH_OUT,
-            message=msg,
-            headers=headers)
+                                     message=msg,
+                                     headers=headers)
         inv_prime = self._intercept_msg_out(inv)
         new_msg = inv_prime.message
         new_headers = inv_prime.headers
@@ -256,11 +257,11 @@ class BaseEndpoint(object):
 
         self.node = node
 
-    #        # @TODO: MOVE THIS
-    #        if name in self.endpoint_by_name:
-    #            self.endpoint_by_name[name].append(self)
-    #        else:
-    #            self.endpoint_by_name[name] = [self]
+#        # @TODO: MOVE THIS
+#        if name in self.endpoint_by_name:
+#            self.endpoint_by_name[name].append(self)
+#        else:
+#            self.endpoint_by_name[name] = [self]
 
     @classmethod
     def _get_container_instance(cls):
@@ -411,24 +412,25 @@ class ListeningBaseEndpoint(BaseEndpoint):
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
         log.debug("LEF.listen")
+        #@TODO: change
         if CFG.endpoint.conversation_enabled:
             conv_rpc_server = conversation.RPCServer(self.node, self._recv_name)
             conv_rpc_server.listen()
+        # notify any listeners of our readiness
         else:
             self.prepare_listener(binding=binding)
-        # notify any listeners of our readiness
-        self._ready_event.set()
 
+        self._ready_event.set()
         while True:
             log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             try:
-                # RPCResponseEndpointUnit
                 if CFG.endpoint.conversation_enabled:
                     e = self.create_endpoint()
                     conv_rpc_server.attach_endpoint_unit(e)
                     conv_rpc_server.process_msg = lambda m, h: e.message_received(m, h)
                     conv_rpc_server.get_one_msg()
                 else:
+                    # RPCResponseEndpointUnit
                     self.get_one_msg()
             except ChannelClosedError as ex:
                 log.debug('Channel was closed during LEF.listen')
@@ -638,9 +640,9 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         finally:
             elapsed = time.time() - ts
             log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-                headers.get('conv-seq', 'NOSEQ'),
-                self.channel._send_name,
-                elapsed)
+                                                                                     headers.get('conv-seq', 'NOSEQ'),
+                                                                                     self.channel._send_name,
+                                                                                     elapsed)
 
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
@@ -651,9 +653,8 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         """
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
-        # @TODO:Conversation Fixes
-        #if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
-        #    headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
+        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+            headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
 
         return headers
 
@@ -669,11 +670,15 @@ class RequestResponseClient(SendingBaseEndpoint):
         if CFG.endpoint.conversation_enabled:
             conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
                                                      self._send_name, endpoint_unit = e)
+
             try:
+                #retval, headers = e.send(msg, headers=headers, timeout=timeout)
                 retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
+
             finally:
                 # always close, even if endpoint raised a logical exception
-                conv_rpc_client.stop_conversation()
+                conv_rpc_client.close()
+                e.close()
         else:
             try:
                 retval, headers = e.send(msg, headers=headers, timeout=timeout)
@@ -692,7 +697,7 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        #@TODO:Conversation Fixes. Uncomment this code
+        #@TODO:Fixes
         #if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
         #    headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
@@ -873,22 +878,22 @@ class RPCClient(RequestResponseClient):
     def __init__(self, iface=None, **kwargs):
         if isinstance(iface, interface.interface.InterfaceClass):
             self._define_interface(iface)
-        #        elif isinstance(iface, IonServiceDefinition):
-        #            self._define_svcdef(iface)
+#        elif isinstance(iface, IonServiceDefinition):
+#            self._define_svcdef(iface)
 
         RequestResponseClient.__init__(self, **kwargs)
 
-    #    def _define_svcdef(self, svc_def):
-    #        """
-    #        Defines an RPCClient's attributes from an IonServiceDefinition.
-    #        """
-    #        for meth in svc_def.operations:
-    #            name        = meth.op_name
-    #            in_obj      = meth.def_in
-    #            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
-    #            doc         = meth.__doc__
-    #
-    #            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
+#    def _define_svcdef(self, svc_def):
+#        """
+#        Defines an RPCClient's attributes from an IonServiceDefinition.
+#        """
+#        for meth in svc_def.operations:
+#            name        = meth.op_name
+#            in_obj      = meth.def_in
+#            callargs    = meth.def_in.schema.keys()     # requires ordering to be correct via OrderedDict yaml patching of pyon/core/object.py
+#            doc         = meth.__doc__
+#
+#            self._set_svc_method(name, in_obj, meth.def_in.schema.keys(), doc)
 
     def _define_interface(self, iface):
         """
@@ -941,7 +946,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
     def __init__(self, routing_obj=None, **kwargs):
         ResponseEndpointUnit.__init__(self)
         self._routing_obj = routing_obj
-
+        
     def _message_received(self, msg, headers):
         """
         Internal _message_received override.
@@ -974,9 +979,9 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
             elapsed = time.time() - ts
             log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-                response_headers.get('conv-seq', 'NOSEQ'),
-                self.channel._recv_name,
-                elapsed)
+                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
+                                                                                      self.channel._recv_name,
+                                                                                      elapsed)
 
         log.info("MESSAGE SEND [S->D] RPC: %s, headers: %s", result, response_headers)
 
@@ -1049,3 +1054,213 @@ class RPCServer(RequestResponseServer):
         """
         log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
+
+
+class ProcessRPCRequestEndpointUnit(RPCRequestEndpointUnit):
+
+    def __init__(self, process=None, **kwargs):
+        RPCRequestEndpointUnit.__init__(self, **kwargs)
+        self._process = process
+
+    def _build_invocation(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs.update({'process':self._process})
+
+        inv = RPCRequestEndpointUnit._build_invocation(self, **newkwargs)
+        return inv
+
+    def _intercept_msg_in(self, inv):
+        """
+        Override for incoming message interception.
+
+        This is a request, so the order should be Message, Process
+        """
+        inv_one = RPCRequestEndpointUnit._intercept_msg_in(self, inv)
+        inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
+        return inv_two
+
+    def _intercept_msg_out(self, inv):
+        """
+        Override for outgoing message interception.
+
+        This is request, so the order should be Process, Message
+        """
+        inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        inv_two = RPCRequestEndpointUnit._intercept_msg_out(self, inv_one)
+
+        return inv_two
+
+    def _build_header(self, raw_msg):
+        """
+        Builds the header for this Process-level RPC conversation.
+        https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
+        """
+
+        context = self._process.get_context()
+        log.debug('ProcessRPCRequestEndpointUnit._build_header has context of: %s', context)
+
+        # conv-id/seq/protocol are set in the base class
+        header = RPCRequestEndpointUnit._build_header(self, raw_msg)
+
+        # add our process identity to the headers
+        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
+                       'sender'       : self._process.id })
+
+        if hasattr(self._process,'process_type' ):
+            header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
+            if self._process.process_type == 'service':
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
+
+        # use context to set security attributes forward
+        if isinstance(context, dict):
+            # fwd on actor specific information, according to common message format spec
+            actor_id            = context.get('ion-actor-id', None)
+            actor_roles         = context.get('ion-actor-roles', None)
+            actor_tokens        = context.get('ion-actor-tokens', None)
+            expiry              = context.get('expiry', None)
+            container_id        = context.get('origin-container-id', None)
+            initiating_conv_id = context.get('initiating-conv-id', None)
+
+            if initiating_conv_id:
+                header['initiating-conv-id']  = initiating_conv_id
+
+            #If an actor-id is specified then there may be other associated data that needs to be passed on
+            if actor_id:
+                header['ion-actor-id']  = actor_id
+                if actor_roles:     header['ion-actor-roles']   = actor_roles
+                if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+
+            if expiry:          header['expiry']                = expiry
+            if container_id:    header['origin-container-id']   = container_id
+        else:
+            # no context? we're the originator of the message then
+            container_id                    = BaseEndpoint._get_container_instance().id
+            header['origin-container-id']   = container_id
+
+        return header
+
+    def _get_sample_name(self):
+        return str(self._process.id)
+
+    def _get_sflow_manager(self):
+        return self._process.container.sflow_manager
+
+class ProcessRPCClient(RPCClient):
+    endpoint_unit_type = ProcessRPCRequestEndpointUnit
+
+    def __init__(self, process=None, **kwargs):
+        self._process = process
+        RPCClient.__init__(self, **kwargs)
+
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        if not self._process:
+            raise StandardError("No Process specified")
+
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        return RPCClient.create_endpoint(self, to_name, existing_channel, **newkwargs)
+
+class ProcessRPCResponseEndpointUnit(RPCResponseEndpointUnit):
+
+    def __init__(self, process=None, **kwargs):
+        RPCResponseEndpointUnit.__init__(self, **kwargs)
+        self._process = process
+        assert process
+
+    def _message_received(self, msg, headers):
+        """
+        Message received override.
+
+        Sets the process' context here to be picked up by subsequent calls out by this service to other services, or replies.
+        """
+        with self._process.push_context(headers):
+            return RPCResponseEndpointUnit._message_received(self, msg, headers)
+
+    def _build_invocation(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs.update({'process':self._process})
+
+        inv = RPCResponseEndpointUnit._build_invocation(self, **newkwargs)
+        return inv
+
+    def _intercept_msg_in(self, inv):
+        """
+        Override for incoming message interception.
+
+        This is response incoming, so the order should be Message, Process
+        """
+        inv_one = RPCResponseEndpointUnit._intercept_msg_in(self, inv)
+        inv_two = process_interceptors(interceptors["process_incoming"] if "process_incoming" in interceptors else [], inv_one)
+        return inv_two
+
+    def _intercept_msg_out(self, inv):
+        """
+        Override for outgoing message interception.
+
+        This is response outgoing, so the order should be Process, Message
+        """
+        inv_one = process_interceptors(interceptors["process_outgoing"] if "process_outgoing" in interceptors else [], inv)
+        inv_two = RPCResponseEndpointUnit._intercept_msg_out(self, inv_one)
+        return inv_two
+
+    def _build_header(self, raw_msg):
+        """
+        Builds the header for this Process-level RPC conversation.
+        https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
+        """
+
+        context = self._process.get_context()
+        log.debug('ProcessRPCResponseEndpointUnit._build_header has context of: %s', context)
+
+        # conv-id/seq/protocol are set in the base class
+        header = RPCResponseEndpointUnit._build_header(self, raw_msg)
+
+        # add our process identity to the headers
+        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
+                       'sender'       : self._process.id })
+
+        if hasattr(self._process,'process_type' ):
+            header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
+            if self._process.process_type == 'service':
+                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
+
+        # use context to set security attributes forward
+        if isinstance(context, dict):
+            # fwd on actor specific information, according to common message format spec
+            actor_id            = context.get('ion-actor-id', None)
+            actor_roles         = context.get('ion-actor-roles', None)
+            actor_tokens        = context.get('ion-actor-tokens', None)
+            expiry              = context.get('expiry', None)
+            container_id        = context.get('origin-container-id', None)
+            initiating_conv_id  = context.get('initiating-conv-id', None)
+
+            if initiating_conv_id:
+                header['initiating-conv-id'] = initiating_conv_id
+
+            #If an actor-id is specified then there may be other associated data that needs to be passed on
+            if actor_id:
+                header['ion-actor-id']  = actor_id
+                if actor_roles:     header['ion-actor-roles']   = actor_roles
+                if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+
+            if expiry:          header['expiry']                = expiry
+            if container_id:    header['origin-container-id']   = container_id
+        else:
+            # no context? we're the originator of the message then (in a response??)
+            container_id                    = BaseEndpoint._get_container_instance().id
+            header['origin-container-id']   = container_id
+
+        return header
+
+class ProcessRPCServer(RPCServer):
+    endpoint_unit_type = ProcessRPCResponseEndpointUnit
+
+    def __init__(self, process=None, **kwargs):
+        assert process
+        self._process = process
+        RPCServer.__init__(self, **kwargs)
+
+    def create_endpoint(self, **kwargs):
+        newkwargs = kwargs.copy()
+        newkwargs['process'] = self._process
+        return RPCServer.create_endpoint(self, **newkwargs)
