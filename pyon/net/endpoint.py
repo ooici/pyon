@@ -513,12 +513,14 @@ class ListeningBaseEndpoint(BaseEndpoint):
                 #conv_rpc_server.get_one_msg()
 
                 e = self.create_endpoint()
+                self.get_one_msg()
                 #if CFG.endpoint.conversation_enabled:
+                #    e = self.create_endpoint()
                 #    conv_rpc_server.attach_endpoint_unit(e)
                 #    conv_rpc_server.process_msg = lambda m, h: e.message_received(m, h)
                 #    conv_rpc_server.get_one_msg()
                 #else:
-                self.get_one_msg()
+                #    self.get_one_msg()
             except ChannelClosedError as ex:
                 break
             finally:
