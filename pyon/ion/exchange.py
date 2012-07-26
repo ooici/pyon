@@ -425,6 +425,44 @@ class ExchangeManager(object):
             self._default_xs_declared = True
             self.default_xs.declare()
 
+    def get_definitions(self):
+        """
+        Rabbit HTTP management API call to get all defined objects on a broker.
+
+        Returns users, vhosts, queues, exchanges, bindings, rabbit_version, and permissions.
+        """
+        url = self._get_management_url("definitions")
+        raw_defs = self._call_management(url)
+
+        return raw_defs
+
+    def list_nodes(self):
+        """
+        Rabbit HTTP management API call to get all nodes in a cluster.
+        """
+        url = self._get_management_url("nodes")
+        nodes = self._call_management(url)
+
+        return nodes
+
+    def list_connections(self):
+        """
+        Rabbit HTTP management API call to get all connections to a broker.
+        """
+        url = self._get_management_url("connections")
+        conns = self._call_management(url)
+
+        return conns
+
+    def list_channels(self):
+        """
+        Rabbit HTTP management API call to get channels opened on the broker.
+        """
+        url = self._get_management_url("channels")
+        chans = self._call_management(url)
+
+        return chans
+
     def list_exchanges(self):
         url = self._get_management_url("exchanges", "%2f")
         raw_exchanges = self._call_management(url)
