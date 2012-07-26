@@ -464,16 +464,38 @@ class ExchangeManager(object):
         return chans
 
     def list_exchanges(self):
-        url = self._get_management_url("exchanges", "%2f")
-        raw_exchanges = self._call_management(url)
+        """
+        Rabbit HTTP management API call to list exchanges on the broker.
 
+        Returns a list of exchange names. If you want the full set of properties for each,
+        use _list_exchanges.
+        """
+        raw_exchanges = self._list_exchanges()
         exchanges = [x['name'] for x in raw_exchanges]
 
         return exchanges
 
+    def _list_exchanges(self):
+        """
+        Rabbit HTTP management API call to list exchanges with full properties.
+
+        This is used by list_exchanges to get a list of names, but does not filter anything.
+        """
+        url = self._get_management_url("exchanges", "%2f")
+        raw_exchanges = self._call_management(url)
+
+        return raw_exchanges
+
     def list_queues(self, name=None):
-        url = self._get_management_url("queues", "%2f")
-        raw_queues = self._call_management(url)
+        """
+        Rabbit HTTP management API call to list names of queues on the broker.
+
+        Returns a list of queue names. If you want the full properties for each,
+        use _list_queues.
+
+        @param  name    If set, filters the list by only including queues with name in them.
+        """
+        raw_queues = self._list_queues()
 
         nl = lambda x: (name is None) or (name is not None and name in x)
 
@@ -481,9 +503,38 @@ class ExchangeManager(object):
 
         return queues
 
+    def _list_queues(self):
+        """
+        Rabbit HTTP management API call to list queues with full properties.
+
+        This is used by list_queues to get a list of names, but does not filter anything.
+        """
+        url = self._get_management_url("queues", "%2f")
+        raw_queues = self._call_management(url)
+
+        return raw_queues
+
     def list_bindings(self, exchange=None, queue=None):
-        url = self._get_management_url("bindings", "%2f")
-        raw_binds = self._call_management(url)
+        """
+        Rabbit HTTP management API call to list bindings.
+
+        Returns a list of tuples formatted as (exchange, queue, routing_key, properties_key aka binding id).
+        This method can optionally filter queues or exchanges (or both) by specifying strings to
+        exchange/queue keyword arguments. If you want the full list of properties unfiltered, call
+        _list_bindings instead.
+
+        The properties_key is used to delete a binding.
+
+        If you want to get the bindings on a specific queue or exchange, don't use the filters here, but
+        call the specific list_bindings_for_queue or list_bindings_for_exchange, as they will not result
+        in a large result from the management API.
+
+        @param  exchange    If set, filters the list by only including bindings with exchanges that have the
+                            passed value in them.
+        @param  queue       If set, filters the list by only including bindings with queues that have the
+                            passed value in them.
+        """
+        raw_binds = self._list_bindings()
 
         ql = lambda x: (queue is None) or (queue is not None and queue in x)
         el = lambda x: (exchange is None) or (exchange is not None and exchange in x)
@@ -491,21 +542,81 @@ class ExchangeManager(object):
         binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['destination_type'] == 'queue' and x['source'] != '' and ql(x['destination']) and el(x['source'])]
         return binds
 
+    def _list_bindings(self):
+        """
+        Rabbit HTTP management API call to list bindings with full properties.
+
+        This is used by list_bindings to get a list of binding tuples, but does not filter anything.
+        """
+        url = self._get_management_url("bindings", "%2f")
+        raw_binds = self._call_management(url)
+
+        return raw_binds
+
     def list_bindings_for_queue(self, queue):
+        """
+        Rabbit HTTP management API call to list bindings for a queue.
+
+        Returns a list of tuples formatted as (exchange, queue, routing_key, properties_key aka binding id).
+        If you want the full list of properties for all the bindings, call _list_bindings_for_queue instead.
+
+        This method is much more efficient than calling list_bindings with a filter. 
+
+        @param  queue   The name of the queue you want bindings for.
+        """
+        raw_binds = self._list_bindings_for_queue(queue)
+
+        binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['source'] != '']
+        return binds
+
+    def _list_bindings_for_queue(self, queue):
+        """
+        Rabbit HTTP management API call to list bindings on a queue with full properties.
+
+        This is used by list_bindings_for_queue to get a list of binding tuples, but does not filter
+        anything.
+        """
         url = self._get_management_url("queues", "%2f", queue, "bindings")
         raw_binds = self._call_management(url)
 
+        return raw_binds
+
+    def list_bindings_for_exchange(self, exchange):
+        """
+        Rabbit HTTP management API call to list bindings for an exchange.
+
+        Returns a list of tuples formatted as (exchange, queue, routing_key, properties_key aka binding id).
+        If you want the full list of properties for all the bindings, call _list_bindings_for_exchange instead.
+
+        This method is much more efficient than calling list_bindings with a filter. 
+
+        @param  exchange    The name of the exchange you want bindings for.
+        """
+        raw_binds = self._list_bindings_for_exchange(exchange)
+
         binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['source'] != '']
         return binds
 
-    def list_bindings_for_exchange(self, exchange):
+    def _list_bindings_for_exchange(self, exchange):
+        """
+        Rabbit HTTP management API call to list bindings for an exchange with full properties.
+
+        This is used by list_bindings_for_exchange to get a list of binding tuples, but does not filter
+        anything.
+        """
         url = self._get_management_url("exchanges", "%2f", exchange, "bindings", "source")
         raw_binds = self._call_management(url)
 
-        binds = [(x['source'], x['destination'], x['routing_key'], x['properties_key']) for x in raw_binds if x['source'] != '']
-        return binds
+        return raw_binds
 
     def delete_binding(self, exchange, queue, binding_prop_key):
+        """
+        Rabbit HTTP management API call to delete a binding.
+
+        You may also use delete_binding_tuple to directly pass the tuples returned by
+        any of the list binding calls.
+        """
+
         # have to urlencode the %, even though it is already urlencoded - rabbit needs this.
         url = self._get_management_url("bindings", "%2f", "e", exchange, "q", queue, binding_prop_key.replace("%", "%25"))
         self._call_management_delete(url)
@@ -513,9 +624,15 @@ class ExchangeManager(object):
         return True
 
     def delete_binding_tuple(self, binding_tuple):
+        """
+        Rabbit HTTP management API call to delete a binding using a tuple from our list binding methods.
+        """
         return self.delete_binding(binding_tuple[0], binding_tuple[1], binding_tuple[3])
 
     def _get_management_url(self, *feats):
+        """
+        Builds a URL to be used with the Rabbit HTTP management API.
+        """
         node = self._nodes.get('priviledged', self._nodes.values()[0])
         host = node.client.parameters.host
 
@@ -524,6 +641,13 @@ class ExchangeManager(object):
         return url
 
     def _call_management(self, url):
+        """
+        Makes a GET HTTP request to the Rabbit HTTP management API.
+
+        This method will raise an exception if a non-200 HTTP status code is returned.
+
+        @param  url     A URL to be used, build one with _get_management_url.
+        """
         log.debug("Calling rabbit API management (GET): %s", url)
         r = requests.get(url, auth=("guest", "guest"))
 
@@ -532,6 +656,13 @@ class ExchangeManager(object):
         return json.loads(r.content)
 
     def _call_management_delete(self, url):
+        """
+        Makes an HTTP DELETE request to the Rabbit HTTP management API.
+
+        This method will raise an exception if a non-200 HTTP status code is returned.
+
+        @param  url     A URL to be used, build one with _get_management_url.
+        """
         log.debug("Calling rabbit API management (DELETE): %s", url)
 
         r = requests.delete(url, auth=("guest", "guest"))
