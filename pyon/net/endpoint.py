@@ -652,8 +652,9 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         """
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
-        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
-            headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
+        # @TODO:Conversation Fixes
+        #if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+        #    headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
 
         return headers
 
