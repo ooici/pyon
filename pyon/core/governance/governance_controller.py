@@ -27,6 +27,7 @@ class GovernanceController(object):
         self.policy_decision_point_manager = None
         self.governance_dispatcher = None
 
+
     def start(self):
 
         log.debug("GovernanceController starting ...")
@@ -133,7 +134,8 @@ class GovernanceController(object):
         service_name = service_policy_event.service_name
 
         if service_name:
-            self.update_service_policy(service_name)
+            if self.container.proc_manager.is_local_service_process(service_name):
+                self.update_service_policy(service_name)
         else:
             rules = self.policy_client.get_active_service_access_policy_rules('', CFG.container.org_name)
             if self.policy_decision_point_manager is not None:
@@ -141,11 +143,12 @@ class GovernanceController(object):
 
                 #Reload all policies for existing services
                 for service_name in self.policy_decision_point_manager.get_list_service_policies():
-                    self.update_service_policy(service_name)
+                    if self.container.proc_manager.is_local_service_process(service_name):
+                        self.update_service_policy(service_name)
 
 
     def update_service_policy(self, service_name):
-        if self.policy_decision_point_manager is not None and self.container.proc_manager.is_local_service_process(service_name):
+        if self.policy_decision_point_manager is not None:
             rules = self.policy_client.get_active_service_access_policy_rules(service_name, CFG.container.org_name)
             self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
 

@@ -118,6 +118,10 @@ class PolicyDecisionPointManager(object):
 
 
     def load_service_policy_rules(self, service_name, rules_text):
+
+        if not rules_text and not self.service_policy_decision_point.has_key(service_name):
+            return
+
         log.info("Loading policies for service: %s" % service_name)
 
         self.clear_service_policy(service_name)
@@ -129,6 +133,10 @@ class PolicyDecisionPointManager(object):
 
 
     def load_resource_policy_rules(self, resource_name, rules_text):
+
+        if not rules_text and not self.resource_policy_decision_point.has_key(resource_key):
+            return
+
         log.info("Loading policies for resource: %s" % resource_name)
 
         self.clear_resource_policy(resource_name)

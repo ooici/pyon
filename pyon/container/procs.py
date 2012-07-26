@@ -284,6 +284,10 @@ class ProcManager(object):
 
         proc.start_listeners()
 
+        # look to load any existing policies for this service
+        if self._is_policy_management_service_available() and self.container.governance_controller:
+            self.container.governance_controller.update_service_policy(service_instance._proc_listen_name)
+
         return service_instance
 
     # -----------------------------------------------------------------
@@ -591,6 +595,15 @@ class ProcManager(object):
             process_type=service_instance._proc_type,
             process_name=service_instance._proc_name,
             state=ProcessStateEnum.SPAWN)
+
+
+    #TODO - check with Michael if this is acceptable or if there is a better way.
+    def _is_policy_management_service_available(self):
+
+        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+        if policy_services:
+            return True
+        return False
 
     def terminate_process(self, process_id):
         """
