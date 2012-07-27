@@ -14,6 +14,7 @@ from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from interface.services.coi.iorg_management_service import OrgManagementServiceProcessClient
+from pyon.core.exception import NotFound
 
 class GovernanceController(object):
 
@@ -121,11 +122,7 @@ class GovernanceController(object):
         resource_type = resource_policy_event.resource_type
         resource_name = resource_policy_event.resource_name
 
-        log.info("Resource policy modified: %s %s %s" % ( policy_id, resource_id, resource_type))
-
-        policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
-        if self.policy_decision_point_manager is not None:
-            self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
+        self.update_resource_access_policy(resource_id)
 
     def service_policy_event_callback(self, *args, **kwargs):
         service_policy_event = args[0]
@@ -135,7 +132,7 @@ class GovernanceController(object):
 
         if service_name:
             if self.container.proc_manager.is_local_service_process(service_name):
-                self.update_service_policy(service_name)
+                self.update_service_access_policy(service_name)
         else:
             rules = self.policy_client.get_active_service_access_policy_rules('', CFG.container.org_name)
             if self.policy_decision_point_manager is not None:
@@ -144,10 +141,21 @@ class GovernanceController(object):
                 #Reload all policies for existing services
                 for service_name in self.policy_decision_point_manager.get_list_service_policies():
                     if self.container.proc_manager.is_local_service_process(service_name):
-                        self.update_service_policy(service_name)
+                        self.update_service_access_policy(service_name)
 
 
-    def update_service_policy(self, service_name):
+    def update_resource_access_policy(self, resource_id):
+        if self.policy_decision_point_manager is not None:
+
+            try:
+                policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
+                self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
+            except NotFound, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.warning("The resource %s is not found, so can't apply access policy" % resource_id)
+                pass
+
+    def update_service_access_policy(self, service_name):
         if self.policy_decision_point_manager is not None:
             rules = self.policy_client.get_active_service_access_policy_rules(service_name, CFG.container.org_name)
             self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)

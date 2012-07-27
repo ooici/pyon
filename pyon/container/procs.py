@@ -238,6 +238,17 @@ class ProcManager(object):
             ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
             ch._destroy_queue()
 
+
+    #TODO - check with Michael if this is acceptable or if there is a better way.
+    def _is_policy_management_service_available(self):
+        """
+        Method to verify if the Policy Management Service is running in the system.
+        """
+        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+        if policy_services:
+            return True
+        return False
+
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
     def _spawn_service_process(self, process_id, name, module, cls, config):
@@ -286,7 +297,7 @@ class ProcManager(object):
 
         # look to load any existing policies for this service
         if self._is_policy_management_service_available() and self.container.governance_controller:
-            self.container.governance_controller.update_service_policy(service_instance._proc_listen_name)
+            self.container.governance_controller.update_service_access_policy(service_instance._proc_listen_name)
 
         return service_instance
 
@@ -384,8 +395,13 @@ class ProcManager(object):
 
         proc.start_listeners()
 
-        if not service_instance.resource_id:
+        if service_instance.resource_id:
+            # look to load any existing policies for this resource
+            if self._is_policy_management_service_available() and self.container.governance_controller:
+                self.container.governance_controller.update_resource_access_policy(service_instance.resource_id)
+        else:
             log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
+
 
         return service_instance
 
@@ -457,6 +473,7 @@ class ProcManager(object):
         self._service_init(service_instance)
         self._service_start(service_instance)
         return service_instance
+
 
     def _create_service_instance(self, process_id, name, module, cls, config):
         """
@@ -597,13 +614,6 @@ class ProcManager(object):
             state=ProcessStateEnum.SPAWN)
 
 
-    #TODO - check with Michael if this is acceptable or if there is a better way.
-    def _is_policy_management_service_available(self):
-
-        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-        if policy_services:
-            return True
-        return False
 
     def terminate_process(self, process_id):
         """
