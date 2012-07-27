@@ -15,6 +15,7 @@ from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport, Transport
 from pyon.util.log import log
 from pyon.util.async import blocking_cb
 from pyon.ion.resource import RT
+from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 
 import requests
 import json
@@ -636,7 +637,7 @@ class ExchangeManager(object):
         node = self._nodes.get('priviledged', self._nodes.values()[0])
         host = node.client.parameters.host
 
-        url = "http://%s:55672/api/%s" % (host, "/".join(feats))
+        url = "http://%s:%s/api/%s" % (host, CFG.get_safe("container.exchange.management.port", "55672"), "/".join(feats))
 
         return url
 
@@ -648,12 +649,7 @@ class ExchangeManager(object):
 
         @param  url     A URL to be used, build one with _get_management_url.
         """
-        log.debug("Calling rabbit API management (GET): %s", url)
-        r = requests.get(url, auth=("guest", "guest"))
-
-        r.raise_for_status()
-
-        return json.loads(r.content)
+        return self._make_management_call(url)
 
     def _call_management_delete(self, url):
         """
@@ -663,13 +659,38 @@ class ExchangeManager(object):
 
         @param  url     A URL to be used, build one with _get_management_url.
         """
-        log.debug("Calling rabbit API management (DELETE): %s", url)
+        return self._make_management_call(url, "delete")
 
-        r = requests.delete(url, auth=("guest", "guest"))
+    def _make_management_call(self, url, use_ems=True, method="get"):
+        """
+        Makes a call to the Rabbit HTTP management API using the passed in HTTP method.
+        """
+        log.debug("Calling rabbit API management (%s): %s", method, url)
 
-        r.raise_for_status()
+        if use_ems and self._ems_available():
+            log.debug("Directing call to EMS")
+            content = self._ems_client.call_management(url, method)
+        else:
+            meth = getattr(requests, method)
 
-        return r
+            try:
+                username = CFG.get_safe("container.exchange.management.username", "guest")
+                password = CFG.get_safe("container.exchange.management.password", "guest")
+
+                r = meth(url, auth=(username, password))
+                r.raise_for_status()
+
+                content = json.loads(r.content)
+            except requests.exceptions.Timeout as ex:
+                raise Timeout(str(ex))
+            except requests.exceptions.ConnectionError as ex:
+                raise ServiceUnavailable(str(ex))
+            except requests.exceptions.RequestException as ex:
+                # the generic base exception all requests' exceptions inherit from, raise our
+                # general server error too.
+                raise ServerError(str(ex))
+
+        return content
 
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
