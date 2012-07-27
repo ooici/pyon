@@ -132,18 +132,18 @@ class PolicyDecisionPointManager(object):
         self.service_policy_decision_point[service_name] = PDP.fromPolicySource(input_source, ReaderFactory)
 
 
-    def load_resource_policy_rules(self, resource_name, rules_text):
+    def load_resource_policy_rules(self, resource_key, rules_text):
 
         if not rules_text and not self.resource_policy_decision_point.has_key(resource_key):
             return
 
-        log.info("Loading policies for resource: %s" % resource_name)
+        log.info("Loading policies for resource: %s" % resource_key)
 
-        self.clear_resource_policy(resource_name)
+        self.clear_resource_policy(resource_key)
 
         #Simply create a new PDP object for the service
-        input_source = StringIO(self.create_policy_from_rules(resource_name,rules_text))
-        self.resource_policy_decision_point[resource_name] = PDP.fromPolicySource(input_source, ReaderFactory)
+        input_source = StringIO(self.create_policy_from_rules(resource_key,rules_text))
+        self.resource_policy_decision_point[resource_key] = PDP.fromPolicySource(input_source, ReaderFactory)
 
     #Remove any policy indexed by the resource_key
     def clear_resource_policy(self, resource_key):
