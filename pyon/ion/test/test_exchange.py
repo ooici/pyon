@@ -588,14 +588,6 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
     Tests creation and deletion of things on the broker.
-
-    We're intentionally trying to declare things and have them blow up and catch them.
-    This could very well leave things in a bad state on the broker, but the tests should
-    still be able to run again and again.
-
-    We need a better way of inspecting the broker.
-    https://github.com/auser/alice is a good option, but looks like we need to use a community fork
-    on github to make it work on a modern rabbit: https://github.com/paukul/alice/commit/3c984a8b88d00f61a65516b16a66d5174782820b
     """
     def setUp(self):
         self._start_container()
@@ -604,113 +596,52 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
         xs = self.container.ex_manager.create_xs('test_xs')
         self.addCleanup(xs.delete)
 
-        # TEST SPECIFIC: make sure we can't declare exchange (already exists with diff params)
-        # get a RecvChannel, mess with the settings to purposely mismatch
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xs._xs_auto_delete
-
-        self.assertRaises(TransportError, ch._declare_exchange, xs.exchange)
+        self.assertIn(xs.exchange, self.container.ex_manager.list_exchanges())
 
     def test_create_xp(self):
         xp = self.container.ex_manager.create_xp('test_xp')
         self.addCleanup(xp.delete)
 
-        # TEST SPECIFIC: make sure we can't declare exchange (already exists with diff params)
-        # get a RecvChannel, mess with the settings to purposely mismatch
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xp._xs._xs_auto_delete
-
-        self.assertRaises(TransportError, ch._declare_exchange, xp.exchange)
+        self.assertIn(xp.exchange, self.container.ex_manager.list_exchanges())
 
     def test_create_xn(self):
         xn = self.container.ex_manager.create_xn_service('test_service')
         self.addCleanup(xn.delete)
 
-        # TEST SPECIFIC: make sure we can't declare queue (already exists with diff params)
-        # get a RecvChannel, mess with the settings to purposely mismatch
-        ch = self.container.node.channel(RecvChannel)
-        ch._queue_auto_delete = not xn._xn_auto_delete
-
-        # must set recv_name (declare queue demands it)
-        ch._recv_name = xn
-
-        self.assertRaises(TransportError, ch._declare_queue, xn.queue)
+        self.assertIn(xn.queue, self.container.ex_manager.list_queues())
 
     def test_delete_xs(self):
-        # we get interesting here.  we have to create or xs, try to declare again to prove it is there,
-        # then delete, then declare to prove we CAN create, then make sure to clean it up.  whew.
         xs = self.container.ex_manager.create_xs('test_xs')
 
-        # prove XS is declared already (can't declare the same named one with diff params)
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xs._xs_auto_delete
-
-        self.assertRaises(TransportError, ch._declare_exchange, xs.exchange)
+        self.assertIn(xs.exchange, self.container.ex_manager.list_exchanges())
 
         # now let's delete via ex manager
         self.container.ex_manager.delete_xs(xs)
 
-        # grab another channel and declare (should work fine this time)
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xs._xs_auto_delete
-
-        ch._declare_exchange(xs.exchange)
-
-        # cool, now cleanup (we don't expose this via Channel)
-        at = AMQPTransport.get_instance()
-        at.delete_exchange_impl(ch._amq_chan, xs.exchange)
+        self.assertNotIn(xs.exchange, self.container.ex_manager.list_exchanges())
 
     def test_delete_xp(self):
         # same as test_delete_xs
         xp = self.container.ex_manager.create_xp('test_xp')
 
-        # prove XS is declared already (can't declare the same named one with diff params)
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xp._xs._xs_auto_delete
-
-        self.assertRaises(TransportError, ch._declare_exchange, xp.exchange)
+        self.assertIn(xp.exchange, self.container.ex_manager.list_exchanges())
 
         # now let's delete via ex manager
         self.container.ex_manager.delete_xp(xp)
 
-        # grab another channel and declare (should work fine this time)
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xp._xs._xs_auto_delete
-
-        ch._declare_exchange(xp.exchange)
-
-        # cool, now cleanup (we don't expose this via Channel)
-        at = AMQPTransport.get_instance()
-        at.delete_exchange_impl(ch._amq_chan, xp.exchange)
+        self.assertNotIn(xp.exchange, self.container.ex_manager.list_exchanges())
 
     def test_delete_xn(self):
-        raise unittest.SkipTest("broken 2 mar, skipping for now")
         # same as the other deletes except with queues instead
 
         xn = self.container.ex_manager.create_xn_service('test_service')
 
-        # prove queue is declared already (can't declare the same named one with diff params)
-        ch = self.container.node.channel(RecvChannel)
-        ch._queue_auto_delete = not xn._xn_auto_delete
-
-        # must set recv_name
-        ch._recv_name = xn
-        self.assertRaises(TransportError, ch._declare_queue, xn.queue)
+        self.assertIn(xn.queue, self.container.ex_manager.list_queues())
 
         # now let's delete via ex manager
         self.container.ex_manager.delete_xn(xn)
 
-        # grab another channel and declare (should work fine this time)
-        ch = self.container.node.channel(RecvChannel)
-        ch._exchange_auto_delete = not xn._xs._xs_auto_delete
-
-        # must set recv_name
-        ch._recv_name = xn
-        ch._declare_queue(xn.queue)
-
-        # cool, now cleanup (we don't expose this via Channel)
-        at = AMQPTransport.get_instance()
-        at.delete_queue_impl(ch._amq_chan, xn.queue)
+        self.assertNotIn(xn.queue, self.container.ex_manager.list_queues())
 
 @attr('UNIT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False, 'management':{'username':'user', 'password':'pass', 'port':'port'}}}})
