@@ -1091,7 +1091,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             tb_output = ""
             for elt in tb_list:
                 tb_output += elt
-            log.warn("server exception being passed to client", exc_info=True)
+            log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
             response_headers = self._create_error_response(ex)
 
@@ -1124,7 +1124,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             tb_output = ""
             for elt in tb_list:
                 tb_output += elt
-            log.warn("server exception being passed to client", exc_info=True)
+            log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
             response_headers = self._create_error_response(ex)
         finally:
