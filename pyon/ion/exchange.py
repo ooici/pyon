@@ -659,7 +659,7 @@ class ExchangeManager(object):
 
         @param  url     A URL to be used, build one with _get_management_url.
         """
-        return self._make_management_call(url, "delete")
+        return self._make_management_call(url, method="delete")
 
     def _make_management_call(self, url, use_ems=True, method="get"):
         """
@@ -680,7 +680,11 @@ class ExchangeManager(object):
                 r = meth(url, auth=(username, password))
                 r.raise_for_status()
 
-                content = json.loads(r.content)
+                if not r.content == "":
+                    content = json.loads(r.content)
+                else:
+                    content = None
+
             except requests.exceptions.Timeout as ex:
                 raise Timeout(str(ex))
             except requests.exceptions.ConnectionError as ex:

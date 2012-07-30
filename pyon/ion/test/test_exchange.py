@@ -11,9 +11,11 @@ from pyon.net.endpoint import RPCServer, Subscriber, Publisher
 from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
-from mock import Mock, sentinel, patch, call
+from mock import Mock, sentinel, patch, call, MagicMock, ANY
 from pyon.net.transport import BaseTransport, TransportError, AMQPTransport
 from pyon.core.bootstrap import get_sys_name
+from pyon.core import exception
+import requests
 from pyon.net.channel import RecvChannel
 from pyon.core.bootstrap import CFG
 from pyon.util.containers import DotDict
@@ -22,6 +24,7 @@ import os
 import time
 import Queue as PQueue
 from gevent.timeout import Timeout
+from uuid import uuid4
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -708,3 +711,214 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
         # cool, now cleanup (we don't expose this via Channel)
         at = AMQPTransport.get_instance()
         at.delete_queue_impl(ch._amq_chan, xn.queue)
+
+@attr('UNIT', group='exchange')
+@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False, 'management':{'username':'user', 'password':'pass', 'port':'port'}}}})
+class TestManagementAPI(PyonTestCase):
+    def setUp(self):
+        self.ex_manager = ExchangeManager(Mock())
+        self.ex_manager._nodes = MagicMock()
+        self.ex_manager._nodes.get.return_value.client.parameters.host = "testhost" # stringifies so don't use sentinel
+
+        self.ex_manager._ems_client = Mock()
+
+    def test__get_management_url(self):
+        url = self.ex_manager._get_management_url()
+
+        self.assertEquals(url, "http://testhost:port/api/")
+
+    def test__get_management_url_with_parts(self):
+        url = self.ex_manager._get_management_url("test", "this")
+
+        self.assertEquals(url, "http://testhost:port/api/test/this")
+
+    @patch('pyon.ion.exchange.json')
+    @patch('pyon.ion.exchange.requests')
+    def test__call_management(self, reqmock, jsonmock):
+        content = self.ex_manager._call_management(sentinel.url)
+
+        self.assertEquals(content, jsonmock.loads.return_value)
+        reqmock.get.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+
+    @patch('pyon.ion.exchange.json')
+    @patch('pyon.ion.exchange.requests')
+    def test__call_management_delete(self, reqmock, jsonmock):
+        content = self.ex_manager._call_management_delete(sentinel.url)
+
+        self.assertEquals(content, jsonmock.loads.return_value)
+        reqmock.delete.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+
+    @patch('pyon.ion.exchange.json')
+    @patch('pyon.ion.exchange.requests')
+    def test__make_management_call(self, reqmock, jsonmock):
+        content = self.ex_manager._make_management_call(sentinel.url, method="scoop")
+
+        reqmock.scoop.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+
+    def test__make_management_call_delegates_to_ems(self):
+        self.ex_manager._ems_available = Mock(return_value=True)
+
+        content = self.ex_manager._make_management_call(sentinel.url, method=sentinel.anymeth)
+
+        self.ex_manager._ems_client.call_management.assert_called_once_with(sentinel.url, sentinel.anymeth)
+
+    def test__make_management_call_raises_exceptions(self):
+        rmock = Mock()
+        rmock.return_value.raise_for_status.side_effect = requests.exceptions.Timeout
+
+        with patch('pyon.ion.exchange.requests.get', rmock):
+            self.assertRaises(exception.Timeout, self.ex_manager._make_management_call, sentinel.url, use_ems=False)
+
+    def test_list_queues_does_filtering(self):
+        self.ex_manager._list_queues = Mock(return_value=[{'name':'a_1'}, {'name':'a_2'}, {'name':'b_1'}, {'name':'b_2'}])
+
+        self.assertEquals(len(self.ex_manager.list_queues("a_")), 2)
+        self.assertEquals(len(self.ex_manager.list_queues("b_")), 2)
+        self.assertEquals(len(self.ex_manager.list_queues("_")), 4)
+        self.assertEquals(len(self.ex_manager.list_queues("_1")), 2)
+        self.assertEquals(len(self.ex_manager.list_queues("_2")), 2)
+
+    def test_list_bindings_does_filtering(self):
+        self.ex_manager._list_bindings = Mock(return_value=[{'source':'ex_1', 'destination':'qq', 'routing_key':'', 'properties_key':'', 'destination_type':'queue'},
+                                                            {'source':'ex_2', 'destination':'qa', 'routing_key':'', 'properties_key':'', 'destination_type':'queue'},
+                                                            {'source':'ex_1', 'destination':'aq', 'routing_key':'', 'properties_key':'', 'destination_type':'queue'},
+                                                            {'source':'ex_2', 'destination':'za', 'routing_key':'', 'properties_key':'', 'destination_type':'queue'},])
+
+        self.assertEquals(len(self.ex_manager.list_bindings(exchange="ex_1")), 2)
+        self.assertEquals(len(self.ex_manager.list_bindings(exchange="ex_2")), 2)
+        self.assertEquals(len(self.ex_manager.list_bindings(exchange="ex_")), 4)
+        self.assertEquals(len(self.ex_manager.list_bindings(queue="qq")), 1)
+        self.assertEquals(len(self.ex_manager.list_bindings(queue="a")), 3)
+        self.assertEquals(len(self.ex_manager.list_bindings(queue="q")), 3)
+
+
+@attr('INT', group='exchange')
+@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
+@unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
+class TestManagementAPIInt(IonIntegrationTestCase):
+
+    def setUp(self):
+        self._start_container()
+
+        self.ex_name = ".".join([get_sys_name(), "ex", str(uuid4())[0:6]])
+        self.queue_name = ".".join([get_sys_name(), "q", str(uuid4())[0:6]])
+        self.bind_name = str(uuid4())[0:6]
+
+    def test_list_exchanges(self):
+
+        exchanges = self.container.ex_manager.list_exchanges()
+
+        self.assertNotIn(self.ex_name, exchanges)
+
+        # do declaration via ex manager's transport
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)
+
+        new_exchanges = self.container.ex_manager.list_exchanges()
+
+        self.assertNotEquals(exchanges, new_exchanges)
+        self.assertIn(self.ex_name, new_exchanges)
+
+    def test_list_queues(self):
+
+        queues = self.container.ex_manager.list_queues()
+
+        self.assertNotIn(self.queue_name, queues)
+
+        # do declaration via ex manager's transport
+        self.container.ex_manager.declare_queue(self.queue_name)
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+
+        new_queues = self.container.ex_manager.list_queues()
+
+        self.assertNotEquals(queues, new_queues)
+        self.assertIn(self.queue_name, new_queues)
+
+    def test_list_bindings(self):
+
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        bindings = self.container.ex_manager.list_bindings()
+
+        # test only - extract the 4-tuples into just 2-tuples here to make sure we have no binds
+        bindings = [(x[0], x[1]) for x in bindings]
+        self.assertNotIn((self.ex_name, self.queue_name), bindings)
+
+        # declare a bind
+        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+
+        bindings = self.container.ex_manager.list_bindings()
+
+        self.assertIn((self.ex_name, self.queue_name, self.bind_name, self.bind_name), bindings)
+
+    def test_list_bindings_for_queue(self):
+
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
+        self.assertEquals(bindings, [])
+
+        # declare a bind
+        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+
+        bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
+
+        self.assertEquals(bindings, [(self.ex_name, self.queue_name, self.bind_name, self.bind_name)])
+
+    def test_list_bindings_for_exchange(self):
+
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
+        self.assertEquals(bindings, [])
+
+        # declare a bind
+        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+
+        bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
+
+        self.assertEquals(bindings, [(self.ex_name, self.queue_name, self.bind_name, self.bind_name)])
+
+    def test_delete_binding(self):
+
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
+        self.assertEquals(bindings, [])
+
+        # declare a bind
+        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+
+        bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
+
+        self.assertEquals(bindings, [(self.ex_name, self.queue_name, self.bind_name, self.bind_name)])
+
+        # delete the bind
+        self.container.ex_manager.delete_binding(self.ex_name, self.queue_name, self.bind_name)
+
+        bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
+        self.assertEquals(bindings, [])
+
