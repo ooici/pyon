@@ -592,6 +592,13 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
+        # test to see if we have access to management URL!
+        url = self.container.ex_manager._get_management_url('overview')
+        try:
+            self.container.ex_manager._make_management_call(url, use_ems=False)
+        except exception.IonException as ex:
+            raise unittest.skipTest("Cannot find management API: %s" % str(ex))
+
     def test_create_xs(self):
         xs = self.container.ex_manager.create_xs('test_xs')
         self.addCleanup(xs.delete)
@@ -730,6 +737,13 @@ class TestManagementAPIInt(IonIntegrationTestCase):
 
     def setUp(self):
         self._start_container()
+
+        # test to see if we have access to management URL!
+        url = self.container.ex_manager._get_management_url('overview')
+        try:
+            self.container.ex_manager._make_management_call(url, use_ems=False)
+        except exception.IonException as ex:
+            raise unittest.skipTest("Cannot find management API: %s" % str(ex))
 
         self.ex_name = ".".join([get_sys_name(), "ex", str(uuid4())[0:6]])
         self.queue_name = ".".join([get_sys_name(), "q", str(uuid4())[0:6]])
