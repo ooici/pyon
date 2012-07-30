@@ -359,24 +359,38 @@ class ProcManager(object):
         if not isinstance(service_instance, ResourceAgent):
             raise ContainerConfigError("Agent process must extend ResourceAgent")
 
+        listeners = []
+
         # Set the resource ID if we get it through the config
         resource_id = get_safe(service_instance.CFG, "agent.resource_id")
         if resource_id:
             service_instance.resource_id = resource_id
+
+            alistener = ProcessRPCServer(node=self.container.node,
+                                         from_name=resource_id,
+                                         service=service_instance,
+                                         process=service_instance)
+
+            listeners.append(alistener)
 
         rsvc = ProcessRPCServer(node=self.container.node,
             from_name=service_instance.id,
             service=service_instance,
             process=service_instance)
 
-        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
+        listeners.append(rsvc)
+
+        # cleanup method to delete process/agent queue (@TODO: leaks a bit here - should use XOs)
+        def agent_cleanup(x):
+            self._cleanup_method(service_instance.id, rsvc)
+            if resource_id:
+                self._cleanup_method(service_instance.id, alistener)
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
-                                   listeners=[rsvc],
+                                   listeners=listeners,
                                    proc_name=service_instance._proc_name,
-                                   cleanup_method=cleanup)
+                                   cleanup_method=agent_cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
