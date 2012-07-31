@@ -54,7 +54,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         if os.environ.get('CEI_LAUNCH_TEST', None):
             # Let's force clean again.  The static initializer is causing
             # issues
-            self.force_clean()
+            self._force_clean()
             self._patch_out_start_rel()
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
