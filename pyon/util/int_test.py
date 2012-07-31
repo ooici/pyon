@@ -52,6 +52,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         bootstrap.testing_fast = True
 
         if os.environ.get('CEI_LAUNCH_TEST', None):
+            # Let's force clean again.  The static initializer is causing
+            # issues
+            self.force_clean()
             self._patch_out_start_rel()
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
@@ -123,7 +126,7 @@ class IonIntegrationTestCase(unittest.TestCase):
         from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
         datastore = CouchDataStore(config=CFG)
         dbs = datastore.list_datastores()
-        things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name()), dbs)
+        things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name().lower()), dbs)
         try:
             for thing in things_to_clean:
                 datastore.delete_datastore(datastore_name=thing)
