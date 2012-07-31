@@ -19,14 +19,33 @@ class IonTime(object):
         '''Can be initialized with a standard unix time stamp'''
         if date is None:
             date = time.time()
-        self.seconds = np.uint32(date + self.JAN_1970)
-        self.useconds = np.uint32((date - int(date)) * 1e6)
+        self._seconds = np.uint32(np.trunc(date) + self.JAN_1970)
+        temp = date + self.JAN_1970
+        self._useconds = np.uint32(np.modf(temp)[0] * 1e6)
+
+
+    @property
+    def seconds(self):
+        return self._seconds
+
+    @seconds.setter
+    def seconds(self,value):
+        self._seconds = np.uint32(value)
+
+    @property
+    def useconds(self):
+        return self._useconds
+
+    @useconds.setter
+    def useconds(self,value):
+        self._useconds = np.uint32(value)
+
 
     def __repr__(self):
         return '<%s "%s" at 0x%x>' % (self.__class__.__name__, str(self), id(self))
 
     def __str__(self):
-        ts = self.seconds + (self.useconds/1e6)
+        ts = int(self.seconds) - int(self.JAN_1970) + (self.useconds/1e6)
         return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))
 
     def to_ntp(self):
@@ -57,14 +76,17 @@ class IonTime(object):
         for i in xrange(8):
             arr[i] = '%02x' % ord(val[i])
         return ''.join(arr)
-
-    def from_string(self, s):
+    
+    @classmethod
+    def from_string(cls, s):
         '''
         Changes this IonTime object to reflect the stringified time stamp
         '''
-        s = self.htonstr(s)
+        s = cls.htonstr(s)
         ntp_ts = np.uint64(int(s,16))
-        self.from_ntp(ntp_ts)
+        it = cls()
+        it.from_ntp(ntp_ts)
+        return it
 
     def to_unix(self):
         '''
