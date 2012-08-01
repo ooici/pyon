@@ -515,6 +515,15 @@ class ExchangeManager(object):
 
         return raw_queues
 
+    def get_queue_info(self, queue):
+        """
+        Rabbit HTTP management API call to get full properties of a single queue.
+        """
+        url = self._get_management_url("queues", "%2f", queue)
+        queue_info = self._call_management(url)
+
+        return queue_info
+
     def list_bindings(self, exchange=None, queue=None):
         """
         Rabbit HTTP management API call to list bindings.
@@ -629,6 +638,15 @@ class ExchangeManager(object):
         Rabbit HTTP management API call to delete a binding using a tuple from our list binding methods.
         """
         return self.delete_binding(binding_tuple[0], binding_tuple[1], binding_tuple[3])
+
+    def purge_queue(self, queue):
+        """
+        Rabbit HTTP management API call to purge a queue.
+        """
+        url = self._get_management_url("queues", "%2f", queue, "contents")
+        self._call_management_delete(url)
+
+        return True
 
     def _get_management_url(self, *feats):
         """

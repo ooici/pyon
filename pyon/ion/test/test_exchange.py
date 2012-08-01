@@ -12,11 +12,11 @@ from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
 from mock import Mock, sentinel, patch, call, MagicMock, ANY
-from pyon.net.transport import BaseTransport, TransportError, AMQPTransport
+from pyon.net.transport import BaseTransport, TransportError, AMQPTransport, NameTrio
 from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
 import requests
-from pyon.net.channel import RecvChannel
+from pyon.net.channel import SendChannel
 from pyon.core.bootstrap import CFG
 from pyon.util.containers import DotDict
 from gevent.queue import Queue
@@ -866,4 +866,53 @@ class TestManagementAPIInt(IonIntegrationTestCase):
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
+
+    def test_purge(self):
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        # declare a bind
+        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+
+        # deliver some messages
+        ch = self.container.node.channel(SendChannel)
+        ch._send_name = NameTrio(self.ex_name, self.bind_name)
+
+        ch.send('one')
+        ch.send('two')
+
+        ch.close()
+
+        # should have two messages after routing happens (non-deterministic)
+        time.sleep(2)
+
+        queue_info = self.container.ex_manager.get_queue_info(self.queue_name)
+        self.assertEquals(queue_info['messages'], 2)
+
+        # now purge it
+        self.container.ex_manager.purge_queue(self.queue_name)
+
+        time.sleep(2)
+
+        queue_info = self.container.ex_manager.get_queue_info(self.queue_name)
+        self.assertEquals(queue_info['messages'], 0)
+
+    def test_get_queue_info_not_declared(self):
+        # try and make sure raises due to not exist
+        self.assertRaises(exception.ServerError, self.container.ex_manager.get_queue_info, self.queue_name)
+
+    def test_get_queue_info(self):
+        # declare both ex and queue
+        self.container.ex_manager.declare_exchange(self.ex_name)
+        self.container.ex_manager.declare_queue(self.queue_name)
+
+        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
+
+        queue_info = self.container.ex_manager.get_queue_info(self.queue_name)
+        self.assertEquals(queue_info['name'], self.queue_name)
 
