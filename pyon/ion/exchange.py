@@ -705,7 +705,7 @@ class ExchangeManager(object):
 
             except requests.exceptions.Timeout as ex:
                 raise Timeout(str(ex))
-            except requests.exceptions.ConnectionError as ex:
+            except (requests.exceptions.ConnectionError, socket.error) as ex:
                 raise ServiceUnavailable(str(ex))
             except requests.exceptions.RequestException as ex:
                 # the generic base exception all requests' exceptions inherit from, raise our
