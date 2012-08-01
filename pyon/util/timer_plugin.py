@@ -63,7 +63,7 @@ class TestTimer(Plugin):
         """Configures the test timer plugin."""
         super(TestTimer, self).configure(options, config)
         self.config = config
-        self._timed_tests = {}
+        self._timed_tests = []
 
     def startTest(self, test):
         """Initializes a timer before starting a test."""
@@ -73,12 +73,11 @@ class TestTimer(Plugin):
         """Report the test times"""
         if not self.enabled:
             return
-        d = sorted(self._timed_tests.iteritems(), key=operator.itemgetter(1))
-        for test, time_taken in d:
+        for test, time_taken in self._timed_tests:
             stream.writeln("%s: %0.4f" % (test, time_taken))
 
     def _register_time(self, test):
-        self._timed_tests[test.id()] = self._timeTaken()
+        self._timed_tests.append((test.id(), self._timeTaken()))
 
     def addError(self, test, err, capt=None):
         self._register_time(test)
