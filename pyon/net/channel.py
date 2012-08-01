@@ -325,7 +325,7 @@ class SendChannel(BaseChannel):
         headers = headers or {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
-            _, testid = os.environ['QUEUE_BLAME'].split(',')
+            testid = os.environ['QUEUE_BLAME'].split(',')
             headers['QUEUE_BLAME'] = testid
 
         props = BasicProperties(headers=headers)
