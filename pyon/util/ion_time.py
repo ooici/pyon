@@ -7,39 +7,42 @@
 '''
 import numpy as np
 import time
+import datetime
 
 class IonTime(object):
     '''
     Utility wrapper for handling time in ntpv4
+    Everything is in ZULU Time
     '''
     FRAC = np.float32(4294967296.)
     JAN_1970 = np.uint32(2208988800)
+    EPOCH = datetime.datetime(1900,1,1)
 
     def __init__(self,date=None): 
         '''Can be initialized with a standard unix time stamp'''
         if date is None:
             date = time.time()
-        self._seconds = np.uint32(np.trunc(date) + self.JAN_1970)
-        temp = date + self.JAN_1970
-        self._useconds = np.uint32(np.modf(temp)[0] * 1e6)
-
+        if isinstance(date,(float,np.float,np.float32)):
+            self._dt = datetime.datetime.utcfromtimestamp(date)
+        elif isinstance(date,datetime.datetime):
+            self._dt = date
+        elif isinstance(date,datetime.date):
+            self._dt = datetime.datetime.combine(date,datetime.time())
 
     @property
     def seconds(self):
-        return self._seconds
+        delta = self._dt - datetime.datetime(1900,1,1)
+        return np.uint32(np.trunc(delta.total_seconds()))
 
     @seconds.setter
     def seconds(self,value):
-        self._seconds = np.uint32(value)
+        delta = datetime.timedelta(seconds=value)
+        self._dt = self.EPOCH + delta
 
     @property
     def useconds(self):
-        return self._useconds
-
-    @useconds.setter
-    def useconds(self,value):
-        self._useconds = np.uint32(value)
-
+        delta = self._dt - datetime.datetime(1900,1,1)
+        return np.uint32(np.modf(delta.total_seconds())[0] * 1e6)
 
     def __repr__(self):
         return '<%s "%s" at 0x%x>' % (self.__class__.__name__, str(self), id(self))
@@ -48,7 +51,7 @@ class IonTime(object):
         ts = int(self.seconds) - int(self.JAN_1970) + (self.useconds/1e6)
         return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))
 
-    def to_ntp(self):
+    def to_ntp32(self):
         '''
         Converts the IonTime object into a RFC 5905 (NTPv4) compliant 64bit time stamp
         '''
@@ -57,21 +60,20 @@ class IonTime(object):
         timestamp = np.uint64(left + right)
         return self.htonll(timestamp)
         
-    def from_ntp(self, val):
+    def from_ntp32(self, val):
         '''
         Converts a RFC 5905 (NTPv4) compliant 64bit time stamp into an IonTime object
         '''
         val = self.htonll(val)
         left = np.uint64(val) >> np.uint64(32)
-        right = (np.uint64(val) & np.uint64(4294967295)) * 1e6 / self.FRAC
-        self.seconds = np.uint32(left)
-        self.useconds = np.uint32(right)
+        right = (np.uint64(val) & np.uint64(4294967295)) / self.FRAC
+        self.seconds = left + right
 
     def to_string(self):
         '''
         Creates a hexidecimal string of the NTP time stamp (serialization)
         '''
-        val = self.to_ntp().tostring()
+        val = self.to_ntp32().tostring()
         arr = [0] * 8
         for i in xrange(8):
             arr[i] = '%02x' % ord(val[i])
@@ -85,7 +87,7 @@ class IonTime(object):
         s = cls.htonstr(s)
         ntp_ts = np.uint64(int(s,16))
         it = cls()
-        it.from_ntp(ntp_ts)
+        it.from_ntp32(ntp_ts)
         return it
 
     def to_unix(self):
