@@ -16,9 +16,8 @@ import numpy as np
 class IonTimeUnitTest(PyonTestCase):
     def test_time_ntp_fidelity(self):
         it1 = IonTime()
-        ntp_ts = it1.to_ntp32()
-        it2 = IonTime()
-        it2.from_ntp32(ntp_ts)
+        ntp_ts = it1.to_ntp64()
+        it2 = IonTime.from_ntp64(ntp_ts)
         self.assertEquals(it1.seconds,it2.seconds)
         self.assertTrue(np.abs(it1.useconds - it2.useconds) <= 1)
 

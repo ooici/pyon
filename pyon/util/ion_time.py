@@ -8,6 +8,7 @@
 import numpy as np
 import time
 import datetime
+import struct
 
 class IonTime(object):
     '''
@@ -17,6 +18,9 @@ class IonTime(object):
     FRAC = np.float32(4294967296.)
     JAN_1970 = np.uint32(2208988800)
     EPOCH = datetime.datetime(1900,1,1)
+
+    ntpv4_timestamp = '! 2I'
+    ntpv4_date      = '! 2I Q'
 
     def __init__(self,date=None): 
         '''Can be initialized with a standard unix time stamp'''
@@ -51,43 +55,84 @@ class IonTime(object):
         ts = int(self.seconds) - int(self.JAN_1970) + (self.useconds/1e6)
         return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))
 
-    def to_ntp32(self):
+    def to_ntp64(self):
         '''
-        Converts the IonTime object into a RFC 5905 (NTPv4) compliant 64bit time stamp
-        '''
-        left = np.uint64(self.seconds << 32)
-        right = np.uint64(self.useconds / 1e6 * self.FRAC)
-        timestamp = np.uint64(left + right)
-        return self.htonll(timestamp)
+        Returns the NTPv4 64bit timestamp
+           0                   1                   2                   3
+           0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+          |                            Seconds                            |
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+          |                            Fraction                           |
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
         
-    def from_ntp32(self, val):
+        '''
+        delta = (self._dt - self.EPOCH).total_seconds()
+        seconds = np.uint32(np.trunc(delta))
+        fraction = np.uint32((delta - int(delta)) * 2**32)
+        timestamp = struct.pack(self.ntpv4_timestamp, seconds, fraction)
+        return timestamp
+    
+    @classmethod
+    def from_ntp64(cls, val):
         '''
         Converts a RFC 5905 (NTPv4) compliant 64bit time stamp into an IonTime object
         '''
-        val = self.htonll(val)
-        left = np.uint64(val) >> np.uint64(32)
-        right = (np.uint64(val) & np.uint64(4294967295)) / self.FRAC
-        self.seconds = left + right
+        seconds, fraction = struct.unpack(cls.ntpv4_timestamp, val)
+        it = cls()
+        it.seconds = seconds + (fraction *1e0 / 2**32)
+        return it
+
+
+    def to_ntp_date(self):
+        '''
+        Returns the NTPv4 128bit date timestamp
+           0                   1                   2                   3
+           0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+          |                           Era Number                          |
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+          |                           Era Offset                          |
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+          |                                                               |
+          |                           Fraction                            |
+          |                                                               |
+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        '''
+        delta = (self._dt - self.EPOCH).total_seconds()
+        era = int(delta) / (2**32)
+        offset = np.uint32(np.trunc(delta)) # Overflow does all the work for us
+        fraction = np.uint64((delta - int(delta)) * 2**64)
+        ntp_date = struct.pack(self.ntpv4_date, era,offset,fraction)
+        return ntp_date
+
+
 
     def to_string(self):
         '''
         Creates a hexidecimal string of the NTP time stamp (serialization)
         '''
-        val = self.to_ntp32().tostring()
+        val = self.to_ntp64()
+        assert len(val) == 8
         arr = [0] * 8
         for i in xrange(8):
             arr[i] = '%02x' % ord(val[i])
-        return ''.join(arr)
+        retval = ''.join(arr)
+        print retval
+        return retval
     
     @classmethod
     def from_string(cls, s):
         '''
         Changes this IonTime object to reflect the stringified time stamp
         '''
-        s = cls.htonstr(s)
-        ntp_ts = np.uint64(int(s,16))
-        it = cls()
-        it.from_ntp32(ntp_ts)
+        assert len(s) == 16
+        arr = [0] * 8
+        for i in xrange(8):
+            arr[i] = chr(int(s[2*i:2*i+2],16))
+        retval = ''.join(arr)
+        print retval
+        it = cls.from_ntp64(retval)
         return it
 
     def to_unix(self):
