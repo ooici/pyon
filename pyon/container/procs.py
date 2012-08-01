@@ -20,7 +20,7 @@ from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_s
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
 from pyon.net.channel import RecvChannel
-from pyon.net.transport import NameTrio
+from pyon.net.transport import NameTrio, TransportError
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -234,9 +234,12 @@ class ProcManager(object):
         if not ep._chan._queue_auto_delete:
             # only need to delete if AMQP didn't handle it for us already!
             # @TODO this will not work with XOs (future)
-            ch = self.container.node.channel(RecvChannel)
-            ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
-            ch._destroy_queue()
+            try:
+                ch = self.container.node.channel(RecvChannel)
+                ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
+                ch._destroy_queue()
+            except TransportError as ex:
+                log.warn("Cleanup method triggered an error, ignoring: %s", ex)
 
 
     #TODO - check with Michael if this is acceptable or if there is a better way.

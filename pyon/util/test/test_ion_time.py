@@ -25,8 +25,7 @@ class IonTimeUnitTest(PyonTestCase):
     def test_time_string_fidelity(self):
         it1 = IonTime()
         ntp_str = it1.to_string()
-        it2 = IonTime()
-        it2.from_string(ntp_str)
+        it2 = IonTime.from_string(ntp_str)
         
         self.assertEquals(it1.seconds,it2.seconds)
         self.assertTrue(np.abs(it1.useconds - it2.useconds) <= 1)
