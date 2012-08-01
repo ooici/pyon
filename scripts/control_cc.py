@@ -10,6 +10,7 @@ import msgpack
 import os
 from interface.services.icontainer_agent import IContainerAgent, ContainerAgentClient
 from pyon.net.messaging import make_node
+from pyon.core.bootstrap import CFG, bootstrap_pyon
 
 def main():
     parser = argparse.ArgumentParser(description="CC Control script")
@@ -29,7 +30,10 @@ def main():
 
     assert parms, "No content in pidfile"
 
+    bootstrap_pyon()
+
     node, ioloop = make_node(parms['messaging'])
+    node.setup_interceptors(CFG.interceptor)
     cc = ContainerAgentClient(node=node, to_name=(parms['container-xp'], parms['container-agent']))
 
     # make a manual call - this is to avoid having to have the IonObject for the call
@@ -37,12 +41,12 @@ def main():
     assert len(methdefs) == 1
 
     arg_names = methdefs[0].positional                                  # ('name', 'module', 'cls', 'config')
-    msg_args = msgpack.dumps(dict(zip(arg_names, opts.commandargs)))    # ('name', <usrinp1>, 'cls', <usrinp2>) -> { 'name' : <usrinp1>, 'cls': <usrinp2> }
+    msg_args = dict(zip(arg_names, opts.commandargs))    # ('name', <usrinp1>, 'cls', <usrinp2>) -> { 'name' : <usrinp1>, 'cls': <usrinp2> }
     retval = cc.request(msg_args, op=opts.command)
 
     # special case: status
     if opts.command == "status":
-        statstr = msgpack.loads(retval)
+        statstr = retval
         print "Status:", statstr
 
         if statstr != "RUNNING":
