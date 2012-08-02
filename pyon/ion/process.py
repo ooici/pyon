@@ -10,6 +10,7 @@ from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
 from pyon.util.async import wait, spawn
+from pyon.core.exception import IonException, ContainerError
 import threading
 import traceback
 
@@ -43,6 +44,7 @@ class IonProcessThread(PyonThread):
         self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
         self._ctrl_queue        = Queue()
         self._ready_control     = Event()
+        self._errors            = []
 
         PyonThread.__init__(self, target=target, **kwargs)
 
@@ -137,7 +139,19 @@ class IonProcessThread(PyonThread):
                 exc = PyonThreadTraceback("IonProcessThread _control_flow caught an exception (call: %s, *args %s, **kwargs %s, context %s)\nTrue traceback captured by IonProcessThread' _control_flow:\n\n%s" % (call, callargs, callkwargs, context, traceback.format_exc()))
                 e.args = e.args + (exc,)
 
-                calling_gl.kill(exception=e, block=False)
+                # HACK HACK HACK
+                # we know that we only handle TypeError and IonException derived things, so only forward those if appropriate
+                if isinstance(e, (TypeError, IonException)):
+                    calling_gl.kill(exception=e, block=False)
+                else:
+                    # otherwise, swallow/record/report and hopefully we can continue on our way
+                    self._errors.append((call, callargs, callkwargs, context, e, exc))
+
+                    log.warn(exc)
+                    log.warn("Attempting to continue...")
+
+                    # have to raise something friendlier on the client side
+                    calling_gl.kill(exception=ContainerError(str(exc)), block=False)
 
             ar.set(res)
 
