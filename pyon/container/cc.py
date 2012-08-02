@@ -177,6 +177,7 @@ class Container(BaseContainerAgent):
         # Start an ION process with the right kind of endpoint factory
         proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self, cleanup_method=cleanup)
         self.proc_manager.proc_sup.ensure_ready(proc)
+        proc.start_listeners()
         self._capabilities.append("CONTAINER_AGENT")
 
         self.event_pub.publish_event(event_type="ContainerLifecycleEvent",

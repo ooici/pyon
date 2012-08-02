@@ -106,11 +106,18 @@ class AMQPTransport(BaseTransport):
 
     def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", client.channel_number, exchange, exchange_type, durable, auto_delete)
+        arguments = {}
+
+        if os.environ.get('QUEUE_BLAME', None) is not None:
+            testid = os.environ['QUEUE_BLAME']
+            arguments.update({'created-by':testid})
+
         self._sync_call(client, client.exchange_declare, 'callback',
                                              exchange=exchange,
                                              type=exchange_type,
                                              durable=durable,
-                                             auto_delete=auto_delete)
+                                             auto_delete=auto_delete,
+                                             arguments=arguments)
 
     def delete_exchange_impl(self, client, exchange, **kwargs):
         log.debug("AMQPTransport.delete_exchange_impl(%s): %s", client.channel_number, exchange)
@@ -121,7 +128,7 @@ class AMQPTransport(BaseTransport):
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
-            ds_name, testid = os.environ['QUEUE_BLAME'].split(',')
+            testid = os.environ['QUEUE_BLAME']
             arguments.update({'created-by':testid})
 
         frame = self._sync_call(client, client.queue_declare, 'callback',
@@ -129,12 +136,6 @@ class AMQPTransport(BaseTransport):
                                 auto_delete=auto_delete,
                                 durable=durable,
                                 arguments=arguments)
-
-        if os.environ.get('QUEUE_BLAME', None) is not None:
-            from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-            ds = CouchDataStore(datastore_name=ds_name)
-            ds.create_doc({'test_id':testid, 'queue_name':frame.method.queue})
-            ds.close()
 
         return frame.method.queue
 

@@ -29,5 +29,15 @@ class PyccCapture(Capture):
         if isinstance(ev, BaseException) and not isinstance(ev, Exception):
             # BaseException derived? convert to unicode string so super's method doesn't choke
             ev = unicode(ev)
-        return super(PyccCapture, self).addCaptureToErr(ev, output)
+        try:
+            return super(PyccCapture, self).addCaptureToErr(ev, output)
+        except UnicodeError as ex:
+            # we don't know if it's the event or the output, so try both then give up
+            try:
+                return super(PyccCapture, self).addCaptureToErr("(pyon.capture cannot format this error: %s)" % str(ex), output)
+            except UnicodeError as ex:
+                try:
+                    return super(PyccCapture, self).addCaptureToErr(ev, "(pyon.capture cannot format this output: %s" % str(ex))
+                except UnicodeError as ex:
+                    return super(PyccCapture, self).addCaptureToErr("cannot format error: %s" % str(ex), "cannot format this output, giving up")
 

@@ -1,4 +1,5 @@
 from nose.plugins import Plugin
+from collections import defaultdict
 
 class QueueBlame(Plugin):
     name = 'queueblame'
@@ -8,245 +9,163 @@ class QueueBlame(Plugin):
         import uuid
         self.ds_name = "queueblame-%s" % str(uuid.uuid4())[0:6]
 
-        from collections import defaultdict
         self.queues_by_test = defaultdict(lambda: defaultdict(dict))
 
     def options(self, parser, env):
         super(QueueBlame, self).options(parser, env=env)
 
-        parser.add_option('--queueblame-by-queue', action='store_true', dest='queueblame_by_queue', help='Show output by queue instead of by test', default=False)
-        parser.add_option('--queueblame-full', action='store_true', dest='queueblame_full', help='Display ALL queues, not just queues with consumers/msgs')
-        parser.add_option('--queueblame-no-trim', action='store_false', dest='queueblame_trim', help='Trim output so that repeated test names/queue names are omitted for brevity. Human readable but not easily machine readable.', default=True)
+        parser.add_option('--queueblame-purge', action='store_true', dest='queueblame_purge', help='Purge queues with leftover messages and remove all bindings')
 
     def configure(self, options, conf):
         """Configure the plugin and system, based on selected options."""
         super(QueueBlame, self).configure(options, conf)
 
-        self._queueblame_by_queue   = options.queueblame_by_queue
-        self._queueblame_full       = options.queueblame_full
-        self._queueblame_trim       = options.queueblame_trim
+        self._queueblame_purge      = options.queueblame_purge
 
     def begin(self):
-        from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-        from pyon.public import CFG
-        self.ds = CouchDataStore(datastore_name=self.ds_name, config=CFG)
+        self._active_queues = set()
+        self._test_changes = {}
+        self._queues_declared = []          # ordered list of queues declared
+        self._queues = defaultdict(list)    # queue name -> list of accesses
+
+        from pyon.ion.exchange import ExchangeManager
+        from pyon.util.containers import DotDict
+        from pyon.core.bootstrap import CFG
+        from mock import Mock
+
+        containermock = Mock()
+        containermock.resource_registry.find_resources.return_value = ([], None)
+
+        self.ex_manager = ExchangeManager(containermock)      # needs to be able to setattr
+        self.ex_manager._nodes['priviledged'] = DotDict(client=DotDict(parameters=DotDict(host=CFG.get_safe('server.amqp.host', 'localhost'))))
 
     def finalize(self, result):
-        self.ds.delete_datastore()
-        self.ds.close()
+        pass
 
     def beforeTest(self, test):
+        self._pre_defs = self.ex_manager.get_definitions()
+
         import os
-        os.environ['QUEUE_BLAME'] = "%s,%s" % (self.ds_name, test.id())
+        os.environ['QUEUE_BLAME'] = str(test.id())
 
     def afterTest(self, test):
-        from pyon.net.transport import NameTrio, TransportError
-        from pyon.net.channel import RecvChannel
         import os
-        import sys
+        from pyon.core.bootstrap import get_sys_name        # can't guarantee exclusive access
 
-        # need a connection to node to get queue stats
-        from pyon.net.messaging import make_node
-        node, ioloop = make_node()
-
-        os.environ.pop('QUEUE_BLAME')
+        #os.environ.pop('QUEUE_BLAME')
         tid = test.id()
 
-        # grab raw data from database
-        obj_ids = self.ds.list_objects()
-        objs = self.ds.read_doc_mult(obj_ids)
+        post_defs = self.ex_manager.get_definitions()
 
-        for x in objs:
-            queue = x['queue_name']
+        # diff the defs
+        pre_queues = {str(x['name']) for x in self._pre_defs['queues']}
+        post_queues = {str(x['name']) for x in post_defs['queues']}
 
-            if 'accesses' in self.queues_by_test[tid][queue]:
-                self.queues_by_test[tid][queue]['accesses'] += 1
-            else:
-                # grab intel from channel
-                ch = node.channel(RecvChannel)
-                ch._recv_name = NameTrio(queue.split('.')[0], queue)
+        pre_exchanges = {str(x['name']) for x in self._pre_defs['exchanges']}
+        post_exchanges = {str(x['name']) for x in post_defs['exchanges']}
 
-                try:
-                    msgs, consumers = ch.get_stats()
-                    exists = True
-                    #print >>sys.stderr, "LOG ME", queue, msgs, consumers
-                except TransportError:
-                    msgs = 0
-                    consumers = 0
-                    exists = False
-                finally:
-                    ch.close()
+        pre_binds = { (x['source'], x['destination'], x['routing_key']) for x in self._pre_defs['bindings'] if x['destination_type'] == 'queue' }
+        post_binds = { (x['source'], x['destination'], x['routing_key']) for x in post_defs['bindings'] if x['destination_type'] == 'queue' }
 
-                self.queues_by_test[tid][queue] = { 'exists': exists,
-                                                    'msgs': msgs,
-                                                    'consumers' : consumers,
-                                                    'accesses' : 1 }
+        queue_diff_add      = post_queues.difference(pre_queues)
+        exchange_diff_add   = post_exchanges.difference(pre_exchanges)
+        binds_diff_add      = post_binds.difference(pre_binds)
 
-        # must also check all the queues from previous tests, to capture bleed
-        bleed_queues = set()
-        for test, testqueues in self.queues_by_test.iteritems():
-            if test != tid:
-                map(bleed_queues.add, testqueues.iterkeys())
+        queue_diff_sub      = pre_queues.difference(post_queues)
+        exchange_diff_sub   = pre_exchanges.difference(post_exchanges)
+        binds_diff_sub      = pre_binds.difference(post_binds)
 
-        # don't test anything we already just tested
-        bleed_queues.difference_update(self.queues_by_test[tid].iterkeys())
+        # maintain active queue set
+        map(self._active_queues.add, queue_diff_add)
+        map(self._active_queues.discard, queue_diff_sub)
 
-        for queue in bleed_queues:
-            ch = node.channel(RecvChannel)
-            ch._recv_name = NameTrio(queue.split('.')[0], queue)
+        # maintain changelog for tests
+        self._test_changes[tid] = (queue_diff_add, queue_diff_sub, exchange_diff_add, exchange_diff_sub, binds_diff_add, binds_diff_sub)
 
-            try:
-                msgs, consumers = ch.get_stats()
-                exists = True
-            except TransportError:
-                msgs = 0
-                consumers = 0
-                exists = False
+        # add any new leftover queues to the list
+        for q in queue_diff_add:
+            if not q in self._queues_declared:
+                self._queues_declared.append(q)
 
-            # drain the queue!
-            if exists and msgs > 0 and consumers == 0:
-                print >>sys.stderr, "DRAIN QUEUE:", queue
-                ch.start_consume()
-                for x in xrange(msgs):
-                    m, h, d = ch.recv()
-                    print >>sys.stderr, h
-                    ch.ack(d)
+        # get stats about each leftover queue and record the access
 
-            ch.close()
+        raw_queues_list = self.ex_manager._list_queues()
+        raw_queues = { str(x['name']) : x for x in raw_queues_list }
 
+        for q in self._queues_declared:
 
-            self.queues_by_test[tid][queue] = { 'exists': exists,
-                                                'msgs': msgs,
-                                                'consumers': consumers,
-                                                'accesses' : 0 }        # 0 is special here, indicates a bleed check
+            # detect if queue has been deleted (and not readded)
+            if len(self._queues[q]) > 0 and isinstance(self._queues[q][-1], str) and not q in queue_diff_add:
+                continue
 
-        # empty the database for next test use
-        self.ds.delete_datastore()
-        self.ds.create_datastore(create_indexes=False)
+            # did we just delete it this test? add the sentinel
+            if q in queue_diff_sub:
+                self._queues[q].append(tid)
+                continue
 
-        node.stop_node()
-        ioloop.join(timeout=5)
+            # record the test, # messages on it, + bindings on the queue, - bindings on the queue
+            self._queues[q].append( (tid,
+                                     str(raw_queues[q]['messages']),
+                                     [x for x in binds_diff_add if str(x[1]) == str(q)],
+                                     [x for x in binds_diff_sub if str(x[1]) == str(q)]))
+
+            # are we supposed to purge it / kill bindings?
+            if self._queueblame_purge and raw_queues[q]['messages'] > 0:
+
+                # remove bindings via API
+                binds = self.ex_manager.list_bindings_for_queue(q)
+                for bind in binds:
+                    self.ex_manager.delete_binding_tuple(bind)
+
+                    # add to list of removed bindings for report
+                    rem_binds = self._queues[q][-1][3]
+                    rem_binds.append(tuple(bind[0:2] + (bind[2] + " (PURGED)",)))
+
+                # purge
+                self.ex_manager.purge_queue(q)
 
     def report(self, stream):
-
-        # format report
         table = []
-        self.total_count = 0
+        for q in self._queues_declared:
 
-        def is_interesting(qd):
-            """
-            Helper method, returns if a row is interesting based on msgs, consumers and queueblame_full flag.
-            """
-            return self._queueblame_full or (not self._queueblame_full and (qd['msgs'] > 0 or qd['consumers'] > 0))
+            qd = self._queues[q]
 
-        def add_row(first, second, queuedict):
-            """
-            Can be called with queue/test or test/queue first, hence generic name.
+            # first rows are:
+            # queue     + test          # messages
+            #             +B exchange   binding
+            table.append([q, "+", qd[0][0], qd[0][1]])
 
-            Returns bool indicated row was added or not.
-            """
-            self.total_count += 1
-            if is_interesting(queuedict):
-                acc = ' '
-                if queuedict['accesses'] > 1:
-                    acc = queuedict['accesses']
-                elif queuedict['accesses'] == 0:
-                    acc = 'PREV'
-                exists = 'T' if queuedict['exists'] else 'F'
-                table.append([str(x) for x in [first, second, acc, exists, queuedict['msgs'], queuedict['consumers']]])
+            for bind in qd[0][2]:
+                table.append(["", "", "    +B ex: %s key: %s" % (bind[0], bind[2]), ""])
 
-                return True
-
-            return False
-
-        # create tests by queue, used in a few places below
-        from collections import defaultdict
-        tests_by_queue = defaultdict(list)
-
-        for test, queues in self.queues_by_test.iteritems():
-            for queue, queuedict in queues.iteritems():
-                tests_by_queue[queue].append(dict(queuedict, test=test))
-
-        # list of queues that are tagged as PREV, we keep tabs on it but only use it later if correct conditions
-        prev_list = set()
-
-        # build output table
-        if not self._queueblame_by_queue:
-            for test, queues in self.queues_by_test.iteritems():
-                for queue, queuedict in queues.iteritems():
-                    ret = add_row(test, queue, queuedict)
-                    if ret and queuedict['accesses'] == 0:
-                        prev_list.add(queue)
-        else:
-            for queue, calls in tests_by_queue.iteritems():
-                for call in calls:
-                    ret = add_row(queue, call['test'], call)
-                    if ret and queuedict['accesses'] == 0:
-                        prev_list.add(queue)
-
-
-        # generate prev_list table if it is interesting
-        prev_list_table = []
-        if not self._queueblame_full:
-            for prev in prev_list:
-                # cut down dict
-                prev_accesses = [qd['test'] for qd in tests_by_queue[prev] if qd['accesses'] > 0]
-
-                for pa in prev_accesses:
-                    prev_list_table.append([prev, pa])
-
-        # sort by first col
-        table.sort(cmp=lambda x,y: cmp(x[0], y[0]))
-        prev_list_table.sort(cmp=lambda x,y: cmp(x[0], y[0]))
-
-        # do we trim?
-        if self._queueblame_trim:
-            last = ""
-            for i, x in enumerate(table):
-                if x[0] != last:
-                    last = x[0]
+            # add rest of accesses
+            #             test          # messages
+            #             +B exchange   binding
+            #             -B exchange   binding
+            for qdd in qd[1:]:
+                if isinstance(qdd, str):
+                    table.append(["", "-", qdd, ""])
                 else:
-                    table[i][0] = ""
-            last = ""
-            for i, x in enumerate(prev_list_table):
-                if x[0] != last:
-                    last = x[0]
-                else:
-                    prev_list_table[i][0] = ""
+                    table.append(["", "", qdd[0], qdd[1]])
 
-        if self._queueblame_by_queue:
-            table.insert(0, ['Queue', 'Test', '# Acc >1', 'Ex?', '# Msgs', '# Cnsmrs'])
-        else:
-            table.insert(0, ['Test', 'Queue', '# Acc >1', 'Ex?', '# Msgs', '# Cnsmrs'])
+                    for bind in qdd[2]:
+                        table.append(["", "", "    +B ex: %s key: %s" % (bind[0], bind[2]), ""])
+                    for bind in qdd[3]:
+                        table.append(["", "", "    -B ex: %s key: %s" % (bind[0], bind[2]), ""])
 
-        if len(prev_list_table) > 0:
-            prev_list_table.insert(0, ['Queue', 'Test'])
-            # format prev_table too
-            widths = [max([len(row[x]) for row in prev_list_table]) for x in xrange(len(prev_list_table[0]))]
-            prev_fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in prev_list_table]
-            prev_fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
-        else:
-            prev_fmt_out = []
+        # header
+        table.insert(0, ['Queue', '', 'Test', '# Msg'])
 
-        # calculate widths
+        # get widths
         widths = [max([len(row[x]) for row in table]) for x in xrange(len(table[0]))]
         fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in table]
+
         # insert col separation row
         fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
 
-        stream.write("\n" + "=" * len(fmt_out[0]) + "\n\n")
-        stream.write("Queue blame report (DB: %s, full: %s, by_queue: %s)\n" % (self.ds_name, self._queueblame_full, self._queueblame_by_queue))
-        stream.write("If 'PREV' in accesses column, indicates queue was not accessed during this test and could indicate bleed between tests.\n")
-        if not self._queueblame_full and len(table) > 1:
-            stream.write("\n*** The following queues still have messages or consumers! ***\n")
-        stream.write("\n")
+        # write this all to sstream
+        stream.write("Queue blame report (purge: %s)\n" % (self._queueblame_purge))
+
         stream.write("\n".join(fmt_out))
-        stream.write("\n" + "=" * len(fmt_out[0]) + "\n")
-        stream.write("%d shown of %d total\n" % (len(table)-1, self.total_count))
         stream.write("\n")
-        if len(prev_fmt_out) > 0:
-            stream.write("\n\nThe following queues were accessed by the associated tests, inspect them for proper cleanup of subscribers!\n\n")
-            stream.write("\n".join(prev_fmt_out))
-            stream.write("\n" + "=" * len(prev_fmt_out[0]) + "\n")
-            stream.write("\n")
 

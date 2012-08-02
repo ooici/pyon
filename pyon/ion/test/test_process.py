@@ -41,6 +41,7 @@ class ProcessTest(PyonTestCase):
         mocklistener.get_ready_event.return_value = readyev
         p.start()
         p.get_ready_event().wait(timeout=5)
+        p.start_listeners()
 
         self.assertEquals(len(p.thread_manager.children), 2)
         mocklistener.listen.assert_called_once_with()
@@ -62,6 +63,7 @@ class ProcessTest(PyonTestCase):
         p = IonProcessThread(name=sentinel.name, listeners=[mocklistener])
         p.start()
         p.get_ready_event().wait(timeout=5)
+        p.start_listeners()
 
         # the exception is linked to the main proc inside the IonProcess, so that should be dead now
         self.assertTrue(p.proc.dead)

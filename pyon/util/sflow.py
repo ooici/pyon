@@ -90,7 +90,7 @@ class SFlowManager(object):
             res = resource.getrusage(resource.RUSAGE_SELF)
 
             # build and send counter structure
-            csample = { 'counters_sample': {
+            csample = { 'counter_sample': {
                             'app_name': str(self._container.id),
                             'app_resources': {
                                 'user_time': int(res.ru_utime * 1000),
@@ -101,14 +101,14 @@ class SFlowManager(object):
                                 'fd_max': 0,    # @TODO ""
                                 'conn_open': 0, # @TODO couch/rabbit connection summary somehow
                                 'conn_max': 0
+                            },
+                            'app_workers':{
+                                'workers_active': len(self._container.proc_manager.proc_sup.children),
+                                'workers_idle': 0,
+                                'workers_max': 1024,
+                                'req_delayed': 0,
+                                'req_dropped': 0
                             }
-                        },
-                        'app_workers':{
-                            'workers_active': len(self._container.proc_manager.proc_sup.children),
-                            'workers_idle': 0,
-                            'workers_max': 1024,
-                            'req_delayed': 0,
-                            'req_dropped': 0
                         }
                       }
 

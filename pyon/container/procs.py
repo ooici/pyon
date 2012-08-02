@@ -20,7 +20,7 @@ from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_s
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
 from pyon.net.channel import RecvChannel
-from pyon.net.transport import NameTrio
+from pyon.net.transport import NameTrio, TransportError
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -172,6 +172,38 @@ class ProcManager(object):
             log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
             raise
 
+    def list_local_processes(self, process_type=''):
+        '''
+        Returns a list of the running ION processes in the container or filtered by the process_type
+        '''
+        ret = list()
+        for p in self.procs.values():
+            if process_type and p.process_type != process_type:
+                continue
+
+            ret.append(p)
+
+        return ret
+
+    def list_local_process_names(self, process_type=''):
+        '''
+        Returns a list of the running ION processes in the container or filtered by the process_type
+        '''
+        ret = list()
+        for p in self.procs.values():
+            if process_type and p.process_type != process_type:
+                continue
+
+            ret.append(p.name)
+
+        return ret
+    def is_local_service_process(self, service_name):
+        local_services = self.list_local_process_names('service')
+        if service_name in local_services:
+            return True
+
+        return False
+
     def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s, %s", gproc, gproc.exception)
 
@@ -202,9 +234,23 @@ class ProcManager(object):
         if not ep._chan._queue_auto_delete:
             # only need to delete if AMQP didn't handle it for us already!
             # @TODO this will not work with XOs (future)
-            ch = self.container.node.channel(RecvChannel)
-            ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
-            ch._destroy_queue()
+            try:
+                ch = self.container.node.channel(RecvChannel)
+                ch._recv_name = NameTrio(get_sys_name(), "%s.%s" % (get_sys_name(), queue_name))
+                ch._destroy_queue()
+            except TransportError as ex:
+                log.warn("Cleanup method triggered an error, ignoring: %s", ex)
+
+
+    #TODO - check with Michael if this is acceptable or if there is a better way.
+    def _is_policy_management_service_available(self):
+        """
+        Method to verify if the Policy Management Service is running in the system.
+        """
+        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+        if policy_services:
+            return True
+        return False
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
@@ -249,6 +295,12 @@ class ProcManager(object):
 
         self._service_init(service_instance)
         self._service_start(service_instance)
+
+        proc.start_listeners()
+
+        # look to load any existing policies for this service
+        if self._is_policy_management_service_available() and self.container.governance_controller:
+            self.container.governance_controller.update_service_access_policy(service_instance._proc_listen_name)
 
         return service_instance
 
@@ -295,6 +347,8 @@ class ProcManager(object):
         self._service_init(service_instance)
         self._service_start(service_instance)
 
+        proc.start_listeners()
+
         return service_instance
 
     # -----------------------------------------------------------------
@@ -308,24 +362,38 @@ class ProcManager(object):
         if not isinstance(service_instance, ResourceAgent):
             raise ContainerConfigError("Agent process must extend ResourceAgent")
 
+        listeners = []
+
         # Set the resource ID if we get it through the config
         resource_id = get_safe(service_instance.CFG, "agent.resource_id")
         if resource_id:
             service_instance.resource_id = resource_id
+
+            alistener = ProcessRPCServer(node=self.container.node,
+                                         from_name=resource_id,
+                                         service=service_instance,
+                                         process=service_instance)
+
+            listeners.append(alistener)
 
         rsvc = ProcessRPCServer(node=self.container.node,
             from_name=service_instance.id,
             service=service_instance,
             process=service_instance)
 
-        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc)
+        listeners.append(rsvc)
+
+        # cleanup method to delete process/agent queue (@TODO: leaks a bit here - should use XOs)
+        def agent_cleanup(x):
+            self._cleanup_method(service_instance.id, rsvc)
+            if resource_id:
+                self._cleanup_method(service_instance.id, alistener)
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
-                                   listeners=[rsvc],
+                                   listeners=listeners,
                                    proc_name=service_instance._proc_name,
-                                   cleanup_method=cleanup)
+                                   cleanup_method=agent_cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % service_instance.id)
 
         # map gproc to service_instance
@@ -342,8 +410,15 @@ class ProcManager(object):
 
         self._service_start(service_instance)
 
-        if not service_instance.resource_id:
+        proc.start_listeners()
+
+        if service_instance.resource_id:
+            # look to load any existing policies for this resource
+            if self._is_policy_management_service_available() and self.container.governance_controller:
+                self.container.governance_controller.update_resource_access_policy(service_instance.resource_id)
+        else:
             log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
+
 
         return service_instance
 
@@ -383,6 +458,8 @@ class ProcManager(object):
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
 
+        proc.start_listeners()
+
         return service_instance
 
     # -----------------------------------------------------------------
@@ -413,6 +490,7 @@ class ProcManager(object):
         self._service_init(service_instance)
         self._service_start(service_instance)
         return service_instance
+
 
     def _create_service_instance(self, process_id, name, module, cls, config):
         """
@@ -551,6 +629,8 @@ class ProcManager(object):
             process_type=service_instance._proc_type,
             process_name=service_instance._proc_name,
             state=ProcessStateEnum.SPAWN)
+
+
 
     def terminate_process(self, process_id):
         """

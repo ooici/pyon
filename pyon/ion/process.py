@@ -42,6 +42,7 @@ class IonProcessThread(PyonThread):
 
         self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
         self._ctrl_queue        = Queue()
+        self._ready_control     = Event()
 
         PyonThread.__init__(self, target=target, **kwargs)
 
@@ -74,10 +75,6 @@ class IonProcessThread(PyonThread):
         """
         if self.name:
             threading.current_thread().name = self.name
-
-        # spawn all listeners in startup listeners (from initializer, or added later)
-        for listener in self._startup_listeners:
-            self.add_endpoint(listener)
 
         # spawn control flow loop
         ct = self.thread_manager.spawn(self._control_flow)
@@ -121,6 +118,8 @@ class IonProcessThread(PyonThread):
         in the greenlet that originally scheduled the call.  If successful, the AsyncResult
         created at scheduling time is set with the result of the call.
         """
+        self._ready_control.set()
+
         for calltuple in self._ctrl_queue:
             calling_gl, ar, call, callargs, callkwargs, context = calltuple
             log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
@@ -142,6 +141,28 @@ class IonProcessThread(PyonThread):
 
             ar.set(res)
 
+    def start_listeners(self):
+        """
+        Starts all listeners in managed greenlets.
+
+        This must be called after starting this IonProcess. Currently, the Container's ProcManager
+        will handle this for you, but if using an IonProcess manually, you must remember to call
+        this method or no attached listeners will run.
+        """
+
+        # spawn all listeners in startup listeners (from initializer, or added later)
+        for listener in self._startup_listeners:
+            self.add_endpoint(listener)
+
+        ev = Event()
+
+        def allready(ev):
+            waitall([x.get_ready_event() for x in self.listeners])
+            ev.set()
+
+        spawn(allready, ev)
+
+        ev.wait(timeout=10)
 
     def _notify_stop(self):
         """
@@ -165,15 +186,9 @@ class IonProcessThread(PyonThread):
 
     def get_ready_event(self):
         """
-        Returns an Event that is set when all the listeners in this Process are running.
+        Returns an Event that is set when the control greenlet is up and running.
         """
-        ev = Event()
-        def allready(ev):
-            waitall([x.get_ready_event() for x in self.listeners])
-            ev.set()
-
-        spawn(allready, ev)
-        return ev
+        return self._ready_control
 
 class IonProcessThreadManager(PyonThreadManager):
 

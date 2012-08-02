@@ -7,7 +7,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import Conflict, NotFound, BadRequest
+from pyon.core.exception import Conflict, Inconsistent, NotFound, BadRequest
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher, EventSubscriber
 from pyon.ion.identifier import create_unique_directory_id
