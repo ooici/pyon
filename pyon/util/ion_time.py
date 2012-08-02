@@ -11,6 +11,9 @@ import datetime
 import struct
 import numbers
 
+class IonDate(datetime.date):
+    pass
+
 class IonTime(object):
     '''
     Utility wrapper for handling time in ntpv4
