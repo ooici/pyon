@@ -184,7 +184,12 @@ class InstTimeoutError(IonInstrumentError):
     """
     status_code = 690
 
-
+class ResourceError(IonException):
+    """
+    A taskable resource error occurred.
+    """
+    status_code = 700
+    
 
 # must appear after ServerError in python module
 class ExceptionFactory(object):
