@@ -13,6 +13,8 @@ from gevent.coros import Semaphore
 from pyon.util.unit_test import PyonTestCase
 import time
 from pyon.util.context import LocalContextMixin
+from pyon.core.exception import IonException, NotFound, ContainerError
+from pyon.util.async import spawn
 
 @attr('UNIT', group='process')
 class ProcessTest(PyonTestCase):
@@ -135,5 +137,56 @@ class ProcessTest(PyonTestCase):
         p._notify_stop()
         p.stop()
 
+    def test_known_error(self):
 
+        # IonExceptions and TypeErrors get forwarded back intact
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+
+        def proc_call():
+            raise NotFound("didn't find it")
+
+        def client_call(p=None, ar=None):
+            try:
+                ca = p._routing_call(proc_call, None)
+                ca.get(timeout=5)
+
+            except IonException as e:
+                ar.set(e)
+
+        ar = AsyncResult()
+        gl_call = spawn(client_call, p=p, ar=ar)
+
+        e = ar.get(timeout=5)
+
+        self.assertIsInstance(e, NotFound)
+
+    def test_unknown_error(self):
+
+        # Unhandled exceptions get handled and then converted to ContainerErrors
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+
+        def proc_call():
+            raise ExpectedError("didn't find it")
+
+        def client_call(p=None, ar=None):
+            try:
+                ca = p._routing_call(proc_call, None)
+                ca.get(timeout=5)
+
+            except IonException as e:
+                ar.set(e)
+
+        ar = AsyncResult()
+        gl_call = spawn(client_call, p=p, ar=ar)
+
+        e = ar.get(timeout=5)
+
+        self.assertIsInstance(e, ContainerError)
+        self.assertEquals(len(p._errors), 1)
 
