@@ -132,60 +132,6 @@ class TestBaseChannel(PyonTestCase):
             with ch._ensure_amq_chan():
                 pass
 
-    def test__sync_call_no_ret_value(self):
-
-        def async_func(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam()
-
-        ch = BaseChannel()
-        rv = ch._sync_call(async_func, 'callback')
-        self.assertIsNone(rv)
-
-    def test__sync_call_with_ret_value(self):
-        def async_func(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam(sentinel.val)
-
-        ch = BaseChannel()
-        rv = ch._sync_call(async_func, 'callback')
-        self.assertEquals(rv, sentinel.val)
-
-    def test__sync_call_with_mult_rets(self):
-        def async_func(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam(sentinel.val, sentinel.val2)
-
-        ch = BaseChannel()
-        rv = ch._sync_call(async_func, 'callback')
-        self.assertEquals(rv, (sentinel.val, sentinel.val2))
-
-    def test__sync_call_with_kwarg_rets(self):
-        def async_func(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam(sup=sentinel.val, sup2=sentinel.val2)
-
-        ch = BaseChannel()
-        rv = ch._sync_call(async_func, 'callback')
-        self.assertEquals(rv, {'sup':sentinel.val, 'sup2':sentinel.val2})
-
-    def test__sync_call_with_normal_and_kwarg_rets(self):
-        def async_func(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam(sentinel.arg, sup=sentinel.val, sup2=sentinel.val2)
-
-        ch = BaseChannel()
-        rv = ch._sync_call(async_func, 'callback')
-        self.assertEquals(rv, (sentinel.arg, {'sup':sentinel.val, 'sup2':sentinel.val2}))
-
-    def test__sync_call_with_error(self):
-        ch = BaseChannel()
-
-        def async_func(*args, **kwargs):
-            ch.on_channel_close(1, 'bam')
-
-        self.assertRaises(ChannelError, ch._sync_call, async_func, 'callback')
-
 @attr('UNIT')
 class TestSendChannel(PyonTestCase):
     def setUp(self):
@@ -388,7 +334,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn(sentinel.binding, self.ch._transport.unbind_impl.call_args[1].itervalues())
 
     def test_start_consume(self):
-        ac = Mock(pchannel.Channel)
+        ac = MagicMock()
         self.ch.attach_underlying_channel(ac)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
@@ -415,7 +361,7 @@ class TestRecvChannel(PyonTestCase):
 
     @patch('pyon.net.channel.log')
     def test_start_consume_with_consumer_tag_and_auto_delete(self, mocklog):
-        ac = Mock(pchannel.Channel)
+        ac = MagicMock()
         self.ch.attach_underlying_channel(ac)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
@@ -429,7 +375,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertTrue(mocklog.warn.called)
 
     def test_stop_consume(self):
-        ac = Mock(pchannel.Channel)
+        ac = MagicMock()
         self.ch.attach_underlying_channel(ac)
 
         # pretend we're consuming
@@ -463,15 +409,17 @@ class TestRecvChannel(PyonTestCase):
 
     @patch('pyon.net.channel.log')
     def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
-        ac = Mock(pchannel.Channel)
+        ac = MagicMock()
         self.ch.attach_underlying_channel(ac)
+        ac.channel_number = sentinel.channel_number
+
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue, sentinel.binding)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
         self.ch._ensure_amq_chan = MagicMock()
-        self.ch._sync_call = Mock()
+        self.ch._transport._sync_call = Mock()
         self.ch._queue_auto_delete = True
 
         self.ch.stop_consume()
@@ -616,7 +564,7 @@ class TestRecvChannel(PyonTestCase):
     def test_reset_when_consuming(self):
         # have to setup a lot here, can't just mock
         # _on_stop_consume because the FSM holds onto it
-        ac = Mock(pchannel.Channel)
+        ac = MagicMock()
         self.ch.attach_underlying_channel(ac)
 
         # pretend we're consuming

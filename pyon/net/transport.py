@@ -34,6 +34,16 @@ class BaseTransport(object):
     def unbind_impl(self, client, exchange, queue, binding):
         raise NotImplementedError()
 
+    def ack_impl(self, client, delivery_tag):
+        raise NotImplementedError()
+    def reject_impl(self, client, delivery_tag, requeue=False):
+        raise NotImplementedError()
+
+    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+        raise NotImplementedError()
+    def stop_consume_impl(self, client, consumer_tag):
+        raise NotImplementedError()
+
     def setup_listener(self, binding, default_cb):
         raise NotImplementedError()
 
@@ -44,6 +54,9 @@ class BaseTransport(object):
         raise NotImplementedError()
 
     def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+        raise NotImplementedError()
+
+    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False): 
         raise NotImplementedError()
 
 class AMQPTransport(BaseTransport):
@@ -156,6 +169,39 @@ class AMQPTransport(BaseTransport):
                                                      exchange=exchange,
                                                      routing_key=binding)
 
+    def ack_impl(self, client, delivery_tag):
+        """
+        Acks a message.
+        """
+        client.basic_ack(delivery_tag)
+
+    def reject_impl(self, client, delivery_tag, requeue=False):
+        """
+        Rejects a message.
+        """
+        client.basic_reject(delivery_tag, requeue=requeue)
+
+    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+        """
+        Starts consuming on a queue.
+        Will asynchronously deliver messages to the callback method supplied.
+
+        @return A consumer tag to be used when stop_consume_impl is called.
+        """
+        log.debug("AMQPTransport.start_consume_impl(%s): %s", client.channel_number, queue)
+        consumer_tag = client.basic_consume(callback,
+                                            queue=queue,
+                                            no_ack=no_ack,
+                                            exclusive=exclusive)
+        return consumer_tag
+
+    def stop_consume_impl(self, client, consumer_tag):
+        """
+        Stops consuming by consumer tag.
+        """
+        log.debug("AMQPTransport.stop_consume_impl(%s): %s", client.channel_number, consumer_tag)
+        self._sync_call(client, client.basic_cancel, 'callback', consumer_tag)
+
     def setup_listener(self, binding, default_cb):
         """
         Calls setup listener via the default callback passed in.
@@ -185,6 +231,17 @@ class AMQPTransport(BaseTransport):
         """
         log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", client.channel_number, prefetch_size, prefetch_count, global_)
         self._sync_call(client, client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
+
+    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        """
+        Publishes a message on an exchange.
+        """
+        client.basic_publish(exchange=exchange, #todo
+                             routing_key=routing_key, #todo
+                             body=body,
+                             properties=properties,
+                             immediate=immediate, #todo
+                             mandatory=mandatory) #todo
 
 class NameTrio(object):
     """

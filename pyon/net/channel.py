@@ -309,34 +309,6 @@ class BaseChannel(object):
             except Exception, e:
                 log.warn("Closed error callback caught an exception: %s", str(e))
 
-    def _sync_call(self, func, cb_arg, *args, **kwargs):
-        """
-        Functionally similar to the generic blocking_cb but with error support that's Channel specific.
-        """
-        ar = AsyncResult()
-
-        def cb(*args, **kwargs):
-            ret = list(args)
-            if len(kwargs): ret.append(kwargs)
-            ar.set(ret)
-
-        def eb(ch, code, text):
-            ar.set(ChannelError("_sync_call could not complete due to an error (%d): %s" % (code, text)))
-
-        kwargs[cb_arg] = cb
-        with self.push_closed_error_callback(eb):
-            func(*args, **kwargs)
-            ret_vals = ar.get(timeout=10)
-
-        if isinstance(ret_vals, ChannelError):
-            raise ret_vals
-
-        if len(ret_vals) == 0:
-            return None
-        elif len(ret_vals) == 1:
-            return ret_vals[0]
-        return tuple(ret_vals)
-
 class SendChannel(BaseChannel):
     """
     A channel that can only send.
@@ -370,12 +342,13 @@ class SendChannel(BaseChannel):
         props = BasicProperties(headers=headers)
 
         with self._ensure_amq_chan():
-            self._amq_chan.basic_publish(exchange=exchange, #todo
-                                    routing_key=routing_key, #todo
-                                    body=data,
-                                    properties=props,
-                                    immediate=False, #todo
-                                    mandatory=False) #todo
+            self._transport.publish_impl(self._amq_chan,
+                                         exchange=exchange, #todo
+                                         routing_key=routing_key, #todo
+                                         body=data,
+                                         properties=props,
+                                         immediate=False, #todo
+                                         mandatory=False) #todo
 
 class RecvChannel(BaseChannel):
     """
@@ -555,10 +528,11 @@ class RecvChannel(BaseChannel):
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
         with self._ensure_amq_chan():
-            self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
-                                                              queue=self._recv_name.queue,
-                                                              no_ack=self._consumer_no_ack,
-                                                              exclusive=self._consumer_exclusive)
+            self._consumer_tag = self._transport.start_consume_impl(self._amq_chan,
+                                                                    self._on_deliver,
+                                                                    queue=self._recv_name.queue,
+                                                                    no_ack=self._consumer_no_ack,
+                                                                    exclusive=self._consumer_exclusive)
 
     def stop_consume(self):
         """
@@ -582,7 +556,7 @@ class RecvChannel(BaseChannel):
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
         with self._ensure_amq_chan():
-            self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
+            self._transport.stop_consume_impl(self._amq_chan, self._consumer_tag)
 
     def reset(self):
         """
@@ -702,7 +676,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel.ack: %s", delivery_tag)
         with self._ensure_amq_chan():
-            self._amq_chan.basic_ack(delivery_tag)
+            self._transport.ack_impl(self._amq_chan, delivery_tag)
 
     def reject(self, delivery_tag, requeue=False):
         """
@@ -711,7 +685,7 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel.reject: %s", delivery_tag)
         with self._ensure_amq_chan():
-            self._amq_chan.basic_reject(delivery_tag, requeue=requeue)
+            self._transport.reject_impl(self._amq_chan, delivery_tag, requeue=requeue)
 
     def get_stats(self):
         """
