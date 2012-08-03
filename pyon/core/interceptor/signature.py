@@ -29,8 +29,11 @@ class SignatureInterceptor(Interceptor):
     def outgoing(self, invocation):
         msg = str(self._dict_sorter.serialize(invocation.message))
         if self.auth.authentication_enabled():
+            signer = 'no-signer'
+            if Container.instance is not None:
+                signer = Container.instance.id
             invocation.headers['signature'] = self.auth.sign_message(msg)
-            invocation.headers['signer'] = Container.instance.id
+            invocation.headers['signer'] = signer
             invocation.headers['certificate'] = self.auth.get_container_cert()
 
         return invocation
