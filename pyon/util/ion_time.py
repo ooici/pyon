@@ -19,6 +19,9 @@ class IonDate(datetime.date):
             if isinstance(args[0],basestring):
                 dt = datetime.datetime.strptime(args[0], '%Y-%m-%d')
                 return datetime.date.__new__(cls, dt.year, dt.month, dt.day)
+            elif isinstance(args[0], datetime.date):
+                dt = args[0]
+                return datetime.date.__new__(cls,dt.year, dt.month, dt.day)
         raise TypeError('Required arguments are (int,int,int) or (str) in the "YYYY-MM-DD" pattern')
 
 class IonTime(object):
@@ -43,6 +46,29 @@ class IonTime(object):
             self._dt = date
         elif isinstance(date,datetime.date):
             self._dt = datetime.datetime.combine(date,datetime.time())
+
+    @property
+    def year(self):
+        return self._dt.year
+    @property
+    def month(self):
+        return self._dt.month
+    @property
+    def day(self):
+        return self._dt.day
+    @property
+    def hour(self):
+        return self._dt.hour
+    @property
+    def minute(self):
+        return self._dt.minute
+    @property
+    def second(self):
+        return self._dt.second
+    @property
+    def date(self):
+        return IonDate(self.year, self.month, self.day)
+
 
     @property
     def era(self):
