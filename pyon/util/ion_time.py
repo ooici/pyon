@@ -12,7 +12,14 @@ import struct
 import numbers
 
 class IonDate(datetime.date):
-    pass
+    def __new__(cls,*args):
+        if len(args) == 3:
+            return datetime.date.__new__(cls,*args)
+        elif len(args) == 1:
+            if isinstance(args[0],basestring):
+                dt = datetime.datetime.strptime(args[0], '%Y-%m-%d')
+                return datetime.date.__new__(cls, dt.year, dt.month, dt.day)
+        raise TypeError('Required arguments are (int,int,int) or (str) in the "YYYY-MM-DD" pattern')
 
 class IonTime(object):
     '''
