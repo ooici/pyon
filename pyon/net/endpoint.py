@@ -569,6 +569,11 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         mos = []
         newch = self._chan.accept(n=num, timeout=timeout)
+        qsize = newch._recv_queue.qsize()
+        if qsize==0:
+            self._chan.exit_accept()
+            return []
+
         for x in xrange(newch._recv_queue.qsize()):
             mo = self.MessageObject(newch.recv(), newch, self.create_endpoint(existing_channel=newch))
             mo.make_body()      # puts through EP interceptors
