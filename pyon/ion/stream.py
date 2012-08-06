@@ -221,5 +221,7 @@ class SimpleStreamSubscriber(Subscriber):
     @classmethod
     def new_subscriber(cls, container, exchange_name, callback):
         xn = container.ex_manager.create_xn_queue(exchange_name)
-        return cls(name=xn, callback=callback)
+        instance = cls(name=xn,callback=callback)
+        setattr(instance,'xn',xn)
+        return instance
 
