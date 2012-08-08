@@ -282,3 +282,67 @@ class NameTrio(object):
 
     def __str__(self):
         return "NP (%s,%s,B: %s)" % (self.exchange, self.queue, self.binding)
+
+
+class LocalBroker(object):
+
+    def __init__(self):
+        self._exchanges = {}
+        self._queues = {}
+        self._binds = []        # list of tuples: exchange, queue, routing_key, who to call
+
+
+        self._lock = coros.RLock()
+
+    def incoming(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+
+        def binding_key_matches(bkey, rkey):
+            return bkey == rkey # @TODO expand obv
+
+        # find all matching calls
+        matching_binds = [x for x in self._binds if x[0] == exchange and binding_key_matches(x[2], routing_key)]
+
+        # make calls
+        for bind in matching_binds:
+            try:
+                method_frame = DotDict()
+                header_frame = DotDict()
+                bind[3](self, method_frame, header_frame, body)
+            except Exception as ex:
+                log.exception("Error in local message routing, continuing")
+
+        return True
+
+    def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
+        if exchange in self._exchanges:
+            exrec = self._exchanges[exchange]
+
+            assert exrec['type'] == exchange_type and exrec['durable'] == durable and exrec['auto_delete'] == auto_delete
+
+        else:
+            assert exchange_type == 'topic', "Topic only supported"
+
+            self._exchanges[exchange] = { 'exchange': exchange,
+                                          'type' : exchange_type,
+                                          'durable' : durable,
+                                          'auto_delete' : auto_delete }
+
+        return True
+
+
+
+
+
+class LocalTransport(BaseTransport):
+
+    def __init__(self, broker):
+        self._broker = broker
+
+    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        return self._broker.incoming(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+
+    def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
+        return self._broker.declare_exchange(exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
+
+
+
