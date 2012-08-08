@@ -90,3 +90,33 @@ class TransformAlgorithm(object):
     @staticmethod
     def execute(*args, **kwargs):
         raise NotImplementedError('Method execute not implemented')#!/usr/bin/env python
+
+
+from pyon.net.endpoint import RPCServer, RPCClient
+from pyon.core.bootstrap import get_sys_name
+import gevent
+
+class TransformStats(TransformBase):
+    def __init__(self):
+        self._stats = {} # Container for statistics information
+    def on_start(self):
+        super(TransformStats,self).on_start()
+        self._rpc_server = RPCServer(self, from_name=(get_sys_name(), self.id))
+        self._listener = gevent.spawn(self._rpc_server.listen)
+
+    def on_quit(self):
+        self._rpc_server.close()
+        self._listener.join(5)
+        super(TransformStats, self).on_quit()
+
+    def _stat(self):
+        return self._stats
+
+    @classmethod
+    def stats(cls,pid):
+        rpc_cli = RPCClient(to_name=(get_sys_name(), pid))
+        return rpc_cli.request({},op='_stat')
+
+
+    
+    
