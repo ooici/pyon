@@ -12,6 +12,16 @@ import sys
 import socket
 from logging.handlers import SysLogHandler, SYSLOG_UDP_PORT
 
+
+DEBUG     = 'DEBUG'
+INFO      = 'INFO'
+WARNING   = 'WARNING'
+ERROR     = 'ERROR'
+CRITICAL  = 'CRITICAL'
+EXCEPTION = 'EXCEPTION'
+
+
+
 class StackFormatter(logging.Formatter):
     def __init__(self,*a,**b):
         super(StackFormatter,self).__init__(*a,**b)
@@ -208,3 +218,24 @@ BaseConfigurator.importer = staticmethod(_import)
 
 log = get_scoped_log()
 
+def change_logging_level(logger,level):
+    '''
+    Change the logging level for a given logger or for all loggers by using 'all'
+
+    Example:
+      from pyon.util.log import CRITICAL,DEBUG, change_logging_level
+      change_logging_level('all', CRITICAL)
+      change_logging_level('pyon', DEBUG)
+
+    '''
+    assert level in [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+    from pyon.core.log import LOGGING_CFG
+    assert logger=='all' or logger in LOGGING_CFG['loggers']
+    import logging.config
+    if logger=='all':
+        for k,v in LOGGING_CFG['loggers'].iteritems():
+            LOGGING_CFG['loggers'][k]['level'] = level
+    else:
+        LOGGING_CFG['loggers'][logger]['level'] = level
+
+    logging.config.dictConfig(LOGGING_CFG)
