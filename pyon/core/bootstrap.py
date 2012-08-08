@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 import uuid
 import os
 import logging
+import sys
 log = logging.getLogger(__name__)
 
 import pyon
@@ -105,7 +106,7 @@ def set_sys_name(sysname=None):
     global sys_name
     old_sys_name = sys_name
     sys_name = sysname
-    print "pyon: sys_name changed from '%s' to '%s'" % (old_sys_name, sys_name)
+    print >> sys.stderr, "pyon: sys_name changed from '%s' to '%s'" % (old_sys_name, sys_name)
 
 def get_sys_name():
     if sys_name:
