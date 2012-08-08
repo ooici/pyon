@@ -211,7 +211,6 @@ class Test_DataStores(IonIntegrationTestCase):
         #data_set.variables = [
         #        {"name":"water_height", "value":"ft"}
         #]
-        data_set.contact.name = "Heitor Villa-Lobos"
 
         # Write DataSet object"
         write_tuple_1 = data_store.create(data_set)
