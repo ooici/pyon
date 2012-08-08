@@ -218,10 +218,15 @@ BaseConfigurator.importer = staticmethod(_import)
 
 log = get_scoped_log()
 
-def change_logging_level(level):
+def change_logging_level(logger,level):
     assert level in [DEBUG, INFO, WARNING, ERROR, CRITICAL]
     from pyon.core.log import LOGGING_CFG
+    assert logger=='all' or logger in LOGGING_CFG['loggers']
     import logging.config
-    for k,v in LOGGING_CFG['loggers'].iteritems():
-        LOGGING_CFG['loggers'][k]['level'] = level
+    if logger=='all':
+        for k,v in LOGGING_CFG['loggers'].iteritems():
+            LOGGING_CFG['loggers'][k]['level'] = level
+    else:
+        LOGGING_CFG['loggers'][logger]['level'] = level
+
     logging.config.dictConfig(LOGGING_CFG)
