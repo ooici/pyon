@@ -83,7 +83,9 @@ class IonIntegrationTestCase(unittest.TestCase):
         if self.container:
             self.container.stop()
             self.container = None
-        self._force_clean()         # deletes only
+        # Let's not do force clean at the end for CEI so we can debug
+        if not os.environ.get('CEI_LAUNCH_TEST', None):
+            self._force_clean()         # deletes only
         bootstrap.testing_fast = False
 
     def _turn_on_queue_auto_delete(self):
