@@ -346,3 +346,113 @@ class LocalTransport(BaseTransport):
 
 
 
+
+
+
+
+class TopicTrie(object):
+    """
+    Support class for building a zeromq device to do amqp-like pattern matching.
+
+    Used for events/pubsub in our system with the zeromq transport. Efficiently stores all registered
+    subscription topic trees in a trie structure, handling wildcards * and #.
+
+    See:
+        http://www.zeromq.org/whitepapers:message-matching      (doesn't handle # so scrapped)
+        http://www.rabbitmq.com/blog/2010/09/14/very-fast-and-scalable-topic-routing-part-1/
+        http://www.rabbitmq.com/blog/2011/03/28/very-fast-and-scalable-topic-routing-part-2/
+    """
+
+    class Node(object):
+        """
+        Internal node of a trie.
+
+        Stores two data points: a token (literal string, '*', or '#', or None if used as root element),
+                                and a set of "patterns" aka a ref to an object representing a bind.
+        """
+        def __init__(self, token, patterns=None):
+            self.token = token
+            self.patterns = patterns or []
+            self.children = {}
+
+        def get_or_create_child(self, token):
+            """
+            Returns a child node with the given token.
+
+            If it doesn't already exist, it is created, otherwise the existing one is returned.
+            """
+            if token in self.children:
+                return self.children[token]
+
+            new_node = TopicTrie.Node(token)
+            self.children[token] = new_node
+
+            return new_node
+
+        def get_all_matches(self, topics):
+            """
+            Given a list of topic tokens, returns all patterns stored in child nodes/self that match the topic tokens.
+
+            This is a depth-first search pruned by token, with special handling for both wildcard types.
+            """
+            results = []
+
+            if len(topics) == 0:
+                # terminal point, return any pattern we have here
+                return self.patterns
+
+            cur_token = topics[0]
+            rem_tokens = topics[1:]     # will always be a list, even if empty or 1-len
+            log.debug('get_all_matches(%s): cur_token %s, rem_tokens %s', self.token, cur_token, rem_tokens)
+
+            # child node direct matching
+            if cur_token in self.children:
+                results.extend(self.children[cur_token].get_all_matches(rem_tokens))
+
+            # now '*' wildcard
+            if '*' in self.children:
+                results.extend(self.children['*'].get_all_matches(rem_tokens))
+
+            # '#' means any number of tokens - naive method of descent, we'll feed it at least current token to start. Then chop
+            # rem_tokens all the way down, put the results in a set to remove duplicates, and also any patterns on self.
+            if '#' in self.children:
+                # keep popping off and descend, make a set out of results
+                all_wild_childs = set()
+                for i in xrange(len(rem_tokens)):
+                    res = self.children['#'].get_all_matches(rem_tokens[i:])
+                    map(all_wild_childs.add, res)
+
+                results.extend(all_wild_childs)
+                results.extend(self.children['#'].patterns)     # any patterns defined in # are legal too
+
+            return results
+
+    def __init__(self):
+        """
+        Creates a dummy root node that all topic trees hang off of.
+        """
+        self.root = self.Node(None)
+
+    def add_topic_tree(self, topic_tree, pattern):
+        """
+        Splits a string topic_tree into tokens (by .) and recursively adds them to the trie.
+
+        Adds the pattern at the terminal node for later retrieval.
+        """
+        topics = topic_tree.split(".")
+
+        curnode = self.root
+
+        for topic in topics:
+            curnode = curnode.get_or_create_child(topic)
+
+        if not pattern in curnode.patterns:
+            curnode.patterns.append(pattern)
+
+    def get_all_matches(self, topic_tree):
+        """
+        Returns a list of all matches for a given topic tree string.
+        """
+        topics = topic_tree.split(".")
+        return self.root.get_all_matches(topics)
+
