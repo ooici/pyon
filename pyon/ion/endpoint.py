@@ -9,7 +9,7 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
-
+from pyon.core.exception import Unauthorized
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
@@ -159,6 +159,16 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         with self._process.push_context(headers):
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
+
+    def message_received(self, msg, headers):
+
+        #This is the hook for checking governance pre-conditions before calling a service operation
+        gc = self._routing_obj.container.governance_controller
+        if gc:
+            gc.check_process_operation_preconditions(self._routing_obj, msg, headers)
+
+        return RPCResponseEndpointUnit.message_received(self, msg, headers)
+
 
     def _build_header(self, raw_msg):
         """

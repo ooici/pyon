@@ -12,20 +12,12 @@ class InformationModelInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        if invocation.args.has_key('process'):
-            log.debug("InformationModelInterceptor.outgoing: %s", invocation.args['process'])
-        else:
-            log.debug("InformationModelInterceptor.outgoing: %s", invocation)
+        log.debug("InformationModelInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-
-        if invocation.args.has_key('process'):
-            log.debug("InformationModelInterceptor.incoming: %s", invocation.args['process'])
-        else:
-            log.debug("InformationModelInterceptor.incoming: %s", invocation)
-
+        log.debug("InformationModelInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
 
         return invocation

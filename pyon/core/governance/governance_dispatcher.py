@@ -38,7 +38,7 @@ class GovernanceDispatcher(object):
 
     def handle_incoming_message(self, invocation):
 
-        receiver = invocation.get_header_value('receiver', 'Unknown')
+        receiver = invocation.get_message_receiver()
         op = invocation.get_header_value('op', 'Unknown')
         actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
 

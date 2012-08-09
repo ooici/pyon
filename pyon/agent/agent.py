@@ -38,6 +38,9 @@ class ResourceAgent(BaseResourceAgent):
         self.agent_def_id = None
         # The ID of the target resource object, e.g. a device id
         self.resource_id = None
+        # The Resource Type of the target resource object - ex. InstrumentDevice or PlatformDevice
+        #Must be set by Implementing Class
+        self.resource_type = None
 
     def _on_init(self):
         log.debug("Resource Agent initializing. name=%s, resource_id=%s" % (self._proc_name, self.resource_id))

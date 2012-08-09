@@ -25,6 +25,16 @@ def hello_client(container, actor_id='anonymous', org_id='no-ooi', text='mytext 
     except Exception, e:
         print "client.hello() failed: " + e.message
 
+def hello_noop(container, actor_id='anonymous', org_id='no-ooi', text='mytext 123'):
+
+
+    try:
+        client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
+
+        ret = client.noop(text, headers={'ion-actor-id': actor_id, 'ion-org-id': org_id})
+
+    except Exception ,e:
+        print "client.hello() failed: " + e.message
 
 
 if __name__ == '__main__':

@@ -25,6 +25,7 @@ from ndg.xacml.core.context.pdp import PDP
 from ndg.xacml.core.context.result import Decision
 from ndg.xacml.core.functions import functionMap, FunctionMap
 
+from pyon.core.exception import NotFound
 from pyon.util.log import log
 
 COMMON_SERVICE_POLICY_RULES='common_service_policy_rules'
@@ -163,7 +164,7 @@ class PolicyDecisionPointManager(object):
         attribute.attributeValues[-1].value = id
         return attribute
 
-    def create_request_from_message(self, invocation):
+    def create_resource_request_from_message(self, invocation):
 
 
         sender_type = invocation.get_header_value('sender-type', 'Unknown')
@@ -213,18 +214,125 @@ class PolicyDecisionPointManager(object):
         return request
 
 
+
+
+    def check_agent_request_policies(self, invocation):
+
+        process = invocation.get_arg_value('process')
+
+        if not process:
+            raise NotFound('Cannot find process in message')
+
+
+        receiver = invocation.get_message_receiver()
+
+        if not process.resource_id:
+            raise NotFound('Cannot find resource id for agent process: %s' % receiver)
+
+
+        #First check agent service policies
+        service_pdp = self.get_service_pdp(receiver)
+        if service_pdp is None:
+            log.debug("PDP could not be created for service: %s" % process.name )
+
+        requestCtx = self.create_service_request_from_message(invocation)
+
+        try:
+            response = service_pdp.evaluate(requestCtx)
+        except Exception, e:
+            log.error("Error evaluating policies: %s" % e.message)
+            return Decision.NOT_APPLICABLE_STR
+
+        for result in response.results:
+            if result.decision == Decision.DENY_STR:
+                break
+
+        #Return if agent service policies deny
+        if result.decision == Decision.DENY_STR:
+            return result.decision
+
+        resource_pdp = self.get_service_pdp(process.resource_id)
+
+        if resource_pdp is None:
+            log.debug("PDP could not be created for resource: %s" % receiver )
+
+        requestCtx = self.create_resource_request_from_message(invocation)
+
+        try:
+            response = resource_pdp.evaluate(requestCtx)
+        except Exception, e:
+            log.error("Error evaluating policies: %s" % e.message)
+            return Decision.NOT_APPLICABLE_STR
+
+        if response is None:
+            log.debug('response from PDP contains nothing, so not authorized')
+            return Decision.DENY_STR
+
+        for result in response.results:
+            if result.decision == Decision.DENY_STR:
+                break
+
+        return result.decision
+
+    def create_service_request_from_message(self, invocation):
+
+        receiver = invocation.get_message_receiver()
+        sender_type = invocation.get_header_value('sender-type', 'Unknown')
+        if sender_type == 'service':
+            sender_header = invocation.get_header_value('sender-service', 'Unknown')
+            sender = invocation.get_service_name(sender_header)
+        else:
+            sender = invocation.get_header_value('sender', 'Unknown')
+
+        op = invocation.get_header_value('op', 'Unknown')
+        ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
+        actor_roles = invocation.get_header_value('ion-actor-roles', {})
+
+
+
+        log.debug("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
+
+
+        request = Request()
+        subject = Subject()
+        subject.attributes.append(self.create_string_attribute(SENDER_ID,sender))
+        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
+
+        #Iterate over the roles associated with the user and create attributes for each
+        for org in actor_roles:
+            attribute = None
+            for role in actor_roles[org]:
+                if attribute is None:
+                    attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)  #TODO - Figure out how to handle multiple Org Roles
+                else:
+                    attribute.attributeValues.append(StringAttributeValue())
+                    attribute.attributeValues[-1].value = org + "_" + role
+
+            subject.attributes.append(attribute)
+
+        request.subjects.append(subject)
+
+        resource = Resource()
+        resource.attributes.append(self.create_string_attribute(Identifiers.Resource.RESOURCE_ID, receiver))
+        request.resources.append(resource)
+
+        request.action = Action()
+        request.action.attributes.append(self.create_string_attribute(Identifiers.Action.ACTION_ID, op))
+        return request
+
+
+
     def check_service_request_policies(self, invocation):
 
 
-        receiver_header = invocation.get_header_value('receiver', 'Unknown')
-        receiver = invocation.get_service_name(receiver_header)
+        receiver = invocation.get_message_receiver()
 
         resource_pdp = self.get_service_pdp(receiver)
 
         if resource_pdp is None:
-            log.debug("pdp could not be created for resource: %s" % receiver )
+            log.debug("PDP could not be created for resource: %s" % receiver )
 
-        requestCtx = self.create_request_from_message(invocation)
+        requestCtx = self.create_service_request_from_message(invocation)
 
         try:
             response = resource_pdp.evaluate(requestCtx)

@@ -12,20 +12,12 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        if invocation.args.has_key('process'):
-            log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation.args['process'])
-        else:
-            log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation)
+        log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-
-        if invocation.args.has_key('process'):
-            log.debug("ConversationMonitorInterceptor.incoming: %s", invocation.args['process'])
-        else:
-            log.debug("ConversationMonitorInterceptor.incoming: %s", invocation)
-
+        log.debug("ConversationMonitorInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
 
         return invocation

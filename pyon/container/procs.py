@@ -185,24 +185,37 @@ class ProcManager(object):
 
         return ret
 
-    def list_local_process_names(self, process_type=''):
+
+    def get_a_local_process(self, proc_name=''):
         '''
-        Returns a list of the running ION processes in the container or filtered by the process_type
+        Returns a running ION processes in the container for the specified name
         '''
-        ret = list()
         for p in self.procs.values():
-            if process_type and p.process_type != process_type:
-                continue
 
-            ret.append(p.name)
+            if p.name == proc_name:
+                return p
 
-        return ret
+            if p.process_type == 'agent' and p.resource_type == proc_name:
+                return p
+
+        return None
+
+
     def is_local_service_process(self, service_name):
-        local_services = self.list_local_process_names('service')
-        if service_name in local_services:
-            return True
+        local_services = self.list_local_processes('service')
+        for p in local_services:
+            if p.name == service_name:
+                return True
 
         return False
+
+    def is_local_agent_process(self, resource_type):
+        local_agents = self.list_local_processes('agent')
+        for p in local_agents:
+            if p.resource_type == resource_type:
+                return True
+        return False
+
 
     def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s, %s", gproc, gproc.exception)
@@ -241,16 +254,6 @@ class ProcManager(object):
             except TransportError as ex:
                 log.warn("Cleanup method triggered an error, ignoring: %s", ex)
 
-
-    #TODO - check with Michael if this is acceptable or if there is a better way.
-    def _is_policy_management_service_available(self):
-        """
-        Method to verify if the Policy Management Service is running in the system.
-        """
-        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-        if policy_services:
-            return True
-        return False
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
@@ -299,8 +302,8 @@ class ProcManager(object):
         proc.start_listeners()
 
         # look to load any existing policies for this service
-        if self._is_policy_management_service_available() and self.container.governance_controller:
-            self.container.governance_controller.update_service_access_policy(service_instance._proc_listen_name)
+        if self.container.governance_controller:
+            self.container.governance_controller.safe_update_service_access_policy(service_instance._proc_listen_name)
 
         return service_instance
 
@@ -412,13 +415,20 @@ class ProcManager(object):
 
         proc.start_listeners()
 
+        # look to load any existing policies for this agent service
+        if self.container.governance_controller:
+            if service_instance.resource_type is None:
+                self.container.governance_controller.safe_update_service_access_policy(service_instance.name)
+            else:
+                self.container.governance_controller.safe_update_service_access_policy(service_instance.resource_type)
+
+
         if service_instance.resource_id:
             # look to load any existing policies for this resource
-            if self._is_policy_management_service_available() and self.container.governance_controller:
-                self.container.governance_controller.update_resource_access_policy(service_instance.resource_id)
+            if self.container.governance_controller:
+                self.container.governance_controller.safe_update_resource_access_policy(service_instance.resource_id)
         else:
             log.warn("Agent process id=%s does not define resource_id!!" % service_instance.id)
-
 
         return service_instance
 

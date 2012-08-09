@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+    #!/usr/bin/env python
 
 
 __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
-import copy
+
+import types
 from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
@@ -14,7 +15,9 @@ from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from interface.services.coi.iorg_management_service import OrgManagementServiceProcessClient
-from pyon.core.exception import NotFound
+from pyon.core.exception import NotFound, Unauthorized
+
+DEFAULT_ACTOR_ID = 'anonymous'
 
 class GovernanceController(object):
 
@@ -27,6 +30,9 @@ class GovernanceController(object):
         self.interceptor_order = []
         self.policy_decision_point_manager = None
         self.governance_dispatcher = None
+
+        # Holds a list per service operation of policy methods to check before the op in a process is allowed to be called
+        self._service_op_preconditions = dict()
 
 
     def start(self):
@@ -112,6 +118,51 @@ class GovernanceController(object):
 
         return invocation
 
+    #Helper methods
+
+
+    #Iterate the Org(s) that the user belongs to and create a header that lists only the role names per Org assigned
+    #to the user; i.e. {'ION': ['Member', 'Operator'], 'Org2': ['Member']}
+    def get_role_message_headers(self, org_roles):
+
+        role_header = dict()
+        for org in org_roles:
+            role_header[org] = []
+            for role in org_roles[org]:
+                role_header[org].append(role.name)
+        return role_header
+
+    #Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
+    def get_actor_header(self, actor_id):
+
+        if not actor_id or actor_id is None:
+            actor_header = {'ion-actor-id': DEFAULT_ACTOR_ID, 'ion-actor-roles': {} }
+        else:
+            header_roles = self.get_role_message_headers(self.org_client.find_all_roles_by_user(actor_id))
+            actor_header = {'ion-actor-id': actor_id, 'ion-actor-roles': header_roles }
+
+        return actor_header
+
+    #Returns the ION System Actor defined in the Resource Registry
+    def get_system_actor(self):
+        system_actor, _ = self.rr_client.find_resources(RT.ActorIdentity,name=CFG.system.system_actor, id_only=False)
+        if not system_actor:
+            return None
+
+        return system_actor[0]
+
+    #Returns the actor related message headers for a the ION System Actor
+    def get_system_actor_header(self):
+        system_actor = self.get_system_actor()
+
+        if not system_actor or system_actor is None:
+            log.warn('The ION System Actor Identity was not found; defaulting to anonymous actor')
+            actor_header = self.get_actor_header(None)
+        else:
+            actor_header = self.get_actor_header(system_actor._id)
+
+        return actor_header
+
     #Manage all of the policies in the container
 
     def resource_policy_event_callback(self, *args, **kwargs):
@@ -129,10 +180,14 @@ class GovernanceController(object):
 
         policy_id = service_policy_event.origin
         service_name = service_policy_event.service_name
+        service_op = service_policy_event.op
 
         if service_name:
             if self.container.proc_manager.is_local_service_process(service_name):
-                self.update_service_access_policy(service_name)
+                self.update_service_access_policy(service_name, service_op)
+            elif self.container.proc_manager.is_local_agent_process(service_name):
+                self.update_service_access_policy(service_name, service_op)
+
         else:
             rules = self.policy_client.get_active_service_access_policy_rules('', CFG.container.org_name)
             if self.policy_decision_point_manager is not None:
@@ -144,19 +199,156 @@ class GovernanceController(object):
                         self.update_service_access_policy(service_name)
 
 
+    def safe_update_resource_access_policy(self, resource_id):
+
+        if self._is_policy_management_service_available():
+            self.update_resource_access_policy(resource_id)
+
     def update_resource_access_policy(self, resource_id):
+
         if self.policy_decision_point_manager is not None:
 
             try:
                 policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
                 self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
+
+
+
+
             except NotFound, e:
                 #If the resource does not exist, just ignore it - but log a warning.
                 log.warning("The resource %s is not found, so can't apply access policy" % resource_id)
                 pass
 
-    def update_service_access_policy(self, service_name):
+    def safe_update_service_access_policy(self, service_name, service_op=''):
+
+        if  self._is_policy_management_service_available():
+            self.update_service_access_policy(service_name)
+
+    def update_service_access_policy(self, service_name, service_op=''):
+
         if self.policy_decision_point_manager is not None:
+            #First update any access policy rules
             rules = self.policy_client.get_active_service_access_policy_rules(service_name, CFG.container.org_name)
             self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
+
+            #Next update any precondition policies
+            if service_op:
+                proc = self.container.proc_manager.get_a_local_process(service_name)
+                if proc is not None:
+                    preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, CFG.container.org_name)
+                    self.unregister_all_process_operation_precondition(proc,service_op)
+                    if preconditions:
+                        for pre in preconditions:
+                            self.register_process_operation_precondition(proc,service_op, pre )
+
+    #TODO - check with Michael if this is acceptable or if there is a better way.
+    def _is_policy_management_service_available(self):
+        """
+        Method to verify if the Policy Management Service is running in the system.
+        """
+
+        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+        if policy_services:
+            return True
+        return False
+
+
+    # Methods for managing operation specific policy
+    def get_process_operation_dict(self, process_name):
+        if self._service_op_preconditions.has_key(process_name):
+            return self._service_op_preconditions[process_name]
+
+        self._service_op_preconditions[process_name] = dict()
+        return self._service_op_preconditions[process_name]
+
+
+    def register_process_operation_precondition(self, process, operation, precondition):
+
+        if not hasattr(process, operation):
+            raise NotFound("The operation %s does not exist for the %s service" % (operation, process.name))
+
+        if type(precondition) == types.MethodType and precondition.im_self != process:
+            raise NotFound("The method %s does not exist for the %s service." % (str(precondition), process.name))
+        elif type(precondition) == types.StringType:
+            #Convert string to instancemethod if it exists..if not store as potential precondition to execute
+            method = getattr(process, precondition, None)
+            if method:
+                precondition = method
+
+        process_op_conditions = self.get_process_operation_dict(process.name)
+        if process_op_conditions.has_key(operation):
+            process_op_conditions[operation].append(precondition)
+        else:
+            preconditions = list()
+            preconditions.append(precondition)
+            process_op_conditions[operation] = preconditions
+
+    def unregister_all_process_operation_precondition(self, process, operation):
+        process_op_conditions = self.get_process_operation_dict(process.name)
+        if process_op_conditions.has_key(operation):
+            del process_op_conditions[operation]
+
+    def unregister_process_operation_precondition(self, process, operation, precondition):
+
+        #Just skip this if there operation is not passed in.
+        if operation is None:
+            return
+
+        if not hasattr(process, operation):
+            raise NotFound("The operation %s does not exist for the %s service" % (operation, process.name))
+
+        if type(precondition) == types.StringType:
+            #Convert string to instancemethod
+            method = getattr(process, precondition, None)
+            if method:
+                precondition = method
+
+        process_op_conditions = self.get_process_operation_dict(process.name)
+        if process_op_conditions.has_key(operation):
+            preconditions = process_op_conditions[operation]
+            preconditions[:] = [pre for pre in preconditions if not pre == precondition]
+            if not preconditions:
+                del process_op_conditions[operation]
+
+
+    def check_process_operation_preconditions(self, process, msg, headers):
+        operation      = headers.get('op', None)
+        if operation is None:
+            return
+
+        process_op_conditions = self.get_process_operation_dict(process.name)
+        if process_op_conditions.has_key(operation):
+            preconditions = process_op_conditions[operation]
+            for precond in preconditions:
+                if type(precond) == types.MethodType or type(precond) == types.FunctionType:
+                    #Handle precondition which are built-in functions
+                    try:
+                        ret_val, ret_message = precond(msg, headers)
+                    except Exception, e:
+                        #TODD - Catching all exceptions and logging as errors, don't want to stop processing for this right now
+                        log.error('Error: processing precondition function: %s for operation: %s - %s' % (str(precond), operation, e.message))
+                        ret_val = True
+                        ret_message = ''
+
+                    if not ret_val:
+                        raise Unauthorized(ret_message)
+
+                elif type(precond) == types.StringType:
+
+                    try:
+                        exec precond
+                        pref = locals()["precondition_func"]
+                        ret_val, ret_message = pref(process, msg, headers)
+
+                    except Exception, e:
+                        #TODD - Catching all exceptions and logging as errors, don't want to stop processing for this right now
+                        log.error('Error: processing precondition: %s for operation: %s - %s' % (precond, operation, e.message))
+                        ret_val = True
+                        ret_message = ''
+
+                    if not ret_val:
+                        raise Unauthorized(ret_message)
+
+
 

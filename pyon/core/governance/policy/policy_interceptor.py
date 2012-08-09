@@ -15,20 +15,13 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        if invocation.args.has_key('process'):
-            log.debug("PolicyInterceptor.outgoing: %s", invocation.args['process'])
-        else:
-            log.debug("PolicyInterceptor.outgoing: %s", invocation)
+        log.debug("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-
-        if invocation.args.has_key('process'):
-            log.debug("PolicyInterceptor.incoming: %s", invocation.args['process'])
-        else:
-            log.debug("PolicyInterceptor.incoming: %s", invocation)
+        log.debug("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
 
         #If missing default to request just to be safe
         msg_performative = invocation.get_header_value('performative', 'request')
@@ -41,7 +34,14 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
             if self.governance_controller is not None:
-                ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
+                process_type = invocation.get_invocation_process_type()
+                if process_type == 'agent':
+                    ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
+
+                elif process_type == 'service':
+                    ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
+
+                #TODO - what to do if process type is unknown?
 
             log.debug("Policy Decision: " + str(ret))
 

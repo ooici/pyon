@@ -8,6 +8,7 @@ from pyon.ion.endpoint import ProcessEndpointUnitMixin, ProcessRPCRequestEndpoin
 from mock import Mock, sentinel, patch, ANY, call, MagicMock
 from pyon.net.channel import SendChannel
 from pyon.util.unit_test import PyonTestCase
+from pyon.core.exception import Unauthorized
 from nose.plugins.attrib import attr
 
 sentinel_interceptors = {'message_incoming': sentinel.msg_incoming,
@@ -162,6 +163,7 @@ class TestProcessRPCClient(PyonTestCase):
 
         mockce.assert_called_once_with(prpc, sentinel.to_name, None, process=sentinel.process)
 
+
 @attr('UNIT')
 class TestProcessRPCResponseEndpointUnit(PyonTestCase):
 
@@ -196,6 +198,36 @@ class TestProcessRPCResponseEndpointUnit(PyonTestCase):
         procmock.push_context.assert_called_once_with(sentinel.headers)
         procmock.push_context().__enter__.assert_called_once_with()
         mockmr.assert_called_once_with(ep, sentinel.msg, sentinel.headers)
+
+    @patch('pyon.net.endpoint.RPCResponseEndpointUnit._message_received')
+    def test_message_received(self, mockmr):
+        procmock = Mock()
+        procmock.push_context = MagicMock()
+
+
+        ep = ProcessRPCResponseEndpointUnit(process=procmock, interceptors={})
+        ep._routing_obj = procmock
+
+        msg_dict = {'iam':'adict'}
+        header_dict =   {'op':'anyop'}
+        ep.message_received(msg_dict, header_dict)
+
+        ep._routing_obj.anyop.assert_called_once_with(iam='adict')
+
+        def deny_anyop(self, operation, id=None):
+            raise Unauthorized('The anyop operation has been denied')
+
+        msg_dict2 = {'iam':'adict2'}
+        ep._routing_obj._service_op_preconditions = {'anyop': 'deny_anyop'}
+        ep._routing_obj.container.governance_controller.check_process_operation_preconditions = deny_anyop
+        with self.assertRaises(Unauthorized) as cm:
+            ep.message_received(msg_dict2, header_dict)
+        self.assertIn('The anyop operation has been denied',cm.exception.message)
+
+        #Using the internal mock counter to see if it was still only called once.
+        ep._routing_obj.anyop.assert_called_once_with(iam='adict')
+
+
 
 @attr('UNIT')
 class TestProcessRPCServer(PyonTestCase):

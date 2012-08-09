@@ -23,9 +23,44 @@ class Invocation(object):
 
         self.message_annotations = {}
 
+    def get_invocation_process_type(self):
+        process = self.get_arg_value('process')
+
+        if not process:
+            return 'simple'
+
+        return getattr(process, 'process_type', 'simple')
+
+
+    def get_message_receiver(self):
+
+        process = self.get_arg_value('process')
+        if not process:
+            return 'Unknown'
+
+        process_type = self.get_invocation_process_type()
+        if process_type == 'service':
+            receiver_header = self.get_header_value('receiver', 'Unknown')
+            receiver = self.get_service_name(receiver_header)
+            return receiver
+
+        elif process_type == 'agent':
+            if process.resource_type is None:
+                return process.name
+            else:
+                return process.resource_type
+
+        else:
+            return process.name
+
+
+    #Returns the value of of the specified arg or the specified default value
+    def get_arg_value(self, arg_name, default_value=None):
+        value = self.args[arg_name] if self.args.has_key(arg_name) and self.args[arg_name] != '' else default_value
+        return value
 
     #Returns the value of of the specified header or the specified default value
-    def get_header_value(self, header_name, default_value):
+    def get_header_value(self, header_name, default_value=None):
         value = self.headers[header_name] if self.headers.has_key(header_name) and self.headers[header_name] != '' else default_value
         return value
 
