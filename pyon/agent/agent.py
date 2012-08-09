@@ -2,6 +2,7 @@
 
 """Base classes for agents"""
 
+
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
@@ -11,6 +12,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core import exception as iex
 from pyon.event.event import EventPublisher
+from pyon.ion.resource import RT
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
@@ -160,7 +162,11 @@ class ResourceAgent(BaseResourceAgent):
         return [name[len(prefix):] for name in dir(obj) if name.startswith(prefix)]
 
 class UserAgent(ResourceAgent):
-    pass
+
+    def __init__(self, *args, **kwargs):
+        ResourceAgent.__init__(self)
+        self.resource_type = RT.ActorIdentity
+
 
 class ResourceAgentClient(ResourceAgentProcessClient):
     """
