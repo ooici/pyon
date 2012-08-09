@@ -162,7 +162,9 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
     def message_received(self, msg, headers):
 
+
         #This is the hook for checking governance pre-conditions before calling a service operation
+        #TODO - replace with a process specific interceptor stack of some sort.
         gc = self._routing_obj.container.governance_controller
         if gc:
             gc.check_process_operation_preconditions(self._routing_obj, msg, headers)
