@@ -40,10 +40,11 @@ class Directory(object):
         self.event_sub = None
 
         # Create directory root entry (for current org) if not existing
-        root_de = self.register("/", "DIR", sys_name=bootstrap.get_sys_name())
-        if root_de is None:
-            # We created this directory just now
-            pass
+        if CFG.system.auto_bootstrap:
+            root_de = self.register("/", "DIR", sys_name=bootstrap.get_sys_name())
+            if root_de is None:
+                # We created this directory just now
+                pass
 
         if self.events_enabled:
             # init change event publisher
