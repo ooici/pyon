@@ -33,6 +33,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
+            ret = ''
             if self.governance_controller is not None:
                 process_type = invocation.get_invocation_process_type()
                 if process_type == 'agent':
