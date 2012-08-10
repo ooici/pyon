@@ -8,7 +8,7 @@ from nose.plugins.attrib import attr
 import uuid
 
 from pyon.datastore.datastore import DatastoreManager
-from pyon.ion.state import StateRepository
+from pyon.ion.state import StateRepository, StatefulProcessMixin
 from pyon.ion.process import StandaloneProcess
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
@@ -60,7 +60,7 @@ class TestStatefulProcess(IonIntegrationTestCase):
         # Send it a message
         # Check that state reflects
 
-class StatefulTestProcess(StandaloneProcess):
+class StatefulTestProcess(StandaloneProcess, StatefulProcessMixin):
     name = "sample_service"
 
     def on_start(self):

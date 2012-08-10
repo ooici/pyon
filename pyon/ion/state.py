@@ -49,3 +49,27 @@ class StateRepository(object):
         log.debug("Retrieving persistent state for key=%s" % key)
         state_obj = self.state_store.read(key)
         return state_obj.state
+
+class StatefulProcessMixin(object):
+    """
+    Mixin class for stateful processes.
+    Need to avoid __init__
+    """
+
+    def _set_state(self, key, value):
+        if not hasattr(self, "_proc_state"):
+            self._proc_state = {}
+            self._proc_state_changed = False
+
+        old_state = self._proc_state.get(key, None)
+        if old_state != value:
+            self._proc_state[key] = value
+            self._proc_state_changed = True
+            log.debug("Process state updated. pid=%s, key=%s, value=%s", self.id, key, value)
+
+    def _get_state(self, key, default=None):
+        if not hasattr(self, "_proc_state"):
+            return None
+
+        state = self._proc_state.get(key, None)
+        return state if state is not None else default

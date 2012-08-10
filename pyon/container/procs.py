@@ -525,22 +525,6 @@ class ProcManager(object):
         service_instance._proc_name = name
         service_instance._proc_start_time = time.time()
 
-        # Process persistent state handling
-        service_instance._proc_state = {}
-        service_instance._proc_state_changed = False
-
-        def _set_state(key, value):
-            old_state = service_instance._proc_state.get(key, None)
-            if old_state != value:
-                service_instance._proc_state[key] = value
-                service_instance._proc_state_changed = True
-                log.debug("Process state updated. pid=%s, key=%s, value=%s", process_id, key, value)
-        def _get_state(key, default=None):
-            state = service_instance._proc_state.get(key, None)
-            return state if state is not None else default
-        service_instance._set_state = _set_state
-        service_instance._get_state = _get_state
-
         # start service dependencies (RPC clients)
         self._start_service_dependencies(service_instance)
         
