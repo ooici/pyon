@@ -35,21 +35,29 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
             ret = ''
             if self.governance_controller is not None:
-                process_type = invocation.get_invocation_process_type()
-                if process_type == 'agent':
-                    ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
 
-                elif process_type == 'service':
-                    ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
+                #First check for Org boundary policies if the container is configured as such
+                org_id = self.governance_controller.get_container_org_boundary_id()
+                if org_id is not None:
+                    ret = self.governance_controller.policy_decision_point_manager.check_resource_request_policies(invocation, org_id)
 
-                #TODO - what to do if process type is unknown?
+                if str(ret) != Decision.DENY_STR:
+                    #Next check endpoint process specific policies
+                    process_type = invocation.get_invocation_process_type()
+                    if process_type == 'agent':
+                        ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
+
+                    elif process_type == 'service':
+                        ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
+
+                    #TODO - what to do if process type is unknown?
 
             log.debug("Policy Decision: " + str(ret))
 
             #Annonate the message has completed policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
 
-            if ret == Decision.DENY_STR:
+            if str(ret) == Decision.DENY_STR:
                 self.policy_denied_message(invocation)
 
         return invocation

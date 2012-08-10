@@ -34,6 +34,9 @@ class GovernanceController(object):
         # Holds a list per service operation of policy methods to check before the op in a process is allowed to be called
         self._service_op_preconditions = dict()
 
+        self._is_container_org_boundary = False
+        self._container_org_name = None
+        self._container_org_id = None
 
     def start(self):
 
@@ -51,6 +54,11 @@ class GovernanceController(object):
 
         self.resource_policy_event_subscriber = None
         self.service_policy_event_subscriber = None
+
+        #containers default to not Org Boundary and ION Root Org
+        self._is_container_org_boundary = CFG.get_safe('container.org_boundary',False)
+        self._container_org_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
+        self._container_org_id = None
 
         if self.enabled:
             self.initialize_from_config(config)
@@ -100,6 +108,21 @@ class GovernanceController(object):
         if self.service_policy_event_subscriber is not None:
             self.service_policy_event_subscriber.stop()
 
+    def is_container_org_boundary(self):
+        return self._is_container_org_boundary
+
+    def get_container_org_boundary_id(self):
+
+        if not self._is_container_org_boundary:
+            return None
+
+        if self._container_org_id == None:
+            org, _ = self.container.resource_registry.find_resources(restype=RT.Org,name=self._container_org_name)
+
+            if org:
+                self._container_org_id = org[0]._id
+
+        return self._container_org_id
 
     def process_incoming_message(self,invocation):
 
@@ -189,7 +212,7 @@ class GovernanceController(object):
                 self.update_service_access_policy(service_name, service_op)
 
         else:
-            rules = self.policy_client.get_active_service_access_policy_rules('', CFG.container.org_name)
+            rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
             if self.policy_decision_point_manager is not None:
                 self.policy_decision_point_manager.load_common_service_policy_rules(rules)
 
@@ -212,9 +235,6 @@ class GovernanceController(object):
                 policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
                 self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
 
-
-
-
             except NotFound, e:
                 #If the resource does not exist, just ignore it - but log a warning.
                 log.warning("The resource %s is not found, so can't apply access policy" % resource_id)
@@ -229,14 +249,14 @@ class GovernanceController(object):
 
         if self.policy_decision_point_manager is not None:
             #First update any access policy rules
-            rules = self.policy_client.get_active_service_access_policy_rules(service_name, CFG.container.org_name)
+            rules = self.policy_client.get_active_service_access_policy_rules(service_name, self._container_org_name)
             self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
 
             #Next update any precondition policies
             if service_op:
                 proc = self.container.proc_manager.get_a_local_process(service_name)
                 if proc is not None:
-                    preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, CFG.container.org_name)
+                    preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
                     self.unregister_all_process_operation_precondition(proc,service_op)
                     if preconditions:
                         for pre in preconditions:
