@@ -72,12 +72,16 @@ class EncodeInterceptor(Interceptor):
         nonelist = [(k, v) for k, v in invocation.headers.iteritems() if v is None]
         assert len(nonelist) == 0, "Invalid headers containing Nones: %s" % str(nonelist)
 
-        log.debug("Post-transform: %s", invocation.message)
+        # Logging binary stuff caused nose capture output to blow up when
+        # there's an exception
+        # log.debug("Post-transform: %s", invocation.message)
         return invocation
 
     def incoming(self, invocation):
         log.debug("EncodeInterceptor.incoming: %s", invocation)
-        log.debug("Pre-transform: %s", invocation.message)
+        # Logging binary stuff caused nose capture output to blow up when
+        # there's an exception
+        # log.debug("Pre-transform: %s", invocation.message)
         invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion, use_list=1)
         log.debug("Post-transform: %s", invocation.message)
         return invocation
