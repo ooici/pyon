@@ -293,7 +293,6 @@ class ResourceAgent(BaseResourceAgent):
     def execute_agent(self, resource_id="", command=None):
         """
         """
-                
         if not command:
             iex = BadRequest('Execute argument "command" not set.')
             self._on_command_error('execute_agent', None, None, None, iex)
