@@ -656,7 +656,7 @@ class ProcManager(object):
         service_instance.quit()
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
-        if service_instance._process:
+        if getattr(service_instance,'_process', None) is not None and service_instance._process:
             service_instance._process.notify_stop()
             service_instance._process.stop()
 
