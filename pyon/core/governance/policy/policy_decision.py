@@ -189,12 +189,12 @@ class PolicyDecisionPointManager(object):
         #Iterate over the roles associated with the user and create attributes for each
         for org in actor_roles:
             attribute = None
-            for role in actor_roles[org]:
+            for role in actor_roles[org]: #TODO - Figure out how to handle multiple Org Roles
                 if attribute is None:
-                    attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)  #TODO - Figure out how to handle multiple Org Roles
+                    attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)
                 else:
                     attribute.attributeValues.append(StringAttributeValue())
-                    attribute.attributeValues[-1].value = org + "_" + role
+                    attribute.attributeValues[-1].value = role
 
             subject.attributes.append(attribute)
 
