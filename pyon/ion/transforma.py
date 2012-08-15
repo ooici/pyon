@@ -109,8 +109,9 @@ class TransformDatasetProcess(TransformBase):
 class TransformDataProcess(TransformStreamListener, TransformStreamPublisher):
 
     def on_start(self):
-        TransformStreamListener.on_start(self)
-        TransformStreamPublisher.on_start(self)
+        super(TransformDataProcess,self).on_start()
+    def on_quit(self):
+        super(TransformDataProcess, self).on_quit()
 
 class TransformAlgorithm(object):
 
