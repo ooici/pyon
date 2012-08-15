@@ -32,7 +32,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
     ORIGIN_TYPE = "Resource"
 
     def __init__(self, *args, **kwargs):
-        super(ResourceAgent, self).__init__(*args, **kwargs)
+        super(SimpleResourceAgent, self).__init__(*args, **kwargs)
 
         # The ID of the AgentInstance subtype resource object
         self.agent_id = None
@@ -164,7 +164,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 class UserAgent(SimpleResourceAgent):
 
     def __init__(self, *args, **kwargs):
-        ResourceAgent.__init__(self)
+        SimpleResourceAgent.__init__(self)
         self.resource_type = RT.ActorIdentity
 
 
@@ -189,34 +189,34 @@ class SimpleResourceAgentClient(SimpleResourceAgentProcessClient):
                 raise iex.NotFound("No agent process found for resource_id %s" % self.resource_id)
 
         assert "name" in kwargs, "Name argument for agent target not set"
-        ResourceAgentProcessClient.__init__(self, *args, **kwargs)
+        SimpleResourceAgentProcessClient.__init__(self, *args, **kwargs)
 
     def negotiate(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).negotiate(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).negotiate(self.resource_id, *args, **kwargs)
 
     def get_capabilities(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).get_capabilities(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).get_capabilities(self.resource_id, *args, **kwargs)
 
     def execute(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).execute(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).execute(self.resource_id, *args, **kwargs)
 
     def get_param(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).get_param(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).get_param(self.resource_id, *args, **kwargs)
 
     def set_param(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).set_param(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).set_param(self.resource_id, *args, **kwargs)
 
     def emit(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).emit(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).emit(self.resource_id, *args, **kwargs)
 
     def execute_agent(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).execute_agent(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).execute_agent(self.resource_id, *args, **kwargs)
 
     def get_agent_param(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).get_agent_param(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).get_agent_param(self.resource_id, *args, **kwargs)
 
     def set_agent_param(self, *args, **kwargs):
-        return super(ResourceAgentClient, self).set_agent_param(self.resource_id, *args, **kwargs)
+        return super(SimpleResourceAgentClient, self).set_agent_param(self.resource_id, *args, **kwargs)
 
     @classmethod
     def _get_agent_process_id(cls, resource_id):

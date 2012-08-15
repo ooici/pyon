@@ -8,6 +8,7 @@ import time
 from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
+from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
@@ -362,9 +363,8 @@ class ProcManager(object):
         Attach to service pid.
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
-        if not isinstance(service_instance, ResourceAgent):
-            raise ContainerConfigError("Agent process must extend ResourceAgent")
-
+        if not isinstance(service_instance, ResourceAgent) and not isinstance(service_instance, SimpleResourceAgent):
+             raise ContainerConfigError("Agent process must extend ResourceAgent")
         listeners = []
 
         # Set the resource ID if we get it through the config
