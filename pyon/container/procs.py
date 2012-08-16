@@ -135,6 +135,8 @@ class ProcManager(object):
         service_cls = named_any("%s.%s" % (module, cls))
         process_type = get_safe(process_cfg, "process.type") or getattr(service_cls, "process_type", "service")
 
+        process_restart = get_safe(config, "process.restart")
+
         service_instance = None
         try:
             # spawn service by type
