@@ -542,14 +542,6 @@ class ResourceAgent(BaseResourceAgent):
     # POWERED_DOWN event handlers.
     ##############################################################    
 
-<<<<<<< HEAD
-class UserAgent(ResourceAgent):
-
-    def __init__(self, *args, **kwargs):
-        ResourceAgent.__init__(self)
-        self.resource_type = RT.ActorIdentity
-
-=======
     def _handler_powered_down_enter(self, *args, **kwargs):
         """
         """
@@ -559,7 +551,6 @@ class UserAgent(ResourceAgent):
         """
         """
         self._common_state_exit(*args, **kwargs)
->>>>>>> refactor_agent
 
     ##############################################################
     # INACTIVE event handlers.
