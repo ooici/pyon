@@ -235,10 +235,10 @@ class GovernanceController(object):
                 policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
                 self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
 
-            except NotFound, e:
+            except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
-                log.warning("The resource %s is not found, so can't apply access policy" % resource_id)
-                pass
+                log.error("The resource %s is not found or there was an error applying access policy: %s" % ( resource_id, e.message))
+
 
     def safe_update_service_access_policy(self, service_name, service_op=''):
 
@@ -248,21 +248,32 @@ class GovernanceController(object):
     def update_service_access_policy(self, service_name, service_op=''):
 
         if self.policy_decision_point_manager is not None:
-            #First update any access policy rules
-            rules = self.policy_client.get_active_service_access_policy_rules(service_name, self._container_org_name)
-            self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
+
+            try:
+                #First update any access policy rules
+                rules = self.policy_client.get_active_service_access_policy_rules(service_name, self._container_org_name)
+                self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
+
+            except Exception, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.error("The service %s is not found or there was an error applying access policy: %s" % ( service_name, e.message))
 
             #Next update any precondition policies
             if service_op:
-                proc = self.container.proc_manager.get_a_local_process(service_name)
-                if proc is not None:
-                    preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
-                    self.unregister_all_process_operation_precondition(proc,service_op)
-                    if preconditions:
-                        for pre in preconditions:
-                            self.register_process_operation_precondition(proc,service_op, pre )
+                try:
+                    proc = self.container.proc_manager.get_a_local_process(service_name)
+                    if proc is not None:
+                        preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+                        self.unregister_all_process_operation_precondition(proc,service_op)
+                        if preconditions:
+                            for pre in preconditions:
+                                self.register_process_operation_precondition(proc,service_op, pre )
 
-    #TODO - check with Michael if this is acceptable or if there is a better way.
+                except Exception, e:
+                    #If the resource does not exist, just ignore it - but log a warning.
+                    log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
+
+    #TODO - Might need to change this once the HA Agent is available
     def _is_policy_management_service_available(self):
         """
         Method to verify if the Policy Management Service is running in the system.
