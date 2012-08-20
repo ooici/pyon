@@ -28,6 +28,9 @@ COUCHDB_CONFIGS = {
     "BASIC":{
         'views': []
     },
+    "FILESYSTEM": {
+        'views': ['catalog']
+    },
 }
 
 COUCHDB_VIEWS = {
@@ -301,7 +304,19 @@ function(doc) {
         'by_dataset' : {
             'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, i], doc._id); }'
         }
-    }
+    },
+
+    'catalog': {
+        'files_by_name': {
+           "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"
+       },
+        "file_by_created_date": {
+           "map": "function(doc) {\n  emit(doc.created_date, doc._id);\n}"
+       },
+       "file_by_modified_date": {
+           "map": "function(doc) {\n  emit(doc.modified_date, doc._id);\n}"
+       }
+   }
 }
 
 def get_couchdb_views(config):
