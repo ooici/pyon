@@ -37,10 +37,13 @@ from interface.objects import CapabilityType
 
 # ION imports.
 # TODO rename these to reflect base resource use.
-from ion.agents.instrument.instrument_fsm import InstrumentFSM 
-from ion.agents.instrument.instrument_fsm import FSMStateError
-from ion.agents.instrument.instrument_fsm import FSMCommandUnknownError
-from ion.agents.instrument.common import BaseEnum
+try:
+    from ion.agents.instrument.instrument_fsm import InstrumentFSM 
+    from ion.agents.instrument.instrument_fsm import FSMStateError
+    from ion.agents.instrument.instrument_fsm import FSMCommandUnknownError
+    from ion.agents.instrument.common import BaseEnum
+except ImportError:
+    pass
 
 
 class UserAgent():
