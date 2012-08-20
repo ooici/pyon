@@ -42,7 +42,7 @@ class ResourceRegistry(object):
         """
         self.rr_store.close()
 
-    def create(self, object=None, actor_id=None):
+    def create(self, object=None, actor_id=None, object_id=None):
         if object is None:
             raise BadRequest("Object not present")
         if not isinstance(object, IonObjectBase):
@@ -55,7 +55,10 @@ class ResourceRegistry(object):
         cur_time = get_ion_ts()
         object.ts_created = cur_time
         object.ts_updated = cur_time
-        new_res_id = create_unique_resource_id()
+        if object_id is None:
+            new_res_id = create_unique_resource_id()
+        else:
+            new_res_id = object_id
         res = self.rr_store.create(object, new_res_id)
         res_id, rev = res
 

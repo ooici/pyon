@@ -2,6 +2,7 @@
 
 __author__ = 'Michael Meisinger'
 
+import uuid
 from unittest import SkipTest
 
 from pyon.core.bootstrap import IonObject
@@ -69,3 +70,12 @@ class TestResourceRegistry(IonIntegrationTestCase):
         aid4,_ = self.rr.create_association(rid1, PRED.hasResource, rid5)
 
         read_obj5 = self.rr.read_object(rid1, PRED.hasResource, RT.PlatformDevice)
+
+    def test_rr_create_with_id(self):
+        res_obj1 = IonObject(RT.Org)
+
+        newid = uuid.uuid4().hex
+        rid1,_ = self.rr.create(res_obj1, object_id=newid)
+
+        self.assertEqual(rid1, newid)
+
