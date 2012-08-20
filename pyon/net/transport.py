@@ -456,3 +456,49 @@ class TopicTrie(object):
         topics = topic_tree.split(".")
         return self.root.get_all_matches(topics)
 
+from gevent_zeromq import zmq
+from pyon.util.async import spawn
+
+class PubSubRoutingDevice(object):
+
+    def __init__(self, zmqcontext):
+        self._xps = {}       # name -> topictrie containing subs
+        self._context = zmqcontext
+        self._poller = zmq.Poller()
+
+        self.gl = spawn(self._run)
+
+    def stop(self):
+        self.gl.kill()  # yikes
+
+    def _run(self):
+        while True:
+            socks = dict(self._poller.poll())
+
+            log.warn(socks)
+
+
+    def _make_xp_addr(self, xp):
+        return "inproc://pubsub.%s" % xp
+
+    def register_publisher(self, xp):
+
+        if not xp in self._xps:
+
+            sub = self._context.socket(zmq.SUB)
+            sub.connect(self._make_xp_addr(xp))
+
+            self._xps[xp] = {'topics': TopicTrie(),
+                             'sub': sub}
+
+            self._poller.register(sub, zmq.POLLIN)
+
+        pubsock = self._context.socket(zmq.PUB)
+        pubsock.bind(self._make_xp_addr(xp))
+
+        return pubsock
+
+    def register_subscriber(self, xp, pattern):
+        pass
+
+
