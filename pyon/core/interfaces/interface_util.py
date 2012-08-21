@@ -5,6 +5,8 @@
 __author__ = 'Seman Said, Michael Meisinger'
 
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
+from yaml import load as yaml_load
+from yaml.constructor import ConstructorError
 
 
 def get_object_definition_from_datastore(sysname):
@@ -36,3 +38,12 @@ def get_service_definition_from_datastore(sysname):
             return ''
     full_definition = "\n".join(fragments)
     return full_definition
+
+def is_yaml_string_valid(yaml_string):
+    try:
+        yaml_load(yaml_string)
+    except ConstructorError:
+        return True
+    except:
+        return False
+    return True
