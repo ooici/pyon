@@ -35,16 +35,10 @@ from interface.services.iresource_agent import BaseResourceAgent
 from interface.services.iresource_agent import ResourceAgentProcessClient
 from interface.objects import CapabilityType
 
-# ION imports.
-# TODO rename these to reflect base resource use.
-try:
-    from ion.agents.instrument.instrument_fsm import InstrumentFSM 
-    from ion.agents.instrument.instrument_fsm import FSMStateError
-    from ion.agents.instrument.instrument_fsm import FSMCommandUnknownError
-    from ion.agents.instrument.common import BaseEnum
-except ImportError:
-    pass
-
+from pyon.agent.instrument_fsm import InstrumentFSM
+from pyon.agent.instrument_fsm import FSMStateError
+from pyon.agent.instrument_fsm import FSMCommandUnknownError
+from pyon.agent.common import BaseEnum
 
 class UserAgent():
     pass

@@ -4,11 +4,7 @@ source =
     examples
 omit =
     */test/*
-
-[report]
-
-omit =
     examples/*
-
+    */mockdb/*
 [html]
 directory = coverage_results
