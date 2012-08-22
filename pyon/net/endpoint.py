@@ -18,11 +18,12 @@ from gevent.timeout import Timeout
 from zope import interface
 import uuid
 import time
-
+import inspect
 import traceback
 import sys
 from Queue import Empty
 from pyon.util.sflow import SFlowManager
+from types import MethodType
 
 class EndpointError(StandardError):
     pass
@@ -1169,19 +1170,26 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         ro_meth     = getattr(self._routing_obj, cmd_op)
 
+        # check arguments (as long as it is a function. might be a mock in testing.)
+        # @TODO doesn't really feel correct.
+        if isinstance(ro_meth, MethodType):
+            ro_meth_args = inspect.getargspec(ro_meth)
+
+            # if the keyword one is not none, we can support anything
+            if ro_meth_args[2] is None:
+                for arg_name in cmd_arg_obj:
+                    if not arg_name in ro_meth_args[0]:
+                        return None, self._create_error_response(BadRequest("Argument %s not present in op signature" % arg_name))
+
         result = None
         response_headers = {}
-        try:
-            ######
-            ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
-            ######
-            result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
-            response_headers    = { 'status_code': 200, 'error_message': '' }
-            ######
 
-        except TypeError as ex:
-            log.exception("TypeError while attempting to call routing object's method")
-            response_headers = self._create_error_response(ServerError(ex.message))
+        ######
+        ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
+        ######
+        result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
+        response_headers    = { 'status_code': 200, 'error_message': '' }
+        ######
 
         return result, response_headers
 

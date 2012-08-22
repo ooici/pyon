@@ -785,8 +785,8 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
         self._do_listen(e)
 
         # test to make sure send got called with our error
-        assert_called_once_with_header(self, ch.send, {'status_code':500,
-                                                       'error_message':'simple() got an unexpected keyword argument \'not_named\'',
+        assert_called_once_with_header(self, ch.send, {'status_code':400,
+                                                       'error_message':'Argument not_named not present in op signature',
                                                        'conv-id': sentinel.conv_id,
                                                        'conv-seq': 2,
                                                        'protocol':'',
