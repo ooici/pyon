@@ -116,7 +116,7 @@ class GovernanceController(object):
         if not self._is_container_org_boundary:
             return None
 
-        if self._container_org_id == None:
+        if self._container_org_id is None:
             org, _ = self.container.resource_registry.find_resources(restype=RT.Org,name=self._container_org_name)
 
             if org:
@@ -212,14 +212,20 @@ class GovernanceController(object):
                 self.update_service_access_policy(service_name, service_op)
 
         else:
-            rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
-            if self.policy_decision_point_manager is not None:
-                self.policy_decision_point_manager.load_common_service_policy_rules(rules)
 
-                #Reload all policies for existing services
-                for service_name in self.policy_decision_point_manager.get_list_service_policies():
-                    if self.container.proc_manager.is_local_service_process(service_name):
-                        self.update_service_access_policy(service_name)
+            if self.policy_decision_point_manager is not None:
+                try:
+                    rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
+                    self.policy_decision_point_manager.load_common_service_policy_rules(rules)
+
+                    #Reload all policies for existing services
+                    for service_name in self.policy_decision_point_manager.get_list_service_policies():
+                        if self.container.proc_manager.is_local_service_process(service_name):
+                            self.update_service_access_policy(service_name)
+
+                except Exception, e:
+                    #If the resource does not exist, just ignore it - but log a warning.
+                    log.error("There was an error applying access policy: %s" % e.message)
 
 
     def safe_update_resource_access_policy(self, resource_id):

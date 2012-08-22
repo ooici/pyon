@@ -86,7 +86,9 @@ class ProcessEndpointUnitMixin(EndpointUnit):
             if actor_id:
                 header['ion-actor-id']  = actor_id
                 if actor_roles:     header['ion-actor-roles']   = actor_roles
-                if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+
+            #This set of tokens is set independently of the actor
+            if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
 
             if expiry:          header['expiry']                = expiry
             if container_id:    header['origin-container-id']   = container_id
