@@ -19,12 +19,9 @@ class HelloService(BaseHelloService):
     def on_start(self, *args, **kwargs):
         log.debug("Hello service start")
 
-    def on_stop(self, *args, **kwargs):
-        log.debug("Hello service stop")
-        self.container.governance_controller.unregister_process_operation_precondition(self, 'noop', self.deny_noop )
-
     def on_quit(self, *args, **kwargs):
         log.debug("Hello service quit")
+        self.container.governance_controller.unregister_process_operation_precondition(self, 'noop', self.deny_noop )
 
     def hello(self, text=''):
         log.debug("In hello_service.hello. Text=%s" % text)
