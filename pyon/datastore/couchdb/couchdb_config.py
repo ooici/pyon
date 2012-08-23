@@ -307,7 +307,7 @@ function(doc) {
     },
 
     'catalog': {
-        'files_by_name': {
+        'file_by_name': {
            "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"
        },
         "file_by_created_date": {
@@ -315,7 +315,10 @@ function(doc) {
        },
        "file_by_modified_date": {
            "map": "function(doc) {\n  emit(doc.modified_date, doc._id);\n}"
-       }
+       },
+       "file_by_owner": {
+           "map": "function(doc) {\n  emit([doc.owner_id, doc.group_id, doc.name], doc._id);\n}"
+       },
    }
 }
 
