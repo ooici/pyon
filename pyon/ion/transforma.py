@@ -15,6 +15,7 @@ from pyon.util.log import log
 
 class TransformBase(SimpleProcess):
     def __init__(self):
+        super(TransformBase,self).__init__()
         self._stats = {} # Container for statistics information
     def on_start(self):
         log.info('TransformBase on_start called')
@@ -36,12 +37,23 @@ class TransformBase(SimpleProcess):
         return rpc_cli.request({},op='_stat')
 
 class TransformStreamProcess(TransformBase):
-    pass
+    def __init__(self):
+        super(TransformStreamProcess,self).__init__()
+    def on_start(self):
+        super(TransformStreamProcess,self).on_start()
+
 
 class TransformEventProcess(TransformBase):
-    pass
+    def __init__(self):
+        super(TransformEventProcess,self).__init__()
+    def on_start(self):
+        super(TransformEventProcess,self).on_start()
+
 
 class TransformStreamListener(TransformStreamProcess):
+
+    def __init__(self):
+        super(TransformStreamListener,self).__init__()
 
     def on_start(self):
         super(TransformStreamListener,self).on_start()
@@ -59,6 +71,9 @@ class TransformStreamListener(TransformStreamProcess):
 
 class TransformStreamPublisher(TransformStreamProcess):
 
+    def __init__(self):
+        super(TransformStreamPublisher,self).__init__()
+
     def on_start(self):
         super(TransformStreamPublisher,self).on_start()
         self.exchange_point = self.CFG.get_safe('process.exchange_point', '')
@@ -73,6 +88,9 @@ class TransformStreamPublisher(TransformStreamProcess):
         super(TransformStreamPublisher,self).on_quit()
 
 class TransformEventListener(TransformEventProcess):
+
+    def __init__(self):
+        super(TransformEventListener,self).__init__()
 
     def on_start(self):
         super(TransformEventListener,self).on_start()
@@ -90,6 +108,9 @@ class TransformEventListener(TransformEventProcess):
 
 class TransformEventPublisher(TransformEventProcess):
 
+    def __init__(self):
+        super(TransformEventPublisher,self).__init__()
+
     def on_start(self):
         super(TransformEventPublisher,self).on_start()
         event_type = self.CFG.get_safe('process.event_type', '')
@@ -104,9 +125,14 @@ class TransformEventPublisher(TransformEventProcess):
         super(TransformEventPublisher,self).on_quit()
 
 class TransformDatasetProcess(TransformBase):
-    pass
+
+    def __init__(self):
+        super(TransformDatasetProcess,self).__init__()
 
 class TransformDataProcess(TransformStreamListener, TransformStreamPublisher):
+
+    def __init__(self):
+        super(TransformDataProcess,self).__init__()
 
     def on_start(self):
         super(TransformDataProcess,self).on_start()

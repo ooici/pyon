@@ -36,9 +36,9 @@ XACML_SAMPLE_POLICY_FILENAME='sample_policies.xml'
 XACML_EMPTY_POLICY_FILENAME='empty_policy_set.xml'
 
 
-SERVICE_PROVIDER_ATTRIBUTE=XACML_1_0_PREFIX + 'resource:service-provider'
 ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-role-id'
 SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-sender-id'
+RECEIVER_TYPE=XACML_1_0_PREFIX + 'resource:receiver-type'
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
@@ -165,7 +165,7 @@ class PolicyDecisionPointManager(object):
         return attribute
 
 
-    def _create_request_from_message(self, invocation, receiver):
+    def _create_request_from_message(self, invocation, receiver, receiver_type='service'):
 
         sender_type = invocation.get_header_value('sender-type', 'Unknown')
         if sender_type == 'service':
@@ -202,6 +202,7 @@ class PolicyDecisionPointManager(object):
 
         resource = Resource()
         resource.attributes.append(self.create_string_attribute(Identifiers.Resource.RESOURCE_ID, receiver))
+        resource.attributes.append(self.create_string_attribute(RECEIVER_TYPE, receiver_type))
         request.resources.append(resource)
 
         request.action = Action()
@@ -218,7 +219,7 @@ class PolicyDecisionPointManager(object):
 
         receiver = invocation.get_message_receiver()
 
-        decision = self._check_service_request_policies(invocation, receiver)
+        decision = self._check_service_request_policies(invocation, receiver, 'agent')
 
         #Return if agent service policies deny the operation
         if decision == Decision.DENY_STR:
@@ -233,12 +234,12 @@ class PolicyDecisionPointManager(object):
     def check_service_request_policies(self, invocation):
         receiver = invocation.get_message_receiver()
 
-        decision = self._check_service_request_policies(invocation, receiver)
+        decision = self._check_service_request_policies(invocation, receiver, 'service')
         return decision
 
-    def _check_service_request_policies(self, invocation, receiver):
+    def _check_service_request_policies(self, invocation, receiver, receiver_type):
 
-        requestCtx = self._create_request_from_message(invocation, receiver)
+        requestCtx = self._create_request_from_message(invocation, receiver, receiver_type)
 
         pdp = self.get_service_pdp(receiver)
 
@@ -253,7 +254,7 @@ class PolicyDecisionPointManager(object):
         if not resource_id:
             raise NotFound('The resource_id is not set')
 
-        requestCtx = self._create_request_from_message(invocation, resource_id)
+        requestCtx = self._create_request_from_message(invocation, resource_id, 'resource')
 
         pdp = self.get_resource_pdp(resource_id)
 

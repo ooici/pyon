@@ -20,6 +20,7 @@ from pyon.core.interceptor.interceptor import Invocation
 from pyon.net.transport import NameTrio, BaseTransport
 from pyon.util.sflow import SFlowManager
 from pyon.util.int_test import IonIntegrationTestCase
+from gevent import sleep
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
 no_interceptors = {'message_incoming': [],
@@ -70,20 +71,6 @@ class TestEndpointUnit(PyonTestCase):
         self._endpoint_unit.attach_channel(ch)
         self._endpoint_unit.close()
         ch.close.assert_called_once_with()
-
-    def test_spawn_listener(self):
-        def recv():
-            ar = event.AsyncResult()
-            ar.wait()
-
-        ch = Mock(spec=BidirClientChannel)
-        ch.recv.side_effect = recv
-        self._endpoint_unit.attach_channel(ch)
-
-        self._endpoint_unit.spawn_listener()
-
-        self._endpoint_unit.close()
-        self.assertTrue(self._endpoint_unit._recv_greenlet.ready())
 
     def test_build_header(self):
         head = self._endpoint_unit._build_header({'fake': 'content'})
@@ -452,7 +439,7 @@ Sets up a mocked channel, ready for fake bidir communication.
 """
         ch = MagicMock(spec=ch_type())
         # set a return value for recv so we get an immediate response
-        vals = [(value, {'status_code':status_code, 'error_message':error_message, 'op': op}, sentinel.delivery_tag)]
+        vals = [(value, {'status_code':status_code, 'error_message':error_message, 'op': op, 'conv-id':sentinel.conv_id}, sentinel.delivery_tag)]
         def _ret(*args, **kwargs):
             if len(vals):
                 return vals.pop()
@@ -498,9 +485,10 @@ class TestSubscriber(PyonTestCase, RecvMockMixin):
         sub.listen()
 
         # make sure we got our message
-        cbmock.assert_called_once_with('subbed', {'status_code':200, 'error_message':'', 'op': None})
+        cbmock.assert_called_once_with('subbed', {'conv-id': sentinel.conv_id, 'status_code':200, 'error_message':'', 'op': None})
 
 @attr('UNIT')
+@patch('pyon.net.endpoint.BidirectionalEndpointUnit._send', Mock(return_value=(sentinel.body, {'conv-id':sentinel.conv_id})))
 class TestRequestResponse(PyonTestCase, RecvMockMixin):
     def setUp(self):
         self._node = Mock(spec=NodeB)
@@ -516,17 +504,14 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         # cleanup
         e.close()
 
-    @patch('pyon.net.endpoint.BidirectionalEndpointUnit._send', Mock())
     def test_endpoint_send_with_timeout(self):
         e = RequestEndpointUnit()
-        e._recv_greenlet = sentinel.recv_greenlet
         e.channel = Mock()
+        e.channel.recv = lambda: sleep(5)   # simulate blocking when recv is called
 
         self.assertRaises(exception.Timeout, e._send, sentinel.msg, Mock(), timeout=1)
 
     def test_rr_client(self):
-        """
-"""
         rr = RequestResponseClient(node=self._node, to_name="rr")
         rr.node.channel.return_value = self._setup_mock_channel()
         rr.node.interceptors = {}
@@ -567,6 +552,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
         # er in json now, how to really check
         self.assertNotEquals(str(msg), str(fakemsg))
 
+    @patch('pyon.net.endpoint.RPCRequestEndpointUnit._build_conv_id', Mock(return_value=sentinel.conv_id))
     def test_endpoint_send(self):
         e = RPCRequestEndpointUnit(interceptors={})
         ch = self._setup_mock_channel()
@@ -577,6 +563,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 
         e.close()
 
+    @patch('pyon.net.endpoint.RPCRequestEndpointUnit._build_conv_id', Mock(return_value=sentinel.conv_id))
     def test_endpoint_send_errors(self):
         errlist = [exception.BadRequest, exception.Unauthorized, exception.NotFound, exception.Timeout, exception.Conflict, exception.ServerError, exception.ServiceUnavailable]
 
@@ -699,6 +686,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
 class TestRPCClient(PyonTestCase, RecvMockMixin):
 
     @patch('pyon.net.endpoint.IonObject')
+    @patch('pyon.net.endpoint.RPCRequestEndpointUnit._build_conv_id', Mock(return_value=sentinel.conv_id))
     def test_rpc_client(self, iomock):
         node = Mock(spec=NodeB)
 
@@ -722,9 +710,20 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
 
     def simple(self, named=None):
         """
-The endpoint will fire its received message into here.
-"""
+        The endpoint will fire its received message into here.
+        """
         self._ar.set(named)
+
+    def _do_listen(self, e):
+        while True:
+            try:
+                msg, headers, _ = e.channel.recv()
+
+                nm, nh = e.intercept_in(msg, headers)
+                e._message_received(nm, nh)
+
+            except ChannelClosedError:
+                break
 
     def test_endpoint_receive(self):
         self._ar = event.AsyncResult()
@@ -739,7 +738,7 @@ The endpoint will fire its received message into here.
         ch = self._setup_mock_channel(value=cvalue, op="simple")
         e.attach_channel(ch)
 
-        e.spawn_listener()
+        self._do_listen(e)
         args = self._ar.get(timeout=10)
 
         self.assertEquals(args, ["ein", "zwei"])
@@ -756,12 +755,11 @@ The endpoint will fire its received message into here.
         ch = self._setup_mock_channel(value=cvalue, op="no_exist")
         e.attach_channel(ch)
 
-        e.spawn_listener()
-        e._recv_greenlet.join()
+        self._do_listen(e)
 
         assert_called_once_with_header(self, ch.send, {'status_code':400,
                                                        'error_message':'Unknown op name: no_exist',
-                                                       'conv-id': '',
+                                                       'conv-id': sentinel.conv_id,
                                                        'conv-seq': 2,
                                                        'protocol':'',
                                                        'performative': 'failure',
@@ -784,13 +782,12 @@ The endpoint will fire its received message into here.
         ch = self._setup_mock_channel(value=cvalue, op="simple")
         e.attach_channel(ch)
 
-        e.spawn_listener()
-        e._recv_greenlet.join()
+        self._do_listen(e)
 
         # test to make sure send got called with our error
-        assert_called_once_with_header(self, ch.send, {'status_code':500,
-                                                       'error_message':'simple() got an unexpected keyword argument \'not_named\'',
-                                                       'conv-id': '',
+        assert_called_once_with_header(self, ch.send, {'status_code':400,
+                                                       'error_message':'Argument not_named not present in op signature',
+                                                       'conv-id': sentinel.conv_id,
                                                        'conv-seq': 2,
                                                        'protocol':'',
                                                        'performative': 'failure',
@@ -837,12 +834,11 @@ Routing method for next test, raises an IonException.
 
         e.send = Mock()
 
-        e.spawn_listener()
-        e._recv_greenlet.join()
+        self._do_listen(e)
 
         assert_called_once_with_header(self, e.send, {'status_code': 401,
                                                       'error_message': str(sentinel.unauth),
-                                                      'conv-id': '',
+                                                      'conv-id': sentinel.conv_id,
                                                       'conv-seq': 2,
                                                       'protocol':'',
                                                       'performative':'failure'})

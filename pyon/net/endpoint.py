@@ -18,11 +18,12 @@ from gevent.timeout import Timeout
 from zope import interface
 import uuid
 import time
-
+import inspect
 import traceback
 import sys
 from Queue import Empty
 from pyon.util.sflow import SFlowManager
+from types import MethodType
 
 class EndpointError(StandardError):
     pass
@@ -44,7 +45,6 @@ class EndpointUnit(object):
     """
 
     channel = None
-    _recv_greenlet = None
     _endpoint = None
     _interceptors = None
 
@@ -138,6 +138,9 @@ class EndpointUnit(object):
 
         Override this method to get custom behavior of how you want your endpoint unit to operate.
         Kwargs passed into send will be forwarded here. They are not used in this base method.
+
+        @returns    A 2-tuple of the message body sent and the message headers sent. These are
+                    post-interceptor. Derivations will likely override the return value.
         """
         #log.debug("In EndpointUnit._send: %s", headers)
         # interceptor point
@@ -150,6 +153,8 @@ class EndpointUnit(object):
 
         self.channel.send(new_msg, new_headers)
 
+        return new_msg, new_headers
+
     def _intercept_msg_out(self, inv):
         """
         Performs interceptions of outgoing messages.
@@ -161,40 +166,10 @@ class EndpointUnit(object):
         inv_prime = process_interceptors(self.interceptors["message_outgoing"] if "message_outgoing" in self.interceptors else [], inv)
         return inv_prime
 
-    def spawn_listener(self):
-        def client_recv():
-            while True:
-                try:
-                    #log.debug("client_recv waiting for a message")
-                    msg, headers, delivery_tag = self.channel.recv()
-                    log_message("MESSAGE RECV <<< RPC-reply", msg, headers, self.channel._send_name, delivery_tag, is_send=False)
-
-                    try:
-                        nm, nh = self.intercept_in(msg, headers)
-                        self._message_received(nm, nh)
-                    finally:
-                        # always ack a listener response
-                        self.channel.ack(delivery_tag)
-                except ChannelClosedError:
-                    break
-
-        # @TODO: spawn should be configurable to maybe the proc_sup in the container?
-        self._recv_greenlet = spawn(client_recv)
-
     def close(self):
 #        log.debug('close endpoint')
-        if self._recv_greenlet is not None:
-            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-            # @TODO: remove spawn_listener altogether.
-            self.channel._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=2)
-            self._recv_greenlet.kill()      # he's dead, jim
 
         if self.channel is not None:
-            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
-            # we may end up having a duplicate, but I think logically it would never be a problem.
-            # still, need to clean this up.
             self.channel.close()
 
     def _build_header(self, raw_msg):
@@ -752,6 +727,34 @@ class BidirectionalListeningEndpointUnit(EndpointUnit):
 #
 
 class RequestEndpointUnit(BidirectionalEndpointUnit):
+    def _get_response(self, conv_id, timeout):
+        """
+        Gets a response message to the conv_id within the given timeout.
+
+        @raises Timeout
+        @return A 2-tuple of the received message body and received message headers.
+        """
+        with Timeout(seconds=timeout):
+
+            # start consuming
+            self.channel.start_consume()
+
+            # consume in a loop: if we get a message not intended for us, we discard
+            # it and consume again
+            while True:
+                rmsg, rheaders, rdtag = self.channel.recv()
+                # log
+                try:
+                    nm, nh = self.intercept_in(rmsg, rheaders)
+                finally:
+                    self.channel.ack(rdtag)
+
+                # is this the message we are looking for?
+                if 'conv-id' in nh and nh['conv-id'] == conv_id:
+                    return nm, nh   # breaks loop
+                else:
+                    log.warn("Discarding unknown message, likely from a previous timed out request (conv-id: %s, seq: %s, perf: %s)", nh.get('conv-id', "no conv id"), nh.get('conv-seq', 'no conv seq'), nh.get('performative', 'None'))
+
     def _send(self, msg, headers=None, **kwargs):
 
         # could have a specified timeout in kwargs
@@ -762,24 +765,21 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         #log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
-        ts = time.time()
+        #ts = time.time()
 
-        if not self._recv_greenlet:
-            self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
-            self.channel.start_consume()
-            self.spawn_listener()
+        self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
 
-        self.response_queue = event.AsyncResult()
-        self.message_received = lambda m, h: self.response_queue.set((m, h))
-
-        BidirectionalEndpointUnit._send(self, msg, headers=headers)
+        # call base send, and get back the headers it ended up building and sending
+        # we extract the conv-id so we can tell the listener what is valid.
+        _, sent_headers = BidirectionalEndpointUnit._send(self, msg, headers=headers)
 
         try:
-            result_data, result_headers = self.response_queue.get(timeout=timeout)
+            result_data, result_headers = self._get_response(sent_headers['conv-id'], timeout)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
         finally:
-            elapsed = time.time() - ts
+            pass
+#            elapsed = time.time() - ts
 #            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
 #                                                                                     headers.get('conv-seq', 'NOSEQ'),
 #                                                                                     self.channel._send_name,
@@ -1170,19 +1170,26 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         ro_meth     = getattr(self._routing_obj, cmd_op)
 
+        # check arguments (as long as it is a function. might be a mock in testing.)
+        # @TODO doesn't really feel correct.
+        if isinstance(ro_meth, MethodType):
+            ro_meth_args = inspect.getargspec(ro_meth)
+
+            # if the keyword one is not none, we can support anything
+            if ro_meth_args[2] is None:
+                for arg_name in cmd_arg_obj:
+                    if not arg_name in ro_meth_args[0]:
+                        return None, self._create_error_response(BadRequest("Argument %s not present in op signature" % arg_name))
+
         result = None
         response_headers = {}
-        try:
-            ######
-            ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
-            ######
-            result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
-            response_headers    = { 'status_code': 200, 'error_message': '' }
-            ######
 
-        except TypeError as ex:
-            log.exception("TypeError while attempting to call routing object's method")
-            response_headers = self._create_error_response(ServerError(ex.message))
+        ######
+        ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
+        ######
+        result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
+        response_headers    = { 'status_code': 200, 'error_message': '' }
+        ######
 
         return result, response_headers
 
