@@ -36,7 +36,7 @@ class TestBaseChannel(PyonTestCase):
         self.assertRaises(AssertionError, ch._declare_exchange, None)
 
         ch._transport = Mock()
-        ch._amq_chan = Mock()
+        ch.attach_underlying_channel(Mock())
 
         ch._declare_exchange('hello')
         self.assertTrue(ch._transport.declare_exchange_impl.called)
@@ -58,7 +58,7 @@ class TestBaseChannel(PyonTestCase):
         # without close callback
         ac = Mock() #pchannel.Channel)  # cannot use this because callbacks is populated dynamically
         ch = BaseChannel()
-        ch._amq_chan = ac
+        ch.attach_underlying_channel(ac)
         ch._fsm.current_state = ch.S_ACTIVE
         
         ch.close()
@@ -86,7 +86,7 @@ class TestBaseChannel(PyonTestCase):
 
     def test_on_channel_close(self):
         ch = BaseChannel()
-        ch._amq_chan = Mock()
+        ch.attach_underlying_channel(Mock())
         ch._amq_chan.channel_number = 1
 
         ch.on_channel_close(0, 'hi')
@@ -94,7 +94,7 @@ class TestBaseChannel(PyonTestCase):
 
     def test_on_channel_closed_with_error_callback(self):
         ch = BaseChannel()
-        ch._amq_chan = Mock()
+        ch.attach_underlying_channel(Mock())
         ch._amq_chan.channel_number = 1
 
         closemock = Mock()
@@ -107,7 +107,7 @@ class TestBaseChannel(PyonTestCase):
     @patch('pyon.net.channel.log')
     def test_on_channel_close_with_error_in_error_callback(self, logmock):
         ch = BaseChannel()
-        ch._amq_chan = Mock()
+        ch.attach_underlying_channel(Mock())
         ch._amq_chan.channel_number = 1
 
         closemock = Mock()
@@ -123,12 +123,14 @@ class TestBaseChannel(PyonTestCase):
 
         self.assertTrue(ch.get_channel_id() is None)
 
-        ch._amq_chan = Mock()
+        ch.attach_underlying_channel(Mock())
         self.assertEquals(ch.get_channel_id(), ch._amq_chan.channel_number)
 
     def test__ensure_amq_chan(self):
         ch = BaseChannel()
-        self.assertRaises(ChannelError, ch._ensure_amq_chan)
+        with self.assertRaises(ChannelError):
+            with ch._ensure_amq_chan():
+                pass
 
     def test__sync_call_no_ret_value(self):
 
@@ -208,7 +210,7 @@ class TestSendChannel(PyonTestCase):
 
     def test__send(self):
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
 
         # test sending in params
         self.ch._send(NameTrio('xp', 'namen'), 'daten')
@@ -349,7 +351,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
         self.ch._transport = Mock(BaseTransport)
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
 
         self.ch.destroy_listener()
 
@@ -372,7 +374,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._recv_binding = sentinel.binding
 
         self.ch._transport = Mock(BaseTransport)
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
 
         self.ch._destroy_binding()
 
@@ -387,7 +389,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_start_consume(self):
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
         ac.basic_consume.return_value = sentinel.consumer_tag
@@ -414,7 +416,7 @@ class TestRecvChannel(PyonTestCase):
     @patch('pyon.net.channel.log')
     def test_start_consume_with_consumer_tag_and_auto_delete(self, mocklog):
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
         # set up recv name for queue
@@ -428,7 +430,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_stop_consume(self):
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
 
         # pretend we're consuming
         self.ch._fsm.current_state = self.ch.S_ACTIVE
@@ -462,13 +464,13 @@ class TestRecvChannel(PyonTestCase):
     @patch('pyon.net.channel.log')
     def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue, sentinel.binding)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
-        self.ch._ensure_amq_chan = Mock()
+        self.ch._ensure_amq_chan = MagicMock()
         self.ch._sync_call = Mock()
         self.ch._queue_auto_delete = True
 
@@ -521,7 +523,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_declare_queue(self):
         self.ch._transport = Mock(BaseTransport)
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
 
         # needs a recv name
         self.ch._recv_name = (NameTrio(str(sentinel.xp)))
@@ -551,7 +553,7 @@ class TestRecvChannel(PyonTestCase):
     def test__bind(self):
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
-        self.ch._amq_chan = Mock()
+        self.ch.attach_underlying_channel(Mock())
         self.ch._transport = Mock()
 
         self.ch._bind(sentinel.binding)
@@ -593,7 +595,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_ack(self):
         ac = Mock(spec=pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
 
         self.ch.ack(sentinel.delivery_tag)
 
@@ -601,7 +603,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_reject(self):
         ac = Mock(spec=pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
 
         self.ch.reject(sentinel.delivery_tag, requeue=True)
 
@@ -615,7 +617,7 @@ class TestRecvChannel(PyonTestCase):
         # have to setup a lot here, can't just mock
         # _on_stop_consume because the FSM holds onto it
         ac = Mock(pchannel.Channel)
-        self.ch._amq_chan = ac
+        self.ch.attach_underlying_channel(ac)
 
         # pretend we're consuming
         self.ch._fsm.current_state = self.ch.S_ACTIVE
@@ -637,7 +639,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertTrue(ac.basic_cancel.called)
 
     def test_get_stats(self):
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
         self.ch._transport = Mock()
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
 
@@ -646,7 +648,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._transport.get_stats_impl.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
 
     def test_purge(self):
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
         self.ch._transport = Mock()
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
 
@@ -733,7 +735,7 @@ class TestListenChannel(PyonTestCase):
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
@@ -758,7 +760,7 @@ class TestListenChannel(PyonTestCase):
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
@@ -796,7 +798,7 @@ class TestListenChannel(PyonTestCase):
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch._amq_chan = sentinel.amq_chan
+        self.ch.attach_underlying_channel(sentinel.amq_chan)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
