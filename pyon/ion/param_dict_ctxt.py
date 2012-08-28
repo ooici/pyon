@@ -3,9 +3,6 @@
 """Resource specific definitions"""
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
-from coverage_model.parameter import ParameterDictionary, ParameterContext
-from coverage_model.parameter_types import QuantityType
-from coverage_model.basic_types import AxisTypeEnum
 
 # Resource Types
 ParamDict = DotDict()
