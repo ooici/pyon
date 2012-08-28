@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Resource specific definitions"""
+"""A module to load as DotDicts the parameter dictionary and context definitions from their respective yml files"""
 from pyon.util.config import Config
 from pyon.util.containers import DotDict
 
