@@ -21,7 +21,7 @@ class DataStore(object):
     DS_STATE = "state"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','BASIC']
+    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','FILESYSTEM','BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     # Maps common datastore logical names to index profiles
