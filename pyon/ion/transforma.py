@@ -76,7 +76,7 @@ class TransformStreamPublisher(TransformStreamProcess):
 
     def on_start(self):
         super(TransformStreamPublisher,self).on_start()
-        self.exchange_point = self.CFG.get_safe('process.exchange_point', '')
+        self.exchange_point = self.CFG.get_safe('process.exchange_point', 'science_data')
 
         self.publisher = SimpleStreamPublisher.new_publisher(self.container, self.exchange_point,'')
 

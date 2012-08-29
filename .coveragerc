@@ -6,5 +6,13 @@ omit =
     */test/*
     examples/*
     */mockdb/*
+    */util/*_plugin*
+    */util/clear_couch_util*
+    */insulate*
+    */util/nose_gevent_profiler*
+    */util/unit_test*
+    */util/lru_cache*
+    */interceptor/sample*
+    pyon/__init__*
 [html]
 directory = coverage_results

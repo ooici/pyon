@@ -41,11 +41,13 @@ is closed)
 from pyon.util.log import log
 from pika import BasicProperties
 from gevent import queue as gqueue
+from gevent import coros
 from contextlib import contextmanager
 from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
 from pyon.util.fsm import FSM
 import os
+import traceback
 
 class ChannelError(StandardError):
     """
@@ -113,6 +115,7 @@ class BaseChannel(object):
         """
         self._close_callback = close_callback
 
+    @contextmanager
     def _ensure_amq_chan(self):
         """
         Ensures this Channel has been activated with the Node.
@@ -120,6 +123,27 @@ class BaseChannel(object):
 #        log.debug("BaseChannel._ensure_amq_chan (current: %s)", self._amq_chan is not None)
         if not self._amq_chan:
             raise ChannelError("No amq_chan attached")
+
+        if not self._lock:
+            raise ChannelError("No lock available")
+
+        # is lock already acquired? spit out a notice
+        if self._lock._is_owned():
+            log.warn("""
+                INTERLEAVE DETECTED:
+
+                CURRENT STACK:
+                %s
+
+                STACK OF LOCKER:
+                %s""", "".join(traceback.format_stack()), "".join(self._lock_trace))
+
+        with self._lock:
+            self._lock_trace = traceback.format_stack()
+            try:
+                yield
+            finally:
+                self._lock_trace = None
 
     def _declare_exchange(self, exchange):
         """
@@ -131,24 +155,25 @@ class BaseChannel(object):
         """
         self._exchange = exchange
         assert self._exchange
-
-        self._ensure_amq_chan()
         assert self._transport
 
-#        log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
+        with self._ensure_amq_chan():
+
+#           log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
 #                                                                 self._exchange_durable, self._exchange_auto_delete)
 
-        self._transport.declare_exchange_impl(self._amq_chan,
-                                              self._exchange,
-                                              exchange_type=self._exchange_type,
-                                              durable=self._exchange_durable,
-                                              auto_delete=self._exchange_auto_delete)
+            self._transport.declare_exchange_impl(self._amq_chan,
+                                                  self._exchange,
+                                                  exchange_type=self._exchange_type,
+                                                  durable=self._exchange_durable,
+                                                  auto_delete=self._exchange_auto_delete)
 
     def attach_underlying_channel(self, amq_chan):
         """
         Attaches an AMQP channel and indicates this channel is now open.
         """
         self._amq_chan = amq_chan
+        self._lock = coros.RLock()
         self._fsm.process(self.I_ATTACH)
 
     def get_channel_id(self):
@@ -330,14 +355,13 @@ class SendChannel(BaseChannel):
 
         props = BasicProperties(headers=headers)
 
-        self._ensure_amq_chan()
-
-        self._amq_chan.basic_publish(exchange=exchange, #todo
-                                routing_key=routing_key, #todo
-                                body=data,
-                                properties=props,
-                                immediate=False, #todo
-                                mandatory=False) #todo
+        with self._ensure_amq_chan():
+            self._amq_chan.basic_publish(exchange=exchange, #todo
+                                    routing_key=routing_key, #todo
+                                    body=data,
+                                    properties=props,
+                                    immediate=False, #todo
+                                    mandatory=False) #todo
 
 class RecvChannel(BaseChannel):
     """
@@ -473,14 +497,14 @@ class RecvChannel(BaseChannel):
         Deletes the binding from the listening queue.
         """
         assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1] and self._recv_binding
-
-        self._ensure_amq_chan()
         assert self._transport
 
-        self._transport.unbind_impl(self._amq_chan,
-                                    exchange=self._recv_name.exchange,
-                                    queue=self._recv_name.queue,
-                                    binding=self._recv_binding)
+
+        with self._ensure_amq_chan():
+            self._transport.unbind_impl(self._amq_chan,
+                                        exchange=self._recv_name.exchange,
+                                        queue=self._recv_name.queue,
+                                        binding=self._recv_binding)
 
     def _destroy_queue(self):
         """
@@ -488,13 +512,12 @@ class RecvChannel(BaseChannel):
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
         assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1]
-
-        self._ensure_amq_chan()
         assert self._transport
 
         log.info("Destroying queue: %s", self._recv_name)
-        self._transport.delete_queue_impl(self._amq_chan,
-                                          queue=self._recv_name.queue)
+        with self._ensure_amq_chan():
+            self._transport.delete_queue_impl(self._amq_chan,
+                                              queue=self._recv_name.queue)
 
     def start_consume(self):
         """
@@ -517,12 +540,12 @@ class RecvChannel(BaseChannel):
         if self._consumer_tag and (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
-        self._ensure_amq_chan()
+        with self._ensure_amq_chan():
+            self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
+                                                              queue=self._recv_name.queue,
+                                                              no_ack=self._consumer_no_ack,
+                                                              exclusive=self._consumer_exclusive)
 
-        self._consumer_tag = self._amq_chan.basic_consume(self._on_deliver,
-                                                          queue=self._recv_name.queue,
-                                                          no_ack=self._consumer_no_ack,
-                                                          exclusive=self._consumer_exclusive)
     def stop_consume(self):
         """
         Stops consuming messages.
@@ -544,9 +567,8 @@ class RecvChannel(BaseChannel):
         if self._queue_auto_delete and self._transport is AMQPTransport.get_instance():
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
-        self._ensure_amq_chan()
-
-        self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
+        with self._ensure_amq_chan():
+            self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
 
     def _on_close_while_consume(self, fsm):
         """
@@ -626,13 +648,12 @@ class RecvChannel(BaseChannel):
             queue = ".".join([self._recv_name.exchange, queue])
             #log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
-        self._ensure_amq_chan()
-
         #log.debug("RecvChannel._declare_queue: %s", queue)
-        queue_name = self._transport.declare_queue_impl(self._amq_chan,
-                                                        queue=queue or '',
-                                                        auto_delete=self._queue_auto_delete,
-                                                        durable=self._queue_durable)
+        with self._ensure_amq_chan():
+            queue_name = self._transport.declare_queue_impl(self._amq_chan,
+                                                            queue=queue or '',
+                                                            auto_delete=self._queue_auto_delete,
+                                                            durable=self._queue_durable)
 
         # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
         if queue_name != self._recv_name.queue:
@@ -644,12 +665,11 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._bind: %s", binding)
         assert self._recv_name and self._recv_name.queue
 
-        self._ensure_amq_chan()
-
-        self._transport.bind_impl(self._amq_chan,
-                                  exchange=self._recv_name.exchange,
-                                  queue=self._recv_name.queue,
-                                  binding=binding)
+        with self._ensure_amq_chan():
+            self._transport.bind_impl(self._amq_chan,
+                                      exchange=self._recv_name.exchange,
+                                      queue=self._recv_name.queue,
+                                      binding=binding)
 
         self._recv_binding = binding
 
@@ -674,8 +694,8 @@ class RecvChannel(BaseChannel):
         Should be called by the EP layer.
         """
         #log.debug("RecvChannel.ack: %s", delivery_tag)
-        self._ensure_amq_chan()
-        self._amq_chan.basic_ack(delivery_tag)
+        with self._ensure_amq_chan():
+            self._amq_chan.basic_ack(delivery_tag)
 
     def reject(self, delivery_tag, requeue=False):
         """
@@ -683,8 +703,8 @@ class RecvChannel(BaseChannel):
         Should be called by the EP layer.
         """
         #log.debug("RecvChannel.reject: %s", delivery_tag)
-        self._ensure_amq_chan()
-        self._amq_chan.basic_reject(delivery_tag, requeue=requeue)
+        with self._ensure_amq_chan():
+            self._amq_chan.basic_reject(delivery_tag, requeue=requeue)
 
     def get_stats(self):
         """
@@ -694,9 +714,9 @@ class RecvChannel(BaseChannel):
         """
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
-        self._ensure_amq_chan()
 
-        return self._transport.get_stats_impl(self._amq_chan, queue=self._recv_name.queue)
+        with self._ensure_amq_chan():
+            return self._transport.get_stats_impl(self._amq_chan, queue=self._recv_name.queue)
 
     def _purge(self):
         """
@@ -704,9 +724,8 @@ class RecvChannel(BaseChannel):
         """
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.purge: %s", self._recv_name.queue)
-        self._ensure_amq_chan()
-
-        return self._transport.purge_impl(self._amq_chan, queue=self._recv_name.queue)
+        with self._ensure_amq_chan():
+            return self._transport.purge_impl(self._amq_chan, queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
 
@@ -873,16 +892,17 @@ class ListenChannel(RecvChannel):
             # start consuming
             self.start_consume()
 
-        with self._recv_queue.await_n(n=n) as ar:
-            log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
-            ar.get(timeout=timeout)
-
-        if not was_consuming:
-            # turn consuming back off if we already were off
-            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
-                self.stop_consume()
-            else:
-                log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
+        try:
+            with self._recv_queue.await_n(n=n) as ar:
+                log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
+                ar.get(timeout=timeout)
+        finally:
+            if not was_consuming:
+                # turn consuming back off if we already were off
+                if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
+                    self.stop_consume()
+                else:
+                    log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
 
         ms = [self.recv() for x in xrange(n)]
 

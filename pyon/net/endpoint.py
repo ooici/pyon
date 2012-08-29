@@ -520,18 +520,6 @@ class ListeningBaseEndpoint(BaseEndpoint):
         assert self._chan
         self._chan.stop_consume()       # channel will yell at you if this is invalid
 
-    def get_stats(self):
-        """
-        Returns a tuple of the form (# ready messages, # of consumers).
-
-        This endpoint must have been initialized in order to have a valid queue
-        to work on.
-
-        Passes down to the channel layer to get this info.
-        """
-        assert self._chan
-        return self._chan.get_stats()
-
     def _get_n_msgs(self, num=1, timeout=None):
         """
         Internal method to accept n messages, create MessageObject wrappers, return them.
@@ -610,7 +598,12 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
     def get_stats(self):
         """
-        Passthrough to channel's get_stats.
+        Returns a tuple of the form (# ready messages, # of consumers).
+
+        This endpoint must have been initialized in order to have a valid queue
+        to work on.
+
+        Passes down to the channel layer to get this info.
         """
         if not self._chan:
             raise EndpointError("No channel attached")

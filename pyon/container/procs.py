@@ -79,11 +79,11 @@ class ProcManager(object):
 #        join(gls)
         procs_list = sorted(self.procs.values(), key=lambda proc: proc._proc_start_time, reverse=True)
 
-        try:
-            for proc in procs_list:
+        for proc in procs_list:
+            try:
                 self.terminate_process(proc.id)
-        except Exception as ex:
-            log.warn("Failed to terminate process (%s): %s", proc.id, ex)
+            except Exception as ex:
+                log.warn("Failed to terminate process (%s): %s", proc.id, ex)
 
         # TODO: Have a choice of shutdown behaviors for waiting on children, timeouts, etc
         self.proc_sup.shutdown(CFG.cc.timeout.shutdown)
