@@ -156,6 +156,7 @@ class TestSendChannel(PyonTestCase):
 
     def test__send(self):
         ac = Mock(pchannel.Channel)
+        ac.channel_number = sentinel.channel_number
         self.ch.attach_underlying_channel(ac)
 
         # test sending in params
@@ -419,10 +420,11 @@ class TestRecvChannel(PyonTestCase):
         self.ch._consuming = True
 
         self.ch._ensure_amq_chan = MagicMock()
-        self.ch._transport._sync_call = Mock()
+        self.ch._transport = Mock()
         self.ch._queue_auto_delete = True
 
-        self.ch.stop_consume()
+        with patch('pyon.net.transport.AMQPTransport.get_instance', Mock(return_value=self.ch._transport)):
+            self.ch.stop_consume()
 
         self.assertTrue(mocklog.debug.called)
         self.assertIn(sentinel.queue, mocklog.debug.call_args[0])
@@ -543,6 +545,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_ack(self):
         ac = Mock(spec=pchannel.Channel)
+        ac.channel_number = sentinel.channel_number
         self.ch.attach_underlying_channel(ac)
 
         self.ch.ack(sentinel.delivery_tag)
@@ -551,6 +554,7 @@ class TestRecvChannel(PyonTestCase):
 
     def test_reject(self):
         ac = Mock(spec=pchannel.Channel)
+        ac.channel_number = sentinel.channel_number
         self.ch.attach_underlying_channel(ac)
 
         self.ch.reject(sentinel.delivery_tag, requeue=True)

@@ -741,18 +741,30 @@ class ExchangeManager(object):
         log.info("ExchangeManager.unbind")
         self._ensure_default_declared()
         self._transport.unbind_impl(self._client, exchange, queue, binding)
-    def ack(self, delivery_tag):
+    def ack(self, client, delivery_tag):
+        """
+        ack is a special case: needs to be on the individual channel, not the shared client in the manager.
+        """
         self._ensure_default_declared()
-        self._transport.ack_impl(self._client, delivery_tag)
-    def reject(self, delivery_tag, requeue=False):
+        self._transport.ack_impl(client, delivery_tag)
+    def reject(self, client, delivery_tag, requeue=False):
+        """
+        reject is a special case: needs to be on the individual channel, not the shared client in the manager.
+        """
         self._ensure_default_declared()
-        self._transport.reject_impl(self._client, delivery_tag, requeue=requeue)
-    def start_consume(self, callback, queue, no_ack=False, exclusive=False):
+        self._transport.reject_impl(client, delivery_tag, requeue=requeue)
+    def start_consume(self, client, callback, queue, no_ack=False, exclusive=False):
+        """
+        start_consume is a special case: needs to be on the individual channel, not the shared client in the manager.
+        """
         self._ensure_default_declared()
-        self._transport.start_consume_impl(callback, queue, no_ack=no_ack, exclusive=exclusive)
-    def stop_consume_impl(self, client, consumer_tag):
+        return self._transport.start_consume_impl(client, callback, queue, no_ack=no_ack, exclusive=exclusive)
+    def stop_consume(self, client, consumer_tag):
+        """
+        stop_consume is a special case: needs to be on the individual channel, not the shared client in the manager.
+        """
         self._ensure_default_declared()
-        self._transport.stop_consume_impl(callback, consumer_tag)
+        self._transport.stop_consume_impl(client, consumer_tag)
     def get_stats(self, queue):
         log.info("ExchangeManager.get_stats")
         self._ensure_default_declared()
@@ -795,15 +807,15 @@ class XOTransport(BaseTransport):
         return self._exchange_manager.unbind(exchange, queue, binding)
 
     def ack_impl(self, client, delivery_tag):
-        return self._exchange_manager.ack(delivery_tag)
+        return self._exchange_manager.ack(client, delivery_tag)
 
     def reject_impl(self, client, delivery_tag, requeue=False):
-        return self._exchange_manager.reject(delivery_tag, requeue=requeue)
+        return self._exchange_manager.reject(client, delivery_tag, requeue=requeue)
 
     def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
-        return self._exchange_manager.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
+        return self._exchange_manager.start_consume(client, callback, queue, no_ack=no_ack, exclusive=exclusive)
     def stop_consume_impl(self, client, consumer_tag):
-        return self._exchange_manager.stop_consume(consumer_tag)
+        return self._exchange_manager.stop_consume(client, consumer_tag)
 
     def setup_listener(self, binding, default_cb):
         log.debug("XOTransport passing on setup_listener")

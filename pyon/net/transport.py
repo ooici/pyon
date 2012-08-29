@@ -173,6 +173,7 @@ class AMQPTransport(BaseTransport):
         """
         Acks a message.
         """
+        log.debug("AMQPTransport.ack(%s): %s", client.channel_number, delivery_tag)
         client.basic_ack(delivery_tag)
 
     def reject_impl(self, client, delivery_tag, requeue=False):
@@ -236,6 +237,7 @@ class AMQPTransport(BaseTransport):
         """
         Publishes a message on an exchange.
         """
+        log.debug("AMQPTransport.publish(%s): ex %s key %s", client.channel_number, exchange, routing_key)
         client.basic_publish(exchange=exchange, #todo
                              routing_key=routing_key, #todo
                              body=body,
