@@ -892,16 +892,17 @@ class ListenChannel(RecvChannel):
             # start consuming
             self.start_consume()
 
-        with self._recv_queue.await_n(n=n) as ar:
-            log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
-            ar.get(timeout=timeout)
-
-        if not was_consuming:
-            # turn consuming back off if we already were off
-            if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
-                self.stop_consume()
-            else:
-                log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
+        try:
+            with self._recv_queue.await_n(n=n) as ar:
+                log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
+                ar.get(timeout=timeout)
+        finally:
+            if not was_consuming:
+                # turn consuming back off if we already were off
+                if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
+                    self.stop_consume()
+                else:
+                    log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
 
         ms = [self.recv() for x in xrange(n)]
 
