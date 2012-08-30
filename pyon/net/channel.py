@@ -46,6 +46,7 @@ from contextlib import contextmanager
 from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
 from pyon.util.fsm import FSM
+import sys
 import os
 import traceback
 
@@ -129,14 +130,8 @@ class BaseChannel(object):
 
         # is lock already acquired? spit out a notice
         if self._lock._is_owned():
-            log.warn("""
-                INTERLEAVE DETECTED:
-
-                CURRENT STACK:
-                %s
-
-                STACK OF LOCKER:
-                %s""", "".join(traceback.format_stack()), "".join(self._lock_trace))
+            print >>sys.stderr, "INTERLEAVE DETECTED:\n\nCURRENT STACK:\n%s\n\nSTACK THAT LOCKED: %s\n" \
+                    %  ("".join(traceback.format_stack()), "".join(self._lock_trace))
 
         with self._lock:
             self._lock_trace = traceback.format_stack()
@@ -217,12 +212,13 @@ class BaseChannel(object):
         """
         Closes the AMQP connection.
         """
-        log.debug("BaseChannel.close_impl (%s)", self.get_channel_id())
+        log.info("BaseChannel.close_impl (%s)", self.get_channel_id())
         if self._amq_chan:
 
             # the close destroys self._amq_chan, so keep a ref here
             amq_chan = self._amq_chan
-            amq_chan.close()
+            with self._ensure_amq_chan():
+                amq_chan.close()
 
             # set to None now so nothing else tries to use the channel during the callback
             self._amq_chan = None
