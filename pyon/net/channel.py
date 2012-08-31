@@ -134,6 +134,10 @@ class BaseChannel(object):
                     %  ("".join(traceback.format_stack()), "".join(self._lock_trace))
 
         with self._lock:
+            # we could wait and wait, and it gets closed, and unless we check again, we'd never know!
+            if not self._amq_chan:
+                raise ChannelError("No amq_chan attached")
+
             self._lock_trace = traceback.format_stack()
             try:
                 yield
