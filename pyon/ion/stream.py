@@ -17,6 +17,7 @@ from pyon.ion.exchange import ExchangePoint
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.core import bootstrap
 from pyon.util.log import log
+from interface.objects import StreamRoute
 
 import gevent
 
@@ -187,6 +188,8 @@ class StreamSubscriberRegistrar(object):
 
         return StreamSubscriber(from_name=xn, process=self.process, callback=callback, node=self.container.node)
 
+
+
 class SimpleStreamPublisher(Publisher):
     def __init__(self,exchange_point, stream_id):
         validate_is_instance(exchange_point,ExchangePoint)
@@ -203,6 +206,24 @@ class SimpleStreamPublisher(Publisher):
     def new_publisher(cls,container,exchange_point,stream_id):
         xp = container.ex_manager.create_xp(exchange_point)
         return cls(xp,stream_id)
+
+class SimpleStreamRoutePublisher(Publisher):
+    def __init__(self,exchange_point, routing_key):
+        validate_is_instance(exchange_point,ExchangePoint)
+        self.routing_key = routing_key
+        self.exchange_point = exchange_point
+        super(SimpleStreamRoutePublisher,self).__init__()
+
+    def publish(self, msg, routing_key=''):
+        if not routing_key:
+            routing_key = self.routing_key
+        return super(SimpleStreamRoutePublisher,self).publish(msg,to_name=self.exchange_point.create_route('%s' % routing_key))
+
+    @classmethod
+    def new_publisher(cls,container,stream_route):
+        validate_is_instance(stream_route,StreamRoute)
+        xp = container.ex_manager.create_xp(stream_route.exchange_point)
+        return cls(xp,stream_route.routing_key)
 
 class SimpleStreamSubscriber(Subscriber):
     def __init__(self,*args, **kwargs):
@@ -225,3 +246,25 @@ class SimpleStreamSubscriber(Subscriber):
         setattr(instance,'xn',xn)
         return instance
 
+class SimpleStreamRouteSubscriber(Subscriber):
+    def __init__(self,*args, **kwargs):
+        self.started = False
+        super(SimpleStreamRouteSubscriber,self).__init__(*args,**kwargs)
+    def start(self):
+        self.started = True
+        self.greenlet = gevent.spawn(self.listen)
+    def stop(self):
+        if not self.started:
+            raise BadRequest('Can\'t stop a subscriber that hasn\'t started.')
+
+        self.close()
+        self.greenlet.join(timeout=10)
+        self.started = False
+    @classmethod
+    def new_subscriber(cls, container, exchange_name,stream_route,callback):
+        xp = container.ex_manager.create_xp(stream_route.exchange_point)
+        xn = container.ex_manager.create_xn_queue(exchange_name)
+        xn.bind(stream_route.routing_key, xp)
+        instance = cls(name=xn,callback=callback)
+        instance.xn = xn
+        return instance
