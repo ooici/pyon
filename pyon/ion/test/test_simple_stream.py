@@ -16,9 +16,24 @@ class SimpleStreamIntTest(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
+        self.queue_cleanup = []
+        self.exchange_cleanup = []
+
+    def tearDown(self):
+        for queue in self.queue_cleanup:
+            xn = self.container.ex_manager.create_xn_queue(queue)
+            xn.delete()
+        for exchange in self.exchange_cleanup:
+            xp = self.container.ex_manager.create_xp(exchange)
+            xp.delete()
+
     def test_stream_pub_sub(self):
         exchange_name = 'queue'
         exchange_point = 'test_exchagne'
+
+        self.queue_cleanup.append(exchange_name)
+        self.exchange_cleanup.append(exchange_point)
+
         self.event = Event()
         def verify(m,h):
             self.event.set()
@@ -42,6 +57,9 @@ class SimpleStreamIntTest(IonIntegrationTestCase):
 
         exchange_point = 'test_exchange'
 
+        self.queue_cleanup.append(exchange_name)
+        self.exchange_cleanup.append(exchange_point)
+        
         stream_route = StreamRoute(routing_key='test.routing.key', exchange_point=exchange_point)
 
         self.event = Event()
