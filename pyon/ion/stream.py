@@ -266,5 +266,5 @@ class SimpleStreamRouteSubscriber(Subscriber):
         xn = container.ex_manager.create_xn_queue(exchange_name)
         xn.bind(stream_route.routing_key, xp)
         instance = cls(name=xn,callback=callback)
-        setattr(instance,'xn',xn)
+        instance.xn = xn
         return instance

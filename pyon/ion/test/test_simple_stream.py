@@ -6,7 +6,8 @@
 '''
 
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.stream import SimpleStreamPublisher, SimpleStreamSubscriber
+from pyon.ion.stream import SimpleStreamPublisher, SimpleStreamSubscriber, SimpleStreamRouteSubscriber, SimpleStreamRoutePublisher
+from interface.objects import StreamRoute
 from gevent.event import Event
 
 from nose.plugins.attrib import attr
@@ -32,6 +33,26 @@ class SimpleStreamIntTest(IonIntegrationTestCase):
         pub = SimpleStreamPublisher.new_publisher(self.container, exchange_point,'stream_id')
 
         pub.publish('test')
+        self.assertTrue(self.event.wait(10))
+        sub.stop()
+
+    def test_stream_route_pub_sub(self):
+
+        exchange_name = 'test_queue'
+
+        exchange_point = 'test_exchange'
+
+        stream_route = StreamRoute(routing_key='test.routing.key', exchange_point=exchange_point)
+
+        self.event = Event()
+        def verify(m,h):
+            if m == 'hi':
+                self.event.set()
+        sub = SimpleStreamRouteSubscriber.new_subscriber(self.container, exchange_name, stream_route, verify)
+        sub.start()
+
+        pub = SimpleStreamRoutePublisher.new_publisher(self.container, stream_route)
+        pub.publish('hi')
         self.assertTrue(self.event.wait(10))
         sub.stop()
 
