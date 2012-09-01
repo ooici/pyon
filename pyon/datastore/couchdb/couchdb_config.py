@@ -126,7 +126,7 @@ function(doc) {
         'by_type':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate && doc.name) {
+  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
     emit([doc.type_, doc.lcstate, doc.name], null);
   }
 }""",
@@ -141,7 +141,7 @@ function(doc) {
         'by_lcstate':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate && doc.name) {
+  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
     emit([0, doc.lcstate, doc.type_, doc.name], null);
     if (doc.lcstate != undefined && doc.lcstate != "") {
       if (doc.lcstate.lastIndexOf("DRAFT",0)!=0 && doc.lcstate != "RETIRED") {
@@ -159,7 +159,7 @@ function(doc) {
         'by_name':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate && doc.name) {
+  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
     emit([doc.name, doc.type_, doc.lcstate], null);
   }
 }""",
