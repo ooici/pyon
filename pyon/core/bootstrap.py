@@ -184,9 +184,6 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     from pyon.ion import resource
     resource.load_definitions()
 
-    from pyon.ion import param_dict_ctxt
-    param_dict_ctxt.load_definitions()
-
     # Set initialized flag
     pyon_initialized = True
     log.debug("pyon: initialized OK")
