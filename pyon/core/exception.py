@@ -97,6 +97,12 @@ class Inconsistent(IonException):
     '''
     status_code = 410
 
+class Immutable(IonException):
+    '''
+    Client request attempted to alter an immutable resource
+    '''
+    status_code = 411
+
 class ServerError(IonException):
     '''
     For reporting generic service failure
