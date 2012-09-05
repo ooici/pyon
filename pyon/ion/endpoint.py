@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """ION messaging endpoints"""
+from pyon.net.transport import NameTrio
 from pyon.util import log
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
@@ -10,6 +11,7 @@ from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_inter
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
 from pyon.core.exception import Unauthorized
+from pyon.net import conversation
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
@@ -218,6 +220,28 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
+class ConversationRPCClient(ProcessRPCClient):
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        base_end = ProcessRPCClient.create_endpoint(self, to_name=to_name,
+                                                    existing_channel=existing_channel,
+                                                    **kwargs)
+        send_name = to_name or self._send_name
+        conv_endpoint = conversation.RPCClient(self.node, NameTrio('test'),
+                                               send_name, endpoint_unit = base_end)
+        return conv_endpoint
+
+class ConversationRPCServer(ProcessRPCServer):
+    participant = None
+
+    def get_one_msg(self):
+        e = self.create_endpoint()
+        self.participant.attach_endpoint_unit(e)
+        self.participant.process_msg = lambda m, h: e.message_received(m, h)
+        return self.participant.get_one_msg()
+
+    def prepare_listener(self, binding = None):
+        self.participant = conversation.RPCServer(self.node, self._recv_name)
+        self.participant.listen()
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
@@ -304,7 +328,6 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
         return ar.get()     # @TODO: timeout?
 
-
 class ProcessSubscriber(Subscriber):
 
     endpoint_unit_type = ProcessSubscriberEndpointUnit
@@ -332,7 +355,6 @@ class ProcessSubscriber(Subscriber):
 #
 # ProcessEventSubscriber
 #
-
 class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
     def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
                  sub_type=None, origin_type=None, process=None, routing_call=None, *args, **kwargs):
