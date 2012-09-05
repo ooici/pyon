@@ -200,7 +200,6 @@ class ConversationEndpoint(object):
         if auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
 
-
     def invite(self, to_role, to_role_addr, merge_with_first_send = False):
         """
 
@@ -490,12 +489,12 @@ class Participant(object):
            self._chan.start_consume()
            while True:
                try:
-                   with self._chan.accept() as newchan:
-                       print 'Before receiving invitation msg'
-                       msg, header, delivery_tag = newchan.recv()
-                       print 'After receiving invitation msg: %s, %s' %(msg, header)
-                       newchan.ack(delivery_tag)
-                       self._recv_invitation(msg, header)
+                   newchan =self._chan.accept()
+                   print 'Before receiving invitation msg'
+                   msg, header, delivery_tag = newchan.recv()
+                   print 'After receiving invitation msg: %s, %s' %(msg, header)
+                   newchan.ack(delivery_tag)
+                   self._recv_invitation(msg, header)
                except ChannelClosedError as ex:
                    log.debug('Channel was closed during LEF.listen')
                    break
@@ -587,11 +586,11 @@ class RPCClient(object):
         self.principal = Participant(self.node, self.name)
         self.endpoint_unit = endpoint_unit
 
-    def request(self, msg, header , **kwargs):
+    def send(self, msg, headers , timeout=None):
         # could have a specified timeout in kwargs
-        if 'timeout' in kwargs and kwargs['timeout'] is not None:
-            timeout = kwargs['timeout']
-        else:
+        #if 'timeout' in kwargs and kwargs['timeout'] is not None:
+        #    timeout = kwargs['timeout']
+        if not timeout:
             timeout = CFG.endpoint.receive.timeout or 10
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
@@ -602,15 +601,15 @@ class RPCClient(object):
         if self.endpoint_unit:
             c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
-        c.send(self.rpc_conv.server_role, msg, header)
+        c.send(self.rpc_conv.server_role, msg, headers)
         try:
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.name)))
         finally:
             elapsed = time.time() - ts
-            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", header.get('conv-id', 'NOCONVID'),
-                     header.get('conv-seq', 'NOSEQ'),
+            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+                     headers.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
             c.stop_conversation()
@@ -642,6 +641,16 @@ class RPCServer(object):
     def attach_endpoint_unit(self, endpoint_unit):
         self.endpoint_unit = endpoint_unit
 
+    class MessageObject(object):
+        def __init__(self, full_msg):
+            self.full_msg = full_msg
+
+        def route(self):
+            pass
+
+        def ack(self):
+            pass
+
     def get_one_msg(self):
         try:
             c = self.principal.accept_next_invitation(merge_with_first_send = True)
@@ -652,6 +661,7 @@ class RPCServer(object):
             try:
                 msg, header = c.recv(self.rpc_conv.client_role)
                 reply = self.process_msg(msg, header)
+                msg_to_return = self.MessageObject(reply)
                 c.send(self.rpc_conv.client_role, reply)
                 if msg == 'quit':
                     self.principal.terminate()
@@ -664,10 +674,10 @@ class RPCServer(object):
             # only occurs when timeout specified, capture the Empty we get from accept and return False
             return False
 
-        return True
+        return msg_to_return
 
-    def process_msg(self, msg, header):
-        return ''
+    def message_received(self):
+        pass
 
 class RPCConversation(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
