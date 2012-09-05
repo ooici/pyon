@@ -220,6 +220,7 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
+
 class ConversationRPCClient(ProcessRPCClient):
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         base_end = ProcessRPCClient.create_endpoint(self, to_name=to_name,
@@ -242,6 +243,14 @@ class ConversationRPCServer(ProcessRPCServer):
     def prepare_listener(self, binding = None):
         self.participant = conversation.RPCServer(self.node, self._recv_name)
         self.participant.listen()
+
+    def deactivate(self):
+        self.participant.stop_listening()
+
+    def close(self):
+        #TODO(Rumi): to be discussed
+        self._chan = self.participant._chan
+        super(ConversationRPCServer, self).close()
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
