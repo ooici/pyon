@@ -826,7 +826,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         """
         headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'request'
-        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+        if self.channel and hasattr(self.channel, '_send_name') and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
 
         return headers
@@ -881,7 +881,7 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+        if self.channel and hasattr(self.channel, '_send_name') and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
