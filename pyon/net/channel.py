@@ -372,7 +372,6 @@ class SendChannel(BaseChannel):
             headers['QUEUE_BLAME'] = testid
 
         props = BasicProperties(headers=headers)
-
         with self._ensure_amq_chan():
             self._amq_chan.basic_publish(exchange=exchange, #todo
                                     routing_key=routing_key, #todo

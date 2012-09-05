@@ -220,7 +220,6 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
-
 class ConversationRPCClient(ProcessRPCClient):
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         base_end = ProcessRPCClient.create_endpoint(self, to_name=to_name,

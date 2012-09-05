@@ -6,6 +6,7 @@ from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import ExceptionFactory, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
+from pyon.net import conversation
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.async import spawn, switch
@@ -487,10 +488,9 @@ class ListeningBaseEndpoint(BaseEndpoint):
         #log.debug("LEF.listen")
 
         self.prepare_listener(binding=binding)
-
         # notify any listeners of our readiness
-        self._ready_event.set()
 
+        self._ready_event.set()
         while True:
             #log.debug("LEF: %s blocking, waiting for a message", self._recv_name)
             m = None
@@ -840,11 +840,24 @@ class RequestResponseClient(SendingBaseEndpoint):
     def request(self, msg, headers=None, timeout=None):
         #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
-        try:
-            retval, headers = e.send(msg, headers=headers, timeout=timeout)
-        finally:
-            # always close, even if endpoint raised a logical exception
-            e.close()
+        if CFG.endpoint.conversation_enabled:
+            conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
+                                                     self._send_name, endpoint_unit = e)
+
+            try:
+                #retval, headers = e.send(msg, headers=headers, timeout=timeout)
+                retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
+
+            finally:
+                # always close, even if endpoint raised a logical exception
+                conv_rpc_client.close()
+                e.close()
+        else:
+            try:
+                retval, headers = e.send(msg, headers=headers, timeout=timeout)
+            finally:
+                # always close, even if endpoint raised a logical exception
+                e.close()
         return retval
 
 
@@ -881,6 +894,7 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
+
         if self.channel and hasattr(self.channel, '_send_name') and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
@@ -1128,7 +1142,6 @@ class RPCClient(RequestResponseClient):
         assert headers is None or isinstance(headers, dict)
         headers = headers or {}
         headers['op'] = op
-
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)
 
 
@@ -1278,8 +1291,6 @@ class RPCServer(RequestResponseServer):
         """
         #log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
-
-
 
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """

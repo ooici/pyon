@@ -3,7 +3,8 @@ from pyon.net import messaging
 from pyon.net.conversation import Participant
 
 node, ioloop_process = messaging.make_node()
-def buyer_app(queue_name):
+
+def buyer_app(service_provider_name):
     #principal initialisation
     customer = Participant(node, NameTrio('rumi-PC',
                                         'rumi'))
@@ -16,7 +17,7 @@ def buyer_app(queue_name):
 
     #interactions
     c.send('seller', 'I will send you a request shortly. Please wait for me.')
-    c.send('seller', 'How expensive is War and Piece?')
+    c.send('seller', 'How expensive is War and Peace?')
     msg, header = c.recv('seller')
     print 'Msg received: %s' % (msg)
 
@@ -28,8 +29,6 @@ def seller_app(service_provider_name):
                                                 service_provider_name))
     service_provider.start_listening()
     c = service_provider.accept_next_invitation(merge_with_first_send = True)
-
-
     #interactions
     msg, header = c.recv('buyer')
     print 'Msg received: %s' %(msg)

@@ -586,6 +586,7 @@ class RPCClient(object):
         self.principal = Participant(self.node, self.name)
         self.endpoint_unit = endpoint_unit
 
+
     def send(self, msg, headers , timeout=None):
         # could have a specified timeout in kwargs
         #if 'timeout' in kwargs and kwargs['timeout'] is not None:
@@ -601,6 +602,7 @@ class RPCClient(object):
         if self.endpoint_unit:
             c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
+
         c.send(self.rpc_conv.server_role, msg, headers)
         try:
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
@@ -608,6 +610,7 @@ class RPCClient(object):
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.name)))
         finally:
             elapsed = time.time() - ts
+
             log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
                      headers.get('conv-seq', 'NOSEQ'),
                 self.server_name,
@@ -672,12 +675,13 @@ class RPCServer(object):
                 c.stop_conversation()
         except Empty:
             # only occurs when timeout specified, capture the Empty we get from accept and return False
-            return False
+            #TODO: handle Channel exceptions, not general ones
+            pass
 
         return msg_to_return
 
-    def message_received(self):
-        pass
+    def process_msg(self, msg, header):
+        return ''
 
 class RPCConversation(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
