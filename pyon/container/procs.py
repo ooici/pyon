@@ -12,7 +12,7 @@ from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
-from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.endpoint import ProcessRPCServer, ConversationRPCServer
 from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
 from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
@@ -273,12 +273,16 @@ class ProcManager(object):
         service_instance._proc_listen_name = listen_name
 
         # Service RPC endpoint
-        rsvc1 = ProcessRPCServer(node=self.container.node,
+        #TODO: RUMI: change back
+        rsvc1 = ConversationRPCServer(node=self.container.node,
+        #rsvc1 = ProcessRPCServer(node=self.container.node,
             from_name=listen_name,
             service=service_instance,
             process=service_instance)
         # Named local RPC endpoint
-        rsvc2 = ProcessRPCServer(node=self.container.node,
+        #TODO: RUMI: change back
+        rsvc2 = ConversationRPCServer(node=self.container.node,
+        #rsvc2 = ProcessRPCServer(node=self.container.node,
             from_name=service_instance.id,
             service=service_instance,
             process=service_instance)
