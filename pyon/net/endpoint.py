@@ -840,24 +840,11 @@ class RequestResponseClient(SendingBaseEndpoint):
     def request(self, msg, headers=None, timeout=None):
         #log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
         e = self.create_endpoint(self._send_name)
-        if CFG.endpoint.conversation_enabled:
-            conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
-                                                     self._send_name, endpoint_unit = e)
-
-            try:
-                #retval, headers = e.send(msg, headers=headers, timeout=timeout)
-                retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
-
-            finally:
-                # always close, even if endpoint raised a logical exception
-                conv_rpc_client.close()
-                e.close()
-        else:
-            try:
-                retval, headers = e.send(msg, headers=headers, timeout=timeout)
-            finally:
-                # always close, even if endpoint raised a logical exception
-                e.close()
+        try:
+            retval, headers = e.send(msg, headers=headers, timeout=timeout)
+        finally:
+            # always close, even if endpoint raised a logical exception
+            e.close()
         return retval
 
 
