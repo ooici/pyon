@@ -12,6 +12,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from gevent.event import AsyncResult
+from gevent.queue import Queue
 from contextlib import contextmanager
 import os
 
@@ -451,56 +452,148 @@ class TopicTrie(object):
         if not pattern in curnode.patterns:
             curnode.patterns.append(pattern)
 
+    def remove_topic_tree(self, topic_tree, pattern):
+        """
+        Splits a string topic_tree into tokens (by .) and removes the pattern from the terminal node.
+
+        @TODO should remove empty nodes
+        """
+        topics = topic_tree.split(".")
+
+        curnode = self.root
+
+        for topic in topics:
+            curnode = curnode.get_or_create_child(topic)
+
+        if pattern in curnode.patterns:
+            curnode.patterns.remove(pattern)
+
     def get_all_matches(self, topic_tree):
         """
         Returns a list of all matches for a given topic tree string.
+
+        Creates a set out of the matching patterns, so multiple binds matching on the same pattern only
+        return once.
         """
         topics = topic_tree.split(".")
-        return self.root.get_all_matches(topics)
+        return set(self.root.get_all_matches(topics))
 
 from gevent_zeromq import zmq
 from pyon.util.async import spawn
 
-class PubSubRoutingDevice(object):
+class ZeroMQRouter(object):
 
-    def __init__(self, zmqcontext):
-        self._xps = {}       # name -> topictrie containing subs
-        self._context = zmqcontext
-        self._poller = zmq.Poller()
+    def __init__(self, context, sysname):
+        self._context = context
+        self._sysname = sysname
 
-        self.gl = spawn(self._run)
+        self._exchanges = {}    # names -> { subscriber, topictrie(queue name) }
+        self._queues = {}       # names -> gevent queue
+        self._consumers = {}    # queue name -> [ctag, channel._on_deliver]
+        self._consumers_by_ctag = {} # ctag -> queue_name ??
+        self._unacked = {}      # dtag -> (ctag, msg)
+
+        self._gl_msgs = None
+
+        self.errors = []
+
+    @property
+    def _connect_addr(self):
+        return "inproc://%s" % self._sysname
+
+    def start(self):
+        """
+        Starts all internal greenlets of this router device.
+        """
+        self._sub = self._context.socket(zmq.SUB)
+        self._sub.bind(self._connect_addr)
+        self._sub.setsockopt(zmq.SUBSCRIBE, '')
+
+        self._gl_msgs = spawn(self._run_gl_msgs)
 
     def stop(self):
-        self.gl.kill()  # yikes
+        self._gl_msgs.kill()    # @TODO: better
 
-    def _run(self):
+    def _run_gl_msgs(self):
         while True:
-            socks = dict(self._poller.poll())
+            [ex, rkey, body, props] = self._sub.recv_multipart()
+            try:
+                self._route(ex, rkey, body, props)
+            except Exception as e:
+                self.errors.append(e)
+                log.exception("Routing message")
 
-            log.warn(socks)
+    def _route(self, exchange, routing_key, body, props):
+        assert exchange in self._exchanges, "Unknown exchange %s" % exchange
 
+        queues = self._exchanges[exchange].get_all_matches(routing_key)
+        log.debug("matched %s routes", len(queues))
 
-    def _make_xp_addr(self, xp):
-        return "inproc://pubsub.%s" % xp
+        # deliver to each queue
+        for q in queues:
+            assert q in self._queues
+            log.debug("deliver -> %s", q)
+            self._queues[q].put((exchange, routing_key, body, props))
 
-    def register_publisher(self, xp):
-
-        if not xp in self._xps:
-
-            sub = self._context.socket(zmq.SUB)
-            sub.connect(self._make_xp_addr(xp))
-
-            self._xps[xp] = {'topics': TopicTrie(),
-                             'sub': sub}
-
-            self._poller.register(sub, zmq.POLLIN)
-
-        pubsock = self._context.socket(zmq.PUB)
-        pubsock.bind(self._make_xp_addr(xp))
-
-        return pubsock
-
-    def register_subscriber(self, xp, pattern):
+    def _run_deliveries(self):
         pass
+
+    def declare_exchange(self, exchange, **kwargs):
+        if not exchange in self._exchanges:
+            self._exchanges[exchange] = TopicTrie()
+
+    def delete_exchange(self, exchange, **kwargs):
+        if exchange in self._exchanges:
+            del self._exchanges[exchange]
+
+            # kill any bindings
+
+    def declare_queue(self, queue, **kwargs):
+        if not queue in self._queues:
+            self._queues[queue] = Queue()
+
+    def delete_queue(self, queue, **kwargs):
+        if queue in self._queues:
+            del self._queues[queue]
+
+            # kill bindings
+
+    def bind(self, exchange, queue, binding):
+        assert exchange in self._exchanges
+        assert queue in self._queues
+
+        self._exchanges[exchange].add_topic_tree(binding, queue)
+
+    def unbind(self, exchange, queue, binding):
+        assert exchange in self._exchanges
+        assert queue in self._queues
+
+        self._exchanges[exchange].remove_topic_tree(binding, queue)
+
+class ZeroMQTransport(BaseTransport):
+    def __init__(self, broker, context):
+        self._broker = broker
+        self._context = context
+
+        self._pub = self._context.socket(zmq.PUB)
+        self._pub.connect(self._broker._connect_addr)
+
+    def declare_exchange_impl(self, client, exchange, **kwargs):
+        self._broker.declare_exchange(exchange, **kwargs)
+    def delete_exchange_impl(self, client, exchange, **kwargs):
+        self._broker.delete_exchange(exchange, **kwargs)
+
+    def declare_queue_impl(self, client, queue, **kwargs):
+        self._broker.declare_queue(queue, **kwargs)
+    def delete_queue_impl(self, client, queue, **kwargs):
+        self._broker.delete_queue(queue, **kwargs)
+
+    def bind_impl(self, client, exchange, queue, binding):
+        self._broker.bind(exchange, queue, binding)
+    def unbind_impl(self, client, exchange, queue, binding):
+        self._broker.unbind(exchange, queue, binding)
+
+    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        self._pub.send_multipart([exchange, routing_key, body, properties])
 
 
