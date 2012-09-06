@@ -39,7 +39,6 @@ point will ack when the content of a delivery naturally concludes (channel
 is closed)
 """
 from pyon.util.log import log
-from pika import BasicProperties
 from gevent import queue as gqueue
 from gevent import coros
 from contextlib import contextmanager
@@ -339,14 +338,12 @@ class SendChannel(BaseChannel):
             testid = os.environ['QUEUE_BLAME'].split(',')
             headers['QUEUE_BLAME'] = testid
 
-        props = BasicProperties(headers=headers)
-
         with self._ensure_amq_chan():
             self._transport.publish_impl(self._amq_chan,
                                          exchange=exchange, #todo
                                          routing_key=routing_key, #todo
                                          body=data,
-                                         properties=props,
+                                         properties=headers,
                                          immediate=False, #todo
                                          mandatory=False) #todo
 

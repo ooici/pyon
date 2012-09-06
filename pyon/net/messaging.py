@@ -11,16 +11,66 @@ from pika.adapters import SelectConnection
 from pika import channel as pikachannel
 from pika.exceptions import NoFreeChannels
 
-from pyon.core.bootstrap import CFG
-from pyon.net import amqp
+from pyon.core.bootstrap import CFG, get_sys_name
 from pyon.net import channel
 from pyon.util.async import blocking_cb
 from pyon.util.containers import for_name
 from pyon.util.log import log
 from pyon.util.pool import IDPool
+from pyon.net.transport import ZeroMQTransport, ZeroMQRouter
+
+from gevent_zeromq import zmq
 from collections import defaultdict
 
-class NodeB(amqp.Node):
+class BaseNode(object):
+    """
+    """
+
+    def __init__(self):
+        self.client = None
+        self.running = False
+
+    def on_connection_open(self, client):
+        """
+        AMQP Connection Open event handler.
+        TODO: Should this be in another class?
+        """
+        log.debug("In Node.on_connection_open")
+        log.debug("client: %s" % str(client))
+        client.add_on_close_callback(self.on_connection_close)
+        self.client = client
+        self.start_node()
+
+    def on_connection_close(self, *a):
+        """
+        AMQP Connection Close event handler.
+        TODO: Should this be in another class?
+        """
+        log.debug("In Node.on_connection_close")
+
+    def start_node(self):
+        """
+        This should only be called by on_connection_opened.
+        so, maybe we don't need a start_node/stop_node interface
+        TODO: Does this mean only one connection is supported?
+        """
+        log.debug("In Node.start_node")
+        self.running = 1
+
+    def stop_node(self):
+        """
+        """
+        log.debug("In Node.stop_node")
+
+    def channel(self, ch_type):
+        """
+        Create a channel on current node.
+        Implement this in subclass
+        name shouldn't be a parameter here
+        """
+        log.debug("In Node.channel")
+
+class NodeB(BaseNode):
     """
     Blocking interface to AMQP messaging primitives.
 
@@ -30,7 +80,8 @@ class NodeB(amqp.Node):
 
     def __init__(self):
         log.debug("In NodeB.__init__")
-        self.running = False
+        BaseNode.__init__(self)
+
         self.ready = event.Event()
         self._lock = coros.RLock()
         self._pool = IDPool()
@@ -39,7 +90,7 @@ class NodeB(amqp.Node):
 
         self.interceptors = {}  # endpoint interceptors
 
-        amqp.Node.__init__(self)
+        BaseNode.__init__(self)
 
     def start_node(self):
         """
@@ -47,7 +98,7 @@ class NodeB(amqp.Node):
         so, maybe we don't need a start_node/stop_node interface
         """
         log.debug("In start_node")
-        amqp.Node.start_node(self)
+        BaseNode.start_node(self)
         self.running = True
         self.ready.set()
 
@@ -255,3 +306,51 @@ def make_node(connection_params=None, name=None, timeout=None):
     node.ready.wait(timeout=timeout)
     return node, ioloop_process
     #return node, ioloop, connection
+
+
+
+class ZeroMQNode(BaseNode):
+    def __init__(self, context):
+        BaseNode.__init__(self)
+        self._context = context
+        self._zmq_router = ZeroMQRouter(self._context, get_sys_name())
+
+    def start_node(self):
+        BaseNode.start_node(self)
+        self._zmq_router.start()
+
+    def stop_node(self):
+        if self.running:
+            self._zmq_router.stop()
+        self.running = False
+
+    def channel(self, ch_type, **kwargs):
+        trans = ZeroMQTransport(self._zmq_router, self._context)
+        chan = ch_type(transport=trans, **kwargs)
+        chan.on_channel_open(ZeroMQChan(trans))
+
+        return chan
+
+class ZeroMQChan(object):
+    def __init__(self, trans):
+        self._trans = trans
+
+    def add_on_close_callback(self, cb):
+        pass
+
+    def close(self):
+        self._trans.close()
+
+
+class ZeroMQClient(object):
+    def __init__(self):
+        pass
+
+    def add_on_close_callback(self, cb):
+        log.debug("ignoring close callback")
+
+def make_zmq_node():
+    zc = zmq.Context(1)
+    node = ZeroMQNode(zc)
+    node.on_connection_open(ZeroMQClient())
+    return node, None

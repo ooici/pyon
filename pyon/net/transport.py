@@ -15,6 +15,9 @@ from gevent.event import AsyncResult
 from gevent.queue import Queue
 from contextlib import contextmanager
 import os
+from uuid import uuid4
+from pika import BasicProperties
+import msgpack
 
 class TransportError(StandardError):
     pass
@@ -239,10 +242,13 @@ class AMQPTransport(BaseTransport):
         Publishes a message on an exchange.
         """
         log.debug("AMQPTransport.publish(%s): ex %s key %s", client.channel_number, exchange, routing_key)
+
+        props = BasicProperties(headers=properties)
+
         client.basic_publish(exchange=exchange, #todo
                              routing_key=routing_key, #todo
                              body=body,
-                             properties=properties,
+                             properties=props,
                              immediate=immediate, #todo
                              mandatory=mandatory) #todo
 
@@ -516,8 +522,10 @@ class ZeroMQRouter(object):
 
     def _run_gl_msgs(self):
         while True:
-            [ex, rkey, body, props] = self._sub.recv_multipart()
+            [ex, rkey, body, serprops] = self._sub.recv_multipart()
             try:
+                props = msgpack.unpackb(serprops)
+
                 self._route(ex, rkey, body, props)
             except Exception as e:
                 self.errors.append(e)
@@ -549,8 +557,19 @@ class ZeroMQRouter(object):
             # kill any bindings
 
     def declare_queue(self, queue, **kwargs):
+
+        # come up with new queue name if none specified
+        if queue is None:
+            while True:
+                proposed = "q-%s" % str(uuid4())[0:10]
+                if proposed not in self._queues:
+                    queue = proposed
+                    break
+
         if not queue in self._queues:
             self._queues[queue] = Queue()
+
+        return queue
 
     def delete_queue(self, queue, **kwargs):
         if queue in self._queues:
@@ -584,7 +603,7 @@ class ZeroMQTransport(BaseTransport):
         self._broker.delete_exchange(exchange, **kwargs)
 
     def declare_queue_impl(self, client, queue, **kwargs):
-        self._broker.declare_queue(queue, **kwargs)
+        return self._broker.declare_queue(queue, **kwargs)
     def delete_queue_impl(self, client, queue, **kwargs):
         self._broker.delete_queue(queue, **kwargs)
 
@@ -594,6 +613,8 @@ class ZeroMQTransport(BaseTransport):
         self._broker.unbind(exchange, queue, binding)
 
     def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
-        self._pub.send_multipart([exchange, routing_key, body, properties])
+        # properties is a dictionary, must serialize to send over zeromq
+        propser = msgpack.packb(properties)
+        self._pub.send_multipart([exchange, routing_key, body, propser])
 
 
