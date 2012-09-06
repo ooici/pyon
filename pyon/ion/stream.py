@@ -1,21 +1,14 @@
 #!/usr/bin/env python
 
 """ION stream endpoints/registrars"""
-from pyon.util import log
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import CFG, IonObject
 from pyon.core.exception import BadRequest
-from pyon.ion.endpoint import ProcessPublisher, ProcessSubscriber, PublisherError
 from pyon.net.endpoint import Publisher, Subscriber
-from pyon.net.channel import PublisherChannel, SubscriberChannel, ChannelError
-from pyon.util.async import  spawn
 from pyon.util.arg_check import validate_is_instance
-from pyon.ion.exchange import ExchangePoint
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceClient
-from pyon.core import bootstrap
 from pyon.util.log import log
 from interface.objects import StreamRoute, Packet
 
