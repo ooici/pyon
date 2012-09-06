@@ -8,8 +8,9 @@
 
 from pyon.ion.process import SimpleProcess
 from pyon.event.event import EventSubscriber, EventPublisher
-from pyon.ion.stream import SimpleStreamPublisher, SimpleStreamSubscriber
+from pyon.ion.stream import SimpleStreamPublisher, SimpleStreamSubscriber, SimpleStreamRoutePublisher
 from pyon.net.endpoint import RPCServer, RPCClient
+from interface.objects import StreamRoute
 import gevent
 from pyon.util.log import log
 
@@ -77,8 +78,9 @@ class TransformStreamPublisher(TransformStreamProcess):
     def on_start(self):
         super(TransformStreamPublisher,self).on_start()
         self.exchange_point = self.CFG.get_safe('process.exchange_point', 'science_data')
+        self.routing_key    = self.CFG.get_safe('process.routing_key', '')
 
-        self.publisher = SimpleStreamPublisher.new_publisher(self.container, self.exchange_point,'')
+        self.publisher = SimpleStreamRoutePublisher.new_publisher(self.container, StreamRoute(exchange_point=self.exchange_point,routing_key=self.routing_key))
 
     def publish(self, msg, to_name):
         raise NotImplementedError('Method publish not implemented')
