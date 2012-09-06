@@ -70,6 +70,7 @@ class StreamSubscriber(Subscriber):
             raise BadRequest("Subscriber is not running.")
         self.close()
         self.greenlet.join(timeout=10)
+        self.greenlet.kill()
         self.started = False
 
 

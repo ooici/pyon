@@ -59,10 +59,10 @@ class TransformStreamListener(TransformStreamProcess):
         super(TransformStreamListener,self).on_start()
         self.queue_name = self.CFG.get_safe('process.queue_name',self.id)
 
-        self.subscriber = StreamSubscriber(self.queue_name, self.recv_packet)
+        self.subscriber = StreamSubscriber(process=self, exchange_name=self.queue_name, callback=self.recv_packet)
         self.subscriber.start()
 
-    def recv_packet(self, msg, headers):
+    def recv_packet(self, msg, stream_route, stream_id):
         raise NotImplementedError('Method recv_packet not implemented')
 
     def on_quit(self):
@@ -79,7 +79,7 @@ class TransformStreamPublisher(TransformStreamProcess):
         self.exchange_point = self.CFG.get_safe('process.exchange_point', 'science_data')
         self.routing_key    = self.CFG.get_safe('process.routing_key', '')
 
-        self.publisher = StreamPublisher(exchange_point=self.exchange_point, routing_key=self.routing_key)
+        self.publisher = StreamPublisher(process=self, exchange_point=self.exchange_point, routing_key=self.routing_key)
 
     def publish(self, msg, to_name):
         raise NotImplementedError('Method publish not implemented')
