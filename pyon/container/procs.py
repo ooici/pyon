@@ -13,7 +13,7 @@ from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
-from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
+from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
@@ -323,8 +323,8 @@ class ProcManager(object):
         listen_name = get_safe(config, "process.listen_name") or name
         service_instance._proc_listen_name = listen_name
 
-        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, container=self.container)
-        sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name)
+        service_instance.stream_subscriber = StreamSubscriber(exchange_name=listen_name, callback=service_instance.call_process)
+
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
@@ -340,7 +340,7 @@ class ProcManager(object):
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
-                                   listeners=[rsvc, sub],
+                                   listeners=[rsvc, service_instance.stream_subscriber],
                                    proc_name=service_instance._proc_name,
                                    cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
@@ -562,13 +562,13 @@ class ProcManager(object):
         service_instance.start()
 
     def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
-        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, container=self.container)
 
         publisher_streams = publisher_streams or {}
 
         for name, stream_id in publisher_streams.iteritems():
             # problem is here
-            pub = service_instance.stream_publisher_registrar.create_publisher(stream_id)
+            pub = StreamPublisher(stream_id=stream_id)
+
 
             setattr(service_instance, name, pub)
 
