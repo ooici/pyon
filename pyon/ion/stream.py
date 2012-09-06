@@ -22,7 +22,7 @@ class StreamPublisher(Publisher):
         self.stream_id = stream_id
         if stream_id:
             # Regardless of what's passed in for stream_route look it up, prevents mismatching
-            pubsub_cli=PubsubManagementServiceProcessClient(process=process)
+            pubsub_cli=PubsubManagementServiceProcessClient(process=process, node=process.container.node)
             self.stream_route = pubsub_cli.read_stream_route(stream_id)
 
         if not stream_route:
