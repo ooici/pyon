@@ -15,9 +15,7 @@ from gevent.event import AsyncResult
 from gevent.queue import Queue
 from contextlib import contextmanager
 import os
-from uuid import uuid4
 from pika import BasicProperties
-import msgpack
 
 class TransportError(StandardError):
     pass
@@ -486,6 +484,10 @@ class TopicTrie(object):
 
 from gevent_zeromq import zmq
 from pyon.util.async import spawn
+from pyon.util.pool import IDPool
+from uuid import uuid4
+from collections import defaultdict
+import msgpack
 
 class ZeroMQRouter(object):
 
@@ -495,8 +497,9 @@ class ZeroMQRouter(object):
 
         self._exchanges = {}    # names -> { subscriber, topictrie(queue name) }
         self._queues = {}       # names -> gevent queue
-        self._consumers = {}    # queue name -> [ctag, channel._on_deliver]
+        self._consumers = defaultdict(list)    # queue name -> [ctag, channel._on_deliver]
         self._consumers_by_ctag = {} # ctag -> queue_name ??
+        self._ctag_pool = IDPool()
         self._unacked = {}      # dtag -> (ctag, msg)
 
         self._gl_msgs = None
@@ -589,6 +592,36 @@ class ZeroMQRouter(object):
 
         self._exchanges[exchange].remove_topic_tree(binding, queue)
 
+    def start_consume(self, callback, queue, no_ack=False, exclusive=False):
+        assert queue in self._queues
+
+        new_ctag = self._generate_ctag()
+        assert new_ctag not in self._consumers_by_ctag
+
+        self._consumers[queue].append((new_ctag, callback, no_ack, exclusive))
+        self._consumers_by_ctag[new_ctag] = queue
+
+        return new_ctag
+
+    def stop_consume(self, consumer_tag):
+        assert consumer_tag in self._consumers_by_ctag
+
+        queue  = self._consumers_by_ctag[consumer_tag]
+        self._consumers_by_ctag.pop(consumer_tag)
+
+        for i, consumer in enumerate(self._consumers[queue]):
+            if consumer[0] == consumer_tag:
+                self._consumers[queue].pop(i)
+                break
+
+        self._return_ctag(consumer_tag)
+
+    def _generate_ctag(self):
+        return "zctag-%s" % self._ctag_pool.get_id()
+
+    def _return_ctag(self, ctag):
+        self._ctag_pool.release_id(int(ctag.split("-")[-1]))
+
 class ZeroMQTransport(BaseTransport):
     def __init__(self, broker, context):
         self._broker = broker
@@ -617,4 +650,8 @@ class ZeroMQTransport(BaseTransport):
         propser = msgpack.packb(properties)
         self._pub.send_multipart([exchange, routing_key, body, propser])
 
+    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+        return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
+    def stop_consume_impl(self, client, consumer_tag):
+        self._broker.stop_consume(consumer_tag)
 
