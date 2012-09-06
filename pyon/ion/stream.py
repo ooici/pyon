@@ -8,20 +8,21 @@ __license__ = 'Apache 2.0'
 from pyon.core.exception import BadRequest
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.arg_check import validate_is_instance
-from interface.services.dm.ipubsub_management_service import PubsubManagementServiceClient
+from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.util.log import log
+from pyon.service.service import BaseService
 from interface.objects import StreamRoute, Packet
 
 import gevent
 
 class StreamPublisher(Publisher):
-    def __init__(self, stream_id='', stream_route=None, exchange_point='', routing_key=''):
+    def __init__(self, process=None, stream_id='', stream_route=None, exchange_point='', routing_key=''):
         super(StreamPublisher,self).__init__()
-        from pyon.container.cc import Container
+        validate_is_instance(process,BaseService, 'No valid process provided.')
         self.stream_id = stream_id
         if stream_id:
             # Regardless of what's passed in for stream_route look it up, prevents mismatching
-            pubsub_cli=PubsubManagementServiceClient()
+            pubsub_cli=PubsubManagementServiceProcessClient(process=process)
             self.stream_route = pubsub_cli.read_stream_route(stream_id)
 
         if not stream_route:
@@ -31,15 +32,13 @@ class StreamPublisher(Publisher):
             self.stream_route = stream_route
         validate_is_instance(self.stream_route, StreamRoute, 'No valid stream route provided to publisher.')
 
-        cc = Container.instance
-        self.xp = cc.ex_manager.create_xp(self.stream_route.exchange_point)
+        self.container = process.container
+        self.xp = self.container.ex_manager.create_xp(self.stream_route.exchange_point)
 
     def publish(self, msg, stream_id='', stream_route=None):
         xp = self.xp
         if stream_route:
-            from pyon.container.cc import Container
-            cc = Container.instance
-            xp = cc.ex_manager.create_xp(stream_route.exchange_point)
+            xp = self.container.ex_manager.create_xp(stream_route.exchange_point)
         else:
             stream_route = self.stream_route
         packet = Packet(route=stream_route or self.stream_route, stream_id=stream_id or self.stream_id, body=msg)
@@ -47,12 +46,12 @@ class StreamPublisher(Publisher):
         super(StreamPublisher,self).publish(packet, to_name=xp.create_route(stream_route.routing_key))
 
 class StreamSubscriber(Subscriber):
-    def __init__(self, exchange_name, callback):
-        from pyon.container.cc import Container
-        cc = Container.instance
-        self.xn = cc.ex_manager.create_xn_queue(exchange_name)
+    def __init__(self, process, exchange_name, callback=None):
+        validate_is_instance(process,BaseService,'No valid process was provided.')
+        self.container = process.container
+        self.xn = self.container.ex_manager.create_xn_queue(exchange_name)
         self.started = False
-        self.callback = callback
+        self.callback = callback or process.call_process
         super(StreamSubscriber,self).__init__(name=self.xn,callback=self.preprocess)
 
     def preprocess(self, msg, headers):

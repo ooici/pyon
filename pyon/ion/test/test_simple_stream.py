@@ -7,6 +7,7 @@
 
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.stream import StreamSubscriber, StreamPublisher
+from pyon.ion.process import SimpleProcess
 from interface.objects import StreamRoute
 from gevent.event import Event
 
@@ -33,13 +34,18 @@ class StreamPubsubTest(IonIntegrationTestCase):
             self.assertEquals(message,'test')
             self.verified.set()
 
-        sub1 = StreamSubscriber('sub1', verify)
+        sub_proc = SimpleProcess()
+        sub_proc.container = self.container
+
+        sub1 = StreamSubscriber(process=sub_proc, exchange_name='sub1', callback=verify)
         sub1.start()
         self.queue_cleanup.append('sub1')
 
         route = StreamRoute(exchange_point='xp_test', routing_key='route')
 
-        pub1 = StreamPublisher(stream_route=route)
+        pub_proc = SimpleProcess()
+        pub_proc.container = self.container
+        pub1 = StreamPublisher(process=pub_proc,stream_route=route)
         sub1.xn.bind(route.routing_key,pub1.xp) 
 
         pub1.publish('test')

@@ -323,7 +323,7 @@ class ProcManager(object):
         listen_name = get_safe(config, "process.listen_name") or name
         service_instance._proc_listen_name = listen_name
 
-        service_instance.stream_subscriber = StreamSubscriber(exchange_name=listen_name, callback=service_instance.call_process)
+        service_instance.stream_subscriber = StreamSubscriber(process=service_instance, exchange_name=listen_name, callback=service_instance.call_process)
 
 
         # Add publishers if any...
@@ -567,7 +567,7 @@ class ProcManager(object):
 
         for name, stream_id in publisher_streams.iteritems():
             # problem is here
-            pub = StreamPublisher(stream_id=stream_id)
+            pub = StreamPublisher(process=service_instance, stream_id=stream_id)
 
 
             setattr(service_instance, name, pub)
