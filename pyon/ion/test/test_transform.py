@@ -6,9 +6,8 @@
 '''
 
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.transforma import TransformBase, TransformStreamPublisher
+from pyon.ion.transforma import TransformBase
 from nose.plugins.attrib import attr
-import gevent
 
 @attr('INT',group='dm')
 class TestTrasforms(IonIntegrationTestCase):
@@ -21,24 +20,4 @@ class TestTrasforms(IonIntegrationTestCase):
 
         retval = TransformBase.stats('test_transform')
         self.assertEquals(retval,{'hits':100})
-
-class HelloWorldTransform(TransformStreamPublisher):
-    def on_start(self):
-        super(HelloWorldTransform,self).on_start()
-        self.done = False
-        self.greenlet = gevent.spawn(self.loop)
-
-    def on_quit(self):
-        self.done = True
-        self.greenlet.join(5)
-        self.greenlet.kill()
-
-    def loop(self):
-        while not self.done:
-            gevent.sleep(1)
-            self.publish('hello world')
-
-    def publish(self, msg, to_name=None):
-        self.publisher.publish(msg)
-
 

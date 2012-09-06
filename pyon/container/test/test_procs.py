@@ -55,7 +55,7 @@ class TestProcManager(IonIntegrationTestCase):
 
         self._spawnproc(pm, 'service')
 
-        self._spawnproc(pm, 'stream_process')
+        #self._spawnproc(pm, 'stream_process')
 
         #self._spawnproc(pm, 'agent', 'SampleAgent')
 
