@@ -76,10 +76,11 @@ class TransformStreamPublisher(TransformStreamProcess):
 
     def on_start(self):
         super(TransformStreamPublisher,self).on_start()
+        self.stream_id      = self.CFG.get_safe('process.stream_id', '')
         self.exchange_point = self.CFG.get_safe('process.exchange_point', 'science_data')
         self.routing_key    = self.CFG.get_safe('process.routing_key', '')
 
-        self.publisher = StreamPublisher(process=self, exchange_point=self.exchange_point, routing_key=self.routing_key)
+        self.publisher = StreamPublisher(process=self, stream_id=self.stream_id, exchange_point=self.exchange_point, routing_key=self.routing_key)
 
     def publish(self, msg, to_name):
         raise NotImplementedError('Method publish not implemented')

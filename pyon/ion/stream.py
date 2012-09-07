@@ -25,7 +25,7 @@ class StreamPublisher(Publisher):
             pubsub_cli=PubsubManagementServiceProcessClient(process=process, node=process.container.node)
             self.stream_route = pubsub_cli.read_stream_route(stream_id)
 
-        if not stream_route:
+        elif not stream_route:
             if exchange_point and routing_key:
                 self.stream_route = StreamRoute(exchange_point=exchange_point,routing_key=routing_key)
         else:
@@ -37,12 +37,14 @@ class StreamPublisher(Publisher):
 
     def publish(self, msg, stream_id='', stream_route=None):
         xp = self.xp
+        log.info('Exchange: %s', xp.exchange)
         if stream_route:
             xp = self.container.ex_manager.create_xp(stream_route.exchange_point)
         else:
             stream_route = self.stream_route
         packet = Packet(route=stream_route or self.stream_route, stream_id=stream_id or self.stream_id, body=msg)
         xp = self.xp
+        log.info('Publishing (%s,%s)', xp.exchange, stream_route.routing_key)
         super(StreamPublisher,self).publish(packet, to_name=xp.create_route(stream_route.routing_key))
 
 class StreamSubscriber(Subscriber):
@@ -82,4 +84,48 @@ class StreamSubscriberRegistrar(object):
 
 class StreamPublisherRegistrar(object):
     pass
+
+class StandaloneStreamPublisher(Publisher):
+    def __init__(self, stream_id, stream_route):
+        super(StandaloneStreamPublisher, self).__init__()
+        self.stream_id = stream_id
+        validate_is_instance(stream_route, StreamRoute, 'stream route is not valid')
+        self.stream_route = stream_route
+
+
+    def publish(self, msg, stream_id='', stream_route=None):
+        from pyon.container.cc import Container
+        stream_id = stream_id or self.stream_id
+        stream_route = stream_route or self.stream_route
+        packet = Packet(body=msg, stream_id=stream_id, route=stream_route)
+        container = Container.instance
+        xp = container.ex_manager.create_xp(stream_route.exchange_point)
+        super(StandaloneStreamPublisher,self).publish(packet,to_name=xp.create_route(stream_route.routing_key))
+
+class StandaloneStreamSubscriber(Subscriber):
+    def __init__(self, exchange_name, callback):
+        from pyon.container.cc import Container
+        self.xn = Container.instance.ex_manager.create_xn_queue(exchange_name)
+        self.callback = callback
+        self.started = False
+        super(StandaloneStreamSubscriber, self).__init__(name=self.xn,callback=self.preprocess)
+    
+    def preprocess(self, msg, headers):
+        packet = msg
+        if not isinstance(packet, Packet): 
+            log.warn('Received non-packet on stream.')
+            return
+        self.callback(packet.body, packet.route, packet.stream_id)
+   
+    def start(self):
+        self.started = True
+        self.greenlet = gevent.spawn(self.listen)
+    
+    def stop(self):
+        if not self.started: 
+            raise BadRequest("Subscriber is not running.")
+        self.close()
+        self.greenlet.join(timeout=10)
+        self.greenlet.kill()
+        self.started = False
 
