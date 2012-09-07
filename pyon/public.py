@@ -7,11 +7,6 @@ __license__ = 'Apache 2.0'
 
 __all__ = []
 
-
-# Tell the magic import log setup to pass through this file
-from pyon.util.log import import_paths
-import_paths.append(__name__)
-
 from pyon.util.log import log
 __all__ += ['log']
 
