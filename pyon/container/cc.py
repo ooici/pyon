@@ -100,6 +100,9 @@ class Container(BaseContainerAgent):
         # protection for when the container itself is used as a Process for clients
         self.container = self
 
+        # publisher, initialized in start()
+        self.event_pub = None
+
         log.debug("Container initialized, OK.")
 
     def start(self):
@@ -266,10 +269,11 @@ class Container(BaseContainerAgent):
     def stop(self):
         log.info("=============== Container stopping... ===============")
 
-        self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
-                                     origin=self.id, origin_type="CapabilityContainer",
-                                     sub_type="TERMINATE",
-                                     state=ContainerStateEnum.TERMINATE)
+        if self.event_pub is not None:
+            self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                         origin=self.id, origin_type="CapabilityContainer",
+                                         sub_type="TERMINATE",
+                                         state=ContainerStateEnum.TERMINATE)
 
         while self._capabilities:
             capability = self._capabilities.pop()

@@ -170,7 +170,9 @@ class EndpointUnit(object):
 #        log.debug('close endpoint')
 
         if self.channel is not None:
-            self.channel.close()
+            ev = self.channel.close()
+            if not ev.wait(timeout=3):
+                log.warn("Channel (%s) close did not respond in time, giving up", self.channel.get_channel_id())
 
     def _build_header(self, raw_msg):
         """
@@ -594,7 +596,10 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
     def close(self):
         BaseEndpoint.close(self)
-        self._chan.close()
+        ev = self._chan.close()
+
+        if not ev.wait(timeout=3):
+            log.warn("Listen channel (%s) close did not respond in time, giving up", self._chan.get_channel_id())
 
     def get_stats(self):
         """

@@ -71,6 +71,7 @@ class BaseChannel(object):
     _close_callback             = None      # close callback to use when closing, not always set (used for pooling)
     _closed_error_callback      = None      # callback which triggers when the underlying transport closes with error
     _exchange                   = None      # exchange (too AMQP specific)
+    _close_event                = None      # used for giving notice a close was processed
 
     # exchange related settings @TODO: these should likely come from config instead
     _exchange_type              = 'topic'
@@ -203,11 +204,19 @@ class BaseChannel(object):
 
         If created via a Node (99% likely), the Node will take care of
         calling close_impl for you at the proper time.
+
+        @returns    An Event you can wait on for completion of the close. Will be set
+                    automatically if the channel came from the Node's pool.
         """
+        ev = Event()
         if self._close_callback:
             self._close_callback(self)
+            ev.set()
         else:
+            self._close_event = ev
             self._fsm.process(self.I_CLOSE)
+
+        return ev
 
     def _on_close(self, fsm):
         self.close_impl()
@@ -282,6 +291,11 @@ class BaseChannel(object):
         if not (code == 0 or code == 200):
             logmeth = log.error
         logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.get_channel_id(), code, text)
+
+        # make callback to user event if we've closed
+        if self._close_event is not None:
+            self._close_event.set()
+            self._close_event = None
 
         # remove amq_chan so we don't try to use it again
         # (all?) calls are protected via _ensure_amq_chan, which raise a ChannelError if you try to do anything with it.
