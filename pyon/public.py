@@ -22,6 +22,9 @@ __all__ += ['spawn', 'switch']
 from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
 __all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 
+from pyon.core.exception import BadRequest, NotFound, Inconsistent, Conflict, IonException, Timeout
+__all__ += ['BadRequest','NotFound','Inconsistent','Conflict','IonException','Timeout']
+
 from pyon.core import exception as iex
 __all__ += ['iex']
 
