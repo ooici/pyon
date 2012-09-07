@@ -135,7 +135,7 @@ class ProcManager(object):
         service_cls = named_any("%s.%s" % (module, cls))
         process_type = get_safe(process_cfg, "process.type") or getattr(service_cls, "process_type", "service")
 
-        process_restart = get_safe(config, "process.restart")
+        process_start_mode = get_safe(config, "process.start_mode")
 
         service_instance = None
         try:
@@ -526,6 +526,33 @@ class ProcManager(object):
         service_instance.CFG = config
         service_instance._proc_name = name
         service_instance._proc_start_time = time.time()
+
+        # Add stateful process operations
+        if hasattr(service_instance, "_flush_state"):
+            def _flush_state():
+                if not hasattr(service_instance, "_proc_state"):
+                    service_instance._proc_state = {}
+                    service_instance._proc_state_changed = False
+                    return
+                service_instance.container.state_repository.put_state(service_instance.id, service_instance._proc_state)
+                service_instance._proc_state_changed = False
+            def _load_state():
+                if not hasattr(service_instance, "_proc_state"):
+                    service_instance._proc_state = {}
+                try:
+                    new_state = service_instance.container.state_repository.get_state(service_instance.id)
+                    service_instance._proc_state.clear()
+                    service_instance._proc_state.update(new_state)
+                    service_instance._proc_state_changed = False
+                except Exception as ex:
+                    log.warn("Process %s load state failed: %s", service_instance.id, str(ex))
+            service_instance._flush_state = _flush_state
+            service_instance._load_state = _load_state
+
+        process_start_mode = get_safe(config, "process.start_mode")
+        if process_start_mode == "RESTART":
+            if hasattr(service_instance, "_load_state"):
+                service_instance._load_state()
 
         # start service dependencies (RPC clients)
         self._start_service_dependencies(service_instance)
