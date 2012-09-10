@@ -679,11 +679,12 @@ class ProcManager(object):
         """
         Terminates a process and all its resources. Termination is graceful with timeout.
         """
-        log.debug("terminate_process: %s", process_id)
         service_instance = self.procs.get(process_id, None)
         if not service_instance:
             raise BadRequest("Cannot terminate. Process id='%s' unknown on container id='%s'" % (
                                         process_id, self.container.id))
+
+        log.info("ProcManager.terminate_process: %s -> pid=%s", service_instance._proc_name, process_id)
 
         # Give the process notice to quit doing stuff.
         service_instance.quit()
