@@ -314,6 +314,7 @@ class ZeroMQNode(BaseNode):
         BaseNode.__init__(self)
         self._context = context
         self._zmq_router = ZeroMQRouter(self._context, get_sys_name())
+        self._channel_id_pool = IDPool()
 
     def start_node(self):
         BaseNode.start_node(self)
@@ -327,20 +328,36 @@ class ZeroMQNode(BaseNode):
     def channel(self, ch_type, **kwargs):
         trans = ZeroMQTransport(self._zmq_router, self._context)
         chan = ch_type(transport=trans, **kwargs)
-        chan.on_channel_open(ZeroMQChan(trans))
+
+        zmqchan = ZeroMQChan(trans, self._channel_id_pool.get_id(), self)
+        chan.on_channel_open(zmqchan)
 
         return chan
 
+    def _on_channel_close(self, ch):
+        log.debug("ZeroMQNode._on_channel_close (%s)", ch.channel_number)
+        self._channel_id_pool.release_id(ch.channel_number)
+
 class ZeroMQChan(object):
-    def __init__(self, trans):
+    """
+    Equivalent to pika's Channel object, lies underneath our Channel.
+    """
+    def __init__(self, trans, chid, node):
         self._trans = trans
+        self.channel_number = chid
+        self._node = node
+
+        # fixup for pika problem, @TODO promote from channel to AMQPTransport
+        self.callbacks = self
+        self.callbacks.remove = lambda a,b: True
 
     def add_on_close_callback(self, cb):
-        pass
+        self._close_callback = cb
 
     def close(self):
-        self._trans.close()
-
+        self._trans.close()                     # alert the router we're closing
+        self._close_callback(0, "Closed ok")    # callback into channel to indicate closed
+        self._node._on_channel_close(self)      # return channel number to node pool
 
 class ZeroMQClient(object):
     def __init__(self):

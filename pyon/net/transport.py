@@ -11,8 +11,10 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
+from pyon.util.containers import DotDict
 from gevent.event import AsyncResult
 from gevent.queue import Queue
+from gevent import coros
 from contextlib import contextmanager
 import os
 from pika import BasicProperties
@@ -502,6 +504,8 @@ class ZeroMQRouter(object):
         self._ctag_pool = IDPool()
         self._unacked = {}      # dtag -> (ctag, msg)
 
+        self._lock_unacked = coros.RLock()      # lock for interacting with unacked field
+
         self._gl_msgs = None
 
         self.errors = []
@@ -562,7 +566,7 @@ class ZeroMQRouter(object):
     def declare_queue(self, queue, **kwargs):
 
         # come up with new queue name if none specified
-        if queue is None:
+        if queue is None or queue == '':
             while True:
                 proposed = "q-%s" % str(uuid4())[0:10]
                 if proposed not in self._queues:
@@ -598,7 +602,8 @@ class ZeroMQRouter(object):
         new_ctag = self._generate_ctag()
         assert new_ctag not in self._consumers_by_ctag
 
-        self._consumers[queue].append((new_ctag, callback, no_ack, exclusive))
+        gl = spawn(self._run_consumer, new_ctag, queue, callback)
+        self._consumers[queue].append((new_ctag, callback, no_ack, exclusive, gl))
         self._consumers_by_ctag[new_ctag] = queue
 
         return new_ctag
@@ -611,16 +616,75 @@ class ZeroMQRouter(object):
 
         for i, consumer in enumerate(self._consumers[queue]):
             if consumer[0] == consumer_tag:
+                consumer[4].kill()      # @TODO not right
                 self._consumers[queue].pop(i)
                 break
 
         self._return_ctag(consumer_tag)
+
+    def _run_consumer(self, ctag, queue, callback):
+        cnt = 0
+        while True:
+            m = self._queues[queue].get()
+            exchange, routing_key, body, props = m
+
+            # create method frame
+            method_frame = DotDict()
+            method_frame['consumer_tag']    = ctag
+            method_frame['redelivered']     = False     # @TODO
+            method_frame['exchange']        = exchange
+            method_frame['routing_key']     = routing_key
+
+            # create header frame
+            header_frame = DotDict()
+            header_frame['headers'] = props.copy()
+
+            # make delivery tag for ack/reject later
+            dtag = self._generate_dtag(ctag, cnt)
+            cnt += 1
+
+            with self._lock_unacked:
+                self._unacked[dtag] = (ctag, queue, m)
+
+            method_frame['delivery_tag'] = dtag
+
+            # deliver to callback
+            try:
+                callback(self, method_frame, header_frame, body)
+            except Exception:
+                log.exception("delivering to consumer, ignore!")
 
     def _generate_ctag(self):
         return "zctag-%s" % self._ctag_pool.get_id()
 
     def _return_ctag(self, ctag):
         self._ctag_pool.release_id(int(ctag.split("-")[-1]))
+
+    def _generate_dtag(self, ctag, cnt):
+        """
+        Generates a unique delivery tag for each consumer
+        """
+        return "%s-%s" % (ctag, cnt)
+
+    def ack(self, delivery_tag):
+        assert delivery_tag in self._unacked
+
+        with self._lock_unacked:
+            del self._unacked[delivery_tag]
+
+    def reject(self, delivery_tag, requeue=False):
+        assert delivery_tag in self._unacked
+
+        with self._lock_unacked:
+            _, queue, m = self._unacked.pop(delivery_tag)
+            if requeue:
+                log.warn("REQUEUE: EXPERIMENTAL %s", delivery_tag)
+                self._queues[queue].append(m)
+
+    def transport_close(self, transport):
+        log.warn("ZeroMQRouter.transport_close: %s TODO", transport)
+
+        # turn off any consumers from this transport
 
 class ZeroMQTransport(BaseTransport):
     def __init__(self, broker, context):
@@ -651,7 +715,14 @@ class ZeroMQTransport(BaseTransport):
         self._pub.send_multipart([exchange, routing_key, body, propser])
 
     def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
-        return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
+        return self._broker.start_consume(self, callback, queue, no_ack=no_ack, exclusive=exclusive)
     def stop_consume_impl(self, client, consumer_tag):
         self._broker.stop_consume(consumer_tag)
 
+    def ack_impl(self, client, delivery_tag):
+        self._broker.ack(delivery_tag)
+    def reject_impl(self, client, delivery_tag, requeue=False):
+        self._broker.reject(delivery_tag, requeue=requeue)
+
+    def close(self):
+        self._broker.transport_close(self)
