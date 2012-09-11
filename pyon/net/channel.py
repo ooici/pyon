@@ -921,7 +921,7 @@ class ServerChannel(ListenChannel):
         assert len(reply_to_set) == 1, "Differing reply-to addresses seen, unsure how to proceed"
 
         send_name = NameTrio(tuple(reply_to_set.pop().split(',')))    # @TODO: stringify is not the best
-        ch = self.BidirAcceptChannel(parent_channel=self)
+        ch = self.BidirAcceptChannel(parent_channel=self, transport=self._transport)
         ch._recv_name = self._recv_name     # for debugging only
         ch.attach_underlying_channel(amq_chan)
         ch.connect(send_name)
