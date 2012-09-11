@@ -29,6 +29,7 @@ class BaseNode(object):
     def __init__(self):
         self.client = None
         self.running = False
+        self.ready = event.Event()
 
         self.interceptors = {}  # endpoint interceptors
 
@@ -57,12 +58,14 @@ class BaseNode(object):
         TODO: Does this mean only one connection is supported?
         """
         log.debug("In Node.start_node")
-        self.running = 1
+        self.running = True
+        self.ready.set()
 
     def stop_node(self):
         """
         """
         log.debug("In Node.stop_node")
+        self.running = False
 
     def channel(self, ch_type):
         """
@@ -113,7 +116,6 @@ class NodeB(BaseNode):
         log.debug("In NodeB.__init__")
         BaseNode.__init__(self)
 
-        self.ready = event.Event()
         self._lock = coros.RLock()
         self._pool = IDPool()
         self._bidir_pool = {}   # maps inactive/active our numbers (from self._pool) to channels
@@ -128,8 +130,6 @@ class NodeB(BaseNode):
         """
         log.debug("In start_node")
         BaseNode.start_node(self)
-        self.running = True
-        self.ready.set()
 
     def stop_node(self):
         """
@@ -141,7 +141,6 @@ class NodeB(BaseNode):
             # clean up pooling before we shut connection
             self._destroy_pool()
             self.client.close()
-        self.running = False
 
     def _destroy_pool(self):
         """
@@ -366,8 +365,11 @@ class ZeroMQClient(object):
     def add_on_close_callback(self, cb):
         log.debug("ignoring close callback")
 
-def make_zmq_node():
+def make_zmq_node(timeout=None):
     zc = zmq.Context(1)
     node = ZeroMQNode(zc)
     node.on_connection_open(ZeroMQClient())
-    return node, None
+    node.ready.wait(timeout=timeout)
+
+    return node, node._zmq_router.gl_ioloop
+

@@ -15,6 +15,7 @@ from pyon.util.containers import DotDict
 from gevent.event import AsyncResult
 from gevent.queue import Queue
 from gevent import coros
+from gevent.pool import Pool
 from contextlib import contextmanager
 import os
 from pika import BasicProperties
@@ -525,6 +526,8 @@ class ZeroMQRouter(object):
         self._lock_unacked = coros.RLock()              # lock for interacting with unacked field
 
         self._gl_msgs = None
+        self._gl_pool = Pool()
+        self.gl_ioloop = None
 
         self.errors = []
 
@@ -540,10 +543,14 @@ class ZeroMQRouter(object):
         self._sub.bind(self._connect_addr)
         self._sub.setsockopt(zmq.SUBSCRIBE, '')
 
-        self._gl_msgs = spawn(self._run_gl_msgs)
+        self._gl_msgs = self._gl_pool.spawn(self._run_gl_msgs)
+        self._gl_msgs.link_exception(self._child_failed)
+
+        self.gl_ioloop = spawn(self._run_ioloop)
 
     def stop(self):
         self._gl_msgs.kill()    # @TODO: better
+        self._gl_pool.join(timeout=5, raise_error=True)
 
     def _run_gl_msgs(self):
         while True:
@@ -573,6 +580,25 @@ class ZeroMQRouter(object):
             assert q in self._queues
             log.debug("deliver -> %s", q)
             self._queues[q].put((exchange, routing_key, body, props))
+
+    def _child_failed(self, gproc):
+        """
+        Handler method for when any child worker thread dies with error.
+
+        Aborts the "ioloop" greenlet.
+        """
+        log.error("Child (%s) failed with an exception: %s", gproc, gproc.exception)
+
+        if self.gl_ioloop:
+            self.gl_ioloop.kill(exception=gproc.exception, block=False)
+
+    def _run_ioloop(self):
+        """
+        An "IOLoop"-like greenlet - sits and waits until the pool is finished.
+
+        Fits with the AMQP node.
+        """
+        self._gl_pool.join()
 
     def declare_exchange(self, exchange, **kwargs):
         with self._lock_declarables:
@@ -638,7 +664,8 @@ class ZeroMQRouter(object):
             assert new_ctag not in self._consumers_by_ctag
 
             with self._lock_declarables:
-                gl = spawn(self._run_consumer, new_ctag, queue, self._queues[queue], callback)
+                gl = self._gl_pool.spawn(self._run_consumer, new_ctag, queue, self._queues[queue], callback)
+                gl.link_exception(self._child_failed)
             self._consumers[queue].append((new_ctag, callback, no_ack, exclusive, gl))
             self._consumers_by_ctag[new_ctag] = queue
 
