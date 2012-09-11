@@ -498,6 +498,12 @@ class ZeroMQRouter(object):
     Using ZeroMQTransport, can handle topic-exchange-like communication in ION.
     """
 
+    class ConsumerClosedMessage(object):
+        """
+        Dummy object used to exit queue get looping greenlets.
+        """
+        pass
+
     def __init__(self, context, sysname):
         self._context = context
         self._sysname = sysname
@@ -647,7 +653,12 @@ class ZeroMQRouter(object):
 
             for i, consumer in enumerate(self._consumers[queue]):
                 if consumer[0] == consumer_tag:
-                    consumer[4].kill()      # @TODO not right
+
+                    # notify consumer greenlet that we want to stop
+                    self._queues[queue].put(self.ConsumerClosedMessage())
+                    consumer[4].join(timeout=5)
+                    consumer[4].kill()
+
                     self._consumers[queue].pop(i)
                     break
 
@@ -657,6 +668,8 @@ class ZeroMQRouter(object):
         cnt = 0
         while True:
             m = gqueue.get()
+            if isinstance(m, self.ConsumerClosedMessage):
+                break
             exchange, routing_key, body, props = m
 
             # create method frame
