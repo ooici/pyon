@@ -798,4 +798,5 @@ class ZeroMQTransport(BaseTransport):
         self._broker.reject(delivery_tag, requeue=requeue)
 
     def close(self):
+        self._pub.close()
         self._broker.transport_close(self)
