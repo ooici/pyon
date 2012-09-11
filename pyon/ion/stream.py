@@ -49,8 +49,14 @@ class StreamPublisher(Publisher):
             self.stream_route = pubsub_cli.read_stream_route(stream_id)
 
         elif not stream_route:
+            self.stream_route = None
             if exchange_point and routing_key:
                 self.stream_route = StreamRoute(exchange_point=exchange_point,routing_key=routing_key)
+            else:
+                pubsub_cli=PubsubManagementServiceProcessClient(process=process, node=process.container.node)
+                stream_id, stream_route = pubsub_cli.create_stream(process.id, exchange_point=exchange_point or 'void')
+                self.stream_id = stream_id
+                self.stream_route = stream_route
         else:
             self.stream_route = stream_route
         validate_is_instance(self.stream_route, StreamRoute, 'No valid stream route provided to publisher.')
@@ -146,7 +152,7 @@ class StandaloneStreamPublisher(Publisher):
         '''
         Creates a new StandaloneStreamPublisher
         @param stream_id    The stream identifier
-        @param steram_route The StreamRoute to publish on.
+        @param stream_route The StreamRoute to publish on.
         '''
         super(StandaloneStreamPublisher, self).__init__()
         self.stream_id = stream_id

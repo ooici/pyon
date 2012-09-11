@@ -190,7 +190,7 @@ class TransformDataProcess(TransformStreamListener, TransformStreamPublisher):
       process.stream_id      Outgoing stream identifier.
       process.exchange_point Route's exchange point.
       process.routing_key    Route's routing key.
-      process.queue_name Name of the queue to listen on.
+      process.queue_name     Name of the queue to listen on.
       
     Either the stream_id or both the exchange_point and routing_key need to be provided.
     '''
