@@ -492,19 +492,31 @@ from collections import defaultdict
 import msgpack
 
 class ZeroMQRouter(object):
+    """
+    A RabbitMQ-like routing device implemented with ZeroMQ.
+
+    Using ZeroMQTransport, can handle topic-exchange-like communication in ION.
+    """
 
     def __init__(self, context, sysname):
         self._context = context
         self._sysname = sysname
 
-        self._exchanges = {}    # names -> { subscriber, topictrie(queue name) }
-        self._queues = {}       # names -> gevent queue
-        self._consumers = defaultdict(list)    # queue name -> [ctag, channel._on_deliver]
-        self._consumers_by_ctag = {} # ctag -> queue_name ??
-        self._ctag_pool = IDPool()
-        self._unacked = {}      # dtag -> (ctag, msg)
+        # exchange/queues/bindings
+        self._exchanges = {}                            # names -> { subscriber, topictrie(queue name) }
+        self._queues = {}                               # names -> gevent queue
+        self._bindings_by_queue = defaultdict(list)     # queue name -> [(ex, binding)]
+        self._lock_declarables = coros.RLock()          # exchanges, queues, bindings, routing method
 
-        self._lock_unacked = coros.RLock()      # lock for interacting with unacked field
+        # consumers
+        self._consumers = defaultdict(list)             # queue name -> [ctag, channel._on_deliver]
+        self._consumers_by_ctag = {}                    # ctag -> queue_name ??
+        self._ctag_pool = IDPool()                      # pool of consumer tags
+        self._lock_consumers = coros.RLock()            # lock for interacting with any consumer related attrs
+
+        # deliveries
+        self._unacked = {}                              # dtag -> (ctag, msg)
+        self._lock_unacked = coros.RLock()              # lock for interacting with unacked field
 
         self._gl_msgs = None
 
@@ -533,12 +545,18 @@ class ZeroMQRouter(object):
             try:
                 props = msgpack.unpackb(serprops)
 
-                self._route(ex, rkey, body, props)
+                with self._lock_declarables:
+                    self._route(ex, rkey, body, props)
             except Exception as e:
                 self.errors.append(e)
                 log.exception("Routing message")
 
     def _route(self, exchange, routing_key, body, props):
+        """
+        Delivers incoming messages into queues based on known routes.
+
+        This entire method runs in a lock (likely pretty slow).
+        """
         assert exchange in self._exchanges, "Unknown exchange %s" % exchange
 
         queues = self._exchanges[exchange].get_all_matches(routing_key)
@@ -550,82 +568,95 @@ class ZeroMQRouter(object):
             log.debug("deliver -> %s", q)
             self._queues[q].put((exchange, routing_key, body, props))
 
-    def _run_deliveries(self):
-        pass
-
     def declare_exchange(self, exchange, **kwargs):
-        if not exchange in self._exchanges:
-            self._exchanges[exchange] = TopicTrie()
+        with self._lock_declarables:
+            if not exchange in self._exchanges:
+                self._exchanges[exchange] = TopicTrie()
 
     def delete_exchange(self, exchange, **kwargs):
-        if exchange in self._exchanges:
-            del self._exchanges[exchange]
-
-            # kill any bindings
+        with self._lock_declarables:
+            if exchange in self._exchanges:
+                del self._exchanges[exchange]
 
     def declare_queue(self, queue, **kwargs):
 
-        # come up with new queue name if none specified
-        if queue is None or queue == '':
-            while True:
-                proposed = "q-%s" % str(uuid4())[0:10]
-                if proposed not in self._queues:
-                    queue = proposed
-                    break
+        with self._lock_declarables:
+            # come up with new queue name if none specified
+            if queue is None or queue == '':
+                while True:
+                    proposed = "q-%s" % str(uuid4())[0:10]
+                    if proposed not in self._queues:
+                        queue = proposed
+                        break
 
-        if not queue in self._queues:
-            self._queues[queue] = Queue()
+            if not queue in self._queues:
+                self._queues[queue] = Queue()
 
-        return queue
+            return queue
 
     def delete_queue(self, queue, **kwargs):
-        if queue in self._queues:
-            del self._queues[queue]
+        with self._lock_declarables:
+            if queue in self._queues:
+                del self._queues[queue]
 
-            # kill bindings
+                # kill bindings
+                for ex, binding in self._bindings_by_queue[queue]:
+                    if ex in self._exchanges:
+                        self._exchanges[ex].remove_topic_tree(binding, queue)
 
     def bind(self, exchange, queue, binding):
-        assert exchange in self._exchanges
-        assert queue in self._queues
+        with self._lock_declarables:
+            assert exchange in self._exchanges
+            assert queue in self._queues
 
-        self._exchanges[exchange].add_topic_tree(binding, queue)
+            self._exchanges[exchange].add_topic_tree(binding, queue)
+            self._bindings_by_queue[queue].append((exchange, binding))
 
     def unbind(self, exchange, queue, binding):
-        assert exchange in self._exchanges
-        assert queue in self._queues
+        with self._lock_declarables:
+            assert exchange in self._exchanges
+            assert queue in self._queues
 
-        self._exchanges[exchange].remove_topic_tree(binding, queue)
+            self._exchanges[exchange].remove_topic_tree(binding, queue)
+            for i, val in enumerate(self._bindings_by_queue[queue]):
+                ex, b = val
+                if ex == exchange and b == binding:
+                    self._bindings_by_queue[queue].pop(i)
+                    break
 
     def start_consume(self, callback, queue, no_ack=False, exclusive=False):
         assert queue in self._queues
 
-        new_ctag = self._generate_ctag()
-        assert new_ctag not in self._consumers_by_ctag
+        with self._lock_consumers:
+            new_ctag = self._generate_ctag()
+            assert new_ctag not in self._consumers_by_ctag
 
-        gl = spawn(self._run_consumer, new_ctag, queue, callback)
-        self._consumers[queue].append((new_ctag, callback, no_ack, exclusive, gl))
-        self._consumers_by_ctag[new_ctag] = queue
+            with self._lock_declarables:
+                gl = spawn(self._run_consumer, new_ctag, queue, self._queues[queue], callback)
+            self._consumers[queue].append((new_ctag, callback, no_ack, exclusive, gl))
+            self._consumers_by_ctag[new_ctag] = queue
 
-        return new_ctag
+            return new_ctag
 
     def stop_consume(self, consumer_tag):
         assert consumer_tag in self._consumers_by_ctag
 
-        queue  = self._consumers_by_ctag[consumer_tag]
-        self._consumers_by_ctag.pop(consumer_tag)
+        with self._lock_consumers:
+            queue  = self._consumers_by_ctag[consumer_tag]
+            self._consumers_by_ctag.pop(consumer_tag)
 
-        for i, consumer in enumerate(self._consumers[queue]):
-            if consumer[0] == consumer_tag:
-                consumer[4].kill()      # @TODO not right
-                self._consumers[queue].pop(i)
-                break
+            for i, consumer in enumerate(self._consumers[queue]):
+                if consumer[0] == consumer_tag:
+                    consumer[4].kill()      # @TODO not right
+                    self._consumers[queue].pop(i)
+                    break
 
-        self._return_ctag(consumer_tag)
+            self._return_ctag(consumer_tag)
 
-    def _run_consumer(self, ctag, queue, callback):
+    def _run_consumer(self, ctag, queue_name, gqueue, callback):
         cnt = 0
         while True:
-            m = self._queues[queue].get()
+            m = gqueue.get()
             exchange, routing_key, body, props = m
 
             # create method frame
@@ -644,7 +675,7 @@ class ZeroMQRouter(object):
             cnt += 1
 
             with self._lock_unacked:
-                self._unacked[dtag] = (ctag, queue, m)
+                self._unacked[dtag] = (ctag, queue_name, m)
 
             method_frame['delivery_tag'] = dtag
 
@@ -662,7 +693,9 @@ class ZeroMQRouter(object):
 
     def _generate_dtag(self, ctag, cnt):
         """
-        Generates a unique delivery tag for each consumer
+        Generates a unique delivery tag for each consumer.
+
+        Greenlet-safe, no need to lock.
         """
         return "%s-%s" % (ctag, cnt)
 
@@ -715,7 +748,7 @@ class ZeroMQTransport(BaseTransport):
         self._pub.send_multipart([exchange, routing_key, body, propser])
 
     def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
-        return self._broker.start_consume(self, callback, queue, no_ack=no_ack, exclusive=exclusive)
+        return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
     def stop_consume_impl(self, client, consumer_tag):
         self._broker.stop_consume(consumer_tag)
 
