@@ -19,6 +19,7 @@ from gevent.pool import Pool
 from contextlib import contextmanager
 import os
 from pika import BasicProperties
+import time
 
 class TransportError(StandardError):
     pass
@@ -786,6 +787,7 @@ class ZeroMQTransport(BaseTransport):
         # properties is a dictionary, must serialize to send over zeromq
         propser = msgpack.packb(properties)
         self._pub.send_multipart([exchange, routing_key, body, propser])
+        time.sleep(0.001)
 
     def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
         return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
