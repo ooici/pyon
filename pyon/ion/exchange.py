@@ -104,7 +104,10 @@ class ExchangeManager(object):
 
             # start it with a zero timeout so it comes right back to us
             try:
-                node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
+                if 'zmq' in cfgkey:
+                    node, ioloop = messaging.make_zmq_node(0)
+                else:
+                    node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
 
                 # install a finished handler directly on the ioloop just for this startup period
                 fail_handle = lambda _: handle_failure(name, node)
@@ -158,7 +161,7 @@ class ExchangeManager(object):
         for name in self._nodes:
             self._nodes[name].stop_node()
             self._ioloops[name].kill()
-            self._nodes[name].client.ioloop.start()     # loop until connection closes
+            #self._nodes[name].client.ioloop.start()     # loop until connection closes
 
         # @TODO undeclare root xs??  need to know if last container
         #self.default_xs.delete()
