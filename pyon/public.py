@@ -7,11 +7,6 @@ __license__ = 'Apache 2.0'
 
 __all__ = []
 
-
-# Tell the magic import log setup to pass through this file
-from pyon.util.log import import_paths
-import_paths.append(__name__)
-
 from pyon.util.log import log
 __all__ += ['log']
 
@@ -26,6 +21,9 @@ __all__ += ['spawn', 'switch']
 
 from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
 __all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
+
+from pyon.core.exception import BadRequest, NotFound, Inconsistent, Conflict, IonException, Timeout
+__all__ += ['BadRequest','NotFound','Inconsistent','Conflict','IonException','Timeout']
 
 from pyon.core import exception as iex
 __all__ += ['iex']

@@ -191,7 +191,15 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
             return RPCResponseEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(),*op_args, **op_kwargs)
-        return ar.get()     # @TODO: timeout?
+        res = ar.get()     # @TODO: timeout?
+
+        # Persistent process state handling
+        if hasattr(self._process,"_proc_state"):
+            if self._process._proc_state_changed:
+                log.debug("Process %s state changed. State=%s", self._process.id, self._process._proc_state)
+                self._process.container.state_repository.put_state(self._process.id, self._process._proc_state)
+                self._process._proc_state_changed = False
+        return res
 
 
 class ProcessRPCServer(RPCServer):

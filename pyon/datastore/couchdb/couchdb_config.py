@@ -33,6 +33,8 @@ COUCHDB_CONFIGS = {
     },
 }
 
+# Defines all the available CouchDB views and their map/reduce functions.
+# Views are associated to datastore based on profile.
 COUCHDB_VIEWS = {
     # -------------------------------------------------------------------------
     # Association (triple) related views
@@ -74,6 +76,7 @@ function(doc) {
   }
 }""",
         },
+        # By predicate then subject then object
         'by_pred':{
             'map':"""
 function(doc) {
@@ -156,6 +159,7 @@ function(doc) {
   }
 }""",
         },
+        # Find by name
         'by_name':{
             'map':"""
 function(doc) {
@@ -164,8 +168,33 @@ function(doc) {
   }
 }""",
         },
+        # Find by keyword then res type (one entry per keyword in a resource)
+        'by_keyword':{
+            'map':"""
+function(doc) {
+  if (doc.type_ && doc.keywords != undefined) {
+    for (var i = 0; i < doc.keywords.length; i++ ) {
+      emit([doc.keywords[i], doc.type_], null);
+    }
+  }
+}""",
+        },
+        # Find by name of nested type, then res type (one record per nested ION object type)
+        'by_nestedtype':{
+            'map':"""
+function(doc) {
+  if (doc.type_) {
+    for (var attr in doc) {
+      if (doc[attr] != undefined && doc[attr].type_) {
+        emit([doc[attr].type_, doc.type_], null);
+      }
+    }
+  }
+}""",
+        },
     },
 
+    # -------------------------------------------------------------------------
     # Directory related objects
     # DirEntry objects are the elements of the directory tree
     'directory':{
@@ -209,6 +238,7 @@ function(doc) {
         },
     },
 
+    # -------------------------------------------------------------------------
     # Event related objects
     'event':{
         'by_time':{
@@ -244,6 +274,9 @@ function(doc) {
 }""",
         },
     },
+
+
+    # -------------------------------------------------------------------------
     'posts' : {
         "dataset_by_id": {
             "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
@@ -276,6 +309,8 @@ function(doc) {
             "map": "function(doc) {\n  if(doc.type_==\"BlogPost\")\n    emit([doc.author.name,doc.updated,doc.post_id], doc.post_id);\n  else if(doc.type==\"BlogComment\")\n    emit([doc.author.name,doc.updated,doc.ref_id], doc.ref_id);\n}"
         }
     },
+
+    # -------------------------------------------------------------------------
     'datasets': {
         # Bounds
         # Map: https://gist.github.com/1781675#file_maps.js
@@ -300,12 +335,15 @@ function(doc) {
         }
 
     },
+
+    # -------------------------------------------------------------------------
     'manifest': {
         'by_dataset' : {
             'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, i], doc._id); }'
         }
     },
 
+    # -------------------------------------------------------------------------
     'catalog': {
         'file_by_name': {
            "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"

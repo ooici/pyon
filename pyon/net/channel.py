@@ -584,13 +584,6 @@ class RecvChannel(BaseChannel):
         with self._ensure_amq_chan():
             self._sync_call(self._amq_chan.basic_cancel, 'callback', self._consumer_tag)
 
-    def _on_close_while_consume(self, fsm):
-        """
-        Handles the case where close is issued on a consuming channel.
-        """
-        self.stop_consume()
-        self.close()
-
     def reset(self):
         """
         Provides a hook for resetting a node (used only by pooling in the node).

@@ -45,17 +45,18 @@ setup(  name = 'pyon',
             },
         dependency_links = [
             'http://sddevrepo.oceanobservatories.org/releases/',
-            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler'
+            'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler',
+            'https://github.com/ooici/utilities/tarball/v2012.9.8#egg=utilities-2012.9.8'
         ],
         test_suite = 'pyon',
         package_data = {'': ['*.xml']},
         install_requires = [
+            'utilities==2012.9.8',
             'greenlet==0.4.0',
             'gevent',
             'simplejson==2.1.6',
             'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
-            'pyyaml==3.10',
             'pika==0.9.5',
             'httplib2>=0.7.2',
             'pyzmq==2.1.7',

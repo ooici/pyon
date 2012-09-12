@@ -33,16 +33,9 @@ class TestExceptionUtils(TestCase):
         self.assertEqual('test2 message', ex.message)
         d = ex.get_stacks()
         labels = [ label for label,stack in ex.get_stacks() ]
-        self.assertTrue('__init__' in labels)
+        self.assertTrue('test2 message' in labels[0], msg='labels: %r'%labels)
         self.assertTrue('added' in labels)
         self.assertTrue(all(isinstance(stack,list) for label,stack in ex.get_stacks()))
-
-    def testToString(self):
-        stack = self.get_stack(3)
-        ex = self.subject.create_exception(553, 'test2 message', [('added',stack)])
-        msg1 = ex.format_stack()
-        msg2 = ex.format_stack(formatter=self.custom_stack_format)
-        self.assertTrue(len(msg1)>len(msg2))
 
     def get_stack(self, n):
         if n>0:

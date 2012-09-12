@@ -49,3 +49,66 @@ class StateRepository(object):
         log.debug("Retrieving persistent state for key=%s" % key)
         state_obj = self.state_store.read(key)
         return state_obj.state
+
+class StatefulProcessMixin(object):
+    """
+    Mixin class for stateful processes.
+    Need to avoid __init__
+    """
+    def _set_state(self, key, value):
+        """
+        Sets a key-value in the process's state vector. Marks the state as changed
+        if the value has actually changed.
+        """
+        if not hasattr(self, "_proc_state"):
+            self._proc_state = {}
+            self._proc_state_changed = False
+
+        old_state = self._proc_state.get(key, None)
+        if old_state != value:
+            self._proc_state[key] = value
+            self._proc_state_changed = True
+            log.debug("Process state updated. pid=%s, key=%s, value=%s", self.id, key, value)
+
+    def _get_state(self, key, default=None):
+        """
+        Returns the value for a key from the process's state vector. If there is no
+        value or the value is None, the default is returned.
+        """
+        if not hasattr(self, "_proc_state"):
+            return None
+
+        state = self._proc_state.get(key, None)
+        return state if state is not None else default
+
+    def _get_state_vector(self):
+        """
+        Returns the entire process state vector as a dict.
+        Note: direct changes to the state vector will not automatically be detected.
+        """
+        if not hasattr(self, "_proc_state"):
+            self._proc_state = {}
+        return self._proc_state
+
+    def _mark_changed(self):
+        """
+        Marks the process state vector as changed. The container will flush the
+        state change to the repository when appropriate.
+        """
+        if not hasattr(self, "_proc_state"):
+            self._proc_state = {}
+        self._proc_state_changed = True
+
+    def _flush_state(self):
+        """
+        Immediately pushes the state to the state repository. This call blocks
+        until the write has completed
+        """
+        pass
+
+    def _load_state(self):
+        """
+        Loads the process's state vector again from the state repository. Calling this
+        operation should not be necessary in normal circumstances.
+        """
+        pass
