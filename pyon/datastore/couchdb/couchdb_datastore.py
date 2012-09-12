@@ -669,10 +669,19 @@ class CouchDB_DataStore(DataStore):
         return assocs
 
     def find_resources(self, restype="", lcstate="", name="", id_only=True):
+        return self.find_resources_ext(restype=restype, lcstate=lcstate, name=name, id_only=id_only)
+
+    def find_resources_ext(self, restype="", lcstate="", name="",
+                           keyword=None, nested_type=None,
+                           limit=None, skip=None, descending=None, id_only=True):
         if name:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
             return self.find_res_by_name(name, restype, id_only)
+        elif keyword:
+            return self.find_res_by_keyword(keyword, restype, id_only)
+        elif nested_type:
+            return self.find_res_by_nested_type(nested_type, restype, id_only)
         elif restype and lcstate:
             return self.find_res_by_lcstate(lcstate, restype, id_only)
         elif restype:
@@ -756,6 +765,56 @@ class CouchDB_DataStore(DataStore):
         res_assocs = [dict(name=row['key'][0], type=row['key'][1], lcstate=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_name() found %s objects", len(res_assocs))
         self._count(find_res_by_name_call=1, find_res_by_name_obj=len(res_assocs))
+        if id_only:
+            res_ids = [row.id for row in rows]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
+            return (res_docs, res_assocs)
+
+    def find_res_by_keyword(self, keyword, restype=None, id_only=False):
+        log.debug("find_res_by_keyword(keyword=%s, restype=%s)", keyword, restype)
+        if not keyword or type(keyword) is not str:
+            raise BadRequest('Argument keyword illegal')
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        ds, datastore_name = self._get_datastore()
+        view = ds.view(self._get_viewname("resource","by_keyword"), include_docs=(not id_only))
+        key = [keyword]
+        if restype:
+            key.append(restype)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(keyword=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
+        log.debug("find_res_by_keyword() found %s objects", len(res_assocs))
+        self._count(find_res_by_kw_call=1, find_res_by_kw_obj=len(res_assocs))
+        if id_only:
+            res_ids = [row.id for row in rows]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
+            return (res_docs, res_assocs)
+
+    def find_res_by_nested_type(self, nested_type, restype=None, id_only=False):
+        log.debug("find_res_by_nested_type(nested_type=%s, restype=%s)", nested_type, restype)
+        if not nested_type or type(nested_type) is not str:
+            raise BadRequest('Argument nested_type illegal')
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        ds, datastore_name = self._get_datastore()
+        view = ds.view(self._get_viewname("resource","by_nestedtype"), include_docs=(not id_only))
+        key = [nested_type]
+        if restype:
+            key.append(restype)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(nested_type=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
+        log.debug("find_res_by_nested_type() found %s objects", len(res_assocs))
+        self._count(find_res_by_nested_call=1, find_res_by_nested_obj=len(res_assocs))
         if id_only:
             res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)

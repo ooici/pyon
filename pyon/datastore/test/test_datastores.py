@@ -61,6 +61,7 @@ class Test_DataStores(IonIntegrationTestCase):
                 ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
 
             self._do_test_views(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
+
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
 
@@ -518,6 +519,26 @@ class Test_DataStores(IonIntegrationTestCase):
         iag1_obj_id = self._create_resource(RT.InstrumentAgentInstance, 'ia1', description='')
 
         data_store.create_association(idev1_obj_id, PRED.hasAgentInstance, iag1_obj_id)
+
+        att1 = self._create_resource(RT.Attachment, 'att1', keywords=[])
+        att2 = self._create_resource(RT.Attachment, 'att2', keywords=['FOO'])
+        att3 = self._create_resource(RT.Attachment, 'att3', keywords=['BAR','FOO'])
+
+        res_list,key_list = data_store.find_resources_ext(restype="NONE", keyword="FOO")
+        self.assertEqual(len(res_list), 0)
+        res_list,key_list = data_store.find_resources_ext(keyword="FOO")
+        self.assertEqual(len(res_list), 2)
+        res_list,key_list = data_store.find_resources_ext(restype=RT.Attachment, keyword="FOO")
+        self.assertEqual(len(res_list), 2)
+
+        res_list,key_list = data_store.find_resources_ext(restype="NONE", nested_type="ContactInformation")
+        self.assertEqual(len(res_list), 0)
+        res_list,key_list = data_store.find_resources_ext(nested_type="ContactInformation")
+        self.assertEqual(len(res_list), 1)
+        res_list,key_list = data_store.find_resources_ext(restype=RT.UserInfo, nested_type="ContactInformation", id_only=False)
+        self.assertEqual(len(res_list), 1)
+        self.assertEqual(res_list[0]._get_type(), RT.UserInfo)
+
 
 
     def _create_resource(self, restype, name, *args, **kwargs):
