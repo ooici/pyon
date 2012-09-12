@@ -414,7 +414,7 @@ class TopicTrie(object):
 
             cur_token = topics[0]
             rem_tokens = topics[1:]     # will always be a list, even if empty or 1-len
-            log.debug('get_all_matches(%s): cur_token %s, rem_tokens %s', self.token, cur_token, rem_tokens)
+            #log.debug('get_all_matches(%s): cur_token %s, rem_tokens %s', self.token, cur_token, rem_tokens)
 
             # child node direct matching
             if cur_token in self.children:
