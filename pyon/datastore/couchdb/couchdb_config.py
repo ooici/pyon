@@ -37,95 +37,11 @@ COUCHDB_CONFIGS = {
 # Views are associated to datastore based on profile.
 COUCHDB_VIEWS = {
     # -------------------------------------------------------------------------
-    # Association (triple) related views
-    'association':{
-        # Subject to object lookup (for range queries)
-        'by_sub':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.s, doc.p, doc.ot, doc.o], doc);
-  }
-}""",
-        },
-        # Object to subject lookup (for range queries)
-        'by_obj':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.o, doc.p, doc.st, doc.s], doc);
-  }
-}""",
-        },
-        # For directed association lookup
-        'by_ids':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
-  }
-}""",
-        },
-        # For undirected association lookup
-        'by_id':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
-    emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
-  }
-}""",
-        },
-        # By predicate then subject then object
-        'by_pred':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Association") {
-    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
-  }
-}""",
-        },
-        # Subject to object lookup (for multi key queries)
-        'by_bulk':{
-            'map':"""
-function(doc) {
-  if(doc.type_ == "Association") {
-    emit(doc.s, doc.o);
-  }
-}""",
-        }
-    },
-
-    # -------------------------------------------------------------------------
-    # Pure ION object related views
-    # Every object has a type and ID
-    'object':{
-        'by_type':{
-            'map':"""
-function(doc) {
-  emit([doc.type_], null);
-}""",
-        },
-    },
-
-    # -------------------------------------------------------------------------
-    # Attachment objects
-    'attachment':{
-        'by_resource':{
-            'map':"""
-function(doc) {
-  if (doc.type_ == "Attachment") {
-    emit([doc.object_id, doc.ts_created], null);
-  }
-}""",
-        }
-    },
-
-    # -------------------------------------------------------------------------
-    # Resource ION object related views
-    # Resources have a type, life cycle state and name
-    # Note: the name in the indexes leads to a sort by name
+    # Views for ION Resource objects
+    # Resources all have a type, life cycle state and name
+    # Note: adding additional entries to the index such as name leads to a sort by name but prevents range queries
     'resource':{
+        # Find resource by exact type
         'by_type':{
             'map':"""
 function(doc) {
@@ -192,6 +108,97 @@ function(doc) {
   }
 }""",
         },
+    },
+
+    # -------------------------------------------------------------------------
+    # Pure ION object related views
+    # Every object has a type and ID
+    'object':{
+        'by_type':{
+            'map':"""
+function(doc) {
+  if (doc.type_ != undefined) {
+    emit([doc.type_], null);
+  }
+}""",
+            },
+        },
+
+    # -------------------------------------------------------------------------
+    # Attachment objects
+    'attachment':{
+        # Attachment for an object, ordered by create timestamp
+        # Note: the keywords list is part of the index so that it can be checked
+        # before retrieving attachment objects
+        'by_resource':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Attachment") {
+    emit([doc.object_id, doc.ts_created, doc.keywords], null);
+  }
+}""",
+        },
+
+    },
+
+    # -------------------------------------------------------------------------
+    # Association (triple) related views
+    'association':{
+        # Subject to object lookup (for range queries)
+        'by_sub':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.p, doc.ot, doc.o], doc);
+  }
+}""",
+            },
+        # Object to subject lookup (for range queries)
+        'by_obj':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.o, doc.p, doc.st, doc.s], doc);
+  }
+}""",
+            },
+        # For directed association lookup
+        'by_ids':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
+  }
+}""",
+            },
+        # For undirected association lookup
+        'by_id':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
+    emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
+  }
+}""",
+            },
+        # By predicate then subject then object
+        'by_pred':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
+  }
+}""",
+            },
+        # Subject to object lookup (for multi key queries)
+        'by_bulk':{
+            'map':"""
+function(doc) {
+  if(doc.type_ == "Association") {
+    emit(doc.s, doc.o);
+  }
+}""",
+            }
     },
 
     # -------------------------------------------------------------------------
