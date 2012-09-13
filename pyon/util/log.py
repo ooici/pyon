@@ -57,7 +57,9 @@ class RPCStackFormatter(ooi.logging.format.StackFormatter):
         # TODO: make sections and definitions of sections configurable to keep up with code changes, apply to other uses
         #
         have_required_sections = False
-        display_frames = None
+        display_frames = []
+        if not stack:
+            return display_frames
         i = iter(stack)
         try:
             file,line,method,code = i.next()
