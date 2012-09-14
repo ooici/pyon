@@ -2,7 +2,7 @@
 '''
 @author Luke Campbell <LCampbell@ASAScience.com>
 @date Mon Jul 16 14:07:06 EDT 2012
-@file pyon/ion/test/test_simple_stream.py
+@file pyon/ion/test/test_stream_pubsub.py
 '''
 
 from pyon.util.int_test import IonIntegrationTestCase
@@ -30,8 +30,11 @@ class StreamPubsubTest(IonIntegrationTestCase):
 
     def test_stream_pub_sub(self):
         self.verified = Event()
+        self.route = StreamRoute(exchange_point='xp_test', routing_key='route')
         def verify(message, route, stream):
             self.assertEquals(message,'test')
+            self.assertEquals(route, self.route)
+            self.assertEquals(stream, '')
             self.verified.set()
 
         sub_proc = SimpleProcess()
@@ -41,12 +44,11 @@ class StreamPubsubTest(IonIntegrationTestCase):
         sub1.start()
         self.queue_cleanup.append('sub1')
 
-        route = StreamRoute(exchange_point='xp_test', routing_key='route')
 
         pub_proc = SimpleProcess()
         pub_proc.container = self.container
-        pub1 = StreamPublisher(process=pub_proc,stream_route=route)
-        sub1.xn.bind(route.routing_key,pub1.xp) 
+        pub1 = StreamPublisher(process=pub_proc,stream_route=self.route)
+        sub1.xn.bind(self.route.routing_key,pub1.xp) 
 
         pub1.publish('test')
 

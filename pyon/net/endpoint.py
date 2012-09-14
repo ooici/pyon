@@ -634,7 +634,7 @@ class Publisher(SendingBaseEndpoint):
         self._pub_ep = None
         SendingBaseEndpoint.__init__(self, **kwargs)
 
-    def publish(self, msg, to_name=None):
+    def publish(self, msg, to_name=None, headers=None):
         if to_name is not None:
             if not isinstance(to_name, NameTrio):
                 to_name = NameTrio(bootstrap.get_sys_name(), to_name)   # ensure NT before
@@ -645,7 +645,7 @@ class Publisher(SendingBaseEndpoint):
         if to_name is not None:
             self._pub_ep.channel.connect(to_name)
 
-        self._pub_ep.send(msg)
+        self._pub_ep.send(msg, headers)
 
     def close(self):
         """

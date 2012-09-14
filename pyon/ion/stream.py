@@ -12,7 +12,7 @@ from pyon.util.arg_check import validate_is_instance
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.util.log import log
 from pyon.service.service import BaseService
-from interface.objects import StreamRoute, Packet
+from interface.objects import StreamRoute
 
 import gevent
 
@@ -75,10 +75,9 @@ class StreamPublisher(Publisher):
             xp = self.container.ex_manager.create_xp(stream_route.exchange_point)
         else:
             stream_route = self.stream_route
-        packet = Packet(route=stream_route or self.stream_route, stream_id=stream_id or self.stream_id, body=msg)
         xp = self.xp
         log.info('Publishing (%s,%s)', xp.exchange, stream_route.routing_key)
-        super(StreamPublisher,self).publish(packet, to_name=xp.create_route(stream_route.routing_key))
+        super(StreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id})
 
 class StreamSubscriber(Subscriber):
     '''
@@ -114,11 +113,8 @@ class StreamSubscriber(Subscriber):
         @param msg     The incoming packet.
         @param headers The headers of the incoming message.
         '''
-        packet = msg
-        if not isinstance(packet, Packet): 
-            log.warn('Received non-packet on stream.')
-            return
-        self.callback(packet.body, packet.route, packet.stream_id)
+        route = StreamRoute(headers['exchange_point'], headers['routing_key'])
+        self.callback(msg, route, headers['stream'])
    
     def start(self):
         '''
@@ -159,7 +155,6 @@ class StandaloneStreamPublisher(Publisher):
         validate_is_instance(stream_route, StreamRoute, 'stream route is not valid')
         self.stream_route = stream_route
 
-
     def publish(self, msg, stream_id='', stream_route=None):
         '''
         Encapsulates and publishes the message on the specified stream/route or 
@@ -171,10 +166,9 @@ class StandaloneStreamPublisher(Publisher):
         from pyon.container.cc import Container
         stream_id = stream_id or self.stream_id
         stream_route = stream_route or self.stream_route
-        packet = Packet(body=msg, stream_id=stream_id, route=stream_route)
         container = Container.instance
         xp = container.ex_manager.create_xp(stream_route.exchange_point)
-        super(StandaloneStreamPublisher,self).publish(packet,to_name=xp.create_route(stream_route.routing_key))
+        super(StandaloneStreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id})
 
 class StandaloneStreamSubscriber(Subscriber):
     '''
@@ -202,11 +196,8 @@ class StandaloneStreamSubscriber(Subscriber):
         @param msg     The incoming packet.
         @param headers The headers of the incoming message.
         '''
-        packet = msg
-        if not isinstance(packet, Packet): 
-            log.warn('Received non-packet on stream.')
-            return
-        self.callback(packet.body, packet.route, packet.stream_id)
+        route = StreamRoute(headers['exchange_point'], headers['routing_key'])
+        self.callback(msg, route, headers['stream'])
    
     def start(self):
         '''
