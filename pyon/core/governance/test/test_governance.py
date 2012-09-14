@@ -25,7 +25,13 @@ class UnitTestService(BaseService):
     def func3(self, msg,  header):
         return True, ''
 
+    #This invalid test function does not have the proper signature
+    def bad_signature(self, msg):
+        return True, ''
 
+    #This invalid test function does not have the proper return tuple
+    def bad_return(self, msg, header):
+        return True
 
 @attr('UNIT')
 class GovernanceTest(PyonTestCase):
@@ -53,6 +59,26 @@ class GovernanceTest(PyonTestCase):
                 return False, 'Cannot call the test_op operation'
             else:
                 return True, ''
+
+        """
+
+        #This invalid test function does not have the proper signature
+        self.bad_pre_func1 =\
+        """def precondition_func(msg, headers):
+            if headers['op'] == 'test_op':
+                return False, 'Cannot call the test_op operation'
+            else:
+                return True, ''
+
+        """
+
+        #This invalid test function does not return the proper tuple
+        self.bad_pre_func2 =\
+        """def precondition_func(process, msg, headers):
+            if headers['op'] == 'test_op':
+                return False
+            else:
+                return True
 
         """
 
@@ -86,13 +112,17 @@ class GovernanceTest(PyonTestCase):
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', 'func2')
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 2)
 
-
+        #Its possible to register invalid functions
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', 'func4')
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 3)
 
 
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', 'self.pre_func1')
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 4)
+
+        #Its possible to register invalid functions
+        self.governance_controller.register_process_operation_precondition(bs, 'test_op', bs.bad_signature)
+        self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 5)
 
     def test_unregister_process_operation_precondition(self):
 
@@ -162,8 +192,30 @@ class GovernanceTest(PyonTestCase):
         self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', self.pre_func2)
         self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
 
+        #Its possible to register invalid functions - but it should get ignored when checked
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', 'func4')
         self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', 'func4')
+
+        #Its possible to register invalid functions - but it should get ignored when checked
+        self.governance_controller.register_process_operation_precondition(bs, 'test_op', bs.bad_signature)
+        self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', bs.bad_signature)
+
+        #Its possible to register invalid functions - but it should get ignored when checked
+        self.governance_controller.register_process_operation_precondition(bs, 'test_op', bs.bad_return)
+        self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', bs.bad_return)
+
+        #Its possible to register invalid functions - but they it get ignored when checked
+        self.governance_controller.register_process_operation_precondition(bs, 'test_op', self.bad_pre_func1)
+        self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', self.bad_pre_func1)
+
+        #Its possible to register invalid functions - but it should get ignored when checked
+        self.governance_controller.register_process_operation_precondition(bs, 'test_op', self.bad_pre_func2)
+        self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', self.bad_pre_func2)
 
 class FakeContainer(object):
     def __init__(self):
