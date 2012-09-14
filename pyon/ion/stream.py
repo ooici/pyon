@@ -77,7 +77,7 @@ class StreamPublisher(Publisher):
             stream_route = self.stream_route
         xp = self.xp
         log.info('Publishing (%s,%s)', xp.exchange, stream_route.routing_key)
-        super(StreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id})
+        super(StreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id or self.stream_id})
 
 class StreamSubscriber(Subscriber):
     '''
@@ -168,7 +168,7 @@ class StandaloneStreamPublisher(Publisher):
         stream_route = stream_route or self.stream_route
         container = Container.instance
         xp = container.ex_manager.create_xp(stream_route.exchange_point)
-        super(StandaloneStreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id})
+        super(StandaloneStreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id or self.stream_id})
 
 class StandaloneStreamSubscriber(Subscriber):
     '''
