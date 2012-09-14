@@ -364,7 +364,7 @@ class GovernanceController(object):
                         ret_val, ret_message = precond(msg, headers)
                     except Exception, e:
                         #TODD - Catching all exceptions and logging as errors, don't want to stop processing for this right now
-                        log.error('Error: processing precondition function: %s for operation: %s - %s' % (str(precond), operation, e.message))
+                        log.error('Executing precondition function: %s for operation: %s - %s so it will be ignored.' % (precond.__name__, operation, e.message))
                         ret_val = True
                         ret_message = ''
 
@@ -380,7 +380,7 @@ class GovernanceController(object):
 
                     except Exception, e:
                         #TODD - Catching all exceptions and logging as errors, don't want to stop processing for this right now
-                        log.error('Error: processing precondition: %s for operation: %s - %s' % (precond, operation, e.message))
+                        log.error('Executing precondition function: %s for operation: %s - %s so it will be ignored.' % (precond, operation, e.message))
                         ret_val = True
                         ret_message = ''
 
