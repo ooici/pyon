@@ -290,13 +290,13 @@ class BaseEndpoint(object):
 
         return e
 
-    def _create_channel(self, **kwargs):
+    def _create_channel(self, transport=None):
         """
         Creates a channel, used by create_endpoint.
 
         Can pass additional kwargs in to be passed through to the channel provider.
         """
-        return self.node.channel(self.channel_type, **kwargs)
+        return self.node.channel(self.channel_type, transport=transport)
 
     def close(self):
         """
@@ -329,16 +329,17 @@ class SendingBaseEndpoint(BaseEndpoint):
         e.channel.connect(name)
         return e
 
-    def _create_channel(self, **kwargs):
+    def _create_channel(self, transport=None):
         """
         Overrides the BaseEndpoint create channel to supply a transport if our send_name is one.
         """
-        if isinstance(self._send_name, BaseTransport):
-            kwargs.update({'transport':self._send_name})
-        elif self._transport is not None:
-            kwargs.update({'transport':self._transport})
+        if transport is None:
+            if isinstance(self._send_name, BaseTransport):
+                transport = self._send_name
+            elif self._transport is not None:
+                transport = self._transport
 
-        return BaseEndpoint._create_channel(self, **kwargs)
+        return BaseEndpoint._create_channel(self, transport=transport)
 
 
 

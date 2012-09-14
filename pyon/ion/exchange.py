@@ -78,8 +78,6 @@ class ExchangeManager(object):
         self._nodes     = {}
         self._ioloops   = {}
 
-        self._transport = None
-
         self._default_xs_declared = False
 
     def start(self):
@@ -135,8 +133,6 @@ class ExchangeManager(object):
                 raise ExchangeManagerError("No node connection was able to start (%d nodes attempted, %d nodes failed)" % (total_count, fail_count))
 
             log.warn("Some nodes could not be started, ignoring for now")   # @TODO change when ready
-
-        self._transport = AMQPTransport.get_instance()
 
         # load interceptors into each
         map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
@@ -258,28 +254,18 @@ class ExchangeManager(object):
         return False
 
     @property
-    def _client(self):
+    def _transport(self, node):
         """
-        Gets a functioning version of a raw Pika channel to speak to the broker.
-
-        Lazy-loads and re-makes itself if the channel has failed for any reason.
-        """
-        return self._get_channel(self._nodes.get('priviledged', self._nodes.values()[0]))        # @TODO
-
-    def _get_channel(self, node):
-        """
-        Get a raw channel to be used by all the ensure_exists methods.
+        Get a transport to be used by operations here.
         """
         assert self.container
 
         # @TODO: needs lock, but so do all these methods
-        if not self._chan or (self._chan and self._chan.closing is not None):
-
-            # if you want to play with node internals, you have to play nice with the node.. needs the lock!
+        if not self._transport or (self._transport and not self._transport.active):
             with node._lock:
-                self._chan = blocking_cb(node.client.channel, 'on_open_callback')
+                self._transport = node._new_transport()
 
-        return self._chan
+        return self._transport
 
     def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xs: %s", name)
@@ -717,33 +703,39 @@ class ExchangeManager(object):
 
         return content
 
+    #######################
+    ###
+    ## @TODO REMOVE
+    ###
+    #######################
+
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_exchange %s", exchange)
         if exchange != ION_ROOT_XS:
             # don't allow recursion!
             self._ensure_default_declared()
-        self._transport.declare_exchange_impl(self._client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
+        self._transport.declare_exchange_impl(exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
     def delete_exchange(self, exchange, **kwargs):
         log.info("ExchangeManager.delete_exchange")
         self._ensure_default_declared()
-        self._transport.delete_exchange_impl(self._client, exchange, **kwargs)
+        self._transport.delete_exchange_impl(exchange, **kwargs)
     def declare_queue(self, queue, durable=False, auto_delete=False):
         log.info("ExchangeManager.declare_queue (queue %s, durable %s, AD %s)", queue, durable, auto_delete)
         self._ensure_default_declared()
-        return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
+        return self._transport.declare_queue_impl(queue, durable=durable, auto_delete=auto_delete)
     def delete_queue(self, queue, **kwargs):
         log.info("ExchangeManager.delete_queue %s", queue)
         self._ensure_default_declared()
-        self._transport.delete_queue_impl(self._client, queue, **kwargs)
+        self._transport.delete_queue_impl(queue, **kwargs)
     def bind(self, exchange, queue, binding):
         log.info("ExchangeManager.bind")
         self._ensure_default_declared()
-        self._transport.bind_impl(self._client, exchange, queue, binding)
+        self._transport.bind_impl(exchange, queue, binding)
     def unbind(self, exchange, queue, binding):
         log.info("ExchangeManager.unbind")
         self._ensure_default_declared()
-        self._transport.unbind_impl(self._client, exchange, queue, binding)
+        self._transport.unbind_impl(exchange, queue, binding)
     def ack(self, client, delivery_tag):
         """
         ack is a special case: needs to be on the individual channel, not the shared client in the manager.
@@ -771,11 +763,11 @@ class ExchangeManager(object):
     def get_stats(self, queue):
         log.info("ExchangeManager.get_stats")
         self._ensure_default_declared()
-        return self._transport.get_stats_impl(self._client, queue)
+        return self._transport.get_stats_impl(queue)
     def purge(self, queue):
         log.info("ExchangeManager.purge")
         self._ensure_default_declared()
-        self._transport.purge_impl(self._client, queue)
+        self._transport.purge_impl(queue)
     def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         """
         QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
@@ -785,7 +777,7 @@ class ExchangeManager(object):
         self._transport.qos_impl(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
     def publish(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         self._ensure_default_declared()
-        self._transport.publish_impl(self._client, exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+        self._transport.publish_impl(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
 
 class XOTransport(BaseTransport):
     def __init__(self, exchange_manager):

@@ -66,7 +66,6 @@ class ChannelShutdownMessage(object):
 
 class BaseChannel(object):
 
-    _amq_chan                   = None      # underlying transport
     _close_callback             = None      # close callback to use when closing, not always set (used for pooling)
     _closed_error_callback      = None      # callback which triggers when the underlying transport closes with error
     _exchange                   = None      # exchange (too AMQP specific)
@@ -84,7 +83,7 @@ class BaseChannel(object):
     I_ATTACH                    = 'ATTACH'
     I_CLOSE                     = 'CLOSE'
 
-    def __init__(self, transport=None, close_callback=None):
+    def __init__(self, close_callback=None):
         """
         Initializes a BaseChannel instance.
 
@@ -96,7 +95,7 @@ class BaseChannel(object):
                                 param, this channel instance.
         """
         self.set_close_callback(close_callback)
-        self._transport = transport or AMQPTransport.get_instance()
+        #self._transport = transport or AMQPTransport.get_instance()
 
         # setup FSM for BaseChannel / SendChannel tree
         self._fsm = FSM(self.S_INIT)
@@ -117,13 +116,13 @@ class BaseChannel(object):
         self._close_callback = close_callback
 
     @contextmanager
-    def _ensure_amq_chan(self):
+    def _ensure_transport(self):
         """
         Ensures this Channel has been activated with the Node.
         """
-#        log.debug("BaseChannel._ensure_amq_chan (current: %s)", self._amq_chan is not None)
-        if not self._amq_chan:
-            raise ChannelError("No amq_chan attached")
+#        log.debug("BaseChannel._ensure_transport (current: %s)", self._transport is not None)
+        if not self._transport:
+            raise ChannelError("No transport attached")
 
         if not self._lock:
             raise ChannelError("No lock available")
@@ -135,8 +134,8 @@ class BaseChannel(object):
 
         with self._lock:
             # we could wait and wait, and it gets closed, and unless we check again, we'd never know!
-            if not self._amq_chan:
-                raise ChannelError("No amq_chan attached")
+            if not self._transport:
+                raise ChannelError("No transport attached")
 
             self._lock_trace = traceback.format_stack()
             try:
@@ -156,24 +155,15 @@ class BaseChannel(object):
         assert self._exchange
         assert self._transport
 
-        with self._ensure_amq_chan():
+        with self._ensure_transport():
 
 #           log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
 #                                                                 self._exchange_durable, self._exchange_auto_delete)
 
-            self._transport.declare_exchange_impl(self._amq_chan,
-                                                  self._exchange,
+            self._transport.declare_exchange_impl(self._exchange,
                                                   exchange_type=self._exchange_type,
                                                   durable=self._exchange_durable,
                                                   auto_delete=self._exchange_auto_delete)
-
-    def attach_underlying_channel(self, amq_chan):
-        """
-        Attaches an AMQP channel and indicates this channel is now open.
-        """
-        self._amq_chan = amq_chan
-        self._lock = coros.RLock()
-        self._fsm.process(self.I_ATTACH)
 
     def get_channel_id(self):
         """
@@ -181,10 +171,10 @@ class BaseChannel(object):
 
         @return Channel id, or None.
         """
-        if not self._amq_chan:
+        if not self._transport:
             return None
 
-        return self._amq_chan.channel_number
+        return self._transport.channel_number
 
     def reset(self):
         """
@@ -225,35 +215,30 @@ class BaseChannel(object):
         Closes the AMQP connection.
         """
         log.info("BaseChannel.close_impl (%s)", self.get_channel_id())
-        if self._amq_chan:
+        if self._transport:
 
-            # the close destroys self._amq_chan, so keep a ref here
-            amq_chan = self._amq_chan
-            with self._ensure_amq_chan():
-                amq_chan.close()
+            # the close destroys self._transport, so keep a ref here
+            transport = self._transport
+            with self._ensure_transport():
+                transport.close()
 
             # set to None now so nothing else tries to use the channel during the callback
-            self._amq_chan = None
+            self._transport = None
 
-            # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
-            # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
-            # up for Pika here so we don't goof up when reusing a channel number.
-            amq_chan.callbacks.remove(amq_chan.channel_number, 'Basic.GetEmpty')
-            amq_chan.callbacks.remove(amq_chan.channel_number, 'Channel.Close')
-            amq_chan.callbacks.remove(amq_chan.channel_number, '_on_basic_deliver')
-            amq_chan.callbacks.remove(amq_chan.channel_number, '_on_basic_get')
-
-            # uncomment these lines to see the full callback list that Pika maintains
-            #stro = pprint.pformat(callbacks._callbacks)
-            #log.error(str(stro))
-
-    def on_channel_open(self, amq_chan):
+    def on_channel_open(self, transport):
         """
-        The node calls here to attach an open Pika channel.
-        We attach our on_channel_close handler and then call attach_underlying_channel.
+        Node calls here to attach a bound transport.
         """
-        amq_chan.add_on_close_callback(self.on_channel_close)
-        self.attach_underlying_channel(amq_chan)
+        transport.add_on_close_callback(self.on_channel_close)
+        self.attach_transport(transport)
+
+    def attach_transport(self, transport):
+        """
+        Attaches a bound transport and indicates this channel is now open.
+        """
+        self._transport = transport
+        self._lock = coros.RLock()
+        self._fsm.process(self.I_ATTACH)
 
     def set_closed_error_callback(self, callback):
         """
@@ -282,23 +267,18 @@ class BaseChannel(object):
         finally:
             self.set_closed_error_callback(cur_cb)
 
-    def on_channel_close(self, code, text):
+    def on_channel_close(self, transport, code, text):
         """
         Callback for when the Pika channel is closed.
         """
-        logmeth = log.debug
-        if not (code == 0 or code == 200):
-            logmeth = log.error
-        logmeth("BaseChannel.on_channel_close\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.get_channel_id(), code, text)
-
         # make callback to user event if we've closed
         if self._close_event is not None:
             self._close_event.set()
             self._close_event = None
 
-        # remove amq_chan so we don't try to use it again
-        # (all?) calls are protected via _ensure_amq_chan, which raise a ChannelError if you try to do anything with it.
-        self._amq_chan = None
+        # remove transport so we don't try to use it again
+        # (all?) calls are protected via _ensure_transport, which raise a ChannelError if you try to do anything with it.
+        self._transport = None
 
         # make callback if it exists!
         if not (code == 0 or code == 200) and self._closed_error_callback:
@@ -338,9 +318,8 @@ class SendChannel(BaseChannel):
             testid = os.environ['QUEUE_BLAME'].split(',')
             headers['QUEUE_BLAME'] = testid
 
-        with self._ensure_amq_chan():
-            self._transport.publish_impl(self._amq_chan,
-                                         exchange=exchange, #todo
+        with self._ensure_transport():
+            self._transport.publish_impl(exchange=exchange, #todo
                                          routing_key=routing_key, #todo
                                          body=data,
                                          properties=headers,
@@ -484,9 +463,8 @@ class RecvChannel(BaseChannel):
         assert self._transport
 
 
-        with self._ensure_amq_chan():
-            self._transport.unbind_impl(self._amq_chan,
-                                        exchange=self._recv_name.exchange,
+        with self._ensure_transport():
+            self._transport.unbind_impl(exchange=self._recv_name.exchange,
                                         queue=self._recv_name.queue,
                                         binding=self._recv_binding)
 
@@ -499,9 +477,8 @@ class RecvChannel(BaseChannel):
         assert self._transport
 
         log.info("Destroying queue: %s", self._recv_name)
-        with self._ensure_amq_chan():
-            self._transport.delete_queue_impl(self._amq_chan,
-                                              queue=self._recv_name.queue)
+        with self._ensure_transport():
+            self._transport.delete_queue_impl(queue=self._recv_name.queue)
 
     def start_consume(self):
         """
@@ -524,9 +501,8 @@ class RecvChannel(BaseChannel):
         if self._consumer_tag and (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
             log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
-        with self._ensure_amq_chan():
-            self._consumer_tag = self._transport.start_consume_impl(self._amq_chan,
-                                                                    self._on_deliver,
+        with self._ensure_transport():
+            self._consumer_tag = self._transport.start_consume_impl(self._on_deliver,
                                                                     queue=self._recv_name.queue,
                                                                     no_ack=self._consumer_no_ack,
                                                                     exclusive=self._consumer_exclusive)
@@ -552,8 +528,8 @@ class RecvChannel(BaseChannel):
         if self._queue_auto_delete and self._transport is AMQPTransport.get_instance():
             log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
-        with self._ensure_amq_chan():
-            self._transport.stop_consume_impl(self._amq_chan, self._consumer_tag)
+        with self._ensure_transport():
+            self._transport.stop_consume_impl(self._consumer_tag)
 
     def reset(self):
         """
@@ -627,9 +603,8 @@ class RecvChannel(BaseChannel):
             #log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 
         #log.debug("RecvChannel._declare_queue: %s", queue)
-        with self._ensure_amq_chan():
-            queue_name = self._transport.declare_queue_impl(self._amq_chan,
-                                                            queue=queue or '',
+        with self._ensure_transport():
+            queue_name = self._transport.declare_queue_impl(queue=queue or '',
                                                             auto_delete=self._queue_auto_delete,
                                                             durable=self._queue_durable)
 
@@ -643,9 +618,8 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._bind: %s", binding)
         assert self._recv_name and self._recv_name.queue
 
-        with self._ensure_amq_chan():
-            self._transport.bind_impl(self._amq_chan,
-                                      exchange=self._recv_name.exchange,
+        with self._ensure_transport():
+            self._transport.bind_impl(exchange=self._recv_name.exchange,
                                       queue=self._recv_name.queue,
                                       binding=binding)
 
@@ -672,8 +646,8 @@ class RecvChannel(BaseChannel):
         Should be called by the EP layer.
         """
         #log.debug("RecvChannel.ack: %s", delivery_tag)
-        with self._ensure_amq_chan():
-            self._transport.ack_impl(self._amq_chan, delivery_tag)
+        with self._ensure_transport():
+            self._transport.ack_impl(delivery_tag)
 
     def reject(self, delivery_tag, requeue=False):
         """
@@ -681,8 +655,8 @@ class RecvChannel(BaseChannel):
         Should be called by the EP layer.
         """
         #log.debug("RecvChannel.reject: %s", delivery_tag)
-        with self._ensure_amq_chan():
-            self._transport.reject_impl(self._amq_chan, delivery_tag, requeue=requeue)
+        with self._ensure_transport():
+            self._transport.reject_impl(delivery_tag, requeue=requeue)
 
     def get_stats(self):
         """
@@ -693,8 +667,8 @@ class RecvChannel(BaseChannel):
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.get_stats: %s", self._recv_name.queue)
 
-        with self._ensure_amq_chan():
-            return self._transport.get_stats_impl(self._amq_chan, queue=self._recv_name.queue)
+        with self._ensure_transport():
+            return self._transport.get_stats_impl(queue=self._recv_name.queue)
 
     def _purge(self):
         """
@@ -702,8 +676,8 @@ class RecvChannel(BaseChannel):
         """
         assert self._recv_name and self._recv_name.queue
         #log.debug("RecvChannel.purge: %s", self._recv_name.queue)
-        with self._ensure_amq_chan():
-            return self._transport.purge_impl(self._amq_chan, queue=self._recv_name.queue)
+        with self._ensure_transport():
+            return self._transport.purge_impl(queue=self._recv_name.queue)
 
 class PublisherChannel(SendChannel):
 
@@ -818,14 +792,14 @@ class ListenChannel(RecvChannel):
         self._fsm.add_transition(self.I_CLOSE,          self.S_ACCEPTED,    None, self.S_CLOSING)
         self._fsm.add_transition(self.I_EXIT_ACCEPT,    self.S_CLOSING,     self._on_close_while_accepted,  self.S_CLOSED)
 
-    def _create_accepted_channel(self, amq_chan, msg):
+    def _create_accepted_channel(self, transport, msg):
         """
         Creates an AcceptedListenChannel.
 
         Can be overridden by derived classes to get custom class types/functionality.
         """
         ch = self.AcceptedListenChannel(parent_channel=self)
-        ch.attach_underlying_channel(amq_chan)
+        ch.attach_transport(transport)
         return ch
 
     @property
@@ -865,7 +839,7 @@ class ListenChannel(RecvChannel):
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
             if not (self._queue_auto_delete and self._transport is AMQPTransport.get_instance()):
-                self._transport.qos_impl(self._amq_chan, prefetch_count=n)
+                self._transport.qos_impl(prefetch_count=n)
 
             # start consuming
             self.start_consume()
@@ -884,7 +858,7 @@ class ListenChannel(RecvChannel):
 
         ms = [self.recv() for x in xrange(n)]
 
-        ch = self._create_accepted_channel(self._amq_chan, ms)
+        ch = self._create_accepted_channel(self._transport, ms)
         map(ch._recv_queue.put, ms)
 
         # transition to ACCEPT
@@ -904,7 +878,7 @@ class ListenChannel(RecvChannel):
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._transport is AMQPTransport.get_instance() and self._recv_name.queue.startswith("amq.gen-"):
+        if not self._queue_auto_delete and self._recv_name and isinstance(self._transport, AMQPTransport) and self._recv_name.queue.startswith("amq.gen-"):
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 
@@ -915,15 +889,15 @@ class ServerChannel(ListenChannel):
     class BidirAcceptChannel(ListenChannel.AcceptedListenChannel, SendChannel):
         pass
 
-    def _create_accepted_channel(self, amq_chan, msg):
+    def _create_accepted_channel(self, transport, msg):
         # pull apart msglist to get a reply-to name
         reply_to_set = set((x[1].get('reply-to') for x in msg))
         assert len(reply_to_set) == 1, "Differing reply-to addresses seen, unsure how to proceed"
 
         send_name = NameTrio(tuple(reply_to_set.pop().split(',')))    # @TODO: stringify is not the best
-        ch = self.BidirAcceptChannel(parent_channel=self, transport=self._transport)
+        ch = self.BidirAcceptChannel(parent_channel=self)
         ch._recv_name = self._recv_name     # for debugging only
-        ch.attach_underlying_channel(amq_chan)
+        ch.attach_transport(transport)
         ch.connect(send_name)
         return ch
 

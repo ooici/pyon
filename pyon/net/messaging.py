@@ -17,7 +17,7 @@ from pyon.util.async import blocking_cb
 from pyon.util.containers import for_name
 from pyon.util.log import log
 from pyon.util.pool import IDPool
-from pyon.net.transport import ZeroMQTransport, ZeroMQRouter
+from pyon.net.transport import ZeroMQTransport, ZeroMQRouter, AMQPTransport
 
 from gevent_zeromq import zmq
 from collections import defaultdict
@@ -75,6 +75,31 @@ class BaseNode(object):
         """
         log.debug("In Node.channel")
 
+    def _new_channel(self, ch_type, ch_number=None, transport=None):
+        """
+        Creates a pyon Channel based on the passed in type, and activates it for use.
+
+        @param  transport   If specified, will wrap the underlying transport created here.
+        """
+        chan = ch_type()
+        new_transport = self._new_transport(ch_number=ch_number)
+
+        if transport is not None:
+            transport.adapt_transport(new_transport)
+        else:
+            transport = new_transport
+
+        chan.on_channel_open(transport)
+        return chan
+
+    def _new_transport(self, ch_number=None):
+        """
+        Creates a new transport to be used by a Channel.
+
+        You must override this in your derived node.
+        """
+        raise NotImplementedError()
+
     def setup_interceptors(self, interceptor_cfg):
         stack = interceptor_cfg["stack"]
         defs = interceptor_cfg["interceptors"]
@@ -123,14 +148,6 @@ class NodeB(BaseNode):
 
         BaseNode.__init__(self)
 
-    def start_node(self):
-        """
-        This should only be called by on_connection_opened.
-        so, maybe we don't need a start_node/stop_node interface
-        """
-        log.debug("In start_node")
-        BaseNode.start_node(self)
-
     def stop_node(self):
         """
         Closes the connection to the broker, cleans up resources held by this node.
@@ -149,11 +166,10 @@ class NodeB(BaseNode):
         for chan in self._bidir_pool.itervalues():
             chan._destroy_queue()
 
-    def _new_channel(self, ch_type, ch_number=None, **kwargs):
+    def _new_transport(self, ch_number=None):
         """
-        Creates a pyon Channel based on the passed in type, and activates it for use.
+        Creates a new AMQPTransport with an underlying Pika channel.
         """
-        chan = ch_type(**kwargs)
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
         if amq_chan is None:
             log.error("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s", ch_number)
@@ -161,10 +177,10 @@ class NodeB(BaseNode):
             traceback.print_stack()
             raise StandardError("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s" % ch_number)
 
-        chan.on_channel_open(amq_chan)
-        return chan
+        transport = AMQPTransport(amq_chan)
+        return transport
 
-    def channel(self, ch_type, **kwargs):
+    def channel(self, ch_type, transport=None):
         """
         Creates a Channel object with an underlying transport callback and returns it.
 
@@ -182,12 +198,12 @@ class NodeB(BaseNode):
                     self._pool_map[ch.get_channel_id()] = chid
                 else:
                     log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
-                    ch = self._new_channel(ch_type, **kwargs)
+                    ch = self._new_channel(ch_type, transport=transport)
                     ch.set_close_callback(self.on_channel_request_close)
                     self._bidir_pool[chid] = ch
                     self._pool_map[ch.get_channel_id()] = chid
             else:
-                ch = self._new_channel(ch_type, **kwargs)
+                ch = self._new_channel(ch_type, transport=transport)
             assert ch
 
         return ch
@@ -324,39 +340,20 @@ class ZeroMQNode(BaseNode):
             self._zmq_router.stop()
         self.running = False
 
-    def channel(self, ch_type, **kwargs):
-        trans = ZeroMQTransport(self._zmq_router, self._context)
-        chan = ch_type(transport=trans, **kwargs)
+    def _new_transport(self, ch_number=None):
+        trans = ZeroMQTransport(self._zmq_router, self._context, ch_number)
+        return trans
 
-        zmqchan = ZeroMQChan(trans, self._channel_id_pool.get_id(), self)
-        chan.on_channel_open(zmqchan)
+    def channel(self, ch_type, transport=None):
+        ch = self._new_channel(ch_type, ch_number=self._channel_id_pool.get_id(), transport=transport)
+        # @TODO keep track of all channels to close them later from the top
 
-        return chan
+        ch._transport.add_on_close_callback(self._on_channel_close)
+        return ch
 
-    def _on_channel_close(self, ch):
+    def _on_channel_close(self, ch, code, text):
         log.debug("ZeroMQNode._on_channel_close (%s)", ch.channel_number)
         self._channel_id_pool.release_id(ch.channel_number)
-
-class ZeroMQChan(object):
-    """
-    Equivalent to pika's Channel object, lies underneath our Channel.
-    """
-    def __init__(self, trans, chid, node):
-        self._trans = trans
-        self.channel_number = chid
-        self._node = node
-
-        # fixup for pika problem, @TODO promote from channel to AMQPTransport
-        self.callbacks = self
-        self.callbacks.remove = lambda a,b: True
-
-    def add_on_close_callback(self, cb):
-        self._close_callback = cb
-
-    def close(self):
-        self._trans.close()                     # alert the router we're closing
-        self._close_callback(0, "Closed ok")    # callback into channel to indicate closed
-        self._node._on_channel_close(self)      # return channel number to node pool
 
 class ZeroMQClient(object):
     def __init__(self):

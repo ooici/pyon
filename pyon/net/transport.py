@@ -25,69 +25,245 @@ class TransportError(StandardError):
     pass
 
 class BaseTransport(object):
-    def declare_exchange_impl(self, client, exchange, **kwargs):
+    def declare_exchange_impl(self, exchange, **kwargs):
         raise NotImplementedError()
-    def delete_exchange_impl(self, client, exchange, **kwargs):
-        raise NotImplementedError()
-
-    def declare_queue_impl(self, client, queue, **kwargs):
-        raise NotImplementedError()
-    def delete_queue_impl(self, client, queue, **kwargs):
+    def delete_exchange_impl(self, exchange, **kwargs):
         raise NotImplementedError()
 
-    def bind_impl(self, client, exchange, queue, binding):
+    def declare_queue_impl(self, queue, **kwargs):
         raise NotImplementedError()
-    def unbind_impl(self, client, exchange, queue, binding):
-        raise NotImplementedError()
-
-    def ack_impl(self, client, delivery_tag):
-        raise NotImplementedError()
-    def reject_impl(self, client, delivery_tag, requeue=False):
+    def delete_queue_impl(self, queue, **kwargs):
         raise NotImplementedError()
 
-    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+    def bind_impl(self, exchange, queue, binding):
         raise NotImplementedError()
-    def stop_consume_impl(self, client, consumer_tag):
+    def unbind_impl(self, exchange, queue, binding):
+        raise NotImplementedError()
+
+    def ack_impl(self, delivery_tag):
+        raise NotImplementedError()
+    def reject_impl(self, delivery_tag, requeue=False):
+        raise NotImplementedError()
+
+    def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
+        raise NotImplementedError()
+    def stop_consume_impl(self, consumer_tag):
         raise NotImplementedError()
 
     def setup_listener(self, binding, default_cb):
         raise NotImplementedError()
 
-    def get_stats_impl(self, client, queue):
+    def get_stats_impl(self, queue):
         raise NotImplementedError()
 
-    def purge_impl(self, client, queue):
+    def purge_impl(self, queue):
         raise NotImplementedError()
 
-    def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+    def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
         raise NotImplementedError()
 
-    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False): 
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False): 
         raise NotImplementedError()
+
+    def close(self):
+        raise NotImplementedError()
+
+    @property
+    def channel_number(self):
+        raise NotImplementedError()
+
+    @property
+    def active(self):
+        raise NotImplementedError()
+
+    def add_on_close_callback(self, cb):
+        raise NotImplementedError()
+
+
+class ComposableTransport(BaseTransport):
+    """
+    A Transport that has its methods composed of two or more transports.
+
+    This is used for ExchangeObjects, where we want to compose the container's ex_manager authoritative
+    transport with a self transport unique to the XO, needed for the following methods:
+        - ack_impl
+        - reject_impl
+        - start_consume_impl
+        - stop_consume_impl
+        - qos_impl
+        - get_stats_impl
+    """
+    def __init__(self, left, right, *methods):
+        self._methods = { 'declare_exchange_impl': left.declare_exchange_impl,
+                          'delete_exchange_impl' : left.delete_exchange_impl,
+                          'declare_queue_impl'   : left.declare_queue_impl,
+                          'delete_queue_impl'    : left.delete_queue_impl,
+                          'bind_impl'            : left.bind_impl,
+                          'unbind_impl'          : left.unbind_impl,
+                          'ack_impl'             : left.ack_impl,
+                          'reject_impl'          : left.reject_impl,
+                          'start_consume_impl'   : left.start_consume_impl,
+                          'stop_consume_impl'    : left.stop_consume_impl,
+                          'setup_listener'       : left.setup_listener,
+                          'get_stats_impl'       : left.get_stats_impl,
+                          'purge_impl'           : left.purge_impl,
+                          'qos_impl'             : left.qos_impl,
+                          'publish_impl'         : left.publish_impl, }
+        self.overlay(right, *methods)
+        self._transports = [left, right]
+        self._close_callbacks = []
+
+    def overlay(self, transport, *methods):
+        for m in methods:
+            self._methods[m] = getattr(transport, m)
+        self._transports.append(transport)
+
+    def declare_exchange_impl(self, exchange, **kwargs):
+        m = self._methods['declare_exchange_impl']
+        return m(exchange, **kwargs)
+
+    def delete_exchange_impl(self, exchange, **kwargs):
+        m = self._methods['delete_exchange_impl']
+        return m(exchange, **kwargs)
+
+    def declare_queue_impl(self, queue, **kwargs):
+        m = self._methods['declare_queue_impl']
+        return m(queue, **kwargs)
+
+    def delete_queue_impl(self, queue, **kwargs):
+        m = self._methods['delete_queue_impl']
+        return m(queue, **kwargs)
+
+    def bind_impl(self, exchange, queue, binding):
+        m = self._methods['bind_impl']
+        return m(exchange, queue, binding)
+
+    def unbind_impl(self, exchange, queue, binding):
+        m = self._methods['unbind_impl']
+        return m(exchange, queue, binding)
+
+    def ack_impl(self, delivery_tag):
+        m = self._methods['ack_impl']
+        return m(delivery_tag)
+
+    def reject_impl(self, delivery_tag, requeue=False):
+        m = self._methods['reject_impl']
+        return m(delivery_tag, requeue=requeue)
+
+    def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
+        m = self._methods['start_consume_impl']
+        return m(callback, queue, no_ack=no_ack, exclusive=exclusive)
+
+    def stop_consume_impl(self, consumer_tag):
+        m = self._methods['stop_consume_impl']
+        return m(consumer_tag)
+
+    def setup_listener(self, binding, default_cb):
+        m = self._methods['setup_listener']
+        return m(binding, default_cb)
+
+    def get_stats_impl(self, queue):
+        m = self._methods['get_stats_impl']
+        return m(queue)
+
+    def purge_impl(self, queue):
+        m = self._methods['purge_impl']
+        return m(queue)
+
+    def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
+        m = self._methods['qos_impl']
+        return m(prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
+
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        m = self._methods['publish_impl']
+        return m(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+
+    def close(self):
+        for t in self._transports:
+            t.close()
+
+        for cb in self._close_callbacks:
+            cb(cb, 200, "Closed OK")    # @TODO where to get real value
+
+    @property
+    def channel_number(self):
+        return self._transports[0].channel_number
+
+    def add_on_close_callback(self, cb):
+        self._close_callbacks.append(cb)
+
+    @property
+    def active(self):
+        return all(map(lambda x: x.active, self._transports))
 
 class AMQPTransport(BaseTransport):
     """
-    This is STATELESS. You can make instances of it, but no need to (true singleton).
+    A transport adapter around a Pika channel.
     """
-    __instance = None
 
-    @classmethod
-    def get_instance(cls):
-        if cls.__instance is None:
-            cls.__instance = AMQPTransport()
-        return cls.__instance
+    def __init__(self, amq_chan):
+        """
+        Creates an AMQPTransport, bound to an underlying Pika channel.
+        """
+        #log.info("AMQPTransport(%d)", amq_chan.channel_number)
+        self._client = amq_chan
+        self._client.add_on_close_callback(self._on_underlying_close)
+
+        self._close_callbacks = []
+
+    def _on_underlying_close(self, code, text):
+        logmeth = log.debug
+        if not (code == 0 or code == 200):
+            logmeth = log.error
+        logmeth("AMQPTransport.underlying closed:\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.channel_number, code, text)
+
+        for cb in self._close_callbacks:
+            cb(self, code, text)
+
+    @property
+    def active(self):
+        if self._client is not None:
+            if self._client.closing is None:
+                return True
+
+        return False
+
+    def close(self):
+        self._client.close()
+
+        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
+        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
+        # up for Pika here so we don't goof up when reusing a channel number.
+
+        # this appears to be fixed in 3050d116899aced2392def2e3e66ca30c93334ac
+        # https://github.com/pika/pika/commit/e93c7ebae2c57b798977ba2992602310deb4758b
+        self._client.callbacks.remove(self._client.channel_number, 'Basic.GetEmpty')
+        self._client.callbacks.remove(self._client.channel_number, 'Channel.Close')
+        self._client.callbacks.remove(self._client.channel_number, '_on_basic_deliver')
+        self._client.callbacks.remove(self._client.channel_number, '_on_basic_get')
+
+        # uncomment these lines to see the full callback list that Pika maintains
+        #stro = pprint.pformat(callbacks._callbacks)
+        #log.error(str(stro))
+
+    @property
+    def channel_number(self):
+        return self._client.channel_number
+
+    def add_on_close_callback(self, cb):
+        self._close_callbacks.append(cb)
 
     @contextmanager
-    def _push_close_cb(self, client, callback):
-        client.add_on_close_callback(callback)
+    def _push_close_cb(self, callback):
+        self._client.add_on_close_callback(callback)
         try:
             yield callback
         finally:
             # PIKA BUG: v0.9.5, we need to specify the callback as a dict - this is fixed in git HEAD (13 Feb 2012)
             de = {'handle': callback, 'one_shot': True}
-            client.callbacks.remove(client.channel_number, '_on_channel_close', de)
+            self._client.callbacks.remove(self._client.channel_number, '_on_channel_close', de)
 
-    def _sync_call(self, client, func, cb_arg, *args, **kwargs):
+    def _sync_call(self, func, cb_arg, *args, **kwargs):
         """
         Functionally similar to the generic blocking_cb but with error support that's Channel specific.
         """
@@ -101,7 +277,7 @@ class AMQPTransport(BaseTransport):
         eb = lambda ch, *args: ar.set(TransportError("_sync_call could not complete due to an error (%s)" % args))
 
         kwargs[cb_arg] = cb
-        with self._push_close_cb(client, eb):
+        with self._push_close_cb(eb):
             func(*args, **kwargs)
             ret_vals = ar.get(timeout=10)
 
@@ -109,10 +285,10 @@ class AMQPTransport(BaseTransport):
 
             # mark this channel as poison, do not use again!
             # don't test for type here, we don't want to have to import PyonSelectConnection
-            if hasattr(client.transport, 'connection') and hasattr(client.transport.connection, 'mark_bad_channel'):
-                client.transport.connection.mark_bad_channel(client.channel_number)
+            if hasattr(self._client.transport, 'connection') and hasattr(self._client.transport.connection, 'mark_bad_channel'):
+                self._client.transport.connection.mark_bad_channel(self._client.channel_number)
             else:
-                log.warn("Could not mark channel # (%s) as bad, Pika could be corrupt", client.channel_number)
+                log.warn("Could not mark channel # (%s) as bad, Pika could be corrupt", self._client.channel_number)
 
             raise ret_vals
 
@@ -123,34 +299,34 @@ class AMQPTransport(BaseTransport):
         return tuple(ret_vals)
 
 
-    def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", client.channel_number, exchange, exchange_type, durable, auto_delete)
+    def declare_exchange_impl(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
+        log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", self._client.channel_number, exchange, exchange_type, durable, auto_delete)
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
             testid = os.environ['QUEUE_BLAME']
             arguments.update({'created-by':testid})
 
-        self._sync_call(client, client.exchange_declare, 'callback',
+        self._sync_call(self._client.exchange_declare, 'callback',
                                              exchange=exchange,
                                              type=exchange_type,
                                              durable=durable,
                                              auto_delete=auto_delete,
                                              arguments=arguments)
 
-    def delete_exchange_impl(self, client, exchange, **kwargs):
-        log.debug("AMQPTransport.delete_exchange_impl(%s): %s", client.channel_number, exchange)
-        self._sync_call(client, client.exchange_delete, 'callback', exchange=exchange)
+    def delete_exchange_impl(self, exchange, **kwargs):
+        log.debug("AMQPTransport.delete_exchange_impl(%s): %s", self._client.channel_number, exchange)
+        self._sync_call(self._client.exchange_delete, 'callback', exchange=exchange)
 
-    def declare_queue_impl(self, client, queue, durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", client.channel_number, queue, durable, auto_delete)
+    def declare_queue_impl(self, queue, durable=False, auto_delete=True):
+        log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", self._client.channel_number, queue, durable, auto_delete)
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
             testid = os.environ['QUEUE_BLAME']
             arguments.update({'created-by':testid})
 
-        frame = self._sync_call(client, client.queue_declare, 'callback',
+        frame = self._sync_call(self._client.queue_declare, 'callback',
                                 queue=queue or '',
                                 auto_delete=auto_delete,
                                 durable=durable,
@@ -158,56 +334,56 @@ class AMQPTransport(BaseTransport):
 
         return frame.method.queue
 
-    def delete_queue_impl(self, client, queue, **kwargs):
-        log.debug("AMQPTransport.delete_queue_impl(%s): %s", client.channel_number, queue)
-        self._sync_call(client, client.queue_delete, 'callback', queue=queue)
+    def delete_queue_impl(self, queue, **kwargs):
+        log.debug("AMQPTransport.delete_queue_impl(%s): %s", self._client.channel_number, queue)
+        self._sync_call(self._client.queue_delete, 'callback', queue=queue)
 
-    def bind_impl(self, client, exchange, queue, binding):
-        log.debug("AMQPTransport.bind_impl(%s): EX %s, Q %s, B %s", client.channel_number, exchange, queue, binding)
-        self._sync_call(client, client.queue_bind, 'callback',
+    def bind_impl(self, exchange, queue, binding):
+        log.debug("AMQPTransport.bind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
+        self._sync_call(self._client.queue_bind, 'callback',
                                         queue=queue,
                                         exchange=exchange,
                                         routing_key=binding)
 
-    def unbind_impl(self, client, exchange, queue, binding):
-        log.debug("AMQPTransport.unbind_impl(%s): EX %s, Q %s, B %s", client.channel_number, exchange, queue, binding)
-        self._sync_call(client, client.queue_unbind, 'callback', queue=queue,
+    def unbind_impl(self, exchange, queue, binding):
+        log.debug("AMQPTransport.unbind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
+        self._sync_call(self._client.queue_unbind, 'callback', queue=queue,
                                                      exchange=exchange,
                                                      routing_key=binding)
 
-    def ack_impl(self, client, delivery_tag):
+    def ack_impl(self, delivery_tag):
         """
         Acks a message.
         """
-        log.debug("AMQPTransport.ack(%s): %s", client.channel_number, delivery_tag)
-        client.basic_ack(delivery_tag)
+        log.debug("AMQPTransport.ack(%s): %s", self._client.channel_number, delivery_tag)
+        self._client.basic_ack(delivery_tag)
 
-    def reject_impl(self, client, delivery_tag, requeue=False):
+    def reject_impl(self, delivery_tag, requeue=False):
         """
         Rejects a message.
         """
-        client.basic_reject(delivery_tag, requeue=requeue)
+        self._client.basic_reject(delivery_tag, requeue=requeue)
 
-    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+    def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         """
         Starts consuming on a queue.
         Will asynchronously deliver messages to the callback method supplied.
 
         @return A consumer tag to be used when stop_consume_impl is called.
         """
-        log.debug("AMQPTransport.start_consume_impl(%s): %s", client.channel_number, queue)
-        consumer_tag = client.basic_consume(callback,
+        log.debug("AMQPTransport.start_consume_impl(%s): %s", self._client.channel_number, queue)
+        consumer_tag = self._client.basic_consume(callback,
                                             queue=queue,
                                             no_ack=no_ack,
                                             exclusive=exclusive)
         return consumer_tag
 
-    def stop_consume_impl(self, client, consumer_tag):
+    def stop_consume_impl(self, consumer_tag):
         """
         Stops consuming by consumer tag.
         """
-        log.debug("AMQPTransport.stop_consume_impl(%s): %s", client.channel_number, consumer_tag)
-        self._sync_call(client, client.basic_cancel, 'callback', consumer_tag)
+        log.debug("AMQPTransport.stop_consume_impl(%s): %s", self._client.channel_number, consumer_tag)
+        self._sync_call(self._client.basic_cancel, 'callback', consumer_tag)
 
     def setup_listener(self, binding, default_cb):
         """
@@ -215,39 +391,39 @@ class AMQPTransport(BaseTransport):
         """
         return default_cb(self, binding)
 
-    def get_stats_impl(self, client, queue):
+    def get_stats_impl(self, queue):
         """
         Gets a tuple of number of messages, number of consumers on a queue.
         """
-        log.debug("AMQPTransport.get_stats_impl(%s): Q %s", client.channel_number, queue)
-        frame = self._sync_call(client, client.queue_declare, 'callback',
+        log.debug("AMQPTransport.get_stats_impl(%s): Q %s", self._client.channel_number, queue)
+        frame = self._sync_call(self._client.queue_declare, 'callback',
                                         queue=queue or '',
                                         passive=True)
         return frame.method.message_count, frame.method.consumer_count
 
-    def purge_impl(self, client, queue):
+    def purge_impl(self, queue):
         """
         Purges a queue.
         """
-        log.debug("AMQPTransport.purge_impl(%s): Q %s", client.channel_number, queue)
-        self._sync_call(client, client.queue_purge, 'callback', queue=queue)
+        log.debug("AMQPTransport.purge_impl(%s): Q %s", self._client.channel_number, queue)
+        self._sync_call(self._client.queue_purge, 'callback', queue=queue)
 
-    def qos_impl(self, client, prefetch_size=0, prefetch_count=0, global_=False):
+    def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
         """
         Adjusts quality of service for a channel.
         """
-        log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", client.channel_number, prefetch_size, prefetch_count, global_)
-        self._sync_call(client, client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
+        log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", self._client.channel_number, prefetch_size, prefetch_count, global_)
+        self._sync_call(self._client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
-    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         """
         Publishes a message on an exchange.
         """
-        log.debug("AMQPTransport.publish(%s): ex %s key %s", client.channel_number, exchange, routing_key)
+        log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
 
         props = BasicProperties(headers=properties)
 
-        client.basic_publish(exchange=exchange, #todo
+        self._client.basic_publish(exchange=exchange, #todo
                              routing_key=routing_key, #todo
                              body=body,
                              properties=props,
@@ -339,27 +515,6 @@ class LocalBroker(object):
                                           'auto_delete' : auto_delete }
 
         return True
-
-
-
-
-
-class LocalTransport(BaseTransport):
-
-    def __init__(self, broker):
-        self._broker = broker
-
-    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
-        return self._broker.incoming(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
-
-    def declare_exchange_impl(self, client, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        return self._broker.declare_exchange(exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
-
-
-
-
-
-
 
 class TopicTrie(object):
     """
@@ -761,44 +916,62 @@ class ZeroMQRouter(object):
         # turn off any consumers from this transport
 
 class ZeroMQTransport(BaseTransport):
-    def __init__(self, broker, context):
+    def __init__(self, broker, context, ch_number):
         self._broker = broker
         self._context = context
+        self._ch_number = ch_number
 
         self._pub = self._context.socket(zmq.PUB)
         self._pub.connect(self._broker._connect_addr)
 
-    def declare_exchange_impl(self, client, exchange, **kwargs):
+        self._close_callbacks = []
+
+    def declare_exchange_impl(self, exchange, **kwargs):
         self._broker.declare_exchange(exchange, **kwargs)
-    def delete_exchange_impl(self, client, exchange, **kwargs):
+    def delete_exchange_impl(self, exchange, **kwargs):
         self._broker.delete_exchange(exchange, **kwargs)
 
-    def declare_queue_impl(self, client, queue, **kwargs):
+    def declare_queue_impl(self, queue, **kwargs):
         return self._broker.declare_queue(queue, **kwargs)
-    def delete_queue_impl(self, client, queue, **kwargs):
+    def delete_queue_impl(self, queue, **kwargs):
         self._broker.delete_queue(queue, **kwargs)
 
-    def bind_impl(self, client, exchange, queue, binding):
+    def bind_impl(self, exchange, queue, binding):
         self._broker.bind(exchange, queue, binding)
-    def unbind_impl(self, client, exchange, queue, binding):
+    def unbind_impl(self, exchange, queue, binding):
         self._broker.unbind(exchange, queue, binding)
 
-    def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         # properties is a dictionary, must serialize to send over zeromq
         propser = msgpack.packb(properties)
         self._pub.send_multipart([exchange, routing_key, body, propser])
         time.sleep(0.001)
 
-    def start_consume_impl(self, client, callback, queue, no_ack=False, exclusive=False):
+    def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
-    def stop_consume_impl(self, client, consumer_tag):
+    def stop_consume_impl(self, consumer_tag):
         self._broker.stop_consume(consumer_tag)
 
-    def ack_impl(self, client, delivery_tag):
+    def ack_impl(self, delivery_tag):
         self._broker.ack(delivery_tag)
-    def reject_impl(self, client, delivery_tag, requeue=False):
+    def reject_impl(self, delivery_tag, requeue=False):
         self._broker.reject(delivery_tag, requeue=requeue)
 
     def close(self):
         self._pub.close()
         self._broker.transport_close(self)
+
+        for cb in self._close_callbacks:
+            cb(self, 200, "Closed ok")         # @TODO should come elsewhere
+
+    def add_on_close_callback(self, cb):
+        self._close_callbacks.append(cb)
+
+    @property
+    def active(self):
+        return not self._pub.closed
+
+    @property
+    def channel_number(self):
+        return self._ch_number
+
