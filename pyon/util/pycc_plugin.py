@@ -9,7 +9,6 @@
 # Read up on insulate: http://code.google.com/p/insulatenoseplugin/
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-import logging
 import time, os
 import subprocess
 import signal
@@ -18,7 +17,6 @@ import sys
 from nose.plugins import Plugin
 
 debug = sys.stderr
-log = logging.getLogger('nose.plugins.pycc')
 
 from putil.rabbitmqadmin import Management, make_parser, LISTABLE, DELETABLE
 import shlex
