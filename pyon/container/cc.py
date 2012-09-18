@@ -4,13 +4,6 @@
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 
-import atexit
-import msgpack
-import os
-import signal
-import traceback
-from contextlib import contextmanager
-
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core import bootstrap
@@ -24,7 +17,7 @@ from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
 from pyon.ion.endpoint import ProcessRPCServer
-from pyon.net import messaging
+from pyon.net.transport import ZeroMQRouter
 from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
@@ -33,6 +26,13 @@ from pyon.util.sflow import SFlowManager
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
 
+import atexit
+import msgpack
+import os
+import signal
+import traceback
+from contextlib import contextmanager
+from gevent_zeromq import zmq
 
 class Container(BaseContainerAgent):
     """
@@ -75,6 +75,10 @@ class Container(BaseContainerAgent):
 
         # Instantiate Directory
         self.directory = Directory()
+
+        # ZeroMQ internal router/context for zmq
+        zc = zmq.Context(1)
+        self.zmq_router = ZeroMQRouter(zc, bootstrap.get_sys_name())
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -154,6 +158,11 @@ class Container(BaseContainerAgent):
         # State repository
         self.state_repository = StateRepository()
         self._capabilities.append("STATE_REPOSITORY")
+
+        # ZMQ Router
+        self.zmq_router.start()
+        self.zmq_router.ready.wait(timeout=2)
+        self._capabilities.append("ZMQ_ROUTER")
 
         # Start ExchangeManager, which starts the node (broker connection)
         self.ex_manager.start()
@@ -319,6 +328,9 @@ class Container(BaseContainerAgent):
 
         elif capability == "EXCHANGE_MANAGER":
             self.ex_manager.stop()
+
+        elif capability == "ZMQ_ROUTER":
+            self.zmq_router.stop()
 
         elif capability == "EVENT_REPOSITORY":
             # close event repository (possible CouchDB connection)

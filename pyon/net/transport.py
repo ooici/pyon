@@ -12,7 +12,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.util.containers import DotDict
-from gevent.event import AsyncResult
+from gevent.event import AsyncResult, Event
 from gevent.queue import Queue
 from gevent import coros
 from gevent.pool import Pool
@@ -93,7 +93,15 @@ class ComposableTransport(BaseTransport):
         - qos_impl
         - get_stats_impl
     """
+    common_methods = ['ack_impl',
+                      'reject_impl',
+                      'start_consume_impl',
+                      'stop_consume_impl',
+                      'qos_impl',
+                      'get_stats_impl']
+
     def __init__(self, left, right, *methods):
+        self._transports = [left]
         self._methods = { 'declare_exchange_impl': left.declare_exchange_impl,
                           'delete_exchange_impl' : left.delete_exchange_impl,
                           'declare_queue_impl'   : left.declare_queue_impl,
@@ -109,8 +117,9 @@ class ComposableTransport(BaseTransport):
                           'purge_impl'           : left.purge_impl,
                           'qos_impl'             : left.qos_impl,
                           'publish_impl'         : left.publish_impl, }
-        self.overlay(right, *methods)
-        self._transports = [left, right]
+
+        if right is not None:
+            self.overlay(right, *methods)
         self._close_callbacks = []
 
     def overlay(self, transport, *methods):
@@ -183,7 +192,7 @@ class ComposableTransport(BaseTransport):
             t.close()
 
         for cb in self._close_callbacks:
-            cb(cb, 200, "Closed OK")    # @TODO where to get real value
+            cb(self, 200, "Closed OK")    # @TODO where to get real value
 
     @property
     def channel_number(self):
@@ -210,6 +219,7 @@ class AMQPTransport(BaseTransport):
         self._client.add_on_close_callback(self._on_underlying_close)
 
         self._close_callbacks = []
+        self.lock = False
 
     def _on_underlying_close(self, code, text):
         logmeth = log.debug
@@ -229,6 +239,10 @@ class AMQPTransport(BaseTransport):
         return False
 
     def close(self):
+
+        if self.lock:
+            return
+
         self._client.close()
 
         # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
@@ -664,6 +678,7 @@ class ZeroMQRouter(object):
     def __init__(self, context, sysname):
         self._context = context
         self._sysname = sysname
+        self.ready = Event()
 
         # exchange/queues/bindings
         self._exchanges = {}                            # names -> { subscriber, topictrie(queue name) }
@@ -709,6 +724,7 @@ class ZeroMQRouter(object):
         self._gl_pool.join(timeout=5, raise_error=True)
 
     def _run_gl_msgs(self):
+        self.ready.set()
         while True:
             [ex, rkey, body, serprops] = self._sub.recv_multipart()
             try:
@@ -729,7 +745,7 @@ class ZeroMQRouter(object):
         assert exchange in self._exchanges, "Unknown exchange %s" % exchange
 
         queues = self._exchanges[exchange].get_all_matches(routing_key)
-        log.debug("matched %s routes", len(queues))
+        log.debug("route: ex %s, rkey %s,  matched %s routes", exchange, routing_key, len(queues))
 
         # deliver to each queue
         for q in queues:
@@ -793,11 +809,14 @@ class ZeroMQRouter(object):
                         self._exchanges[ex].remove_topic_tree(binding, queue)
 
     def bind(self, exchange, queue, binding):
+        log.info("Bind: ex %s, q %s, b %s", exchange, queue, binding)
         with self._lock_declarables:
-            assert exchange in self._exchanges
+            assert exchange in self._exchanges, "Missing exchange %s in list of exchanges" % str(exchange)
             assert queue in self._queues
 
-            self._exchanges[exchange].add_topic_tree(binding, queue)
+            tt = self._exchanges[exchange]
+
+            tt.add_topic_tree(binding, queue)
             self._bindings_by_queue[queue].append((exchange, binding))
 
     def unbind(self, exchange, queue, binding):
@@ -841,6 +860,8 @@ class ZeroMQRouter(object):
                     self._queues[queue].put(self.ConsumerClosedMessage())
                     consumer[4].join(timeout=5)
                     consumer[4].kill()
+
+                    # @TODO reject any unacked messages
 
                     self._consumers[queue].pop(i)
                     break
@@ -912,8 +933,19 @@ class ZeroMQRouter(object):
 
     def transport_close(self, transport):
         log.warn("ZeroMQRouter.transport_close: %s TODO", transport)
+        # @TODO reject all messages in unacked spot
 
         # turn off any consumers from this transport
+
+    def get_stats(self, queue):
+        """
+        Returns a 2-tuple of (# msgs, # consumers) on a given queue.
+        """
+        assert queue in self._queues
+        assert queue in self._consumers
+
+        # the queue qsize gives you number of undelivered messages, which i think is what AMQP does too
+        return (self._queues[queue].qsize(), len(self._consumers[queue]))
 
 class ZeroMQTransport(BaseTransport):
     def __init__(self, broker, context, ch_number):
@@ -974,4 +1006,10 @@ class ZeroMQTransport(BaseTransport):
     @property
     def channel_number(self):
         return self._ch_number
+
+    def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
+        log.info("TODO: QOS")
+
+    def get_stats_impl(self, queue):
+        return self._broker.get_stats(queue)
 

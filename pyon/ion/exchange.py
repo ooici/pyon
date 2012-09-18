@@ -5,20 +5,18 @@
 __author__ = 'Michael Meisinger, Dave Foster'
 __license__ = 'Apache 2.0'
 
-import time
-import socket
-
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.net import messaging
-from pyon.net.transport import BaseTransport, NameTrio, AMQPTransport, TransportError
+from pyon.net.transport import BaseTransport, NameTrio, TransportError, ComposableTransport
 from pyon.util.log import log
-from pyon.util.async import blocking_cb
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 
 import requests
 import json
+import time
+import socket
 
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
@@ -58,17 +56,16 @@ class ExchangeManager(object):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.default_xs         = ExchangeSpace(self, ION_ROOT_XS)
-        self._xs_cache          = {}        # caching of xs names to RR objects
-        self._default_xs_obj    = None      # default XS registry object
-        self.org_id             = None
+        self.default_xs             = None
+        self._xs_cache              = {}        # caching of xs names to RR objects
+        self._default_xs_obj        = None      # default XS registry object
+        self.org_id                 = None
+        self._default_xs_declared   = False
 
         # mappings
-        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
-        self.xn_by_name = {}                                    # friendly named XN to XNO
+        self.xs_by_name = {}                    # friendly named XS to XSO
+        self.xn_by_name = {}                    # friendly named XN to XNO
         # xn by xs is a property
-
-        self._chan = None
 
         # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
         self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
@@ -77,8 +74,6 @@ class ExchangeManager(object):
         # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
         self._nodes     = {}
         self._ioloops   = {}
-
-        self._default_xs_declared = False
 
     def start(self):
         log.debug("ExchangeManager.start")
@@ -103,7 +98,7 @@ class ExchangeManager(object):
             # start it with a zero timeout so it comes right back to us
             try:
                 if 'zmq' in cfgkey:
-                    node, ioloop = messaging.make_zmq_node(0)
+                    node, ioloop = messaging.make_zmq_node(0, self.container.zmq_router)
                 else:
                     node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
 
@@ -137,6 +132,13 @@ class ExchangeManager(object):
         # load interceptors into each
         map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
 
+        # prepare priviledged transport
+        self._priviledged_transport = self.get_transport(self._nodes.get('priviledged', self._nodes.get('primary')))
+        self._priviledged_transport.lock = True     # prevent any attempt to close
+
+        self.default_xs         = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
+        self.xs_by_name[ION_ROOT_XS] = self.default_xs
+
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
 
     def stop(self, *args, **kwargs):
@@ -158,6 +160,9 @@ class ExchangeManager(object):
             self._nodes[name].stop_node()
             self._ioloops[name].kill()
             #self._nodes[name].client.ioloop.start()     # loop until connection closes
+
+        self._priviledged_transport.lock = False
+        self._priviledged_transport.close()
 
         # @TODO undeclare root xs??  need to know if last container
         #self.default_xs.delete()
@@ -253,23 +258,24 @@ class ExchangeManager(object):
 
         return False
 
-    @property
-    def _transport(self, node):
+    def get_transport(self, node):
         """
         Get a transport to be used by operations here.
         """
         assert self.container
 
-        # @TODO: needs lock, but so do all these methods
-        if not self._transport or (self._transport and not self._transport.active):
-            with node._lock:
-                self._transport = node._new_transport()
-
-        return self._transport
+        with node._lock:
+            transport = node._new_transport()
+            return transport
 
     def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xs: %s", name)
-        xs = ExchangeSpace(self, name, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
+        xs = ExchangeSpace(self,
+                           self._priviledged_transport,
+                           name,
+                           exchange_type=exchange_type,
+                           durable=durable,
+                           auto_delete=auto_delete)
 
         self.xs_by_name[name] = xs
 
@@ -281,6 +287,7 @@ class ExchangeManager(object):
 
             log.debug("Created RR XS object, id: %s", xso_id)
         else:
+            self._ensure_default_declared()
             xs.declare()
 
         return xs
@@ -310,7 +317,11 @@ class ExchangeManager(object):
     def create_xp(self, name, xs=None, use_ems=True, **kwargs):
         log.debug("ExchangeManager.create_xp: %s", name)
         xs = xs or self.default_xs
-        xp = ExchangePoint(self, name, xs, **kwargs)
+        xp = ExchangePoint(self,
+                           self._priviledged_transport,
+                           name,
+                           xs,
+                           **kwargs)
 
         # put in xn_by_name anyway
         self.xn_by_name[name] = xp
@@ -321,6 +332,7 @@ class ExchangeManager(object):
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
             xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id)        # @TODO: _exchange is wrong
         else:
+            self._ensure_default_declared()
             xp.declare()
 
         return xp
@@ -353,11 +365,23 @@ class ExchangeManager(object):
         log.debug("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
 
         if xn_type == "service":
-            xn = ExchangeNameService(self, name, xs, **kwargs)
+            xn = ExchangeNameService(self,
+                                     self._priviledged_transport,
+                                     name,
+                                     xs,
+                                     **kwargs)
         elif xn_type == "process":
-            xn = ExchangeNameProcess(self, name, xs, **kwargs)
+            xn = ExchangeNameProcess(self,
+                                     self._priviledged_transport,
+                                     name,
+                                     xs,
+                                     **kwargs)
         elif xn_type == "queue":
-            xn = ExchangeNameQueue(self, name, xs, **kwargs)
+            xn = ExchangeNameQueue(self,
+                                   self._priviledged_transport,
+                                   name,
+                                   xs,
+                                   **kwargs)
         else:
             raise StandardError("Unknown XN type: %s" % xn_type)
 
@@ -368,6 +392,7 @@ class ExchangeManager(object):
             xno = ResExchangeName(name=name, xn_type=xn.xn_type)
             self._ems_client.declare_exchange_name(xno, self._get_xs_obj(xs._exchange)._id)     # @TODO: exchange is wrong
         else:
+            self._ensure_default_declared()
             xn.declare()
 
         return xn
@@ -709,6 +734,7 @@ class ExchangeManager(object):
     ###
     #######################
 
+    '''
     # transport implementations - XOTransport objects call here
     def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.info("ExchangeManager.declare_exchange %s", exchange)
@@ -778,8 +804,19 @@ class ExchangeManager(object):
     def publish(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         self._ensure_default_declared()
         self._transport.publish_impl(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+    '''
 
-class XOTransport(BaseTransport):
+class XOTransport(ComposableTransport):
+    def __init__(self, exchange_manager, priviledged_transport):
+        self._exchange_manager = exchange_manager
+        ComposableTransport.__init__(self, priviledged_transport, None, *ComposableTransport.common_methods)
+
+    def setup_listener(self, binding, default_cb):
+        log.debug("XOTransport passing on setup_listener")
+        pass
+
+'''
+class OldXOTransport(BaseTransport):
     def __init__(self, exchange_manager):
         self._exchange_manager = exchange_manager
 
@@ -832,13 +869,14 @@ class XOTransport(BaseTransport):
 
     def publish_impl(self, client, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         return self._exchange_manager.publish(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+'''
 
 class ExchangeSpace(XOTransport, NameTrio):
 
     ION_DEFAULT_XS = "ioncore"
 
-    def __init__(self, exchange_manager, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        XOTransport.__init__(self, exchange_manager=exchange_manager)
+    def __init__(self, exchange_manager, priviledged_transport, exchange, exchange_type='topic', durable=False, auto_delete=True):
+        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
         NameTrio.__init__(self, exchange=exchange)
 
         self._xs_exchange_type = exchange_type
@@ -850,13 +888,13 @@ class ExchangeSpace(XOTransport, NameTrio):
         return "%s.ion.xs.%s" % (bootstrap.get_sys_name(), self._exchange)
 
     def declare(self):
-        self.declare_exchange_impl(None, self.exchange,
-                                         exchange_type=self._xs_exchange_type,
-                                         durable=self._xs_durable,
-                                         auto_delete=self._xs_auto_delete)
+        self.declare_exchange_impl(self.exchange,
+                                   exchange_type=self._xs_exchange_type,
+                                   durable=self._xs_durable,
+                                   auto_delete=self._xs_auto_delete)
 
     def delete(self):
-        self.delete_exchange_impl(None, self.exchange)
+        self.delete_exchange_impl(self.exchange)
 
 class ExchangeName(XOTransport, NameTrio):
 
@@ -866,8 +904,8 @@ class ExchangeName(XOTransport, NameTrio):
     _xn_auto_delete = False
     _declared_queue = None
 
-    def __init__(self, exchange_manager, name, xs, durable=None, auto_delete=None):
-        XOTransport.__init__(self, exchange_manager=exchange_manager)
+    def __init__(self, exchange_manager, priviledged_transport, name, xs, durable=None, auto_delete=None):
+        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
         NameTrio.__init__(self, exchange=None, queue=name)
 
         self._xs = xs
@@ -889,11 +927,11 @@ class ExchangeName(XOTransport, NameTrio):
         return queue
 
     def declare(self):
-        self._declared_queue = self.declare_queue_impl(None, self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
+        self._declared_queue = self.declare_queue_impl(self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
         return self._declared_queue
 
     def delete(self):
-        self.delete_queue_impl(None, self.queue)
+        self.delete_queue_impl(self.queue)
         self._declared_queue = None
 
     def bind(self, binding_key, xs_or_xp=None):
@@ -901,14 +939,14 @@ class ExchangeName(XOTransport, NameTrio):
         if xs_or_xp is not None:
             exchange = xs_or_xp.exchange
 
-        self.bind_impl(None, exchange, self.queue, binding_key)
+        self.bind_impl(exchange, self.queue, binding_key)
 
     def unbind(self, binding_key, xs_or_xp=None):
         exchange = self.exchange
         if xs_or_xp is not None:
             exchange = xs_or_xp.exchange
 
-        self.unbind_impl(None, exchange, self.queue, binding_key)
+        self.unbind_impl(exchange, self.queue, binding_key)
 
     def setup_listener(self, binding, default_cb):
         log.debug("ExchangeName.setup_listener: B %s", binding)
@@ -917,10 +955,10 @@ class ExchangeName(XOTransport, NameTrio):
         self.bind(binding)
 
     def get_stats(self):
-        return self.get_stats_impl(None, self.queue)
+        return self.get_stats_impl(self.queue)
 
     def purge(self):
-        return self.purge_impl(None, self.queue)
+        return self.purge_impl(self.queue)
 
 class ExchangePoint(ExchangeName):
     """
@@ -935,10 +973,10 @@ class ExchangePoint(ExchangeName):
 
     xn_type = "XN_XP"
 
-    def __init__(self, exchange_manager, name, xs, xptype=None):
+    def __init__(self, exchange_manager, priviledged_transport, name, xs, xptype=None):
         xptype = xptype or 'ttree'
 
-        XOTransport.__init__(self, exchange_manager=exchange_manager)
+        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
         NameTrio.__init__(self, exchange=name)
 
         self._xs        = xs
@@ -955,10 +993,10 @@ class ExchangePoint(ExchangeName):
         return None     # @TODO: correct?
 
     def declare(self):
-        self.declare_exchange_impl(None, self.exchange)
+        self.declare_exchange_impl(self.exchange)
 
     def delete(self):
-        self.delete_exchange_impl(None, self.exchange)
+        self.delete_exchange_impl(self.exchange)
 
     def create_route(self, name):
         """

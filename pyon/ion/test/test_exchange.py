@@ -13,6 +13,7 @@ import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
 from mock import Mock, sentinel, patch, call, MagicMock, ANY
 from pyon.net.transport import BaseTransport, TransportError, AMQPTransport, NameTrio
+from pyon.net.messaging import NodeB
 from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
 import requests
@@ -464,6 +465,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
     def test_rpc_with_xn(self):
         # get an xn to use for send/recv
         xn = self.container.ex_manager.create_xn_service('hello')
+        self.addCleanup(xn.delete)
 
         # create an RPCServer for a hello service
         hs = HelloService()
@@ -471,7 +473,14 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # spawn the listener, kill on test exit (success/fail/error should cover?)
         gl_listen = spawn(rpcs.listen)
-        self.addCleanup(gl_listen.kill)
+        def cleanup():
+            rpcs.close()
+            gl_listen.join(timeout=2)
+            gl_listen.kill()
+        self.addCleanup(cleanup)
+
+        # wait for listen to be ready
+        rpcs.get_ready_event().wait(timeout=5)
 
         # ok, now create a client using same xn
         hsc = HelloServiceClient(to_name=xn)
@@ -481,9 +490,6 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # did we get back what we expected?
         self.assertEquals(ret, 'BACK:hi there')
-
-        # clean xn up
-        xn.delete()
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
@@ -529,7 +535,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # NOW we have messages!
         for x in xrange(10):
-            mo = sub.get_one_msg(timeout=1)
+            mo = sub.get_one_msg(timeout=10)
             self.assertEquals(mo.body, "3,%s" % str(x))
             mo.ack()
 
@@ -591,6 +597,10 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
     def setUp(self):
         self._start_container()
+
+        # skip if we're not an amqp node
+        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+            raise unittest.SkipTest("Management API only works with AMQP nodes for now")
 
         # test to see if we have access to management URL!
         url = self.container.ex_manager._get_management_url('overview')
@@ -738,6 +748,12 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
+        # skip if we're not an amqp node
+        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+            raise unittest.SkipTest("Management API only works with AMQP nodes for now")
+
+        self.transport = self.container.ex_manager.get_transport(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]))
+
         # test to see if we have access to management URL!
         url = self.container.ex_manager._get_management_url('overview')
         try:
@@ -756,8 +772,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn(self.ex_name, exchanges)
 
         # do declaration via ex manager's transport
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.addCleanup(self.transport.delete_exchange_impl, self.ex_name)
 
         new_exchanges = self.container.ex_manager.list_exchanges()
 
@@ -771,8 +787,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn(self.queue_name, queues)
 
         # do declaration via ex manager's transport
-        self.container.ex_manager.declare_queue(self.queue_name)
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.transport.declare_queue_impl(self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
 
         new_queues = self.container.ex_manager.list_queues()
 
@@ -782,10 +798,10 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings()
@@ -795,8 +811,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn((self.ex_name, self.queue_name), bindings)
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings()
 
@@ -805,18 +821,18 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings_for_queue(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
 
@@ -825,18 +841,18 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings_for_exchange(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
 
@@ -845,38 +861,38 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_delete_binding(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
 
         self.assertEquals(bindings, [(self.ex_name, self.queue_name, self.bind_name, self.bind_name)])
 
         # delete the bind
-        self.container.ex_manager.delete_binding(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.unbind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
     def test_purge(self):
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         # deliver some messages
         ch = self.container.node.channel(SendChannel)
@@ -894,7 +910,7 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertEquals(queue_info['messages'], 2)
 
         # now purge it
-        self.container.ex_manager.purge_queue(self.queue_name)
+        self.transport.purge_impl(self.queue_name)
 
         time.sleep(2)
 
@@ -907,10 +923,10 @@ class TestManagementAPIInt(IonIntegrationTestCase):
 
     def test_get_queue_info(self):
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         queue_info = self.container.ex_manager.get_queue_info(self.queue_name)
