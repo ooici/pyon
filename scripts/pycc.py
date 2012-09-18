@@ -238,8 +238,11 @@ def main(opts, *args, **kwargs):
                 raise Exception("Cannot start deploy file '%s'" % opts.rel)
 
         if opts.mx:
+            from pyon.public import CFG
+            port = CFG.get_safe('container.flask_webapp.port',8080)
             container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
-            print "pycc: Container UI started ... listening on http://localhost:8080"
+            print "pycc: Container UI started ... listening on http://localhost:%s" % port
+            
 
         if opts.signalparent:
             import os
