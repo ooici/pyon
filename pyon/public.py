@@ -43,7 +43,7 @@ __all__ += ['BaseService']
 from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
-            'ProcessSubscriber', 'ProcessPublisher', 'StreamSubscriberRegistrar', 'StreamPublisherRegistrar']
+            'ProcessSubscriber', 'ProcessPublisher']
 
 from pyon.ion.resource import ResourceTypes, RT, ObjectTypes, OT,PredicateType, PRED, AssociationType, AT, LifeCycleStates, LCS, LCE
 __all__ += ['RT', 'OT', 'PRED', 'AT', 'LCS', 'LCE']
