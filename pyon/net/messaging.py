@@ -158,6 +158,8 @@ class NodeB(BaseNode):
             self._destroy_pool()
             self.client.close()
 
+        BaseNode.stop_node(self)
+
     def _destroy_pool(self):
         """
         Explicitly deletes pooled queues in this Node.
