@@ -8,7 +8,7 @@ __license__ = 'Apache 2.0'
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.net import messaging
-from pyon.net.transport import BaseTransport, NameTrio, TransportError, ComposableTransport
+from pyon.net.transport import NameTrio, TransportError, ComposableTransport
 from pyon.util.log import log
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
@@ -1002,7 +1002,7 @@ class ExchangePoint(ExchangeName):
         """
         Returns an ExchangePointRoute used for sending messages to an exchange point.
         """
-        return ExchangePointRoute(self._exchange_manager, name, self)
+        return ExchangePointRoute(self._exchange_manager, self._transports[0], name, self)
 
     def get_stats(self):
         raise NotImplementedError("get_stats not implemented for XP")
@@ -1017,8 +1017,8 @@ class ExchangePointRoute(ExchangeName):
     This object is created via ExchangePoint.create_route
     """
 
-    def __init__(self, exchange_manager, name, xp):
-        ExchangeName.__init__(self, exchange_manager, name, xp)     # xp goes to xs param
+    def __init__(self, exchange_manager, priviledged_transport, name, xp):
+        ExchangeName.__init__(self, exchange_manager, priviledged_transport, name, xp)     # xp goes to xs param
 
     def declare(self):
         raise StandardError("ExchangePointRoute does not support declare")
