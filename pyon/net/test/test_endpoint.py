@@ -398,11 +398,11 @@ class TestPublisher(PyonTestCase):
 
         self._pub.publish("pub")
 
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 2)
 
     def test_publish_with_new_name(self):
