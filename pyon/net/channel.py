@@ -95,7 +95,7 @@ class BaseChannel(object):
                                 param, this channel instance.
         """
         self.set_close_callback(close_callback)
-        #self._transport = transport or AMQPTransport.get_instance()
+        self._transport = None
 
         # setup FSM for BaseChannel / SendChannel tree
         self._fsm = FSM(self.S_INIT)
@@ -498,10 +498,10 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_start_consume")
 
-        if self._consumer_tag and (self._queue_auto_delete and isinstance(self._transport, AMQPTransport)):
-            log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
-
         with self._ensure_transport():
+            if self._consumer_tag and (self._queue_auto_delete and isinstance(self._transport, AMQPTransport)):
+                log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
+
             self._consumer_tag = self._transport.start_consume_impl(self._on_deliver,
                                                                     queue=self._recv_name.queue,
                                                                     no_ack=self._consumer_no_ack,
@@ -525,10 +525,10 @@ class RecvChannel(BaseChannel):
         """
         #log.debug("RecvChannel._on_stop_consume")
 
-        if self._queue_auto_delete and isinstance(self._transport, AMQPTransport):
-            log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
-
         with self._ensure_transport():
+            if self._queue_auto_delete and isinstance(self._transport, AMQPTransport):
+                log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
+
             self._transport.stop_consume_impl(self._consumer_tag)
 
     def reset(self):
@@ -838,7 +838,7 @@ class ListenChannel(RecvChannel):
 
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
-            if not (self._queue_auto_delete and isinstance(self._transport, AMQPTransport)):
+            if not (self._queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
                 self._transport.qos_impl(prefetch_count=n)
 
             # start consuming
@@ -851,7 +851,7 @@ class ListenChannel(RecvChannel):
         finally:
             if not was_consuming:
                 # turn consuming back off if we already were off
-                if not (self._queue_auto_delete and isinstance(self._transport, AMQPTransport)):
+                if not (self._queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
                     self.stop_consume()
                 else:
                     log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
@@ -878,7 +878,7 @@ class ListenChannel(RecvChannel):
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and isinstance(self._transport, AMQPTransport) and self._recv_name.queue.startswith("amq.gen-"):
+        if not self._queue_auto_delete and self._recv_name and self._transport is not None and isinstance(self._transport, AMQPTransport) and self._recv_name.queue.startswith("amq.gen-"):
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 

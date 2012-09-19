@@ -3,22 +3,19 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
-from gevent import queue, spawn
 from pyon.util.unit_test import PyonTestCase
-from mock import Mock, sentinel, patch, MagicMock
-from pika import channel as pchannel
-from pika import BasicProperties
+from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
 from nose.plugins.attrib import attr
-from pyon.net.transport import NameTrio, BaseTransport
-from pyon.util.fsm import ExceptionFSM
+from pyon.net.transport import NameTrio, BaseTransport, AMQPTransport
 from pyon.util.int_test import IonIntegrationTestCase
-import time
-from gevent.event import Event
-import Queue as PQueue
-from gevent.queue import Queue
-from unittest import skip
 from pyon.core import bootstrap
+
+from mock import Mock, sentinel, patch, MagicMock
+from gevent.event import Event
+from gevent import spawn
+from gevent.queue import Queue
+import Queue as PQueue
+import time
 
 @attr('UNIT')
 class TestBaseChannel(PyonTestCase):
@@ -35,35 +32,27 @@ class TestBaseChannel(PyonTestCase):
         ch = BaseChannel()
         self.assertRaises(AssertionError, ch._declare_exchange, None)
 
-        ch._transport = Mock()
-        ch.attach_underlying_channel(Mock())
+        transport = Mock()
+        ch.on_channel_open(transport)
 
         ch._declare_exchange('hello')
-        self.assertTrue(ch._transport.declare_exchange_impl.called)
-        self.assertIn(ch._amq_chan,     ch._transport.declare_exchange_impl.call_args[0])
-        self.assertIn('hello',          ch._transport.declare_exchange_impl.call_args[0])
-        self.assertIn('exchange_type',  ch._transport.declare_exchange_impl.call_args[1])
-        self.assertIn('durable',        ch._transport.declare_exchange_impl.call_args[1])
-        self.assertIn('auto_delete',    ch._transport.declare_exchange_impl.call_args[1])
-
-    def test_attach_underlying_channel(self):
-        ch = BaseChannel()
-        ch.attach_underlying_channel(sentinel.amq_chan)
-
-        self.assertEquals(ch._amq_chan, sentinel.amq_chan)
+        self.assertTrue(transport.declare_exchange_impl.called)
+        self.assertIn('hello',          transport.declare_exchange_impl.call_args[0])
+        self.assertIn('exchange_type',  transport.declare_exchange_impl.call_args[1])
+        self.assertIn('durable',        transport.declare_exchange_impl.call_args[1])
+        self.assertIn('auto_delete',    transport.declare_exchange_impl.call_args[1])
 
     @patch('pyon.net.channel.log', Mock())  # to avoid having to put it in signature
     def test_close(self):
 
         # without close callback
-        ac = Mock() #pchannel.Channel)  # cannot use this because callbacks is populated dynamically
+        transport = Mock()
         ch = BaseChannel()
-        ch.attach_underlying_channel(ac)
+        ch.on_channel_open(transport)
         ch._fsm.current_state = ch.S_ACTIVE
         
         ch.close()
-        ac.close.assert_called_once_with()
-        self.assertEquals(ac.callbacks.remove.call_count, 4)
+        transport.close.assert_called_once_with()
 
     def test_close_with_callback(self):
         # with close callback
@@ -78,43 +67,43 @@ class TestBaseChannel(PyonTestCase):
     def test_on_channel_open(self):
         ch = BaseChannel()
 
-        ac = Mock(pchannel.Channel)
-        ch.on_channel_open(ac)
+        transport = Mock()
+        ch.on_channel_open(transport)
 
-        ac.add_on_close_callback.assert_called_once_with(ch.on_channel_close)
-        self.assertEquals(ch._amq_chan, ac)
+        transport.add_on_close_callback.assert_called_once_with(ch.on_channel_close)
+        self.assertEquals(ch._transport, transport)
 
     def test_on_channel_close(self):
         ch = BaseChannel()
-        ch.attach_underlying_channel(Mock())
-        ch._amq_chan.channel_number = 1
+        ch.on_channel_open(Mock())
+        ch._transport.channel_number = 1
 
-        ch.on_channel_close(0, 'hi')
-        self.assertIsNone(ch._amq_chan)
+        ch.on_channel_close(ch, 0, 'hi')
+        self.assertIsNone(ch._transport)
 
     def test_on_channel_closed_with_error_callback(self):
         ch = BaseChannel()
-        ch.attach_underlying_channel(Mock())
-        ch._amq_chan.channel_number = 1
+        ch.on_channel_open(Mock())
+        ch._transport.channel_number = 1
 
         closemock = Mock()
         ch.set_closed_error_callback(closemock)
 
-        ch.on_channel_close(1, 'hi')
+        ch.on_channel_close(ch, 1, 'hi')
 
         closemock.assert_called_once_with(ch, 1, 'hi')
 
     @patch('pyon.net.channel.log')
     def test_on_channel_close_with_error_in_error_callback(self, logmock):
         ch = BaseChannel()
-        ch.attach_underlying_channel(Mock())
-        ch._amq_chan.channel_number = 1
+        ch.on_channel_open(Mock())
+        ch._transport.channel_number = 1
 
         closemock = Mock()
         closemock.side_effect = StandardError
         ch.set_closed_error_callback(closemock)
 
-        ch.on_channel_close(1, 'hi')
+        ch.on_channel_close(ch, 1, 'hi')
 
         self.assertEquals(logmock.warn.call_count, 1)
 
@@ -123,13 +112,13 @@ class TestBaseChannel(PyonTestCase):
 
         self.assertTrue(ch.get_channel_id() is None)
 
-        ch.attach_underlying_channel(Mock())
-        self.assertEquals(ch.get_channel_id(), ch._amq_chan.channel_number)
+        ch.on_channel_open(Mock())
+        self.assertEquals(ch.get_channel_id(), ch._transport.channel_number)
 
-    def test__ensure_amq_chan(self):
+    def test__ensure_transport(self):
         ch = BaseChannel()
         with self.assertRaises(ChannelError):
-            with ch._ensure_amq_chan():
+            with ch._ensure_transport():
                 pass
 
 @attr('UNIT')
@@ -155,34 +144,32 @@ class TestSendChannel(PyonTestCase):
         _sendmock.assert_called_once_with(np, 'data', headers={'header':sentinel.headervalue})
 
     def test__send(self):
-        ac = Mock(pchannel.Channel)
-        ac.channel_number = sentinel.channel_number
-        self.ch.attach_underlying_channel(ac)
+        transport = Mock()
+        transport.channel_number = sentinel.channel_number
+        self.ch.on_channel_open(transport)
 
         # test sending in params
         self.ch._send(NameTrio('xp', 'namen'), 'daten')
 
         # get our props
-        self.assertTrue(ac.basic_publish.called)
-        self.assertIn('exchange', ac.basic_publish.call_args[1])
-        self.assertIn('routing_key', ac.basic_publish.call_args[1])
-        self.assertIn('body', ac.basic_publish.call_args[1])
-        self.assertIn('immediate', ac.basic_publish.call_args[1])
-        self.assertIn('mandatory', ac.basic_publish.call_args[1])
-        self.assertIn('properties', ac.basic_publish.call_args[1])
+        self.assertTrue(transport.publish_impl.called)
+        self.assertIn('exchange', transport.publish_impl.call_args[1])
+        self.assertIn('routing_key', transport.publish_impl.call_args[1])
+        self.assertIn('body', transport.publish_impl.call_args[1])
+        self.assertIn('immediate', transport.publish_impl.call_args[1])
+        self.assertIn('mandatory', transport.publish_impl.call_args[1])
+        self.assertIn('properties', transport.publish_impl.call_args[1])
 
-        props = ac.basic_publish.call_args[1].get('properties')
-        self.assertIsInstance(props, BasicProperties)
-        self.assertTrue(hasattr(props, 'headers'))
-        self.assertEquals(props.headers, {})
+        props = transport.publish_impl.call_args[1].get('properties')
+        self.assertEquals(props, {})
 
         # try another call to _send with a header
         self.ch._send(NameTrio('xp', 'namen'), 'daten', headers={'custom':'val'})
 
         # make sure our property showed up
-        props = ac.basic_publish.call_args[1].get('properties')
-        self.assertIn('custom', props.headers)
-        self.assertEquals(props.headers['custom'], 'val')
+        props = transport.publish_impl.call_args[1].get('properties')
+        self.assertIn('custom', props)
+        self.assertEquals(props['custom'], 'val')
 
 @attr('UNIT')
 class TestRecvChannel(PyonTestCase):
@@ -297,8 +284,7 @@ class TestRecvChannel(PyonTestCase):
     def test__destroy_queue(self):
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
-        self.ch._transport = Mock(BaseTransport)
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(Mock(BaseTransport))
 
         self.ch.destroy_listener()
 
@@ -320,8 +306,7 @@ class TestRecvChannel(PyonTestCase):
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
         self.ch._recv_binding = sentinel.binding
 
-        self.ch._transport = Mock(BaseTransport)
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(Mock(BaseTransport))
 
         self.ch._destroy_binding()
 
@@ -335,11 +320,11 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn(sentinel.binding, self.ch._transport.unbind_impl.call_args[1].itervalues())
 
     def test_start_consume(self):
-        ac = MagicMock()
-        self.ch.attach_underlying_channel(ac)
+        transport = MagicMock()
+        self.ch.on_channel_open(transport)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
-        ac.basic_consume.return_value = sentinel.consumer_tag
+        transport.start_consume_impl.return_value = sentinel.consumer_tag
 
         # set up recv name for queue
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
@@ -350,7 +335,7 @@ class TestRecvChannel(PyonTestCase):
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
         self.assertEquals(self.ch._consumer_tag, sentinel.consumer_tag)
 
-        ac.basic_consume.assert_called_once_with(self.ch._on_deliver, queue=sentinel.queue, no_ack=self.ch._consumer_no_ack, exclusive=self.ch._consumer_exclusive)
+        transport.start_consume_impl.assert_called_once_with(self.ch._on_deliver, queue=sentinel.queue, no_ack=self.ch._consumer_no_ack, exclusive=self.ch._consumer_exclusive)
 
     def test_start_consume_already_started(self):
         self.ch._on_start_consume = Mock()
@@ -362,13 +347,12 @@ class TestRecvChannel(PyonTestCase):
 
     @patch('pyon.net.channel.log')
     def test_start_consume_with_consumer_tag_and_auto_delete(self, mocklog):
-        ac = MagicMock()
-        self.ch.attach_underlying_channel(ac)
+        transport = AMQPTransport(Mock())
+        self.ch.on_channel_open(transport)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
 
         # set up recv name for queue
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
-
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._queue_auto_delete = True
 
@@ -376,19 +360,12 @@ class TestRecvChannel(PyonTestCase):
         self.assertTrue(mocklog.warn.called)
 
     def test_stop_consume(self):
-        ac = MagicMock()
-        self.ch.attach_underlying_channel(ac)
+        transport = MagicMock()
+        self.ch.on_channel_open(transport)
 
         # pretend we're consuming
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
-
-        # callback sideffect!
-        def basic_cancel_side(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam()
-
-        ac.basic_cancel.side_effect = basic_cancel_side
 
         # set a sentinel as our consumer tag
         self.ch._consumer_tag = sentinel.consumer_tag
@@ -398,8 +375,8 @@ class TestRecvChannel(PyonTestCase):
 
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
         self.assertFalse(self.ch._consuming)
-        self.assertTrue(ac.basic_cancel.called)
-        self.assertIn(sentinel.consumer_tag, ac.basic_cancel.call_args[0])
+        self.assertTrue(transport.stop_consume_impl.called)
+        self.assertIn(sentinel.consumer_tag, transport.stop_consume_impl.call_args[0])
 
     def test_stop_consume_havent_started(self):
         self.ch._on_stop_consume = Mock()
@@ -410,21 +387,20 @@ class TestRecvChannel(PyonTestCase):
 
     @patch('pyon.net.channel.log')
     def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
-        ac = MagicMock()
-        self.ch.attach_underlying_channel(ac)
-        ac.channel_number = sentinel.channel_number
+        transport = AMQPTransport(Mock())
+        transport.stop_consume_impl = Mock()
+        self.ch.on_channel_open(transport)
+        #transport.channel_number = sentinel.channel_number
 
         self.ch._consumer_tag = sentinel.consumer_tag
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue, sentinel.binding)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
-        self.ch._ensure_amq_chan = MagicMock()
-        self.ch._transport = Mock()
+        #self.ch._ensure_transport = MagicMock()
         self.ch._queue_auto_delete = True
 
-        with patch('pyon.net.transport.AMQPTransport.get_instance', Mock(return_value=self.ch._transport)):
-            self.ch.stop_consume()
+        self.ch.stop_consume()
 
         self.assertTrue(mocklog.debug.called)
         self.assertIn(sentinel.queue, mocklog.debug.call_args[0])
@@ -472,8 +448,7 @@ class TestRecvChannel(PyonTestCase):
         mockbasechannel.close_impl.assert_called_once_with(self.ch)
 
     def test_declare_queue(self):
-        self.ch._transport = Mock(BaseTransport)
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(Mock(BaseTransport))
 
         # needs a recv name
         self.ch._recv_name = (NameTrio(str(sentinel.xp)))
@@ -503,8 +478,7 @@ class TestRecvChannel(PyonTestCase):
     def test__bind(self):
         self.ch._recv_name = NameTrio(sentinel.xp, sentinel.queue)
 
-        self.ch.attach_underlying_channel(Mock())
-        self.ch._transport = Mock()
+        self.ch.on_channel_open(Mock())
 
         self.ch._bind(sentinel.binding)
 
@@ -544,22 +518,22 @@ class TestRecvChannel(PyonTestCase):
         self.assertIn(sentinel.exists, rqmock.put.call_args[0][0][1].itervalues())
 
     def test_ack(self):
-        ac = Mock(spec=pchannel.Channel)
-        ac.channel_number = sentinel.channel_number
-        self.ch.attach_underlying_channel(ac)
+        transport = Mock()
+        transport.channel_number = sentinel.channel_number
+        self.ch.on_channel_open(transport)
 
         self.ch.ack(sentinel.delivery_tag)
 
-        ac.basic_ack.assert_called_once_with(sentinel.delivery_tag)
+        transport.ack_impl.assert_called_once_with(sentinel.delivery_tag)
 
     def test_reject(self):
-        ac = Mock(spec=pchannel.Channel)
-        ac.channel_number = sentinel.channel_number
-        self.ch.attach_underlying_channel(ac)
+        transport = Mock()
+        transport.channel_number = sentinel.channel_number
+        self.ch.on_channel_open(transport)
 
         self.ch.reject(sentinel.delivery_tag, requeue=True)
 
-        ac.basic_reject.assert_called_once_with(sentinel.delivery_tag, requeue=True)
+        transport.reject_impl.assert_called_once_with(sentinel.delivery_tag, requeue=True)
 
     def test_reset(self):
         self.ch.reset()
@@ -568,19 +542,12 @@ class TestRecvChannel(PyonTestCase):
     def test_reset_when_consuming(self):
         # have to setup a lot here, can't just mock
         # _on_stop_consume because the FSM holds onto it
-        ac = MagicMock()
-        self.ch.attach_underlying_channel(ac)
+        transport = MagicMock()
+        self.ch.on_channel_open(transport)
 
         # pretend we're consuming
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
-
-        # callback sideffect!
-        def basic_cancel_side(*args, **kwargs):
-            cbparam = kwargs.get('callback')
-            cbparam()
-
-        ac.basic_cancel.side_effect = basic_cancel_side
 
         # set a sentinel as our consumer tag
         self.ch._consumer_tag = sentinel.consumer_tag
@@ -588,25 +555,25 @@ class TestRecvChannel(PyonTestCase):
         self.ch.reset()
 
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
-        self.assertTrue(ac.basic_cancel.called)
+        self.assertTrue(transport.stop_consume_impl.called)
 
     def test_get_stats(self):
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
-        self.ch._transport = Mock()
+        transport = Mock()
+        self.ch.on_channel_open(transport)
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
 
         self.ch.get_stats()
 
-        self.ch._transport.get_stats_impl.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+        self.ch._transport.get_stats_impl.assert_called_once_with(queue=sentinel.queue)
 
     def test_purge(self):
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
-        self.ch._transport = Mock()
+        transport = Mock()
+        self.ch.on_channel_open(transport)
         self.ch._recv_name = NameTrio(sentinel.ex, sentinel.queue)
 
         self.ch._purge()
 
-        self.ch._transport.purge_impl.assert_called_once_with(sentinel.amq_chan, queue=sentinel.queue)
+        self.ch._transport.purge_impl.assert_called_once_with(queue=sentinel.queue)
 
 @attr('UNIT')
 @patch('pyon.net.channel.SendChannel')
@@ -674,26 +641,27 @@ class TestListenChannel(PyonTestCase):
         self.ch = ListenChannel()
 
     def test__create_accepted_channel(self):
-        newch = self.ch._create_accepted_channel(sentinel.amq_chan, sentinel.msg)
+        newch = self.ch._create_accepted_channel(sentinel.transport, sentinel.msg)
         self.assertIsInstance(newch, ListenChannel.AcceptedListenChannel)
-        self.assertEquals(newch._amq_chan, sentinel.amq_chan)
+        self.assertEquals(newch._transport, sentinel.transport)
 
     def test_accept(self):
         rmock = Mock()
         rmock.return_value = sentinel.msg
 
         cacmock = Mock()
+        transport = Mock()
 
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(transport)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
         retch = self.ch.accept()
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACCEPTED)
-        cacmock.assert_called_once_with(sentinel.amq_chan, [sentinel.msg])
+        cacmock.assert_called_once_with(transport, [sentinel.msg])
         retch._recv_queue.put.assert_called_once_with(sentinel.msg)
 
         # we've mocked all the working machinery of accept's return etc, so we must manually exit accept
@@ -708,11 +676,12 @@ class TestListenChannel(PyonTestCase):
         rmock.return_value = sentinel.msg
 
         cacmock = Mock()
+        transport = Mock()
 
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(transport)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
@@ -746,11 +715,12 @@ class TestListenChannel(PyonTestCase):
         rmock.return_value = sentinel.msg
 
         cacmock = Mock()
+        transport = Mock()
 
         self.ch.recv = rmock
         self.ch._recv_queue.await_n = MagicMock()
         self.ch._create_accepted_channel = cacmock
-        self.ch.attach_underlying_channel(sentinel.amq_chan)
+        self.ch.on_channel_open(transport)
         self.ch._fsm.current_state = self.ch.S_ACTIVE
         self.ch._consuming = True
 
@@ -774,17 +744,19 @@ class TestListenChannel(PyonTestCase):
         self.assertEquals(self.ch._fsm.current_state, self.ch.S_ACTIVE)
 
     def test_AcceptedListenChannel_close_does_not_close_underlying_amqp_channel(self):
-        ac = Mock(pchannel.Channel)
-        newch = self.ch._create_accepted_channel(ac, sentinel.msg)
+        transport = Mock()
+        newch = self.ch._create_accepted_channel(transport, sentinel.msg)
 
         newch.close()
-        self.assertEquals(ac.close.call_count, 0)
+        self.assertEquals(transport.close.call_count, 0)
 
 @attr('UNIT')
 class TestSubscriberChannel(PyonTestCase):
 
     def test_close_does_delete_if_anonymous_and_not_auto_delete(self):
+        transport = AMQPTransport(Mock())
         ch = SubscriberChannel()
+        ch.on_channel_open(transport)
         ch._queue_auto_delete = False
         ch._destroy_queue = Mock()
         ch._recv_name = NameTrio(sentinel.exchange, 'amq.gen-ABCD')
@@ -819,10 +791,10 @@ class TestServerChannel(PyonTestCase):
         # this is not all that great
         msg = [[None, {'reply-to':'one,two'}]]
 
-        newch = ch._create_accepted_channel(sentinel.amq_chan, msg)
+        newch = ch._create_accepted_channel(sentinel.transport, msg)
 
         self.assertIsInstance(newch, ServerChannel.BidirAcceptChannel)
-        self.assertEquals(newch._amq_chan, sentinel.amq_chan)
+        self.assertEquals(newch._transport, sentinel.transport)
         self.assertTrue(hasattr(newch._send_name, 'exchange'))
         self.assertTrue(hasattr(newch._send_name, 'queue'))
         self.assertEquals(newch._send_name.exchange, 'one')
