@@ -15,6 +15,7 @@ from pyon.util.containers import DotDict
 from gevent.event import AsyncResult, Event
 from gevent.queue import Queue
 from gevent import coros
+from gevent.timeout import Timeout
 from gevent.pool import Pool
 from contextlib import contextmanager
 import os
@@ -857,7 +858,8 @@ class ZeroMQRouter(object):
                 if consumer[0] == consumer_tag:
 
                     # notify consumer greenlet that we want to stop
-                    self._queues[queue].put(self.ConsumerClosedMessage())
+                    if queue in self._queues:
+                        self._queues[queue].put(self.ConsumerClosedMessage())
                     consumer[4].join(timeout=5)
                     consumer[4].kill()
 
@@ -929,7 +931,7 @@ class ZeroMQRouter(object):
             _, queue, m = self._unacked.pop(delivery_tag)
             if requeue:
                 log.warn("REQUEUE: EXPERIMENTAL %s", delivery_tag)
-                self._queues[queue].append(m)
+                self._queues[queue].put(m)
 
     def transport_close(self, transport):
         log.warn("ZeroMQRouter.transport_close: %s TODO", transport)
@@ -942,10 +944,25 @@ class ZeroMQRouter(object):
         Returns a 2-tuple of (# msgs, # consumers) on a given queue.
         """
         assert queue in self._queues
-        assert queue in self._consumers
+
+        consumers = 0
+        if queue in self._consumers:
+            consumers = len(self._consumers[queue])
 
         # the queue qsize gives you number of undelivered messages, which i think is what AMQP does too
-        return (self._queues[queue].qsize(), len(self._consumers[queue]))
+        return (self._queues[queue].qsize(), consumers)
+
+    def purge(self, queue):
+        """
+        Deletes all contents of a queue.
+
+        @TODO could end up in a race with an infinite producer
+        """
+        assert queue in self._queues
+
+        with Timeout(5):
+            while not self._queues[queue].empty():
+                self._queues[queue].get_nowait()
 
 class ZeroMQTransport(BaseTransport):
     def __init__(self, broker, context, ch_number):
@@ -1013,3 +1030,5 @@ class ZeroMQTransport(BaseTransport):
     def get_stats_impl(self, queue):
         return self._broker.get_stats(queue)
 
+    def purge_impl(self, queue):
+        return self._broker.purge(queue)
