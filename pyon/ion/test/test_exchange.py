@@ -11,14 +11,14 @@ from pyon.net.endpoint import RPCServer, Subscriber, Publisher
 from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
-from mock import Mock, sentinel, patch, call, MagicMock, ANY
-from pyon.net.transport import BaseTransport, TransportError, AMQPTransport, NameTrio
+from mock import Mock, sentinel, patch, call, MagicMock
+from pyon.net.transport import BaseTransport, NameTrio
 from pyon.net.messaging import NodeB
 from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
 import requests
 from pyon.net.channel import SendChannel
-from pyon.core.bootstrap import CFG
+from pyon.core.bootstrap import CFG, set_config
 from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os
@@ -37,7 +37,7 @@ class TestExchangeManager(PyonTestCase):
     def setUp(self):
         self.container = Mock()
         self.ex_manager = ExchangeManager(self.container)
-        self.ex_manager._get_channel = Mock()
+        self.ex_manager.get_transport = Mock()
 
     def test_verify_service(self, mockmessaging):
         PyonTestCase.test_verify_service(self)
@@ -222,22 +222,21 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
     def test_start_stop_with_bad_host_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-
 @attr('UNIT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjects(PyonTestCase):
     def setUp(self):
         self.ex_manager = ExchangeManager(Mock())
-        self.ex_manager._transport  = Mock(BaseTransport)
+        self.pt = Mock(spec=BaseTransport)
+        self.ex_manager.get_transport = Mock(return_value=self.pt)
 
-        # mock out _client, which is a property, to return a sentinel
-        propmock = Mock()
-        propmock.__get__ = Mock(return_value=sentinel.client)
-        patcher = patch.object(ExchangeManager, '_client', propmock)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # set up some nodes
+        self.ex_manager._nodes = {'primary': Mock(), 'priviledged': Mock()}
 
-        # all exchange level operations are patched out via the _transport
+        # patch for setUp and test
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register':False}}, 'messaging':{'server':{}}})
+
+        # start ex manager
+        self.ex_manager.start()
 
     def test_exchange_by_name(self):
         # defaults: Root XS, no XNs
@@ -290,7 +289,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(self.ex_manager.xs_by_name[sentinel.xs], xs)
 
         # should've tried to declare
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.pt.declare_exchange_impl.assert_called_with(exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xs_with_params(self):
         xs      = self.ex_manager.create_xs(sentinel.xs, exchange_type=sentinel.ex_type, durable=True)
@@ -300,7 +299,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xs._xs_exchange_type, sentinel.ex_type)
 
         # declaration?
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
+        self.pt.declare_exchange_impl.assert_called_with(exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
 
     def test_delete_xs(self):
         # need an XS first
@@ -314,7 +313,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.delete_me, self.ex_manager.xs_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
+        self.pt.delete_exchange_impl.assert_called_once_with(exstr)
 
     def test_create_xp(self):
         xp      = self.ex_manager.create_xp(sentinel.xp)
@@ -329,7 +328,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xp.exchange, exstr)
 
         # declaration
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.pt.declare_exchange_impl.assert_called_with(exstr)
 
     def test_create_xp_with_params(self):
         xp = self.ex_manager.create_xp(sentinel.xp, xptype=sentinel.xptype)
@@ -359,7 +358,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.xp, self.ex_manager.xn_by_name)
 
         # deletion
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
+        self.pt.delete_exchange_impl.assert_called_once_with(exstr)
 
     def test__create_xn_unknown_type(self):
         self.assertRaises(StandardError, self.ex_manager._create_xn, sentinel.unknown)
@@ -392,7 +391,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertIn(xn, self.ex_manager.xn_by_xs[ION_ROOT_XS])
 
         # declaration
-        self.ex_manager._transport.declare_queue_impl.assert_called_once(sentinel.client, qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
+        self.pt.declare_queue_impl.assert_called_once(qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
 
     def test_create_xn_process(self):
         xn = self.ex_manager.create_xn_process('procname')
@@ -430,7 +429,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn('procname', self.ex_manager.xn_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_queue_impl.assert_called_once_with(sentinel.client, qstr)
+        self.pt.delete_queue_impl.assert_called_once_with(qstr)
 
     def test_xn_setup_listener(self):
         xn      = self.ex_manager.create_xn_service('servicename')
@@ -438,21 +437,21 @@ class TestExchangeObjects(PyonTestCase):
 
         xn.setup_listener(sentinel.binding, None)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, qstr, sentinel.binding)
+        self.pt.bind_impl.assert_called_once_with(xn.exchange, qstr, sentinel.binding)
 
     def test_xn_bind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.bind(sentinel.bind)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
+        self.pt.bind_impl.assert_called_once_with(xn.exchange, xn.queue, sentinel.bind)
 
     def test_xn_unbind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.unbind(sentinel.bind)
 
-        self.ex_manager._transport.unbind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
+        self.pt.unbind_impl.assert_called_once_with(xn.exchange, xn.queue, sentinel.bind)
 
 
 @attr('INT', group='exchange')
