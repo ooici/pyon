@@ -594,13 +594,13 @@ class TopicTrie(object):
             if '*' in self.children:
                 results.extend(self.children['*'].get_all_matches(rem_tokens))
 
-            # '#' means any number of tokens - naive method of descent, we'll feed it at least current token to start. Then chop
-            # rem_tokens all the way down, put the results in a set to remove duplicates, and also any patterns on self.
+            # '#' means any number of tokens - naive method of descent, we'll feed it nothing to start. Then chop the full
+            # topics all the way down, put the results in a set to remove duplicates, and also any patterns on self.
             if '#' in self.children:
                 # keep popping off and descend, make a set out of results
                 all_wild_childs = set()
-                for i in xrange(len(rem_tokens)):
-                    res = self.children['#'].get_all_matches(rem_tokens[i:])
+                for i in xrange(len(topics)):
+                    res = self.children['#'].get_all_matches(topics[i:])
                     map(all_wild_childs.add, res)
 
                 results.extend(all_wild_childs)
