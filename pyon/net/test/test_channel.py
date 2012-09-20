@@ -803,6 +803,7 @@ class TestServerChannel(PyonTestCase):
 @attr('INT')
 class TestChannelInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     #@skip('Not working consistently on buildbot')
@@ -1028,4 +1029,10 @@ class TestChannelInt(IonIntegrationTestCase):
 
         ch.stop_consume()
 
+
+@attr('INT')
+class TestChannelIntZeroMQ(TestChannelInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self._start_container()
 
