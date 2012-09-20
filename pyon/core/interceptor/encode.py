@@ -2,12 +2,12 @@ import msgpack
 
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
-import numpy
+import numpy as np
 
-"""
-@todod Add other ion object stuff here...
-"""
-
+numpy_floats  = (np.float, np.float16, np.float32, np.float64)
+numpy_ints    = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.uint64)
+numpy_bool    = (np.bool)
+numpy_complex = (np.complex, np.complex64, np.complex128)
 
 def decode_ion( obj):
     """
@@ -23,11 +23,14 @@ def decode_ion( obj):
 
     elif "__ion_array__" in obj:
         # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
-        return numpy.array(obj['content'],dtype=numpy.dtype(obj['header']['type']))
+        return np.array(obj['content'],dtype=np.dtype(obj['header']['type']))
 
     elif '__complex__' in obj:
         return complex(obj['real'], obj['imag'])
         ## Always return object
+    elif '__dtype__' in obj:
+        dt = np.dtype(obj['__dtype__'])
+        return dt.type(obj['val'])
     return obj
 
 def encode_ion( obj):
@@ -42,16 +45,22 @@ def encode_ion( obj):
     if isinstance(obj, set):
         return {"__set__":True, 'tuple':tuple(obj)}
 
-    if isinstance(obj, numpy.ndarray):
+    if isinstance(obj, np.ndarray):
         if obj.ndim == 0:
-            raise ValueError('Can not encode a numpy array with rank 0')
+            raise ValueError('Can not encode a np array with rank 0')
         return {"header":{"type":str(obj.dtype),"nd":obj.ndim,"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
 
     if isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
 
-    if isinstance(obj, (numpy.float, numpy.float16, numpy.float32, numpy.float64)):
-        raise ValueError('Can not encode numpy scalars!')
+    if isinstance(obj, np.number):
+        if isinstance(obj,numpy_floats):
+            return {'__dtype__': obj.dtype.str, 'val':obj.astype(float)}
+        elif isinstance(obj, numpy_ints):
+            return {'__dtype__': obj.dtype.str, 'val':obj.astype(int)}
+        else:
+            raise TypeError('Unsupported type "%s"', str(type(obj)))
+
 
 
     # Must raise type error to avoid recursive failure
