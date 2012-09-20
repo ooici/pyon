@@ -97,10 +97,12 @@ class ExchangeManager(object):
 
             # start it with a zero timeout so it comes right back to us
             try:
-                if 'zmq' in cfgkey:
+                cfg_params = CFG.server[cfgkey]
+
+                if cfg_params['type'] == 'zeromq':
                     node, ioloop = messaging.make_zmq_node(0, self.container.zmq_router)
                 else:
-                    node, ioloop = messaging.make_node(CFG.server[cfgkey], name, 0)
+                    node, ioloop = messaging.make_node(cfg_params, name, 0)
 
                 # install a finished handler directly on the ioloop just for this startup period
                 fail_handle = lambda _: handle_failure(name, node)
