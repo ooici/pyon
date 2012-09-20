@@ -10,7 +10,7 @@ from interface.services.examples.hello.ihello_service import HelloServiceClient
 from pyon.net.endpoint import RPCServer, Subscriber, Publisher
 from pyon.util.async import spawn
 import unittest
-from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
+from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
 from mock import Mock, sentinel, patch, call, MagicMock
 from pyon.net.transport import BaseTransport, NameTrio
 from pyon.net.messaging import NodeB
@@ -18,12 +18,11 @@ from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
 import requests
 from pyon.net.channel import SendChannel
-from pyon.core.bootstrap import CFG, set_config
+from pyon.core.bootstrap import CFG
 from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os
 import time
-import Queue as PQueue
 from gevent.timeout import Timeout
 from uuid import uuid4
 
@@ -455,10 +454,11 @@ class TestExchangeObjects(PyonTestCase):
 
 
 @attr('INT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
 @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+                                                              'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     def test_rpc_with_xn(self):
@@ -587,6 +587,14 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
             mo.ack()
 
         sub.close()
+
+@attr('INT', group='exchange')
+@unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
+class TestExchangeObjectsIntWithZeroMQ(TestExchangeObjectsInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+                                                              'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self._start_container()
 
 @attr('INT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
