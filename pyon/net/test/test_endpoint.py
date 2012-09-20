@@ -348,6 +348,7 @@ class TestListeningBaseEndpoint(PyonTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     def test_get_stats(self):
@@ -383,6 +384,11 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         gl1.join(timeout=5)
         gl2.join(timeout=5)
 
+@attr('INT', group='COI')
+class TestListeningBaseEndpointIntWithZeroMQ(TestListeningBaseEndpointInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self._start_container()
 
 @attr('UNIT')
 class TestPublisher(PyonTestCase):
