@@ -27,10 +27,14 @@ def decode_ion( obj):
 
     elif '__complex__' in obj:
         return complex(obj['real'], obj['imag'])
+
+    elif '__npdtype__' in obj:
+        return np.dtype(obj)
         ## Always return object
     elif '__dtype__' in obj:
         dt = np.dtype(obj['__dtype__'])
         return dt.type(obj['val'])
+
     return obj
 
 def encode_ion( obj):
@@ -60,6 +64,9 @@ def encode_ion( obj):
             return {'__dtype__': obj.dtype.str, 'val':obj.astype(int)}
         else:
             raise TypeError('Unsupported type "%s"', str(type(obj)))
+
+    if isinstance(obj, np.dtype):
+        return {'__npdtype__':obj.str}
 
 
 
