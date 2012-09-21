@@ -77,8 +77,7 @@ class Container(BaseContainerAgent):
         self.directory = Directory()
 
         # ZeroMQ internal router/context for zmq
-        zc = zmq.Context(1)
-        self.zmq_router = ZeroMQRouter(zc, bootstrap.get_sys_name())
+        self.zmq_router = None
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -159,7 +158,9 @@ class Container(BaseContainerAgent):
         self.state_repository = StateRepository()
         self._capabilities.append("STATE_REPOSITORY")
 
-        # ZMQ Router
+        # ZeroMQ internal router/context for zmq
+        zc = zmq.Context(1)
+        self.zmq_router = ZeroMQRouter(zc, bootstrap.get_sys_name())
         self.zmq_router.start()
         self.zmq_router.ready.wait(timeout=2)
         self._capabilities.append("ZMQ_ROUTER")
@@ -330,7 +331,9 @@ class Container(BaseContainerAgent):
             self.ex_manager.stop()
 
         elif capability == "ZMQ_ROUTER":
-            self.zmq_router.stop()
+            if self.zmq_router is not None:
+                self.zmq_router.stop()
+                self.zmq_router._context.destroy()
 
         elif capability == "EVENT_REPOSITORY":
             # close event repository (possible CouchDB connection)
