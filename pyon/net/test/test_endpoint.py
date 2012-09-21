@@ -348,6 +348,7 @@ class TestListeningBaseEndpoint(PyonTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     def test_get_stats(self):
@@ -383,6 +384,11 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         gl1.join(timeout=5)
         gl2.join(timeout=5)
 
+@attr('INT', group='COI')
+class TestListeningBaseEndpointIntWithZeroMQ(TestListeningBaseEndpointInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self._start_container()
 
 @attr('UNIT')
 class TestPublisher(PyonTestCase):
@@ -398,11 +404,11 @@ class TestPublisher(PyonTestCase):
 
         self._pub.publish("pub")
 
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 2)
 
     def test_publish_with_new_name(self):

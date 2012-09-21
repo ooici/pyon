@@ -10,9 +10,10 @@ from interface.services.examples.hello.ihello_service import HelloServiceClient
 from pyon.net.endpoint import RPCServer, Subscriber, Publisher
 from pyon.util.async import spawn
 import unittest
-from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeSpace, ExchangePoint, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
-from mock import Mock, sentinel, patch, call, MagicMock, ANY
-from pyon.net.transport import BaseTransport, TransportError, AMQPTransport, NameTrio
+from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
+from mock import Mock, sentinel, patch, call, MagicMock
+from pyon.net.transport import BaseTransport, NameTrio
+from pyon.net.messaging import NodeB
 from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
 import requests
@@ -22,7 +23,6 @@ from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os
 import time
-import Queue as PQueue
 from gevent.timeout import Timeout
 from uuid import uuid4
 
@@ -30,13 +30,19 @@ def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
     return DotDict(CFG.container, messaging=DotDict(CFG.container.messaging, server=ddkwargs))
 
+dict_amqp                = DotDict(type='amqp')
+dict_amqp_again          = DotDict(type='amqp')
+dict_amqp_fail           = DotDict(type='amqp')
+dict_amqp_not_default    = DotDict(type='amqp')
+
 @attr('UNIT', group='COI')
 @patch('pyon.ion.exchange.messaging')
 class TestExchangeManager(PyonTestCase):
+
     def setUp(self):
         self.container = Mock()
         self.ex_manager = ExchangeManager(self.container)
-        self.ex_manager._get_channel = Mock()
+        self.ex_manager.get_transport = Mock()
 
     def test_verify_service(self, mockmessaging):
         PyonTestCase.test_verify_service(self)
@@ -45,23 +51,23 @@ class TestExchangeManager(PyonTestCase):
     def test_start_with_no_connections(self, mockmessaging):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':sentinel.amqp}, container=_make_server_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp}, container=_make_server_cfg(primary='amqp'))
     def test_start_with_one_connection(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
 
-        mockmessaging.make_node.assert_called_once_with(sentinel.amqp, 'primary', 0)
+        mockmessaging.make_node.assert_called_once_with(dict_amqp, 'primary', 0)
         self.assertIn('primary', self.ex_manager._nodes)
         self.assertIn('primary', self.ex_manager._ioloops)
         self.assertEquals(self.ex_manager._nodes['primary'], mockmessaging.make_node.return_value[0])
         self.assertEquals(self.ex_manager._ioloops['primary'], mockmessaging.make_node.return_value[1])
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':sentinel.amqp, 'amqp_again':sentinel.amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
     def test_start_with_multi_connections(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
 
-        mockmessaging.make_node.assert_calls(call(sentinel.amqp, 'primary', 0), call(sentinel.amqp_again, 'secondary', 0))
+        mockmessaging.make_node.assert_calls(call(dict_amqp, 'primary', 0), call(dict_amqp_again, 'secondary', 0))
 
         self.assertIn('primary', self.ex_manager._nodes)
         self.assertIn('primary', self.ex_manager._ioloops)
@@ -80,7 +86,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         self.assertFalse(mockmessaging.make_node.called)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':sentinel.amqp, 'amqp_fail':sentinel.amqp_fail}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_fail':dict_amqp_fail}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
     def test_start_with_working_and_failing_connection(self, mockmessaging):
 
         # set up return values - first is amqp (Working) second is amqp_fail (not working)
@@ -99,7 +105,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(len(self.ex_manager._nodes), 1)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_fail':sentinel.amqp_fail}, container=_make_server_cfg(primary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_fail':dict_amqp_fail}, container=_make_server_cfg(primary='amqp_fail'))
     def test_start_with_only_failing_connections(self, mockmessaging):
         nodemock = Mock()
         nodemock.running = False
@@ -110,7 +116,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':sentinel.amqp}, container=_make_server_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp}, container=_make_server_cfg(primary='amqp'))
     def test_start_stop(self, mockmessaging):
         nodemock = Mock()
         iomock = Mock()
@@ -125,7 +131,7 @@ class TestExchangeManager(PyonTestCase):
     def test_default_node_no_connections(self, mockmessaging):
         self.assertIsNone(self.ex_manager.default_node)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_not_default':sentinel.amqp_not_default}, container=_make_server_cfg(secondary='amqp_not_default'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_not_default':dict_amqp_not_default}, container=_make_server_cfg(secondary='amqp_not_default'))
     def test_default_node_no_default_name(self, mockmessaging):
         nodemock = Mock()
         mockmessaging.make_node.return_value = (nodemock, Mock())     # node, ioloop
@@ -134,7 +140,7 @@ class TestExchangeManager(PyonTestCase):
 
         self.assertEquals(self.ex_manager.default_node, nodemock)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':sentinel.amqp, 'amqp_again':sentinel.amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
     def test_default_node(self, mockmessaging):
 
         # set up return values - amqp returns this named version, amqp_again does not
@@ -221,22 +227,21 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
     def test_start_stop_with_bad_host_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-
 @attr('UNIT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjects(PyonTestCase):
     def setUp(self):
         self.ex_manager = ExchangeManager(Mock())
-        self.ex_manager._transport  = Mock(BaseTransport)
+        self.pt = Mock(spec=BaseTransport)
+        self.ex_manager.get_transport = Mock(return_value=self.pt)
 
-        # mock out _client, which is a property, to return a sentinel
-        propmock = Mock()
-        propmock.__get__ = Mock(return_value=sentinel.client)
-        patcher = patch.object(ExchangeManager, '_client', propmock)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # set up some nodes
+        self.ex_manager._nodes = {'primary': Mock(), 'priviledged': Mock()}
 
-        # all exchange level operations are patched out via the _transport
+        # patch for setUp and test
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register':False}}, 'messaging':{'server':{}}})
+
+        # start ex manager
+        self.ex_manager.start()
 
     def test_exchange_by_name(self):
         # defaults: Root XS, no XNs
@@ -289,7 +294,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(self.ex_manager.xs_by_name[sentinel.xs], xs)
 
         # should've tried to declare
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.pt.declare_exchange_impl.assert_called_with(exstr, auto_delete=True, durable=False, exchange_type='topic')
 
     def test_create_xs_with_params(self):
         xs      = self.ex_manager.create_xs(sentinel.xs, exchange_type=sentinel.ex_type, durable=True)
@@ -299,7 +304,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xs._xs_exchange_type, sentinel.ex_type)
 
         # declaration?
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
+        self.pt.declare_exchange_impl.assert_called_with(exstr, auto_delete=True, durable=True, exchange_type=sentinel.ex_type)
 
     def test_delete_xs(self):
         # need an XS first
@@ -313,7 +318,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.delete_me, self.ex_manager.xs_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
+        self.pt.delete_exchange_impl.assert_called_once_with(exstr)
 
     def test_create_xp(self):
         xp      = self.ex_manager.create_xp(sentinel.xp)
@@ -328,7 +333,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertEquals(xp.exchange, exstr)
 
         # declaration
-        self.ex_manager._transport.declare_exchange_impl.assert_called_with(sentinel.client, exstr, auto_delete=True, durable=False, exchange_type='topic')
+        self.pt.declare_exchange_impl.assert_called_with(exstr)
 
     def test_create_xp_with_params(self):
         xp = self.ex_manager.create_xp(sentinel.xp, xptype=sentinel.xptype)
@@ -358,7 +363,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn(sentinel.xp, self.ex_manager.xn_by_name)
 
         # deletion
-        self.ex_manager._transport.delete_exchange_impl.assert_called_once_with(sentinel.client, exstr)
+        self.pt.delete_exchange_impl.assert_called_once_with(exstr)
 
     def test__create_xn_unknown_type(self):
         self.assertRaises(StandardError, self.ex_manager._create_xn, sentinel.unknown)
@@ -391,7 +396,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertIn(xn, self.ex_manager.xn_by_xs[ION_ROOT_XS])
 
         # declaration
-        self.ex_manager._transport.declare_queue_impl.assert_called_once(sentinel.client, qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
+        self.pt.declare_queue_impl.assert_called_once(qstr, durable=ExchangeNameService._xn_durable, auto_delete=ExchangeNameService._xn_auto_delete)
 
     def test_create_xn_process(self):
         xn = self.ex_manager.create_xn_process('procname')
@@ -429,7 +434,7 @@ class TestExchangeObjects(PyonTestCase):
         self.assertNotIn('procname', self.ex_manager.xn_by_name)
 
         # call to broker
-        self.ex_manager._transport.delete_queue_impl.assert_called_once_with(sentinel.client, qstr)
+        self.pt.delete_queue_impl.assert_called_once_with(qstr)
 
     def test_xn_setup_listener(self):
         xn      = self.ex_manager.create_xn_service('servicename')
@@ -437,33 +442,35 @@ class TestExchangeObjects(PyonTestCase):
 
         xn.setup_listener(sentinel.binding, None)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, qstr, sentinel.binding)
+        self.pt.bind_impl.assert_called_once_with(xn.exchange, qstr, sentinel.binding)
 
     def test_xn_bind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.bind(sentinel.bind)
 
-        self.ex_manager._transport.bind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
+        self.pt.bind_impl.assert_called_once_with(xn.exchange, xn.queue, sentinel.bind)
 
     def test_xn_unbind(self):
         xn      = self.ex_manager.create_xn_service('servicename')
 
         xn.unbind(sentinel.bind)
 
-        self.ex_manager._transport.unbind_impl.assert_called_once_with(sentinel.client, xn.exchange, xn.queue, sentinel.bind)
+        self.pt.unbind_impl.assert_called_once_with(xn.exchange, xn.queue, sentinel.bind)
 
 
 @attr('INT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
 @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+                                                              'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     def test_rpc_with_xn(self):
         # get an xn to use for send/recv
         xn = self.container.ex_manager.create_xn_service('hello')
+        self.addCleanup(xn.delete)
 
         # create an RPCServer for a hello service
         hs = HelloService()
@@ -471,7 +478,14 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # spawn the listener, kill on test exit (success/fail/error should cover?)
         gl_listen = spawn(rpcs.listen)
-        self.addCleanup(gl_listen.kill)
+        def cleanup():
+            rpcs.close()
+            gl_listen.join(timeout=2)
+            gl_listen.kill()
+        self.addCleanup(cleanup)
+
+        # wait for listen to be ready
+        rpcs.get_ready_event().wait(timeout=5)
 
         # ok, now create a client using same xn
         hsc = HelloServiceClient(to_name=xn)
@@ -481,9 +495,6 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # did we get back what we expected?
         self.assertEquals(ret, 'BACK:hi there')
-
-        # clean xn up
-        xn.delete()
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
@@ -529,7 +540,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # NOW we have messages!
         for x in xrange(10):
-            mo = sub.get_one_msg(timeout=1)
+            mo = sub.get_one_msg(timeout=10)
             self.assertEquals(mo.body, "3,%s" % str(x))
             mo.ack()
 
@@ -584,6 +595,14 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         sub.close()
 
 @attr('INT', group='exchange')
+@unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
+class TestExchangeObjectsIntWithZeroMQ(TestExchangeObjectsInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+                                                              'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self._start_container()
+
+@attr('INT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
 class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
@@ -591,6 +610,10 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
     def setUp(self):
         self._start_container()
+
+        # skip if we're not an amqp node
+        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+            raise unittest.SkipTest("Management API only works with AMQP nodes for now")
 
         # test to see if we have access to management URL!
         url = self.container.ex_manager._get_management_url('overview')
@@ -738,6 +761,12 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
 
+        # skip if we're not an amqp node
+        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+            raise unittest.SkipTest("Management API only works with AMQP nodes for now")
+
+        self.transport = self.container.ex_manager.get_transport(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]))
+
         # test to see if we have access to management URL!
         url = self.container.ex_manager._get_management_url('overview')
         try:
@@ -756,8 +785,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn(self.ex_name, exchanges)
 
         # do declaration via ex manager's transport
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.addCleanup(self.transport.delete_exchange_impl, self.ex_name)
 
         new_exchanges = self.container.ex_manager.list_exchanges()
 
@@ -771,8 +800,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn(self.queue_name, queues)
 
         # do declaration via ex manager's transport
-        self.container.ex_manager.declare_queue(self.queue_name)
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.transport.declare_queue_impl(self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
 
         new_queues = self.container.ex_manager.list_queues()
 
@@ -782,10 +811,10 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings()
@@ -795,8 +824,8 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertNotIn((self.ex_name, self.queue_name), bindings)
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings()
 
@@ -805,18 +834,18 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings_for_queue(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_queue(self.queue_name)
 
@@ -825,18 +854,18 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_list_bindings_for_exchange(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
-        self.addCleanup(self.container.ex_manager.unbind, self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
+        self.addCleanup(self.transport.unbind_impl, self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
 
@@ -845,38 +874,38 @@ class TestManagementAPIInt(IonIntegrationTestCase):
     def test_delete_binding(self):
 
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
 
         self.assertEquals(bindings, [(self.ex_name, self.queue_name, self.bind_name, self.bind_name)])
 
         # delete the bind
-        self.container.ex_manager.delete_binding(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.unbind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         bindings = self.container.ex_manager.list_bindings_for_exchange(self.ex_name)
         self.assertEquals(bindings, [])
 
     def test_purge(self):
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         # declare a bind
-        self.container.ex_manager.bind(self.ex_name, self.queue_name, self.bind_name)
+        self.transport.bind_impl(self.ex_name, self.queue_name, self.bind_name)
 
         # deliver some messages
         ch = self.container.node.channel(SendChannel)
@@ -894,7 +923,7 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self.assertEquals(queue_info['messages'], 2)
 
         # now purge it
-        self.container.ex_manager.purge_queue(self.queue_name)
+        self.transport.purge_impl(self.queue_name)
 
         time.sleep(2)
 
@@ -907,10 +936,10 @@ class TestManagementAPIInt(IonIntegrationTestCase):
 
     def test_get_queue_info(self):
         # declare both ex and queue
-        self.container.ex_manager.declare_exchange(self.ex_name)
-        self.container.ex_manager.declare_queue(self.queue_name)
+        self.transport.declare_exchange_impl(self.ex_name)
+        self.transport.declare_queue_impl(self.queue_name)
 
-        self.addCleanup(self.container.ex_manager.delete_queue, self.queue_name)
+        self.addCleanup(self.transport.delete_queue_impl, self.queue_name)
         #self.addCleanup(self.container.ex_manager.delete_exchange, self.ex_name)   #@TODO exchange AD takes care of this when delete of queue
 
         queue_info = self.container.ex_manager.get_queue_info(self.queue_name)

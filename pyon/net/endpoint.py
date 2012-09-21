@@ -223,9 +223,10 @@ class BaseEndpoint(object):
     endpoint_by_name = {}
     _interceptors = None
 
-    def __init__(self, node=None):
+    def __init__(self, node=None, transport=None):
 
         self.node = node
+        self._transport = transport
 
 #        # @TODO: MOVE THIS
 #        if name in self.endpoint_by_name:
@@ -289,13 +290,13 @@ class BaseEndpoint(object):
 
         return e
 
-    def _create_channel(self, **kwargs):
+    def _create_channel(self, transport=None):
         """
         Creates a channel, used by create_endpoint.
 
         Can pass additional kwargs in to be passed through to the channel provider.
         """
-        return self.node.channel(self.channel_type, **kwargs)
+        return self.node.channel(self.channel_type, transport=transport)
 
     def close(self):
         """
@@ -304,8 +305,8 @@ class BaseEndpoint(object):
         pass
 
 class SendingBaseEndpoint(BaseEndpoint):
-    def __init__(self, node=None, to_name=None, name=None):
-        BaseEndpoint.__init__(self, node=node)
+    def __init__(self, node=None, to_name=None, name=None, transport=None):
+        BaseEndpoint.__init__(self, node=node, transport=transport)
 
         if name:
             log.warn("SendingBaseEndpoint: name param is deprecated, please use to_name instead")
@@ -328,14 +329,17 @@ class SendingBaseEndpoint(BaseEndpoint):
         e.channel.connect(name)
         return e
 
-    def _create_channel(self, **kwargs):
+    def _create_channel(self, transport=None):
         """
         Overrides the BaseEndpoint create channel to supply a transport if our send_name is one.
         """
-        if isinstance(self._send_name, BaseTransport):
-            kwargs.update({'transport':self._send_name})
+        if transport is None:
+            if isinstance(self._send_name, BaseTransport):
+                transport = self._send_name
+            elif self._transport is not None:
+                transport = self._transport
 
-        return BaseEndpoint._create_channel(self, **kwargs)
+        return BaseEndpoint._create_channel(self, transport=transport)
 
 
 
@@ -409,8 +413,8 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
             self.endpoint._message_received(self.body, self.headers)
 
-    def __init__(self, node=None, name=None, from_name=None, binding=None):
-        BaseEndpoint.__init__(self, node=node)
+    def __init__(self, node=None, name=None, from_name=None, binding=None, transport=None):
+        BaseEndpoint.__init__(self, node=node, transport=transport)
 
         if name:
             log.warn("ListeningBaseEndpoint: name param is deprecated, please use from_name instead")
@@ -430,6 +434,8 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
         if isinstance(self._recv_name, BaseTransport):
             kwargs.update({'transport':self._recv_name})
+        elif self._transport is not None:
+            kwargs.update({'transport':self._transport})
 
         return BaseEndpoint._create_channel(self, **kwargs)
 
@@ -495,6 +501,8 @@ class ListeningBaseEndpoint(BaseEndpoint):
         kwargs = {}
         if isinstance(self._recv_name, BaseTransport):
             kwargs.update({'transport':self._recv_name})
+        elif self._transport is not None:
+            kwargs.update({'transport':self._transport})
         self._chan = self.node.channel(self.channel_type, **kwargs)
 
         # @TODO this does not feel right

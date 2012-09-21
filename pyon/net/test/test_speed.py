@@ -49,7 +49,7 @@ class TestMessagingSpeed(IonIntegrationTestCase):
         print >>sys.stderr, "Requests per second (RPC):", mps, "(", self.counter, "messages in", diff, "seconds)"
 
     def test_pub_speed(self):
-        pub = Publisher(node=self.container.node, name="i_no_exist")
+        pub = Publisher(node=self.container.node, to_name="i_no_exist")
 
         print >>sys.stderr, ""
 

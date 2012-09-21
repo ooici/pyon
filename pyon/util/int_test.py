@@ -138,4 +138,20 @@ class IonIntegrationTestCase(unittest.TestCase):
         finally:
             datastore.close()
 
+    def patch_cfg(self, cfg_obj_or_str, *args, **kwargs):
+        """
+        Helper method for patching the CFG (or any dict, but useful for patching CFG).
+
+        This method exists because the decorator versions of patch/patch.dict do not function
+        until the test_ method is called - ie, when setUp is run, the patch hasn't occured yet.
+        Use this in your setUp method if you need to patch CFG and have stuff in setUp respect it.
+
+        @param  cfg_obj_or_str  An actual ref to CFG or a string defining where to find it ie 'pyon.ion.exchange.CFG'
+        @param  *args           *args to pass to patch.dict
+        @param  **kwargs        **kwargs to pass to patch.dict
+        """
+        patcher = patch.dict(cfg_obj_or_str, *args, **kwargs)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
 initialize_ion_int_tests()
