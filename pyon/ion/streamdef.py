@@ -33,5 +33,3 @@ class StreamDef(object):
 
     def __contains__(self, xpath):
         return bool(self.xpath(xpath))
-
-

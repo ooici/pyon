@@ -8,16 +8,16 @@
 import uuid
 import time
 import gevent
-import sys
+
 from pyon.container.cc import Container
 from pyon.core.bootstrap import get_sys_name
 from pyon.event.event import EventPublisher
-
 from pyon.ion.streamproc import StreamProcess
 from pyon.net.endpoint import Subscriber, Publisher
 from pyon.net.transport import NameTrio
 from pyon.util.async import spawn
 from pyon.util.log import log
+
 
 class TransformBase(StreamProcess):
     """
@@ -25,17 +25,15 @@ class TransformBase(StreamProcess):
     """
 
     def on_start(self):
-        super(TransformBase,self).on_start()
+        super(TransformBase, self).on_start()
         # Assign a name based on CFG, required for messaging
-        self.name = self.CFG.get_safe('process.name',None)
+        self.name = self.CFG.get_safe('process.name', None)
 
         # Assign a list of streams available
-        self.streams = self.CFG.get_safe('process.publish_streams',[])
+        self.streams = self.CFG.get_safe('process.publish_streams', [])
 
         # Assign the transform resource id
-        self._transform_id = self.CFG.get_safe('process.transform_id','Unknown_transform_id')
-
-
+        self._transform_id = self.CFG.get_safe('process.transform_id', 'Unknown_transform_id')
 
     def callback(self):
         pass
@@ -48,7 +46,6 @@ class TransformBase(StreamProcess):
             event_publisher = EventPublisher()
             event_publisher.publish_event(origin=self._transform_id, event_type='ExceptionEvent',
                 exception_type=str(type(e)), exception_message=e.message)
-
 
     def process(self, packet):
         pass
@@ -69,17 +66,16 @@ class TransformProcessAdaptor(TransformBase):
         pass
 
 
-
 class TransformDataProcess(TransformBase):
     """Model for a TransformDataProcess
 
     """
     def __init__(self):
-        super(TransformDataProcess,self).__init__()
+        super(TransformDataProcess, self).__init__()
         self._pub_init = False
 
     def on_start(self):
-        super(TransformDataProcess,self).on_start()
+        super(TransformDataProcess, self).on_start()
 
     def process(self, packet):
         pass
@@ -87,9 +83,8 @@ class TransformDataProcess(TransformBase):
     def callback(self):
         pass
 
-    def publish(self,msg):
+    def publish(self, msg):
         self._publish_all(msg)
-
 
     def _publish_all(self, msg):
         '''Publishes a message on all output streams (publishers)
@@ -97,15 +92,13 @@ class TransformDataProcess(TransformBase):
         # Ensure the publisher list is only initialized once
         if not self._pub_init:
             self._pub_init = True
-            stream_names = list(k for k,v in self.streams.iteritems())
+            stream_names = list(k for k, v in self.streams.iteritems())
             self.publishers = []
             for stream in stream_names:
-                self.publishers.append(getattr(self,stream))
-
+                self.publishers.append(getattr(self, stream))
 
         for publisher in self.publishers:
             publisher.publish(msg)
-            
 
 
 class TransformBenchTesting(TransformDataProcess):
@@ -118,15 +111,14 @@ class TransformBenchTesting(TransformDataProcess):
     """
     transform_number = 0
     message_length = 0
+
     def __init__(self):
-        super(TransformBenchTesting,self).__init__()
+        super(TransformBenchTesting, self).__init__()
         self.count = 0
         TransformBenchTesting.transform_number += 1
 
-        
     def perf(self):
-
-        with open('/tmp/pyon_performance.dat','a') as f:
+        with open('/tmp/pyon_performance.dat', 'a') as f:
             then = time.time()
             ocount = self.count
             while True:
@@ -136,31 +128,24 @@ class TransformBenchTesting(TransformDataProcess):
                 delta_t = now - then
                 delta_c = count - ocount
 
-                f.write('%s|%s\t%s\t%s\t%3.3f\n' % (get_sys_name(),time.strftime("%H:%M:%S", time.gmtime()),TransformBenchTesting.message_length,TransformBenchTesting.transform_number, float(delta_c) / delta_t))
+                f.write('%s|%s\t%s\t%s\t%3.3f\n' % (get_sys_name(), time.strftime("%H:%M:%S", time.gmtime()), TransformBenchTesting.message_length, TransformBenchTesting.transform_number, float(delta_c) / delta_t))
                 then = now
                 ocount = count
                 f.flush()
-            
-        
-        
 
     @staticmethod
-    def launch_benchmark(transform_number=1, primer=1,message_length=4):
-        import gevent
+    def launch_benchmark(transform_number=1, primer=1, message_length=4):
         from gevent.greenlet import Greenlet
         from pyon.util.containers import DotDict
-        from pyon.net.transport import NameTrio
-        from pyon.net.endpoint import Publisher
-        import uuid
         num = transform_number
         msg_len = message_length
         transforms = list()
         pids = 1
         TransformBenchTesting.message_length = message_length
         cc = Container.instance
-        pub = Publisher(to_name=NameTrio(get_sys_name(),str(uuid.uuid4())[0:6]))
+        pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
         for i in xrange(num):
-            tbt=cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlace', DotDict({'process':{'name':'tbt%d' % pids, 'transform_id':pids}}))
+            tbt = cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlace', DotDict({'process': {'name': 'tbt%d' % pids, 'transform_id': pids}}))
             tbt.init()
             tbt.start()
             gevent.sleep(0.2)
@@ -186,7 +171,7 @@ class TransformBenchTesting(TransformDataProcess):
 
     def publish(self, msg):
         self._bt_pub.publish(msg)
-        self.count+=1
+        self.count += 1
 
     def _stop_listener(self):
         self._bt_sub.close()
@@ -202,9 +187,6 @@ class TransformBenchTesting(TransformDataProcess):
         self._stop_listener()
 
 
-
-
-
 class TransformBenchNewGranuleTesting(TransformBenchTesting):
     """
     Easiest way to run:
@@ -215,20 +197,14 @@ class TransformBenchNewGranuleTesting(TransformBenchTesting):
     """
 
     def __init__(self):
-        super(TransformBenchNewGranuleTesting,self).__init__()
+        super(TransformBenchNewGranuleTesting, self).__init__()
         self.count = 0
         TransformBenchNewGranuleTesting.transform_number += 1
 
-
-
-
     @staticmethod
-    def launch_benchmark(transform_number=1, primer=1,message_length=4):
-        import gevent
+    def launch_benchmark(transform_number=1, primer=1, message_length=4):
         from gevent.greenlet import Greenlet
         from pyon.util.containers import DotDict
-        from pyon.net.transport import NameTrio
-        from pyon.net.endpoint import Publisher
         import numpy
         from pyon.ion.granule.record_dictionary import RecordDictionaryTool
         from pyon.ion.granule.taxonomy import TaxyTool
@@ -237,33 +213,27 @@ class TransformBenchNewGranuleTesting(TransformBenchTesting):
         tt = TaxyTool()
         tt.add_taxonomy_set('a')
 
-        import uuid
         num = transform_number
-        msg_len = message_length
         transforms = list()
         pids = 1
         TransformBenchTesting.message_length = message_length
         cc = Container.instance
-        pub = Publisher(to_name=NameTrio(get_sys_name(),str(uuid.uuid4())[0:6]))
+        pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
         for i in xrange(num):
-            tbt=cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlaceNewGranule', DotDict({'process':{'name':'tbt%d' % pids, 'transform_id':pids}}))
+            tbt = cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlaceNewGranule', DotDict({'process': {'name': 'tbt%d' % pids, 'transform_id': pids}}))
             tbt.init()
             tbt.start()
             gevent.sleep(0.2)
             for i in xrange(primer):
                 rd = RecordDictionaryTool(tt, message_length)
                 rd['a'] = numpy.arange(message_length)
-                gran = build_granule(data_producer_id='dp_id',taxonomy=tt, record_dictionary=rd)
+                gran = build_granule(data_producer_id='dp_id', taxonomy=tt, record_dictionary=rd)
                 pub.publish(gran)
 
             g = Greenlet(tbt.perf)
             g.start()
             transforms.append(tbt)
             pids += 1
-
-
-
-
 
 
 class TransformFunction(TransformDataProcess):
@@ -281,7 +251,5 @@ class TransformFunction(TransformDataProcess):
 
     def process(self, packet):
         ret = self.execute(packet)
-        if len(self.streams)>0:
+        if len(self.streams) > 0:
             self.publish(ret)
-
-

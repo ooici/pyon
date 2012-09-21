@@ -5,7 +5,7 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.registry import IonObjectRegistry, getextends, issubtype
+from pyon.core.registry import getextends, issubtype
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
@@ -20,7 +20,7 @@ OT = ObjectTypes
 ResourceTypes = DotDict()
 RT = ResourceTypes
 
-# Predicate Types
+# Predicate Type4194304
 Predicates = DotDict()
 PredicateType = DotDict()
 PRED = PredicateType
@@ -46,6 +46,7 @@ LCE = DotDict()
 lcs_workflow_defs = {}
 lcs_workflows = {}
 
+
 def get_predicate_type_list():
     Predicates.clear()
     assoc_defs = Config(["res/config/associations.yml"]).data['AssociationDefinitions']
@@ -55,10 +56,12 @@ def get_predicate_type_list():
         Predicates[ad['predicate']] = ad
     return Predicates.keys()
 
+
 def get_compound_associations_list():
     CompoundAssociations.clear()
     CompoundAssociations.update(Config(["res/config/associations.yml"]).data['CompoundAssociations'])
     return CompoundAssociations.keys()
+
 
 def initialize_res_lcsms():
     """
@@ -87,6 +90,7 @@ def initialize_res_lcsms():
     # Initialize the set of resource types with lifecycle
     for res_type, wf_name in res_lifecycle["LifecycleResourceTypes"].iteritems():
         lcs_workflows[res_type] = lcs_workflow_defs[wf_name]
+
 
 def load_definitions():
     """Loads constants for resource, association and life cycle states.
@@ -123,16 +127,20 @@ def load_definitions():
     LCE.clear()
     LCE.update(zip([e.upper() for e in CommonResourceLifeCycleSM.BASE_EVENTS], CommonResourceLifeCycleSM.BASE_EVENTS))
 
+
 def get_restype_lcsm(restype):
     return lcs_workflows.get(restype, None)
+
 
 def get_maturity_visibility(lcstate):
     if lcstate == 'RETIRED':
         return (None, None)
     return lcstate.split('_')
 
+
 def is_resource(object):
     return issubtype(object._get_type(), "Resource")
+
 
 class ResourceLifeCycleSM(object):
     """
@@ -154,7 +162,7 @@ class ResourceLifeCycleSM(object):
 
     def _clone_with_restrictions(self, wfargs=None):
         wfargs = wfargs if not None else {}
-        clone =  self.__class__(**wfargs)
+        clone = self.__class__(**wfargs)
         clone._apply_restrictions(**wfargs)
         return clone
 
@@ -228,7 +236,6 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
     DEPLOY = "deploy"
     RETIRE = "retire"
 
-
     ANNOUNCE = "announce"
     UNANNOUNCE = "unannounce"
     ENABLE = "enable"
@@ -279,13 +286,13 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
     def __init__(self, **kwargs):
         super(CommonResourceLifeCycleSM, self).__init__(**kwargs)
         # Flatten transitions originating from hierarchical states
-        for (s0,ev),s1 in self.BASE_TRANSITIONS.iteritems():
+        for (s0, ev), s1 in self.BASE_TRANSITIONS.iteritems():
             assert s1 not in self.STATE_ALIASES, "Transition target state cannot be hierarchical"
             if s0 in self.STATE_ALIASES:
                 for state in self.STATE_ALIASES[s0]:
-                    self.transitions[(state,ev)] = s1
+                    self.transitions[(state, ev)] = s1
             else:
-                self.transitions[(s0,ev)] = s1
+                self.transitions[(s0, ev)] = s1
         #import pprint; pprint.pprint(self.transitions)
 
     def _create_basic_transitions(self):
@@ -295,10 +302,9 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
         pass
 
 
-
 class ExtendedResourceContainer(object):
 
-    def __init__(self,serv_prov, res_registry=None):
+    def __init__(self, serv_prov, res_registry=None):
         self.service_provider = serv_prov
         if res_registry is None:
             self.resource_registry = self.service_provider.clients.resource_registry
@@ -312,10 +318,10 @@ class ExtendedResourceContainer(object):
             raise Inconsistent("This class is not initialized properly")
 
         if extended_resource_type not in getextends(OT.ResourceContainer):
-            raise BadRequest('Requested resource %s is not extended from %s' % ( extended_resource_type, OT.ResourceContainer) )
+            raise BadRequest('Requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourceContainer))
 
         if computed_resource_type and computed_resource_type not in getextends(OT.ComputedAttributes):
-            raise BadRequest('Requested resource %s is not extended from %s' % ( computed_resource_type, OT.ComputedAttributes) )
+            raise BadRequest('Requested resource %s is not extended from %s' % (computed_resource_type, OT.ComputedAttributes))
 
         resource_object = self.resource_registry.read(resource_id)
         if not resource_object:
@@ -375,7 +381,7 @@ class ExtendedResourceContainer(object):
                 #Handle compound association chains
                 elif self.is_compound_association(decorator):
                     deco_value = obj.get_decorator_value(field, decorator)
-                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator), deco_value )
+                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator), deco_value)
                     self.set_field_associations(obj, field,  assoc)
 
                 #If the decorator is a valid association, then get any associated objects
@@ -389,18 +395,17 @@ class ExtendedResourceContainer(object):
         ret_list = list()
         assoc = self.find_associations(object, predicates[index], deco_value)
         for obj in assoc:
-            if index+1 == len(predicates):
+            if index + 1 == len(predicates):
                 return obj
             else:
                 #Only pass in the decorator filter value at the first level
-                ret_obj = self.walk_associations(obj, predicates, None, index+1)
+                ret_obj = self.walk_associations(obj, predicates, None, index + 1)
                 if index == 0:
                     ret_list.append(ret_obj)
 
         return ret_list
 
-
-    #Helper method for setting the field value based on the decorator association
+    # Helper method for setting the field value based on the decorator association
     def set_field_associations(self, obj, field, assoc):
         if assoc:
             if obj._schema[field]['type'] == 'list':
@@ -409,7 +414,6 @@ class ExtendedResourceContainer(object):
                 setattr(obj, field, len(assoc))
             else:
                 setattr(obj, field, assoc[0])
-
 
     #This method iterates over the dict of extended field names and associations dynamically passed in
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
@@ -424,7 +428,6 @@ class ExtendedResourceContainer(object):
                     res_container.ext_associations[ext_field] = objs
                 else:
                     res_container.ext_associations[ext_field] = list()
-
 
     def is_predicate_association(self, predicate,  predicate_type, res):
         for predt in predicate[predicate_type]:
@@ -448,7 +451,7 @@ class ExtendedResourceContainer(object):
         if CompoundAssociations.has_key(association):
             return CompoundAssociations[association]['predicates']
 
-        return list() # If not found then return empty list
+        return list()  # If not found then return empty list
 
     #This method figures out appropriate association call based on the predicate definitions
     def find_associations(self, resource, association_predicate, associated_resource=None):
@@ -458,35 +461,34 @@ class ExtendedResourceContainer(object):
         #First validate the association predicate
         pred = Predicates[association_predicate]
         if not pred:
-            return objs  #unknown association type so return empty list
+            return objs  # Unknown association type so return empty list
 
         #Resource Registry finds take a None if not set
         if associated_resource == '':
             associated_resource = None
 
         #Need to check through all of these in this order to account for specific vs base class inclusions
-        if self.is_predicate_association(pred,'domain',resource.type_ ):
-            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+        if self.is_predicate_association(pred, 'domain', resource.type_):
+            objs, _ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
 
             #If no objects were found, try finding as subjects just in case.
             if not objs:
-                self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+                self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
 
-        elif self.is_predicate_association(pred,'range',resource.type_ ):
-            objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+        elif self.is_predicate_association(pred, 'range', resource.type_):
+            objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
 
-        elif self.is_predicate_association_extension(pred,'domain',resource.type_ ):
-            objs,_ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+        elif self.is_predicate_association_extension(pred, 'domain', resource.type_):
+            objs, _ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
 
             #If no objects were found, try finding as subjects just in case.
             if not objs:
-                objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+                objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
 
-        elif self.is_predicate_association_extension(pred,'range',resource.type_ ):
-            objs,_ = self.resource_registry.find_subjects(associated_resource,association_predicate, resource._id, False )
+        elif self.is_predicate_association_extension(pred, 'range', resource.type_):
+            objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
 
         return objs
-
 
     # This method will dynamically call the specified method. It will look for the method in the current class
     # and also in the class specified by the service_provider
@@ -502,12 +504,3 @@ class ExtendedResourceContainer(object):
                 return func(resource_id)
 
         return None
-
-
-
-
-
-
-
-
-

@@ -41,7 +41,7 @@ class StateRepository(object):
             state_obj.state = state
             state_obj.ts = get_ion_ts()
             self.state_store.update(state_obj)
-        except NotFound as nf:
+        except NotFound:
             state_obj = ProcessState(state=state, ts=get_ion_ts())
             self.state_store.create(state_obj, object_id=key)
 
@@ -49,6 +49,7 @@ class StateRepository(object):
         log.debug("Retrieving persistent state for key=%s" % key)
         state_obj = self.state_store.read(key)
         return state_obj.state
+
 
 class StatefulProcessMixin(object):
     """
