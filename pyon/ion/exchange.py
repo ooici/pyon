@@ -7,6 +7,8 @@ __license__ = 'Apache 2.0'
 
 import time
 import socket
+import requests
+import json
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
@@ -17,9 +19,6 @@ from pyon.util.async import blocking_cb
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 
-import requests
-import json
-
 from interface.objects import ExchangeName as ResExchangeName
 from interface.objects import ExchangeSpace as ResExchangeSpace
 from interface.objects import ExchangePoint as ResExchangePoint
@@ -28,14 +27,16 @@ from interface.services.coi.iresource_registry_service import ResourceRegistrySe
 
 
 ION_URN_PREFIX = "urn:ionx"
-
 ION_ROOT_XS = "ioncore"
+
 
 def valid_xname(name):
     return name and str(name).find(":") == -1 and str(name).find(" ") == -1
 
+
 class ExchangeManagerError(StandardError):
     pass
+
 
 class ExchangeManager(object):
     """
@@ -58,25 +59,24 @@ class ExchangeManager(object):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.default_xs         = ExchangeSpace(self, ION_ROOT_XS)
-        self._xs_cache          = {}        # caching of xs names to RR objects
-        self._default_xs_obj    = None      # default XS registry object
-        self.org_id             = None
+        self.default_xs = ExchangeSpace(self, ION_ROOT_XS)
+        self._xs_cache = {}              # caching of xs names to RR objects
+        self._default_xs_obj = None      # default XS registry object
 
         # mappings
-        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
+        self.xs_by_name = {ION_ROOT_XS: self.default_xs}        # friendly named XS to XSO
         self.xn_by_name = {}                                    # friendly named XN to XNO
         # xn by xs is a property
 
         self._chan = None
 
         # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
-        self._ems_client    = ExchangeManagementServiceProcessClient(process=self.container)
-        self._rr_client     = ResourceRegistryServiceProcessClient(process=self.container)
+        self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
+        self._rr_client = ResourceRegistryServiceProcessClient(process=self.container)
 
         # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
-        self._nodes     = {}
-        self._ioloops   = {}
+        self._nodes = {}
+        self._ioloops = {}
 
         self._transport = None
 
@@ -111,7 +111,7 @@ class ExchangeManager(object):
                 ioloop.link(fail_handle)
 
                 # wait for the node ready event, with a large timeout just in case
-                node_ready = node.ready.wait(timeout=15)
+                node.ready.wait(timeout=15)
 
                 # remove the finished handler, we don't care about it here
                 ioloop.unlink(fail_handle)
@@ -120,10 +120,10 @@ class ExchangeManager(object):
                 if not node.running:
                     ioloop.kill()      # make sure ioloop dead
                 else:
-                    self._nodes[name]   = node
+                    self._nodes[name] = node
                     self._ioloops[name] = ioloop
 
-            except socket.error as e:
+            except socket.error:
                 log.warn("Could not start connection %s due to socket error, continuing", name)
 
         fail_count = total_count - len(self._nodes)
@@ -213,7 +213,7 @@ class ExchangeManager(object):
 
         # reset xs map to initial state
         self._default_xs_declared = False
-        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
+        self.xs_by_name = {ION_ROOT_XS: self.default_xs}      # friendly named XS to XSO
 
     def _get_xs_obj(self, name=ION_ROOT_XS):
         """
@@ -303,9 +303,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager.delete_xs: %s", xs)
 
         name = xs._exchange     # @TODO this feels wrong
-        self.xs_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
-                                        # so delete in the safest way possible
-                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
+        self.xs_by_name.pop(name, None)  # EMS may be running on the same container, which touches this same dict
+                                         # so delete in the safest way possible
+                                         # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xs")
@@ -337,12 +337,12 @@ class ExchangeManager(object):
         return xp
 
     def delete_xp(self, xp, use_ems=True):
-        log.debug("ExchangeManager.delete_xp: name=%s", 'TODO') #xp.build_xname())
+        log.debug("ExchangeManager.delete_xp: name=%s", 'TODO')  # xp.build_xname())
 
-        name = xp._exchange # @TODO: not right
-        self.xn_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
-                                        # so delete in the safest way possible
-                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
+        name = xp._exchange              # @TODO: not right
+        self.xn_by_name.pop(name, None)  # EMS may be running on the same container, which touches this same dict
+                                         # so delete in the safest way possible
+                                         # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xp")
@@ -393,12 +393,12 @@ class ExchangeManager(object):
         return self._create_xn('queue', name, xs=xs, **kwargs)
 
     def delete_xn(self, xn, use_ems=False):
-        log.debug("ExchangeManager.delete_xn: name=%s", "TODO") #xn.build_xlname())
+        log.debug("ExchangeManager.delete_xn: name=%s", "TODO")   # xn.build_xlname())
 
-        name = xn._queue                # @TODO feels wrong
-        self.xn_by_name.pop(name, None) # EMS may be running on the same container, which touches this same dict
-                                        # so delete in the safest way possible
-                                        # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
+        name = xn._queue                 # @TODO feels wrong
+        self.xn_by_name.pop(name, None)  # EMS may be running on the same container, which touches this same dict
+                                         # so delete in the safest way possible
+                                         # @TODO: does this mean we need to sync xs_by_name and friends in the datastore?
 
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xn")
@@ -570,7 +570,7 @@ class ExchangeManager(object):
         Returns a list of tuples formatted as (exchange, queue, routing_key, properties_key aka binding id).
         If you want the full list of properties for all the bindings, call _list_bindings_for_queue instead.
 
-        This method is much more efficient than calling list_bindings with a filter. 
+        This method is much more efficient than calling list_bindings with a filter.
 
         @param  queue   The name of the queue you want bindings for.
         """
@@ -598,7 +598,7 @@ class ExchangeManager(object):
         Returns a list of tuples formatted as (exchange, queue, routing_key, properties_key aka binding id).
         If you want the full list of properties for all the bindings, call _list_bindings_for_exchange instead.
 
-        This method is much more efficient than calling list_bindings with a filter. 
+        This method is much more efficient than calling list_bindings with a filter.
 
         @param  exchange    The name of the exchange you want bindings for.
         """
@@ -721,34 +721,42 @@ class ExchangeManager(object):
             # don't allow recursion!
             self._ensure_default_declared()
         self._transport.declare_exchange_impl(self._client, exchange, exchange_type=exchange_type, durable=durable, auto_delete=auto_delete)
+
     def delete_exchange(self, exchange, **kwargs):
         log.info("ExchangeManager.delete_exchange")
         self._ensure_default_declared()
         self._transport.delete_exchange_impl(self._client, exchange, **kwargs)
+
     def declare_queue(self, queue, durable=False, auto_delete=False):
         log.info("ExchangeManager.declare_queue (queue %s, durable %s, AD %s)", queue, durable, auto_delete)
         self._ensure_default_declared()
         return self._transport.declare_queue_impl(self._client, queue, durable=durable, auto_delete=auto_delete)
+
     def delete_queue(self, queue, **kwargs):
         log.info("ExchangeManager.delete_queue %s", queue)
         self._ensure_default_declared()
         self._transport.delete_queue_impl(self._client, queue, **kwargs)
+
     def bind(self, exchange, queue, binding):
         log.info("ExchangeManager.bind")
         self._ensure_default_declared()
         self._transport.bind_impl(self._client, exchange, queue, binding)
+
     def unbind(self, exchange, queue, binding):
         log.info("ExchangeManager.unbind")
         self._ensure_default_declared()
         self._transport.unbind_impl(self._client, exchange, queue, binding)
+
     def get_stats(self, queue):
         log.info("ExchangeManager.get_stats")
         self._ensure_default_declared()
         return self._transport.get_stats_impl(self._client, queue)
+
     def purge(self, queue):
         log.info("ExchangeManager.purge")
         self._ensure_default_declared()
         self._transport.purge_impl(self._client, queue)
+
     def qos(self, client, prefetch_size=0, prefetch_count=0, global_=False):
         """
         QOS is a special case: needs to be on the individual channel, not the shared client in the manager.
@@ -798,6 +806,7 @@ class XOTransport(BaseTransport):
         """
         return self._exchange_manager.qos(client, prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
+
 class ExchangeSpace(XOTransport, NameTrio):
 
     ION_DEFAULT_XS = "ioncore"
@@ -807,8 +816,8 @@ class ExchangeSpace(XOTransport, NameTrio):
         NameTrio.__init__(self, exchange=exchange)
 
         self._xs_exchange_type = exchange_type
-        self._xs_durable       = durable
-        self._xs_auto_delete   = auto_delete
+        self._xs_durable = durable
+        self._xs_auto_delete = auto_delete
 
     @property
     def exchange(self):
@@ -823,11 +832,12 @@ class ExchangeSpace(XOTransport, NameTrio):
     def delete(self):
         self.delete_exchange_impl(None, self.exchange)
 
+
 class ExchangeName(XOTransport, NameTrio):
 
     xn_type = "XN_BASE"
 
-    _xn_durable     = False
+    _xn_durable = False
     _xn_auto_delete = False
     _declared_queue = None
 
@@ -837,8 +847,10 @@ class ExchangeName(XOTransport, NameTrio):
 
         self._xs = xs
 
-        if durable is not None:     self._xn_durable        = durable
-        if auto_delete is not None: self._xn_auto_delete    = auto_delete
+        if durable is not None:
+            self._xn_durable = durable
+        if auto_delete is not None:
+            self._xn_auto_delete = auto_delete
 
     @property
     def exchange(self):
@@ -887,6 +899,7 @@ class ExchangeName(XOTransport, NameTrio):
     def purge(self):
         return self.purge_impl(None, self.queue)
 
+
 class ExchangePoint(ExchangeName):
     """
     @TODO is this really an ExchangeName? seems more inline with XS
@@ -894,8 +907,8 @@ class ExchangePoint(ExchangeName):
             messages from the XP.
     """
     XPTYPES = {
-        'basic':'basic',
-        'ttree':'ttree',
+        'basic': 'basic',
+        'ttree': 'ttree',
         }
 
     xn_type = "XN_XP"
@@ -906,8 +919,8 @@ class ExchangePoint(ExchangeName):
         XOTransport.__init__(self, exchange_manager=exchange_manager)
         NameTrio.__init__(self, exchange=name)
 
-        self._xs        = xs
-        self._xptype    = xptype
+        self._xs = xs
+        self._xptype = xptype
 
     @property
     def exchange(self):
@@ -937,6 +950,7 @@ class ExchangePoint(ExchangeName):
     def purge(self):
         raise NotImplementedError("purge not implemented for XP")
 
+
 class ExchangePointRoute(ExchangeName):
     """
     Used for sending messages to an exchange point via a Publisher.
@@ -953,17 +967,21 @@ class ExchangePointRoute(ExchangeName):
     def delete(self):
         raise StandardError("ExchangePointRoute does not support delete")
 
+
 class ExchangeNameProcess(ExchangeName):
     xn_type = "XN_PROCESS"
     pass
+
 
 class ExchangeNameService(ExchangeName):
     xn_type = "XN_SERVICE"
     _xn_auto_delete = False
     pass
 
+
 class ExchangeNameQueue(ExchangeName):
     xn_type = "XN_QUEUE"
+
     @property
     def queue(self):
         if self._declared_queue:
@@ -972,4 +990,3 @@ class ExchangeNameQueue(ExchangeName):
 
     def setup_listener(self, binding, default_cb):
         log.debug("ExchangeQueue.setup_listener: passing on binding")
-
