@@ -525,6 +525,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         for x in xrange(10):
             pub3.publish("3,%s" % str(x))
 
+        # allow time for routing
+        time.sleep(2)
+
         # no messages yet
         self.assertRaises(Timeout, sub.get_one_msg, timeout=0)
 
@@ -537,6 +540,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         # publish those messages again
         for x in xrange(10):
             pub3.publish("3,%s" % str(x))
+
+        # allow time for routing
+        time.sleep(2)
 
         # NOW we have messages!
         for x in xrange(10):
@@ -555,6 +561,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
             pub3.publish("3,%s" % str(x))
             time.sleep(0.3)
             pub5.publish("5,%s" % str(x))
+
+        # allow time for routing
+        time.sleep(2)
 
         # should get all 20, interleaved
         for x in xrange(10):
@@ -581,6 +590,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         for x in xrange(10):
             pub5.publish("5,%s" % str(x))
+
+        # allow time for routing
+        time.sleep(2)
 
         # 10 messages in the queue, no consumers
         self.assertTupleEqual((10, 0), sub._chan.get_stats())
