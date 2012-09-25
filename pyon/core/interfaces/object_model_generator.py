@@ -8,7 +8,6 @@ __license__ = 'Apache 2.0'
 from collections import OrderedDict
 import csv
 import os
-import os.path
 import re
 import string
 import yaml
@@ -16,6 +15,7 @@ import cgi
 
 from pyon.core.path import list_files_recursive
 from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
+
 
 class IonYamlLoader(yaml.Loader):
     """ For ION-specific overrides of YAML loading behavior. """
@@ -275,7 +275,7 @@ class ObjectModelGenerator:
                 self.dataobject_output_text += "}\n"
 
                 if opts.objectdoc:
-                    self.csv_types_row_entries.append([classname, 'enum','object',""])
+                    self.csv_types_row_entries.append([classname, 'enum', 'object', ""])
 
     def add_yaml_constructors(self):
         '''
@@ -362,7 +362,7 @@ class ObjectModelGenerator:
                     value = dec[1] if len(dec) == 2 else ""
                     # Add it to the decorator list
                     if not decorators:
-                        decorators = '"' + key  + '":"' + value + '"'
+                        decorators = '"' + key + '":"' + value + '"'
                     else:
                         decorators = decorators + ', "' + key + '":"' + value + '"'
                 else:
@@ -386,7 +386,7 @@ class ObjectModelGenerator:
                                 csv_description = dsc
                             else:
                                 description = description + ' ' + dsc
-                                csv_description =  csv_description + ' ' + dsc
+                                csv_description = csv_description + ' ' + dsc
                     except KeyError:
                         # Ignore key error because value is nested
                         continue
@@ -436,7 +436,7 @@ class ObjectModelGenerator:
                 if first_time:
                     first_time = False
                 else:
-                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators':""}
+                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators': ""}
                     for arg in args:
                         self.dataobject_output_text += arg
                     self.dataobject_output_text += "):\n"
@@ -474,7 +474,7 @@ class ObjectModelGenerator:
                     current_class_schema = "\n    _schema = {"
                     line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
-                class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'")+ "\n    '''" if class_comment else ''
+                class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
                 self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n    def __init__(self"
                 current_class_comment = class_comment
                 class_comment = ''
@@ -503,13 +503,13 @@ class ObjectModelGenerator:
             attrtableentries = ""
             field_details.sort()
             for field_detail in field_details:
-                att_comments = cgi.escape(field_detail[3].strip(' ,#').replace('#',''))
+                att_comments = cgi.escape(field_detail[3].strip(' ,#').replace('#', ''))
                 attrtableentries += html_doc_templates['attribute_table_entry'].substitute(
                     attrname=field_detail[0], type=field_detail[1].replace("'", '"'),
                     default=field_detail[2].replace("'", '"'),
                     decorators=cgi.escape(field_detail[4]),
                     attrcomment=att_comments)
-                self.csv_attributes_row_entries.append(["", objname, field_detail[0], "", field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
+                self.csv_attributes_row_entries.append(["", objname, field_detail[0], "", field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#', '')])
 
             related_associations = self._lookup_associations(objname)
             assoctableentries = "".join([html_doc_templates['association_table_entry'].substitute(
@@ -535,7 +535,7 @@ class ObjectModelGenerator:
                 superclassattrtableentries = ""
                 fld_details.sort()
                 for fld_detail in fld_details:
-                    att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#',''))
+                    att_comments = cgi.escape(fld_detail[3].strip(' ,#').replace('#', ''))
                     superclassattrtableentries += html_doc_templates['attribute_table_entry'].substitute(
                         attrname=fld_detail[0], type=fld_detail[1].replace("'", '"'),
                         default=fld_detail[2].replace("'", '"'), decorators=cgi.escape(fld_detail[4]),
@@ -572,7 +572,6 @@ class ObjectModelGenerator:
                 pass
             with open(datamodelhtmlfile, 'w') as f:
                 f.write(doc_output)
-
 
         datadir = 'interface'
         objecttypecsvfile = os.path.join(datadir, 'objecttypes.csv')
