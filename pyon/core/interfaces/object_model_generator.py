@@ -530,7 +530,7 @@ class ObjectModelGenerator:
             sub_classes = ""
             sup = super_class
             super_class_attribute_tables = ""
-            class_type = self._get_class_type(sup)
+            class_type = self._get_class_type(objname)
             while sup != "IonObjectBase":
                 sup_class_type = self._get_class_type(sup)
                 if sup_class_type == "resource":
