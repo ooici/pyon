@@ -103,13 +103,13 @@ class CouchDataStore(object):
         This caches the datastore instance to avoid an explicit lookup to save on http request.
         The consequence is that if another process deletes the datastore in the meantime, we will fail later.
         """
-        datastore_name  = self._get_datastore_name(datastore_name)
+        datastore_name = self._get_datastore_name(datastore_name)
 
         if datastore_name in self._datastore_cache:
             return self._datastore_cache[datastore_name], datastore_name
 
         try:
-            ds = self.server[datastore_name] # Note: causes http lookup
+            ds = self.server[datastore_name]   # Note: causes http lookup
             self._datastore_cache[datastore_name] = ds
             return ds, datastore_name
         except ResourceNotFound:
@@ -123,7 +123,7 @@ class CouchDataStore(object):
         equivalent to creating a database on a database server.
         @param datastore_name  Datastore to work on. Will be scoped if scope was provided.
         """
-        datastore_name  = self._get_datastore_name(datastore_name)
+        datastore_name = self._get_datastore_name(datastore_name)
         try:
             self.server.create(datastore_name)
         except PreconditionFailed:
@@ -136,7 +136,7 @@ class CouchDataStore(object):
         Delete the data store with the given name.  This is
         equivalent to deleting a database from a database server.
         """
-        datastore_name  = self._get_datastore_name(datastore_name)
+        datastore_name = self._get_datastore_name(datastore_name)
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
@@ -169,9 +169,9 @@ class CouchDataStore(object):
         """
         Indicates whether named data store currently exists.
         """
-        datastore_name  = self._get_datastore_name(datastore_name)
+        datastore_name = self._get_datastore_name(datastore_name)
         try:
-            ds = self.server[datastore_name]
+            self.server[datastore_name]
             return True
         except ResourceNotFound:
             return False
@@ -388,9 +388,9 @@ class CouchDataStore(object):
         try:
             design_doc = ds[doc_id]
             view_name = design_doc["views"].keys()[0]
-            rows = ds.view(self._get_view_name(design, view_name))
-        except Exception, ex:
-            log.exception("Problem with design %s/%s" ,datastore_name, doc_id)
+            ds.view(self._get_view_name(design, view_name))
+        except Exception:
+            log.exception("Problem with design %s/%s", datastore_name, doc_id)
 
     def delete_views(self, design, datastore_name=None):
         ds, datastore_name = self._get_datastore(datastore_name)
@@ -404,9 +404,9 @@ class CouchDataStore(object):
         @brief From given all_args dict, extract all entries that are valid CouchDB view options.
         @see http://wiki.apache.org/couchdb/HTTP_view_API
         """
-        view_args = dict((k, v) for k,v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
+        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
         limit = int(all_args.get('limit', 0))
-        if limit>0:
+        if limit > 0:
             view_args['limit'] = limit
         return view_args
 
