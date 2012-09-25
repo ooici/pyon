@@ -6,6 +6,8 @@
 
 from ooi.logging import config
 
+DEFAULT_LOGGING_PATHS = ['res/config/logging.yml', 'res/config/logging.local.yml']
+logging_was_configured = False
 
 def configure_logging(logging_conf_paths, logging_config_override=None):
     """
@@ -13,6 +15,9 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
     @param logging_conf_paths  List of paths to logging config YML files (in read order)
     @param config_override  Dict with config entries overriding files read
     """
+    global logging_was_configured
+    logging_was_configured = True
+
     for path in logging_conf_paths:
         try:
             config.add_configuration(path)
@@ -21,5 +26,10 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
     if logging_config_override:
         try:
             config.add_configuration(logging_config_override)
-        except Exception, e:
-            print 'WARNING: failed to apply logging override %r: %e' % (logging_config_override, e)
+        except Exception,e:
+            print 'WARNING: failed to apply logging override %r: %e' % (logging_config_override,e)
+
+def is_logging_configured():
+    """ allow caller to determine if logging has already been configured in this container """
+    global logging_was_configured
+    return logging_was_configured

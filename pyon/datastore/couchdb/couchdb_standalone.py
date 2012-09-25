@@ -12,7 +12,7 @@ from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.util.containers import get_safe, SimpleLog, DictDiffer
 
-log = SimpleLog("CouchDataStore", 0)
+from ooi.logging import log
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
 # prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
