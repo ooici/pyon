@@ -400,6 +400,24 @@ class AMQPTransport(BaseTransport):
         log.debug("AMQPTransport.stop_consume_impl(%s): %s", self._client.channel_number, consumer_tag)
         self._sync_call(self._client.basic_cancel, 'callback', consumer_tag)
 
+        # PIKA 0.9.5 / GEVENT interaction problem here
+        # we get called back too early, the basic_cancel hasn't really finished processing yet. we need
+        # to wait until our consumer tag is removed from the pika channel's consumers dict.
+        # See: https://gist.github.com/3751870
+
+        attempts = 5
+        while attempts > 0:
+            if consumer_tag not in self._client._consumers:
+                break
+            else:
+                log.debug("stop_consume_impl waiting for ctag to be removed from consumers, attempts rem: %s", attempts)
+
+            attempts -= 1
+            time.sleep(1)
+
+        if consumer_tag in self._client._consumers:
+            raise TransportError("stop_consume_impl did not complete in the expected amount of time, transport may be compromised")
+
     def setup_listener(self, binding, default_cb):
         """
         Calls setup listener via the default callback passed in.
