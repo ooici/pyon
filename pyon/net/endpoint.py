@@ -1203,12 +1203,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
 
         # build op name: typically sender-service.op, or falling back to sender.op
-        op_first = response_headers.get('sender-service', response_headers.get('sender', headers.get('receiver', '')))
-        if "," in op_first:
-            op_first = op_first.rsplit(',', 1)[-1]
+        svc_name = response_headers.get('sender-service', response_headers.get('sender', headers.get('receiver', '')))
+        if "," in svc_name:
+            svc_name = svc_name.rsplit(',', 1)[-1]
 
-        op = ".".join((op_first,
-                       headers.get('op', 'unknown')))
+        op = headers.get('op', 'unknown')
 
         # status code map => ours to sFlow (defaults to 3 aka INTERNAL_ERROR)
         status = SFlowManager.status_map.get(status, 3)
@@ -1222,7 +1221,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                     'resp_bytes':   len(str(response)),
                     'uS':           time_taken,
                     'initiator':    headers.get('sender', ''),
-                    'target':       headers.get('receiver', '')}
+                    'target':       svc_name }
 
         return sample
 
