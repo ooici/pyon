@@ -13,9 +13,9 @@ from pyon.core.exception import NotFound
 from pyon.net.endpoint import RPCClient
 from pyon.util.log import log
 
-from interface.services.iapp_integration_service import IAppIntegrationService, BaseAppIntegrationService
+#from interface.services.iapp_integration_service import IAppIntegrationService, BaseAppIntegrationService
 
-class AppIntegrationService(BaseAppIntegrationService):
+class AppIntegrationService(object): #(BaseAppIntegrationService):
 
     def __init__(self, config_params={}):
         log.debug("In __init__")

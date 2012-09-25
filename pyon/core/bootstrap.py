@@ -7,7 +7,8 @@ import uuid
 import os
 import logging
 import sys
-log = logging.getLogger(__name__)
+from ooi.logging import log
+from pyon.core import log as logutil
 
 import pyon
 # NOTE: no other imports inside pyon
@@ -65,13 +66,6 @@ def assert_environment():
         raise ContainerStartupError("pyon environment assertion failed: res/config directory not found")
     if not os.path.exists("res/config/pyon.yml"):
         raise ContainerStartupError("pyon environment assertion failed: pyon.yml config missing")
-
-def load_logging_config(logging_config_override=None):
-    """
-    Initialize pyon logging system
-    """
-    from pyon.core import log
-    log.configure_logging(pyon.DEFAULT_LOGGING_PATHS, logging_config_override=logging_config_override)
 
 def set_config(pyon_cfg=None):
     """
@@ -157,7 +151,8 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
     assert_environment()
 
     # LOGGING. Initialize logging from config
-    load_logging_config(logging_config_override=logging_config_override)
+    if not logutil.is_logging_configured():
+        logutil.configure_logging(logutil.DEFAULT_LOGGING_PATHS, logging_config_override=logging_config_override)
 
     # YAML patch: OrderedDicts instead of dicts
     from pyon.util.yaml_ordered_dict import apply_yaml_patch

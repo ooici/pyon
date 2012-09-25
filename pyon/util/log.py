@@ -60,6 +60,7 @@ class RPCStackFormatter(ooi.logging.format.StackFormatter):
         display_frames = []
         if not stack:
             return display_frames
+        finished_iterating = False
         i = iter(stack)
         try:
             file,line,method,code = i.next()
@@ -84,10 +85,13 @@ class RPCStackFormatter(ooi.logging.format.StackFormatter):
                 more_rpc, file,line,method,code = self._collect_frames(True, i, file,line,method,code)
                 rpc_frames = more_rpc
         except StopIteration:
+            finished_iterating = True
             pass
+        except Exception,e:
+            print 'WARNING: RPCStackFormatter failed to filter frames in stack %r' % stack
 
         # if we did not find enough sections in the right order, use the whole stack
-        return display_frames if have_required_sections else stack
+        return display_frames if have_required_sections and finished_iterating else stack
 
     def _collect_frames(self, is_endpoint, i, file,line,method,code):
         # iterate and check if lines are ignored endpoints,

@@ -44,7 +44,6 @@ else:
 # -------------------------------------------------------------------------
 # CONSTANTS FOR PYON CODE
 # CHANGE HERE BEFORE IMPORTING ANY FURTHER PYON CODE TO OVERRIDE
-DEFAULT_LOGGING_PATHS = ['res/config/logging.yml', 'res/config/logging.local.yml']
 DEFAULT_CONFIG_PATHS = ['res/config/pyon.yml']
 DEFAULT_LOCAL_CONFIG_PATHS = ['res/config/pyon.local.yml']
 
