@@ -929,8 +929,17 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         Should return a dict in the form of kwargs to be passed to SFlowManager.transaction.
         """
         # build args to pass to transaction
-        extra_attrs = {'conv-id': headers.get('conv-id', ''),
-                       'service': response_headers.get('sender-service', '')}
+        #extra_attrs = {'conv-id': headers.get('conv-id', ''),
+        #               'service': response_headers.get('sender-service', '')}
+        extra_attrs = {}
+
+        # Message Latency
+        # Defined as difference between message sent timestamp and message received timestamp.:
+        if 'msg-rcvd' in response_headers and 'ts' in headers:
+            rsts = int(headers['ts'])
+            mrts = int(response_headers['msg-rcvd'])
+
+            extra_attrs['ml'] = str(mrts - rsts)
 
         cur_time_ms = int(time.time() * 1000)
         time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
@@ -1125,7 +1134,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
 
-#        ts = time.time()
+        ts = time.time()
         try:
             result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
         except IonException as ex:
@@ -1143,6 +1152,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             response_headers['protocol']    = headers.get('protocol', '')
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+            response_headers['msg-rcvd']    = ts
 
 #            elapsed = time.time() - ts
 #            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
