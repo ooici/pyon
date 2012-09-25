@@ -852,14 +852,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
     def _send(self, msg, headers=None, **kwargs):
         log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
 
-        try:
-            res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
-        except exception.Timeout:
-            self._sample_request(-1, 'Timeout', msg, headers, '', {})
-            raise
-
-        # possibly sample before we do any raising
-        self._sample_request(res_headers['status_code'], res_headers['error_message'], msg, headers, res, res_headers)
+        res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
 
         # Check response header
         if res_headers["status_code"] != 200:
@@ -878,95 +871,6 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
             raise ex
 
         return res, res_headers
-
-    def _sample_request(self, status, status_descr, msg, headers, response, response_headers):
-        """
-        Performs sFlow sampling of a completed/errored RPC request (if configured to).
-
-        Makes two calls:
-        1) get_sflow_manager (overridden at process level)
-        2) make sample dict (the kwargs to sflow_manager.transaction, may be overridden where appropriate)
-
-        Then performs the transact call if the manager says to do so.
-        """
-        if CFG.get_safe('container.sflow.enabled', False):
-            sm = self._get_sflow_manager()
-            if sm and sm.should_sample:
-                app_name = self._get_sample_name()
-                try:
-                    trans_kwargs = self._build_sample(app_name, status, status_descr, msg, headers, response, response_headers)
-                    sm.transaction(**trans_kwargs)
-                except Exception:
-                    log.exception("Could not sample, ignoring")
-
-            else:
-                log.debug("No SFlowManager or it told us not to sample this transaction")
-
-    def _get_sample_name(self):
-        """
-        Gets the app_name that should be used for the sample.
-
-        Typically this would be a process id.
-        """
-        # at the rpc level we really don't know, we're not a process.
-        return "unknown-rpc-client"
-
-    def _get_sflow_manager(self):
-        """
-        Finds the sFlow manager that should be used.
-        """
-        # at this level, we don't have any ref back to the container other than the singleton
-        from pyon.container.cc import Container
-        if Container.instance:
-            return Container.instance.sflow_manager
-
-        return None
-
-    def _build_sample(self, name, status, status_descr, msg, headers, response, response_headers):
-        """
-        Builds a transaction sample.
-
-        Should return a dict in the form of kwargs to be passed to SFlowManager.transaction.
-        """
-        # build args to pass to transaction
-        #extra_attrs = {'conv-id': headers.get('conv-id', ''),
-        #               'service': response_headers.get('sender-service', '')}
-        extra_attrs = {}
-
-        # Message Latency
-        # Defined as difference between message sent timestamp and message received timestamp.:
-        if 'msg-rcvd' in response_headers and 'ts' in headers:
-            rsts = int(headers['ts'])
-            mrts = int(response_headers['msg-rcvd'])
-
-            extra_attrs['ml'] = str(mrts - rsts)
-
-        cur_time_ms = int(time.time() * 1000)
-        time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
-
-        # build op name: typically sender-service.op, or falling back to sender.op
-        op_first = response_headers.get('sender-service', response_headers.get('sender', headers.get('receiver', '')))
-        if "," in op_first:
-            op_first = op_first.rsplit(',', 1)[-1]
-
-        op = ".".join((op_first,
-                       headers.get('op', 'unknown')))
-
-        # status code map => ours to sFlow (defaults to 3 aka INTERNAL_ERROR)
-        status = SFlowManager.status_map.get(status, 3)
-
-        sample = {  'app_name':     name,
-                    'op':           op,
-                    'attrs':        extra_attrs,
-                    'status_descr': status_descr,
-                    'status':       str(status),
-                    'req_bytes':    len(str(msg)),
-                    'resp_bytes':   len(str(response)),
-                    'uS':           time_taken,
-                    'initiator':    headers.get('sender', ''),
-                    'target':       headers.get('receiver', '')}
-
-        return sample
 
     conv_id_counter = 0
     _lock = coros.RLock()       # @TODO: is this safe?
@@ -1134,9 +1038,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         result = None
         response_headers = {}
 
-        ts = time.time()
+        ts = get_ion_ts()
+        response_headers['msg-rcvd'] = ts
+
         try:
-            result, response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
+            result, new_response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
+            response_headers.update(new_response_headers)       # don't clobber our msg-rcvd header
+
         except IonException as ex:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             tb_list = traceback.extract_tb(sys.exc_info()[2])
@@ -1146,19 +1054,23 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                 tb_output += elt
             log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
-            response_headers = self._create_error_response(ex)
+
+            response_headers.update(self._create_error_response(ex))
+
         finally:
             # REPLIES: propogate protocol, conv-id, conv-seq
             response_headers['protocol']    = headers.get('protocol', '')
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
-            response_headers['msg-rcvd']    = ts
 
-#            elapsed = time.time() - ts
+#            elapsed = int(get_ion_ts()) - int(ts)
 #            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
 #                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
 #                                                                                      self.channel._recv_name,
 #                                                                                      elapsed)
+
+        # sample (possibly) before we do any sending
+        self._sample_request(response_headers['status_code'], response_headers['error_message'], msg, headers, result, response_headers)
 
         log_message("MESSAGE SEND <<< RPC-reply", result, response_headers, is_send=True)
 
@@ -1222,6 +1134,97 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         May be overridden at a lower level.
         """
         return call(*op_args, **op_kwargs)
+
+    def _sample_request(self, status, status_descr, msg, headers, response, response_headers):
+        """
+        Performs sFlow sampling of a completed/errored RPC request (if configured to).
+
+        Makes two calls:
+        1) get_sflow_manager (overridden at process level)
+        2) make sample dict (the kwargs to sflow_manager.transaction, may be overridden where appropriate)
+
+        Then performs the transact call if the manager says to do so.
+        """
+        if CFG.get_safe('container.sflow.enabled', False):
+            sm = self._get_sflow_manager()
+            if sm and sm.should_sample:
+                app_name = self._get_sample_name()
+                try:
+                    trans_kwargs = self._build_sample(app_name, status, status_descr, msg, headers, response, response_headers)
+                    sm.transaction(**trans_kwargs)
+                except Exception:
+                    log.exception("Could not sample, ignoring")
+
+            else:
+                log.debug("No SFlowManager or it told us not to sample this transaction")
+
+    def _get_sample_name(self):
+        """
+        Gets the app_name that should be used for the sample.
+
+        Typically this would be a process id.
+        """
+        # at the rpc level we really don't know, we're not a process.
+        return "unknown-rpc-server"
+
+    def _get_sflow_manager(self):
+        """
+        Finds the sFlow manager that should be used.
+        """
+        # at this level, we don't have any ref back to the container other than the singleton
+        from pyon.container.cc import Container
+        if Container.instance:
+            return Container.instance.sflow_manager
+
+        return None
+
+    def _build_sample(self, name, status, status_descr, msg, headers, response, response_headers):
+        """
+        Builds a transaction sample.
+
+        Should return a dict in the form of kwargs to be passed to SFlowManager.transaction.
+        """
+        # build args to pass to transaction
+        #extra_attrs = {'conv-id': headers.get('conv-id', ''),
+        #               'service': response_headers.get('sender-service', '')}
+        extra_attrs = {}
+
+        # Message Latency
+        # Defined as difference between message sent timestamp and message received timestamp.
+        if 'msg-rcvd' in response_headers and 'ts' in headers:
+            rsts = int(headers['ts'])
+            mrts = int(response_headers['msg-rcvd'])
+
+            extra_attrs['ml'] = str(mrts - rsts)
+
+        # uS: process latency
+        # 1-way message latency (req to svc ONLY) + processing time
+        cur_time_ms = int(get_ion_ts())
+        time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
+
+        # build op name: typically sender-service.op, or falling back to sender.op
+        op_first = response_headers.get('sender-service', response_headers.get('sender', headers.get('receiver', '')))
+        if "," in op_first:
+            op_first = op_first.rsplit(',', 1)[-1]
+
+        op = ".".join((op_first,
+                       headers.get('op', 'unknown')))
+
+        # status code map => ours to sFlow (defaults to 3 aka INTERNAL_ERROR)
+        status = SFlowManager.status_map.get(status, 3)
+
+        sample = {  'app_name':     name,
+                    'op':           op,
+                    'attrs':        extra_attrs,
+                    'status_descr': status_descr,
+                    'status':       str(status),
+                    'req_bytes':    len(str(msg)),
+                    'resp_bytes':   len(str(response)),
+                    'uS':           time_taken,
+                    'initiator':    headers.get('sender', ''),
+                    'target':       headers.get('receiver', '')}
+
+        return sample
 
 
 class RPCServer(RequestResponseServer):
