@@ -512,6 +512,12 @@ class ObjectModelGenerator:
                 self.csv_attributes_row_entries.append(["", objname, field_detail[0], "", field_detail[1], field_detail[2], field_detail[3].strip(' ,#').replace('#','')])
 
             related_associations = self._lookup_associations(objname)
+
+            #Check for missing docstring
+            for assockey, assocval in related_associations.iteritems():
+                if not assocval.has_key("docstring"):
+                    assocval["docstring"] = "This entry is missing a docstring value"
+
             assoctableentries = "".join([html_doc_templates['association_table_entry'].substitute(
                 subject=str(assocval["domain"]).replace("'", ""),
                 predicate=assockey,
@@ -519,11 +525,12 @@ class ObjectModelGenerator:
                 description=str(assocval["docstring"]).replace("'", ""),
                 constraints=str(assocval.get("cardinality", "n,n"))) for assockey, assocval in related_associations.iteritems()])
 
+
             super_classes = ""
             sub_classes = ""
             sup = super_class
             super_class_attribute_tables = ""
-            class_type = self._get_class_type(sup)
+            class_type = self._get_class_type(objname)
             while sup != "IonObjectBase":
                 sup_class_type = self._get_class_type(sup)
                 if sup_class_type == "resource":
