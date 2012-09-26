@@ -13,6 +13,7 @@ from pyon.util.log import log
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 
+import gevent
 import requests
 import json
 import time
@@ -711,7 +712,8 @@ class ExchangeManager(object):
                 username = CFG.get_safe("container.exchange.management.username", "guest")
                 password = CFG.get_safe("container.exchange.management.password", "guest")
 
-                r = meth(url, auth=(username, password))
+                with gevent.timeout.Timeout(10):
+                    r = meth(url, auth=(username, password))
                 r.raise_for_status()
 
                 if not r.content == "":
@@ -719,6 +721,8 @@ class ExchangeManager(object):
                 else:
                     content = None
 
+            except gevent.timeout.Timeout as ex:
+                raise Timeout(str(ex))
             except requests.exceptions.Timeout as ex:
                 raise Timeout(str(ex))
             except (requests.exceptions.ConnectionError, socket.error) as ex:
