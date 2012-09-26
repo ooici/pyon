@@ -760,6 +760,7 @@ Routing method for next test, raises an IonException.
         self.assertRaises(exception.BadRequest, e.message_received, 3, {})
 
     @patch('pyon.net.endpoint.ResponseEndpointUnit._send', Mock(side_effect=exception.Timeout))
+    @unittest.skip('timeouts no longer captured by sFlow')
     def test_timeout_makes_sflow_sample(self):
         e = RPCResponseEndpointUnit(interceptors={})
         e._sample_request = Mock()
