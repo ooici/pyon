@@ -9,8 +9,9 @@ from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
-from pyon.util.async import wait, spawn
+from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError
+from pyon.util.containers import get_ion_ts
 import threading
 import traceback
 
@@ -46,7 +47,23 @@ class IonProcessThread(PyonThread):
         self._ready_control     = Event()
         self._errors            = []
 
+        # processing vs idle time (ms)
+        self._start_time        = None
+        self._proc_time         = 0
+
         PyonThread.__init__(self, target=target, **kwargs)
+
+    @property
+    def time_stats(self):
+        """
+        Returns a 3-tuple of (total time, idle time, processing time), all in ms.
+        """
+        now = int(get_ion_ts())
+        running_time = now - self._start_time
+
+        idle_time = running_time - self._proc_time
+
+        return (running_time, idle_time, self._proc_time)
 
     def _child_failed(self, child):
         """
@@ -77,6 +94,9 @@ class IonProcessThread(PyonThread):
         """
         if self.name:
             threading.current_thread().name = self.name
+
+        # start time
+        self._start_time = int(get_ion_ts())
 
         # spawn control flow loop
         ct = self.thread_manager.spawn(self._control_flow)
@@ -127,6 +147,7 @@ class IonProcessThread(PyonThread):
             log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
 
             res = None
+            start_proc_time = int(get_ion_ts())
             try:
                 with self.service.push_context(context):
                     res = call(*callargs, **callkwargs)
@@ -152,6 +173,9 @@ class IonProcessThread(PyonThread):
 
                     # have to raise something friendlier on the client side
                     calling_gl.kill(exception=ContainerError(str(exc)), block=False)
+            finally:
+                proc_time = int(get_ion_ts()) - start_proc_time
+                self._proc_time += proc_time
 
             ar.set(res)
 

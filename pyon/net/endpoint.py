@@ -1072,9 +1072,14 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # sample (possibly) before we do any sending
         self._sample_request(response_headers['status_code'], response_headers['error_message'], msg, headers, result, response_headers)
 
-        log_message("MESSAGE SEND <<< RPC-reply", result, response_headers, is_send=True)
-
         return self.send(result, response_headers)
+
+    def _send(self, msg, headers=None, **kwargs):
+        """
+        Override for more accurate reply log message.
+        """
+        log_message("MESSAGE SEND <<< RPC-reply", msg, headers, is_send=True)
+        return ResponseEndpointUnit._send(self, msg, headers=headers, **kwargs)
 
     def message_received(self, msg, headers):
         assert self._routing_obj, "How did I get created without a routing object?"
@@ -1200,6 +1205,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             mrts = int(response_headers['msg-rcvd'])
 
             extra_attrs['ml'] = str(mrts - rsts)
+
+        # Process Saturation
+        # processing time / total time running, as an integer percentage
+        if 'process-saturation' in response_headers:
+            extra_attrs['ps'] = response_headers['process-saturation']
 
         # uS: process latency
         # 1-way message latency (req to svc ONLY) + processing time
