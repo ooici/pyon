@@ -18,6 +18,7 @@ from pyon.util.containers import get_ion_ts
 
 from interface.services.isimple_resource_agent import BaseSimpleResourceAgent, SimpleResourceAgentProcessClient
 
+
 class SimpleResourceAgent(BaseSimpleResourceAgent):
     """
     A resource agent is an ION process of type "agent" that exposes the standard
@@ -90,7 +91,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
                                 origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
                                 sub_type=sub_type, command=command, result=cmd_res)
         post_event = self._post_execute_event_hook(post_event)
-        success = self._event_publisher._publish_event(post_event, origin=post_event.origin)
+        self._event_publisher._publish_event(post_event, origin=post_event.origin)
 
         return cmd_res
 
@@ -160,6 +161,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 
     def _get_names(self, obj, prefix):
         return [name[len(prefix):] for name in dir(obj) if name.startswith(prefix)]
+
 
 class UserAgent(SimpleResourceAgent):
 

@@ -4,9 +4,6 @@
 
 __author__ = 'Michael Meisinger'
 
-from zope.interface import providedBy
-from zope.interface import Interface, implements
-
 from pyon.core.exception import ContainerAppError, ConfigNotFound
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, dict_merge
@@ -14,6 +11,7 @@ from pyon.util.log import log
 
 
 START_PERMANENT = "permanent"
+
 
 class AppManager(object):
     def __init__(self, container):
@@ -41,7 +39,7 @@ class AppManager(object):
             self.start_rel(rel, config)
             log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK.", rel_url)
             return True
-        except ConfigNotFound as cnf:
+        except ConfigNotFound:
             log.warning("Could not find container deploy file '%s'", rel_url)
         except Exception as ex:
             log.exception("Could not start container deploy file '%s'", rel_url)
@@ -60,7 +58,8 @@ class AppManager(object):
         """
         log.debug("AppManager.start_rel(rel=%s) ...", rel)
 
-        if rel is None: rel = {}
+        if rel is None:
+            rel = {}
 
         for rel_app_cfg in rel.apps:
             name = rel_app_cfg.name
@@ -97,14 +96,13 @@ class AppManager(object):
             app = Config([app_url]).data
             self.start_app(appdef=app, config=config)
             return True
-        except ConfigNotFound as cnf:
+        except ConfigNotFound:
             log.warning("Could not find container app file '%s'" % app_url)
         except Exception as ex:
             log.exception("Could not start app file %s" % app_url)
             raise ContainerAppError(ex.message)
 
         return False
-
 
     def start_app(self, appdef=None, config=None):
         """
@@ -130,7 +128,7 @@ class AppManager(object):
                 pid = self.container.spawn_process(name, module, cls, config)
                 appdef._pid = pid
                 self.apps.append(appdef)
-            except Exception, ex:
+            except Exception:
                 log.exception("Appl %s start from processapp failed" % appdef.name)
         else:
             # Case 2: Appdef contains full app start params
@@ -147,7 +145,7 @@ class AppManager(object):
                 log.debug("App '%s' started. Root sup-id=%s" % (appdef.name, supid))
 
                 self.apps.append(appdef)
-            except Exception, ex:
+            except Exception:
                 log.exception("Appl %s start from appdef failed" % appdef.name)
 
     def stop_app(self, appdef):
@@ -155,5 +153,5 @@ class AppManager(object):
         try:
             if '_mod_loaded' in appdef:
                 appdef._mod_loaded.stop(self.container, appdef._state)
-        except Exception, ex:
+        except Exception:
             log.exception("Application %s stop failed" % appdef.name)

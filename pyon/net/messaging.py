@@ -22,6 +22,7 @@ from pyon.net.transport import ZeroMQTransport, ZeroMQRouter, AMQPTransport, Com
 from gevent_zeromq import zmq
 from collections import defaultdict
 
+
 class BaseNode(object):
     """
     """
@@ -116,8 +117,8 @@ class BaseNode(object):
                     interceptor_def = defs[name]
 
                     # Instantiate and put in by_name array
-                    modpath, classname  = interceptor_def['class'].rsplit('.', 1)
-                    classinst           = for_name(modpath, classname)
+                    modpath, classname = interceptor_def['class'].rsplit('.', 1)
+                    classinst = for_name(modpath, classname)
 
                     # Call configure
                     classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
@@ -128,6 +129,7 @@ class BaseNode(object):
                 interceptors[type_and_direction].append(classinst)
 
         self.interceptors = dict(interceptors)
+
 
 class NodeB(BaseNode):
     """
@@ -234,6 +236,7 @@ class NodeB(BaseNode):
                 self._bidir_pool.pop(chid)
                 self._pool._ids_free.remove(chid)
 
+
 def ioloop(connection, name=None):
     # Loop until CTRL-C
     if name:
@@ -256,6 +259,7 @@ def ioloop(connection, name=None):
 
         # Loop until the connection is closed
         connection.ioloop.start()
+
 
 class PyonSelectConnection(SelectConnection):
     """
@@ -282,7 +286,7 @@ class PyonSelectConnection(SelectConnection):
         limit = self.parameters.channel_max or pikachannel.MAX_CHANNELS
 
         # generate a set of available channels
-        available = set(xrange(1, limit+1))
+        available = set(xrange(1, limit + 1))
 
         # subtract out existing channels
         available.difference_update(self._channels.keys())
@@ -305,6 +309,7 @@ class PyonSelectConnection(SelectConnection):
         log.debug("Marking %d as a bad channel", ch_number)
         self._bad_channel_numbers.add(ch_number)
 
+
 def make_node(connection_params=None, name=None, timeout=None):
     """
     Blocking construction and connection of node.
@@ -316,13 +321,12 @@ def make_node(connection_params=None, name=None, timeout=None):
     connection_params = connection_params or CFG.server.amqp
     credentials = PlainCredentials(connection_params["username"], connection_params["password"])
     conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
-    connection = PyonSelectConnection(conn_parameters , node.on_connection_open)
+    connection = PyonSelectConnection(conn_parameters, node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection, name=name)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
     node.ready.wait(timeout=timeout)
     return node, ioloop_process
     #return node, ioloop, connection
-
 
 
 class ZeroMQNode(BaseNode):
@@ -364,12 +368,14 @@ class ZeroMQNode(BaseNode):
         log.debug("ZeroMQNode._on_channel_close (%s)", ch.channel_number)
         self._channel_id_pool.release_id(ch.channel_number)
 
+
 class ZeroMQClient(object):
     def __init__(self):
         pass
 
     def add_on_close_callback(self, cb):
         log.debug("ignoring close callback")
+
 
 def make_zmq_node(timeout=None, router=None):
 
@@ -382,4 +388,3 @@ def make_zmq_node(timeout=None, router=None):
     node.ready.wait(timeout=timeout)
 
     return node, node._zmq_router.gl_ioloop
-

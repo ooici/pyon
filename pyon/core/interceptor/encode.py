@@ -4,12 +4,13 @@ from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
 import numpy as np
 
-numpy_floats  = (np.float, np.float16, np.float32, np.float64)
-numpy_ints    = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.uint64)
-numpy_bool    = (np.bool)
+numpy_floats = (np.float, np.float16, np.float32, np.float64)
+numpy_ints = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.uint64)
+numpy_bool = (np.bool)
 numpy_complex = (np.complex, np.complex64, np.complex128)
 
-def decode_ion( obj):
+
+def decode_ion(obj):
     """
     MsgPack object hook to decode any ion object as part of the message pack walk rather than implementing it again in
     pyon
@@ -23,7 +24,7 @@ def decode_ion( obj):
 
     elif "__ion_array__" in obj:
         # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
-        return np.array(obj['content'],dtype=np.dtype(obj['header']['type']))
+        return np.array(obj['content'], dtype=np.dtype(obj['header']['type']))
 
     elif '__complex__' in obj:
         return complex(obj['real'], obj['imag'])
@@ -33,39 +34,37 @@ def decode_ion( obj):
         return dt.type(obj['val'])
     return obj
 
-def encode_ion( obj):
+
+def encode_ion(obj):
     """
     MsgPack object hook to encode any ion object as part of the message pack walk rather than implementing it again in
     pyon
     """
 
     if isinstance(obj, list):
-        return {"__list__":True, 'tuple':tuple(obj)}
+        return {"__list__": True, 'tuple': tuple(obj)}
 
     if isinstance(obj, set):
-        return {"__set__":True, 'tuple':tuple(obj)}
+        return {"__set__": True, 'tuple': tuple(obj)}
 
     if isinstance(obj, np.ndarray):
         if obj.ndim == 0:
             raise ValueError('Can not encode a np array with rank 0')
-        return {"header":{"type":str(obj.dtype),"nd":obj.ndim,"shape":obj.shape},"content":obj.tolist(),"__ion_array__":True}
+        return {"header": {"type": str(obj.dtype), "nd": obj.ndim, "shape": obj.shape}, "content": obj.tolist(), "__ion_array__": True}
 
     if isinstance(obj, complex):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
 
     if isinstance(obj, np.number):
-        if isinstance(obj,numpy_floats):
-            return {'__dtype__': obj.dtype.str, 'val':obj.astype(float)}
+        if isinstance(obj, numpy_floats):
+            return {'__dtype__': obj.dtype.str, 'val': obj.astype(float)}
         elif isinstance(obj, numpy_ints):
-            return {'__dtype__': obj.dtype.str, 'val':obj.astype(int)}
+            return {'__dtype__': obj.dtype.str, 'val': obj.astype(int)}
         else:
             raise TypeError('Unsupported type "%s"', str(type(obj)))
 
-
-
     # Must raise type error to avoid recursive failure
     raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
-
 
 
 class EncodeInterceptor(Interceptor):

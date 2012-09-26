@@ -13,14 +13,16 @@ from pyon.util.log import log
 
 from ndg.xacml.core.context.result import Decision
 
-ALLOW_RESOURCE_REGISTRY_SUB_CALLS='ALLOW_RESOURCE_REGISTRY_SUB_CALLS'
+ALLOW_RESOURCE_REGISTRY_SUB_CALLS = 'ALLOW_RESOURCE_REGISTRY_SUB_CALLS'
 
 #TODO - will need to iterate on this
+
 
 #Factory method
 def create_policy_token(originating_container, actor_id, requesting_message, token):
     p = PolicyToken(originating_container, actor_id, requesting_message, token)
     return pickle.dumps(p)
+
 
 class PolicyToken:
 
@@ -30,8 +32,8 @@ class PolicyToken:
         self.requesting_message = requesting_message
         self.token = token
 
-        timeout = CFG.get_safe('endpoint.receive.timeout',10)
-        self.expire_time = current_time_millis() + (timeout*1000)  # Set the expire time to current time + timeout in ms
+        timeout = CFG.get_safe('endpoint.receive.timeout', 10)
+        self.expire_time = current_time_millis() + (timeout * 1000)  # Set the expire time to current time + timeout in ms
 
     def is_expired(self):
         if current_time_millis() > self.expire_time:
@@ -48,13 +50,13 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        log.debug("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
+        log.debug("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-        log.debug("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
+        log.debug("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
 
         #If missing default to request just to be safe
         msg_performative = invocation.get_header_value('performative', 'request')
@@ -103,15 +105,12 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 elif str(ret) == Decision.PERMIT:
                     self.permit_registry_calls_token(invocation)
 
-
         return invocation
-
 
     def annotate_denied_message(self, invocation):
         #TODO - Fix this to use the proper annotation reference and figure out special cases
         if invocation.headers.has_key('op') and invocation.headers['op'] != 'start_rel_from_url':
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_REJECT
-
 
     def permit_registry_calls_token(self, invocation):
         actor_tokens = invocation.get_header_value('ion-actor-tokens', None)
@@ -136,7 +135,6 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         token = create_policy_token(container_id, actor_id, requesting_message, ALLOW_RESOURCE_REGISTRY_SUB_CALLS)
         actor_tokens.append(token)
 
-
     def has_valid_token(self, invocation, token):
 
         actor_tokens = invocation.get_header_value('ion-actor-tokens', None)
@@ -150,6 +148,5 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 return True
 
         return False
-
 
 

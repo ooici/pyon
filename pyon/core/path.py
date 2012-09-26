@@ -5,8 +5,8 @@ __license__ = 'Apache 2.0'
 
 import fnmatch
 import os
-import os.path
 from pkg_resources import resource_filename
+
 
 def resolve(filename):
     """
@@ -17,7 +17,7 @@ def resolve(filename):
 
     resolved_file = filename
 
-    if not '/' in filename: # Looking for a package
+    if not '/' in filename:  # Looking for a package
         pass
     else:
         if not os.path.isabs(filename):
@@ -37,6 +37,7 @@ def resolve(filename):
 
     return resolved_file
 
+
 def list_files_recursive(file_dir, pattern, do_first=[], exclude_dirs=[]):
     """
     Recursively find all files matching pattern under file_dir and return a list.
@@ -47,7 +48,8 @@ def list_files_recursive(file_dir, pattern, do_first=[], exclude_dirs=[]):
 
     new_files = []
     for root, dirs, files in os.walk(file_dir):
-        if root in exclude_dirs: continue
+        if root in exclude_dirs:
+            continue
         for file in fnmatch.filter(files, pattern):
             path = os.path.join(root, file)
             if not path in skip_me:

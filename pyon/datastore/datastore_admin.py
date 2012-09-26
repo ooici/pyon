@@ -9,7 +9,8 @@ import os.path
 
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-from pyon.public import log, iex
+from pyon.public import log
+
 
 class DatastoreAdmin(object):
 
@@ -79,7 +80,7 @@ class DatastoreAdmin(object):
             else:
                 for obj_id, obj_key, obj in objs:
                     # Some object ids have slashes
-                    fn = obj_id.replace("/","_")
+                    fn = obj_id.replace("/", "_")
                     with open("%s/%s.yml" % (outpath, fn), 'w') as f:
                         yaml.dump(obj, f, default_flow_style=False)
                         numwrites += 1

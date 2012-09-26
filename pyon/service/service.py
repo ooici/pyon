@@ -12,12 +12,14 @@ from pyon.util.log import log
 from pyon.util.containers import named_any, itersubclasses
 from pyon.util.context import LocalContextMixin
 
+
 class BaseClients(object):
     """
     Basic object to hold clients for a service. Derived in implementations.
     Placeholder, may not need any functionality.
     """
     pass
+
 
 class BaseService(LocalContextMixin):
     """
@@ -32,13 +34,13 @@ class BaseService(LocalContextMixin):
     process_type = "service"
 
     def __init__(self, *args, **kwargs):
-        self.id         = None
+        self.id = None
         self._proc_name = None
         self._proc_type = None
-        self.errcause   = None
-        self.container  = None
-        self.CFG        = None
-        self._process   = None      # reference to IonProcess, internal
+        self.errcause = None
+        self.container = None
+        self.CFG = None
+        self._process = None      # reference to IonProcess, internal
         super(BaseService, self).__init__()
 
     def init(self):
@@ -108,15 +110,15 @@ class BaseService(LocalContextMixin):
     def __str__(self):
         proc_name = 'Unknown proc_name' if self._proc_name is None else self._proc_name
         proc_type = 'Unknown proc_type' if self._proc_type is None else self._proc_type
-        return "".join((self.__class__.__name__,"(",
+        return "".join((self.__class__.__name__, "(",
                         "name=", proc_name,
                         ",id=", self.id,
                         ",type=", proc_type,
                         ")"))
 
+
 # -----------------------------------------------------------------------------------------------
 # Service management infrastructure
-
 class IonServiceDefinition(object):
     """
     Provides a walkable structure for ION service metadata and object definitions.
@@ -148,6 +150,7 @@ class IonServiceDefinition(object):
     def __repr__(self):
         return str(self)
 
+
 class IonServiceOperation(object):
     def __init__(self, name):
         self.name = name
@@ -161,6 +164,7 @@ class IonServiceOperation(object):
 
     def __repr__(self):
         return str(self)
+
 
 class IonServiceRegistry(object):
     def __init__(self):
@@ -199,7 +203,7 @@ class IonServiceRegistry(object):
 
         for mod_imp, mod_name, is_pkg in pkgutil.iter_modules([path]):
             if is_pkg:
-                cls.load_service_mods(path+"/"+mod_name)
+                cls.load_service_mods(path + "/" + mod_name)
             else:
                 mod_qual = "%s.%s" % (mod_prefix, mod_name)
                 #print "Import", mod_qual
@@ -208,14 +212,13 @@ class IonServiceRegistry(object):
                 except Exception, ex:
                     log.warning("Import module '%s' failed: %s" % (mod_qual, ex))
 
-
     def build_service_map(self):
         """
         Adds all known service definitions to service registry.
         @todo: May be a bit fragile due to using BaseService.__subclasses__
         """
         for cls in BaseService.__subclasses__():
-            assert hasattr(cls,'name'), 'Service class must define name value. Service class in error: %s' % cls
+            assert hasattr(cls, 'name'), 'Service class must define name value. Service class in error: %s' % cls
             if cls.name:
                 self.services_by_name[cls.name] = cls
                 self.add_servicedef_entry(cls.name, "base", cls)
@@ -228,7 +231,7 @@ class IonServiceRegistry(object):
                         self.add_servicedef_entry(cls.name, "client", named_any(client))
                         sclient = "%s.%sClient" % (cls.__module__, cls.__name__[4:])
                         self.add_servicedef_entry(cls.name, "simple_client", named_any(sclient))
-                    except Exception, ex:
+                    except Exception:
                         log.warning("Cannot find client for service %s" % (cls.name))
 
     def discover_service_classes(self):
@@ -262,6 +265,3 @@ class IonServiceRegistry(object):
             return self.services[name]
         else:
             return None
-
-
-

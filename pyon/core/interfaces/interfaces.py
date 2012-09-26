@@ -4,16 +4,14 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
-import inspect
 import os
 from collections import OrderedDict
-import argparse
 
 from pyon.core.path import list_files_recursive
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
-from pyon.util.containers import get_safe
+
 
 class InterfaceAdmin:
     """
@@ -180,11 +178,11 @@ class InterfaceAdmin:
     def _register_bulk(self):
         print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
-        res = self.dir.register_mult(entries)
+        self.dir.register_mult(entries)
         self.bulk_entries = {}
 
         print "store_interfaces: Storing %s resources in registry..." % len(self.bulk_resources)
-        res = self.rr.create_mult(self.bulk_resources)
+        self.rr.create_mult(self.bulk_resources)
         self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"

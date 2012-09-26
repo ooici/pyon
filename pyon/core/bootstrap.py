@@ -67,6 +67,7 @@ def assert_environment():
     if not os.path.exists("res/config/pyon.yml"):
         raise ContainerStartupError("pyon environment assertion failed: pyon.yml config missing")
 
+
 def set_config(pyon_cfg=None):
     """
     Initialize pyon global configuration

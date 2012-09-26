@@ -2,14 +2,13 @@
 
 """
 
-from pyon.core.exception import IonException, ServerError, BadRequest, NotFound
-from pyon.core.object import IonObjectSerializer, IonObjectDeserializer, IonObjectBase
+from pyon.core.exception import IonException, ServerError, BadRequest
+from pyon.core.object import IonObjectBase
 from pyon.datastore.id_factory import SaltedTimeIDFactory
 from pyon.ion.resource import AT
-from pyon.util.containers import DotDict, get_ion_ts, get_safe
 from pyon.util.log import log
-from pyon.datastore.pool import Pool
 from pyon.datastore.representation import IonSerializerDictionaryRepresentation
+
 
 class Repository(object):
 
@@ -48,7 +47,7 @@ class Repository(object):
 
     def _is_id(self, arg):
         return isinstance(arg, str) or (isinstance(arg, list) and isinstance(arg[0], str))
-    
+
     #############################
     #
     # CRUD operations delegate to datastore
@@ -106,21 +105,21 @@ class Repository(object):
             return arg
         else:
             return self._encode(arg)
-            
+
     def _encode(self, arg, add_id=False):
         if isinstance(arg, list):
-            return [ self._encode(o, add_id=add_id) for o in arg ]
+            return [self._encode(o, add_id=add_id) for o in arg]
         return self._representation.encode(arg, add_id=add_id)
 
     def _decode(self, arg):
         if isinstance(arg, list):
-            return [ self._decode(d) for d in arg ]
+            return [self._decode(d) for d in arg]
         if isinstance(arg, tuple):
             return arg[0], arg[1], self._decode(arg[2])
         if isinstance(arg, Exception):
             return arg
         return self._representation.decode(arg)
-    
+
     def _perform(self, op, store, *args, **kwargs):
         """ re-invoke the calling operation with a pooled DB connection """
         pool = self._pool[store]
@@ -141,12 +140,20 @@ class Repository(object):
     #############################
     #
     # NOT YET IMPLEMENTED
+    def create_association(self, subject=None, predicate=None, arg=None, assoc_type=AT.H2H):
+        pass
 
-    def create_association(self, subject=None, predicate=None, arg=None, assoc_type=AT.H2H): pass
-    def delete_association(self, association=''): pass
+    def delete_association(self, association=''):
+        pass
 
-    def find_objects(self, subject, predicate="", object_type="", id_only=False): pass
-    def find_subjects(self, subject_type="", predicate="", obj="", id_only=False): pass
-    def find_associations(self, subject="", predicate="", obj="", assoc_type=AT.H2H, id_only=True): pass
-    def find_resources(self, restype="", lcstate="", name="", id_only=True): pass
+    def find_objects(self, subject, predicate="", object_type="", id_only=False):
+        pass
 
+    def find_subjects(self, subject_type="", predicate="", obj="", id_only=False):
+        pass
+
+    def find_associations(self, subject="", predicate="", obj="", assoc_type=AT.H2H, id_only=True):
+        pass
+
+    def find_resources(self, restype="", lcstate="", name="", id_only=True):
+        pass

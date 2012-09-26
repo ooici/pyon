@@ -21,7 +21,7 @@ class DataStore(object):
     DS_STATE = "state"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS','RESOURCES','DIRECTORY','STATE','EVENTS','EXAMPLES','SCIDATA','FILESYSTEM','BASIC']
+    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'EXAMPLES', 'SCIDATA', 'FILESYSTEM', 'BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     # Maps common datastore logical names to index profiles
@@ -212,6 +212,7 @@ class DataStore(object):
         """
         pass
 
+
 class DatastoreManager(object):
     """
     Container manager for datastore instances.
@@ -285,7 +286,7 @@ class DatastoreManager(object):
         for x in self._datastores.itervalues():
             try:
                 x.close()
-            except Exception as ex:
+            except Exception:
                 log.exception("Error closing datastore")
 
         self._datastores = {}

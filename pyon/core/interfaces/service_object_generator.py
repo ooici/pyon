@@ -15,7 +15,6 @@ import sys
 import string
 import yaml
 import hashlib
-import argparse
 import traceback
 from collections import OrderedDict
 
@@ -23,6 +22,7 @@ from pyon.core.path import list_files_recursive
 from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
 from pyon.service.service import BaseService
 from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
+from pyon.ion.directory_standalone import DirectoryStandalone
 
 templates = {
       'file':
@@ -502,7 +502,7 @@ class ServiceObjectGenerator:
 
             # Load interface base classes
             self.load_mods("interface/services", True)
-            base_subtypes = self.find_subtypes(BaseService)
+            self.find_subtypes(BaseService)
             # Load impl classes
             self.load_mods("ion", False)
 
@@ -687,7 +687,6 @@ class ServiceObjectGenerator:
             res.append(cls)
         return res
 
-
     def generate_service(self, interface_file, svc_def, client_defs, opts):
         """
         Generates a single service/client/interface definition.
@@ -867,7 +866,6 @@ class ServiceObjectGenerator:
             for item in data:
                 return (item.value['attributes']['definition'])
             return ''
-
 
     def get_object_definition(self):
         if self.read_from_yaml_file:

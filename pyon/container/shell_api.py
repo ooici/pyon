@@ -6,15 +6,18 @@ __author__ = 'Michael Meisinger'
 
 container = None
 
+
 def get_console_dimensions():
     """Returns (rowns, columns) of current terminal"""
     import os
     rows, columns = os.popen('stty size', 'r').read().split()
     return int(rows), int(columns)
 
+
 def get_max_width(table, index):
     """Get the maximum width of the given column index"""
     return max([len(str(row[index])) for row in table])
+
 
 def pprint_table(table, pad=1, indent=0, trunc=None):
     """Prints out a table of data, padded for alignment
@@ -30,24 +33,25 @@ def pprint_table(table, pad=1, indent=0, trunc=None):
 
     col_paddings = []
     for i in xrange(len(table[0])):
-        if trunc and trunc[i]!=0:
+        if trunc and trunc[i] != 0:
             col_paddings.append(abs(trunc[i]))
         else:
             col_paddings.append(get_max_width(table, i))
 
     for row in table:
-        strl.append(' '*indent)
+        strl.append(' ' * indent)
         for i in xrange(len(row)):
             col = str(row[i])
-            if trunc and trunc[i]>2 and len(col)>trunc[i]:
-                col = col[0:trunc[i]-2] + ".."
-            elif trunc and trunc[i]<-2 and len(col)>abs(trunc[i]):
-                col = ".." + col[trunc[i]+2:]
+            if trunc and trunc[i] > 2 and len(col) > trunc[i]:
+                col = col[0:trunc[i] - 2] + ".."
+            elif trunc and trunc[i]<-2 and len(col) > abs(trunc[i]):
+                col = ".." + col[trunc[i] + 2:]
             col = col.ljust(col_paddings[i] + pad)
             strl.append(col)
         strl.append('\n')
 
     return "".join(strl)
+
 
 def pprint_list(l, c, pad=1, indent=0):
     """Pretty prints a list as table and returns string.
@@ -61,34 +65,37 @@ def pprint_list(l, c, pad=1, indent=0):
             rows, columns = get_console_dimensions()
 
             table_n = None
-            for c in xrange(1, min(columns/(pad+1), len(l))):
+            for c in xrange(1, min(columns / (pad + 1), len(l))):
                 table = table_n
-                table_n = [l[c*i:c*i+c] for i in range(1+len(l)/c)]
-                table_n[-1].extend(['']*(c-len(table_n[-1])))
+                table_n = [l[c * i:c * i + c] for i in range(1 + len(l) / c)]
+                table_n[-1].extend([''] * (c - len(table_n[-1])))
                 sumwid = indent
                 for i in xrange(c):
                     sumwid += get_max_width(table_n, i)
                 sumwid += pad * c
                 if sumwid > columns:
-                    if not table: table = table_n
+                    if not table:
+                        table = table_n
                     break
-        except Exception as ex:
+        except Exception:
             return pprint_list(l, 1, pad, indent)
     else:
-        table = [l[c*i:c*i+c] for i in range(1+len(l)/c)]
-        table_n[-1].extend(['']*(c-len(table_n[-1])))
+        table = [l[c * i:c * i + c] for i in range(1 + len(l) / c)]
+        table_n[-1].extend([''] * (c - len(table_n[-1])))
 
     return pprint_table(table, pad, indent)
 
 
 # -------------------------------------------------
 
+
 def ps(ret=False):
     print "List of ION processes"
     print "---------------------"
-    print "\n".join(("%s: %s"%(name, p) for (name,p) in container.proc_manager.procs.iteritems()))
+    print "\n".join(("%s: %s" % (name, p) for (name, p) in container.proc_manager.procs.iteritems()))
     if ret:
         return container.proc_manager.procs
+
 
 def procs(ret=False):
     print "\nList of pyon processes"
@@ -96,6 +103,7 @@ def procs(ret=False):
     print "\n".join((str(p) for p in container.proc_manager.proc_sup.children))
     if ret:
         return container.proc_manager.proc_sup.children
+
 
 def ms():
     print "List of messaging endpoints"
@@ -114,13 +122,15 @@ def ms():
     proclist = container.proc_manager.procs
     for name in sorted(endpoint_by_group.keys()):
         print "%s (%s)" % (name, proclist[name]._proc_name if name in proclist else "")
-        print "\n".join(("  %s, %s"%(ed.name if hasattr(ed,'name') else '', ed) for ed in sorted(endpoint_by_group[name],
+        print "\n".join(("  %s, %s" % (ed.name if hasattr(ed, 'name') else '', ed) for ed in sorted(endpoint_by_group[name],
                                         key=lambda ep: (ep.__class__.__name__, getattr(ep, 'name')))))
+
 
 def apps():
     print "List of active pyon apps"
     print "------------------------"
-    print "\n".join(("%s: %s"%(appdef.name, appdef) for appdef in container.app_manager.apps))
+    print "\n".join(("%s: %s" % (appdef.name, appdef) for appdef in container.app_manager.apps))
+
 
 def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
@@ -147,7 +157,6 @@ def svc_defs(svcs=None, op=None):
     else:
         print "List of defined services"
         print "------------------------"
-        from pyon.core.bootstrap import get_obj_registry
 
         for svcname in sorted(get_service_registry().services.keys()):
             svcdef = get_service_registry().services[svcname]
@@ -155,6 +164,7 @@ def svc_defs(svcs=None, op=None):
 
         print "\nType svc_defs('name') or svc_defs(['name1','name2']) for definition"
         return None
+
 
 def obj_defs(ob=None):
     """Returns object definitions for object name(s)
@@ -177,6 +187,7 @@ def obj_defs(ob=None):
         print pprint_list(onames, -1, 1, 2)
         print "\nType obj_defs('name') or obj_defs(['name1','name2']) for definition"
 
+
 def type_defs(ob=None):
     """Returns object type definitions for object name(s)
     @param ob name or list of names of object
@@ -198,6 +209,7 @@ def type_defs(ob=None):
         print pprint_list(tnames, -1, 1, 2)
         print "\nType type_defs('name') or type_defs(['name1','name2']) for definition"
 
+
 def lsdir(qname='/', truncate=True):
     """Prints all directory entries below the given node.
     @param qname the directory node (must start with '/')
@@ -212,15 +224,17 @@ def lsdir(qname='/', truncate=True):
     if truncate:
         rows, columns = get_console_dimensions()
         col1wid = get_max_width(detable, 0)
-        col1max = min(50 if columns>50 else 0, col1wid)
-        print pprint_table(detable, trunc=[-col1max,columns-col1max-2 if columns>col1max+3 else 0])
+        col1max = min(50 if columns > 50 else 0, col1wid)
+        print pprint_table(detable, trunc=[-col1max, columns - col1max - 2 if columns > col1max + 3 else 0])
     else:
         print "\n".join(["%s: %s" % tup for tup in detable])
+
 
 def spawn(proc, procname=None):
     procmod, proccls = proc.rsplit('.', 1)
     procname = procname or proccls
     container.spawn_process(procname, procmod, proccls)
+
 
 def ionhelp():
     print "ION R2 CC interactive shell"
@@ -229,8 +243,9 @@ def ionhelp():
     print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp,ps,procs,ms,apps,svc_defs,obj_defs,type_defs,lsdir,spawn]
+public_api = [ionhelp, ps, procs, ms, apps, svc_defs, obj_defs, type_defs, lsdir, spawn]
 public_vars = None
+
 
 def get_proc():
     from pyon.util.containers import DotDict
@@ -238,14 +253,17 @@ def get_proc():
     pn = DotDict(container.proc_manager.procs_by_name)
     return procs, pn
 
+
 def define_vars():
     from pyon.core.bootstrap import CFG as cfg
-    if public_vars: return public_vars
+    if public_vars:
+        return public_vars
     cc = container
     proc, pn = get_proc()
     govc = cc.instance.governance_controller
     CFG = cfg
     return locals()
+
 
 def get_shell_api(cc):
     """Returns an API to introspect and manipulate the container

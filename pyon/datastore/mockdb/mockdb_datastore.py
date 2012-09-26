@@ -12,6 +12,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 
+
 class MockDB_DataStore(DataStore):
     """
     Data store implementation utilizing in-memory dict of dicts
@@ -24,8 +25,8 @@ class MockDB_DataStore(DataStore):
         self.root = {}
 
         # serializers
-        self._io_serializer     = IonObjectSerializer()
-        self._io_deserializer   = IonObjectDeserializer(obj_registry=get_obj_registry())
+        self._io_serializer = IonObjectSerializer()
+        self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
 
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:
@@ -153,8 +154,8 @@ class MockDB_DataStore(DataStore):
 
         res = []
         for doc, oid in zip(docs, object_ids):
-            oid,rev = self.create_doc(doc, oid)
-            res.append((True,oid,rev))
+            oid, rev = self.create_doc(doc, oid)
+            res.append((True, oid, rev))
         return res
 
     def read(self, object_id, rev_id="", datastore_name=""):
@@ -274,7 +275,7 @@ class MockDB_DataStore(DataStore):
             object_id = doc
         else:
             object_id = doc["_id"]
-        
+
         log.info('Deleting object %s/%s' % (datastore_name, object_id))
         if object_id in datastore_dict.keys():
 
@@ -307,8 +308,9 @@ class MockDB_DataStore(DataStore):
         except KeyError:
             raise BadRequest('Data store ' + datastore_name + ' does not exist.')
 
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'type_' in obj and obj['type_'] == "Association":
                 association = obj
                 if association["s"] == obj_id or association["o"] == obj_id:
@@ -337,8 +339,9 @@ class MockDB_DataStore(DataStore):
         assoc_list = []
         target_id_list = []
         target_list = []
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'type_' in obj and obj['type_'] == "Association":
                 if obj['s'] == subject_id:
                     if predicate and obj['p'] == predicate:
@@ -378,8 +381,9 @@ class MockDB_DataStore(DataStore):
         assoc_list = []
         target_id_list = []
         target_list = []
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'type_' in obj and obj['type_'] == "Association":
                 if obj['o'] == object_id:
                     if predicate and obj['p'] == predicate:
@@ -427,8 +431,9 @@ class MockDB_DataStore(DataStore):
                 else:
                     object_id = obj._id
             target_list = []
-            for objname,obj in datastore_dict.iteritems():
-                if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            for objname, obj in datastore_dict.iteritems():
+                if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                    continue
                 if 'type_' in obj and obj['type_'] == "Association":
                     if obj['s'] == subject_id and obj['o'] == object_id:
                         if assoc_type:
@@ -438,8 +443,9 @@ class MockDB_DataStore(DataStore):
                             target_list.append(obj)
         else:
             target_list = []
-            for objname,obj in datastore_dict.iteritems():
-                if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+            for objname, obj in datastore_dict.iteritems():
+                if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                    continue
                 if 'type_' in obj and obj['type_'] == "Association":
                     if obj['p'] == predicate:
                         target_list.append(obj)
@@ -450,7 +456,7 @@ class MockDB_DataStore(DataStore):
             assocs = [self._persistence_dict_to_ion_object(row) for row in target_list]
         log.debug("find_associations() found %s associations" % (len(assocs)))
         return assocs
-        
+
     def find_res_by_type(self, restype, lcstate=None, id_only=False):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)" % (restype, lcstate))
         if type(id_only) is not bool:
@@ -463,8 +469,9 @@ class MockDB_DataStore(DataStore):
         assoc_list = []
         target_id_list = []
         target_list = []
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'type_' in obj and (obj['type_'] == restype or (not restype and obj['type_'] != "Association")):
                 if (lcstate and 'lcstate' in obj and obj['lcstate'] == lcstate) or not lcstate or not restype:
                     target_id_list.append(obj['_id'])
@@ -493,8 +500,9 @@ class MockDB_DataStore(DataStore):
         assoc_list = []
         target_id_list = []
         target_list = []
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'lcstate' in obj and obj['lcstate'] in lcstate_match:
                 if (restype and obj['type_'] == restype) or not restype:
                     target_id_list.append(obj['_id'])
@@ -522,8 +530,9 @@ class MockDB_DataStore(DataStore):
         assoc_list = []
         target_id_list = []
         target_list = []
-        for objname,obj in datastore_dict.iteritems():
-            if (objname.find('_version_')>0) or (not type(obj) is dict): continue
+        for objname, obj in datastore_dict.iteritems():
+            if (objname.find('_version_') > 0) or (not type(obj) is dict):
+                continue
             if 'name' in obj and obj['name'] == name:
                 if (restype and obj['type_'] == restype) or not restype:
                     target_id_list.append(obj['_id'])
@@ -540,13 +549,15 @@ class MockDB_DataStore(DataStore):
         raise NotImplementedError()
 
     def _ion_object_to_persistence_dict(self, ion_object):
-        if ion_object is None: return None
+        if ion_object is None:
+            return None
 
         obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
-        if obj_dict is None: return None
+        if obj_dict is None:
+            return None
 
         ion_object = self._io_deserializer.deserialize(obj_dict)
         return ion_object
