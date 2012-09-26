@@ -5,17 +5,9 @@
 @file: pyon/ion/transform.py
 @description: Implementation for TransformBase class
 '''
-import uuid
-import time
-import gevent
 
-from pyon.container.cc import Container
-from pyon.core.bootstrap import get_sys_name
 from pyon.event.event import EventPublisher
 from pyon.ion.streamproc import StreamProcess
-from pyon.net.endpoint import Subscriber, Publisher
-from pyon.net.transport import NameTrio
-from pyon.util.async import spawn
 from pyon.util.log import log
 
 
@@ -99,141 +91,6 @@ class TransformDataProcess(TransformBase):
 
         for publisher in self.publishers:
             publisher.publish(msg)
-
-
-class TransformBenchTesting(TransformDataProcess):
-    """
-    Easiest way to run:
-    from pyon.util.containers import DotDict
-    tbt=cc.proc_manager._create_service_instance('55', 'tbt', 'pyon.ion.transform', 'TransformBenchTesting', DotDict({'process':{'name':'tbt', 'transform_id':'55'}}))
-    tbt.init()
-    tbt.start()
-    """
-    transform_number = 0
-    message_length = 0
-
-    def __init__(self):
-        super(TransformBenchTesting, self).__init__()
-        self.count = 0
-        TransformBenchTesting.transform_number += 1
-
-    def perf(self):
-        with open('/tmp/pyon_performance.dat', 'a') as f:
-            then = time.time()
-            ocount = self.count
-            while True:
-                gevent.sleep(2.)
-                now = time.time()
-                count = self.count
-                delta_t = now - then
-                delta_c = count - ocount
-
-                f.write('%s|%s\t%s\t%s\t%3.3f\n' % (get_sys_name(), time.strftime("%H:%M:%S", time.gmtime()), TransformBenchTesting.message_length, TransformBenchTesting.transform_number, float(delta_c) / delta_t))
-                then = now
-                ocount = count
-                f.flush()
-
-    @staticmethod
-    def launch_benchmark(transform_number=1, primer=1, message_length=4):
-        from gevent.greenlet import Greenlet
-        from pyon.util.containers import DotDict
-        num = transform_number
-        msg_len = message_length
-        transforms = list()
-        pids = 1
-        TransformBenchTesting.message_length = message_length
-        cc = Container.instance
-        pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
-        for i in xrange(num):
-            tbt = cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlace', DotDict({'process': {'name': 'tbt%d' % pids, 'transform_id': pids}}))
-            tbt.init()
-            tbt.start()
-            gevent.sleep(0.2)
-            for i in xrange(primer):
-                pub.publish(list(xrange(msg_len)))
-            g = Greenlet(tbt.perf)
-            g.start()
-            transforms.append(tbt)
-            pids += 1
-
-    def on_start(self):
-        TransformDataProcess.on_start(self)
-
-        # set up subscriber to *
-        self._bt_sub = Subscriber(callback=lambda m, h: self.call_process(m),
-                                  from_name=NameTrio(get_sys_name(), 'bench_queue', '*'))
-
-        # spawn listener
-        self._sub_gl = spawn(self._bt_sub.listen)
-
-        # set up publisher to anything!
-        self._bt_pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
-
-    def publish(self, msg):
-        self._bt_pub.publish(msg)
-        self.count += 1
-
-    def _stop_listener(self):
-        self._bt_sub.close()
-        self._sub_gl.join(timeout=2)
-        self._sub_gl.kill()
-
-    def on_stop(self):
-        TransformDataProcess.on_stop(self)
-        self._stop_listener()
-
-    def on_quit(self):
-        TransformDataProcess.on_quit(self)
-        self._stop_listener()
-
-
-class TransformBenchNewGranuleTesting(TransformBenchTesting):
-    """
-    Easiest way to run:
-    from pyon.util.containers import DotDict
-    tbt=cc.proc_manager._create_service_instance('55', 'tbt', 'pyon.ion.transform', 'TransformBenchTesting', DotDict({'process':{'name':'tbt', 'transform_id':'55'}}))
-    tbt.init()
-    tbt.start()
-    """
-
-    def __init__(self):
-        super(TransformBenchNewGranuleTesting, self).__init__()
-        self.count = 0
-        TransformBenchNewGranuleTesting.transform_number += 1
-
-    @staticmethod
-    def launch_benchmark(transform_number=1, primer=1, message_length=4):
-        from gevent.greenlet import Greenlet
-        from pyon.util.containers import DotDict
-        import numpy
-        from pyon.ion.granule.record_dictionary import RecordDictionaryTool
-        from pyon.ion.granule.taxonomy import TaxyTool
-        from pyon.ion.granule.granule import build_granule
-
-        tt = TaxyTool()
-        tt.add_taxonomy_set('a')
-
-        num = transform_number
-        transforms = list()
-        pids = 1
-        TransformBenchTesting.message_length = message_length
-        cc = Container.instance
-        pub = Publisher(to_name=NameTrio(get_sys_name(), str(uuid.uuid4())[0:6]))
-        for i in xrange(num):
-            tbt = cc.proc_manager._create_service_instance(str(pids), 'tbt', 'prototype.transforms.linear', 'TransformInPlaceNewGranule', DotDict({'process': {'name': 'tbt%d' % pids, 'transform_id': pids}}))
-            tbt.init()
-            tbt.start()
-            gevent.sleep(0.2)
-            for i in xrange(primer):
-                rd = RecordDictionaryTool(tt, message_length)
-                rd['a'] = numpy.arange(message_length)
-                gran = build_granule(data_producer_id='dp_id', taxonomy=tt, record_dictionary=rd)
-                pub.publish(gran)
-
-            g = Greenlet(tbt.perf)
-            g.start()
-            transforms.append(tbt)
-            pids += 1
 
 
 class TransformFunction(TransformDataProcess):

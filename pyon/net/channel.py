@@ -896,7 +896,7 @@ class ServerChannel(ListenChannel):
 
         send_name = NameTrio(tuple(reply_to_set.pop().split(',')))    # @TODO: stringify is not the best
         ch = self.BidirAcceptChannel(parent_channel=self)
-        ch._recv_name = self._recv_name     # for debugging only
+        ch._recv_name = self._recv_name     # for debugging / queue len for sflow
         ch.attach_transport(transport)
         ch.connect(send_name)
         return ch

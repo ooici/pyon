@@ -173,7 +173,16 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         if gc:
             gc.check_process_operation_preconditions(self._routing_obj, msg, headers)
 
-        return RPCResponseEndpointUnit.message_received(self, msg, headers)
+        result, response_headers = RPCResponseEndpointUnit.message_received(self, msg, headers)
+
+        # decorate our response_headers with process-saturation, as we need them to be set in the headers
+        # earlier than send/build_header so the sampling takes notice
+        try:
+            response_headers['process-saturation'] = self._get_process_saturation()
+        except Exception as ex:
+            log.warn("Could not set process-saturation header, ignoring: %s", ex)
+
+        return result, response_headers
 
     def _build_header(self, raw_msg):
         """
@@ -202,6 +211,12 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
                 self._process._proc_state_changed = False
         return res
 
+    def _get_process_saturation(self):
+        """
+        Gets the process' saturation, as an integer percentage (process time / total time).
+        """
+        total, _, proc = self._process._process.time_stats  # we want the ion proc's stats
+        return str(int(proc / float(total) * 100))
 
 class ProcessRPCServer(RPCServer):
     endpoint_unit_type = ProcessRPCResponseEndpointUnit

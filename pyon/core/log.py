@@ -4,6 +4,7 @@
          currently this module is maintained for API compatability, but is implemented using the new package.
 """
 
+import logging
 from ooi.logging import config
 
 DEFAULT_LOGGING_PATHS = ['res/config/logging.yml', 'res/config/logging.local.yml']
@@ -28,6 +29,10 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
             config.add_configuration(logging_config_override)
         except Exception,e:
             print 'WARNING: failed to apply logging override %r: %e' % (logging_config_override,e)
+            
+    # direct warnings mechanism to loggers
+    logging.captureWarnings(True)
+
 
 def is_logging_configured():
     """ allow caller to determine if logging has already been configured in this container """

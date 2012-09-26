@@ -14,6 +14,7 @@ from socket import socket, AF_INET, SOCK_DGRAM
 import os
 from random import random
 import resource
+import md5
 
 class SFlowManager(object):
     """
@@ -178,21 +179,13 @@ class SFlowManager(object):
         Called from Process level endpoint layer.
         """
 
-        log.debug("SFlowManager.transaction")
+        log.debug("SFlowManager.transaction: %s.%s", app_name, op)
 
-        # build up the true app name
-        full_app = ['ion', get_sys_name()]
-
-        # don't duplicate the container (proc ids are typically containerid.number)
-        if self._container.id in app_name:
-            full_app.append(app_name)
-        else:
-            full_app.extend((self._container.id, app_name))
-
-        full_app_name = ".".join(full_app)
+        # hash the app_name because we only have 32 chars to work with
+        hash_app_name = md5.new(app_name).hexdigest()
 
         tsample = { 'flow_sample':{
-                        'app_name': full_app_name,
+                        'app_name': hash_app_name,
                         'sampling_rate': self._trans_sample_rate,
                         'app_operation': {
                             'operation': op,
