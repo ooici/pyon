@@ -1150,7 +1150,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             if sm and sm.should_sample:
                 app_name = self._get_sample_name()
                 try:
-                    trans_kwargs = self._build_sample(app_name, status, status_descr, msg, headers, response, response_headers)
+                    # get queue length
+                    qlen, _ = self.channel.get_stats()
+                    qlen += self.channel._recv_queue.qsize()      # add delivered but unproc'd msgs, @TODO correct?
+
+                    trans_kwargs = self._build_sample(app_name, status, status_descr, msg, headers, response, response_headers, qlen)
                     sm.transaction(**trans_kwargs)
                 except Exception:
                     log.exception("Could not sample, ignoring")
@@ -1178,7 +1182,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         return None
 
-    def _build_sample(self, name, status, status_descr, msg, headers, response, response_headers):
+    def _build_sample(self, name, status, status_descr, msg, headers, response, response_headers, qlen):
         """
         Builds a transaction sample.
 
@@ -1187,7 +1191,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # build args to pass to transaction
         #extra_attrs = {'conv-id': headers.get('conv-id', ''),
         #               'service': response_headers.get('sender-service', '')}
-        extra_attrs = {}
+        extra_attrs = {'ql': qlen}      # queue length (both on server + delivered to this process)
 
         # Message Latency
         # Defined as difference between message sent timestamp and message received timestamp.
