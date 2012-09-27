@@ -56,7 +56,7 @@ setup(  name = 'pyon',
             'greenlet==0.4.0',
             # Don't put == version on gevent
             'gevent',
-            'simplejson',
+            'simplejson==2.1.6',
             'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
             'pika==0.9.5patch3',
@@ -71,13 +71,14 @@ setup(  name = 'pyon',
             # Don't put == version on coverage.
             'coverage',
             'nose==1.1.2',
-            'ipython',
+            'ipython==0.11',
             'readline==6.2.1',
             'mock==0.8',
             'ndg-xacml==0.5.1',
+            'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
             'python-gevent-profiler',
             'lxml==2.3.4', # Fails to compile on Linux ??!??
-            'requests',
+            'requests==0.13.5',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',
