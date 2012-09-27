@@ -1,3 +1,6 @@
 [submodule "extern/ion-definitions"]
 	path = extern/ion-definitions
 	url = https://github.com/ooici/ion-definitions.git
+[submodule "extern/utilities"]
+	path = extern/utilities
+	url = https://github.com/ooici/utilities.git
