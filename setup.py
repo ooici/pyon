@@ -47,10 +47,12 @@ setup(  name = 'pyon',
             'http://sddevrepo.oceanobservatories.org/releases/',
             'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler',
             'https://github.com/ooici/pika/tarball/v0.9.5patch3#egg=pika-0.9.5patch3',
+            'https://github.com/ooici/utilities/tarball/master#egg=coverage-model',
         ],
         test_suite = 'pyon',
         package_data = {'': ['*.xml']},
         install_requires = [
+            'utilities',
             'greenlet==0.4.0',
             # Don't put == version on gevent
             'gevent',
