@@ -100,8 +100,8 @@ class ExchangeManager(object):
             try:
                 cfg_params = CFG.server[cfgkey]
 
-                if cfg_params['type'] == 'zeromq':
-                    node, ioloop = messaging.make_zmq_node(0, self.container.zmq_router)
+                if cfg_params['type'] == 'local':
+                    node, ioloop = messaging.make_local_node(0, self.container.local_router)
                 else:
                     node, ioloop = messaging.make_node(cfg_params, name, 0)
 

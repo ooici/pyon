@@ -17,9 +17,8 @@ from pyon.util.async import blocking_cb
 from pyon.util.containers import for_name
 from pyon.util.log import log
 from pyon.util.pool import IDPool
-from pyon.net.transport import ZeroMQTransport, ZeroMQRouter, AMQPTransport, ComposableTransport
+from pyon.net.transport import LocalTransport, LocalRouter, AMQPTransport, ComposableTransport
 
-from gevent_zeromq import zmq
 from collections import defaultdict
 
 class BaseNode(object):
@@ -325,32 +324,31 @@ def make_node(connection_params=None, name=None, timeout=None):
 
 
 
-class ZeroMQNode(BaseNode):
-    def __init__(self, context, router=None):
+class LocalNode(BaseNode):
+    def __init__(self, router=None):
         BaseNode.__init__(self)
-        self._context = context
 
         self._own_router = True
         if router is not None:
-            self._zmq_router = router
+            self._local_router = router
             self._own_router = False
         else:
-            self._zmq_router = ZeroMQRouter(self._context, get_sys_name())
+            self._local_router = LocalRouter(get_sys_name())
         self._channel_id_pool = IDPool()
 
     def start_node(self):
         BaseNode.start_node(self)
         if self._own_router:
-            self._zmq_router.start()
+            self._local_router.start()
 
     def stop_node(self):
         if self.running:
             if self._own_router:
-                self._zmq_router.stop()
+                self._local_router.stop()
         self.running = False
 
     def _new_transport(self, ch_number=None):
-        trans = ZeroMQTransport(self._zmq_router, self._context, ch_number)
+        trans = LocalTransport(self._local_router, ch_number)
         return trans
 
     def channel(self, ch_type, transport=None):
@@ -364,22 +362,21 @@ class ZeroMQNode(BaseNode):
         log.debug("ZeroMQNode._on_channel_close (%s)", ch.channel_number)
         self._channel_id_pool.release_id(ch.channel_number)
 
-class ZeroMQClient(object):
+class LocalClient(object):
     def __init__(self):
         pass
 
     def add_on_close_callback(self, cb):
         log.debug("ignoring close callback")
 
-def make_zmq_node(timeout=None, router=None):
+def make_local_node(timeout=None, router=None):
 
     if router is not None:
-        node = ZeroMQNode(router._context, router=router)
+        node = LocalNode(router=router)
     else:
-        zc = zmq.Context(1)
-        node = ZeroMQNode(zc)
-    node.on_connection_open(ZeroMQClient())
+        node = LocalNode()
+    node.on_connection_open(LocalClient())
     node.ready.wait(timeout=timeout)
 
-    return node, node._zmq_router.gl_ioloop
+    return node, node._local_router.gl_ioloop
 

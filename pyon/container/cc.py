@@ -17,7 +17,7 @@ from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
 from pyon.ion.endpoint import ProcessRPCServer
-from pyon.net.transport import ZeroMQRouter
+from pyon.net.transport import LocalRouter
 from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
@@ -32,7 +32,6 @@ import os
 import signal
 import traceback
 from contextlib import contextmanager
-from gevent_zeromq import zmq
 
 class Container(BaseContainerAgent):
     """
@@ -76,8 +75,8 @@ class Container(BaseContainerAgent):
         # Instantiate Directory
         self.directory = Directory()
 
-        # ZeroMQ internal router/context for zmq
-        self.zmq_router = None
+        # internal router
+        self.local_router = None
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -158,12 +157,11 @@ class Container(BaseContainerAgent):
         self.state_repository = StateRepository()
         self._capabilities.append("STATE_REPOSITORY")
 
-        # ZeroMQ internal router/context for zmq
-        zc = zmq.Context(1)
-        self.zmq_router = ZeroMQRouter(zc, bootstrap.get_sys_name())
-        self.zmq_router.start()
-        self.zmq_router.ready.wait(timeout=2)
-        self._capabilities.append("ZMQ_ROUTER")
+        # internal router for local transports
+        self.local_router = LocalRouter(bootstrap.get_sys_name())
+        self.local_router.start()
+        self.local_router.ready.wait(timeout=2)
+        self._capabilities.append("LOCAL_ROUTER")
 
         # Start ExchangeManager, which starts the node (broker connection)
         self.ex_manager.start()
@@ -330,14 +328,14 @@ class Container(BaseContainerAgent):
         elif capability == "EXCHANGE_MANAGER":
             self.ex_manager.stop()
 
-        elif capability == "ZMQ_ROUTER":
-            if self.zmq_router is not None:
-                self.zmq_router.stop()
-                self.zmq_router._context.destroy()
+        elif capability == "LOCAL_ROUTER":
+            if self.local_router is not None:
+                self.local_router.stop()
 
         elif capability == "EVENT_REPOSITORY":
             # close event repository (possible CouchDB connection)
             self.event_repository.close()
+            self.event_pub.close()
 
         elif capability == "STATE_REPOSITORY":
             # close state repository (possible CouchDB connection)

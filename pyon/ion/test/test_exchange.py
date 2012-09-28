@@ -611,7 +611,7 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 class TestExchangeObjectsIntWithZeroMQ(TestExchangeObjectsInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
-                                                              'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+                                                              'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
 
 @attr('INT', group='exchange')
