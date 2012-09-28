@@ -14,13 +14,12 @@ from pyon.util.log import log
 from pyon.util.containers import DotDict
 from gevent.event import AsyncResult, Event
 from gevent.queue import Queue
-from gevent import coros
+from gevent import coros, sleep
 from gevent.timeout import Timeout
 from gevent.pool import Pool
 from contextlib import contextmanager
 import os
 from pika import BasicProperties
-import time
 
 class TransportError(StandardError):
     pass
@@ -413,7 +412,7 @@ class AMQPTransport(BaseTransport):
                 log.debug("stop_consume_impl waiting for ctag to be removed from consumers, attempts rem: %s", attempts)
 
             attempts -= 1
-            time.sleep(1)
+            sleep(1)
 
         if consumer_tag in self._client._consumers:
             raise TransportError("stop_consume_impl did not complete in the expected amount of time, transport may be compromised")
@@ -729,10 +728,7 @@ class ZeroMQRouter(object):
         """
         Starts all internal greenlets of this router device.
         """
-        self._sub = self._context.socket(zmq.SUB)
-        self._sub.bind(self._connect_addr)
-        self._sub.setsockopt(zmq.SUBSCRIBE, '')
-
+        self._queue_incoming = Queue()
         self._gl_msgs = self._gl_pool.spawn(self._run_gl_msgs)
         self._gl_msgs.link_exception(self._child_failed)
 
@@ -745,10 +741,8 @@ class ZeroMQRouter(object):
     def _run_gl_msgs(self):
         self.ready.set()
         while True:
-            [ex, rkey, body, serprops] = self._sub.recv_multipart()
+            ex, rkey, body, props = self._queue_incoming.get()
             try:
-                props = msgpack.unpackb(serprops)
-
                 with self._lock_declarables:
                     self._route(ex, rkey, body, props)
             except Exception as e:
@@ -790,6 +784,10 @@ class ZeroMQRouter(object):
         Fits with the AMQP node.
         """
         self._gl_pool.join()
+
+    def publish(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        self._queue_incoming.put((exchange, routing_key, body, properties))
+        sleep(0.0001)      # really wish switch would work instead of a sleep, seems wrong
 
     def declare_exchange(self, exchange, **kwargs):
         with self._lock_declarables:
@@ -988,8 +986,7 @@ class ZeroMQTransport(BaseTransport):
         self._context = context
         self._ch_number = ch_number
 
-        self._pub = self._context.socket(zmq.PUB)
-        self._pub.connect(self._broker._connect_addr)
+        self._active = True
 
         self._close_callbacks = []
 
@@ -1009,10 +1006,7 @@ class ZeroMQTransport(BaseTransport):
         self._broker.unbind(exchange, queue, binding)
 
     def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
-        # properties is a dictionary, must serialize to send over zeromq
-        propser = msgpack.packb(properties)
-        self._pub.send_multipart([exchange, routing_key, body, propser])
-        time.sleep(0.001)
+        self._broker.publish(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
 
     def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
@@ -1025,8 +1019,8 @@ class ZeroMQTransport(BaseTransport):
         self._broker.reject(delivery_tag, requeue=requeue)
 
     def close(self):
-        self._pub.close()
         self._broker.transport_close(self)
+        self._active = False
 
         for cb in self._close_callbacks:
             cb(self, 200, "Closed ok")         # @TODO should come elsewhere
@@ -1036,7 +1030,7 @@ class ZeroMQTransport(BaseTransport):
 
     @property
     def active(self):
-        return not self._pub.closed
+        return self._active
 
     @property
     def channel_number(self):
@@ -1050,3 +1044,4 @@ class ZeroMQTransport(BaseTransport):
 
     def purge_impl(self, queue):
         return self._broker.purge(queue)
+
