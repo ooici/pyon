@@ -117,9 +117,6 @@ class TestZeroMQRouter(PyonTestCase):
         self.zr.start()
         self.addCleanup(self.zr.stop)
 
-        self.pub = self.zc.socket(zmq.PUB)
-        self.pub.connect(self.zr._connect_addr)
-
         # make a hook so we can tell when a message gets routed
         self.ev = Event()
         def new_route(*args, **kwargs):
@@ -130,7 +127,7 @@ class TestZeroMQRouter(PyonTestCase):
 
     def test_publish_to_unknown_exchange(self):
         self.assertEquals(len(self.zr.errors), 0)
-        self.pub.send_multipart(['ex', 'rkey', 'body', 'props'])
+        self.zr.publish('ex', 'rkey', 'body', 'props')
         self.ev.wait(timeout=10)
         self.assertEquals(len(self.zr.errors), 1)
 
@@ -139,7 +136,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.zr.declare_exchange('known')
 
         # send message
-        self.pub.send_multipart(['known', 'rkey', 'body', 'props'])
+        self.zr.publish('known', 'rkey', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -155,7 +152,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.assertEquals(self.zr._queues['iamqueue'].qsize(), 0)
 
         # send message
-        self.pub.send_multipart(['known', 'binzim', 'body', 'props'])
+        self.zr.publish('known', 'binzim', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -177,7 +174,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.zr.bind('known', 'q3', '*.b')
 
         # send message
-        self.pub.send_multipart(['known', 'a.b', 'body', 'props'])
+        self.zr.publish('known', 'a.b', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -198,7 +195,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.assertEquals(self.zr._queues['iamqueue'].qsize(), 0)
 
         # send message
-        self.pub.send_multipart(['known', 'a.b', 'body', 'props'])
+        self.zr.publish('known', 'a.b', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -215,7 +212,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.assertEquals(self.zr._queues['ein'].qsize(), 0)
 
         # send message
-        self.pub.send_multipart(['known', 'ein', 'body', 'props'])
+        self.zr.publish('known', 'ein', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -228,7 +225,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.zr.bind('known', 'ein', 'ein')
 
         # send message
-        self.pub.send_multipart(['known', 'ein', 'body', 'props'])
+        self.zr.publish('known', 'ein', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -238,7 +235,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.assertEquals(self.zr._queues['ein'].qsize(), 1)
 
         # send again
-        self.pub.send_multipart(['known', 'ein', 'body', 'props'])
+        self.zr.publish('known', 'ein', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
@@ -251,7 +248,7 @@ class TestZeroMQRouter(PyonTestCase):
         self.zr.unbind('known', 'ein', 'ein')
 
         # send again
-        self.pub.send_multipart(['known', 'ein', 'body', 'props'])
+        self.zr.publish('known', 'ein', 'body', 'props')
 
         # wait for route
         self.ev.wait(timeout=10)
