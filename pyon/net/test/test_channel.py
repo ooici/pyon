@@ -1033,6 +1033,6 @@ class TestChannelInt(IonIntegrationTestCase):
 @attr('INT')
 class TestChannelIntZeroMQ(TestChannelInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'zmq', 'priviledged':None}}}})
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
 

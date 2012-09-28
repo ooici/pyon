@@ -14,13 +14,16 @@ from pyon.util.log import log
 from pyon.util.containers import DotDict
 from gevent.event import AsyncResult, Event
 from gevent.queue import Queue
-from gevent import coros
+from gevent import coros, sleep
 from gevent.timeout import Timeout
 from gevent.pool import Pool
 from contextlib import contextmanager
 import os
 from pika import BasicProperties
-import time
+from pyon.util.async import spawn
+from pyon.util.pool import IDPool
+from uuid import uuid4
+from collections import defaultdict
 
 
 class TransportError(StandardError):
@@ -110,21 +113,21 @@ class ComposableTransport(BaseTransport):
 
     def __init__(self, left, right, *methods):
         self._transports = [left]
-        self._methods = {'declare_exchange_impl': left.declare_exchange_impl,
-                         'delete_exchange_impl' : left.delete_exchange_impl,
-                         'declare_queue_impl'   : left.declare_queue_impl,
-                         'delete_queue_impl'    : left.delete_queue_impl,
-                         'bind_impl'            : left.bind_impl,
-                         'unbind_impl'          : left.unbind_impl,
-                         'ack_impl'             : left.ack_impl,
-                         'reject_impl'          : left.reject_impl,
-                         'start_consume_impl'   : left.start_consume_impl,
-                         'stop_consume_impl'    : left.stop_consume_impl,
-                         'setup_listener'       : left.setup_listener,
-                         'get_stats_impl'       : left.get_stats_impl,
-                         'purge_impl'           : left.purge_impl,
-                         'qos_impl'             : left.qos_impl,
-                         'publish_impl'         : left.publish_impl, }
+        self._methods = { 'declare_exchange_impl': left.declare_exchange_impl,
+                          'delete_exchange_impl' : left.delete_exchange_impl,
+                          'declare_queue_impl'   : left.declare_queue_impl,
+                          'delete_queue_impl'    : left.delete_queue_impl,
+                          'bind_impl'            : left.bind_impl,
+                          'unbind_impl'          : left.unbind_impl,
+                          'ack_impl'             : left.ack_impl,
+                          'reject_impl'          : left.reject_impl,
+                          'start_consume_impl'   : left.start_consume_impl,
+                          'stop_consume_impl'    : left.stop_consume_impl,
+                          'setup_listener'       : left.setup_listener,
+                          'get_stats_impl'       : left.get_stats_impl,
+                          'purge_impl'           : left.purge_impl,
+                          'qos_impl'             : left.qos_impl,
+                          'publish_impl'         : left.publish_impl, }
 
         if right is not None:
             self.overlay(right, *methods)
@@ -294,8 +297,7 @@ class AMQPTransport(BaseTransport):
 
         def cb(*args, **kwargs):
             ret = list(args)
-            if len(kwargs):
-                ret.append(kwargs)
+            if len(kwargs): ret.append(kwargs)
             ar.set(ret)
 
         eb = lambda ch, *args: ar.set(TransportError("_sync_call could not complete due to an error (%s)" % args))
@@ -421,7 +423,7 @@ class AMQPTransport(BaseTransport):
                 log.debug("stop_consume_impl waiting for ctag to be removed from consumers, attempts rem: %s", attempts)
 
             attempts -= 1
-            time.sleep(1)
+            sleep(1)
 
         if consumer_tag in self._client._consumers:
             raise TransportError("stop_consume_impl did not complete in the expected amount of time, transport may be compromised")
@@ -493,9 +495,9 @@ class NameTrio(object):
         elif isinstance(queue, tuple):
             self._exchange, self._queue, self._binding = list(queue) + ([None] * (3 - len(queue)))
         else:
-            self._exchange = exchange
-            self._queue = queue
-            self._binding = binding
+            self._exchange  = exchange
+            self._queue     = queue
+            self._binding   = binding
 
     @property
     def exchange(self):
@@ -513,56 +515,11 @@ class NameTrio(object):
         return "NP (%s,%s,B: %s)" % (self.exchange, self.queue, self.binding)
 
 
-class LocalBroker(object):
-
-    def __init__(self):
-        self._exchanges = {}
-        self._queues = {}
-        self._binds = []        # list of tuples: exchange, queue, routing_key, who to call
-
-        self._lock = coros.RLock()
-
-    def incoming(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
-
-        def binding_key_matches(bkey, rkey):
-            return bkey == rkey   # @TODO expand obv
-
-        # find all matching calls
-        matching_binds = [x for x in self._binds if x[0] == exchange and binding_key_matches(x[2], routing_key)]
-
-        # make calls
-        for bind in matching_binds:
-            try:
-                method_frame = DotDict()
-                header_frame = DotDict()
-                bind[3](self, method_frame, header_frame, body)
-            except Exception:
-                log.exception("Error in local message routing, continuing")
-
-        return True
-
-    def declare_exchange(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        if exchange in self._exchanges:
-            exrec = self._exchanges[exchange]
-
-            assert exrec['type'] == exchange_type and exrec['durable'] == durable and exrec['auto_delete'] == auto_delete
-
-        else:
-            assert exchange_type == 'topic', "Topic only supported"
-
-            self._exchanges[exchange] = {'exchange': exchange,
-                                         'type': exchange_type,
-                                         'durable': durable,
-                                         'auto_delete': auto_delete}
-
-        return True
-
-
 class TopicTrie(object):
     """
-    Support class for building a zeromq device to do amqp-like pattern matching.
+    Support class for building a routing device to do amqp-like pattern matching.
 
-    Used for events/pubsub in our system with the zeromq transport. Efficiently stores all registered
+    Used for events/pubsub in our system with the local transport. Efficiently stores all registered
     subscription topic trees in a trie structure, handling wildcards * and #.
 
     See:
@@ -683,19 +640,12 @@ class TopicTrie(object):
         topics = topic_tree.split(".")
         return set(self.root.get_all_matches(topics))
 
-from gevent_zeromq import zmq
-from pyon.util.async import spawn
-from pyon.util.pool import IDPool
-from uuid import uuid4
-from collections import defaultdict
-import msgpack
-
-
-class ZeroMQRouter(object):
+class LocalRouter(object):
     """
-    A RabbitMQ-like routing device implemented with ZeroMQ.
+    A RabbitMQ-like routing device implemented with gevent mechanisms for an in-memory broker.
 
-    Using ZeroMQTransport, can handle topic-exchange-like communication in ION.
+    Using LocalTransport, can handle topic-exchange-like communication in ION within the context
+    of a single container.
     """
 
     class ConsumerClosedMessage(object):
@@ -704,8 +654,7 @@ class ZeroMQRouter(object):
         """
         pass
 
-    def __init__(self, context, sysname):
-        self._context = context
+    def __init__(self, sysname):
         self._sysname = sysname
         self.ready = Event()
 
@@ -739,10 +688,7 @@ class ZeroMQRouter(object):
         """
         Starts all internal greenlets of this router device.
         """
-        self._sub = self._context.socket(zmq.SUB)
-        self._sub.bind(self._connect_addr)
-        self._sub.setsockopt(zmq.SUBSCRIBE, '')
-
+        self._queue_incoming = Queue()
         self._gl_msgs = self._gl_pool.spawn(self._run_gl_msgs)
         self._gl_msgs.link_exception(self._child_failed)
 
@@ -755,10 +701,8 @@ class ZeroMQRouter(object):
     def _run_gl_msgs(self):
         self.ready.set()
         while True:
-            [ex, rkey, body, serprops] = self._sub.recv_multipart()
+            ex, rkey, body, props = self._queue_incoming.get()
             try:
-                props = msgpack.unpackb(serprops)
-
                 with self._lock_declarables:
                     self._route(ex, rkey, body, props)
             except Exception as e:
@@ -800,6 +744,10 @@ class ZeroMQRouter(object):
         Fits with the AMQP node.
         """
         self._gl_pool.join()
+
+    def publish(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+        self._queue_incoming.put((exchange, routing_key, body, properties))
+        sleep(0.0001)      # really wish switch would work instead of a sleep, seems wrong
 
     def declare_exchange(self, exchange, **kwargs):
         with self._lock_declarables:
@@ -962,7 +910,7 @@ class ZeroMQRouter(object):
                 self._queues[queue].put(m)
 
     def transport_close(self, transport):
-        log.warn("ZeroMQRouter.transport_close: %s TODO", transport)
+        log.warn("LocalRouter.transport_close: %s TODO", transport)
         # @TODO reject all messages in unacked spot
 
         # turn off any consumers from this transport
@@ -992,15 +940,12 @@ class ZeroMQRouter(object):
             while not self._queues[queue].empty():
                 self._queues[queue].get_nowait()
 
-
-class ZeroMQTransport(BaseTransport):
-    def __init__(self, broker, context, ch_number):
+class LocalTransport(BaseTransport):
+    def __init__(self, broker, ch_number):
         self._broker = broker
-        self._context = context
         self._ch_number = ch_number
 
-        self._pub = self._context.socket(zmq.PUB)
-        self._pub.connect(self._broker._connect_addr)
+        self._active = True
 
         self._close_callbacks = []
 
@@ -1023,10 +968,7 @@ class ZeroMQTransport(BaseTransport):
         self._broker.unbind(exchange, queue, binding)
 
     def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
-        # properties is a dictionary, must serialize to send over zeromq
-        propser = msgpack.packb(properties)
-        self._pub.send_multipart([exchange, routing_key, body, propser])
-        time.sleep(0.001)
+        self._broker.publish(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
 
     def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
@@ -1041,8 +983,8 @@ class ZeroMQTransport(BaseTransport):
         self._broker.reject(delivery_tag, requeue=requeue)
 
     def close(self):
-        self._pub.close()
         self._broker.transport_close(self)
+        self._active = False
 
         for cb in self._close_callbacks:
             cb(self, 200, "Closed ok")         # @TODO should come elsewhere
@@ -1052,7 +994,7 @@ class ZeroMQTransport(BaseTransport):
 
     @property
     def active(self):
-        return not self._pub.closed
+        return self._active
 
     @property
     def channel_number(self):
@@ -1066,3 +1008,4 @@ class ZeroMQTransport(BaseTransport):
 
     def purge_impl(self, queue):
         return self._broker.purge(queue)
+

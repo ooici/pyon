@@ -13,6 +13,7 @@ from pyon.util.log import log
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 
+import gevent
 import requests
 import json
 import time
@@ -101,8 +102,8 @@ class ExchangeManager(object):
             try:
                 cfg_params = CFG.server[cfgkey]
 
-                if cfg_params['type'] == 'zeromq':
-                    node, ioloop = messaging.make_zmq_node(0, self.container.zmq_router)
+                if cfg_params['type'] == 'local':
+                    node, ioloop = messaging.make_local_node(0, self.container.local_router)
                 else:
                     node, ioloop = messaging.make_node(cfg_params, name, 0)
 
@@ -713,7 +714,8 @@ class ExchangeManager(object):
                 username = CFG.get_safe("container.exchange.management.username", "guest")
                 password = CFG.get_safe("container.exchange.management.password", "guest")
 
-                r = meth(url, auth=(username, password))
+                with gevent.timeout.Timeout(10):
+                    r = meth(url, auth=(username, password))
                 r.raise_for_status()
 
                 if not r.content == "":
@@ -721,6 +723,8 @@ class ExchangeManager(object):
                 else:
                     content = None
 
+            except gevent.timeout.Timeout as ex:
+                raise Timeout(str(ex))
             except requests.exceptions.Timeout as ex:
                 raise Timeout(str(ex))
             except (requests.exceptions.ConnectionError, socket.error) as ex:

@@ -17,11 +17,9 @@ from pyon.util.async import blocking_cb
 from pyon.util.containers import for_name
 from pyon.util.log import log
 from pyon.util.pool import IDPool
-from pyon.net.transport import ZeroMQTransport, ZeroMQRouter, AMQPTransport, ComposableTransport
+from pyon.net.transport import LocalTransport, LocalRouter, AMQPTransport, ComposableTransport
 
-from gevent_zeromq import zmq
 from collections import defaultdict
-
 
 class BaseNode(object):
     """
@@ -117,8 +115,8 @@ class BaseNode(object):
                     interceptor_def = defs[name]
 
                     # Instantiate and put in by_name array
-                    modpath, classname = interceptor_def['class'].rsplit('.', 1)
-                    classinst = for_name(modpath, classname)
+                    modpath, classname  = interceptor_def['class'].rsplit('.', 1)
+                    classinst           = for_name(modpath, classname)
 
                     # Call configure
                     classinst.configure(config = interceptor_def["config"] if "config" in interceptor_def else None)
@@ -129,7 +127,6 @@ class BaseNode(object):
                 interceptors[type_and_direction].append(classinst)
 
         self.interceptors = dict(interceptors)
-
 
 class NodeB(BaseNode):
     """
@@ -236,7 +233,6 @@ class NodeB(BaseNode):
                 self._bidir_pool.pop(chid)
                 self._pool._ids_free.remove(chid)
 
-
 def ioloop(connection, name=None):
     # Loop until CTRL-C
     if name:
@@ -259,7 +255,6 @@ def ioloop(connection, name=None):
 
         # Loop until the connection is closed
         connection.ioloop.start()
-
 
 class PyonSelectConnection(SelectConnection):
     """
@@ -286,7 +281,7 @@ class PyonSelectConnection(SelectConnection):
         limit = self.parameters.channel_max or pikachannel.MAX_CHANNELS
 
         # generate a set of available channels
-        available = set(xrange(1, limit + 1))
+        available = set(xrange(1, limit+1))
 
         # subtract out existing channels
         available.difference_update(self._channels.keys())
@@ -309,7 +304,6 @@ class PyonSelectConnection(SelectConnection):
         log.debug("Marking %d as a bad channel", ch_number)
         self._bad_channel_numbers.add(ch_number)
 
-
 def make_node(connection_params=None, name=None, timeout=None):
     """
     Blocking construction and connection of node.
@@ -321,7 +315,7 @@ def make_node(connection_params=None, name=None, timeout=None):
     connection_params = connection_params or CFG.server.amqp
     credentials = PlainCredentials(connection_params["username"], connection_params["password"])
     conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
-    connection = PyonSelectConnection(conn_parameters, node.on_connection_open)
+    connection = PyonSelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection, name=name)
     #ioloop_process = gevent.spawn(connection.ioloop.start)
     node.ready.wait(timeout=timeout)
@@ -329,32 +323,32 @@ def make_node(connection_params=None, name=None, timeout=None):
     #return node, ioloop, connection
 
 
-class ZeroMQNode(BaseNode):
-    def __init__(self, context, router=None):
+
+class LocalNode(BaseNode):
+    def __init__(self, router=None):
         BaseNode.__init__(self)
-        self._context = context
 
         self._own_router = True
         if router is not None:
-            self._zmq_router = router
+            self._local_router = router
             self._own_router = False
         else:
-            self._zmq_router = ZeroMQRouter(self._context, get_sys_name())
+            self._local_router = LocalRouter(get_sys_name())
         self._channel_id_pool = IDPool()
 
     def start_node(self):
         BaseNode.start_node(self)
         if self._own_router:
-            self._zmq_router.start()
+            self._local_router.start()
 
     def stop_node(self):
         if self.running:
             if self._own_router:
-                self._zmq_router.stop()
+                self._local_router.stop()
         self.running = False
 
     def _new_transport(self, ch_number=None):
-        trans = ZeroMQTransport(self._zmq_router, self._context, ch_number)
+        trans = LocalTransport(self._local_router, ch_number)
         return trans
 
     def channel(self, ch_type, transport=None):
@@ -368,23 +362,21 @@ class ZeroMQNode(BaseNode):
         log.debug("ZeroMQNode._on_channel_close (%s)", ch.channel_number)
         self._channel_id_pool.release_id(ch.channel_number)
 
-
-class ZeroMQClient(object):
+class LocalClient(object):
     def __init__(self):
         pass
 
     def add_on_close_callback(self, cb):
         log.debug("ignoring close callback")
 
-
-def make_zmq_node(timeout=None, router=None):
+def make_local_node(timeout=None, router=None):
 
     if router is not None:
-        node = ZeroMQNode(router._context, router=router)
+        node = LocalNode(router=router)
     else:
-        zc = zmq.Context(1)
-        node = ZeroMQNode(zc)
-    node.on_connection_open(ZeroMQClient())
+        node = LocalNode()
+    node.on_connection_open(LocalClient())
     node.ready.wait(timeout=timeout)
 
-    return node, node._zmq_router.gl_ioloop
+    return node, node._local_router.gl_ioloop
+
