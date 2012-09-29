@@ -502,7 +502,7 @@ class ServiceObjectGenerator:
 
             # Load interface base classes
             self.load_mods("interface/services", True)
-            self.find_subtypes(BaseService)
+            base_subtypes = self.find_subtypes(BaseService)
             # Load impl classes
             self.load_mods("ion", False)
 

@@ -43,10 +43,10 @@ class Container(BaseContainerAgent):
 
     # Singleton static variables
     #node        = None
-    id = None
-    name = None
-    pidfile = None
-    instance = None
+    id          = None
+    name        = None
+    pidfile     = None
+    instance    = None
 
     def __init__(self, *args, **kwargs):
         BaseContainerAgent.__init__(self, *args, **kwargs)
@@ -196,8 +196,8 @@ class Container(BaseContainerAgent):
                                      sub_type="START",
                                      state=ContainerStateEnum.START)
 
-        self._is_started = True
-        self._status = "RUNNING"
+        self._is_started    = True
+        self._status        = "RUNNING"
 
         log.info("Container started, OK.")
 
@@ -247,7 +247,7 @@ class Container(BaseContainerAgent):
                 # This just waits in this Greenlet for all child processes to complete,
                 # which is triggered somewhere else.
                 self.proc_manager.proc_sup.join_children()
-            except (KeyboardInterrupt, SystemExit):
+            except (KeyboardInterrupt, SystemExit) as ex:
                 log.info('Received a kill signal, shutting down the container.')
                 watch_parent = CFG.system.get('watch_parent', None)
                 if watch_parent:
@@ -288,7 +288,7 @@ class Container(BaseContainerAgent):
             log.debug("stop(): Stopping '%s'" % capability)
             try:
                 self._stop_capability(capability)
-            except Exception:
+            except Exception as ex:
                 log.exception("Container stop(): Error stop %s" % capability)
 
         Container.instance = None

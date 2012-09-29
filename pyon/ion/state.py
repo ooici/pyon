@@ -41,7 +41,7 @@ class StateRepository(object):
             state_obj.state = state
             state_obj.ts = get_ion_ts()
             self.state_store.update(state_obj)
-        except NotFound:
+        except NotFound as nf:
             state_obj = ProcessState(state=state, ts=get_ion_ts())
             self.state_store.create(state_obj, object_id=key)
 

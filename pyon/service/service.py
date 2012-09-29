@@ -34,13 +34,13 @@ class BaseService(LocalContextMixin):
     process_type = "service"
 
     def __init__(self, *args, **kwargs):
-        self.id = None
+        self.id         = None
         self._proc_name = None
         self._proc_type = None
-        self.errcause = None
-        self.container = None
-        self.CFG = None
-        self._process = None      # reference to IonProcess, internal
+        self.errcause   = None
+        self.container  = None
+        self.CFG        = None
+        self._process   = None      # reference to IonProcess, internal
         super(BaseService, self).__init__()
 
     def init(self):
@@ -231,7 +231,7 @@ class IonServiceRegistry(object):
                         self.add_servicedef_entry(cls.name, "client", named_any(client))
                         sclient = "%s.%sClient" % (cls.__module__, cls.__name__[4:])
                         self.add_servicedef_entry(cls.name, "simple_client", named_any(sclient))
-                    except Exception:
+                    except Exception, ex:
                         log.warning("Cannot find client for service %s" % (cls.name))
 
     def discover_service_classes(self):

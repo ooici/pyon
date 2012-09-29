@@ -400,8 +400,8 @@ class IonObjectDeserializer(IonObjectSerializationBase):
     def _transform(self, obj):
         # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict) and "type_" in obj:
-            objc = obj.copy()
-            type = objc['type_'].encode('ascii')
+            objc    = obj.copy()
+            type    = objc['type_'].encode('ascii')
 
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
@@ -420,8 +420,8 @@ class IonObjectBlameDeserializer(IonObjectDeserializer):
     def _transform(self, obj):
 
         def handle_ion_obj(in_obj):
-            objc = in_obj.copy()
-            type = objc['type_'].encode('ascii')
+            objc    = in_obj.copy()
+            type    = objc['type_'].encode('ascii')
 
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.

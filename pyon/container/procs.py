@@ -131,7 +131,7 @@ class ProcManager(object):
         service_cls = named_any("%s.%s" % (module, cls))
         process_type = get_safe(process_cfg, "process.type") or getattr(service_cls, "process_type", "service")
 
-        get_safe(config, "process.start_mode")
+        process_start_mode = get_safe(config, "process.start_mode")
 
         service_instance = None
         try:
@@ -557,8 +557,8 @@ class ProcManager(object):
             assert client, "Client for dependency not found: %s" % dependency
 
             # @TODO: should be in a start_client in RPCClient chain
-            client.process = service_instance
-            client.node = self.container.node
+            client.process  = service_instance
+            client.node     = self.container.node
 
             # ensure that dep actually exists and is running
             # MM: commented out - during startup (init actually), we don't need to check for service dependencies

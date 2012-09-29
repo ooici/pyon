@@ -72,7 +72,7 @@ class Pool(object):
         self._close = op
         if interrupt:
             # make copy so checkins won't update list while iterating
-            for o in [o for o in self._used]:
+            for o in [ o for o in self._used ]:
                 try:
                     op(o)
                 except:

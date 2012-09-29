@@ -4,9 +4,9 @@ from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
 import numpy as np
 
-numpy_floats = (np.float, np.float16, np.float32, np.float64)
-numpy_ints = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.uint64)
-numpy_bool = (np.bool)
+numpy_floats  = (np.float, np.float16, np.float32, np.float64)
+numpy_ints    = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.uint32, np.uint64, np.uint64)
+numpy_bool    = (np.bool)
 numpy_complex = (np.complex, np.complex64, np.complex128)
 
 

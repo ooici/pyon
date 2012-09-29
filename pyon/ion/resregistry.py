@@ -199,7 +199,7 @@ class ResourceRegistry(object):
         res_obj.lcstate = target_lcstate
         res_obj.ts_updated = get_ion_ts()
 
-        self.rr_store.update(res_obj)
+        updres = self.rr_store.update(res_obj)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),

@@ -337,7 +337,7 @@ def shutdown_or_die(delay_sec=0):
 
             if old:
                 print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
-        except ValueError:
+        except ValueError, ex:
             print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
             pass
     else:

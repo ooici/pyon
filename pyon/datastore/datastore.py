@@ -286,7 +286,7 @@ class DatastoreManager(object):
         for x in self._datastores.itervalues():
             try:
                 x.close()
-            except Exception:
+            except Exception as ex:
                 log.exception("Error closing datastore")
 
         self._datastores = {}

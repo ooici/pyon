@@ -39,7 +39,7 @@ class AppManager(object):
             self.start_rel(rel, config)
             log.debug("AppManager.start_rel_from_url(rel_url=%s) done,  OK.", rel_url)
             return True
-        except ConfigNotFound:
+        except ConfigNotFound as cnf:
             log.warning("Could not find container deploy file '%s'", rel_url)
         except Exception as ex:
             log.exception("Could not start container deploy file '%s'", rel_url)
@@ -96,7 +96,7 @@ class AppManager(object):
             app = Config([app_url]).data
             self.start_app(appdef=app, config=config)
             return True
-        except ConfigNotFound:
+        except ConfigNotFound as cnf:
             log.warning("Could not find container app file '%s'" % app_url)
         except Exception as ex:
             log.exception("Could not start app file %s" % app_url)
@@ -153,5 +153,5 @@ class AppManager(object):
         try:
             if '_mod_loaded' in appdef:
                 appdef._mod_loaded.stop(self.container, appdef._state)
-        except Exception:
+        except Exception, ex:
             log.exception("Application %s stop failed" % appdef.name)

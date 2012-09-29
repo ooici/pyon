@@ -128,8 +128,7 @@ class EndpointUnit(object):
         @param  kwargs      Passed through to _send.
         """
         _msg, _header = self._build_msg(msg)
-        if headers:
-            _header.update(headers)
+        if headers: _header.update(headers)
         return self._send(_msg, _header, **kwargs)
 
     def _send(self, msg, headers=None, **kwargs):
@@ -469,7 +468,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
                 m = self.get_one_msg()
                 m.route()       # call default handler
 
-            except ChannelClosedError :
+            except ChannelClosedError as ex:
                 break
             finally:
                 # ChannelClosedError will go into here too, so make sure we have a message object to ack with
@@ -1127,7 +1126,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
         ######
         result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
-        response_headers    = {'status_code': 200, 'error_message': ''}
+        response_headers    = { 'status_code': 200, 'error_message': '' }
         ######
 
         return result, response_headers

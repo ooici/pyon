@@ -45,12 +45,13 @@ class ColoredFormatter(logging.Formatter):
             # background is set with 40 plus color, foreground with 30
             if self.COLORS[levelname] < 0:
                 # Compensate for off padding because of invisible escape sequences
-                record.levelname = self.NOOP_SEQ + record.levelname + self.RESET_SEQ
+                record.levelname    = self.NOOP_SEQ + record.levelname + self.RESET_SEQ
+
             else:
-                record.levelname = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.levelname + self.RESET_SEQ
+                record.levelname    = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.levelname + self.RESET_SEQ
                 if not isinstance(record.msg, str):
                     record.msg = str(record.msg)
-                record.msg = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.msg + self.RESET_SEQ
+                record.msg          = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.msg + self.RESET_SEQ
 
         return logging.Formatter.format(self, record)
 

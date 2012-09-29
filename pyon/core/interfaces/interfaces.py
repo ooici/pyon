@@ -178,11 +178,11 @@ class InterfaceAdmin:
     def _register_bulk(self):
         print "store_interfaces: Storing %s entries in directory..." % len(self.bulk_entries)
         entries = [(path, key, attrs) for ((path, key), attrs) in self.bulk_entries.iteritems()]
-        self.dir.register_mult(entries)
+        res = self.dir.register_mult(entries)
         self.bulk_entries = {}
 
         print "store_interfaces: Storing %s resources in registry..." % len(self.bulk_resources)
-        self.rr.create_mult(self.bulk_resources)
+        res = self.rr.create_mult(self.bulk_resources)
         self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"

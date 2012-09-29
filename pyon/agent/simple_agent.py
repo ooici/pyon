@@ -91,7 +91,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
                                 origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
                                 sub_type=sub_type, command=command, result=cmd_res)
         post_event = self._post_execute_event_hook(post_event)
-        self._event_publisher._publish_event(post_event, origin=post_event.origin)
+        success = self._event_publisher._publish_event(post_event, origin=post_event.origin)
 
         return cmd_res
 

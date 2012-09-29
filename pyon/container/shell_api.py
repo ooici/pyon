@@ -256,8 +256,7 @@ def get_proc():
 
 def define_vars():
     from pyon.core.bootstrap import CFG as cfg
-    if public_vars:
-        return public_vars
+    if public_vars: return public_vars
     cc = container
     proc, pn = get_proc()
     govc = cc.instance.governance_controller

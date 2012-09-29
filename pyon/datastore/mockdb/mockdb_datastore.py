@@ -25,8 +25,8 @@ class MockDB_DataStore(DataStore):
         self.root = {}
 
         # serializers
-        self._io_serializer = IonObjectSerializer()
-        self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
+        self._io_serializer     = IonObjectSerializer()
+        self._io_deserializer   = IonObjectDeserializer(obj_registry=get_obj_registry())
 
     def create_datastore(self, datastore_name="", create_indexes=True):
         if not datastore_name:
@@ -549,15 +549,13 @@ class MockDB_DataStore(DataStore):
         raise NotImplementedError()
 
     def _ion_object_to_persistence_dict(self, ion_object):
-        if ion_object is None:
-            return None
+        if ion_object is None: return None
 
         obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
-        if obj_dict is None:
-            return None
+        if obj_dict is None: return None
 
         ion_object = self._io_deserializer.deserialize(obj_dict)
         return ion_object

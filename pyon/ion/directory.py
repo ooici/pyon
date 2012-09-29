@@ -161,7 +161,7 @@ class Directory(object):
         """
         try:
             return self.register(parent, key, **kwargs)
-        except Exception:
+        except Exception as ex:
             log.exception("Error registering key=%s/%s, args=%s" % (parent, key, kwargs))
 
     def register_mult(self, entries):
@@ -199,7 +199,7 @@ class Directory(object):
     def unregister_safe(self, parent, key):
         try:
             return self.unregister(parent, key)
-        except Exception:
+        except Exception as ex:
             log.exception("Error unregistering key=%s/%s" % (parent, key))
 
     def find_child_entries(self, parent='/', direct_only=True, **kwargs):

@@ -108,12 +108,12 @@ class Repository(object):
 
     def _encode(self, arg, add_id=False):
         if isinstance(arg, list):
-            return [self._encode(o, add_id=add_id) for o in arg]
+            return [ self._encode(o, add_id=add_id) for o in arg ]
         return self._representation.encode(arg, add_id=add_id)
 
     def _decode(self, arg):
         if isinstance(arg, list):
-            return [self._decode(d) for d in arg]
+            return [ self._decode(d) for d in arg ]
         if isinstance(arg, tuple):
             return arg[0], arg[1], self._decode(arg[2])
         if isinstance(arg, Exception):

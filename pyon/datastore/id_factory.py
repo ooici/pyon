@@ -44,7 +44,7 @@ class SaltedTimeIDFactory(IDFactory):
         self._last_time = 0
 
     def _change_salt(self):
-        self._salt = [choice(self._CHARSET) for n in xrange(self._salt_chars)]
+        self._salt = [ choice(self._CHARSET) for n in xrange(self._salt_chars) ]
 
     def create_id(self):
 #        buffer = bytearray((self._salt_bits + 42)/8)

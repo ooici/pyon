@@ -856,10 +856,10 @@ class LocalRouter(object):
 
             # create method frame
             method_frame = DotDict()
-            method_frame['consumer_tag'] = ctag
-            method_frame['redelivered'] = False     # @TODO
-            method_frame['exchange'] = exchange
-            method_frame['routing_key'] = routing_key
+            method_frame['consumer_tag']    = ctag
+            method_frame['redelivered']     = False     # @TODO
+            method_frame['exchange']        = exchange
+            method_frame['routing_key']     = routing_key
 
             # create header frame
             header_frame = DotDict()

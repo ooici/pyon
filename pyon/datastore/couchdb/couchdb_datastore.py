@@ -78,9 +78,9 @@ class CouchDB_DataStore(DataStore):
         self.profile = profile
 
         # serializers
-        self._io_serializer = IonObjectSerializer()
+        self._io_serializer    = IonObjectSerializer()
         # TODO: Not nice to have this class depend on ION objects
-        self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
+        self._io_deserializer  = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
     def close(self):
@@ -875,15 +875,13 @@ class CouchDB_DataStore(DataStore):
         return res_rows
 
     def _ion_object_to_persistence_dict(self, ion_object):
-        if ion_object is None:
-            return None
+        if ion_object is None: return None
 
         obj_dict = self._io_serializer.serialize(ion_object)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
-        if obj_dict is None:
-            return None
+        if obj_dict is None: return None
 
         ion_object = self._io_deserializer.deserialize(obj_dict)
         return ion_object

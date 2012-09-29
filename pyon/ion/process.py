@@ -44,15 +44,15 @@ class IonProcessThread(PyonThread):
                                 notify_stop calls have run. Should take one param, this instance.
         """
         self._startup_listeners = listeners or []
-        self.listeners = []
-        self.name = name
-        self.service = service
-        self._cleanup_method = cleanup_method
+        self.listeners          = []
+        self.name               = name
+        self.service            = service
+        self._cleanup_method    = cleanup_method
 
-        self.thread_manager = ThreadManager(failure_notify_callback=self._child_failed)  # bubbles up to main thread manager
-        self._ctrl_queue = Queue()
-        self._ready_control = Event()
-        self._errors = []
+        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed)  # bubbles up to main thread manager
+        self._ctrl_queue        = Queue()
+        self._ready_control     = Event()
+        self._errors            = []
 
         # processing vs idle time (ms)
         self._start_time        = None

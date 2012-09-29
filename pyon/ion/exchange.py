@@ -59,11 +59,11 @@ class ExchangeManager(object):
         for call in self.container_api:
             setattr(self.container, call.__name__, call)
 
-        self.default_xs = None
-        self._xs_cache = {}              # caching of xs names to RR objects
-        self._default_xs_obj = None      # default XS registry object
-        self.org_id = None
-        self._default_xs_declared = False
+        self.default_xs             = None
+        self._xs_cache              = {}              # caching of xs names to RR objects
+        self._default_xs_obj        = None      # default XS registry object
+        self.org_id                 = None
+        self._default_xs_declared   = False
 
         # mappings
         self.xs_by_name = {}                    # friendly named XS to XSO
@@ -75,8 +75,8 @@ class ExchangeManager(object):
         self._rr_client = ResourceRegistryServiceProcessClient(process=self.container)
 
         # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
-        self._nodes = {}
-        self._ioloops = {}
+        self._nodes     = {}
+        self._ioloops   = {}
 
     def start(self):
         log.debug("ExchangeManager.start")
@@ -112,7 +112,7 @@ class ExchangeManager(object):
                 ioloop.link(fail_handle)
 
                 # wait for the node ready event, with a large timeout just in case
-                node.ready.wait(timeout=15)
+                node_ready = node.ready.wait(timeout=15)
 
                 # remove the finished handler, we don't care about it here
                 ioloop.unlink(fail_handle)
@@ -124,7 +124,7 @@ class ExchangeManager(object):
                     self._nodes[name] = node
                     self._ioloops[name] = ioloop
 
-            except socket.error:
+            except socket.error as e:
                 log.warn("Could not start connection %s due to socket error, continuing", name)
 
         fail_count = total_count - len(self._nodes)
@@ -141,7 +141,7 @@ class ExchangeManager(object):
         self._priviledged_transport = self.get_transport(self._nodes.get('priviledged', self._nodes.get('primary')))
         self._priviledged_transport.lock = True     # prevent any attempt to close
 
-        self.default_xs = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
+        self.default_xs         = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
         self.xs_by_name[ION_ROOT_XS] = self.default_xs
 
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
@@ -222,7 +222,7 @@ class ExchangeManager(object):
 
         # reset xs map to initial state
         self._default_xs_declared = False
-        self.xs_by_name = {ION_ROOT_XS: self.default_xs}      # friendly named XS to XSO
+        self.xs_by_name = { ION_ROOT_XS: self.default_xs }      # friendly named XS to XSO
 
     def _get_xs_obj(self, name=ION_ROOT_XS):
         """
@@ -335,7 +335,7 @@ class ExchangeManager(object):
             log.debug("Using EMS to create_xp")
             # create an RR object
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
-            self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id)        # @TODO: _exchange is wrong
+            xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id)        # @TODO: _exchange is wrong
         else:
             self._ensure_default_declared()
             xp.declare()
@@ -756,8 +756,8 @@ class ExchangeSpace(XOTransport, NameTrio):
         NameTrio.__init__(self, exchange=exchange)
 
         self._xs_exchange_type = exchange_type
-        self._xs_durable = durable
-        self._xs_auto_delete = auto_delete
+        self._xs_durable       = durable
+        self._xs_auto_delete   = auto_delete
 
     @property
     def exchange(self):
@@ -786,10 +786,8 @@ class ExchangeName(XOTransport, NameTrio):
 
         self._xs = xs
 
-        if durable is not None:
-            self._xn_durable = durable
-        if auto_delete is not None:
-            self._xn_auto_delete = auto_delete
+        if durable is not None:     self._xn_durable = durable
+        if auto_delete is not None: self._xn_auto_delete = auto_delete
 
     @property
     def exchange(self):
@@ -858,8 +856,8 @@ class ExchangePoint(ExchangeName):
         XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
         NameTrio.__init__(self, exchange=name)
 
-        self._xs = xs
-        self._xptype = xptype
+        self._xs        = xs
+        self._xptype    = xptype
 
     @property
     def exchange(self):

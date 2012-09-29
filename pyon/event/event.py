@@ -93,7 +93,7 @@ class EventPublisher(Publisher):
 
         try:
             self.publish(event_msg, to_name=to_name)
-        except Exception:
+        except Exception as ex:
             log.exception("Failed to publish event '%s'" % (event_msg))
             return False
 
@@ -101,7 +101,7 @@ class EventPublisher(Publisher):
             # store published event but only if we specified an event_repo
             if PERSIST_ON_PUBLISH and self.event_repo:
                 self.event_repo.put_event(event_msg)
-        except Exception:
+        except Exception as ex:
             log.exception("Failed to store published event '%s'" % (event_msg))
             return False
 
@@ -147,7 +147,7 @@ class BaseEventSubscriberMixin(object):
 
         sub_type = sub_type or "*.#"
         origin_type = origin_type or "*"
-        origin = origin or "*"
+        origin      = origin or "*"
 
         return "%s.%s.%s.%s" % (event_type, sub_type, origin_type, origin)
 
