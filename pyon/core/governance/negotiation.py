@@ -20,7 +20,8 @@ class Negotiation(object):
 
     #Clones the most recent proposal and modifies conditions as needed
     @classmethod
-    def create_counter_proposal(self,negotiation=None):
+    def create_counter_proposal(self,negotiation=None, proposal_status=ProposalStatusEnum.COUNTER,
+                                originator=ProposalOriginatorEnum.CONSUMER):
 
         if negotiation is None or negotiation.type_ != OT.Negotiation:
             raise BadRequest('The negotiation parameter must be a valid Negotiation object')
@@ -28,6 +29,8 @@ class Negotiation(object):
         counter_sap = copy.deepcopy(negotiation.proposals[-1])
 
         counter_sap.sequence_num += 1
+        counter_sap.proposal_status = proposal_status
+        counter_sap.originator = originator
 
         return counter_sap
 
