@@ -161,15 +161,12 @@ class Negotiation(object):
             event_data['sub_type'] = status
             event_data['description'] = ProposalStatusEnum._str_map[status]
 
+        #Look for other data that belongs in the event
+        for field in sap._schema:
+            for decorator in sap._schema[field]['decorators']:
+                if decorator == 'EventData':
+                    event_data[field] = getattr(sap,field)
 
-        if sap._schema.has_key('resource'):
-            event_data['resource'] = sap.resource
-
-        if sap._schema.has_key('acquisition_type'):
-            event_data['acquisition_type'] = sap.acquisition_type
-
-        if sap._schema.has_key('role_name'):
-            event_data['role_name'] = sap.role_name
 
         self.service_provider.event_pub.publish_event(event_type=event_type,
             origin=origin, **event_data)
