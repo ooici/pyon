@@ -1,0 +1,17 @@
+protocol RPC(role ServiceRequester as R, role ServiceProvider as P)
+  try {
+    request from R to P;
+    choice at P{
+    accept() from R to P;
+      choice at P {
+        inform-result from P to R;
+      } or {
+      failure() from P to R;
+    } or {
+      reject() from R to P;
+    }
+  } interrupt at R {
+    timeout();
+    cancel()
+  }
+}
