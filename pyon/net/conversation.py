@@ -174,6 +174,13 @@ class ConversationEndpoint(object):
         self._next_control_msg_type = 0
         self._recv_queues = {}
         self.endpoint_unit = None
+        self.conv_seq = self.gen_conv_seq()
+
+    def gen_conv_seq(self):
+        x = 1
+        while True:
+            yield x
+            x += 1
 
     @property
     def conv(self):
@@ -197,7 +204,7 @@ class ConversationEndpoint(object):
         #@TODO: Fix that, nameTrio is too AMQP specific. better have short and long name for principal
         self.join(inv_header['receiver-role'], base_name, c)
         self._on_msg_received(inv_msg, inv_header)
-        if auto_reply:
+        if not auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
 
     def invite(self, to_role, to_role_addr, merge_with_first_send = False):
@@ -337,16 +344,18 @@ class ConversationEndpoint(object):
         to_role_addr = self._conv[to_role]
         header['conv-msg-type']  = MSG_TYPE.TRANSMIT
         if self._next_control_msg_type == MSG_TYPE.ACCEPT:
-            header['conv-msg-type']  = header.get(['conv-msg-type'], 0) | MSG_TYPE.ACCEPT
+            header['conv-msg-type']  = header.get('conv-msg-type', 0) | MSG_TYPE.ACCEPT
             header = self._build_control_header(header, to_role, to_role_addr)
             self._next_control_msg_type = 0
         self._send(to_role, to_role_addr, msg, header)
 
     #@TODO: Shell we combine build_header and _build_conv_header ?
-    def _send(self, to_role, to_role_addr, msg, header = None):
+    def _send(self, to_role, to_role_addr, msg, new_header = None):
+        header = {}
         header = self._build_conv_header(header, to_role, to_role_addr)
         header = self._build_header(msg, header)
         msg = self._build_payload(msg)
+        if new_header: header.update(new_header)
         msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
         log.info("""\n
@@ -364,7 +373,7 @@ class ConversationEndpoint(object):
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['conv-id'] = self._conv.id
-        header['conv-seq'] = 1 # @TODO: Not done, How to track it: per role, per conversation ???
+        header['conv-seq'] = self.conv_seq.next() # @TODO: Not done, How to track it: per role, per conversation ???
         header['protocol'] = self._conv.protocol
         return header
 
@@ -430,12 +439,13 @@ class ConversationEndpoint(object):
         """
         if self.endpoint_unit:
             header.update(self.endpoint_unit._build_header(msg))
-
+        """
+        Below headers are set by the base_endpoint classes
         header['language'] = 'ion-r2'
         header['encoding'] = 'msgpack'
         header['format']   = msg.__class__.__name__    # hmm
         header['reply-by'] = 'todo'                        # clock sync is a problem
-
+        """
         return header
 
     def _build_payload(self, msg):
@@ -663,9 +673,9 @@ class RPCServer(object):
                 c.attach_endpoint_unit(self.endpoint_unit)
             try:
                 msg, header = c.recv(self.rpc_conv.client_role)
-                reply = self.process_msg(msg, header)
+                reply, reply_header = self.process_msg(msg, header)
                 msg_to_return = self.MessageObject(reply)
-                c.send(self.rpc_conv.client_role, reply)
+                c.send(self.rpc_conv.client_role, reply, reply_header)
                 if msg == 'quit':
                     self.principal.terminate()
             except Exception:
@@ -686,8 +696,8 @@ class RPCServer(object):
 class RPCConversation(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
         self.protocol = protocol or 'rpc'
-        self.server_role = server_role or 'server'
-        self.client_role = client_role or 'client'
+        self.server_role = server_role or 'provider'
+        self.client_role = client_role or 'requester'
 
 class PrincipalName(object):
     def __init__(self, namespace, name):

@@ -23,7 +23,7 @@ from pyon.ion.directory import Directory
 from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
-from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.endpoint import ProcessRPCServer, ConversationRPCServer
 from pyon.net import messaging
 from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem

@@ -108,7 +108,6 @@ class ProcManager(object):
         """
         Spawn a process within the container. Processes can be of different type.
         """
-
         if process_id and not is_valid_identifier(process_id, ws_sub='_'):
             raise BadRequest("Given process_id %s is not a valid identifier" % process_id)
 
@@ -274,18 +273,29 @@ class ProcManager(object):
 
         # Service RPC endpoint
         #TODO: RUMI: change back
-        rsvc1 = ConversationRPCServer(node=self.container.node,
-        #rsvc1 = ProcessRPCServer(node=self.container.node,
-            from_name=listen_name,
-            service=service_instance,
-            process=service_instance)
-        # Named local RPC endpoint
-        #TODO: RUMI: change back
-        rsvc2 = ConversationRPCServer(node=self.container.node,
-        #rsvc2 = ProcessRPCServer(node=self.container.node,
-            from_name=service_instance.id,
-            service=service_instance,
-            process=service_instance)
+        if CFG.endpoint.conversation_enabled:
+            rsvc1 = ConversationRPCServer(node=self.container.node,
+                from_name=listen_name,
+                service=service_instance,
+                process=service_instance)
+            # Named local RPC endpoint
+            #TODO: RUMI: change back
+            rsvc2 = ConversationRPCServer(node=self.container.node,
+                from_name=service_instance.id,
+                service=service_instance,
+                process=service_instance)
+
+        else:
+            rsvc1 = ProcessRPCServer(node=self.container.node,
+                                          from_name=listen_name,
+                                          service=service_instance,
+                                          process=service_instance)
+            # Named local RPC endpoint
+            #TODO: RUMI: change back
+            rsvc2 = ProcessRPCServer(node=self.container.node,
+                                          from_name=service_instance.id,
+                                          service=service_instance,
+                                          process=service_instance)
 
         # cleanup method to delete process queue
         cleanup = lambda _: self._cleanup_method(service_instance.id, rsvc2)

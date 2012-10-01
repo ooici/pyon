@@ -6,6 +6,7 @@ class Transition(object):
     def get_trigger(self):
         pass
 
+
 class DefaultTransition(Transition):     
     def __init__(self, lt_type, label, role):
         self.role = role
@@ -13,6 +14,11 @@ class DefaultTransition(Transition):
         self.lt_type = lt_type
     def get_trigger(self):
         return "%s_%s_%s" %(self.lt_type, self.label, str.lower(str(self.role)))
+
+    @classmethod
+    def create_from_string(cls, from_string):
+        [type, label, role] = from_string.split('_')
+        return cls(type, label, role)
 
 class AssertionTransition(Transition):
     __metaclass__= ABCMeta

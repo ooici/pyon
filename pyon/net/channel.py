@@ -528,7 +528,8 @@ class RecvChannel(BaseChannel):
         You should only call this if you want to delete the queue. Even so, you must know you are
         the only one on it - there appears to be no mechanic for determining if anyone else is listening.
         """
-        assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1]
+        #TODO: RUMI: Uncomment
+        #assert self._recv_name # and isinstance(self._recv_name, tuple) and self._recv_name[1]
         assert self._transport
 
         log.info("Destroying queue: %s", self._recv_name)

@@ -1,5 +1,6 @@
 from collections import deque
 from pydoc import deque
+from pyon.core.governance.conversation.core.transition import DefaultTransition
 from transition import Transition, AssertionTransition
 
 class ExceptionFSM(Exception):
@@ -30,9 +31,10 @@ class FSM:
     EMPTY_TRANSITION = 'EMPTY'
     REC_TRANSITION = 'REC'
     END_PAR_TRANSITION = 'END_PAR'
-    
+
     def __init__(self, initial_state, memory=None):
 
+        self.generics = ['request']
         # Map (input_symbol, current_state) --> (action, next_state).
         self.state_transitions = {}
         # Map (current_state) --> (action, next_state).
@@ -62,7 +64,20 @@ class FSM:
 
     def set_assertion_check_off(self):
         self.check_assertions = False
-        
+
+    def instantiate_generics(self, op_mapping):
+        state_transitions = self.state_transitions.copy()
+        for (transition, state) in state_transitions:
+            for input in op_mapping:
+                op = '_%s_'%(input)
+                if op in transition:
+                    val = self.state_transitions.pop((transition, state))
+                    old_transition = DefaultTransition.create_from_string(transition)
+                    new_transition = DefaultTransition(old_transition.lt_type, op_mapping[input], old_transition.role)
+                    self.state_transitions[(new_transition.get_trigger(), state)] = val
+                    break
+
+
     def reset (self):
 
         """This sets the current_state to the initial_state and sets

@@ -222,6 +222,7 @@ class ProcessRPCServer(RPCServer):
 
 class ConversationRPCClient(ProcessRPCClient):
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+
         base_end = ProcessRPCClient.create_endpoint(self, to_name=to_name,
                                                     existing_channel=existing_channel,
                                                     **kwargs)
@@ -233,7 +234,7 @@ class ConversationRPCClient(ProcessRPCClient):
 class ConversationRPCServer(ProcessRPCServer):
     participant = None
 
-    def get_one_msg(self):
+    def get_one_msg(self, num=1, timeout=None):
         e = self.create_endpoint()
         self.participant.attach_endpoint_unit(e)
         self.participant.process_msg = lambda m, h: e.message_received(m, h)
