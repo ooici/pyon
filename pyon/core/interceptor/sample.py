@@ -1,6 +1,7 @@
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.util.log import log
 
+
 class SampleInterceptor(Interceptor):
     def outgoing(self, invocation):
         log.debug("SampleInterceptor.outgoing: %s", invocation)
@@ -14,6 +15,7 @@ class SampleInterceptor(Interceptor):
         else:
             log.debug("This message was NOT sample intercepted!")
         return invocation
+
 
 class SampleProcessOnlyInterceptor(Interceptor):
     def outgoing(self, invocation):

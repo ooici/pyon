@@ -32,11 +32,10 @@ def main():
     #parser.add_option("-s", "--sysname", dest="sysname", default=None, help="The sysname prefix to clear in couch", action="store", type=str, metavar="SYSNAME")
     parser.add_option("-v", "--verbose", help="More verbose output", action="store_true")
 
-
     (options, args) = parser.parse_args()
 
     # Hack to set the user name and password
-    if len(args) ==0:
+    if len(args) == 0:
         print 'clear_couch: Error: no prefix argument specified'
         parser.print_help()
         sys.exit()
@@ -55,6 +54,7 @@ def main():
 
     _clear_couch(options.couch_host, options.couch_port, options.couch_uname, options.couch_pword, prefix=prefix, verbose=bool(options.verbose))
 
+
 def clear_couch(config, prefix):
     _clear_couch(
         config.server.couchdb.host,
@@ -62,6 +62,7 @@ def clear_couch(config, prefix):
         config.server.couchdb.username,
         config.server.couchdb.password,
         prefix=prefix)
+
 
 def _clear_couch(host, port, username, password, prefix, verbose=False):
     db_server = CouchDataStore(host=host, port=str(port), username=username, password=password)

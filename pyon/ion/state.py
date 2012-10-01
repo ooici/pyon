@@ -50,6 +50,7 @@ class StateRepository(object):
         state_obj = self.state_store.read(key)
         return state_obj.state
 
+
 class StatefulProcessMixin(object):
     """
     Mixin class for stateful processes.

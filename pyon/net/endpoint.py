@@ -4,11 +4,9 @@
 
 from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
-from pyon.core.exception import ExceptionFactory, IonException, BadRequest, ServerError
-from pyon.core.object import IonObjectBase
-from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
+from pyon.core.exception import ExceptionFactory, IonException, BadRequest
+from pyon.net.channel import ChannelClosedError, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
-from pyon.util.async import spawn, switch
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 from pyon.net.transport import NameTrio, BaseTransport
@@ -21,12 +19,13 @@ import time
 import inspect
 import traceback
 import sys
-from Queue import Empty
 from pyon.util.sflow import SFlowManager
 from types import MethodType
 
+
 class EndpointError(StandardError):
     pass
+
 
 class EndpointUnit(object):
     """
@@ -179,7 +178,7 @@ class EndpointUnit(object):
         Assembles the headers of a message from the raw message's content.
         """
 #        log.debug("EndpointUnit _build_header")
-        return {'ts':get_ion_ts()}
+        return {'ts': get_ion_ts()}
 
     def _build_payload(self, raw_msg):
         """
@@ -342,7 +341,6 @@ class SendingBaseEndpoint(BaseEndpoint):
         return BaseEndpoint._create_channel(self, transport=transport)
 
 
-
 class ListeningBaseEndpoint(BaseEndpoint):
     """
     Establishes channel type for a host of derived, listen/react endpoint factories.
@@ -433,9 +431,9 @@ class ListeningBaseEndpoint(BaseEndpoint):
         Overrides the BaseEndpoint create channel to supply a transport if our recv name is one.
         """
         if isinstance(self._recv_name, BaseTransport):
-            kwargs.update({'transport':self._recv_name})
+            kwargs.update({'transport': self._recv_name})
         elif self._transport is not None:
-            kwargs.update({'transport':self._transport})
+            kwargs.update({'transport': self._transport})
 
         return BaseEndpoint._create_channel(self, **kwargs)
 
@@ -500,9 +498,9 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._ensure_node()
         kwargs = {}
         if isinstance(self._recv_name, BaseTransport):
-            kwargs.update({'transport':self._recv_name})
+            kwargs.update({'transport': self._recv_name})
         elif self._transport is not None:
-            kwargs.update({'transport':self._transport})
+            kwargs.update({'transport': self._transport})
         self._chan = self.node.channel(self.channel_type, **kwargs)
 
         # @TODO this does not feel right
@@ -543,7 +541,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         mos = []
         newch = self._chan.accept(n=num, timeout=timeout)
         qsize = newch._recv_queue.qsize()
-        if qsize==0:
+        if qsize == 0:
             self._chan.exit_accept()
             return []
 
@@ -623,6 +621,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
         return self._chan.get_stats()
 
+
 #
 # PUB/SUB
 #
@@ -661,7 +660,6 @@ class Publisher(SendingBaseEndpoint):
         """
         if self._pub_ep:
             self._pub_ep.close()
-
 
 
 class SubscriberEndpointUnit(EndpointUnit):
@@ -725,12 +723,14 @@ class Subscriber(ListeningBaseEndpoint):
 class BidirectionalEndpointUnit(EndpointUnit):
     pass
 
+
 class BidirectionalListeningEndpointUnit(EndpointUnit):
     pass
 
 #
 #  REQ / RESP (and RPC)
 #
+
 
 class RequestEndpointUnit(BidirectionalEndpointUnit):
     def _get_response(self, conv_id, timeout):
@@ -773,7 +773,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         #ts = time.time()
 
-        self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
+        self.channel.setup_listener(NameTrio(self.channel._send_name.exchange))  # anon queue
 
         # call base send, and get back the headers it ended up building and sending
         # we extract the conv-id so we can tell the listener what is valid.
@@ -805,6 +805,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
 
         return headers
 
+
 class RequestResponseClient(SendingBaseEndpoint):
     """
     Sends a request, waits for a response.
@@ -820,6 +821,7 @@ class RequestResponseClient(SendingBaseEndpoint):
             # always close, even if endpoint raised a logical exception
             e.close()
         return retval
+
 
 class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
     """
@@ -840,10 +842,12 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
 
         return headers
 
+
 class RequestResponseServer(ListeningBaseEndpoint):
     endpoint_unit_type = ResponseEndpointUnit
     channel_type = ServerChannel
     pass
+
 
 class RPCRequestEndpointUnit(RequestEndpointUnit):
 
@@ -915,6 +919,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         return headers
 
+
 class RPCClient(RequestResponseClient):
     """
     Base RPCClient class.
@@ -972,7 +977,7 @@ class RPCClient(RequestResponseClient):
         schema.
         """
         def svcmethod(self, *args, **kwargs):
-            assert len(args)==0, "You MUST used named keyword args when calling a dynamically generated remote method"      # we have no way of getting correct order
+            assert len(args) == 0, "You MUST used named keyword args when calling a dynamically generated remote method"      # we have no way of getting correct order
             headers = kwargs.pop('headers', None)           # pull headers off, cannot put this in the signature due to *args for ordering
             ionobj = IonObject(in_obj, **kwargs)
             return self.request(ionobj, op=name, headers=headers)
@@ -1130,7 +1135,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
         return {'status_code': ex.get_status_code(),
                 'error_message': str(ex.get_error_message()),
-                'performative':'failure'}
+                'performative': 'failure'}
 
     def _make_routing_call(self, call, *op_args, **op_kwargs):
         """
@@ -1256,7 +1261,6 @@ class RPCServer(RequestResponseServer):
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
 
-
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """
     Utility function to print an legible comprehensive summary of a received message.
@@ -1270,15 +1274,15 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
         if recv and getattr(recv, '__iter__', False):
             recv = ".".join(str(item) for item in recv if item)
         _recv = headers.get('receiver', '?')
-        _opstat = "op=%s"%headers.get('op', '') if 'op' in headers else "status=%s"%headers.get('status_code', '')
+        _opstat = "op=%s" % headers.get('op', '') if 'op' in headers else "status=%s" % headers.get('status_code', '')
         try:
             import msgpack
             _msg = msgpack.unpackb(msg)
             _msg = str(_msg)
         except Exception:
             _msg = str(msg)
-        _msg = _msg[0:400]+"..." if len(_msg) > 400 else _msg
-        _delivery = "\nDELIVERY: tag=%s"%delivery_tag if delivery_tag else ""
+        _msg = _msg[0:400] + "..." if len(_msg) > 400 else _msg
+        _delivery = "\nDELIVERY: tag=%s" % delivery_tag if delivery_tag else ""
         log.info("%s: %s%s%s -> %s%s%s %s:\nHEADERS: %s\nCONTENT: %s%s",
             prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
     except Exception as ex:

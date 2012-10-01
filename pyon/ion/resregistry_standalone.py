@@ -4,7 +4,6 @@ __author__ = 'Michael Meisinger'
 
 from pyon.core.exception import NotFound
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
@@ -99,9 +98,6 @@ class ResourceRegistryStandalone(object):
 
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
-        from pyon.core.registry import getextends
-        from pyon.ion.resource import Predicates
-        from pyon.core.bootstrap import IonObject
 
         assoc = dict(type_="Association",
             at=assoc_type,

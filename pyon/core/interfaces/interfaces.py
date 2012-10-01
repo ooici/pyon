@@ -4,16 +4,14 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
-import inspect
 import os
 from collections import OrderedDict
-import argparse
 
 from pyon.core.path import list_files_recursive
 from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
-from pyon.util.containers import get_safe
+
 
 class InterfaceAdmin:
     """

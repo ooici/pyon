@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 """ION messaging endpoints"""
-from pyon.util import log
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -9,12 +8,11 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
-from pyon.core.exception import Unauthorized
+
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
 #############################################################################
-
 class ProcessEndpointUnitMixin(EndpointUnit):
     """
     Common-base mixin for Process related endpoints.
@@ -27,7 +25,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
-        newkwargs.update({'process':self._process})
+        newkwargs.update({'process': self._process})
 
         inv = EndpointUnit._build_invocation(self, **newkwargs)
         return inv
@@ -62,13 +60,13 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         header = EndpointUnit._build_header(self, raw_msg)
 
         # add our process identity to the headers
-        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id })
+        header.update({'sender-name': self._process.name or 'unnamed-process',     # @TODO
+                       'sender': self._process.id})
 
-        if hasattr(self._process,'process_type' ):
-            header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
+        if hasattr(self._process, 'process_type'):
+            header.update({'sender-type': self._process.process_type or 'unknown-process-type'})
             if self._process.process_type == 'service':
-                header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
+                header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
 
         context = self._process.get_context()
         log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
@@ -84,11 +82,11 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
-                header['ion-actor-id']  = actor_id
+                header['ion-actor-id'] = actor_id
                 if actor_roles:     header['ion-actor-roles']   = actor_roles
 
             #This set of tokens is set independently of the actor
-            if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+            if actor_tokens:    header['ion-actor-tokens']   = actor_tokens
 
             if expiry:          header['expiry']                = expiry
             if container_id:    header['origin-container-id']   = container_id
@@ -104,6 +102,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
     def _get_sflow_manager(self):
         return self._process.container.sflow_manager
+
 
 class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpointUnit):
     def __init__(self, process=None, **kwargs):
@@ -121,6 +120,7 @@ class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpoint
         header1.update(header2)
 
         return header1
+
 
 class ProcessRPCClient(RPCClient):
     endpoint_unit_type = ProcessRPCRequestEndpointUnit
@@ -163,8 +163,6 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
     def message_received(self, msg, headers):
-
-
         #This is the hook for checking governance pre-conditions before calling a service operation
         #TODO - replace with a process specific interceptor stack of some sort.
         gc = self._routing_obj.container.governance_controller
@@ -202,7 +200,7 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         res = ar.get()     # @TODO: timeout?
 
         # Persistent process state handling
-        if hasattr(self._process,"_proc_state"):
+        if hasattr(self._process, "_proc_state"):
             if self._process._proc_state_changed:
                 log.debug("Process %s state changed. State=%s", self._process.id, self._process._proc_state)
                 self._process.container.state_repository.put_state(self._process.id, self._process._proc_state)
@@ -256,6 +254,7 @@ class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUn
 
         return header1
 
+
 class ProcessPublisher(Publisher):
 
     endpoint_unit_type = ProcessPublisherEndpointUnit
@@ -270,17 +269,20 @@ class ProcessPublisher(Publisher):
         newkwargs['process'] = self._process
         return Publisher.create_endpoint(self, *args, **newkwargs)
 
+
 class PublisherError(StandardError):
     """
     An exception class for errors in the subscriber
     """
     pass
 
+
 class SubscriberError(StandardError):
     """
     An exception class for errors in the subscriber
     """
     pass
+
 
 class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpointUnit):
     def __init__(self, process=None, callback=None, routing_call=None, **kwargs):
@@ -350,10 +352,10 @@ class ProcessSubscriber(Subscriber):
         newkwargs['routing_call'] = self._routing_call
         return Subscriber.create_endpoint(self, **newkwargs)
 
+
 #
 # ProcessEventSubscriber
 #
-
 class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
     def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
                  sub_type=None, origin_type=None, process=None, routing_call=None, *args, **kwargs):
@@ -364,5 +366,3 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         log.debug("EventPublisher events pattern %s", self.binding)
 
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
-
-

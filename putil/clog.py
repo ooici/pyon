@@ -7,6 +7,7 @@ __license__ = 'Apache 2.0'
 
 import logging
 
+
 class ColoredFormatter(logging.Formatter):
     """
     Colorized formatter.
@@ -45,6 +46,7 @@ class ColoredFormatter(logging.Formatter):
             if self.COLORS[levelname] < 0:
                 # Compensate for off padding because of invisible escape sequences
                 record.levelname    = self.NOOP_SEQ + record.levelname + self.RESET_SEQ
+
             else:
                 record.levelname    = self.COLOR_SEQ % (30 + self.COLORS[levelname]) + record.levelname + self.RESET_SEQ
                 if not isinstance(record.msg, str):
@@ -59,6 +61,7 @@ class ColoredFormatter(logging.Formatter):
         else:
             message = message.replace("$RESET", "").replace("$BOLD", "")
         return message
+
 
 class ColoredStreamHandler(logging.StreamHandler):
     """

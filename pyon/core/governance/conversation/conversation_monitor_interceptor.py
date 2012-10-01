@@ -12,12 +12,12 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
+        log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-        log.debug("ConversationMonitorInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
+        log.debug("ConversationMonitorInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
 
         return invocation

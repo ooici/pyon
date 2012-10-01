@@ -7,7 +7,6 @@ import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
-from pyon.util.log import log
 
 import interface.objects
 import interface.messages
@@ -15,6 +14,7 @@ import interface.messages
 enum_classes = {}
 model_classes = {}
 message_classes = {}
+
 
 def getextends(type):
     """
@@ -31,6 +31,7 @@ def getextends(type):
             ret.append(name)
     return ret
 
+
 def issubtype(obj_type, base_type):
     obj_cls = model_classes.get(obj_type, None)
     base_cls = model_classes.get(base_type, None)
@@ -40,8 +41,10 @@ def issubtype(obj_type, base_type):
 
     return False
 
+
 def isenum(clzz_name):
     return clzz_name in enum_classes
+
 
 def get_message_class_parm_type(service_name, service_operation, parameter, in_out):
     """
@@ -61,18 +64,19 @@ def get_message_class_parm_type(service_name, service_operation, parameter, in_o
 
     return parm_type
 
+
 def get_message_class_in_parm_type(service_name, service_operation, parameter):
     """
     Helper function for get_message_class_parm_type
     """
-    return  get_message_class_parm_type(service_name, service_operation, parameter, 'in')
+    return get_message_class_parm_type(service_name, service_operation, parameter, 'in')
 
 
 def get_message_class_out_parm_type(service_name, service_operation, parameter):
     """
     Helper function for get_message_class_parm_type
     """
-    return  get_message_class_parm_type(service_name, service_operation, parameter, 'out')
+    return get_message_class_parm_type(service_name, service_operation, parameter, 'out')
 
 
 def is_ion_object(_def):
@@ -95,6 +99,7 @@ def is_ion_object_dict(obj):
         pass
 
     return False
+
 
 class IonObjectRegistry(object):
     """
@@ -142,7 +147,7 @@ class IonObjectRegistry(object):
 
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)
-            
+
         if _dict:
             # Traverse input parameters looking for dict values being passed in as
             # the init values of complex types.  Instantiate new object and substitute
@@ -152,7 +157,7 @@ class IonObjectRegistry(object):
                 if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
                     obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
                     tmpdict[key] = obj_param
-                    
+
             # Apply dict values, then override with kwargs
             keywordargs = tmpdict
             keywordargs.update(kwargs)

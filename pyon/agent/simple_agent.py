@@ -18,6 +18,7 @@ from pyon.util.containers import get_ion_ts
 
 from interface.services.isimple_resource_agent import BaseSimpleResourceAgent, SimpleResourceAgentProcessClient
 
+
 class SimpleResourceAgent(BaseSimpleResourceAgent):
     """
     A resource agent is an ION process of type "agent" that exposes the standard
@@ -160,6 +161,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 
     def _get_names(self, obj, prefix):
         return [name[len(prefix):] for name in dir(obj) if name.startswith(prefix)]
+
 
 class UserAgent(SimpleResourceAgent):
 

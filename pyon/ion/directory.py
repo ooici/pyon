@@ -7,13 +7,12 @@ __license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import Conflict, Inconsistent, NotFound, BadRequest
+from pyon.core.exception import Inconsistent, BadRequest
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher, EventSubscriber
 from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
-
 from interface.objects import DirEntry
 
 
@@ -240,7 +239,7 @@ class Directory(object):
         if parent is None:
             raise BadRequest("Illegal arguments")
         start_key = [self.orgname, key, parent]
-        end_key = [self.orgname, key, parent+"ZZZZZZ"]
+        end_key = [self.orgname, key, parent + "ZZZZZZ"]
         res = self.dir_store.find_by_view('directory', 'by_key',
             start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
@@ -256,7 +255,7 @@ class Directory(object):
         if subtree is None:
             raise BadRequest("Illegal arguments")
         start_key = [self.orgname, attribute, value, subtree]
-        end_key = [self.orgname, attribute, value, subtree+"ZZZZZZ"]
+        end_key = [self.orgname, attribute, value, subtree + "ZZZZZZ"]
         res = self.dir_store.find_by_view('directory', 'by_attribute',
                         start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
@@ -268,11 +267,8 @@ class Directory(object):
 
     # ------------------------------------------
     # Specific directory entry methods
-
-
     # ------------------------------------------
     # Internal methods
-
     def _assert_existence(self, parent, key, **kwargs):
         """
         Make sure an entry is in the directory.
@@ -292,5 +288,4 @@ class Directory(object):
     def receive_directory_change_event(self, event_msg, headers):
         # @TODO add support to fold updated config into container config
         pass
-
 

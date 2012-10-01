@@ -18,13 +18,13 @@ try:
 except ImportError as e:
     _have_numpy = False
 
-built_in_attrs = set(['_id','_rev', 'type_', 'blame_'])
+built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
 
 class IonObjectBase(object):
 
     def __str__(self):
         return str(self.__dict__)
-    
+
     def __eq__(self, other):
         if type(other) == type(self):
             if other.__dict__ == self.__dict__:
@@ -37,7 +37,7 @@ class IonObjectBase(object):
         Named _validate instead of validate because the data may have a field named "validate".
         """
         fields, schema = self.__dict__, self._schema
-        
+
         # Check for extra fields not defined in the schema
         extra_fields = fields.viewkeys() - schema.viewkeys() - built_in_attrs
         if len(extra_fields) > 0:
@@ -114,7 +114,7 @@ class IonObjectBase(object):
                     continue
 
                 # TODO remove this at some point
-                if isinstance(field_val,IonObjectBase) and schema_val['type'] == 'dict':
+                if isinstance(field_val, IonObjectBase) and schema_val['type'] == 'dict':
                     log.warn('TODO: Please convert generic dict attribute type to abstract type for field "%s.%s"' % (type(self).__name__, key))
                     continue
 
@@ -149,7 +149,7 @@ class IonObjectBase(object):
                         self.check_collection_length(key, field_val, schema_val['decorators'][content_count_decorator])
                     if schema_val['type'] == 'dict' or schema_val['type'] == 'OrderedDict':
                         self.check_collection_length(key, field_val.values(), schema_val['decorators'][content_count_decorator])
-            
+
             if isinstance(field_val, IonObjectBase):
                 field_val._validate()
 
@@ -169,12 +169,12 @@ class IonObjectBase(object):
         return self.__class__.__name__
 
     def _get_extends(self):
-        parents = [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase','object',self._get_type()]]
+        parents = [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase', 'object', self._get_type()]]
         return parents
 
     def __contains__(self, item):
         return hasattr(self, item)
-    
+
     def update(self, other):
         """
         Method that allows self object attributes to be updated with other object.
@@ -186,7 +186,6 @@ class IonObjectBase(object):
                 raise BadRequest("Object %s and %s do not have compatible types for update" % (type(self).__name__, type(other).__name__))
         for key in other.__dict__:
             setattr(self, key, other.__dict__[key])
-
 
     def is_decorator(self, field, decorator):
         if self._schema[field]['decorators'].has_key(decorator):
@@ -228,7 +227,7 @@ class IonObjectBase(object):
             if baseclz.__name__ == "object":
                 return False
             else:
-                val = self.check_inheritance_chain(baseclz,expected_type)
+                val = self.check_inheritance_chain(baseclz, expected_type)
                 return val
         return False
 
@@ -284,9 +283,11 @@ class IonObjectBase(object):
             raise AttributeError('Invalid value length for collection field "%s.%s", should be between %d and %d' %
                 (type(self).__name__, key, min, max))
 
+
 class IonMessageObjectBase(IonObjectBase):
     pass
-    
+
+
 def walk(o, cb):
     """
     Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
@@ -301,11 +302,11 @@ def walk(o, cb):
 
     # is now or is still an iterable? iterate it.
     if _have_numpy:
-        if isinstance(newo,np.ndarray):
+        if isinstance(newo, np.ndarray):
             return newo
     if hasattr(newo, '__iter__'):
         if isinstance(newo, dict):
-            return dict(((k, walk(v, cb)) for k,v in newo.iteritems()))
+            return dict(((k, walk(v, cb)) for k, v in newo.iteritems()))
         else:
             return [walk(x, cb) for x in newo]
 
@@ -326,10 +327,6 @@ def walk(o, cb):
         return newo
 
 
-
-
-
-
 class IonObjectSerializationBase(object):
     """
     Base serialization class for serializing/deserializing IonObjects.
@@ -341,7 +338,7 @@ class IonObjectSerializationBase(object):
     IonObjectSerializer or IonObjectDeserializer defines them for you.
     """
     def __init__(self, transform_method=None, **kwargs):
-        self._transform_method  = transform_method or self._transform
+        self._transform_method = transform_method or self._transform
 
     def operate(self, obj):
         return walk(obj, self._transform_method)
@@ -350,7 +347,6 @@ class IonObjectSerializationBase(object):
         raise NotImplementedError("Implement _transform in a derived class")
 
 
-    
 class IonObjectSerializer(IonObjectSerializationBase):
     """
     Serializer for IonObjects.
@@ -370,8 +366,9 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
         return obj
 
+
 class IonObjectBlameSerializer(IonObjectSerializer):
-    
+
     def _transform(self, obj):
         res = IonObjectSerializer._transform(self, obj)
         blame = None
@@ -383,6 +380,7 @@ class IonObjectBlameSerializer(IonObjectSerializer):
             res["blame_"] = blame
 
         return res
+
 
 class IonObjectDeserializer(IonObjectSerializationBase):
     """
@@ -416,8 +414,9 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 
         return obj
 
+
 class IonObjectBlameDeserializer(IonObjectDeserializer):
-    
+
     def _transform(self, obj):
 
         def handle_ion_obj(in_obj):
@@ -443,10 +442,11 @@ class IonObjectBlameDeserializer(IonObjectDeserializer):
             else:
                 if "type_" in obj:
                     return handle_ion_obj(obj)
-  
+
         return obj
 
 ion_serializer = IonObjectSerializer()
+
 
 # Pretty print IonObjects
 def ionprint(obj):
