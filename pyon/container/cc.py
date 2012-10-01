@@ -4,13 +4,6 @@
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 
-import atexit
-import msgpack
-import os
-import signal
-import traceback
-from contextlib import contextmanager
-
 from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core import bootstrap
@@ -23,8 +16,11 @@ from pyon.ion.directory import Directory
 from pyon.ion.exchange import ExchangeManager
 from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
+
 from pyon.ion.endpoint import ProcessRPCServer, ConversationRPCServer
 from pyon.net import messaging
+from pyon.ion.endpoint import ProcessRPCServer
+from pyon.net.transport import LocalRouter
 from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
@@ -32,6 +28,13 @@ from pyon.util.sflow import SFlowManager
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
+
+import atexit
+import msgpack
+import os
+import signal
+import traceback
+from contextlib import contextmanager
 
 class Container(BaseContainerAgent):
     """
@@ -74,6 +77,9 @@ class Container(BaseContainerAgent):
 
         # Instantiate Directory
         self.directory = Directory()
+
+        # internal router
+        self.local_router = None
 
         # Create this Container's specific ExchangeManager instance
         self.ex_manager = ExchangeManager(self)
@@ -153,6 +159,12 @@ class Container(BaseContainerAgent):
         # State repository
         self.state_repository = StateRepository()
         self._capabilities.append("STATE_REPOSITORY")
+
+        # internal router for local transports
+        self.local_router = LocalRouter(bootstrap.get_sys_name())
+        self.local_router.start()
+        self.local_router.ready.wait(timeout=2)
+        self._capabilities.append("LOCAL_ROUTER")
 
         # Start ExchangeManager, which starts the node (broker connection)
         self.ex_manager.start()
@@ -319,9 +331,14 @@ class Container(BaseContainerAgent):
         elif capability == "EXCHANGE_MANAGER":
             self.ex_manager.stop()
 
+        elif capability == "LOCAL_ROUTER":
+            if self.local_router is not None:
+                self.local_router.stop()
+
         elif capability == "EVENT_REPOSITORY":
             # close event repository (possible CouchDB connection)
             self.event_repository.close()
+            self.event_pub.close()
 
         elif capability == "STATE_REPOSITORY":
             # close state repository (possible CouchDB connection)

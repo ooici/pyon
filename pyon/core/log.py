@@ -1,43 +1,14 @@
-#!/usr/bin/env python
+"""Basic pyon logging (with or without container)
 
-"""Basic pyon logging (with or without container) """
+   NOTE: the functionality of this module has moved to ooi.logging.config.
+         currently this module is maintained for API compatability, but is implemented using the new package.
+"""
 
-__author__ = 'Michael Meisinger, Thomas Lennan'
+import logging
+from ooi.logging import config
 
-# @WARN: GLOBAL STATE
-
-import os
-
-# -------------------------------------------------
-# Pyon logging initialization
-
-# Keeps the logging configuration dict
-LOGGING_CFG = None
-
-def _read_logging_config(logging_conf_paths):
-    from pyon.util.config import Config
-    global LOGGING_CFG
-    LOGGING_CFG = Config(logging_conf_paths, ignore_not_found=True).data
-
-def _override_config(config_override):
-    if type(config_override) is not dict:
-        print "pyon: WARNING: config_override is not dict but", config_override
-    from pyon.util.containers import dict_merge
-    dict_merge(LOGGING_CFG, config_override)
-
-def _initialize_logging():
-    # Create directories as configured for all logging handlers
-    for handler in LOGGING_CFG.get('handlers', {}).itervalues():
-        if 'filename' in handler:
-            log_dir = os.path.dirname(handler['filename'])
-            if not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-
-    # if there's no logging config, we can't configure it: the call requires version at a minimum
-    if LOGGING_CFG:
-        import logging.config
-        logging.config.dictConfig(LOGGING_CFG)
-
+DEFAULT_LOGGING_PATHS = ['res/config/logging.yml', 'res/config/logging.local.yml']
+logging_was_configured = False
 
 def configure_logging(logging_conf_paths, logging_config_override=None):
     """
@@ -45,7 +16,25 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
     @param logging_conf_paths  List of paths to logging config YML files (in read order)
     @param config_override  Dict with config entries overriding files read
     """
-    _read_logging_config(logging_conf_paths)
+    global logging_was_configured
+    logging_was_configured = True
+
+    for path in logging_conf_paths:
+        try:
+            config.add_configuration(path)
+        except Exception,e:
+            print 'WARNING: could not load logging configuration file %s: %s' % (path,e)
     if logging_config_override:
-        _override_config(logging_config_override)
-    _initialize_logging()
+        try:
+            config.add_configuration(logging_config_override)
+        except Exception,e:
+            print 'WARNING: failed to apply logging override %r: %e' % (logging_config_override,e)
+            
+    # direct warnings mechanism to loggers
+    logging.captureWarnings(True)
+
+
+def is_logging_configured():
+    """ allow caller to determine if logging has already been configured in this container """
+    global logging_was_configured
+    return logging_was_configured

@@ -348,6 +348,7 @@ class TestListeningBaseEndpoint(PyonTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointInt(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
     def test_get_stats(self):
@@ -383,6 +384,11 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         gl1.join(timeout=5)
         gl2.join(timeout=5)
 
+@attr('INT', group='COI')
+class TestListeningBaseEndpointIntWithZeroMQ(TestListeningBaseEndpointInt):
+    def setUp(self):
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
+        self._start_container()
 
 @attr('UNIT')
 class TestPublisher(PyonTestCase):
@@ -398,11 +404,11 @@ class TestPublisher(PyonTestCase):
 
         self._pub.publish("pub")
 
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 1)
 
         self._pub.publish("pub2")
-        self._node.channel.assert_called_once_with(self._pub.channel_type)
+        self._node.channel.assert_called_once_with(self._pub.channel_type, transport=None)
         self.assertEquals(self._ch.send.call_count, 2)
 
     def test_publish_with_new_name(self):
@@ -573,115 +579,6 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
             e.attach_channel(ch)
             self.assertRaises(err, e.send, {})
 
-    @patch('pyon.net.endpoint.RequestEndpointUnit._send', Mock(side_effect=exception.Timeout))
-    def test_timeout_makes_sflow_sample(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        e._sample_request = Mock()
-
-        self.assertRaises(exception.Timeout, e._send, sentinel.msg, sentinel.headers, timeout=1)
-        e._sample_request.assert_called_once_with(-1, 'Timeout', sentinel.msg, sentinel.headers, '', {})
-
-    def test__get_sample_name(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertEquals(e._get_sample_name(), "unknown-rpc-client")
-
-    def test__get_sflow_manager(self):
-        Container.instance = None
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertIsNone(e._get_sflow_manager())
-
-    def test__get_sflow_manager_with_container(self):
-        Container.instance = None
-        c = Container() # ensure an instance
-        e = RPCRequestEndpointUnit(interceptors={})
-        self.assertEquals(e._get_sflow_manager(), c.sflow_manager)
-
-        Container.instance = None
-
-    @patch('pyon.net.endpoint.time.time', Mock(return_value=1))
-    def test__build_sample(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-
-        heads = {'conv-id': sentinel.conv_id,
-                 'ts': '1',
-                 'op': 'remove_femur',
-                 'sender': sentinel.sender,
-                 'receiver': sentinel.receiver}
-        resp_heads = {'sender-service': 'theservice'}
-
-        samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads)
-
-        self.assertEquals(samp, {
-            'app_name' : sentinel.name,
-            'op' : 'theservice.remove_femur',
-            'attrs' : {'conv-id': sentinel.conv_id, 'service': 'theservice'},
-            'status_descr' : "Ok",
-            'status' : '0',
-            'req_bytes' : len('msg'),
-            'resp_bytes': len('response'),
-            'uS' : 999000, # it's in microseconds!
-            'initiator' : sentinel.sender,
-            'target' : sentinel.receiver
-        })
-
-    def test__build_sample_uses_last_name_for_op(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-
-        heads = {'conv-id': sentinel.conv_id,
-                 'ts': '1',
-                 'op': 'remove_femur',
-                 'sender': sentinel.sender,
-                 'receiver': sentinel.receiver}
-        resp_heads = {'sender-service': 'service1,service2,service3'}
-
-        samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads)
-
-        self.assertIn('op', samp)
-        self.assertEquals(samp['op'], 'service3.remove_femur')
-
-    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
-    def test__sample_request(self):
-        e = RPCRequestEndpointUnit(interceptors={})
-
-        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
-        e._get_sflow_manager.return_value.should_sample = True
-        e._build_sample = Mock(return_value={'test':sentinel.test})
-
-        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
-
-        e._get_sflow_manager.assert_called_once_with()
-        e._build_sample.assert_called_once_with(ANY, sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
-
-        e._get_sflow_manager.return_value.transaction.assert_called_once_with(test=sentinel.test)
-
-    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
-    @patch('pyon.net.endpoint.log')
-    def test__sample_request_no_sample(self, mocklog):
-        e = RPCRequestEndpointUnit(interceptors={})
-
-        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
-        e._get_sflow_manager.return_value.should_sample = False
-        e._get_sample_name = Mock()
-
-        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
-
-        self.assertEquals(mocklog.debug.call_count, 1)
-        self.assertIn("not to sample", mocklog.debug.call_args[0][0])
-
-    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
-    @patch('pyon.net.endpoint.log')
-    def test__sample_request_exception(self, mocklog):
-
-        e = RPCRequestEndpointUnit(interceptors={})
-
-        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
-        e._get_sflow_manager.return_value.should_sample = True
-        e._build_sample = Mock(side_effect=TestError)
-
-        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
-
-        mocklog.exception.assert_called_once_with("Could not sample, ignoring")
-
 @attr('UNIT')
 class TestRPCClient(PyonTestCase, RecvMockMixin):
 
@@ -767,6 +664,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                        'encoding':'msgpack',
                                                        'format':'list',
                                                        'receiver': ',',
+                                                       'msg-rcvd':ANY,
                                                        'ts': sentinel.ts,
                                                        'reply-by': 'todo'})
 
@@ -795,6 +693,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                        'encoding':'msgpack',
                                                        'format':'NoneType',
                                                        'receiver': ',',
+                                                       'msg-rcvd':ANY,
                                                        'ts': sentinel.ts,
                                                        'reply-by': 'todo'})
 
@@ -810,6 +709,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
             assert_called_once_with_header(self, e.send, {'status_code': -1,
                                                           'error_message':'',
                                                           'conv-id': '',
+                                                          'msg-rcvd':ANY,
                                                           'conv-seq': 2,
                                                           'protocol':'',
                                                           'performative': 'failure'})
@@ -839,6 +739,7 @@ Routing method for next test, raises an IonException.
         assert_called_once_with_header(self, e.send, {'status_code': 401,
                                                       'error_message': str(sentinel.unauth),
                                                       'conv-id': sentinel.conv_id,
+                                                      'msg-rcvd':ANY,
                                                       'conv-seq': 2,
                                                       'protocol':'',
                                                       'performative':'failure'})
@@ -857,6 +758,104 @@ Routing method for next test, raises an IonException.
         e = RPCResponseEndpointUnit(routing_obj=rout_obj)
 
         self.assertRaises(exception.BadRequest, e.message_received, 3, {})
+
+    @patch('pyon.net.endpoint.ResponseEndpointUnit._send', Mock(side_effect=exception.Timeout))
+    @unittest.skip('timeouts no longer captured by sFlow')
+    def test_timeout_makes_sflow_sample(self):
+        e = RPCResponseEndpointUnit(interceptors={})
+        e._sample_request = Mock()
+
+        self.assertRaises(exception.Timeout, e._send, sentinel.msg, sentinel.headers, timeout=1)
+        e._sample_request.assert_called_once_with(-1, 'Timeout', sentinel.msg, sentinel.headers, '', {})
+
+    def test__get_sample_name(self):
+        e = RPCResponseEndpointUnit(interceptors={})
+        self.assertEquals(e._get_sample_name(), "unknown-rpc-server")
+
+    def test__get_sflow_manager(self):
+        Container.instance = None
+        e = RPCResponseEndpointUnit(interceptors={})
+        self.assertIsNone(e._get_sflow_manager())
+
+    def test__get_sflow_manager_with_container(self):
+        Container.instance = None
+        c = Container() # ensure an instance
+        e = RPCResponseEndpointUnit(interceptors={})
+        self.assertEquals(e._get_sflow_manager(), c.sflow_manager)
+
+        Container.instance = None
+
+    @patch('pyon.net.endpoint.time.time', Mock(return_value=1))
+    def test__build_sample(self):
+        e = RPCResponseEndpointUnit(interceptors={})
+
+        heads = {'conv-id': sentinel.conv_id,
+                 'ts': '1',
+                 'op': 'remove_femur',
+                 'sender': sentinel.sender,
+                 'receiver': sentinel.receiver}
+        resp_heads = {'sender-service': 'theservice'}
+
+        samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads, sentinel.qlen)
+
+        self.assertEquals(samp, {
+            'app_name' : sentinel.name,
+            'op' : 'remove_femur',
+            'attrs' : {'ql':sentinel.qlen},
+            'status_descr' : "Ok",
+            'status' : '0',
+            'req_bytes' : len('msg'),
+            'resp_bytes': len('response'),
+            'uS' : 999000, # it's in microseconds!
+            'initiator' : sentinel.sender,
+            'target' : 'theservice'
+        })
+
+    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
+    def test__sample_request(self):
+        e = RPCResponseEndpointUnit(interceptors={})
+
+        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
+        e._get_sflow_manager.return_value.should_sample = True
+        e._build_sample = Mock(return_value={'test':sentinel.test})
+        e.channel = Mock()
+        e.channel.get_stats = Mock(return_value=(3, 0))
+        e.channel._recv_queue.qsize = Mock(return_value=3)
+
+        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
+
+        e._get_sflow_manager.assert_called_once_with()
+        e._build_sample.assert_called_once_with(ANY, sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers, 6)
+
+        e._get_sflow_manager.return_value.transaction.assert_called_once_with(test=sentinel.test)
+
+    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
+    @patch('pyon.net.endpoint.log')
+    def test__sample_request_no_sample(self, mocklog):
+        e = RPCResponseEndpointUnit(interceptors={})
+
+        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
+        e._get_sflow_manager.return_value.should_sample = False
+        e._get_sample_name = Mock()
+
+        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
+
+        self.assertEquals(mocklog.debug.call_count, 1)
+        self.assertIn("not to sample", mocklog.debug.call_args[0][0])
+
+    @patch.dict('pyon.net.endpoint.CFG', {'container':{'sflow':{'enabled':True}}})
+    @patch('pyon.net.endpoint.log')
+    def test__sample_request_exception(self, mocklog):
+
+        e = RPCResponseEndpointUnit(interceptors={})
+
+        e._get_sflow_manager = Mock(return_value=Mock(spec=SFlowManager))
+        e._get_sflow_manager.return_value.should_sample = True
+        e._build_sample = Mock(side_effect=TestError)
+
+        e._sample_request(sentinel.status, sentinel.status_descr, sentinel.msg, sentinel.headers, sentinel.response, sentinel.response_headers)
+
+        mocklog.exception.assert_called_once_with("Could not sample, ignoring")
 
 @attr('UNIT')
 class TestRPCServer(PyonTestCase, RecvMockMixin):

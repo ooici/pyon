@@ -13,7 +13,7 @@ import traceback
 from uuid import uuid4
 
 from script_util import parse_args
-
+from pyon.core import log as logutil
 #
 # WARNING - DO NOT IMPORT GEVENT OR PYON HERE. IMPORTS **MUST** BE DONE IN THE MAIN()
 # DUE TO DAEMONIZATION.
@@ -76,6 +76,21 @@ def main(opts, *args, **kwargs):
     """
     Processes arguments and starts the capability container.
     """
+    def prepare_logging():
+    # Load logging override config if provided. Supports variants literal and path.
+        logging_config_override = None
+        if opts.logcfg:
+            if '{' in opts.logcfg:
+                # Variant 1: Value is dict of config values
+                try:
+                    eval_value = ast.literal_eval(opts.logcfg)
+                    logging_config_override = eval_value
+                except ValueError:
+                    raise Exception("Value error in logcfg arg '%s'" % opts.logcfg)
+            else:
+                # Variant 2: Value is path to YAML file containing config values
+                logutil.DEFAULT_LOGGING_PATHS.append(opts.logcfg)
+        logutil.configure_logging(logutil.DEFAULT_LOGGING_PATHS, logging_config_override=logging_config_override)
 
     def prepare_container():
         """
@@ -171,28 +186,12 @@ def main(opts, *args, **kwargs):
         config.apply_configuration(pyon_config, config_override)
         config.apply_configuration(pyon_config, command_line_config)
 
-        # Load logging override config if provided. Supports variants literal and path.
-        logging_config_override = None
-        if opts.logcfg:
-            if '{' in opts.logcfg:
-                # Variant 1: Value is dict of config values
-                try:
-                    eval_value = ast.literal_eval(opts.logcfg)
-                    logging_config_override = eval_value
-                except ValueError:
-                    raise Exception("Value error in logcfg arg '%s'" % opts.logcfg)
-            else:
-                # Variant 2: Value is path to YAML file containing config values
-                pyon.DEFAULT_LOGGING_PATHS.append(opts.logcfg)
-
         # Also set the immediate flag, but only if specified - it is an override
         if opts.immediate:
             dict_merge(pyon_config, {'system':{'immediate':True}}, True)
 
         # Bootstrap pyon's core. Load configuration etc.
-        bootstrap.bootstrap_pyon(
-            logging_config_override=logging_config_override,
-            pyon_cfg=pyon_config)
+        bootstrap.bootstrap_pyon(pyon_cfg=pyon_config)
 
         # Auto-bootstrap interfaces
         if bootstrap_config.system.auto_bootstrap:
@@ -238,8 +237,11 @@ def main(opts, *args, **kwargs):
                 raise Exception("Cannot start deploy file '%s'" % opts.rel)
 
         if opts.mx:
+            from pyon.public import CFG
+            port = CFG.get_safe('container.flask_webapp.port',8080)
             container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
-            print "pycc: Container UI started ... listening on http://localhost:8080"
+            print "pycc: Container UI started ... listening on http://localhost:%s" % port
+            
 
         if opts.signalparent:
             import os
@@ -280,6 +282,7 @@ def main(opts, *args, **kwargs):
     # ----------------------------------------------------------------------------------
     # Container life cycle
 
+    prepare_logging()
     container = None
     try:
         container = prepare_container()

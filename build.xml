@@ -34,6 +34,7 @@
         <delete>
             <fileset dir="${src}" includes="**/*.pyc"/>
             <fileset dir="scripts" includes="**/*.pyc"/>
+            <fileset dir="examples" includes="**/*.pyc"/>
             <fileset dir="prototype" includes="**/*.pyc"/>
         </delete>
         <delete dir="interface"/>

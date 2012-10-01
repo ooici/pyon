@@ -249,16 +249,17 @@ class ResourceRegistry(object):
     def delete_attachment(self, attachment_id=''):
         return self.rr_store.delete(attachment_id, del_associations=True)
 
-    def find_attachments(self, resource_id='', limit=0, descending=False, include_content=False, id_only=True):
+    def find_attachments(self, resource_id='', keyword=None,
+                         limit=0, descending=False, include_content=False, id_only=True):
         key = [resource_id]
         att_res = self.rr_store.find_by_view("attachment", "by_resource", start_key=key, end_key=list(key),
-            descending=descending, limit=limit, id_only=id_only)
+            descending=descending, limit=limit, id_only=True)
 
+        att_ids = [att[0] for att in att_res if not keyword or keyword in att[1][2]]
         if id_only:
-            att_ids = [att[0] for att in att_res]
             return att_ids
         else:
-            atts = [att[2] for att in att_res]
+            atts = self.rr_store.read_mult(att_ids)
             if include_content:
                 for att in atts:
                     att.content = None
@@ -327,3 +328,10 @@ class ResourceRegistry(object):
 
     def find_resources(self, restype="", lcstate="", name="", id_only=False):
         return self.rr_store.find_resources(restype, lcstate, name, id_only=id_only)
+
+    def find_resources_ext(self, restype="", lcstate="", name="",
+                           keyword=None, nested_type=None,
+                           limit=None, skip=None, descending=None, id_only=True):
+        return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
+            keyword=keyword, nested_type=nested_type, limit=limit, skip=skip, descending=descending,
+            id_only=id_only)

@@ -81,7 +81,7 @@ class TestNodeB(PyonTestCase):
         ch = self._node._new_channel(BaseChannel)
 
         self.assertIsInstance(ch, BaseChannel)
-        self.assertEquals(ch._amq_chan, bcbmock())
+        self.assertEquals(ch._transport._client, bcbmock())
 
     @patch('pyon.net.messaging.NodeB._new_channel', return_value=sentinel.new_chan)
     def test_channel_nonpooled(self, ncmock):
@@ -89,7 +89,7 @@ class TestNodeB(PyonTestCase):
 
         ch = self._node.channel(BaseChannel)
 
-        ncmock.assert_called_once_with(BaseChannel)
+        ncmock.assert_called_once_with(BaseChannel, transport=None)
         self.assertEquals(ch, sentinel.new_chan)
 
     def test_channel_pool(self):

@@ -12,8 +12,11 @@ from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
+
 from pyon.ion.endpoint import ProcessRPCServer, ConversationRPCServer
 from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
+from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
@@ -133,6 +136,8 @@ class ProcManager(object):
 
         service_cls = named_any("%s.%s" % (module, cls))
         process_type = get_safe(process_cfg, "process.type") or getattr(service_cls, "process_type", "service")
+
+        process_start_mode = get_safe(config, "process.start_mode")
 
         service_instance = None
         try:
@@ -337,8 +342,8 @@ class ProcManager(object):
         listen_name = get_safe(config, "process.listen_name") or name
         service_instance._proc_listen_name = listen_name
 
-        service_instance.stream_subscriber_registrar = StreamSubscriberRegistrar(process=service_instance, container=self.container)
-        sub = service_instance.stream_subscriber_registrar.create_subscriber(exchange_name=listen_name)
+        service_instance.stream_subscriber = StreamSubscriber(process=service_instance, exchange_name=listen_name, callback=service_instance.call_process)
+
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
@@ -354,7 +359,7 @@ class ProcManager(object):
 
         proc = self.proc_sup.spawn(name=service_instance.id,
                                    service=service_instance,
-                                   listeners=[rsvc, sub],
+                                   listeners=[rsvc, service_instance.stream_subscriber],
                                    proc_name=service_instance._proc_name,
                                    cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % service_instance._proc_name)
@@ -539,6 +544,33 @@ class ProcManager(object):
         service_instance._proc_name = name
         service_instance._proc_start_time = time.time()
 
+        # Add stateful process operations
+        if hasattr(service_instance, "_flush_state"):
+            def _flush_state():
+                if not hasattr(service_instance, "_proc_state"):
+                    service_instance._proc_state = {}
+                    service_instance._proc_state_changed = False
+                    return
+                service_instance.container.state_repository.put_state(service_instance.id, service_instance._proc_state)
+                service_instance._proc_state_changed = False
+            def _load_state():
+                if not hasattr(service_instance, "_proc_state"):
+                    service_instance._proc_state = {}
+                try:
+                    new_state = service_instance.container.state_repository.get_state(service_instance.id)
+                    service_instance._proc_state.clear()
+                    service_instance._proc_state.update(new_state)
+                    service_instance._proc_state_changed = False
+                except Exception as ex:
+                    log.warn("Process %s load state failed: %s", service_instance.id, str(ex))
+            service_instance._flush_state = _flush_state
+            service_instance._load_state = _load_state
+
+        process_start_mode = get_safe(config, "process.start_mode")
+        if process_start_mode == "RESTART":
+            if hasattr(service_instance, "_load_state"):
+                service_instance._load_state()
+
         # start service dependencies (RPC clients)
         self._start_service_dependencies(service_instance)
         
@@ -571,18 +603,19 @@ class ProcManager(object):
 
     def _service_start(self, service_instance):
         # Start process
+        # THIS SHOULD BE CALLED LATER THAN SPAWN
         # TODO: Check for timeout
         service_instance.errcause = "starting service"
         service_instance.start()
 
     def _set_publisher_endpoints(self, service_instance, publisher_streams=None):
-        service_instance.stream_publisher_registrar = StreamPublisherRegistrar(process=service_instance, container=self.container)
 
         publisher_streams = publisher_streams or {}
 
         for name, stream_id in publisher_streams.iteritems():
             # problem is here
-            pub = service_instance.stream_publisher_registrar.create_publisher(stream_id)
+            pub = StreamPublisher(process=service_instance, stream_id=stream_id)
+
 
             setattr(service_instance, name, pub)
 
@@ -663,11 +696,12 @@ class ProcManager(object):
         """
         Terminates a process and all its resources. Termination is graceful with timeout.
         """
-        log.debug("terminate_process: %s", process_id)
         service_instance = self.procs.get(process_id, None)
         if not service_instance:
             raise BadRequest("Cannot terminate. Process id='%s' unknown on container id='%s'" % (
                                         process_id, self.container.id))
+
+        log.info("ProcManager.terminate_process: %s -> pid=%s", service_instance._proc_name, process_id)
 
         # Give the process notice to quit doing stuff.
         service_instance.quit()

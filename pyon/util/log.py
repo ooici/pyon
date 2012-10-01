@@ -1,18 +1,18 @@
-#!/usr/bin/env python
-import cStringIO
-import traceback
-from pyon.core.exception import IonException
+"""
+logging utilities for pycc container
+- formatter that makes RPC exception chains more readable by dropping the RPC communication-related overhead (pyon.endpoint, pika, gevent, etc)
+- log, the magic scoped logger anyone can import (now with TRACE log level)
+- config, the log configuration manager
+"""
 
-__author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
-
-import __builtin__
+import ooi.logging
+import ooi.logging.format
 import logging
 import sys
-import socket
-from logging.handlers import SysLogHandler, SYSLOG_UDP_PORT
 
+log = ooi.logging.log
 
+TRACE = 'TRACE'
 DEBUG     = 'DEBUG'
 INFO      = 'INFO'
 WARNING   = 'WARNING'
@@ -20,58 +20,47 @@ ERROR     = 'ERROR'
 CRITICAL  = 'CRITICAL'
 EXCEPTION = 'EXCEPTION'
 
+class RPCStackFormatter(ooi.logging.format.StackFormatter):
+    """ print stack traces for exceptions with special handling for chains of RPC calls.
+        for chains of RPC calls, the stack trace will drop stack frames from the top (where gevent invokes the function),
+        and from the bottom (where the call invokes another remote RPC service and passes through the broker).
+        the intent is that the frames show only application business logic and not the details of relaying through RPC.
+        this is appropriate for tracing application issues if the RPC framework code is trusted.
+        when troubleshooting the RPC framework, use StackFormatter or the default logging formatter instead.
 
+        USAGE
 
-class StackFormatter(logging.Formatter):
-    def __init__(self,*a,**b):
-        super(StackFormatter,self).__init__(*a,**b)
-        self._format_args = {'formatter': self._format_rpc_stack}
-        self._filter_frames = True
-        self.set_filename_width(40)
+        Example lines from logging.yml:
 
-    def set_filename_width(self, width):
-        self._filename_width = width
-        self._format_string = '%%%ds:%%-7d%%s'%width
-
-    def set_stack_formatter(self, formatter):
-        if filter is None:                      # use default in exception.py
-            del self._format_args['formatter']
-        elif filter == 'RPC':                   # skip RPC framework
-            self._format_args['formatter']=self._format_rpc_stack
-        else:
-            self._format_args['formatter']=formatter  # use caller-defined format
-
-    def formatException(self, record):
-        type,ex,tb = sys.exc_info()
-        # use special exception logging only for IonExceptions with more than one saved stack
-        if isinstance(ex,IonException) and len(ex.get_stacks())>1:
-            return ex.format_stack(**self._format_args)
-        else:
-            super(StackFormatter,self).formatException(record)
-
-    def _format_rpc_stack(self, label, stack):
-        top_stack = label=='__init__'  # skip initial label -- start output with first stack frame
-        if not top_stack:
-            yield '   ----- '+label+' -----'
-
-        frames = self._get_frames(top_stack, stack) if self._filter_frames else stack
-
-        # create format string to align frames evenly, limit filename to 40chars
-        w=self._filename_width
-        p=-w
-        s=self._format_string
-        for file,line,method,code in frames:
-            file_part = file if len(file)<w else file[p:]
-            yield s%(file_part,line,code)
-
-    def _get_frames(self, top_stack, stack):
-        # split stack into these sections:
-        # [non-endpoint], endpoint, displayable, endpoint, [non-endpoint]
+            formatters:
+              rpc:
+                (): 'pyon.util.log.RPCStackFormatter'
+                format: '%(asctime)s %(levelname)-8s %(threadName)s %(name)-15s:%(lineno)d %(message)s'
+            handlers:
+              console:
+                class: logging.StreamHandler
+                level: DEBUG
+                stream: ext://sys.stdout
+                formatter: rpc
+    """
+    def filter_frames(self, top_stack, stack):
+        # split stack into sections.
+        # if this is the first stack, sections will be: displayable, endpoint, non-endpoint
+        # otherwise the sections will be: non-endpoint, endpoint, displayable, endpoint, non-endpoint
         #
-        # TODO: first and last sections should be [non-endpoint,non-project],
-        #       can drop greenlet, pika, etc; but make sure we don't drop too much
+        # if it matches this pattern, return only the middle "displayable" section,
+        # otherwise return the whole stack.
+        #
+        # "endpoint" means pyon.net.endpoint or pyon.ion.endpoint
+        # "non-endpoint" means anything else, although TODO: should limit this to non-project code only (like pika, gevent, ...)
+        #
+        # TODO: make sections and definitions of sections configurable to keep up with code changes, apply to other uses
+        #
         have_required_sections = False
-        display_frames = None
+        display_frames = []
+        if not stack:
+            return display_frames
+        finished_iterating = False
         i = iter(stack)
         try:
             file,line,method,code = i.next()
@@ -96,10 +85,13 @@ class StackFormatter(logging.Formatter):
                 more_rpc, file,line,method,code = self._collect_frames(True, i, file,line,method,code)
                 rpc_frames = more_rpc
         except StopIteration:
+            finished_iterating = True
             pass
+        except Exception,e:
+            print 'WARNING: RPCStackFormatter failed to filter frames in stack %r' % stack
 
         # if we did not find enough sections in the right order, use the whole stack
-        return display_frames if have_required_sections else stack
+        return display_frames if have_required_sections and finished_iterating else stack
 
     def _collect_frames(self, is_endpoint, i, file,line,method,code):
         # iterate and check if lines are ignored endpoints,
@@ -114,110 +106,6 @@ class StackFormatter(logging.Formatter):
     def _is_endpoint(self, file):
         return file.endswith('pyon/net/endpoint.py') or file.endswith('pyon/ion/endpoint.py')
 
-class StackLogger(logging.Logger):
-    def __init__(self, *a, **b):
-        super(StackLogger,self).__init__(*a, **b)
-        self.stack_formatter = StackFormatter()
-        handler = logging.StreamHandler()
-        handler.setFormatter(self.stack_formatter)
-        self.addHandler(handler)
-    def set_stack_formatter(self, formatter):
-        self.stack_formatter.set_stack_formatter(formatter)
-
-class Pyon_SysLogHandler(logging.handlers.SysLogHandler):
-    """
-    Class to override built-in syslog handler to work around
-    issue where log records that are over MTU get dropped.
-    We will chunk the message up so it at least gets logged.
-    """ 
-    MTU = 1400
-
-    def __init__(self, address=('localhost', SYSLOG_UDP_PORT),
-                 facility=SysLogHandler.LOG_USER, socktype=socket.SOCK_DGRAM, MTU=1400):
-        SysLogHandler.__init__(self, address, facility, socktype)
-        self.MTU = MTU
-        
-    def emit(self, record):
-        message = record.getMessage()
-        msg_len = len(message)
-        if msg_len > self.MTU:
-            # Chunk message into MTU size parts
-            start_index = 0
-            end_index = self.MTU - 1
-            while True:
-                msg = message[start_index:end_index]
-                rec = logging.LogRecord(record.name, record.levelno, record.pathname, record.lineno, msg, None, record.exc_info, record.funcName)
-                SysLogHandler.emit(self, rec)
-                start_index = start_index + self.MTU
-                if start_index >= msg_len:
-                    break
-                end_index = end_index + self.MTU
-                if end_index > msg_len:
-                    end_index = msg_len - 1
-        else:
-            SysLogHandler.emit(self, record)
-
-# List of module names that will pass-through for the magic import scoping. This can be modified.
-import_paths = [__name__]
-
-def get_logger(loggername=__name__):
-    """
-    Creates an instance of a logger.
-    Adds any registered handlers with this factory.
-
-    Note: as this method is called typically on module load, if you haven't
-    registered a handler at this time, that instance of a logger will not
-    have that handler.
-    """
-    logger = logging.getLogger(loggername)
-
-    return logger
-
-# Special placeholder object, to be swapped out for each module that imports this one
-log = None
-
-def get_scoped_log(framestoskip=1):
-    frame = sys._getframe(framestoskip)
-    name = frame.f_locals.get('__name__', None)
-
-    while name in import_paths and frame.f_back:
-        frame = frame.f_back
-        name = frame.f_locals.get('__name__', None)
-
-#    logging.setLoggerClass(StackLogger)
-    log = get_logger(name) if name else None
-    return log
-
-_orig___import__ = __import__
-def _import(name, globals=None, locals=None, fromlist=None, level=-1):
-    """
-    Magic import mechanism  to get a logger that's auto-scoped to the importing module. Example:
-    from pyon.public import scoped_log as log
-
-    Inspects the stack; should be harmless since this is just syntactic sugar for module declarations.
-    """
-    kwargs = dict()
-    if globals:
-        kwargs['globals'] = globals
-    if locals:
-        kwargs['locals'] = locals
-    if fromlist:
-        kwargs['fromlist'] = fromlist
-    kwargs['level'] = level
-    module = _orig___import__(name, **kwargs)
-    if name in import_paths and ('log' in fromlist or '*' in fromlist):
-        log = get_scoped_log(2)
-        setattr(module, 'log', log)
-
-    return module
-__builtin__.__import__ = _import
-
-# Workaround a quirk in python 2.7 with custom imports
-from logging.config import BaseConfigurator
-BaseConfigurator.importer = staticmethod(_import)
-
-log = get_scoped_log()
-
 def change_logging_level(logger,level):
     '''
     Change the logging level for a given logger or for all loggers by using 'all'
@@ -227,15 +115,13 @@ def change_logging_level(logger,level):
       change_logging_level('all', CRITICAL)
       change_logging_level('pyon', DEBUG)
 
+    WARNING: MAGIC VALUE ANTIPATTERN: prevents use of a logger called "all".
+    TODO: make more obscure:  None?  __all__
     '''
-    assert level in [DEBUG, INFO, WARNING, ERROR, CRITICAL]
-    from pyon.core.log import LOGGING_CFG
-    assert logger=='all' or logger in LOGGING_CFG['loggers']
-    import logging.config
-    if logger=='all':
-        for k,v in LOGGING_CFG['loggers'].iteritems():
-            LOGGING_CFG['loggers'][k]['level'] = level
-    else:
-        LOGGING_CFG['loggers'][logger]['level'] = level
 
-    logging.config.dictConfig(LOGGING_CFG)
+    assert level in logging._levelNames
+
+    if logger=='all':
+        config.set_all_levels(level)
+    else:
+        config.set_level(logger,level)
