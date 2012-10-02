@@ -128,7 +128,7 @@ class EndpointUnit(object):
         @param  headers     Optional headers to send. Will override anything produced by _build_header.
         @param  kwargs      Passed through to _send.
         """
-        _msg, _header = self._build_msg(msg)
+        _msg, _header = self._build_msg(msg, headers)
         if headers: _header.update(headers)
         return self._send(_msg, _header, **kwargs)
 
@@ -174,14 +174,17 @@ class EndpointUnit(object):
             if not ev.wait(timeout=3):
                 log.warn("Channel (%s) close did not respond in time, giving up", self.channel.get_channel_id())
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
-        Assembles the headers of a message from the raw message's content.
+        Assembles the headers of a message from the raw message's content or raw headers.
+        
+        Any headers passed in here are strictly for reference. Headers set in there will take
+        precedence and override any headers with the same key.
         """
 #        log.debug("EndpointUnit _build_header")
         return {'ts':get_ion_ts()}
 
-    def _build_payload(self, raw_msg):
+    def _build_payload(self, raw_msg, raw_headers):
         """
         Assembles the payload of a message from the raw message's content.
 
@@ -190,7 +193,7 @@ class EndpointUnit(object):
 #        log.debug("EndpointUnit _build_payload")
         return raw_msg
 
-    def _build_msg(self, raw_msg):
+    def _build_msg(self, raw_msg, raw_headers):
         """
         Builds a message (headers/payload) from the raw message's content.
         You typically do not need to override this method, but override the _build_header
@@ -199,8 +202,8 @@ class EndpointUnit(object):
         @returns A 2-tuple of payload, headers
         """
 #        log.debug("EndpointUnit _build_msg")
-        header = self._build_header(raw_msg)
-        payload = self._build_payload(raw_msg)
+        header = self._build_header(raw_msg, raw_headers)
+        payload = self._build_payload(raw_msg, raw_headers)
 
         return payload, header
 
@@ -797,11 +800,11 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         #log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Sets headers common to Request-Response patterns, non-ion-specific.
         """
-        headers = BidirectionalEndpointUnit._build_header(self, raw_msg)
+        headers = BidirectionalEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['performative'] = 'request'
         if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)   # @TODO correct?
@@ -828,18 +831,17 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
     """
     The listener side makes one of these.
     """
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Sets headers common to Response side of Request-Response patterns, non-ion-specific.
         """
-        headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg)
+        headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
         if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
         headers['format']       = raw_msg.__class__.__name__
-        headers['reply-by']     = 'todo'                        # @TODO unnecessary for inform-result?
 
         return headers
 
@@ -900,14 +902,14 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         return "%s-%d" % (RPCRequestEndpointUnit._conv_id_root, RPCRequestEndpointUnit.conv_id_counter)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Build header override.
 
         This should set header values that are invariant or have nothing to do with the specific
         call being made (such as op).
         """
-        headers = RequestEndpointUnit._build_header(self, raw_msg)
+        headers = RequestEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['protocol'] = 'rpc'
         headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
         headers['conv-id']  = self._build_conv_id()
