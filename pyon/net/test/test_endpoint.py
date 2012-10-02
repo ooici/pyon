@@ -383,7 +383,7 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         gl2.join(timeout=5)
 
 @attr('INT', group='COI')
-class TestListeningBaseEndpointIntWithZeroMQ(TestListeningBaseEndpointInt):
+class TestListeningBaseEndpointIntWithLocal(TestListeningBaseEndpointInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
