@@ -64,6 +64,12 @@ class Inconsistent(IonException):
     '''
     status_code = 410
 
+class OperationInterruptedException(IonException):
+    '''
+    Client request timed out server-side while being processed
+    '''
+    status_code = 411
+
 class ServerError(IonException):
     '''
     For reporting generic service failure

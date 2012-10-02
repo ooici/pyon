@@ -10,7 +10,7 @@ from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
 from pyon.util.async import spawn
-from pyon.core.exception import IonException, ContainerError
+from pyon.core.exception import IonException, ContainerError, OperationInterruptedException
 from pyon.util.containers import get_ion_ts
 import threading
 import traceback
@@ -43,6 +43,7 @@ class IonProcessThread(PyonThread):
         self._cleanup_method    = cleanup_method
 
         self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
+        self._ctrl_thread       = None
         self._ctrl_queue        = Queue()
         self._ready_control     = Event()
         self._errors            = []
@@ -99,10 +100,10 @@ class IonProcessThread(PyonThread):
         self._start_time = int(get_ion_ts())
 
         # spawn control flow loop
-        ct = self.thread_manager.spawn(self._control_flow)
+        self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
 
         # wait on control flow loop!
-        ct.get()
+        self._ctrl_thread.get()
 
     def _routing_call(self, call, context, *callargs, **callkwargs):
         """
@@ -151,6 +152,10 @@ class IonProcessThread(PyonThread):
             try:
                 with self.service.push_context(context):
                     res = call(*callargs, **callkwargs)
+            except OperationInterruptedException:
+                # endpoint layer takes care of response as it's the one that caused this
+                log.debug("Operation interrupted")
+                pass
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.

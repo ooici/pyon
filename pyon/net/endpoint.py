@@ -769,6 +769,9 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         else:
             timeout = CFG.get_safe('endpoint.receive.timeout', 10)
 
+        # we have a timeout, update reply-by header
+        headers['reply-by'] = str(int(headers['ts']) + timeout * 1000)
+
         #log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
         #ts = time.time()
@@ -782,7 +785,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         try:
             result_data, result_headers = self._get_response(sent_headers['conv-id'], timeout)
         except Timeout:
-            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
+            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s, conv %s' % (timeout, str(self.channel._send_name), sent_headers['conv-id']))
         finally:
             pass
 #            elapsed = time.time() - ts
@@ -835,8 +838,8 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
-        headers['format']       = raw_msg.__class__.__name__    # hmm
-        headers['reply-by']     = 'todo'                        # clock sync is a problem
+        headers['format']       = raw_msg.__class__.__name__
+        headers['reply-by']     = 'todo'                        # @TODO unnecessary for inform-result?
 
         return headers
 
@@ -910,8 +913,8 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         headers['conv-id']  = self._build_conv_id()
         headers['language'] = 'ion-r2'
         headers['encoding'] = 'msgpack'
-        headers['format']   = raw_msg.__class__.__name__    # hmm
-        headers['reply-by'] = 'todo'                        # clock sync is a problem
+        headers['format']   = raw_msg.__class__.__name__
+        headers['reply-by'] = 'todo'                        # set by _send override @TODO should be set here
 
         return headers
 
@@ -1089,6 +1092,9 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         cmd_arg_obj = msg
         cmd_op      = headers.get('op', None)
 
+        # get timeout
+        timeout = self._calculate_timeout(headers)
+
         # transform cmd_arg_obj into a dict
         if hasattr(cmd_arg_obj, '__dict__'):
             cmd_arg_obj = cmd_arg_obj.__dict__
@@ -1120,11 +1126,31 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         ######
         ###### THIS IS WHERE THE SERVICE OPERATION IS CALLED ######
         ######
-        result              = self._make_routing_call(ro_meth, **cmd_arg_obj)
+        result              = self._make_routing_call(ro_meth, timeout, **cmd_arg_obj)
         response_headers    = { 'status_code': 200, 'error_message': '' }
         ######
 
         return result, response_headers
+
+    def _calculate_timeout(self, headers):
+        """
+        Takes incoming message headers and calculates an integer value in seconds to be used for timeouts.
+
+        @return None or an integer value in seconds.
+        """
+        if not ('ts' in headers and 'reply-by' in headers):
+            return None
+
+        ts = int(headers['ts'])
+        reply_by = int(headers['reply-by'])
+        latency = int(get_ion_ts()) - ts         # we don't have access to response headers here, so calc again, not too big of a deal
+
+        # reply-by minus timestamp gives us max allowable, subtract 2x observed latency, give 10% margin, and convert to integers
+        to_val = int((reply_by - ts - 2 * latency) / 1000 * 0.9)
+
+        log.debug("calculated timeout val of %s for conv-id %s", to_val, headers.get('conv-id', 'NONE'))
+
+        return to_val
 
     def _create_error_response(self, ex):
         # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
@@ -1132,13 +1158,18 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                 'error_message': str(ex.get_error_message()),
                 'performative':'failure'}
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         """
         Calls into the routing object.
 
         May be overridden at a lower level.
         """
-        return call(*op_args, **op_kwargs)
+        try:
+            with Timeout(timeout):
+                return call(*op_args, **op_kwargs)
+        except Timeout:
+            # cleanup shouldn't be needed, executes in same greenlet as current
+            raise exception.Timeout("Timed out making call to service (non-ION process)")
 
     def _sample_request(self, status, status_descr, msg, headers, response, response_headers):
         """

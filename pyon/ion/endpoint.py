@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 """ION messaging endpoints"""
-from pyon.util import log
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -9,7 +8,9 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
-from pyon.core.exception import Unauthorized
+from pyon.core.exception import Timeout as IonTimeout
+from pyon.core.exception import OperationInterruptedException
+from gevent.timeout import Timeout
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
@@ -194,12 +195,16 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return RPCResponseEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        res = ar.get()     # @TODO: timeout?
+        try:
+            res = ar.get(timeout=timeout)
+        except Timeout:
+            self._process._process._ctrl_thread.proc.kill(exception=OperationInterruptedException, block=False)
+            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller
 
         # Persistent process state handling
         if hasattr(self._process,"_proc_state"):
@@ -318,12 +323,12 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return SubscriberEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        return ar.get()     # @TODO: timeout?
+        return ar.get(timeout=timeout)
 
 
 class ProcessSubscriber(Subscriber):
