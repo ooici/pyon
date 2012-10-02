@@ -515,7 +515,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         e.channel = Mock()
         e.channel.recv = lambda: sleep(5)   # simulate blocking when recv is called
 
-        self.assertRaises(exception.Timeout, e._send, sentinel.msg, Mock(), timeout=1)
+        self.assertRaises(exception.Timeout, e._send, sentinel.msg, MagicMock(), timeout=1)
 
     def test_rr_client(self):
         rr = RequestResponseClient(node=self._node, to_name="rr")
