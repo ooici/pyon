@@ -203,8 +203,11 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         try:
             res = ar.get(timeout=timeout)
         except Timeout:
-            self._process._process._ctrl_thread.proc.kill(exception=OperationInterruptedException, block=False)
-            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller
+
+            # cancel or abort current processing
+            self._process._process.cancel_or_abort_call(ar)
+
+            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
 
         # Persistent process state handling
         if hasattr(self._process,"_proc_state"):

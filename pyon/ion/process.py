@@ -127,6 +127,43 @@ class IonProcessThread(PyonThread):
         self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, callkwargs, context))
         return ar
 
+    def has_pending_call(self, ar):
+        """
+        Returns true if the call (keyed by the AsyncResult returned by _routing_call) is still pending.
+        """
+        for _, qar, _, _, _, _ in self._ctrl_queue.queue:
+            if qar == ar:
+                return True
+
+        return False
+
+    def _cancel_pending_call(self, ar):
+        """
+        Cancels a pending call (keyed by the AsyncResult returend by _routing_call).
+
+        @return True if the call was truly pending.
+        """
+        if self.has_pending_call(ar):
+            ar.set(False)
+            return True
+
+        return False
+
+    def _interrupt_control_thread(self):
+        """
+        Signal the control flow thread that it needs to abort processing, likely due to a timeout.
+        """
+        self._ctrl_thread.proc.kill(exception=OperationInterruptedException, block=False)
+
+    def cancel_or_abort_call(self, ar):
+        """
+        Either cancels a future pending call, or aborts the current processing if the given AR is unset.
+
+        The pending call is keyed by the AsyncResult returned by _routing_call.
+        """
+        if not self._cancel_pending_call(ar) and not ar.ready():
+            self._interrupt_control_thread()
+
     def _control_flow(self):
         """
         Main process thread of execution method.
@@ -149,6 +186,18 @@ class IonProcessThread(PyonThread):
 
             res = None
             start_proc_time = int(get_ion_ts())
+
+            # check context for expiration
+            if context is not None and 'reply-by' in context:
+                if start_proc_time >= int(context['reply-by']):
+                    log.info("control_flow: attempting to process message already exceeding reply-by, ignore")
+                    continue
+
+            # also check ar if it is set, if it is, that means it is cancelled
+            if ar.ready():
+                log.info("control_flow: attempting to process message that has been cancelled, ignore")
+                continue
+
             try:
                 with self.service.push_context(context):
                     res = call(*callargs, **callkwargs)
