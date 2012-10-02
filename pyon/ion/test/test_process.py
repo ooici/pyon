@@ -3,21 +3,23 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from mock import sentinel, Mock, MagicMock
-from nose.plugins.attrib import attr
 from pyon.ion.process import IonProcessThread
-from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.endpoint import ProcessRPCServer
 from gevent.event import AsyncResult, Event
 from gevent.coros import Semaphore
 from gevent.timeout import Timeout
 from pyon.util.unit_test import PyonTestCase
-import time
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.context import LocalContextMixin
-from pyon.core.exception import IonException, NotFound, ContainerError
+from pyon.core.exception import IonException, NotFound, ContainerError, Timeout as IonTimeout
 from pyon.util.async import spawn
+from mock import sentinel, Mock, MagicMock
+from nose.plugins.attrib import attr
+from pyon.net.endpoint import RPCClient
+from pyon.service.service import BaseService
+import time
 
-@attr('UNIT', group='process')
+@attr('UNIT', group='coi')
 class ProcessTest(PyonTestCase):
 
     class ExpectedFailure(StandardError):
@@ -316,4 +318,28 @@ class ProcessTest(PyonTestCase):
         futurear2 = AsyncResult()
         ar2 = p._routing_call(futurear2.set, MagicMock(), sentinel.val2)
         ar2.get(timeout=2)
+
+class FakeService(BaseService):
+    """
+    Class to use for testing below.
+    """
+    name = 'fake_service'
+    dependencies = []
+
+    def takes_too_long(self):
+        ar = AsyncResult()
+        ar.wait()
+
+@attr('INT', group='coi')
+class TestProcessInt(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+        self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
+        self.fsclient = RPCClient(to_name='fake_service')
+
+    def test_timeout_with_messaging(self):
+        with self.assertRaises(IonTimeout) as cm:
+            self.fsclient.request({}, op='takes_too_long', timeout=5)
+
+        self.assertIn('execute in allotted time', cm.exception.message)
 
