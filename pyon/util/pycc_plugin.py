@@ -36,6 +36,9 @@ class RabbitManagementHelper:
         listables = simplejson.loads(output_json)
         return listables
 
+    def list_names_with_prefix(self, listables, name_prefix):
+        return [l['name'] for l in listables if l['name'].startswith(name_prefix)]
+
     # This function works on exchange, queue, vhost, user
     def delete_names_with_prefix(self, deletable_type, deleteable,  name_prefix):
         deleted = []
