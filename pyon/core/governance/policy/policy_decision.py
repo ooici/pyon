@@ -29,7 +29,6 @@ COMMON_SERVICE_POLICY_RULES = 'common_service_policy_rules'
 
 
 THIS_DIR = path.dirname(__file__)
-XACML_SAMPLE_POLICY_FILENAME = 'sample_policies.xml'
 XACML_EMPTY_POLICY_FILENAME = 'empty_policy_set.xml'
 
 ROLE_ATTRIBUTE_ID = XACML_1_0_PREFIX + 'subject:subject-role-id'
@@ -44,12 +43,14 @@ StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
 
 class PolicyDecisionPointManager(object):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, governance_controller):
         self.resource_policy_decision_point = dict()
         self.service_policy_decision_point = dict()
 
         self.empty_pdp = PDP.fromPolicySource(path.join(THIS_DIR, XACML_EMPTY_POLICY_FILENAME), ReaderFactory)
         self.load_common_service_policy_rules('')
+
+        self.governance_controller = governance_controller
 
         #No longer need this cause these were added to the XACML engine library, but left here for historical purposes.
         #from pyon.core.governance.policy.xacml.not_function import Not
@@ -158,6 +159,18 @@ class PolicyDecisionPointManager(object):
         attribute.attributeValues[-1].value = id
         return attribute
 
+    def create_org_role_attribute(self, actor_roles, subject):
+        attribute = None
+        for role in actor_roles:
+            if attribute is None:
+                attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)
+            else:
+                attribute.attributeValues.append(StringAttributeValue())
+                attribute.attributeValues[-1].value = role
+
+        if attribute is not None:
+            subject.attributes.append(attribute)
+
     def _create_request_from_message(self, invocation, receiver, receiver_type='service'):
 
         sender_type = invocation.get_header_value('sender-type', 'Unknown')
@@ -178,17 +191,17 @@ class PolicyDecisionPointManager(object):
         subject.attributes.append(self.create_string_attribute(SENDER_ID, sender))
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID, ion_actor_id))
 
-        #Iterate over the roles associated with the user and create attributes for each
-        for org in actor_roles:
-            attribute = None
-            for role in actor_roles[org]:  # TODO - Figure out how to handle multiple Org Roles
-                if attribute is None:
-                    attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)
-                else:
-                    attribute.attributeValues.append(StringAttributeValue())
-                    attribute.attributeValues[-1].value = role
+        #Get the Org Id of this container that is running the endpoint process
+        org_name = self.governance_controller.get_container_org_boundary_name()
 
-            subject.attributes.append(attribute)
+        #If this is not a root Org container, then iterate over the roles associated with the user only for
+        #the Org that this container is associated with otherwise include all roles and create attributes for each
+        if self.governance_controller.is_root_org_container():
+            for org in actor_roles:
+                self.create_org_role_attribute(actor_roles[org],subject)
+        else:
+            if actor_roles.has_key(org_name):
+                self.create_org_role_attribute(actor_roles[org_name],subject)
 
         request.subjects.append(subject)
 

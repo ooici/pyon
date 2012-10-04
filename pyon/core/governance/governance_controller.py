@@ -60,6 +60,8 @@ class GovernanceController(object):
         self._container_org_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
         self._container_org_id = None
 
+        self._is_root_org_container = (self._container_org_name == CFG.get_safe('system.root_org', 'ION'))
+
         if self.enabled:
             self.initialize_from_config(config)
 
@@ -77,7 +79,7 @@ class GovernanceController(object):
 
         self.governance_dispatcher = GovernanceDispatcher()
 
-        self.policy_decision_point_manager = PolicyDecisionPointManager()
+        self.policy_decision_point_manager = PolicyDecisionPointManager(self)
 
         if 'interceptor_order' in config:
             self.interceptor_order = config['interceptor_order']
@@ -110,6 +112,12 @@ class GovernanceController(object):
 
     def is_container_org_boundary(self):
         return self._is_container_org_boundary
+
+    def is_root_org_container(self):
+        return self._is_root_org_container
+
+    def get_container_org_boundary_name(self):
+        return self._container_org_name
 
     def get_container_org_boundary_id(self):
 

@@ -81,6 +81,26 @@ class TestProcManager(IonIntegrationTestCase):
 
         return pid
 
+    def test_proc_org(self):
+        self._start_container()
+
+        pm = self.container.proc_manager
+
+        config = {'process':{'type':'standalone'}}
+        pid1 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid1)
+
+        config = {'process':{'type':'standalone'}, 'org_name': 'Org2'}
+        pid2 = pm.spawn_process('sample2', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid2)
+
+        proc = pm.procs_by_name['sample1']
+        self.assertEqual(proc.org_name,'ION')
+
+        proc = pm.procs_by_name['sample2']
+        self.assertEqual(proc.org_name,'Org2')
+
+
     def test_procmanager_shutdown(self):
         self.test_procmanager()
         pm = self.container.proc_manager

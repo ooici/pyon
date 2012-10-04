@@ -92,7 +92,6 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                     elif process_type == 'service':
                         ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
-                    #TODO - what to do if process type is unknown?
 
             log.debug("Policy Decision: " + str(ret))
 
