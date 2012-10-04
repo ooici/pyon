@@ -5,10 +5,8 @@ AMQP messaging with Pika.
 Uses Pika SelectConnection (using monkey patched select module).
 """
 
-from pika.adapters import SelectConnection
-from pika import BasicProperties
-
 from pyon.util.log import log
+
 
 class Node(object):
     """
@@ -22,7 +20,7 @@ class Node(object):
     received messages to receiver/consumer protocol things.
     """
 
-    client = None 
+    client = None
     running = 0
 
     def on_connection_open(self, client):

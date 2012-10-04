@@ -1,4 +1,3 @@
-import json
 from collections import OrderedDict
 
 from pyon.container.cc import Container
@@ -6,7 +5,7 @@ from pyon.core.exception import BadRequest
 from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.object import IonObjectSerializationBase
 from pyon.core.security import authentication
-from pyon.util.log import log
+
 
 class DictSorter(IonObjectSerializationBase):
     serialize = IonObjectSerializationBase.operate
@@ -19,6 +18,7 @@ class DictSorter(IonObjectSerializationBase):
             return res
 
         return obj
+
 
 class SignatureInterceptor(Interceptor):
     def __init__(self, *args, **kwargs):

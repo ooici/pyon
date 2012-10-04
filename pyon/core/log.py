@@ -22,8 +22,8 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
     for path in logging_conf_paths:
         try:
             config.add_configuration(path)
-        except Exception,e:
-            print 'WARNING: could not load logging configuration file %s: %s' % (path,e)
+        except Exception, e:
+            print 'WARNING: could not load logging configuration file %s: %s' % (path, e)
     if logging_config_override:
         try:
             config.add_configuration(logging_config_override)

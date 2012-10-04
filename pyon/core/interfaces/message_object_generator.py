@@ -118,7 +118,7 @@ class MessageObjectGenerator:
                             value = dec[1] if len(dec) == 2 else ""
                             # Add it to the decorator list
                             if not decorators:
-                                decorators = '"' + key  + '":"' + value + '"'
+                                decorators = '"' + key + '":"' + value + '"'
                             else:
                                 decorators = decorators + ', "' + key + '":"' + value + '"'
                         else:

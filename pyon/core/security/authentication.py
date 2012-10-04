@@ -10,12 +10,10 @@
 import binascii
 import urllib
 import os
-import sys
-import tempfile
 import datetime
 import hashlib
 
-from M2Crypto import EVP, X509, BIO, SMIME, RSA
+from M2Crypto import EVP, X509
 
 from pyon.core.bootstrap import CFG
 from pyon.container.cc import Container
@@ -29,9 +27,9 @@ BASEPATH = os.path.realpath(".")
 CERTSTORE_PATH = BASEPATH + '/res/certstore/'
 KEYSTORE_PATH = BASEPATH + '/res/keystore/'
 
-CONTAINER_CERT_NAME='container.crt'
-CONTAINER_KEY_NAME='container.key'
-ORG_CERT_NAME='root.crt'
+CONTAINER_CERT_NAME = 'container.crt'
+CONTAINER_KEY_NAME = 'container.key'
+ORG_CERT_NAME = 'root.crt'
 
 
 class Authentication(object):
@@ -61,7 +59,7 @@ class Authentication(object):
                 log.debug("cont_key_path: %s" % cont_key_path)
                 root_cert_path = os.path.join(certstore_path, ORG_CERT_NAME)
                 log.debug("root_cert_path: %s" % root_cert_path)
-                
+
                 if os.path.exists(cont_cert_path) and os.path.exists(cont_key_path) and os.path.exists(root_cert_path):
                     with open(cont_cert_path, 'r') as f:
                         self.cont_cert = f.read()
@@ -83,7 +81,7 @@ class Authentication(object):
         if self.cont_key:
             return True
         else:
-            return False 
+            return False
 
     def sign_message_hex(self, message, rsa_private_key=None):
         """
@@ -92,7 +90,7 @@ class Authentication(object):
         """
         return binascii.hexlify(self.sign_message(message, rsa_private_key))
 
-    def sign_message(self, message, rsa_private_key=None): 
+    def sign_message(self, message, rsa_private_key=None):
         """
         take a message, and return a binary signature of it
         """
@@ -148,27 +146,27 @@ class Authentication(object):
         Return a Dict of all known attributes for the certificate
         """
         attributes = {}
-        
+
         attributes['subject_items'] = {}
         attributes['subject'] = str(x509.get_subject())
         for item in attributes['subject'].split('/'):
             try:
-                key,value = item.split('=')
+                key, value = item.split('=')
                 attributes['subject_items'][key] = urllib.unquote(value)
             except:
                 """
                 """
-        
+
         attributes['issuer_items'] = {}
         attributes['issuer'] = str(x509.get_issuer())
         for item in attributes['issuer'].split('/'):
             try:
-                key,value = item.split('=')
+                key, value = item.split('=')
                 attributes['issuer_items'][key] = urllib.unquote(value)
             except:
                 """
                 """
-        
+
         attributes['not_valid_before'] = str(x509.get_not_before())
         attributes['not_valid_after'] = str(x509.get_not_after())
         attributes['ext_count'] = str(x509.get_ext_count())
@@ -176,7 +174,7 @@ class Authentication(object):
         attributes['text'] = str(x509.as_text())
         attributes['serial_number'] = str(x509.get_serial_number())
         attributes['version'] = str(x509.get_version())
-        
+
         return attributes
 
     def is_certificate_valid(self, cert_string):
@@ -202,10 +200,10 @@ class Authentication(object):
         """
         root_cert_attrs = self.decode_certificate_string(root_cert)
         root_subject = root_cert_attrs['subject']
-        
+
         cert_attrs = self.decode_certificate_string(cert_string)
         cert_issuer = cert_attrs['issuer']
-        
+
         if root_subject == cert_issuer:
             return True
         return False
@@ -219,10 +217,10 @@ class Authentication(object):
         Test if the current date is covered by the certificates valid within date range.
         """
         cert = X509.load_cert_string(cert_string)
-        nvb = datetime.datetime.strptime(str(cert.get_not_before()),"%b %d %H:%M:%S %Y %Z")
-        nva = datetime.datetime.strptime(str(cert.get_not_after()),"%b %d %H:%M:%S %Y %Z")
+        nvb = datetime.datetime.strptime(str(cert.get_not_before()), "%b %d %H:%M:%S %Y %Z")
+        nva = datetime.datetime.strptime(str(cert.get_not_after()), "%b %d %H:%M:%S %Y %Z")
         now = datetime.datetime.utcnow()
-        
+
         if now < nvb:
             return False
         if now > nva:

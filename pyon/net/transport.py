@@ -25,32 +25,39 @@ from pyon.util.pool import IDPool
 from uuid import uuid4
 from collections import defaultdict
 
+
 class TransportError(StandardError):
     pass
+
 
 class BaseTransport(object):
     def declare_exchange_impl(self, exchange, **kwargs):
         raise NotImplementedError()
+
     def delete_exchange_impl(self, exchange, **kwargs):
         raise NotImplementedError()
 
     def declare_queue_impl(self, queue, **kwargs):
         raise NotImplementedError()
+
     def delete_queue_impl(self, queue, **kwargs):
         raise NotImplementedError()
 
     def bind_impl(self, exchange, queue, binding):
         raise NotImplementedError()
+
     def unbind_impl(self, exchange, queue, binding):
         raise NotImplementedError()
 
     def ack_impl(self, delivery_tag):
         raise NotImplementedError()
+
     def reject_impl(self, delivery_tag, requeue=False):
         raise NotImplementedError()
 
     def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         raise NotImplementedError()
+
     def stop_consume_impl(self, consumer_tag):
         raise NotImplementedError()
 
@@ -66,7 +73,7 @@ class BaseTransport(object):
     def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
         raise NotImplementedError()
 
-    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False): 
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
         raise NotImplementedError()
 
     def close(self):
@@ -209,6 +216,7 @@ class ComposableTransport(BaseTransport):
     def active(self):
         return all(map(lambda x: x.active, self._transports))
 
+
 class AMQPTransport(BaseTransport):
     """
     A transport adapter around a Pika channel.
@@ -316,14 +324,13 @@ class AMQPTransport(BaseTransport):
             return ret_vals[0]
         return tuple(ret_vals)
 
-
     def declare_exchange_impl(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", self._client.channel_number, exchange, exchange_type, durable, auto_delete)
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
             testid = os.environ['QUEUE_BLAME']
-            arguments.update({'created-by':testid})
+            arguments.update({'created-by': testid})
 
         self._sync_call(self._client.exchange_declare, 'callback',
                                              exchange=exchange,
@@ -342,7 +349,7 @@ class AMQPTransport(BaseTransport):
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
             testid = os.environ['QUEUE_BLAME']
-            arguments.update({'created-by':testid})
+            arguments.update({'created-by': testid})
 
         frame = self._sync_call(self._client.queue_declare, 'callback',
                                 queue=queue or '',
@@ -459,12 +466,13 @@ class AMQPTransport(BaseTransport):
 
         props = BasicProperties(headers=properties)
 
-        self._client.basic_publish(exchange=exchange, #todo
-                             routing_key=routing_key, #todo
+        self._client.basic_publish(exchange=exchange,  # todo
+                             routing_key=routing_key,  # todo
                              body=body,
                              properties=props,
-                             immediate=immediate, #todo
-                             mandatory=mandatory) #todo
+                             immediate=immediate,      # todo
+                             mandatory=mandatory)      # todo
+
 
 class NameTrio(object):
     """
@@ -483,9 +491,9 @@ class NameTrio(object):
                             and if not specified, defaults to the *internal* queue name.
         """
         if isinstance(exchange, tuple):
-            self._exchange, self._queue, self._binding = list(exchange) + ([None] *(3-len(exchange)))
+            self._exchange, self._queue, self._binding = list(exchange) + ([None] * (3 - len(exchange)))
         elif isinstance(queue, tuple):
-            self._exchange, self._queue, self._binding = list(queue) + ([None] *(3-len(queue)))
+            self._exchange, self._queue, self._binding = list(queue) + ([None] * (3 - len(queue)))
         else:
             self._exchange  = exchange
             self._queue     = queue
@@ -819,7 +827,7 @@ class LocalRouter(object):
         assert consumer_tag in self._consumers_by_ctag
 
         with self._lock_consumers:
-            queue  = self._consumers_by_ctag[consumer_tag]
+            queue = self._consumers_by_ctag[consumer_tag]
             self._consumers_by_ctag.pop(consumer_tag)
 
             for i, consumer in enumerate(self._consumers[queue]):
@@ -943,16 +951,19 @@ class LocalTransport(BaseTransport):
 
     def declare_exchange_impl(self, exchange, **kwargs):
         self._broker.declare_exchange(exchange, **kwargs)
+
     def delete_exchange_impl(self, exchange, **kwargs):
         self._broker.delete_exchange(exchange, **kwargs)
 
     def declare_queue_impl(self, queue, **kwargs):
         return self._broker.declare_queue(queue, **kwargs)
+
     def delete_queue_impl(self, queue, **kwargs):
         self._broker.delete_queue(queue, **kwargs)
 
     def bind_impl(self, exchange, queue, binding):
         self._broker.bind(exchange, queue, binding)
+
     def unbind_impl(self, exchange, queue, binding):
         self._broker.unbind(exchange, queue, binding)
 
@@ -961,11 +972,13 @@ class LocalTransport(BaseTransport):
 
     def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):
         return self._broker.start_consume(callback, queue, no_ack=no_ack, exclusive=exclusive)
+
     def stop_consume_impl(self, consumer_tag):
         self._broker.stop_consume(consumer_tag)
 
     def ack_impl(self, delivery_tag):
         self._broker.ack(delivery_tag)
+
     def reject_impl(self, delivery_tag, requeue=False):
         self._broker.reject(delivery_tag, requeue=requeue)
 

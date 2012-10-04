@@ -18,12 +18,13 @@ def get_object_definition_from_datastore(sysname):
         return ''
     for item in obj_types:
         try:
-            fragments.append((item['definition_order'],item['definition']))
+            fragments.append((item['definition_order'], item['definition']))
         except:
             return ''
     fragments = [item for ordinal, item in sorted(fragments)]
     full_definition = "\n".join(fragments)
     return full_definition
+
 
 def get_service_definition_from_datastore(sysname):
     fragments = []
@@ -38,6 +39,7 @@ def get_service_definition_from_datastore(sysname):
             return ''
     full_definition = "\n".join(fragments)
     return full_definition
+
 
 def is_yaml_string_valid(yaml_string):
     try:

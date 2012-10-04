@@ -3,6 +3,7 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>, Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
+
 class Invocation(object):
     """
     Container object for parameters of events/messages passed to internal
@@ -31,7 +32,6 @@ class Invocation(object):
 
         return getattr(process, 'process_type', 'simple')
 
-
     def get_message_receiver(self):
 
         process = self.get_arg_value('process')
@@ -53,7 +53,6 @@ class Invocation(object):
         else:
             return process.name
 
-
     #Returns the value of of the specified arg or the specified default value
     def get_arg_value(self, arg_name, default_value=None):
         value = self.args[arg_name] if self.args.has_key(arg_name) and self.args[arg_name] != '' else default_value
@@ -67,8 +66,9 @@ class Invocation(object):
     #This function is used to parse the two value tuple of sysname,servicename
     def get_service_name(self, header_value):
         value_list = [x.strip() for x in header_value.split(',')]
-        value =  value_list[1] if len(value_list) > 1 else value_list[0]
+        value = value_list[1] if len(value_list) > 1 else value_list[0]
         return value
+
 
 class Interceptor(object):
     """
@@ -83,9 +83,9 @@ class Interceptor(object):
     def incoming(self, invocation):
         pass
 
+
 def process_interceptors(interceptors, invocation):
     for interceptor in interceptors:
         func = getattr(interceptor, invocation.path)
         invocation = func(invocation)
     return invocation
-

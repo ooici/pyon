@@ -1,23 +1,19 @@
 #!/usr/bin/env python
 """
-@package pyon.agent.common_agent 
+@package pyon.agent.common_agent
 @file pyon/agent/common_agent.py
 @author Edward Hunter
 @brief Common base class for ION resource agents.
 """
 
 __author__ = 'Edward Hunter'
-
 __license__ = 'Apache 2.0'
 
-# Standard imports.
-import traceback
 
 # Pyon imports.
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.event.event import EventPublisher
-from pyon.ion.resource import RT
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
@@ -25,10 +21,8 @@ from pyon.util.containers import get_ion_ts
 from pyon.core.exception import IonException
 from pyon.core.exception import BadRequest
 from pyon.core.exception import Conflict
-from pyon.core.exception import Timeout
 from pyon.core.exception import NotFound
 from pyon.core.exception import ServerError
-from pyon.core.exception import ResourceError
 
 # Interface imports.
 from interface.services.iresource_agent import BaseResourceAgent
@@ -40,8 +34,10 @@ from pyon.agent.instrument_fsm import FSMStateError
 from pyon.agent.instrument_fsm import FSMCommandUnknownError
 from pyon.agent.common import BaseEnum
 
+
 class UserAgent():
     pass
+
 
 class ResourceAgentState(BaseEnum):
     """
@@ -58,6 +54,7 @@ class ResourceAgentState(BaseEnum):
     CALIBRATE = 'RESOURCE_AGENT_STATE_CALIBRATE'
     DIRECT_ACCESS = 'RESOUCE_AGENT_STATE_DIRECT_ACCESS'
     BUSY = 'RESOURCE_AGENT_STATE_BUSY'
+
 
 class ResourceAgentEvent(BaseEnum):
     """
@@ -84,7 +81,8 @@ class ResourceAgentEvent(BaseEnum):
     GET_RESOURCE_CAPABILITIES = 'RESOURCE_AGENT_EVENT_GET_RESOURCE_CAPABILITIES'
     DONE = 'RESOURCE_AGENT_EVENT_DONE'
     PING_RESOURCE = 'RESOURCE_AGENT_PING_RESOURCE'
-    
+
+
 class ResourceAgent(BaseResourceAgent):
     """
     A resource agent is an ION process of type "agent" that exposes the standard
@@ -92,7 +90,7 @@ class ResourceAgent(BaseResourceAgent):
     common to all resource agents and is subclassed with implementations
     specific for instrument agents, user agents, etc.
     """
-    
+
     ##############################################################
     # Class variables.
     ##############################################################
@@ -105,20 +103,20 @@ class ResourceAgent(BaseResourceAgent):
 
     # Override in subclass to set specific origin type.
     ORIGIN_TYPE = "Resource"
-    
+
     # Override in subclass to expose agent capabilities.
     CAPABILITIES = []
-    
+
     ##############################################################
     # Constructor and ION init/deinit.
-    ##############################################################    
-    
+    ##############################################################
+
     def __init__(self, *args, **kwargs):
         """
         Initialize superclass and id variables.
         """
-        
-        # Base class constructor.        
+
+        # Base class constructor.
         super(ResourceAgent, self).__init__(*args, **kwargs)
 
         # The ID of the AgentInstance subtype resource object.
@@ -138,15 +136,15 @@ class ResourceAgent(BaseResourceAgent):
 
         # Event publisher.
         self._event_publisher = None
-                
+
         # An example agent parameter.
         self.aparam_example = None
 
-        # Set intial state.        
+        # Set intial state.
         if 'initial_state' in kwargs:
             if ResourceAgentState.has(kwargs['initial_state']):
                 self._initial_state = kwargs['initial_state']
-        
+
         else:
             self._initial_state = ResourceAgentState.UNINITIALIZED
 
@@ -174,7 +172,7 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # Governance interface.
-    ##############################################################    
+    ##############################################################
 
     def negotiate(self, resource_id="", sap_in=None):
         """
@@ -184,23 +182,23 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # Capabilities interface.
-    ##############################################################    
+    ##############################################################
 
     def get_capabilities(self, resource_id="", current_state=True):
         """
         """
-        
+
         agent_cmds = self._fsm.get_events(current_state)
         agent_cmds = self._filter_capabilities(agent_cmds)
         agent_params = self.get_agent_parameters()
-        
+
         try:
             [res_cmds, res_params] = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_CAPABILITIES, current_state)
 
         except FSMStateError:
             res_cmds = []
             res_params = []
-                
+
         caps = []
         for item in agent_cmds:
             cap = IonObject('AgentCapability', name=item,
@@ -220,22 +218,21 @@ class ResourceAgent(BaseResourceAgent):
             caps.append(cap)
 
         return caps
-    
+
     def get_agent_parameters(self):
         """
         """
         params = [x.lstrip('aparam_') for x in vars(self).keys() if x.startswith('aparam_')]
-        return params    
-    
+        return params
+
     def _filter_capabilities(self, events):
         """
         """
         return events
-    
+
     ##############################################################
     # Agent interface.
-    ##############################################################    
-
+    ##############################################################
     def get_agent(self, resource_id='', params=[]):
         """
         """
@@ -245,15 +242,15 @@ class ResourceAgent(BaseResourceAgent):
                 key = 'aparam_' + x
                 val = getattr(self, key)
                 result[x] = val
-            
+
             except TypeError:
                 raise BadRequest('Bad agent parameter name: %s' % str(x))
 
             except AttributeError:
                 raise BadRequest('Unknown agent parameter: %s' % x)
-        
+
         return result
-        
+
     def set_agent(self, resource_id='', params={}):
         """
         """
@@ -261,30 +258,30 @@ class ResourceAgent(BaseResourceAgent):
             try:
                 key = 'aparam_' + x
                 getattr(self, key)
-                
+
                 set_key = 'aparam_set_' + x
                 try:
                     set_func = getattr(self, set_key)
-                    
+
                 except AttributeError:
                     set_func = None
-                
+
                 else:
                     if not callable(set_func):
                         set_func = None
 
                 if set_func:
                     set_func(val)
-                
+
                 else:
                     setattr(self, key, val)
-                    
+
             except TypeError:
                 raise BadRequest('Bad agent parameter name: %s' % str(x))
 
             except AttributeError:
                 raise BadRequest('Unknown agent parameter: %s' % x)
-    
+
     def get_agent_state(self, resource_id=''):
         """
         Return resource agent current common fsm state.
@@ -298,7 +295,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = BadRequest('Execute argument "command" not set.')
             self._on_command_error('execute_agent', None, None, None, iex)
             raise iex
-        
+
         # Grab command syntax.
         id = command.command_id
         cmd = command.command
@@ -321,17 +318,17 @@ class ResourceAgent(BaseResourceAgent):
             result = self._fsm.on_event(cmd, *args, **kwargs)
             cmd_result.result = result
             self._on_command('execute_agent', cmd, args, kwargs, result)
-        
+
         except FSMStateError as ex:
-            iex = Conflict(*(ex.args))    
+            iex = Conflict(*(ex.args))
             self._on_command_error('execute_agent', cmd, args, kwargs, iex)
             raise iex
 
         except FSMCommandUnknownError as ex:
-            iex = BadRequest(*(ex.args))    
+            iex = BadRequest(*(ex.args))
             self._on_command_error('execute_agent', cmd, args, kwargs, iex)
             raise iex
-                
+
         except IonException as iex:
             self._on_command_error('execute_agent', cmd, args, kwargs, iex)
             raise
@@ -340,7 +337,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = ServerError(*(ex.args))
             self._on_command_error('execute_agent', cmd, args, kwargs, iex)
             raise iex
-                
+
         return cmd_result
 
     def ping_agent(self, resource_id=""):
@@ -354,28 +351,27 @@ class ResourceAgent(BaseResourceAgent):
         """
         if isinstance(val, str):
             self.aparam_example = val
-        
+
         else:
             raise BadRequest('Invalid type to set agent parameter "example".')
-        
+
     ##############################################################
     # Resource interface.
-    ##############################################################    
-    
+    ##############################################################
     def get_resource(self, resource_id='', params=[]):
         """
         """
-        
+
         try:
             result = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE, params)
             return result
-        
+
         except FSMStateError as ex:
             iex = Conflict(*(ex.args))
             self._on_command_error('get_resource', None, [params], None, iex)
             raise iex
-    
-        except FSMCommandUnknownError as iex:
+
+        except FSMCommandUnknownError as ex:
             iex = BadRequest(*(ex.args))
             self._on_command_error('get_resource', None, [params], None, iex)
             raise iex
@@ -388,7 +384,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = ServerError(*(ex.args))
             self._on_command_error('get_resource', None, [params], None, iex)
             raise iex
-    
+
     def set_resource(self, resource_id='', params={}):
         """
         """
@@ -397,12 +393,12 @@ class ResourceAgent(BaseResourceAgent):
             result = self._fsm.on_event(ResourceAgentEvent.SET_RESOURCE, params)
             self._on_command('set_resource', None, [params], None, result)
             return result
-        
+
         except FSMStateError as ex:
             iex = Conflict(*(ex.args))
             self._on_command_error('set_resource', None, [params], None, iex)
             raise iex
-        
+
         except FSMCommandUnknownError as ex:
             iex = BadRequest(*(ex.args))
             self._on_command_error('set_resource', None, [params], None, iex)
@@ -411,9 +407,9 @@ class ResourceAgent(BaseResourceAgent):
         except IonException as iex:
             self._on_command_error('set_resource', None, [params], None, iex)
             raise iex
-    
+
         except Exception as ex:
-            iex = ServerError(*(ex.args))            
+            iex = ServerError(*(ex.args))
             self._on_command_error('set_resource', None, [params], None, iex)
             raise iex
 
@@ -422,9 +418,9 @@ class ResourceAgent(BaseResourceAgent):
         """
         try:
             return self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_STATE)
-            
+
         except FSMStateError as ex:
-            iex = Conflict(*(ex.args))    
+            iex = Conflict(*(ex.args))
             self._on_command_error('get_resource_state', None, None, None, iex)
             raise iex
 
@@ -432,7 +428,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = BadRequest(*(ex.args))
             self._on_command_error('get_resource_state', None, None, None, iex)
             raise iex
-        
+
         except IonException as iex:
             self._on_command_error('get_resource_state', None, None, None, iex)
             raise iex
@@ -441,10 +437,10 @@ class ResourceAgent(BaseResourceAgent):
             iex = ServerError(*(ex.args))
             self._on_command_error('get_resource_state', None, None, None, iex)
             raise iex
-        
+
     def execute_resource(self, resource_id='', command=None):
         """
-        """        
+        """
 
         if not command:
             iex = BadRequest('Execute argument "command" not set.')
@@ -474,9 +470,9 @@ class ResourceAgent(BaseResourceAgent):
                 ResourceAgentEvent.EXECUTE_RESOURCE, cmd, *args, **kwargs)
             cmd_result.result = result
             self._on_command('execute_resource', cmd, args, kwargs, result)
-            
+
         except FSMStateError as ex:
-            iex = Conflict(*(ex.args))    
+            iex = Conflict(*(ex.args))
             self._on_command_error('execute_resource', cmd, args, kwargs, iex)
             raise iex
 
@@ -484,7 +480,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = BadRequest(*(ex.args))
             self._on_command_error('execute_resource', cmd, args, kwargs, iex)
             raise iex
-        
+
         except IonException as iex:
             self._on_command_error('execute_resource', cmd, args, kwargs, iex)
             raise iex
@@ -493,17 +489,17 @@ class ResourceAgent(BaseResourceAgent):
             iex = ServerError(*(ex.args))
             self._on_command_error('execute_resource', cmd, args, kwargs, iex)
             raise iex
-        
-        return cmd_result        
+
+        return cmd_result
 
     def ping_resource(self, resource_id=''):
         """
         """
         try:
             return self._fsm.on_event(ResourceAgentEvent.PING_RESOURCE)
-            
+
         except FSMStateError as ex:
-            iex = Conflict(*(ex.args))    
+            iex = Conflict(*(ex.args))
             self._on_command_error('ping_resource', None, None, None, iex)
             raise iex
 
@@ -511,7 +507,7 @@ class ResourceAgent(BaseResourceAgent):
             iex = BadRequest(*(ex.args))
             self._on_command_error('ping_resource', None, None, None, iex)
             raise iex
-        
+
         except IonException as iex:
             self._on_command_error('ping_resource', None, None, None, iex)
             raise iex
@@ -523,13 +519,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # UNINITIALIZED event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_uninitialized_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_uninitialized_exit(self, *args, **kwargs):
         """
         """
@@ -537,13 +533,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # POWERED_DOWN event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_powered_down_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_powered_down_exit(self, *args, **kwargs):
         """
         """
@@ -551,13 +547,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # INACTIVE event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_inactive_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_inactive_exit(self, *args, **kwargs):
         """
         """
@@ -565,13 +561,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # IDLE event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_idle_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_idle_exit(self, *args, **kwargs):
         """
         """
@@ -579,13 +575,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # STOPPED event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_stopped_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_stopped_exit(self, *args, **kwargs):
         """
         """
@@ -593,13 +589,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # COMMAND event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_command_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_command_exit(self, *args, **kwargs):
         """
         """
@@ -607,13 +603,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # STREAMING event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_streaming_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_streaming_exit(self, *args, **kwargs):
         """
         """
@@ -621,13 +617,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # TEST event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_test_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_test_exit(self, *args, **kwargs):
         """
         """
@@ -635,13 +631,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # CALIBRATE event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_calibrate_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_calibrate_exit(self, *args, **kwargs):
         """
         """
@@ -649,13 +645,13 @@ class ResourceAgent(BaseResourceAgent):
 
     ##############################################################
     # DIRECT_ACCESS event handlers.
-    ##############################################################    
+    ##############################################################
 
     def _handler_direct_access_enter(self, *args, **kwargs):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_direct_access_exit(self, *args, **kwargs):
         """
         """
@@ -669,25 +665,24 @@ class ResourceAgent(BaseResourceAgent):
         """
         """
         self._common_state_enter(*args, **kwargs)
-    
+
     def _handler_busy_exit(self, *args, **kwargs):
         """
         """
         self._common_state_exit(*args, **kwargs)
-    
+
     ##############################################################
     # Helpers.
-    ##############################################################    
-    
+    ##############################################################
     def _common_state_enter(self, *args, **kwargs):
         """
         Common work upon every state entry.
         """
         state = self._fsm.get_current_state()
         log.info('Resource agent %s publsihing state change: %s, time: %s', self.id, state, get_ion_ts())
-        
+
         event_data = {
-            'state' : state
+            'state': state
         }
         self._event_publisher.publish_event(event_type='ResourceAgentStateEvent',
                               origin=self.resource_id, **event_data)
@@ -697,7 +692,7 @@ class ResourceAgent(BaseResourceAgent):
         Common work upon every state exit.
         """
         pass
-    
+
     def _on_command(self, cmd, execute_cmd, args, kwargs, result):
         log.info('Resource agent %s publishing command event: \
                  cmd=%s, execute_cmd=%s, args=%s kwargs=%s time=%s',
@@ -705,52 +700,52 @@ class ResourceAgent(BaseResourceAgent):
                  get_ion_ts())
         event_data = {
             'command': cmd,
-            'execute_command' : execute_cmd,
-            'args' : args,
-            'kwargs' : kwargs,
-            'result' : result
+            'execute_command': execute_cmd,
+            'args': args,
+            'kwargs': kwargs,
+            'result': result
         }
         self._event_publisher.publish_event(event_type='ResourceAgentCommandEvent',
                                             origin=self.resource_id,
                                             **event_data)
-    
+
     def _on_command_error(self, cmd, execute_cmd, args, kwargs, ex):
         log.info('Resource agent %s publishing command error event: \
                  cmd=%s, execute_cmd=%s, args=%s, kwargs=%s, \
                  errtype=%s, errmsg=%s, errno=%i, time=%s',
                  self.id, str(cmd), str(execute_cmd), str(args), str(kwargs),
                  str(type(ex)), ex.message, ex.status_code, get_ion_ts())
-        
+
         if hasattr(ex, 'status_code'):
             status_code = ex.status_code
         else:
             status_code = -1
-            
+
         event_data = {
             'command': cmd,
-            'execute_command' : execute_cmd,
-            'args' : args,
-            'kwargs' : kwargs,
-            'error_type' : str(type(ex)),
-            'error_msg' : ex.message,
-            'error_code' : status_code
+            'execute_command': execute_cmd,
+            'args': args,
+            'kwargs': kwargs,
+            'error_type': str(type(ex)),
+            'error_msg': ex.message,
+            'error_code': status_code
         }
-            
+
         self._event_publisher.publish_event(event_type='ResourceAgentErrorEvent',
                                             origin=self.resource_id,
                                             **event_data)
-     
+
     def _construct_fsm(self):
         """
         Construct the state machine and register default handlers.
         Override in subclass to add handlers for resouce-dependent behaviors
         and state transitions.
         """
-                
+
         # Instrument agent state machine.
         self._fsm = InstrumentFSM(ResourceAgentState, ResourceAgentEvent,
                             ResourceAgentEvent.ENTER, ResourceAgentEvent.EXIT)
-        
+
         self._fsm.add_handler(ResourceAgentState.UNINITIALIZED, ResourceAgentEvent.ENTER, self._handler_uninitialized_enter)
         self._fsm.add_handler(ResourceAgentState.UNINITIALIZED, ResourceAgentEvent.EXIT, self._handler_uninitialized_exit)
 
@@ -768,22 +763,23 @@ class ResourceAgent(BaseResourceAgent):
 
         self._fsm.add_handler(ResourceAgentState.COMMAND, ResourceAgentEvent.ENTER, self._handler_command_enter)
         self._fsm.add_handler(ResourceAgentState.COMMAND, ResourceAgentEvent.EXIT, self._handler_command_exit)
-        
+
         self._fsm.add_handler(ResourceAgentState.STREAMING, ResourceAgentEvent.ENTER, self._handler_streaming_enter)
         self._fsm.add_handler(ResourceAgentState.STREAMING, ResourceAgentEvent.EXIT, self._handler_streaming_exit)
-        
+
         self._fsm.add_handler(ResourceAgentState.TEST, ResourceAgentEvent.ENTER, self._handler_test_enter)
         self._fsm.add_handler(ResourceAgentState.TEST, ResourceAgentEvent.EXIT, self._handler_test_exit)
-        
+
         self._fsm.add_handler(ResourceAgentState.CALIBRATE, ResourceAgentEvent.ENTER, self._handler_calibrate_enter)
         self._fsm.add_handler(ResourceAgentState.CALIBRATE, ResourceAgentEvent.EXIT, self._handler_calibrate_exit)
-        
+
         self._fsm.add_handler(ResourceAgentState.DIRECT_ACCESS, ResourceAgentEvent.ENTER, self._handler_direct_access_enter)
         self._fsm.add_handler(ResourceAgentState.DIRECT_ACCESS, ResourceAgentEvent.EXIT, self._handler_direct_access_exit)
-        
+
         self._fsm.add_handler(ResourceAgentState.BUSY, ResourceAgentEvent.ENTER, self._handler_busy_enter)
         self._fsm.add_handler(ResourceAgentState.BUSY, ResourceAgentEvent.EXIT, self._handler_busy_exit)
-    
+
+
 class ResourceAgentClient(ResourceAgentProcessClient):
     """
     Generic client for resource agents.
@@ -795,7 +791,7 @@ class ResourceAgentClient(ResourceAgentProcessClient):
         @param name Use this kwarg to set the target exchange name
         (service or process).
         """
-        
+
         # Assert and set the resource ID.
         assert resource_id, "resource_id must be set for an agent"
         self.resource_id = resource_id
@@ -812,13 +808,13 @@ class ResourceAgentClient(ResourceAgentProcessClient):
                 raise NotFound("No agent process found for resource_id %s" % self.resource_id)
 
         assert "name" in kwargs, "Name argument for agent target not set"
-        
+
         # Superclass constructor.
         ResourceAgentProcessClient.__init__(self, *args, **kwargs)
 
     ##############################################################
     # Client interface.
-    ##############################################################    
+    ##############################################################
 
     def negotiate(self, *args, **kwargs):
         return super(ResourceAgentClient, self).negotiate(self.resource_id, *args, **kwargs)
@@ -861,8 +857,7 @@ class ResourceAgentClient(ResourceAgentProcessClient):
 
     ##############################################################
     # Helpers.
-    ##############################################################    
-
+    ###########################################################
     @classmethod
     def _get_agent_process_id(cls, resource_id):
         """

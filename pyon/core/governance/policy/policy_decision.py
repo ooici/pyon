@@ -15,35 +15,32 @@ from ndg.xacml.core import Identifiers, XACML_1_0_PREFIX
 from ndg.xacml.core.attribute import Attribute
 from ndg.xacml.core.attributevalue import (AttributeValue,
                                            AttributeValueClassFactory)
-from pyon.core.exception import ContainerError
-
 from ndg.xacml.core.context.request import Request
 from ndg.xacml.core.context.subject import Subject
 from ndg.xacml.core.context.resource import Resource
 from ndg.xacml.core.context.action import Action
 from ndg.xacml.core.context.pdp import PDP
 from ndg.xacml.core.context.result import Decision
-from ndg.xacml.core.functions import functionMap, FunctionMap
 
 from pyon.core.exception import NotFound
 from pyon.util.log import log
 
-COMMON_SERVICE_POLICY_RULES='common_service_policy_rules'
+COMMON_SERVICE_POLICY_RULES = 'common_service_policy_rules'
 
 
 THIS_DIR = path.dirname(__file__)
-XACML_SAMPLE_POLICY_FILENAME='sample_policies.xml'
-XACML_EMPTY_POLICY_FILENAME='empty_policy_set.xml'
+XACML_SAMPLE_POLICY_FILENAME = 'sample_policies.xml'
+XACML_EMPTY_POLICY_FILENAME = 'empty_policy_set.xml'
 
-
-ROLE_ATTRIBUTE_ID=XACML_1_0_PREFIX + 'subject:subject-role-id'
-SENDER_ID=XACML_1_0_PREFIX + 'subject:subject-sender-id'
-RECEIVER_TYPE=XACML_1_0_PREFIX + 'resource:receiver-type'
+ROLE_ATTRIBUTE_ID = XACML_1_0_PREFIX + 'subject:subject-role-id'
+SENDER_ID = XACML_1_0_PREFIX + 'subject:subject-sender-id'
+RECEIVER_TYPE = XACML_1_0_PREFIX + 'resource:receiver-type'
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
+
 
 class PolicyDecisionPointManager(object):
 
@@ -59,7 +56,6 @@ class PolicyDecisionPointManager(object):
         #from pyon.core.governance.policy.xacml.and_function import And
         #functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
         #functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
-
 
     def _get_policy_template(self):
 
@@ -114,9 +110,8 @@ class PolicyDecisionPointManager(object):
     def load_common_service_policy_rules(self, rules_text):
 
         self.common_service_rules = rules_text
-        input_source = StringIO(self.create_policy_from_rules(COMMON_SERVICE_POLICY_RULES,rules_text))
+        input_source = StringIO(self.create_policy_from_rules(COMMON_SERVICE_POLICY_RULES, rules_text))
         self.load_common_service_pdp = PDP.fromPolicySource(input_source, ReaderFactory)
-
 
     def load_service_policy_rules(self, service_name, rules_text):
 
@@ -129,9 +124,8 @@ class PolicyDecisionPointManager(object):
         service_rule_set = self.common_service_rules + rules_text
 
         #Simply create a new PDP object for the service
-        input_source = StringIO(self.create_policy_from_rules(service_name,service_rule_set))
+        input_source = StringIO(self.create_policy_from_rules(service_name, service_rule_set))
         self.service_policy_decision_point[service_name] = PDP.fromPolicySource(input_source, ReaderFactory)
-
 
     def load_resource_policy_rules(self, resource_key, rules_text):
 
@@ -143,7 +137,7 @@ class PolicyDecisionPointManager(object):
         self.clear_resource_policy(resource_key)
 
         #Simply create a new PDP object for the service
-        input_source = StringIO(self.create_policy_from_rules(resource_key,rules_text))
+        input_source = StringIO(self.create_policy_from_rules(resource_key, rules_text))
         self.resource_policy_decision_point[resource_key] = PDP.fromPolicySource(input_source, ReaderFactory)
 
     #Remove any policy indexed by the resource_key
@@ -164,7 +158,6 @@ class PolicyDecisionPointManager(object):
         attribute.attributeValues[-1].value = id
         return attribute
 
-
     def _create_request_from_message(self, invocation, receiver, receiver_type='service'):
 
         sender_type = invocation.get_header_value('sender-type', 'Unknown')
@@ -180,16 +173,15 @@ class PolicyDecisionPointManager(object):
 
         log.debug("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
-
         request = Request()
         subject = Subject()
-        subject.attributes.append(self.create_string_attribute(SENDER_ID,sender))
-        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID,ion_actor_id))
+        subject.attributes.append(self.create_string_attribute(SENDER_ID, sender))
+        subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID, ion_actor_id))
 
         #Iterate over the roles associated with the user and create attributes for each
         for org in actor_roles:
             attribute = None
-            for role in actor_roles[org]: #TODO - Figure out how to handle multiple Org Roles
+            for role in actor_roles[org]:  # TODO - Figure out how to handle multiple Org Roles
                 if attribute is None:
                     attribute = self.create_string_attribute(ROLE_ATTRIBUTE_ID,  role)
                 else:
@@ -208,7 +200,6 @@ class PolicyDecisionPointManager(object):
         request.action = Action()
         request.action.attributes.append(self.create_string_attribute(Identifiers.Action.ACTION_ID, op))
         return request
-
 
     def check_agent_request_policies(self, invocation):
 
@@ -230,7 +221,6 @@ class PolicyDecisionPointManager(object):
 
         return decision
 
-
     def check_service_request_policies(self, invocation):
         receiver = invocation.get_message_receiver()
 
@@ -248,7 +238,6 @@ class PolicyDecisionPointManager(object):
 
         return self._evaluate_pdp(pdp, requestCtx)
 
-
     def check_resource_request_policies(self, invocation, resource_id):
 
         if not resource_id:
@@ -262,7 +251,6 @@ class PolicyDecisionPointManager(object):
             return Decision.NOT_APPLICABLE_STR
 
         return self._evaluate_pdp(pdp, requestCtx)
-
 
     def _evaluate_pdp(self, pdp, requestCtx):
 
