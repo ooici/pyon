@@ -675,14 +675,15 @@ class SubscriberEndpointUnit(EndpointUnit):
         EndpointUnit.message_received(self, msg, headers)
         assert self._callback, "No callback provided, cannot route subscribed message"
 
-        self._make_routing_call(self._callback, msg, headers)
+        self._make_routing_call(self._callback, None, msg, headers)
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         """
         Calls into the routing object.
 
         May be overridden at a lower level.
         """
+        # @TODO respect timeout
         return call(*op_args, **op_kwargs)
 
 
