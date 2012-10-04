@@ -75,7 +75,6 @@ class StreamPublisher(Publisher):
             xp = self.container.ex_manager.create_xp(stream_route.exchange_point)
         else:
             stream_route = self.stream_route
-        xp = self.xp
         log.trace('Publishing (%s,%s)', xp.exchange, stream_route.routing_key)
         super(StreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id or self.stream_id})
 
