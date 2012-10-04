@@ -41,6 +41,7 @@ testing = True
 # Identifies the unique name and namespace of this ION distributed system instance
 sys_name = None
 
+
 # Factory metaclass to create ION objects
 def IonObject(*args, **kwargs):
     return _obj_registry.new(*args, **kwargs)
@@ -52,7 +53,6 @@ container_instance = None
 # -----------------------------------------------------------------------------
 # Initialization helper functions
 # NOTE: no static initializers here!!
-
 def assert_environment():
     """
     This asserts the mandatory (minimal) execution environment for pyon.
@@ -66,6 +66,7 @@ def assert_environment():
         raise ContainerStartupError("pyon environment assertion failed: res/config directory not found")
     if not os.path.exists("res/config/pyon.yml"):
         raise ContainerStartupError("pyon environment assertion failed: pyon.yml config missing")
+
 
 def set_config(pyon_cfg=None):
     """
@@ -83,6 +84,7 @@ def set_config(pyon_cfg=None):
 
     assert_configuration(CFG)
 
+
 def assert_configuration(config):
     """
     Checks that configuration is OK.
@@ -93,14 +95,17 @@ def assert_configuration(config):
     if not is_basic_identifier(config.get_safe("system.root_org", "")):
         raise ContainerConfigError("Config entry 'system.root_org' has illegal value")
 
+
 def is_testing():
     return testing
+
 
 def set_sys_name(sysname=None):
     global sys_name
     old_sys_name = sys_name
     sys_name = sysname
     print >> sys.stderr, "pyon: sys_name changed from '%s' to '%s'" % (old_sys_name, sys_name)
+
 
 def get_sys_name():
     if sys_name:
@@ -124,11 +129,14 @@ def get_sys_name():
         set_sys_name(default_sys_name)
         return default_sys_name
 
+
 def get_obj_registry():
     return _obj_registry
 
+
 def get_service_registry():
     return _service_registry
+
 
 # -----------------------------------------------------------------------------
 

@@ -29,12 +29,13 @@ from pyon.util.stats import StatsCounter
 #END_MARKER = "\x7f\x7f\x7f\x7f"
 END_MARKER = "ZZZZZZ"
 
+
 def sha1hex(doc):
     """
     Compare the content of the doc without its id or revision...
     """
-    doc_id = doc.pop('_id',None)
-    doc_rev = doc.get('_rev',None)
+    doc_id = doc.pop('_id', None)
+    doc_rev = doc.get('_rev', None)
     doc_string = str(doc)
 
     if doc_id is not None:
@@ -44,6 +45,7 @@ def sha1hex(doc):
         doc['_rev'] = doc_rev
 
     return hashlib.sha1(doc_string).hexdigest().upper()
+
 
 class CouchDB_DataStore(DataStore):
     """
@@ -76,9 +78,9 @@ class CouchDB_DataStore(DataStore):
         self.profile = profile
 
         # serializers
-        self._io_serializer     = IonObjectSerializer()
+        self._io_serializer    = IonObjectSerializer()
         # TODO: Not nice to have this class depend on ION objects
-        self._io_deserializer   = IonObjectDeserializer(obj_registry=get_obj_registry())
+        self._io_deserializer  = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
     def close(self):
@@ -93,7 +95,7 @@ class CouchDB_DataStore(DataStore):
             return (self._datastore_cache[datastore_name], datastore_name)
 
         try:
-            ds = self.server[datastore_name] #http lookup
+            ds = self.server[datastore_name]   # http lookup
             self._datastore_cache[datastore_name] = ds
             return ds, datastore_name
         except ResourceNotFound:
@@ -210,7 +212,7 @@ class CouchDB_DataStore(DataStore):
                 doc["_id"] = doc.get("_id", None) or uuid4().hex
 
         # Update docs.  CouchDB will assign versions to docs.
-        db,_ = self._get_datastore()
+        db, _ = self._get_datastore()
         res = db.update(docs)
         self._count(create_mult_call=1, create_mult_obj=len(docs))
         if not all([success for success, oid, rev in res]):
@@ -238,7 +240,7 @@ class CouchDB_DataStore(DataStore):
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         else:
-            log.debug('Reading version %s of object %s/%s' ,rev_id, datastore_name, doc_id)
+            log.debug('Reading version %s of object %s/%s', rev_id, datastore_name, doc_id)
             doc = ds.get(doc_id, rev=rev_id)
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
@@ -266,7 +268,7 @@ class CouchDB_DataStore(DataStore):
         doc_list = [row.doc.copy() for row in docs]
         self._count(read_mult_call=1, read_mult_obj=len(doc_list))
         return doc_list
-    
+
     def update(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase):
             raise BadRequest("Obj param is not instance of IonObjectBase")
@@ -464,9 +466,9 @@ class CouchDB_DataStore(DataStore):
             for viewname in viewdef:
                 try:
                     rows = ds.view("_design/%s/_view/%s" % (design, viewname))
-                    log.debug("View %s/_design/%s/_view/%s: %s rows" ,datastore_name, design, viewname, len(rows))
+                    log.debug("View %s/_design/%s/_view/%s: %s rows", datastore_name, design, viewname, len(rows))
                 except Exception, ex:
-                    log.exception("Problem with view %s/_design/%s/_view/%s" ,datastore_name, design, viewname)
+                    log.exception("Problem with view %s/_design/%s/_view/%s", datastore_name, design, viewname)
 
     _refresh_views = _update_views
 
@@ -487,9 +489,9 @@ class CouchDB_DataStore(DataStore):
         @brief From given all_args dict, extract all entries that are valid CouchDB view options.
         @see http://wiki.apache.org/couchdb/HTTP_view_API
         """
-        view_args = dict((k, v) for k,v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
+        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
         limit = int(all_args.get('limit', 0))
-        if limit>0:
+        if limit > 0:
             view_args['limit'] = limit
         return view_args
 
@@ -513,7 +515,7 @@ class CouchDB_DataStore(DataStore):
         ds, datastore_name = self._get_datastore()
         validate_is_instance(subjects, list, 'subjects is not a list of resource_ids')
         view_args = dict(keys=subjects, include_docs=True)
-        results = self.query_view(self._get_viewname("association","by_bulk"), view_args)
+        results = self.query_view(self._get_viewname("association", "by_bulk"), view_args)
         ids = [i['value'] for i in results]
         assocs = [i['doc'] for i in results]
         self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
@@ -523,7 +525,7 @@ class CouchDB_DataStore(DataStore):
             return self.read_mult(ids), assocs
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
-        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s" ,subject, predicate, object_type, id_only)
+        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not subject:
@@ -539,7 +541,7 @@ class CouchDB_DataStore(DataStore):
                 subject_id = subject._id
 
         view_args = self._get_view_args(kwargs)
-        view = ds.view(self._get_viewname("association","by_sub"), **view_args)
+        view = ds.view(self._get_viewname("association", "by_sub"), **view_args)
         key = [subject_id]
         if predicate:
             key.append(predicate)
@@ -577,7 +579,7 @@ class CouchDB_DataStore(DataStore):
                 object_id = obj._id
 
         view_args = self._get_view_args(kwargs)
-        view = ds.view(self._get_viewname("association","by_obj"), **view_args)
+        view = ds.view(self._get_viewname("association", "by_obj"), **view_args)
         key = [object_id]
         if predicate:
             key.append(predicate)
@@ -632,7 +634,7 @@ class CouchDB_DataStore(DataStore):
         view_args = self._get_view_args(kwargs)
 
         if subject and obj:
-            view = ds.view(self._get_viewname("association","by_ids"), **view_args)
+            view = ds.view(self._get_viewname("association", "by_ids"), **view_args)
             key = [subject_id, object_id]
             if predicate:
                 key.append(predicate)
@@ -642,7 +644,7 @@ class CouchDB_DataStore(DataStore):
             endkey.append(END_MARKER)
             rows = view[key:endkey]
         elif subject:
-            view = ds.view(self._get_viewname("association","by_id"), **view_args)
+            view = ds.view(self._get_viewname("association", "by_id"), **view_args)
             key = [subject_id]
             if predicate:
                 key.append(predicate)
@@ -652,7 +654,7 @@ class CouchDB_DataStore(DataStore):
             endkey.append(END_MARKER)
             rows = view[key:endkey]
         elif predicate:
-            view = ds.view(self._get_viewname("association","by_pred"), **view_args)
+            view = ds.view(self._get_viewname("association", "by_pred"), **view_args)
             key = [predicate]
             endkey = list(key)
             endkey.append(END_MARKER)
@@ -696,7 +698,7 @@ class CouchDB_DataStore(DataStore):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource","by_type"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_type"), include_docs=(not id_only))
         if restype:
             key = [restype]
             if lcstate:
@@ -722,7 +724,7 @@ class CouchDB_DataStore(DataStore):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource","by_lcstate"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_lcstate"), include_docs=(not id_only))
         is_hierarchical = (lcstate in CommonResourceLifeCycleSM.STATE_ALIASES)
         # lcstate is a hiearachical state and we need to treat the view differently
         if is_hierarchical:
@@ -754,7 +756,7 @@ class CouchDB_DataStore(DataStore):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource","by_name"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_name"), include_docs=(not id_only))
         key = [name]
         if restype:
             key.append(restype)
@@ -779,7 +781,7 @@ class CouchDB_DataStore(DataStore):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource","by_keyword"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_keyword"), include_docs=(not id_only))
         key = [keyword]
         if restype:
             key.append(restype)
@@ -804,7 +806,7 @@ class CouchDB_DataStore(DataStore):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource","by_nestedtype"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_nestedtype"), include_docs=(not id_only))
         key = [nested_type]
         if restype:
             key.append(restype)
@@ -858,14 +860,14 @@ class CouchDB_DataStore(DataStore):
 
         if id_only:
             if convert_doc:
-                res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['value'])) for row in rows]
+                res_rows = [(row['id'], row['key'], self._persistence_dict_to_ion_object(row['value'])) for row in rows]
             else:
-                res_rows = [(row['id'],row['key'],row['value']) for row in rows]
+                res_rows = [(row['id'], row['key'], row['value']) for row in rows]
         else:
             if convert_doc:
-                res_rows = [(row['id'],row['key'],self._persistence_dict_to_ion_object(row['doc'])) for row in rows]
+                res_rows = [(row['id'], row['key'], self._persistence_dict_to_ion_object(row['doc'])) for row in rows]
             else:
-                res_rows = [(row['id'],row['key'],row['doc']) for row in rows]
+                res_rows = [(row['id'], row['key'], row['doc']) for row in rows]
 
         self._count(find_by_view_call=1, find_by_view_obj=len(res_rows))
 
@@ -911,10 +913,9 @@ class CouchDB_DataStore(DataStore):
         permanent view before using them in an application.
         '''
         ds, datastore_name = self._get_datastore(datastore_name)
-        res = ds.query(map_fun,reduce_fun,**options)
+        res = ds.query(map_fun, reduce_fun, **options)
 
         return self._parse_results(res)
-
 
     def _parse_results(self, doc):
         ''' Parses a complex object and organizes it into basic types
@@ -938,7 +939,7 @@ class CouchDB_DataStore(DataStore):
         #-------------------------------
         # \_ Split it into a dict with a key and a value
         #    Recursively parse down through the structure.
-        if isinstance(doc,Row):
+        if isinstance(doc, Row):
             if 'id' in doc:
                 ret['id'] = doc['id']
             ret['key'] = self._parse_results(doc['key'])
@@ -952,7 +953,7 @@ class CouchDB_DataStore(DataStore):
         #-------------------------------
         # \_ Break it apart and parse each element in the list
 
-        if isinstance(doc,list):
+        if isinstance(doc, list):
             ret = []
             for element in doc:
                 ret.append(self._parse_results(element))
@@ -962,12 +963,12 @@ class CouchDB_DataStore(DataStore):
         #-------------------------------
         # \_ Check to make sure it's not an IonObject
         # \_ Parse the key value structure for other objects
-        if isinstance(doc,dict):
+        if isinstance(doc, dict):
             if '_id' in doc:
                 # IonObject
                 return self._persistence_dict_to_ion_object(doc)
 
-            for key,value in doc.iteritems():
+            for key, value in doc.iteritems():
                 ret[key] = self._parse_results(value)
             return ret
 

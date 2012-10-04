@@ -62,11 +62,9 @@ class ProcManager(object):
 
         #Create an association to an Org object if not the rot ION org and only if found
         if CFG.container.org_name and CFG.container.org_name != CFG.system.root_org:
-            org,_ = self.container.resource_registry.find_resources(restype=RT.Org,name=CFG.container.org_name, id_only=True )
+            org, _ = self.container.resource_registry.find_resources(restype=RT.Org, name=CFG.container.org_name, id_only=True)
             if org:
-                self.container.resource_registry.create_association(org[0],PRED.hasResource, self.cc_id)  #TODO - replace with proper association
-
-
+                self.container.resource_registry.create_association(org[0], PRED.hasResource, self.cc_id)  # TODO - replace with proper association
 
         log.debug("ProcManager started, OK.")
 
@@ -117,7 +115,7 @@ class ProcManager(object):
 
         # Generate a new process id if not provided
         # TODO: Ensure it is system-wide unique
-        process_id =  process_id or "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
+        process_id = process_id or "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
         log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s, config=%s) as pid=%s", name, module, cls, config, process_id)
 
         process_cfg = CFG.copy()
@@ -194,7 +192,6 @@ class ProcManager(object):
 
         return ret
 
-
     def get_a_local_process(self, proc_name=''):
         '''
         Returns a running ION processes in the container for the specified name
@@ -208,7 +205,6 @@ class ProcManager(object):
                 return p
 
         return None
-
 
     def is_local_service_process(self, service_name):
         local_services = self.list_local_processes('service')
@@ -224,7 +220,6 @@ class ProcManager(object):
             if p.resource_type == resource_type:
                 return True
         return False
-
 
     def _spawned_proc_failed(self, gproc):
         log.error("ProcManager._spawned_proc_failed: %s, %s", gproc, gproc.exception)
@@ -256,7 +251,6 @@ class ProcManager(object):
         self._call_proc_state_changed(svc, ProcessStateEnum.ERROR)
 
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
-
 
     def _cleanup_method(self, queue_name, ep=None):
         """
@@ -364,7 +358,6 @@ class ProcManager(object):
 
         service_instance.stream_subscriber = StreamSubscriber(process=service_instance, exchange_name=listen_name, callback=service_instance.call_process)
 
-
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(service_instance, publish_streams)
@@ -406,7 +399,7 @@ class ProcManager(object):
         """
         service_instance = self._create_service_instance(process_id, name, module, cls, config)
         if not isinstance(service_instance, ResourceAgent) and not isinstance(service_instance, SimpleResourceAgent):
-             raise ContainerConfigError("Agent process must extend ResourceAgent")
+            raise ContainerConfigError("Agent process must extend ResourceAgent")
         listeners = []
 
         # Set the resource ID if we get it through the config
@@ -463,7 +456,6 @@ class ProcManager(object):
                 self.container.governance_controller.safe_update_service_access_policy(service_instance.name)
             else:
                 self.container.governance_controller.safe_update_service_access_policy(service_instance.resource_type)
-
 
         if service_instance.resource_id:
             # look to load any existing policies for this resource
@@ -543,7 +535,6 @@ class ProcManager(object):
         self._service_start(service_instance)
         return service_instance
 
-
     def _create_service_instance(self, process_id, name, module, cls, config):
         """
         Creates an instance of a "service", be it a Service, Agent, Stream, etc.
@@ -573,6 +564,7 @@ class ProcManager(object):
                     return
                 service_instance.container.state_repository.put_state(service_instance.id, service_instance._proc_state)
                 service_instance._proc_state_changed = False
+
             def _load_state():
                 if not hasattr(service_instance, "_proc_state"):
                     service_instance._proc_state = {}
@@ -593,7 +585,7 @@ class ProcManager(object):
 
         # start service dependencies (RPC clients)
         self._start_service_dependencies(service_instance)
-        
+
         return service_instance
 
     def _start_service_dependencies(self, service_instance):
@@ -635,7 +627,6 @@ class ProcManager(object):
         for name, stream_id in publisher_streams.iteritems():
             # problem is here
             pub = StreamPublisher(process=service_instance, stream_id=stream_id)
-
 
             setattr(service_instance, name, pub)
 
@@ -728,7 +719,7 @@ class ProcManager(object):
         service_instance.quit()
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
-        if getattr(service_instance,'_process', None) is not None and service_instance._process:
+        if getattr(service_instance, '_process', None) is not None and service_instance._process:
             service_instance._process.notify_stop()
             service_instance._process.stop()
 
@@ -760,7 +751,6 @@ class ProcManager(object):
 
         elif service_instance._proc_type == "agent":
             self.container.directory.unregister_safe("/Agents", service_instance.id)
-
 
         # Remove internal registration in container
         del self.procs[process_id]

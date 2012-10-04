@@ -4,9 +4,6 @@
 
 __author__ = 'Michael Meisinger'
 
-from zope.interface import providedBy
-from zope.interface import Interface, implements
-
 from pyon.core.exception import ContainerAppError, ConfigNotFound
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, dict_merge
@@ -14,6 +11,7 @@ from pyon.util.log import log
 
 
 START_PERMANENT = "permanent"
+
 
 class AppManager(object):
     def __init__(self, container):
@@ -60,7 +58,8 @@ class AppManager(object):
         """
         log.debug("AppManager.start_rel(rel=%s) ...", rel)
 
-        if rel is None: rel = {}
+        if rel is None:
+            rel = {}
 
         for rel_app_cfg in rel.apps:
             name = rel_app_cfg.name
@@ -105,7 +104,6 @@ class AppManager(object):
 
         return False
 
-
     def start_app(self, appdef=None, config=None):
         """
         @brief Start an app from an app definition.
@@ -130,7 +128,7 @@ class AppManager(object):
                 pid = self.container.spawn_process(name, module, cls, config)
                 appdef._pid = pid
                 self.apps.append(appdef)
-            except Exception, ex:
+            except Exception:
                 log.exception("Appl %s start from processapp failed" % appdef.name)
         else:
             # Case 2: Appdef contains full app start params
@@ -147,7 +145,7 @@ class AppManager(object):
                 log.debug("App '%s' started. Root sup-id=%s" % (appdef.name, supid))
 
                 self.apps.append(appdef)
-            except Exception, ex:
+            except Exception:
                 log.exception("Appl %s start from appdef failed" % appdef.name)
 
     def stop_app(self, appdef):
