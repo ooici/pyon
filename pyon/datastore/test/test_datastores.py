@@ -139,7 +139,7 @@ class Test_DataStores(IonIntegrationTestCase):
         marine_operator_role_ooi_id = marine_operator_role_tuple[0]
 
         role_objs = data_store.read_mult([admin_role_ooi_id, data_provider_role_ooi_id, marine_operator_role_ooi_id])
-            
+
         self.assertTrue(len(role_objs) == 3)
         self.assertTrue(role_objs[0]._id == admin_role_ooi_id)
         self.assertTrue(role_objs[1]._id == data_provider_role_ooi_id)
@@ -147,7 +147,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Construct three user info objects and assign them roles
         hvl_contact_info = {
-            "name": "Heitor Villa-Lobos",
+            "individual_names_given": "Heitor Villa-Lobos",
             "email": "prelude1@heitor.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Legendary Brazilian composer"}
@@ -165,7 +165,7 @@ class Test_DataStores(IonIntegrationTestCase):
         heitor_villa_lobos_ooi_id = hvl_user_info_tuple[0]
 
         ats_contact_info = {
-            "name": "Andres Torres Segovia",
+            "individual_names_given": "Andres Torres Segovia",
             "email": "asturas@andres.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Legendary Concert Guitarist"}
@@ -181,7 +181,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(len(ats_user_info_tuple) == 2)
 
         pok_contact_info = {
-            "name": "Per-Olov Kindgren",
+            "individual_names_given": "Per-Olov Kindgren",
             "email": "etude6@per.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Composer and YouTube star"}

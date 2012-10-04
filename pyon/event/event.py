@@ -89,7 +89,7 @@ class EventPublisher(Publisher):
         topic = self._topic(event_type, origin, base_types=event_msg.base_types,
             sub_type=event_msg.sub_type, origin_type=event_msg.origin_type)
         to_name = (self._send_name.exchange, topic)
-        log.debug("Publishing event message to %s", to_name)
+        log.trace("Publishing event message to %s", to_name)
 
         try:
             self.publish(event_msg, to_name=to_name)
@@ -172,7 +172,7 @@ class BaseEventSubscriberMixin(object):
         if queue_name is not None:
             if not queue_name.startswith(bootstrap.get_sys_name()):
                 queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
-                log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
+                log.warn("queue_name specified, prepending sys_name to it: %s", queue_name)
 
         # set this name to be picked up by inherited folks
         self._ev_recv_name = (xp_name, queue_name)
@@ -240,13 +240,13 @@ class EventRepository(object):
         self.event_store.close()
 
     def put_event(self, event):
-        log.debug("Store event persistently %s", event)
+        log.trace("Store event persistently %s", event)
         if not isinstance(event, Event):
             raise BadRequest("event must be type Event, not %s" % type(event))
         return self.event_store.create(event)
 
     def put_events(self, events):
-        log.info("Store %s events persistently", len(events))
+        log.debug("Store %s events persistently", len(events))
         if type(events) is not list:
             raise BadRequest("events must be type list, not %s" % type(events))
         if not all([isinstance(event, Event) for event in events]):
@@ -258,13 +258,13 @@ class EventRepository(object):
             return None
 
     def get_event(self, event_id):
-        log.debug("Retrieving persistent event for id=%s" % event_id)
+        log.trace("Retrieving persistent event for id=%s", event_id)
         event_obj = self.event_store.read(event_id)
         return event_obj
 
     def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
-        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s" % (
-            event_type, origin, start_ts, end_ts, kwargs.get("descending", None), kwargs.get("limit", None)))
+        log.trace("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s",
+            event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None))
         events = None
 
         design_name = "event"

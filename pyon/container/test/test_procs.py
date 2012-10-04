@@ -3,13 +3,14 @@
 __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
-from mock import Mock, patch
+from mock import Mock, patch, ANY
 
 from pyon.agent.agent import ResourceAgent
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
+from interface.objects import ProcessStateEnum
 
 class FakeContainer(object):
     def __init__(self):
@@ -113,4 +114,21 @@ class TestProcManager(IonIntegrationTestCase):
         self.container.terminate_process(pid)
 
         self.assertEquals(len(self.container.proc_manager.procs), 0)
+
+    def test_proc_state_change_callback(self):
+        self._start_container()
+
+        m = Mock()
+        pm = self.container.proc_manager
+        pm.add_proc_state_changed_callback(m)
+
+        pid = self._spawnproc(pm, 'service')
+
+        m.assert_called_with(ANY, ProcessStateEnum.SPAWN, self.container)
+        self.assertIsInstance(m.call_args[0][0], SampleProcess)
+
+        self.container.terminate_process(pid)
+
+        m.assert_called_with(ANY, ProcessStateEnum.TERMINATE, self.container)
+        self.assertIsInstance(m.call_args[0][0], SampleProcess)
 

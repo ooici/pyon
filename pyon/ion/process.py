@@ -16,7 +16,7 @@ from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
 from pyon.util.async import spawn
-from pyon.core.exception import IonException, ContainerError
+from pyon.core.exception import IonException, ContainerError, OperationInterruptedException
 from pyon.util.containers import get_ion_ts
 import threading
 import traceback
@@ -49,7 +49,8 @@ class IonProcessThread(PyonThread):
         self.service            = service
         self._cleanup_method    = cleanup_method
 
-        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed)  # bubbles up to main thread manager
+        self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
+        self._ctrl_thread       = None
         self._ctrl_queue        = Queue()
         self._ready_control     = Event()
         self._errors            = []
@@ -106,10 +107,10 @@ class IonProcessThread(PyonThread):
         self._start_time = int(get_ion_ts())
 
         # spawn control flow loop
-        ct = self.thread_manager.spawn(self._control_flow)
+        self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
 
         # wait on control flow loop!
-        ct.get()
+        self._ctrl_thread.get()
 
     def _routing_call(self, call, context, *callargs, **callkwargs):
         """
@@ -133,6 +134,43 @@ class IonProcessThread(PyonThread):
         self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, callkwargs, context))
         return ar
 
+    def has_pending_call(self, ar):
+        """
+        Returns true if the call (keyed by the AsyncResult returned by _routing_call) is still pending.
+        """
+        for _, qar, _, _, _, _ in self._ctrl_queue.queue:
+            if qar == ar:
+                return True
+
+        return False
+
+    def _cancel_pending_call(self, ar):
+        """
+        Cancels a pending call (keyed by the AsyncResult returend by _routing_call).
+
+        @return True if the call was truly pending.
+        """
+        if self.has_pending_call(ar):
+            ar.set(False)
+            return True
+
+        return False
+
+    def _interrupt_control_thread(self):
+        """
+        Signal the control flow thread that it needs to abort processing, likely due to a timeout.
+        """
+        self._ctrl_thread.proc.kill(exception=OperationInterruptedException, block=False)
+
+    def cancel_or_abort_call(self, ar):
+        """
+        Either cancels a future pending call, or aborts the current processing if the given AR is unset.
+
+        The pending call is keyed by the AsyncResult returned by _routing_call.
+        """
+        if not self._cancel_pending_call(ar) and not ar.ready():
+            self._interrupt_control_thread()
+
     def _control_flow(self):
         """
         Main process thread of execution method.
@@ -155,9 +193,25 @@ class IonProcessThread(PyonThread):
 
             res = None
             start_proc_time = int(get_ion_ts())
+
+            # check context for expiration
+            if context is not None and 'reply-by' in context:
+                if start_proc_time >= int(context['reply-by']):
+                    log.info("control_flow: attempting to process message already exceeding reply-by, ignore")
+                    continue
+
+            # also check ar if it is set, if it is, that means it is cancelled
+            if ar.ready():
+                log.info("control_flow: attempting to process message that has been cancelled, ignore")
+                continue
+
             try:
                 with self.service.push_context(context):
                     res = call(*callargs, **callkwargs)
+            except OperationInterruptedException:
+                # endpoint layer takes care of response as it's the one that caused this
+                log.debug("Operation interrupted")
+                pass
             except Exception as e:
                 # raise the exception in the calling greenlet, and don't
                 # wait for it to die - it's likely not going to do so.

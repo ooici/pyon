@@ -5,11 +5,13 @@
 __author__ = 'Michael Meisinger'
 
 import time
+from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
 from pyon.agent.simple_agent import SimpleResourceAgent
-from pyon.core.bootstrap import CFG,  get_sys_name
-from pyon.core.exception import ContainerConfigError, BadRequest
+from pyon.core import exception
+from pyon.core.bootstrap import CFG, IonObject, get_sys_name
+from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager
@@ -46,6 +48,9 @@ class ProcManager(object):
 
         # The pyon worker process supervisor
         self.proc_sup = IonProcessThreadManager(heartbeat_secs=CFG.cc.timeout.heartbeat, failure_notify_callback=self._spawned_proc_failed)
+
+        # list of callbacks for process state changes
+        self._proc_state_change_callbacks = []
 
     def start(self):
         log.debug("ProcManager starting ...")
@@ -227,12 +232,23 @@ class ProcManager(object):
 #            log.warn("No record of gproc %s in our map (%s)", gproc, self._spawned_proc_to_process)
 #            return
 #
-        svc = self._spawned_proc_to_process.get(gproc, "Unknown")
+        svc = self._spawned_proc_to_process.get(gproc, DotDict(id="unknown", _proc_type="unknown", _proc_name="unknown"))
 #
 #        # make sure svc is in our list
 #        if not svc in self.procs.values():
 #            log.warn("svc %s not found in procs list", svc)
 #            return
+
+        self.container.event_pub.publish_event(event_type="ProcessLifecycleEvent",
+            origin=svc.id,
+            origin_type="ContainerProcess",
+            sub_type="ERROR",
+            container_id=self.container.id,
+            process_type=svc._proc_type,
+            process_name=svc._proc_name,
+            state=ProcessStateEnum.ERROR)
+
+        self._call_proc_state_changed(svc, ProcessStateEnum.ERROR)
 
         self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
@@ -251,6 +267,30 @@ class ProcManager(object):
                 ch._destroy_queue()
             except TransportError as ex:
                 log.warn("Cleanup method triggered an error, ignoring: %s", ex)
+
+    def add_proc_state_changed_callback(self, cb):
+        """
+        Adds a callback to be called when a process' state changes.
+
+        The callback should take three parameters: The process, the state, and the container.
+        """
+        self._proc_state_change_callbacks.append(cb)
+
+    def remove_proc_state_changed_callback(self, cb):
+        """
+        Removes a callback from the process state change callback list.
+
+        If the callback is not registered, this method does nothing.
+        """
+        if cb in self._proc_state_change_callbacks:
+            self._proc_state_change_callbacks.remove(cb)
+
+    def _call_proc_state_changed(self, svc, state):
+        """
+        Internal method to call all registered process state change callbacks.
+        """
+        for cb in self._proc_state_change_callbacks:
+            cb(svc, state, self.container)
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
@@ -661,6 +701,9 @@ class ProcManager(object):
             process_name=service_instance._proc_name,
             state=ProcessStateEnum.SPAWN)
 
+        self._call_proc_state_changed(service_instance, ProcessStateEnum.SPAWN)
+
+
     def terminate_process(self, process_id):
         """
         Terminates a process and all its resources. Termination is graceful with timeout.
@@ -690,6 +733,8 @@ class ProcManager(object):
             container_id=self.container.id,
             process_type=service_instance._proc_type, process_name=service_instance._proc_name,
             state=ProcessStateEnum.TERMINATE)
+
+        self._call_proc_state_changed(service_instance, ProcessStateEnum.TERMINATE)
 
     def _unregister_process(self, process_id, service_instance):
         # Remove process registration in resource registry

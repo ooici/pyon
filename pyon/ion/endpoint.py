@@ -8,6 +8,9 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
+from pyon.core.exception import Timeout as IonTimeout
+from pyon.core.exception import OperationInterruptedException
+from gevent.timeout import Timeout
 
 
 #############################################################################
@@ -51,13 +54,13 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         return inv_two
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Builds the header for this Process-level RPC conversation.
         https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
         """
 
-        header = EndpointUnit._build_header(self, raw_msg)
+        header = EndpointUnit._build_header(self, raw_msg, raw_headers)
 
         # add our process identity to the headers
         header.update({'sender-name': self._process.name or 'unnamed-process',     # @TODO
@@ -109,13 +112,13 @@ class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpoint
         ProcessEndpointUnitMixin.__init__(self, process=process)
         RPCRequestEndpointUnit.__init__(self, **kwargs)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the RPCRequest side, then the Process mixin.
         """
 
-        header1 = RPCRequestEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = RPCRequestEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
@@ -180,24 +183,31 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         return result, response_headers
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the RPCResponse side, then the Process mixin.
         """
 
-        header1 = RPCResponseEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = RPCResponseEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return RPCResponseEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        res = ar.get()     # @TODO: timeout?
+        try:
+            res = ar.get(timeout=timeout)
+        except Timeout:
+
+            # cancel or abort current processing
+            self._process._process.cancel_or_abort_call(ar)
+
+            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
 
         # Persistent process state handling
         if hasattr(self._process, "_proc_state"):
@@ -243,12 +253,12 @@ class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUn
         ProcessEndpointUnitMixin.__init__(self, process=process)
         PublisherEndpointUnit.__init__(self, **kwargs)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the Publisher, then the Process mixin.
         """
-        header1 = PublisherEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = PublisherEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
@@ -308,24 +318,24 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
         with self._process.push_context(headers):
             return SubscriberEndpointUnit._message_received(self, msg, headers)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the Subscriber, then the Process mixin.
         """
 
-        header1 = Subscriber._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = Subscriber._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return SubscriberEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        return ar.get()     # @TODO: timeout?
+        return ar.get(timeout=timeout)
 
 
 class ProcessSubscriber(Subscriber):

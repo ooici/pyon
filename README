@@ -64,6 +64,9 @@ Use Buildout to install the python package dependencies with:
     > python bootstrap.py
     > bin/buildout
 
+** Add following to your .bashrc profile on Macs if buildout fails to
+    compile for packages such as gevent, pyml, etc.
+    export C_INCLUDE_PATH=/usr/local/include
 
 ION-DEFINITIONS SUBMODULE:
 

@@ -3,20 +3,23 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from mock import sentinel, Mock
-from nose.plugins.attrib import attr
 from pyon.ion.process import IonProcessThread
-from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.endpoint import ProcessRPCServer
 from gevent.event import AsyncResult, Event
 from gevent.coros import Semaphore
+from gevent.timeout import Timeout
 from pyon.util.unit_test import PyonTestCase
-import time
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.context import LocalContextMixin
-from pyon.core.exception import IonException, NotFound, ContainerError
+from pyon.core.exception import IonException, NotFound, ContainerError, Timeout as IonTimeout
 from pyon.util.async import spawn
+from mock import sentinel, Mock, MagicMock
+from nose.plugins.attrib import attr
+from pyon.net.endpoint import RPCClient
+from pyon.service.service import BaseService
+import time
 
-@attr('UNIT', group='process')
+@attr('UNIT', group='coi')
 class ProcessTest(PyonTestCase):
 
     class ExpectedFailure(StandardError):
@@ -144,6 +147,7 @@ class ProcessTest(PyonTestCase):
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
 
         def proc_call():
             raise NotFound("didn't find it")
@@ -170,9 +174,10 @@ class ProcessTest(PyonTestCase):
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
 
         def proc_call():
-            raise ExpectedError("didn't find it")
+            raise self.ExpectedError("didn't find it")
 
         def client_call(p=None, ar=None):
             try:
@@ -189,4 +194,152 @@ class ProcessTest(PyonTestCase):
 
         self.assertIsInstance(e, ContainerError)
         self.assertEquals(len(p._errors), 1)
+
+    def test_has_pending_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+
+        ar = p._routing_call(sentinel.call, MagicMock())
+        self.assertTrue(p.has_pending_call(ar))
+
+    def test_has_pending_call_with_no_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+
+        ar = p._routing_call(sentinel.call, MagicMock())
+        # pretend we've processed it
+        p._ctrl_queue.get()
+
+        self.assertFalse(p.has_pending_call(ar))
+
+    def test__cancel_pending_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+
+        ar = p._routing_call(sentinel.call, MagicMock())
+        val = p._cancel_pending_call(ar)
+
+        self.assertTrue(val)
+        self.assertTrue(ar.ready())
+
+    def test__cancel_pending_call_with_no_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+
+        ar = p._routing_call(sentinel.call, MagicMock())
+        # pretend we've processed it
+        p._ctrl_queue.get()
+
+        val = p._cancel_pending_call(ar)
+
+        self.assertFalse(val)
+
+    def test__interrupt_control_thread(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
+
+        # put a call in that will never finish
+        waitar = AsyncResult()      # test specific, wait for this to indicate we're being processed/hung
+        callar = AsyncResult()      # test specific, an ar that is just waited on by the spin call
+        def spin(inar, outar):
+            outar.set(True)
+            inar.wait()
+
+        ar = p._routing_call(spin, MagicMock(), callar, waitar)
+
+        # wait until we get notice we're being processed
+        waitar.get(timeout=2)
+
+        # interrupt it
+        p._interrupt_control_thread()
+
+        # the ar we got back from routing_call will not be set, it never finished the call
+        self.assertFalse(ar.ready())
+
+        # to prove we're unblocked, run another call through the control thread
+        ar2 = p._routing_call(callar.set, MagicMock(), sentinel.val)
+        ar2.get(timeout=2)
+        self.assertTrue(callar.ready())
+        self.assertEquals(callar.get(), sentinel.val)
+
+    def test__control_flow_cancelled_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
+
+        # put a call in that will never finish
+        waitar = AsyncResult()      # test specific, wait for this to indicate we're being processed/hung
+        callar = AsyncResult()      # test specific, an ar that is just waited on by the spin call (eventually set in this test)
+        def spin(inar, outar):
+            outar.set(True)
+            inar.wait()
+
+        ar = p._routing_call(spin, MagicMock(), callar, waitar)
+
+        # schedule a second call that we're going to cancel
+        futurear = AsyncResult()
+        ar2 = p._routing_call(futurear.set, MagicMock(), sentinel.val)
+
+        # wait until we get notice we're being processed
+        waitar.get(timeout=2)
+
+        # cancel the SECOND call
+        p.cancel_or_abort_call(ar2)
+
+        # prove we didn't interrupt the current proc by allowing it to continue
+        callar.set()
+        ar.get(timeout=2)
+
+        # now the second proc will get queued and never called because it is cancelled
+        self.assertRaises(Timeout, futurear.get, timeout=2)
+        self.assertTrue(ar2.ready())
+
+    def test__control_flow_expired_call(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
+
+        ctx = { 'reply-by' : 0 }        # no need for real time, as it compares by CURRENT >= this value
+        futurear = AsyncResult()
+        ar = p._routing_call(futurear.set, ctx, sentinel.val)
+
+        # ar won't be set, nor will futurear, but we'll be unblocked, so prove we can
+        self.assertRaises(Timeout, ar.get, timeout=2)
+        self.assertFalse(futurear.ready())
+
+        # put a new call through
+        futurear2 = AsyncResult()
+        ar2 = p._routing_call(futurear2.set, MagicMock(), sentinel.val2)
+        ar2.get(timeout=2)
+
+class FakeService(BaseService):
+    """
+    Class to use for testing below.
+    """
+    name = 'fake_service'
+    dependencies = []
+
+    def takes_too_long(self):
+        ar = AsyncResult()
+        ar.wait()
+
+@attr('INT', group='coi')
+class TestProcessInt(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+        self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
+        self.fsclient = RPCClient(to_name='fake_service')
+
+    def test_timeout_with_messaging(self):
+        with self.assertRaises(IonTimeout) as cm:
+            self.fsclient.request({}, op='takes_too_long', timeout=5)
+
+        self.assertIn('execute in allotted time', cm.exception.message)
 
