@@ -323,7 +323,7 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
         Override to direct the calls in _build_header - first the Subscriber, then the Process mixin.
         """
 
-        header1 = Subscriber._build_header(self, raw_msg, raw_headers)
+        header1 = SubscriberEndpointUnit._build_header(self, raw_msg, raw_headers)
         header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)

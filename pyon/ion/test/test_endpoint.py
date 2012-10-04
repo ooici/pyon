@@ -4,7 +4,7 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
 from pyon.net import endpoint
-from pyon.ion.endpoint import ProcessEndpointUnitMixin, ProcessRPCRequestEndpointUnit, ProcessRPCClient, ProcessRPCResponseEndpointUnit, ProcessRPCServer
+from pyon.ion.endpoint import ProcessEndpointUnitMixin, ProcessRPCRequestEndpointUnit, ProcessRPCClient, ProcessRPCResponseEndpointUnit, ProcessRPCServer, ProcessPublisherEndpointUnit, ProcessPublisher, ProcessSubscriberEndpointUnit, ProcessSubscriber
 from mock import Mock, sentinel, patch, ANY, call, MagicMock
 from pyon.net.channel import SendChannel
 from pyon.util.unit_test import PyonTestCase
@@ -241,4 +241,119 @@ class TestProcessRPCServer(PyonTestCase):
         prps.create_endpoint(to_name=sentinel.to_name)
 
         mockce.assert_called_once_with(prps, process=sentinel.process, to_name=sentinel.to_name, routing_call=sentinel.rcall)
+
+
+@attr('UNIT')
+class TestProcessPublisherEndpointUnit(PyonTestCase):
+
+    @patch('pyon.ion.endpoint.ProcessEndpointUnitMixin._build_header')
+    @patch('pyon.net.endpoint.PublisherEndpointUnit._build_header')
+    def test_build_header(self, mockr, mockp):
+        mockr.return_value = {'one':1, 'two':2}
+        mockp.return_value = {'two':-2, 'three':3}
+
+        ep = ProcessPublisherEndpointUnit()
+        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+
+        self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
+
+@attr('UNIT')
+class TestProcessPublisher(PyonTestCase):
+
+    @patch('pyon.ion.endpoint.Publisher.__init__')
+    def test_init(self, mockp):
+        p = ProcessPublisher(sentinel.process, kw1=sentinel.kw1, kw2=sentinel.kw2)
+
+        self.assertEquals(p._process, sentinel.process)
+        mockp.assert_called_once_with(p, kw1=sentinel.kw1, kw2=sentinel.kw2)
+
+    @patch('pyon.ion.endpoint.Publisher.create_endpoint')
+    def test_create_endpoint(self, mockpce):
+        p = ProcessPublisher(sentinel.process)
+
+        ep = p.create_endpoint(sentinel.arg, kw=sentinel.kwarg)
+        mockpce.assert_called_once_with(ANY, sentinel.arg, process=sentinel.process, kw=sentinel.kwarg)
+
+
+@attr('UNIT')
+class TestProcessSubscriberEndpointUnit(PyonTestCase):
+
+    @patch('pyon.ion.endpoint.ProcessEndpointUnitMixin.__init__')
+    @patch('pyon.net.endpoint.SubscriberEndpointUnit.__init__')
+    def test_init(self, mockr, mockp):
+
+        ep = ProcessSubscriberEndpointUnit(process=sentinel.process, callback=sentinel.callback, other=sentinel.other)
+        mockp.assert_called_once_with(ep, process=sentinel.process)
+        mockr.assert_called_once_with(ep, callback=sentinel.callback, other=sentinel.other)
+
+    @patch('pyon.ion.endpoint.ProcessEndpointUnitMixin._build_header')
+    @patch('pyon.net.endpoint.SubscriberEndpointUnit._build_header')
+    def test__build_header(self, mockr, mockp):
+
+        mockr.return_value = {'one':1, 'two':2}
+        mockp.return_value = {'two':-2, 'three':3}
+
+        ep = ProcessSubscriberEndpointUnit()
+        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+
+        self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
+
+    @patch('pyon.net.endpoint.SubscriberEndpointUnit._message_received')
+    def test__message_received(self, mockmr):
+        procmock = Mock()
+        procmock.push_context = MagicMock()
+
+        ep = ProcessSubscriberEndpointUnit(process=procmock, interceptors={})
+        ep._message_received(sentinel.msg, sentinel.headers)
+
+        procmock.push_context.assert_called_once_with(sentinel.headers)
+        procmock.push_context().__enter__.assert_called_once_with()
+        mockmr.assert_called_once_with(ep, sentinel.msg, sentinel.headers)
+
+    @patch('pyon.ion.endpoint.SubscriberEndpointUnit._make_routing_call')
+    def test__make_routing_call(self, mockmrc):
+        ep = ProcessSubscriberEndpointUnit()
+
+        ep._make_routing_call(sentinel.call, sentinel.timeout, sentinel.arg, kw=sentinel.kwarg)
+        mockmrc.assert_called_once_with(ep, sentinel.call, sentinel.timeout, sentinel.arg, kw=sentinel.kwarg)
+
+    def test__make_routing_call_with_routing_call_set(self):
+        mrc = Mock()
+        proc = Mock()
+        proc.get_context.return_value = sentinel.context
+
+        ep = ProcessSubscriberEndpointUnit(process=proc, routing_call=mrc)
+
+        ep._make_routing_call(sentinel.call, sentinel.timeout, sentinel.arg, kw=sentinel.kwarg)
+        mrc.assert_called_once_with(sentinel.call, sentinel.context, sentinel.arg, kw=sentinel.kwarg)
+
+        mrcar = mrc()
+        mrcar.get.assert_called_once_with(timeout=sentinel.timeout)
+
+
+@attr('UNIT')
+class TestProcessSubscriber(PyonTestCase):
+    @patch('pyon.ion.endpoint.Subscriber.__init__')
+    def test_init(self, mocks):
+        s = ProcessSubscriber(process=sentinel.process, routing_call=sentinel.routing_call, kw1=sentinel.kw1, kw2=sentinel.kw2)
+
+        self.assertEquals(s._process, sentinel.process)
+        self.assertEquals(s._routing_call, sentinel.routing_call)
+        mocks.assert_called_once_with(s, kw1=sentinel.kw1, kw2=sentinel.kw2)
+
+    def test_routing_call_property(self):
+        s = ProcessSubscriber(process=sentinel.process, routing_call=sentinel.routing_call)
+
+        self.assertEquals(s.routing_call, sentinel.routing_call)
+
+        s.routing_call = sentinel.something_else
+        self.assertEquals(s.routing_call, sentinel.something_else)
+
+    @patch('pyon.ion.endpoint.Subscriber.create_endpoint')
+    def test_create_endpoint(self, mockce):
+
+        s = ProcessSubscriber(process=sentinel.process, routing_call=sentinel.routing_call)
+        ep = s.create_endpoint(kw=sentinel.kwarg)
+
+        mockce.assert_called_once_with(ANY, process=sentinel.process, routing_call=sentinel.routing_call, kw=sentinel.kwarg)
 
