@@ -188,6 +188,7 @@ def main(opts, *args, **kwargs):
 
         # Also set the immediate flag, but only if specified - it is an override
         if opts.immediate:
+            from pyon.util.containers import dict_merge
             dict_merge(pyon_config, {'system':{'immediate':True}}, True)
 
         # Bootstrap pyon's core. Load configuration etc.

@@ -5,6 +5,7 @@
 __author__ = 'Seman Said, Michael Meisinger'
 
 import argparse
+import ast
 
 import pyon
 from pyon.core import bootstrap, config
@@ -35,13 +36,11 @@ def main():
     '''
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-fc', '--force_clean', action='store_true',
-            help='Force clean.')
-    parser.add_argument("-of", "--object", dest="fobject",
-            help="Load object definition from a file")
+    parser.add_argument('-c', '--config', type=str, help='Additional config files to load or dict config content.', default=[])
+    parser.add_argument('-fc', '--force_clean', action='store_true', help='Force clean.')
+    parser.add_argument("-of", "--object", dest="fobject", help="Load object definition from a file")
     parser.add_argument("-s", "--sysname", dest="sysname", help="System name")
-    parser.add_argument("-sf", "--service", dest="fservice",
-            help="Load service definition from a file")
+    parser.add_argument("-sf", "--service", dest="fservice", help="Load service definition from a file")
 
     options, extra = parser.parse_known_args()
     args, command_line_config = parse_args(extra)
@@ -58,9 +57,26 @@ def main():
     if options.sysname:
         bootstrap.set_sys_name(options.sysname)
 
-    # Load minimal bootstrap config
+    # Load config override if provided. Supports variants literal and list of paths
+    config_override = None
+    if options.config:
+        if '{' in options.config:
+            # Variant 1: Dict of config values
+            try:
+                eval_value = ast.literal_eval(options.config)
+                config_override = eval_value
+            except ValueError:
+                raise Exception("Value error in config arg '%s'" % options.config)
+        else:
+            # Variant 2: List of paths
+            from pyon.util.config import Config
+            config_override = Config([options.config]).data
+
+    # bootstrap_config - Used for running this store_interfaces script
     bootstrap_config = config.read_local_configuration(['res/config/pyon_min_boot.yml'])
     config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
+    if config_override:
+        config.apply_configuration(bootstrap_config, config_override)
     config.apply_configuration(bootstrap_config, command_line_config)
 
     # Delete sysname datastores if option "force_clean" is set
@@ -69,10 +85,10 @@ def main():
         print "store_interfaces: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
         clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
 
-
-    # This holds the new CFG object for the system
-    # @TODO: Could add command line --config
+    # ion_config - Holds the new CFG object for the system (independent of this tool's config)
     ion_config = config.read_standard_configuration()
+    if config_override:
+        config.apply_configuration(ion_config, config_override)
     config.apply_configuration(ion_config, command_line_config)
 
 
