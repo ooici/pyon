@@ -180,23 +180,19 @@ class ProcManager(object):
             raise
 
     def list_local_processes(self, process_type=''):
-        '''
+        """
         Returns a list of the running ION processes in the container or filtered by the process_type
-        '''
-        ret = list()
-        for p in self.procs.values():
-            if process_type and p.process_type != process_type:
-                continue
+        """
+        if not process_type:
+            return self.proc.values()
 
-            ret.append(p)
-
-        return ret
+        return [p for p in self.procs.itervalues() if p.process_type == process_type]
 
     def get_a_local_process(self, proc_name=''):
-        '''
+        """
         Returns a running ION processes in the container for the specified name
-        '''
-        for p in self.procs.values():
+        """
+        for p in self.procs.itervalues():
 
             if p.name == proc_name:
                 return p
