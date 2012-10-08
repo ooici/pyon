@@ -184,24 +184,35 @@ class PolicyDecisionPointManager(object):
         ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
         actor_roles = invocation.get_header_value('ion-actor-roles', {})
 
-        log.debug("XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
+        log.debug("Using XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
         request = Request()
         subject = Subject()
         subject.attributes.append(self.create_string_attribute(SENDER_ID, sender))
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID, ion_actor_id))
 
-        #Get the Org Id of this container that is running the endpoint process
-        org_name = self.governance_controller.get_container_org_boundary_name()
+        #Get the Org name associated with the endpoint process
+        endpoint_process = invocation.get_arg_value('process', invocation)
+        if hasattr(endpoint_process,'org_name'):
+            org_name = endpoint_process.org_name
+        else:
+            org_name = self.governance_controller._system_root_org_name
 
-        #If this is not a root Org container, then iterate over the roles associated with the user only for
-        #the Org that this container is associated with otherwise include all roles and create attributes for each
-        if self.governance_controller.is_root_org_container():
+        #If this process is not associated wiht the root Org, then iterate over the roles associated with the user only for
+        #the Org that this process is associated with otherwise include all roles and create attributes for each
+        if org_name == self.governance_controller._system_root_org_name:
+            #If the process Org name is the same for the System Root Org, then include all of them to be safe
             for org in actor_roles:
                 self.create_org_role_attribute(actor_roles[org],subject)
         else:
             if actor_roles.has_key(org_name):
                 self.create_org_role_attribute(actor_roles[org_name],subject)
+
+            #Handle the special case for the ION system actor
+            if actor_roles.has_key(self.governance_controller._system_root_org_name):
+                if 'ION_MANAGER' in actor_roles[self.governance_controller._system_root_org_name]:
+                    self.create_org_role_attribute(['ION_MANAGER'],subject)
+
 
         request.subjects.append(subject)
 
@@ -212,6 +223,8 @@ class PolicyDecisionPointManager(object):
 
         request.action = Action()
         request.action.attributes.append(self.create_string_attribute(Identifiers.Action.ACTION_ID, op))
+
+
         return request
 
     def check_agent_request_policies(self, invocation):

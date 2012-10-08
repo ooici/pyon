@@ -12,7 +12,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core import exception as iex
 from pyon.event.event import EventPublisher
-from pyon.ion.resource import RT
+from pyon.ion.resource import RT, PRED, LCS
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
@@ -51,6 +51,32 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 
     def _on_quit(self):
         pass
+
+
+    ##############################################################
+    # Governance interfaces and helpers
+    ##############################################################
+
+    def _is_policy_enabled(self):
+        #TODO - may have to figure out another way to do this.
+
+        if self.CFG.get_safe("system.load_policy", False):
+            return True
+
+        return False
+
+    def _get_resource_commitments(self, user_id):
+
+        log.debug("Checking for commitments for user_id: " + user_id)
+        #TODO - why isn't the resource registry defined in this agent?
+
+        #commitments,_ = self.clients.resource_registry.find_objects(self.resource_id, PRED.hasCommitment, RT.Commitment)
+        #for com in commitments:
+        #    if com.consumer == user_id and com.lcstate != LCS.RETIRED:
+        #        return com
+
+        return None
+
 
     def negotiate(self, resource_id="", sap_in=None):
         pass

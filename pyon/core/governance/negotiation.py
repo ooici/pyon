@@ -23,7 +23,7 @@ class Negotiation(object):
     def create_counter_proposal(self,negotiation=None, proposal_status=ProposalStatusEnum.COUNTER,
                                 originator=ProposalOriginatorEnum.CONSUMER):
 
-        if negotiation is None or negotiation.type_ != OT.Negotiation:
+        if negotiation is None or negotiation.type_ != RT.Negotiation:
             raise BadRequest('The negotiation parameter must be a valid Negotiation object')
 
         counter_sap = copy.deepcopy(negotiation.proposals[-1])

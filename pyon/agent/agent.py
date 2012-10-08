@@ -16,6 +16,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.event.event import EventPublisher
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
+from pyon.ion.resource import RT, PRED, OT, LCS
 
 # Pyon exceptions.
 from pyon.core.exception import IonException
@@ -171,8 +172,27 @@ class ResourceAgent(BaseResourceAgent):
         pass
 
     ##############################################################
-    # Governance interface.
+    # Governance interfaces and helpers
     ##############################################################
+
+    def _is_policy_enabled(self):
+        #TODO - may have to figure out another way to do this.
+
+        if self.CFG.get_safe("system.load_policy", False):
+            return True
+
+        return False
+
+    def _get_resource_commitments(self, user_id):
+
+        log.debug("Checking for commitments for user_id: " + user_id)
+
+        commitments,_ = self.clients.resource_registry.find_objects(self.resource_id, PRED.hasCommitment, RT.Commitment)
+        for com in commitments:
+            if com.consumer == user_id and com.lcstate != LCS.RETIRED:
+                return com
+
+        return None
 
     def negotiate(self, resource_id="", sap_in=None):
         """

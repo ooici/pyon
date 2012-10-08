@@ -59,8 +59,9 @@ class GovernanceController(object):
         self._is_container_org_boundary = CFG.get_safe('container.org_boundary',False)
         self._container_org_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
         self._container_org_id = None
+        self._system_root_org_name = CFG.get_safe('system.root_org', 'ION')
 
-        self._is_root_org_container = (self._container_org_name == CFG.get_safe('system.root_org', 'ION'))
+        self._is_root_org_container = (self._container_org_name == self._system_root_org_name)
 
         if self.enabled:
             self.initialize_from_config(config)
