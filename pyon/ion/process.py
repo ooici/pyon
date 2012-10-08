@@ -3,14 +3,8 @@
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-import threading
-import traceback
-from gevent.event import Event, waitall, AsyncResult
-from gevent.queue import Queue
-from gevent import greenlet
-
 from pyon.util.log import log
-from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback
+from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback, PyonHeartbeatError
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
@@ -20,7 +14,6 @@ from pyon.core.exception import IonException, ContainerError, OperationInterrupt
 from pyon.util.containers import get_ion_ts
 import threading
 import traceback
-
 
 class IonProcessThread(PyonThread):
     """
@@ -83,7 +76,7 @@ class IonProcessThread(PyonThread):
         listeners_ok = True
         for l in self.listeners:
             # find the listen greenlet in the thread manager
-            if not any((gl.proc._run == l.listen for gl in self.thread_manager.children)):
+            if not any((hasattr(gl.proc, '_run') and gl.proc._run == l.listen for gl in self.thread_manager.children)):
                 listeners_ok = False
 
         ctrl_thread_ok = self._ctrl_thread.running
@@ -167,8 +160,13 @@ class IonProcessThread(PyonThread):
         # spawn control flow loop
         self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
 
-        # wait on control flow loop!
-        self._ctrl_thread.get()
+        # wait on control flow loop, heartbeating as appropriate
+        while not self._ctrl_thread.ev_exit.wait(timeout=10):
+            hbst = self.heartbeat()
+
+            if not all(hbst):
+                log.warn("Heartbeat status for process %s returned %s", self, hbst)
+                raise PyonHeartbeatError()
 
     def _routing_call(self, call, context, *callargs, **callkwargs):
         """
