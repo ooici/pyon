@@ -217,3 +217,4 @@ class StandaloneStreamSubscriber(Subscriber):
         self.greenlet.join(timeout=10)
         self.greenlet.kill()
         self.started = False
+

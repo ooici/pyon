@@ -28,7 +28,7 @@ def decode_ion(obj):
 
     elif '__complex__' in obj:
         return complex(obj['real'], obj['imag'])
-        ## Always return object
+    
     elif '__dtype__' in obj:
         dt = np.dtype(obj['__dtype__'])
         return dt.type(obj['val'])
@@ -56,10 +56,10 @@ def encode_ion(obj):
         return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
 
     if isinstance(obj, np.number):
-        if isinstance(obj, numpy_floats):
-            return {'__dtype__': obj.dtype.str, 'val': obj.astype(float)}
+        if isinstance(obj,numpy_floats):
+            return {'__dtype__': obj.dtype.str, 'val':float(obj.astype(float))}
         elif isinstance(obj, numpy_ints):
-            return {'__dtype__': obj.dtype.str, 'val': obj.astype(int)}
+            return {'__dtype__': obj.dtype.str, 'val':int(obj.astype(int))}
         else:
             raise TypeError('Unsupported type "%s"', str(type(obj)))
 
