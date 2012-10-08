@@ -32,6 +32,9 @@ def decode_ion(obj):
     elif '__dtype__' in obj:
         dt = np.dtype(obj['__dtype__'])
         return dt.type(obj['val'])
+
+    elif '__slice__' in obj:
+        return slice(obj['start'], obj['stop'], obj['step'])
     return obj
 
 
@@ -62,6 +65,9 @@ def encode_ion(obj):
             return {'__dtype__': obj.dtype.str, 'val':int(obj.astype(int))}
         else:
             raise TypeError('Unsupported type "%s"', str(type(obj)))
+
+    if isinstance(obj, slice):
+        return {'__slice__':True, 'start':obj.start, 'stop' : obj.stop, 'step':obj.step}
 
     # Must raise type error to avoid recursive failure
     raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
