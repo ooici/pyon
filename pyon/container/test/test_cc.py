@@ -69,34 +69,3 @@ class TestCCIntProcs(IonIntegrationTestCase):
     def tearDown(self):
         pass
 
-    def test_fail_fast(self):
-
-        # need to install signal protection so we don't kill nosetests!
-        ev = Event()
-        def no_abort(*args):
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-            ev.set()
-
-        signal.signal(signal.SIGTERM, no_abort)
-
-        # spawn the proc, wait for it to die and kill the container
-        def failtarget(*args, **kwargs):
-            raise self.ExpectedFailure("I am supposed to fail!")
-
-        proc = self.cc.proc_manager.proc_sup.spawn(failtarget)
-        # do not ensure ready - ensure ready will blow up with a container error, on purpose
-
-        # wait for the kill signal to happen
-        ev.wait(timeout=5)
-
-        # verify things got called
-        self.cc.stop.assert_called_once_with()
-        self.cc.event_pub.publish_event.assert_called_with(event_type="ProcessLifecycleEvent",
-                                                           origin=ANY,
-                                                           origin_type="ContainerProcess",
-                                                           sub_type="ERROR",
-                                                           container_id=self.cc.id,
-                                                           process_type=ANY,
-                                                           process_name=ANY,
-                                                           state=ProcessStateEnum.ERROR)
-

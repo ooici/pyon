@@ -144,11 +144,11 @@ class TestProcManager(IonIntegrationTestCase):
 
         pid = self._spawnproc(pm, 'service')
 
-        m.assert_called_with(ANY, ProcessStateEnum.SPAWN, self.container)
+        m.assert_called_with(ANY, ProcessStateEnum.RUNNING, self.container)
         self.assertIsInstance(m.call_args[0][0], SampleProcess)
 
         self.container.terminate_process(pid)
 
-        m.assert_called_with(ANY, ProcessStateEnum.TERMINATE, self.container)
+        m.assert_called_with(ANY, ProcessStateEnum.TERMINATED, self.container)
         self.assertIsInstance(m.call_args[0][0], SampleProcess)
 
