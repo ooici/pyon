@@ -407,7 +407,11 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
             ion_obj = self._obj_registry.new(type)
             for k, v in objc.iteritems():
-                if k != "type_":
+
+                #in CouchDB _attachments contains attachment metadata
+                #in pyon we have metadata in the document itself and so we discard _attachments
+
+                if k != "type_" and k!= "_attachments":
                     setattr(ion_obj, k, v)
 
             return ion_obj
