@@ -3,7 +3,6 @@
 __author__ = 'Michael Meisinger'
 
 import uuid
-from unittest import SkipTest
 
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound, Inconsistent
@@ -98,6 +97,10 @@ class TestResourceRegistry(IonIntegrationTestCase):
         att = Attachment(content=base64.encodestring(binary), attachment_type=AttachmentType.ASCII)
         aid2 = self.rr.create_attachment(iid, att)
 
+        #tests that attachments can be read without content
+        att1 = self.rr.read_attachment(aid2,includeContent=False)
+        self.assertEquals(None, att1.content)
+        #tests that attachments have content by default
         att1 = self.rr.read_attachment(aid2)
         self.assertEquals(binary, base64.decodestring(att1.content))
 
@@ -135,3 +138,8 @@ class TestResourceRegistry(IonIntegrationTestCase):
         att_objs = self.rr.find_attachments(iid, keyword="FOO", id_only=False)
         self.assertEquals(len(att_objs), 1)
         self.assertEquals(att_objs[0].content, "SOME TEXT")
+
+        #tests that attachments can be retrieved without content
+        att_objs_without_content = self.rr.find_attachments(iid, keyword="FOO", id_only=False,include_content=False)
+        self.assertEquals(len(att_objs_without_content), 1)
+        self.assertEquals(att_objs_without_content[0].content, "pyon.attachment")
