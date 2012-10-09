@@ -184,8 +184,10 @@ class GovernanceController(object):
         return system_actor[0]
 
     #Returns the actor related message headers for a the ION System Actor
-    def get_system_actor_header(self):
-        system_actor = self.get_system_actor()
+    def get_system_actor_header(self, system_actor=None):
+
+        if system_actor is None:
+            system_actor = self.get_system_actor()
 
         if not system_actor or system_actor is None:
             log.warn('The ION System Actor Identity was not found; defaulting to anonymous actor')
