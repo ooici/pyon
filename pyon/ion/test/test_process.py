@@ -421,6 +421,7 @@ class ProcessTest(PyonTestCase):
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
+        p._ctrl_thread.ev_exit.set()            # prevent heartbeat loop in proc's target
 
         def fake_op(evout, evin):
             evout.set(True)
@@ -439,8 +440,7 @@ class ProcessTest(PyonTestCase):
         hb = p.heartbeat()
 
         self.assertEquals((True, True, True), hb)
-        self.assertEquals(1, p._heartbeat_count)        # This could fail in a timing situation where 10s elapses and the
-                                                        # IONProcess target method is calling heartbeat as well
+        self.assertEquals(1, p._heartbeat_count)
         self.assertEquals(ar, p._heartbeat_op)
         self.assertIsNotNone(p._heartbeat_time)
         self.assertIsNotNone(p._heartbeat_stack)
@@ -452,6 +452,7 @@ class ProcessTest(PyonTestCase):
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
+        p._ctrl_thread.ev_exit.set()            # prevent heartbeat loop in proc's target
 
         def fake_op(evout, evin):
             evout.set(True)
@@ -471,15 +472,17 @@ class ProcessTest(PyonTestCase):
             hb = p.heartbeat()
 
         self.assertEquals((True, True, True), hb)
-        self.assertEquals(5, p._heartbeat_count)        # This could fail in a timing situation where 10s elapses and the
-                                                        # IONProcess target method is calling heartbeat as well
+        self.assertEquals(5, p._heartbeat_count)
         self.assertEquals(ar, p._heartbeat_op)
 
     def test_heartbeat_current_op_over_limit(self):
+        self.patch_cfg('pyon.ion.process.CFG', {'cc':{'timeout':{'heartbeat_proc_count_threshold':2}}})
+
         svc = LocalContextMixin()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
+        p._ctrl_thread.ev_exit.set()            # prevent heartbeat loop in proc's target
 
         def fake_op(evout, evin):
             evout.set(True)
@@ -495,7 +498,8 @@ class ProcessTest(PyonTestCase):
 
         listenoutev.wait(timeout=5)         # wait for ctrl thread to run our op
 
-        for x in xrange(31):
+        # make sure it's over the threshold
+        for x in xrange(3):
             hb = p.heartbeat()
 
         self.assertEquals((True, True, False), hb)
@@ -528,6 +532,8 @@ class TestProcessInt(IonIntegrationTestCase):
 
     @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False), "Test reaches into container, doesn't work with CEI")
     def test_heartbeat_failure(self):
+        self.patch_cfg('pyon.ion.process.CFG', {'cc':{'timeout':{'heartbeat_proc_count_threshold':2, 'heartbeat':1.0}}})
+
         svc = self.container.proc_manager.procs[self.pid]
         ip = svc._process
         stopar = AsyncResult()
@@ -538,17 +544,18 @@ class TestProcessInt(IonIntegrationTestCase):
 
         noticear.get(timeout=10)        # wait for the call to be made
 
-        # slam the heartbeat so it hits the threshold so when target notices it, it will kick over
-        for x in xrange(40):
+        # heartbeat a few times so we trigger the failure soon
+        for x in xrange(2):
             ip.heartbeat()
 
         # wait for ip thread to kick over
-        ip._ctrl_thread.join(timeout=12)
+        ip._ctrl_thread.join(timeout=5)
 
         # now wait for notice proc got canned
-        stopargs = stopar.get(timeout=10)
+        stopargs = stopar.get(timeout=5)
 
         self.assertEquals(stopargs, (svc, ProcessStateEnum.FAILED, self.container))
 
         # should've shut down, no longer in container's process list
         self.assertEquals(len(self.container.proc_manager.procs), 0)
+

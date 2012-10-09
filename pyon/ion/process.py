@@ -12,6 +12,7 @@ from gevent import greenlet
 from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError, OperationInterruptedException
 from pyon.util.containers import get_ion_ts
+from pyon.core.bootstrap import CFG
 import threading
 import traceback
 
@@ -20,7 +21,7 @@ class IonProcessThread(PyonThread):
     Form the base of an ION process.
     """
 
-    def __init__(self, target=None, listeners=None, name=None, service=None, cleanup_method=None, **kwargs):
+    def __init__(self, target=None, listeners=None, name=None, service=None, cleanup_method=None, heartbeat_secs=10, **kwargs):
         """
         Constructs an ION process.
 
@@ -35,6 +36,7 @@ class IonProcessThread(PyonThread):
                                 an ION process.
         @param  cleanup_method  An optional callable to run when the process is stopping. Runs after all other
                                 notify_stop calls have run. Should take one param, this instance.
+        @param  heartbeat_secs  Number of seconds to wait in between heartbeats.
         """
         self._startup_listeners = listeners or []
         self.listeners          = []
@@ -54,10 +56,11 @@ class IonProcessThread(PyonThread):
         self._proc_time         = 0
 
         # for heartbeats, used to detect stuck processes
-        self._heartbeat_stack   = None      # stacktrace of last heartbeat
-        self._heartbeat_time    = None      # timestamp of heart beat last matching the current op
-        self._heartbeat_op      = None      # last operation (by AR)
-        self._heartbeat_count   = 0         # number of times this operation has been seen consecutively
+        self._heartbeat_secs    = heartbeat_secs    # amount of time to wait between heartbeats
+        self._heartbeat_stack   = None              # stacktrace of last heartbeat
+        self._heartbeat_time    = None              # timestamp of heart beat last matching the current op
+        self._heartbeat_op      = None              # last operation (by AR)
+        self._heartbeat_count   = 0                 # number of times this operation has been seen consecutively
 
         PyonThread.__init__(self, target=target, **kwargs)
 
@@ -93,7 +96,8 @@ class IonProcessThread(PyonThread):
 
                     # we've been in this for the last 30 ticks, or it's been 30s, fail this part of the heartbeat
                     # @TODO configurable?
-                    if self._heartbeat_count > 30 or int(get_ion_ts()) - int(self._heartbeat_time) >= 30000:
+                    if self._heartbeat_count > CFG.get_safe('cc.timeout.heartbeat_proc_count_threshold', 30) or \
+                       int(get_ion_ts()) - int(self._heartbeat_time) >= CFG.get_safe('cc.timeout.heartbeat_proc_time_threshold', 30):
                         heartbeat_ok = False
                 else:
                     # it's made some progress
@@ -161,12 +165,17 @@ class IonProcessThread(PyonThread):
         self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
 
         # wait on control flow loop, heartbeating as appropriate
-        while not self._ctrl_thread.ev_exit.wait(timeout=10):
+        while not self._ctrl_thread.ev_exit.wait(timeout=self._heartbeat_secs):
             hbst = self.heartbeat()
 
             if not all(hbst):
                 log.warn("Heartbeat status for process %s returned %s", self, hbst)
                 raise PyonHeartbeatError()
+
+        # this is almost a no-op as we don't fall out of the above loop without
+        # exiting the ctrl_thread, but having this line here makes testing much
+        # easier.
+        self._ctrl_thread.join()
 
     def _routing_call(self, call, context, *callargs, **callkwargs):
         """
@@ -352,7 +361,7 @@ class IonProcessThread(PyonThread):
 class IonProcessThreadManager(PyonThreadManager):
 
     def _create_thread(self, target=None, **kwargs):
-        return IonProcessThread(target=target, **kwargs)
+        return IonProcessThread(target=target, heartbeat_secs=self.heartbeat_secs, **kwargs)
 
 # ---------------------------------------------------------------------------------------------------
 
