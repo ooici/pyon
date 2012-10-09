@@ -17,7 +17,10 @@ from mock import sentinel, Mock, MagicMock
 from nose.plugins.attrib import attr
 from pyon.net.endpoint import RPCClient
 from pyon.service.service import BaseService
+from interface.objects import ProcessStateEnum
 import time
+import os
+import unittest
 
 @attr('UNIT', group='coi')
 class ProcessTest(PyonTestCase):
@@ -319,6 +322,184 @@ class ProcessTest(PyonTestCase):
         ar2 = p._routing_call(futurear2.set, MagicMock(), sentinel.val2)
         ar2.get(timeout=2)
 
+    def test_heartbeat_no_listeners(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
+
+        hb = p.heartbeat()
+
+        self.assertEquals((True, True, True), hb)
+        self.assertEquals(0, p._heartbeat_count)
+        self.assertIsNone(p._heartbeat_op)
+
+    def test_heartbeat_with_listeners(self):
+        mocklistener = Mock(spec=ProcessRPCServer)
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[mocklistener], service=svc)
+        readyev = Event()
+        readyev.set()
+        mocklistener.get_ready_event.return_value = readyev
+
+        def fake_listen(evout, evin):
+            evout.set(True)
+            evin.wait()
+
+        listenoutev = AsyncResult()
+        listeninev = Event()
+
+        mocklistener.listen = lambda *a, **kw: fake_listen(listenoutev, listeninev)
+
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        p.start_listeners()
+
+        listenoutev.wait(timeout=5)         # wait for listen loop to start
+
+        self.addCleanup(listeninev.set)     # makes listen loop fall out on shutdown
+        self.addCleanup(p.stop)
+
+        # now test heartbeat!
+        hb = p.heartbeat()
+
+        self.assertEquals((True, True, True), hb)
+        self.assertEquals(0, p._heartbeat_count)
+        self.assertIsNone(p._heartbeat_op)
+
+    def test_heartbeat_listener_dead(self):
+        mocklistener = Mock(spec=ProcessRPCServer)
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[mocklistener], service=svc)
+        readyev = Event()
+        readyev.set()
+        mocklistener.get_ready_event.return_value = readyev
+
+        def fake_listen(evout, evin):
+            evout.set(True)
+            evin.wait()
+
+        listenoutev = AsyncResult()
+        listeninev = Event()
+
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        p.start_listeners()
+
+        listenoutev.wait(timeout=5)         # wait for listen loop to start
+
+        self.addCleanup(listeninev.set)     # makes listen loop fall out on shutdown
+        self.addCleanup(p.stop)
+
+        listeninev.set()                    # stop the listen loop
+        p.thread_manager.children[1].join(timeout=5)        # wait for listen loop to terminate
+
+        hb = p.heartbeat()
+
+        self.assertEquals((False, True, True), hb)
+        self.assertEquals(0, p._heartbeat_count)
+        self.assertIsNone(p._heartbeat_op)
+
+    def test_heartbeat_ctrl_thread_dead(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+        self.addCleanup(p.stop)
+
+        p._ctrl_thread.stop()
+
+        hb = p.heartbeat()
+
+        self.assertEquals((True, False, True), hb)
+        self.assertEquals(0, p._heartbeat_count)
+        self.assertIsNone(p._heartbeat_op)
+
+    def test_heartbeat_with_current_op(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+
+        def fake_op(evout, evin):
+            evout.set(True)
+            evin.wait()
+
+        listenoutev = AsyncResult()
+        listeninev = Event()
+
+        self.addCleanup(listeninev.set)     # allow graceful termination
+        self.addCleanup(p.stop)
+
+        ar = p._routing_call(fake_op, None, listenoutev, listeninev)
+
+        listenoutev.wait(timeout=5)         # wait for ctrl thread to run our op
+
+        hb = p.heartbeat()
+
+        self.assertEquals((True, True, True), hb)
+        self.assertEquals(1, p._heartbeat_count)        # This could fail in a timing situation where 10s elapses and the
+                                                        # IONProcess target method is calling heartbeat as well
+        self.assertEquals(ar, p._heartbeat_op)
+        self.assertIsNotNone(p._heartbeat_time)
+        self.assertIsNotNone(p._heartbeat_stack)
+
+        self.assertIn("evin.wait", str(p._heartbeat_stack))
+
+    def test_heartbeat_with_current_op_multiple_times(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+
+        def fake_op(evout, evin):
+            evout.set(True)
+            evin.wait()
+
+        listenoutev = AsyncResult()
+        listeninev = Event()
+
+        self.addCleanup(listeninev.set)     # allow graceful termination
+        self.addCleanup(p.stop)
+
+        ar = p._routing_call(fake_op, None, listenoutev, listeninev)
+
+        listenoutev.wait(timeout=5)         # wait for ctrl thread to run our op
+
+        for x in xrange(5):
+            hb = p.heartbeat()
+
+        self.assertEquals((True, True, True), hb)
+        self.assertEquals(5, p._heartbeat_count)        # This could fail in a timing situation where 10s elapses and the
+                                                        # IONProcess target method is calling heartbeat as well
+        self.assertEquals(ar, p._heartbeat_op)
+
+    def test_heartbeat_current_op_over_limit(self):
+        svc = LocalContextMixin()
+        p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
+        p.start()
+        p.get_ready_event().wait(timeout=5)
+
+        def fake_op(evout, evin):
+            evout.set(True)
+            evin.wait()
+
+        listenoutev = AsyncResult()
+        listeninev = Event()
+
+        self.addCleanup(listeninev.set)     # allow graceful termination
+        self.addCleanup(p.stop)
+
+        ar = p._routing_call(fake_op, None, listenoutev, listeninev)
+
+        listenoutev.wait(timeout=5)         # wait for ctrl thread to run our op
+
+        for x in xrange(31):
+            hb = p.heartbeat()
+
+        self.assertEquals((True, True, False), hb)
+
 class FakeService(BaseService):
     """
     Class to use for testing below.
@@ -326,7 +507,9 @@ class FakeService(BaseService):
     name = 'fake_service'
     dependencies = []
 
-    def takes_too_long(self):
+    def takes_too_long(self, noticear=None):
+        if noticear is not None:
+            noticear.set(True)
         ar = AsyncResult()
         ar.wait()
 
@@ -334,7 +517,7 @@ class FakeService(BaseService):
 class TestProcessInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
-        self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
+        self.pid = self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
         self.fsclient = RPCClient(to_name='fake_service')
 
     def test_timeout_with_messaging(self):
@@ -343,3 +526,29 @@ class TestProcessInt(IonIntegrationTestCase):
 
         self.assertIn('execute in allotted time', cm.exception.message)
 
+    @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False), "Test reaches into container, doesn't work with CEI")
+    def test_heartbeat_failure(self):
+        svc = self.container.proc_manager.procs[self.pid]
+        ip = svc._process
+        stopar = AsyncResult()
+        self.container.proc_manager.add_proc_state_changed_callback(lambda *args: stopar.set(args))
+
+        noticear = AsyncResult()        # notify us when the call has been made
+        ar = ip._routing_call(svc.takes_too_long, None, noticear=noticear)
+
+        noticear.get(timeout=10)        # wait for the call to be made
+
+        # slam the heartbeat so it hits the threshold so when target notices it, it will kick over
+        for x in xrange(40):
+            ip.heartbeat()
+
+        # wait for ip thread to kick over
+        ip._ctrl_thread.join(timeout=12)
+
+        # now wait for notice proc got canned
+        stopargs = stopar.get(timeout=10)
+
+        self.assertEquals(stopargs, (svc, ProcessStateEnum.FAILED, self.container))
+
+        # should've shut down, no longer in container's process list
+        self.assertEquals(len(self.container.proc_manager.procs), 0)
