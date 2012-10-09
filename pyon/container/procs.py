@@ -236,16 +236,25 @@ class ProcManager(object):
 #            log.warn("No record of gproc %s in our map (%s)", gproc, self._spawned_proc_to_process)
 #            return
 #
-        prc = self._spawned_proc_to_process.get(gproc, DotDict(id="unknown", _proc_type="unknown", _proc_name="unknown"))
+        prc = self._spawned_proc_to_process.get(gproc, None)
 #
-#        # make sure svc is in our list
-#        if not svc in self.procs.values():
-#            log.warn("svc %s not found in procs list", svc)
+#        # make sure prc is in our list
+#        if not prc in self.procs.values():
+#            log.warn("prc %s not found in procs list", prc)
 #            return
 
-        self._call_proc_state_changed(prc, ProcessStateEnum.FAILED)
+        # stop the rest of the process
+        if prc is not None:
+            try:
+                self.terminate_process(prc.id, False)
+            except Exception as e:
+                log.warn("Problem while stopping rest of failed process %s: %s", prc, e)
+            finally:
+                self._call_proc_state_changed(prc, ProcessStateEnum.FAILED)
+        else:
+            log.warn("No ION process found for failed proc manager child: %s", gproc)
 
-        self.container.fail_fast("Container process (%s) failed: %s" % (prc, gproc.exception))
+        #self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
     def _cleanup_method(self, queue_name, ep=None):
         """
@@ -696,9 +705,14 @@ class ProcManager(object):
 
         self._call_proc_state_changed(process_instance, ProcessStateEnum.RUNNING)
 
-    def terminate_process(self, process_id):
+    def terminate_process(self, process_id, do_notifications=True):
         """
         Terminates a process and all its resources. Termination is graceful with timeout.
+
+        @param  process_id          The id of the process to terminate. Should exist in the container's
+                                    list of processes or this will raise.
+        @param  do_notifications    If True, emits process state changes for TERMINATING and TERMINATED.
+                                    If False, supresses any state changes. Used near EXITED and FAILED.
         """
         process_instance = self.procs.get(process_id, None)
         if not process_instance:
@@ -707,7 +721,8 @@ class ProcManager(object):
 
         log.info("ProcManager.terminate_process: %s -> pid=%s", process_instance._proc_name, process_id)
 
-        self._call_proc_state_changed(service_instance, ProcessStateEnum.TERMINATING)
+        if do_notifications:
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.TERMINATING)
 
         # Give the process notice to quit doing stuff.
         process_instance.quit()
@@ -719,7 +734,8 @@ class ProcManager(object):
 
         self._unregister_process(process_id, process_instance)
 
-        self._call_proc_state_changed(process_instance, ProcessStateEnum.TERMINATED)
+        if do_notifications:
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.TERMINATED)
 
     def _unregister_process(self, process_id, process_instance):
         # Remove process registration in resource registry
