@@ -531,6 +531,7 @@ class TestProcessInt(IonIntegrationTestCase):
         self.assertIn('execute in allotted time', cm.exception.message)
 
     @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False), "Test reaches into container, doesn't work with CEI")
+    @unittest.skip("heartbeat failing process is disabled")
     def test_heartbeat_failure(self):
         self.patch_cfg('pyon.ion.process.CFG', {'cc':{'timeout':{'heartbeat_proc_count_threshold':2, 'heartbeat':1.0}}})
 
