@@ -94,10 +94,9 @@ class IonProcessThread(PyonThread):
                 if st == self._heartbeat_stack:
                     self._heartbeat_count += 1  # we've seen this before! increment count
 
-                    # we've been in this for the last 30 ticks, or it's been 30s, fail this part of the heartbeat
-                    # @TODO configurable?
+                    # we've been in this for the last X ticks, or it's been X seconds, fail this part of the heartbeat
                     if self._heartbeat_count > CFG.get_safe('cc.timeout.heartbeat_proc_count_threshold', 30) or \
-                       int(get_ion_ts()) - int(self._heartbeat_time) >= CFG.get_safe('cc.timeout.heartbeat_proc_time_threshold', 30):
+                       int(get_ion_ts()) - int(self._heartbeat_time) >= CFG.get_safe('cc.timeout.heartbeat_proc_time_threshold', 30) * 1000:
                         heartbeat_ok = False
                 else:
                     # it's made some progress
