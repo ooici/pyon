@@ -184,6 +184,10 @@ class ProcManager(object):
         except Exception:
             errcause = process_instance.errcause if process_instance else "instantiating process"
             log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
+
+            # trigger failed notification - catches problems in init/start
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
+
             raise
 
     def list_local_processes(self, process_type=''):
