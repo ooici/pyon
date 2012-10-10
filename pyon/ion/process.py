@@ -169,7 +169,12 @@ class IonProcessThread(PyonThread):
 
             if not all(hbst):
                 log.warn("Heartbeat status for process %s returned %s", self, hbst)
-                raise PyonHeartbeatError()
+                if self._heartbeat_stack is not None:
+                    stack_out = "".join(traceback.format_list(self._heartbeat_stack))
+                else:
+                    stack_out = "N/A"
+
+                raise PyonHeartbeatError("Heartbeat failed: %s, stacktrace:\n%s" % (hbst, stack_out))
 
         # this is almost a no-op as we don't fall out of the above loop without
         # exiting the ctrl_thread, but having this line here makes testing much
