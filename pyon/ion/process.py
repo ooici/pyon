@@ -174,7 +174,8 @@ class IonProcessThread(PyonThread):
                 else:
                     stack_out = "N/A"
 
-                raise PyonHeartbeatError("Heartbeat failed: %s, stacktrace:\n%s" % (hbst, stack_out))
+                #raise PyonHeartbeatError("Heartbeat failed: %s, stacktrace:\n%s" % (hbst, stack_out))
+                log.warn("Heartbeat failed: %s, stacktrace:\n%s", hbst, stack_out)
 
         # this is almost a no-op as we don't fall out of the above loop without
         # exiting the ctrl_thread, but having this line here makes testing much
