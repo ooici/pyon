@@ -35,6 +35,10 @@ def decode_ion(obj):
 
     elif '__slice__' in obj:
         return slice(obj['start'], obj['stop'], obj['step'])
+
+    elif '__npdtype__' in obj:
+        return np.dtype(obj['__npdtype__'])
+
     return obj
 
 
@@ -51,8 +55,6 @@ def encode_ion(obj):
         return {"__set__": True, 'tuple': tuple(obj)}
 
     if isinstance(obj, np.ndarray):
-        if obj.ndim == 0:
-            raise ValueError('Can not encode a np array with rank 0')
         return {"header": {"type": str(obj.dtype), "nd": obj.ndim, "shape": obj.shape}, "content": obj.tolist(), "__ion_array__": True}
 
     if isinstance(obj, complex):
@@ -68,6 +70,9 @@ def encode_ion(obj):
 
     if isinstance(obj, slice):
         return {'__slice__':True, 'start':obj.start, 'stop' : obj.stop, 'step':obj.step}
+
+    if isinstance(obj,np.dtype):
+        return {'__npdtype__':obj.str}
 
     # Must raise type error to avoid recursive failure
     raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
