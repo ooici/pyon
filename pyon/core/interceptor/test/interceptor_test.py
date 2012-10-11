@@ -48,13 +48,6 @@ class InterceptorTest(PyonTestCase):
         b = received.message
         self.assertTrue((a==b).all())
 
-        # Rank 0 array raises Value Error because numpy tolist does not return a list
-        a = np.array(3.14159265358979323846264,dtype='float32')
-
-        invoke = Invocation()
-        invoke.message = a
-
-        self.assertRaises(ValueError, codec.outgoing, invoke)
 
     @unittest.skipIf(not _have_numpy,'No numpy')
     def test_packed_numpy(self):
@@ -104,6 +97,29 @@ class InterceptorTest(PyonTestCase):
 
     def test_slice(self):
         a = slice(5,20,2)
+        invoke = Invocation()
+        invoke.message = a
+        codec = EncodeInterceptor()
+
+        mangled = codec.outgoing(invoke)
+        received = codec.incoming(mangled)
+        b = received.message
+
+        self.assertEquals(a,b)
+    
+    def test_dtype(self):
+        a = np.dtype('float32')
+        invoke = Invocation()
+        invoke.message = a
+        codec = EncodeInterceptor()
+
+        mangled = codec.outgoing(invoke)
+        received = codec.incoming(mangled)
+        b = received.message
+
+        self.assertEquals(a,b)
+        
+        a = np.dtype('object')
         invoke = Invocation()
         invoke.message = a
         codec = EncodeInterceptor()
