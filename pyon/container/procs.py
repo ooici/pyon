@@ -308,7 +308,6 @@ class ProcManager(object):
         In most cases it will create a ProcessRPCServer.
         """
         eptypestr = CFG.get_safe('container.messaging.endpoint.proc_listening_type', None)
-        log.error("%s - %s", eptypestr, CFG.container.messaging)
         if eptypestr is not None:
             module, cls     = eptypestr.rsplit('.', 1)
             mod             = __import__(module, fromlist=[cls])
