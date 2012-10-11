@@ -11,6 +11,7 @@ import simplejson
 import base64
 import uuid
 import os
+from copy import deepcopy
 
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
@@ -82,7 +83,7 @@ class DotDict(DotNotationGetItem, dict):
             self[key] = value
 
     def copy(self):
-        return DotDict(dict.copy(self))
+        return deepcopy(self)
 
     def get_safe(self, qual_key, default=None):
         """
