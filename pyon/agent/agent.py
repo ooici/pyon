@@ -29,7 +29,9 @@ from pyon.core.exception import ServerError
 from interface.services.iresource_agent import BaseResourceAgent
 from interface.services.iresource_agent import ResourceAgentProcessClient
 from interface.objects import CapabilityType
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
+#Agent imports
 from pyon.agent.instrument_fsm import InstrumentFSM
 from pyon.agent.instrument_fsm import FSMStateError
 from pyon.agent.instrument_fsm import FSMCommandUnknownError
@@ -175,19 +177,18 @@ class ResourceAgent(BaseResourceAgent):
     # Governance interfaces and helpers
     ##############################################################
 
-    def _is_policy_enabled(self):
-        #TODO - may have to figure out another way to do this.
-
-        if self.CFG.get_safe("system.load_policy", False):
-            return True
-
-        return False
+    def _is_governance_enabled(self):
+        return self.container.governance_controller.enabled and self.CFG.get_safe("system.load_policy", False)
 
     def _get_resource_commitments(self, user_id):
 
-        log.debug("Checking for commitments for user_id: " + user_id)
+        if not self._is_governance_enabled():
+            return None
 
-        commitments,_ = self.clients.resource_registry.find_objects(self.resource_id, PRED.hasCommitment, RT.Commitment)
+        log.debug("Finding commitments for user_id: " + user_id)
+
+        rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self)
+        commitments,_ = rr_client.find_objects(self.resource_id, PRED.hasCommitment, RT.Commitment)
         for com in commitments:
             if com.consumer == user_id and com.lcstate != LCS.RETIRED:
                 return com

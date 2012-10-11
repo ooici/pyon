@@ -42,15 +42,9 @@ class GovernanceController(object):
 
         log.debug("GovernanceController starting ...")
 
-        config = CFG.interceptor.interceptors.governance.config
+        self.enabled = CFG.get_safe('interceptor.interceptors.governance.config.enabled', False)
 
-        if config is None:
-            config['enabled'] = False
-
-        if "enabled" in config:
-            self.enabled = config["enabled"]
-
-        log.debug("GovernanceInterceptor enabled: %s" % str(self.enabled))
+        log.info("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
         self.resource_policy_event_subscriber = None
         self.service_policy_event_subscriber = None
@@ -64,6 +58,9 @@ class GovernanceController(object):
         self._is_root_org_container = (self._container_org_name == self._system_root_org_name)
 
         if self.enabled:
+
+            config = CFG.get_safe('interceptor.interceptors.governance.config')
+
             self.initialize_from_config(config)
 
             self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.resource_policy_event_callback)
