@@ -40,6 +40,7 @@ class IonProcessThread(PyonThread):
         """
         self._startup_listeners = listeners or []
         self.listeners          = []
+        self._listener_map      = {}
         self.name               = name
         self.service            = service
         self._cleanup_method    = cleanup_method
@@ -78,8 +79,7 @@ class IonProcessThread(PyonThread):
         """
         listeners_ok = True
         for l in self.listeners:
-            # find the listen greenlet in the thread manager
-            if not any((hasattr(gl.proc, '_run') and gl.proc._run == l.listen for gl in self.thread_manager.children)):
+            if not (l in self._listener_map and not self._listener_map[l].proc.dead):
                 listeners_ok = False
 
         ctrl_thread_ok = self._ctrl_thread.running
@@ -144,8 +144,8 @@ class IonProcessThread(PyonThread):
         to start on startup.
         """
         if self.proc:
-            listener.routing_call = self._routing_call
-            self.thread_manager.spawn(listener.listen)
+            listener.routing_call           = self._routing_call
+            self._listener_map[listener]    = self.thread_manager.spawn(listener.listen)
             self.listeners.append(listener)
         else:
             self._startup_listeners.append(listener)
