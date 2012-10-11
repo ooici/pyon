@@ -1081,4 +1081,3 @@ class CouchDB_DataStore(DataStore):
     def _count(self, datastore=None, **kwargs):
         datastore = datastore or self.datastore_name
         self._stats.count(namespace=datastore, **kwargs)
-

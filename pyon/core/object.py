@@ -287,7 +287,6 @@ class IonObjectBase(object):
 class IonMessageObjectBase(IonObjectBase):
     pass
 
-
 def walk(o, cb):
     """
     Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
