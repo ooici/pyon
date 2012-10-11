@@ -358,14 +358,23 @@ class ListeningBaseEndpoint(BaseEndpoint):
         attributes will remain None and the error attribute will be set. Calling route()
         will be a no-op, but ack/reject work.
         """
-        def __init__(self, msgtuple, ch, e):
-            self.channel = ch
-            self.endpoint = e
+        def __init__(self, msgtuple, ackmethod, rejectmethod, e):
+            """
+            Creates a MessageObject.
+
+            @param  msgtuple        A 3-tuple of (body, headers, delivery_tag)
+            @param  ackmethod       A callable to call to ack a message.
+            @param  rejectmethod    A callable to call to reject a message.
+            @param  e               An EndpointUnit.
+            """
+            self.ackmethod      = ackmethod
+            self.rejectmethod   = rejectmethod
+            self.endpoint       = e
 
             self.raw_body, self.raw_headers, self.delivery_tag = msgtuple
-            self.body = None
-            self.headers = None
-            self.error = None
+            self.body           = None
+            self.headers        = None
+            self.error          = None
 
         def make_body(self):
             """
@@ -383,7 +392,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
             Must call this if using get_one_msg/get_n_msgs.
             """
-            self.channel.ack(self.delivery_tag)
+            self.ackmethod(self.delivery_tag)
 
         def reject(self, requeue=False):
             """
@@ -391,7 +400,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
 
             Must call this if using get_one_msg/get_n_msgs.
             """
-            self.channel.reject(self.delivery_tag, requeue=requeue)
+            self.rejectmethod(self.delivery_tag, requeue=requeue)
 
         def route(self):
             """
@@ -538,7 +547,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
             return []
 
         for x in xrange(newch._recv_queue.qsize()):
-            mo = self.MessageObject(newch.recv(), newch, self.create_endpoint(existing_channel=newch))
+            mo = self.MessageObject(newch.recv(), newch.ack, newch.reject, self.create_endpoint(existing_channel=newch))
             mo.make_body()      # puts through EP interceptors
             mos.append(mo)
             log_message("MESSAGE RECV >>> RPC-request", mo.raw_body, mo.raw_headers, self._recv_name, mo.delivery_tag, is_send=False)
