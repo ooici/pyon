@@ -11,6 +11,8 @@ from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 from interface.objects import ProcessStateEnum
+from pyon.ion.endpoint import ProcessRPCServer
+from mock import sentinel
 
 class FakeContainer(object):
     def __init__(self):
@@ -35,6 +37,9 @@ class BadProcess(BaseService):
 
 class SampleAgent(ResourceAgent):
     dependencies = []
+
+class TestRPCServer(ProcessRPCServer):
+    pass
 
 @attr('INT')
 class TestProcManager(IonIntegrationTestCase):
@@ -151,4 +156,20 @@ class TestProcManager(IonIntegrationTestCase):
 
         m.assert_called_with(ANY, ProcessStateEnum.TERMINATED, self.container)
         self.assertIsInstance(m.call_args[0][0], SampleProcess)
+
+    def test_create_listening_endpoint(self):
+        self.patch_cfg('pyon.container.procs.CFG', {'container':{'messaging':{'endpoint':{'proc_listening_type':'pyon.container.test.test_procs.TestRPCServer'}}}})
+
+        fakecc = FakeContainer()
+        fakecc.resource_registry = Mock()
+        fakecc.resource_registry.create.return_value=["ID","rev"]
+
+        pm = ProcManager(fakecc)
+
+        ep = pm._create_listening_endpoint(node=sentinel.node,
+                                           service=sentinel.service,
+                                           process=sentinel.process)
+
+        self.assertIsInstance(ep, TestRPCServer)
+
 

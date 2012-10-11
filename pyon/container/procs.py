@@ -300,6 +300,24 @@ class ProcManager(object):
         for cb in self._proc_state_change_callbacks:
             cb(svc, state, self.container)
 
+    def _create_listening_endpoint(self, **kwargs):
+        """
+        Creates a listening endpoint for spawning processes.
+
+        This method exists to be able to override the type created via configuration.
+        In most cases it will create a ProcessRPCServer.
+        """
+        eptypestr = CFG.get_safe('container.messaging.endpoint.proc_listening_type', None)
+        log.error("%s - %s", eptypestr, CFG.container.messaging)
+        if eptypestr is not None:
+            module, cls     = eptypestr.rsplit('.', 1)
+            mod             = __import__(module, fromlist=[cls])
+            eptype          = getattr(mod, cls)
+            ep              = eptype(**kwargs)
+        else:
+            ep = ProcessRPCServer(**kwargs)
+        return ep
+
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
     def _spawn_service_process(self, process_id, name, module, cls, config):
@@ -314,15 +332,15 @@ class ProcManager(object):
         process_instance._proc_listen_name = listen_name
 
         # Service RPC endpoint
-        rsvc1 = ProcessRPCServer(node=self.container.node,
-            from_name=listen_name,
-            service=process_instance,
-            process=process_instance)
+        rsvc1 = self._create_listening_endpoint(node=self.container.node,
+                                                from_name=listen_name,
+                                                service=process_instance,
+                                                process=process_instance)
         # Named local RPC endpoint
-        rsvc2 = ProcessRPCServer(node=self.container.node,
-            from_name=process_instance.id,
-            service=process_instance,
-            process=process_instance)
+        rsvc2 = self._create_listening_endpoint(node=self.container.node,
+                                                from_name=process_instance.id,
+                                                service=process_instance,
+                                                process=process_instance)
 
         # cleanup method to delete process queue
         cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc2)
@@ -371,10 +389,10 @@ class ProcManager(object):
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(process_instance, publish_streams)
 
-        rsvc = ProcessRPCServer(node=self.container.node,
-            from_name=process_instance.id,
-            service=process_instance,
-            process=process_instance)
+        rsvc = self._create_listening_endpoint(node=self.container.node,
+                                               from_name=process_instance.id,
+                                               service=process_instance,
+                                               process=process_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
         cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc)
@@ -416,17 +434,17 @@ class ProcManager(object):
         if resource_id:
             process_instance.resource_id = resource_id
 
-            alistener = ProcessRPCServer(node=self.container.node,
-                                         from_name=resource_id,
-                                         service=process_instance,
-                                         process=process_instance)
+            alistener = self._create_listening_endpoint(node=self.container.node,
+                                                        from_name=resource_id,
+                                                        service=process_instance,
+                                                        process=process_instance)
 
             listeners.append(alistener)
 
-        rsvc = ProcessRPCServer(node=self.container.node,
-            from_name=process_instance.id,
-            service=process_instance,
-            process=process_instance)
+        rsvc = self._create_listening_endpoint(node=self.container.node,
+                                               from_name=process_instance.id,
+                                               service=process_instance,
+                                               process=process_instance)
 
         listeners.append(rsvc)
 
@@ -483,10 +501,10 @@ class ProcManager(object):
         Attach to service pid.
         """
         process_instance = self._create_process_instance(process_id, name, module, cls, config)
-        rsvc = ProcessRPCServer(node=self.container.node,
-            from_name=process_instance.id,
-            service=process_instance,
-            process=process_instance)
+        rsvc = self._create_listening_endpoint(node=self.container.node,
+                                               from_name=process_instance.id,
+                                               service=process_instance,
+                                               process=process_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
         cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc)
