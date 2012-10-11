@@ -219,9 +219,6 @@ class ResourceRegistry(object):
             if type(attachment.content) is not str:
                 raise BadRequest("Attachment content must be str")
 
-            #saving encoded attachment content separately
-            #content = base64.encodestring(attachment.content)
-            # and emptying it from the attachment object
             attachment.content=base64.encodestring(attachment.content)
 
         elif attachment.attachment_type == AttachmentType.ASCII:
