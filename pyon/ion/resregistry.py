@@ -234,7 +234,6 @@ class ResourceRegistry(object):
 
         att_id,_ = self.create(attachment,includeAttachment=True)
 
-
         if resource_id:
             self.rr_store.create_association(resource_id, PRED.hasAttachment, att_id)
 
