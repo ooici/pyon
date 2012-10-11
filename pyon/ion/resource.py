@@ -5,11 +5,14 @@
 __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+import types
 from pyon.core.registry import getextends, issubtype
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import IonObject, get_service_registry
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
+from pyon.util.log import log
+from interface.objects import ComputedValueAvailability
 
 
 # Object Types
@@ -311,8 +314,29 @@ class ExtendedResourceContainer(object):
         else:
             self.resource_registry = res_registry
 
+
+
+
+    def create_extended_resource_container_list(self, extended_resource_type, resource_id_list, computed_resource_type=None,
+                                                ext_associations=None, ext_exclude=None):
+
+        if not isinstance(resource_id_list, types.ListType):
+            raise Inconsistent("The paramater resource_id_list is not a list of resource_ids")
+
+        ret = list()
+        for res_id in resource_id_list:
+            ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type,
+                                                                ext_associations, ext_exclude )
+            ret.append(ext_res)
+
+        return ret
+
+
     def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
                                            ext_associations=None, ext_exclude=None):
+
+        if not isinstance(resource_id, types.StringType):
+            raise Inconsistent("The paramater resource_id is not a single resource id string")
 
         if not self.service_provider or not self.resource_registry:
             raise Inconsistent("This class is not initialized properly")
@@ -494,13 +518,35 @@ class ExtendedResourceContainer(object):
     # and also in the class specified by the service_provider
     def execute_method(self, resource_id, method_name):
 
-        #First look for the method in the current class
-        func = getattr(self, method_name, None)
-        if func:
-            return func(resource_id)
+        #First look to see if this is a remote method
+        if method_name.find('.') > 0:
+
+            try:
+                #This is a remote method.
+                rmi_call = method_name.split('.')
+                #Retrieve service definition
+                service_name = rmi_call[0]
+                operation = rmi_call[1]
+                target_service = get_service_registry().get_service_by_name(service_name)
+                client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
+                methodToCall = getattr(client, operation)
+                param_list = [resource_id]
+                ret = methodToCall(*param_list)
+                return ret
+
+            except Exception, e:
+                log.error(e)
+                return None
+
         else:
-            func = getattr(self.service_provider, method_name, None)
+            #For local methods, first look for the method in the current class
+            func = getattr(self, method_name, None)
             if func:
                 return func(resource_id)
+            else:
+                #Next look to see if the method exists in the service provider process
+                func = getattr(self.service_provider, method_name, None)
+                if func:
+                    return func(resource_id)
 
-        return None
+            return None

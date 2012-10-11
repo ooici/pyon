@@ -11,8 +11,10 @@ from pyon.core.exception import BadRequest
 from pyon.util.unit_test import IonUnitTestCase
 from nose.plugins.attrib import attr
 
+
 @attr('UNIT', group='resource')
 class TestResources(IonUnitTestCase):
+
 
     def test_resource_lcworkflow(self):
         default_workflow = lcs_workflows['InstrumentDevice']
@@ -59,6 +61,7 @@ class TestResources(IonUnitTestCase):
         mock_clients = self._create_service_mock('resource_registry')
 
         self.clients = mock_clients
+        self.container = Mock()
 
         extended_resource_handler = ExtendedResourceContainer(self, mock_clients.resource_registry)
 
@@ -66,6 +69,11 @@ class TestResources(IonUnitTestCase):
         instrument_device._id = '123'
         instrument_device.name = "MyInstrument"
         instrument_device.type_ = RT.InstrumentDevice
+
+        instrument_device2 = Mock()
+        instrument_device2._id = '456'
+        instrument_device2.name = "MyInstrument2"
+        instrument_device2.type_ = RT.InstrumentDevice
 
 
         actor_identity = Mock()
@@ -90,10 +98,20 @@ class TestResources(IonUnitTestCase):
         actor_identity_to_info_association.o = "444"
         actor_identity_to_info_association.ot = RT.UserInfo
 
-        # ActorIdentity to UserInfo association
+        # ActorIdentity to Instrument Device association
         Instrument_device_to_actor_identity_association = Mock()
         Instrument_device_to_actor_identity_association._id = '666'
         Instrument_device_to_actor_identity_association.s = "123"
+        Instrument_device_to_actor_identity_association.st = RT.InstumentDevice
+        Instrument_device_to_actor_identity_association.p = PRED.hasOwner
+        Instrument_device_to_actor_identity_association.o = "111"
+        Instrument_device_to_actor_identity_association.ot = RT.ActorIdentity
+
+
+        # ActorIdentity to Instrument Device association
+        Instrument_device_to_actor_identity_association = Mock()
+        Instrument_device_to_actor_identity_association._id = '666'
+        Instrument_device_to_actor_identity_association.s = "456"
         Instrument_device_to_actor_identity_association.st = RT.InstumentDevice
         Instrument_device_to_actor_identity_association.p = PRED.hasOwner
         Instrument_device_to_actor_identity_association.o = "111"
@@ -121,9 +139,24 @@ class TestResources(IonUnitTestCase):
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123')
         self.assertEquals(extended_res.resource, instrument_device)
         self.assertEquals(len(extended_res.owners),1)
+        self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
 
         #Test field exclusion
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123',ext_exclude=['owners'])
         self.assertEquals(extended_res.resource, instrument_device)
         self.assertEquals(len(extended_res.owners),0)
+        self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
 
+        #Test the list of ids interface
+        extended_res_list = extended_resource_handler.create_extended_resource_container_list(OT.TestExtendedResource, ['123','456'])
+        self.assertEqual(len(extended_res_list), 2)
+        self.assertEquals(extended_res_list[0].resource, instrument_device)
+        self.assertEquals(len(extended_res_list[0].owners),1)
+        self.assertEquals(extended_res_list[0].resource_object.type_, RT.SystemResource)
+
+
+    def get_resource_object(self, resource_id):
+        '''
+        Method used for testing
+        '''
+        return IonObject(RT.SystemResource, name='TestSystem_Resource')
