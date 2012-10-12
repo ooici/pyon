@@ -675,6 +675,7 @@ class CouchDB_DataStore(DataStore):
 
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
+                           attr_name=None, attr_value=None,
                            limit=None, skip=None, descending=None, id_only=True):
         if name:
             if lcstate:
@@ -684,6 +685,8 @@ class CouchDB_DataStore(DataStore):
             return self.find_res_by_keyword(keyword, restype, id_only)
         elif nested_type:
             return self.find_res_by_nested_type(nested_type, restype, id_only)
+        elif restype and attr_name:
+            return self.find_res_by_attribute(restype, attr_name, attr_value, id_only=id_only)
         elif restype and lcstate:
             return self.find_res_by_lcstate(lcstate, restype, id_only)
         elif restype:
@@ -817,6 +820,31 @@ class CouchDB_DataStore(DataStore):
         res_assocs = [dict(nested_type=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_nested_type() found %s objects", len(res_assocs))
         self._count(find_res_by_nested_call=1, find_res_by_nested_obj=len(res_assocs))
+        if id_only:
+            res_ids = [row.id for row in rows]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
+            return (res_docs, res_assocs)
+
+    def find_res_by_attribute(self, restype, attr_name, attr_value=None, id_only=False):
+        log.debug("find_res_by_attribute(restype=%s, attr_name=%s, attr_value=%s)", restype, attr_name, attr_value)
+        if not attr_name or type(attr_name) is not str:
+            raise BadRequest('Argument attr_name illegal')
+        if type(id_only) is not bool:
+            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        ds, datastore_name = self._get_datastore()
+        view = ds.view(self._get_viewname("resource", "by_attribute"), include_docs=(not id_only))
+        key = [restype, attr_name]
+        if attr_value:
+            key.append(attr_value)
+        endkey = list(key)
+        endkey.append(END_MARKER)
+        rows = view[key:endkey]
+
+        res_assocs = [dict(type=row['key'][0], attr_name=row['key'][1], attr_value=row['key'][2], id=row.id) for row in rows]
+        log.debug("find_res_by_attribute() found %s objects", len(res_assocs))
+        self._count(find_res_by_attribute_call=1, find_res_by_attribute_obj=len(res_assocs))
         if id_only:
             res_ids = [row.id for row in rows]
             return (res_ids, res_assocs)

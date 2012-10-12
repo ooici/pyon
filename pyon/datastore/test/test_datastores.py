@@ -326,7 +326,9 @@ class Test_DataStores(IonIntegrationTestCase):
 
         admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
 
-        admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Profile')
+        admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Some User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "John Doe",
+                                                       "email": "johnny@iamdevops.com"}))
 
         other_user_id = self._create_resource(RT.ActorIdentity, 'Paul Smithy', description='Other user')
 
@@ -513,6 +515,7 @@ class Test_DataStores(IonIntegrationTestCase):
         assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
 
+
         # Test regression bug: Inherited resources in associations
         idev1_obj_id = self._create_resource(RT.InstrumentDevice, 'id1', description='')
 
@@ -539,6 +542,26 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEqual(len(res_list), 1)
         self.assertEqual(res_list[0]._get_type(), RT.UserInfo)
 
+        # Find by attribute
+        admin_user2_id = self._create_resource(RT.UserInfo, 'Other User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
+                                                       "email": "frank@mydomain.com"}))
+
+        admin_user3_id = self._create_resource(RT.UserInfo, 'Different User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
+                                                       "email": "frank@mydomain.com"}))
+
+        res_list,key_list = data_store.find_resources(restype="UserInfo")
+        self.assertEqual(len(res_list), 3)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email")
+        self.assertEqual(len(res_list), 3)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email", attr_value="johnny@iamdevops.com")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email", attr_value="DOES NOT EXIST")
+        self.assertEqual(len(res_list), 0)
 
 
     def _create_resource(self, restype, name, *args, **kwargs):

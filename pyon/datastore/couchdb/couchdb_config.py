@@ -108,6 +108,18 @@ function(doc) {
   }
 }""",
         },
+        # Find by attribute only for special resources.
+        # This is a special case treatment. Add emits below as needed for access elsewhere in the code.
+        'by_attribute':{
+            'map':"""
+function(doc) {
+  if (doc.type_) {
+    if (doc.type_ == "UserInfo" && doc.contact != undefined && doc.contact.email != undefined) {
+      emit([doc.type_, "contact.email", doc.contact.email], null);
+    }
+  }
+}""",
+        },
     },
 
     # -------------------------------------------------------------------------
