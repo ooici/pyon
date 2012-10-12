@@ -545,11 +545,13 @@ class Test_DataStores(IonIntegrationTestCase):
         # Find by attribute
         admin_user2_id = self._create_resource(RT.UserInfo, 'Other User',
             contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
-                                                       "email": "frank@mydomain.com"}))
+                                                       "email": "frank@mydomain.com"}),
+            alt_ids=["ALT_ID1"])
 
         admin_user3_id = self._create_resource(RT.UserInfo, 'Different User',
             contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
-                                                       "email": "frank@mydomain.com"}))
+                                                       "email": "frank@mydomain.com"}),
+            alt_ids=["NS1:ALT_ID2", "ALT_ID2"])
 
         res_list,key_list = data_store.find_resources(restype="UserInfo")
         self.assertEqual(len(res_list), 3)
@@ -561,6 +563,22 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEqual(len(res_list), 1)
 
         res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email", attr_value="DOES NOT EXIST")
+        self.assertEqual(len(res_list), 0)
+
+        # Find by alternate id
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2")
+        self.assertEqual(len(res_list), 2)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="NS1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="BULL")
         self.assertEqual(len(res_list), 0)
 
 

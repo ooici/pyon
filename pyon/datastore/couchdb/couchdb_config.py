@@ -84,6 +84,25 @@ function(doc) {
   }
 }""",
         },
+        # Find by alternative ID (e.g. as used in preload)
+        'by_altid':{
+            'map':"""
+function(doc) {
+  if (doc.type_ && doc.alt_ids) {
+    for (var i = 0; i < doc.alt_ids.length; i++ ) {
+      altid = doc.alt_ids[i];
+      parts = altid.split(":");
+      if (parts.length == 2) {
+        emit([parts[1], parts[0]], null);
+      } else {
+        emit([altid, ""], null);
+      }
+    }
+  } else if (doc.type_ && doc.uirefid) {
+    emit([doc.uirefid, "UIREFID"], null);
+  }
+}""",
+        },
         # Find by keyword then res type (one entry per keyword in a resource)
         'by_keyword':{
             'map':"""
