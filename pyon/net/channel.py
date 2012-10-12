@@ -101,7 +101,7 @@ class BaseChannel(object):
         self._fsm = FSM(self.S_INIT)
         self._fsm.add_transition(self.I_ATTACH, self.S_INIT, None, self.S_ACTIVE)
         self._fsm.add_transition(self.I_CLOSE, self.S_ACTIVE, self._on_close, self.S_CLOSED)
-        self._fsm.add_transition(self.I_CLOSE, self.S_CLOSED, None, self.S_CLOSED)              # closed is a goal state, multiple closes are ok and are no-ops
+        self._fsm.add_transition(self.I_CLOSE, self.S_CLOSED, lambda *args: self.on_channel_close(None, 0, ""), self.S_CLOSED)              # closed is a goal state, multiple closes are ok
         self._fsm.add_transition(self.I_CLOSE, self.S_INIT, None, self.S_CLOSED)                # INIT to CLOSED is fine too
 
     def set_close_callback(self, close_callback):
@@ -287,6 +287,10 @@ class BaseChannel(object):
                 self._closed_error_callback(self, code, text)
             except Exception, e:
                 log.warn("Closed error callback caught an exception: %s", str(e))
+
+        # fixup channel state fsm, but only if we're not executing a transition right now
+        if self._fsm.current_state != self.S_CLOSED and self._fsm.next_state is None:
+            self._fsm.current_state = self.S_CLOSED
 
 class SendChannel(BaseChannel):
     """
