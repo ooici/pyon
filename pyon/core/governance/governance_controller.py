@@ -300,17 +300,18 @@ class GovernanceController(object):
                 log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
 
 
-    #TODO - Might need to change this once the HA Agent is available
     def _is_policy_management_service_available(self):
         """
-        Method to verify if the Policy Management Service is running in the system.
+        Method to verify if the Policy Management Service is running in the system. If the container cannot connect to
+        the RR then assume it is remote container so do not try to access Policy Management Service
         """
-
-        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-        if policy_services:
-            return True
-        return False
-
+        try:
+            policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+            if policy_services:
+                return True
+            return False
+        except:
+            return False
 
     # Methods for managing operation specific policy
     def get_process_operation_dict(self, process_name):
