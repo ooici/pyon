@@ -8,8 +8,7 @@ import types
 from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
-from pyon.core.governance.policy.policy_decision import COMMON_SERVICE_POLICY_RULES
-from pyon.ion.resource import RT, PRED
+from pyon.ion.resource import RT, PRED, LCS
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
@@ -149,7 +148,6 @@ class GovernanceController(object):
 
     #Helper methods
 
-
     #Iterate the Org(s) that the user belongs to and create a header that lists only the role names per Org assigned
     #to the user; i.e. {'ION': ['Member', 'Operator'], 'Org2': ['Member']}
     def get_role_message_headers(self, org_roles):
@@ -193,6 +191,18 @@ class GovernanceController(object):
             actor_header = self.get_actor_header(system_actor._id)
 
         return actor_header
+
+    #Returns the list of commitments for the specified user and resource
+    def get_resource_commitment(self, user_id, resource_id):
+
+        log.debug("Finding commitments for user_id: %s and resource_id: %s" % (user_id, resource_id))
+
+        commitments,_ = self.rr_client.find_objects(resource_id, PRED.hasCommitment, RT.Commitment)
+        for com in commitments:
+            if com.consumer == user_id and com.lcstate != LCS.RETIRED:
+                return com
+
+        return None
 
     #Manage all of the policies in the container
 
@@ -273,19 +283,22 @@ class GovernanceController(object):
                 log.error("The service %s is not found or there was an error applying access policy: %s" % ( service_name, e.message))
 
             #Next update any precondition policies
-            if service_op:
-                try:
-                    proc = self.container.proc_manager.get_a_local_process(service_name)
-                    if proc is not None:
-                        preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+            try:
+                proc = self.container.proc_manager.get_a_local_process(service_name)
+                if proc is not None:
+                    if service_op: #handles the delete policy case
                         self.unregister_all_process_operation_precondition(proc,service_op)
-                        if preconditions:
-                            for pre in preconditions:
-                                self.register_process_operation_precondition(proc,service_op, pre )
+                    op_preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+                    if op_preconditions:
+                        for op in op_preconditions:
+                            self.unregister_all_process_operation_precondition(proc,op.op)
+                            for pre in op.preconditions:
+                                self.register_process_operation_precondition(proc, op.op, pre )
 
-                except Exception, e:
-                    #If the resource does not exist, just ignore it - but log a warning.
-                    log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
+            except Exception, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
+
 
     #TODO - Might need to change this once the HA Agent is available
     def _is_policy_management_service_available(self):

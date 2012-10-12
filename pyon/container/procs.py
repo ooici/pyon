@@ -178,6 +178,9 @@ class ProcManager(object):
 
                 # terminate process also triggers TERMINATING/TERMINATED
                 self._call_proc_state_changed(process_instance, ProcessStateEnum.EXITED)
+            else:
+                #Shouldn't be any policies for immediate processes
+                self.update_container_policies(process_instance)
 
             return process_instance.id
 
@@ -189,6 +192,31 @@ class ProcManager(object):
             self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
 
             raise
+
+    #This must be called after registering the process
+    def update_container_policies(self, process_instance):
+
+        if not self.container.governance_controller:
+            return
+
+        if process_instance._proc_type == "service":
+
+            # look to load any existing policies for this service
+            self.container.governance_controller.safe_update_service_access_policy(process_instance._proc_listen_name)
+
+        if process_instance._proc_type == "agent":
+
+            # look to load any existing policies for this agent service
+            if process_instance.resource_type is None:
+                self.container.governance_controller.safe_update_service_access_policy(process_instance.name)
+            else:
+                self.container.governance_controller.safe_update_service_access_policy(process_instance.resource_type)
+
+            if process_instance.resource_id:
+                # look to load any existing policies for this resource
+                self.container.governance_controller.safe_update_resource_access_policy(process_instance.resource_id)
+
+
 
     def list_local_processes(self, process_type=''):
         """
@@ -363,10 +391,6 @@ class ProcManager(object):
 
         proc.start_listeners()
 
-        # look to load any existing policies for this service
-        if self.container.governance_controller:
-            self.container.governance_controller.safe_update_service_access_policy(process_instance._proc_listen_name)
-
         return process_instance
 
     # -----------------------------------------------------------------
@@ -476,18 +500,7 @@ class ProcManager(object):
 
         proc.start_listeners()
 
-        # look to load any existing policies for this agent service
-        if self.container.governance_controller:
-            if process_instance.resource_type is None:
-                self.container.governance_controller.safe_update_service_access_policy(process_instance.name)
-            else:
-                self.container.governance_controller.safe_update_service_access_policy(process_instance.resource_type)
-
-        if process_instance.resource_id:
-            # look to load any existing policies for this resource
-            if self.container.governance_controller:
-                self.container.governance_controller.safe_update_resource_access_policy(process_instance.resource_id)
-        else:
+        if not process_instance.resource_id:
             log.warn("Agent process id=%s does not define resource_id!!" % process_instance.id)
 
         return process_instance

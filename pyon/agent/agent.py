@@ -177,23 +177,18 @@ class ResourceAgent(BaseResourceAgent):
     # Governance interfaces and helpers
     ##############################################################
 
-    def _is_governance_enabled(self):
-        return self.container.governance_controller.enabled and self.CFG.get_safe("system.load_policy", False)
 
     def _get_resource_commitments(self, user_id):
 
-        if not self._is_governance_enabled():
+        if not self.container.governance_controller.enabled:
             return None
 
-        log.debug("Finding commitments for user_id: " + user_id)
+        try:
+            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
+        except Exception, e:
+            log.error(e.message)
+            return None
 
-        rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self)
-        commitments,_ = rr_client.find_objects(self.resource_id, PRED.hasCommitment, RT.Commitment)
-        for com in commitments:
-            if com.consumer == user_id and com.lcstate != LCS.RETIRED:
-                return com
-
-        return None
 
     def negotiate(self, resource_id="", sap_in=None):
         """
