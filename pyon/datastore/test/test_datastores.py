@@ -581,6 +581,14 @@ class Test_DataStores(IonIntegrationTestCase):
         res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="BULL")
         self.assertEqual(len(res_list), 0)
 
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="NS1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="", id_only=True)
+        self.assertEqual(len(res_list), 2)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="", id_only=False)
+        self.assertEqual(len(res_list), 2)
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))

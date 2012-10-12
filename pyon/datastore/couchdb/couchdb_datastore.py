@@ -683,7 +683,7 @@ class CouchDB_DataStore(DataStore):
             return self.find_res_by_name(name, restype, id_only)
         elif keyword:
             return self.find_res_by_keyword(keyword, restype, id_only)
-        elif alt_id:
+        elif alt_id or alt_id_ns is not None:
             return self.find_res_by_alternative_id(alt_id, alt_id_ns, id_only)
         elif nested_type:
             return self.find_res_by_nested_type(nested_type, restype, id_only)
@@ -854,29 +854,40 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_alternative_id(self, alt_id, alt_id_ns=None, id_only=False):
+    def find_res_by_alternative_id(self, alt_id=None, alt_id_ns=None, id_only=False):
         log.debug("find_res_by_alternative_id(restype=%s, alt_id_ns=%s)", alt_id, alt_id_ns)
-        if not alt_id or type(alt_id) is not str:
+        if alt_id and type(alt_id) is not str:
             raise BadRequest('Argument alt_id illegal')
+        if alt_id_ns and type(alt_id_ns) is not str:
+            raise BadRequest('Argument alt_id_ns illegal')
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         ds, datastore_name = self._get_datastore()
         view = ds.view(self._get_viewname("resource", "by_altid"), include_docs=(not id_only))
-        key = [alt_id]
-        if alt_id_ns is not None:
-            key.append(alt_id_ns)
+        key = []
+        if alt_id:
+            key.append(alt_id)
+            if alt_id_ns is not None:
+                key.append(alt_id_ns)
+
         endkey = list(key)
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        res_assocs = [dict(type=row['key'][1], alt_id=row['key'][0], id=row.id) for row in rows]
+        if alt_id_ns is not None and not alt_id:
+            res_assocs = [dict(alt_id=row['key'][0], alt_id_ns=row['key'][1], id=row.id) for row in rows if row['key'][1] == alt_id_ns]
+        else:
+            res_assocs = [dict(alt_id=row['key'][0], alt_id_ns=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_alternative_id() found %s objects", len(res_assocs))
         self._count(find_res_by_altid_call=1, find_res_by_altid_obj=len(res_assocs))
         if id_only:
-            res_ids = [row.id for row in rows]
+            res_ids = [row['id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
+            if alt_id_ns is not None and not alt_id:
+                res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows if row['key'][1] == alt_id_ns]
+            else:
+                res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
     def find_res_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
