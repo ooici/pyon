@@ -95,7 +95,7 @@ function(doc) {
       if (parts.length == 2) {
         emit([parts[1], parts[0]], null);
       } else {
-        emit([altid, ""], null);
+        emit([altid, "_"], null);
       }
     }
   } else if (doc.type_ && doc.uirefid) {

@@ -683,7 +683,7 @@ class CouchDB_DataStore(DataStore):
             return self.find_res_by_name(name, restype, id_only)
         elif keyword:
             return self.find_res_by_keyword(keyword, restype, id_only)
-        elif alt_id or alt_id_ns is not None:
+        elif alt_id or alt_id_ns:
             return self.find_res_by_alternative_id(alt_id, alt_id_ns, id_only)
         elif nested_type:
             return self.find_res_by_nested_type(nested_type, restype, id_only)
@@ -874,7 +874,7 @@ class CouchDB_DataStore(DataStore):
         endkey.append(END_MARKER)
         rows = view[key:endkey]
 
-        if alt_id_ns is not None and not alt_id:
+        if alt_id_ns and not alt_id:
             res_assocs = [dict(alt_id=row['key'][0], alt_id_ns=row['key'][1], id=row.id) for row in rows if row['key'][1] == alt_id_ns]
         else:
             res_assocs = [dict(alt_id=row['key'][0], alt_id_ns=row['key'][1], id=row.id) for row in rows]
@@ -884,7 +884,7 @@ class CouchDB_DataStore(DataStore):
             res_ids = [row['id'] for row in res_assocs]
             return (res_ids, res_assocs)
         else:
-            if alt_id_ns is not None and not alt_id:
+            if alt_id_ns and not alt_id:
                 res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows if row['key'][1] == alt_id_ns]
             else:
                 res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
