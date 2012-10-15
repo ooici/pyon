@@ -66,22 +66,16 @@ class InterceptorTest(PyonTestCase):
             self.assertTrue((a==d).all())
 
     def test_set(self):
-
-        a = {'s':set([1,2,3]),'l':[1,2,3],'t':(1,2,3)}
-
+        a = {1,2}
         invoke = Invocation()
         invoke.message = a
         codec = EncodeInterceptor()
 
         mangled = codec.outgoing(invoke)
-
         received = codec.incoming(mangled)
-
         b = received.message
 
-        # We only get lists back - damn you msgpack!
-        only_lists = {'s':set([1,2,3]),'l':[1,2,3],'t':[1,2,3]}
-        self.assertEquals(only_lists,b)
+        self.assertEquals(a,b)
 
     def test_scalars(self):
         a = np.uint64(312)

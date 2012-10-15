@@ -9,6 +9,17 @@ numpy_ints    = (np.int, np.int8, np.int16, np.int64, np.uint8, np.uint16, np.ui
 numpy_bool    = (np.bool)
 numpy_complex = (np.complex, np.complex64, np.complex128)
 
+class EncodeTypes(object):
+    SET = 's'
+    LIST = 'l'
+    NPARRAY = 'a'
+    COMPLEX = 'c'
+    DTYPE = 'd'
+    SLICE = 'i'
+    NPVAL = 'n'
+
+
+
 
 def decode_ion(obj):
     """
@@ -16,28 +27,30 @@ def decode_ion(obj):
     pyon
     """
 
-    if "__set__" in obj:
-        return set(obj['tuple'])
+    if not 't' in obj:
+        return obj
 
-    elif "__list__" in obj:
-        return list(obj['tuple'])
+    if obj['t'] == EncodeTypes.LIST:
+        return list(obj['o'])
 
-    elif "__ion_array__" in obj:
-        # Shape is currently implicit because tolist encoding makes a list of lists for a 2d array.
-        return np.array(obj['content'], dtype=np.dtype(obj['header']['type']))
+    elif obj['t'] == EncodeTypes.NPARRAY:
+        return np.array(obj['o'], dtype=np.dtype(obj['d']))
 
-    elif '__complex__' in obj:
-        return complex(obj['real'], obj['imag'])
+    elif obj['t'] == EncodeTypes.COMPLEX:
+        return complex(obj['o'][0], obj['o'][1])
     
-    elif '__dtype__' in obj:
-        dt = np.dtype(obj['__dtype__'])
-        return dt.type(obj['val'])
+    elif obj['t'] == EncodeTypes.DTYPE:
+        return np.dtype(obj['o'])
 
-    elif '__slice__' in obj:
-        return slice(obj['start'], obj['stop'], obj['step'])
+    elif obj['t'] == EncodeTypes.SLICE:
+        return slice(obj['o'][0], obj['o'][1], obj['o'][2])
 
-    elif '__npdtype__' in obj:
-        return np.dtype(obj['__npdtype__'])
+    elif obj['t'] == EncodeTypes.SET:
+        return set(obj['o'])
+
+    elif obj['t'] == EncodeTypes.NPVAL:
+        dt = np.dtype(obj['d'])
+        return dt.type(obj['o'])
 
     return obj
 
@@ -49,30 +62,30 @@ def encode_ion(obj):
     """
 
     if isinstance(obj, list):
-        return {"__list__": True, 'tuple': tuple(obj)}
+        return {'t':EncodeTypes.LIST,'o':tuple(obj)}
 
     if isinstance(obj, set):
-        return {"__set__": True, 'tuple': tuple(obj)}
+        return {'t':EncodeTypes.SET, 'o':tuple(obj)}
 
     if isinstance(obj, np.ndarray):
-        return {"header": {"type": str(obj.dtype), "nd": obj.ndim, "shape": obj.shape}, "content": obj.tolist(), "__ion_array__": True}
+        return {'t':EncodeTypes.NPARRAY, 'o':obj.tolist(), 'd':obj.dtype.str}
 
     if isinstance(obj, complex):
-        return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
+        return {'t':EncodeTypes.COMPLEX, 'o':tuple(obj.real, obj.imag)}
 
     if isinstance(obj, np.number):
         if isinstance(obj,numpy_floats):
-            return {'__dtype__': obj.dtype.str, 'val':float(obj.astype(float))}
+            return {'t':EncodeTypes.NPVAL, 'o':float(obj.astype(float)), 'd':obj.dtype.str}
         elif isinstance(obj, numpy_ints):
-            return {'__dtype__': obj.dtype.str, 'val':int(obj.astype(int))}
+            return {'t':EncodeTypes.NPVAL, 'o':int(obj.astype(int)), 'd':obj.dtype.str}
         else:
             raise TypeError('Unsupported type "%s"', str(type(obj)))
 
     if isinstance(obj, slice):
-        return {'__slice__':True, 'start':obj.start, 'stop' : obj.stop, 'step':obj.step}
+        return {'t':EncodeTypes.SLICE, 'o':(obj.start, obj.stop, obj.step)}
 
     if isinstance(obj,np.dtype):
-        return {'__npdtype__':obj.str}
+        return {'t':EncodeTypes.DTYPE, 'o':obj.str}
 
     # Must raise type error to avoid recursive failure
     raise TypeError('Unknown type "%s" in user specified encoder: "%s"' % (str(type(obj)), str(obj)))
