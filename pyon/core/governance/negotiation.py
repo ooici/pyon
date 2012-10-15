@@ -13,7 +13,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.registry import issubtype
 from pyon.core.exception import  Inconsistent, NotFound, BadRequest
 from pyon.ion.resource import RT, PRED, OT
-from interface.objects import ProposalStatusEnum, NegotiationTypeEnum, AcquisitionTypeEnum, ProposalOriginatorEnum, NegotiationStatusEnum
+from interface.objects import ProposalStatusEnum, NegotiationTypeEnum, ProposalOriginatorEnum, NegotiationStatusEnum
 
 
 class Negotiation(object):
@@ -65,15 +65,16 @@ class Negotiation(object):
         if sap.negotiation_id != '':
             raise Inconsistent('The specified Service Agreement Proposal cannot have a negotiation_id for an initial proposal')
 
-        #validate preconditions before creating
-        for pc in self.negotiation_rules[sap.type_]['pre_conditions']:
-            if pc.startswith('not '):
-                pre_condition_met = not eval("self.service_provider." + pc.lstrip('not ')) #Strip off the 'not ' part
-            else:
-                pre_condition_met = eval("self.service_provider."+pc)
+        if self.negotiation_rules.has_key(sap.type_):
+            #validate preconditions before creating
+            for pc in self.negotiation_rules[sap.type_]['pre_conditions']:
+                if pc.startswith('not '):
+                    pre_condition_met = not eval("self.service_provider." + pc.lstrip('not ')) #Strip off the 'not ' part
+                else:
+                    pre_condition_met = eval("self.service_provider."+pc)
 
-            if not pre_condition_met:
-                raise BadRequest("A precondition for this request has not been satisfied: %s" % pc)
+                if not pre_condition_met:
+                    raise BadRequest("A precondition for this request has not been satisfied: %s" % pc)
 
         #Should be able to determine the negotiation type based on the intial originator
         neg_type = NegotiationTypeEnum.REQUEST
