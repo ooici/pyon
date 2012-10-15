@@ -9,7 +9,6 @@ from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_inter
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
 from pyon.core.exception import Timeout as IonTimeout
-from pyon.core.exception import OperationInterruptedException
 from gevent.timeout import Timeout
 
 

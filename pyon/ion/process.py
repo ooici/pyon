@@ -10,11 +10,21 @@ from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet
 from pyon.util.async import spawn
-from pyon.core.exception import IonException, ContainerError, OperationInterruptedException
+from pyon.core.exception import IonException, ContainerError
 from pyon.util.containers import get_ion_ts
 from pyon.core.bootstrap import CFG
 import threading
 import traceback
+
+class OperationInterruptedException(BaseException):
+    """
+    Interrupted exception. Used by external items timing out execution in the
+    IonProcessThread's control thread.
+
+    Derived from BaseException to specifically avoid try/except Exception blocks,
+    such as in Publisher's publish_event.
+    """
+    pass
 
 class IonProcessThread(PyonThread):
     """
