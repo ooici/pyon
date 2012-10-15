@@ -214,7 +214,7 @@ class BaseChannel(object):
         """
         Closes the AMQP connection.
         """
-        log.info("BaseChannel.close_impl (%s)", self.get_channel_id())
+        log.trace("BaseChannel.close_impl (%s)", self.get_channel_id())
         if self._transport:
 
             # the close destroys self._transport, so keep a ref here
