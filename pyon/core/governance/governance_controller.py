@@ -8,8 +8,7 @@ import types
 from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
-from pyon.core.governance.policy.policy_decision import COMMON_SERVICE_POLICY_RULES
-from pyon.ion.resource import RT, PRED
+from pyon.ion.resource import RT, PRED, LCS
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
@@ -42,15 +41,9 @@ class GovernanceController(object):
 
         log.debug("GovernanceController starting ...")
 
-        config = CFG.interceptor.interceptors.governance.config
+        self.enabled = CFG.get_safe('interceptor.interceptors.governance.config.enabled', False)
 
-        if config is None:
-            config['enabled'] = False
-
-        if "enabled" in config:
-            self.enabled = config["enabled"]
-
-        log.debug("GovernanceInterceptor enabled: %s" % str(self.enabled))
+        log.info("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
         self.resource_policy_event_subscriber = None
         self.service_policy_event_subscriber = None
@@ -59,8 +52,14 @@ class GovernanceController(object):
         self._is_container_org_boundary = CFG.get_safe('container.org_boundary',False)
         self._container_org_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
         self._container_org_id = None
+        self._system_root_org_name = CFG.get_safe('system.root_org', 'ION')
+
+        self._is_root_org_container = (self._container_org_name == self._system_root_org_name)
 
         if self.enabled:
+
+            config = CFG.get_safe('interceptor.interceptors.governance.config')
+
             self.initialize_from_config(config)
 
             self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.resource_policy_event_callback)
@@ -77,7 +76,7 @@ class GovernanceController(object):
 
         self.governance_dispatcher = GovernanceDispatcher()
 
-        self.policy_decision_point_manager = PolicyDecisionPointManager()
+        self.policy_decision_point_manager = PolicyDecisionPointManager(self)
 
         if 'interceptor_order' in config:
             self.interceptor_order = config['interceptor_order']
@@ -111,6 +110,12 @@ class GovernanceController(object):
     def is_container_org_boundary(self):
         return self._is_container_org_boundary
 
+    def is_root_org_container(self):
+        return self._is_root_org_container
+
+    def get_container_org_boundary_name(self):
+        return self._container_org_name
+
     def get_container_org_boundary_id(self):
 
         if not self._is_container_org_boundary:
@@ -143,7 +148,6 @@ class GovernanceController(object):
 
     #Helper methods
 
-
     #Iterate the Org(s) that the user belongs to and create a header that lists only the role names per Org assigned
     #to the user; i.e. {'ION': ['Member', 'Operator'], 'Org2': ['Member']}
     def get_role_message_headers(self, org_roles):
@@ -175,8 +179,10 @@ class GovernanceController(object):
         return system_actor[0]
 
     #Returns the actor related message headers for a the ION System Actor
-    def get_system_actor_header(self):
-        system_actor = self.get_system_actor()
+    def get_system_actor_header(self, system_actor=None):
+
+        if system_actor is None:
+            system_actor = self.get_system_actor()
 
         if not system_actor or system_actor is None:
             log.warn('The ION System Actor Identity was not found; defaulting to anonymous actor')
@@ -185,6 +191,18 @@ class GovernanceController(object):
             actor_header = self.get_actor_header(system_actor._id)
 
         return actor_header
+
+    #Returns the list of commitments for the specified user and resource
+    def get_resource_commitment(self, user_id, resource_id):
+
+        log.debug("Finding commitments for user_id: %s and resource_id: %s" % (user_id, resource_id))
+
+        commitments,_ = self.rr_client.find_objects(resource_id, PRED.hasCommitment, RT.Commitment)
+        for com in commitments:
+            if com.consumer == user_id and com.lcstate != LCS.RETIRED:
+                return com
+
+        return None
 
     #Manage all of the policies in the container
 
@@ -265,31 +283,35 @@ class GovernanceController(object):
                 log.error("The service %s is not found or there was an error applying access policy: %s" % ( service_name, e.message))
 
             #Next update any precondition policies
-            if service_op:
-                try:
-                    proc = self.container.proc_manager.get_a_local_process(service_name)
-                    if proc is not None:
-                        preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+            try:
+                proc = self.container.proc_manager.get_a_local_process(service_name)
+                if proc is not None:
+                    if service_op: #handles the delete policy case
                         self.unregister_all_process_operation_precondition(proc,service_op)
-                        if preconditions:
-                            for pre in preconditions:
-                                self.register_process_operation_precondition(proc,service_op, pre )
+                    op_preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+                    if op_preconditions:
+                        for op in op_preconditions:
+                            self.unregister_all_process_operation_precondition(proc,op.op)
+                            for pre in op.preconditions:
+                                self.register_process_operation_precondition(proc, op.op, pre )
 
-                except Exception, e:
-                    #If the resource does not exist, just ignore it - but log a warning.
-                    log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
+            except Exception, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
 
-    #TODO - Might need to change this once the HA Agent is available
+
     def _is_policy_management_service_available(self):
         """
-        Method to verify if the Policy Management Service is running in the system.
+        Method to verify if the Policy Management Service is running in the system. If the container cannot connect to
+        the RR then assume it is remote container so do not try to access Policy Management Service
         """
-
-        policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-        if policy_services:
-            return True
-        return False
-
+        try:
+            policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+            if policy_services:
+                return True
+            return False
+        except:
+            return False
 
     # Methods for managing operation specific policy
     def get_process_operation_dict(self, process_name):

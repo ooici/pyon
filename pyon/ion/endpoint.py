@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 """ION messaging endpoints"""
+<<<<<<< HEAD
 from pyon.net.transport import NameTrio
 from pyon.util import log
+=======
+>>>>>>> master
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -10,13 +13,18 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
+<<<<<<< HEAD
 from pyon.core.exception import Unauthorized
 from pyon.net import conversation
+=======
+from pyon.core.exception import Timeout as IonTimeout
+from gevent.timeout import Timeout
+
+>>>>>>> master
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
 #############################################################################
-
 class ProcessEndpointUnitMixin(EndpointUnit):
     """
     Common-base mixin for Process related endpoints.
@@ -29,7 +37,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
-        newkwargs.update({'process':self._process})
+        newkwargs.update({'process': self._process})
 
         inv = EndpointUnit._build_invocation(self, **newkwargs)
         return inv
@@ -55,23 +63,30 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         return inv_two
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Builds the header for this Process-level RPC conversation.
         https://confluence.oceanobservatories.org/display/syseng/CIAD+COI+OV+Common+Message+Format
         """
 
-        header = EndpointUnit._build_header(self, raw_msg)
+        header = EndpointUnit._build_header(self, raw_msg, raw_headers)
 
         # add our process identity to the headers
-        header.update({'sender-name'  : self._process.name or 'unnamed-process',     # @TODO
-                       'sender'       : self._process.id })
+        header.update({'sender-name': self._process.name or 'unnamed-process',     # @TODO
+                       'sender': self._process.id})
 
+<<<<<<< HEAD
         if hasattr(self._process,'process_type' ):
             header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
             #@TODO: Fixes
             #if self._process.process_type == 'service':
             #    header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
+=======
+        if hasattr(self._process, 'process_type'):
+            header.update({'sender-type': self._process.process_type or 'unknown-process-type'})
+            if self._process.process_type == 'service':
+                header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
+>>>>>>> master
 
         context = self._process.get_context()
         log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
@@ -87,11 +102,11 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
-                header['ion-actor-id']  = actor_id
+                header['ion-actor-id'] = actor_id
                 if actor_roles:     header['ion-actor-roles']   = actor_roles
 
             #This set of tokens is set independently of the actor
-            if actor_tokens:    header['ion-actor-tokens']  = actor_tokens
+            if actor_tokens:    header['ion-actor-tokens']   = actor_tokens
 
             if expiry:          header['expiry']                = expiry
             if container_id:    header['origin-container-id']   = container_id
@@ -108,22 +123,24 @@ class ProcessEndpointUnitMixin(EndpointUnit):
     def _get_sflow_manager(self):
         return self._process.container.sflow_manager
 
+
 class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpointUnit):
     def __init__(self, process=None, **kwargs):
         ProcessEndpointUnitMixin.__init__(self, process=process)
         RPCRequestEndpointUnit.__init__(self, **kwargs)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the RPCRequest side, then the Process mixin.
         """
 
-        header1 = RPCRequestEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = RPCRequestEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
+
 
 class ProcessRPCClient(RPCClient):
     endpoint_unit_type = ProcessRPCRequestEndpointUnit
@@ -166,8 +183,6 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
             return RPCResponseEndpointUnit._message_received(self, msg, headers)
 
     def message_received(self, msg, headers):
-
-
         #This is the hook for checking governance pre-conditions before calling a service operation
         #TODO - replace with a process specific interceptor stack of some sort.
         gc = self._routing_obj.container.governance_controller
@@ -185,27 +200,34 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
 
         return result, response_headers
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the RPCResponse side, then the Process mixin.
         """
 
-        header1 = RPCResponseEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = RPCResponseEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return RPCResponseEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        res = ar.get()     # @TODO: timeout?
+        try:
+            res = ar.get(timeout=timeout)
+        except Timeout:
+
+            # cancel or abort current processing
+            self._process._process.cancel_or_abort_call(ar)
+
+            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
 
         # Persistent process state handling
-        if hasattr(self._process,"_proc_state"):
+        if hasattr(self._process, "_proc_state"):
             if self._process._proc_state_changed:
                 log.debug("Process %s state changed. State=%s", self._process.id, self._process._proc_state)
                 self._process.container.state_repository.put_state(self._process.id, self._process._proc_state)
@@ -279,16 +301,17 @@ class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUn
         ProcessEndpointUnitMixin.__init__(self, process=process)
         PublisherEndpointUnit.__init__(self, **kwargs)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the Publisher, then the Process mixin.
         """
-        header1 = PublisherEndpointUnit._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = PublisherEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
+
 
 class ProcessPublisher(Publisher):
 
@@ -304,17 +327,20 @@ class ProcessPublisher(Publisher):
         newkwargs['process'] = self._process
         return Publisher.create_endpoint(self, *args, **newkwargs)
 
+
 class PublisherError(StandardError):
     """
     An exception class for errors in the subscriber
     """
     pass
 
+
 class SubscriberError(StandardError):
     """
     An exception class for errors in the subscriber
     """
     pass
+
 
 class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpointUnit):
     def __init__(self, process=None, callback=None, routing_call=None, **kwargs):
@@ -340,24 +366,24 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
         with self._process.push_context(headers):
             return SubscriberEndpointUnit._message_received(self, msg, headers)
 
-    def _build_header(self, raw_msg):
+    def _build_header(self, raw_msg, raw_headers):
         """
         Override to direct the calls in _build_header - first the Subscriber, then the Process mixin.
         """
 
-        header1 = Subscriber._build_header(self, raw_msg)
-        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg)
+        header1 = SubscriberEndpointUnit._build_header(self, raw_msg, raw_headers)
+        header2 = ProcessEndpointUnitMixin._build_header(self, raw_msg, raw_headers)
 
         header1.update(header2)
 
         return header1
 
-    def _make_routing_call(self, call, *op_args, **op_kwargs):
+    def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
         if not self._routing_call:
-            return SubscriberEndpointUnit._make_routing_call(self, call, *op_args, **op_kwargs)
+            return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        return ar.get()     # @TODO: timeout?
+        return ar.get(timeout=timeout)
 
 class ProcessSubscriber(Subscriber):
 
@@ -383,6 +409,7 @@ class ProcessSubscriber(Subscriber):
         newkwargs['routing_call'] = self._routing_call
         return Subscriber.create_endpoint(self, **newkwargs)
 
+
 #
 # ProcessEventSubscriber
 #
@@ -396,5 +423,3 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         log.debug("EventPublisher events pattern %s", self.binding)
 
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
-
-

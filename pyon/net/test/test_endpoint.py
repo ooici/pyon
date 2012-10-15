@@ -73,22 +73,20 @@ class TestEndpointUnit(PyonTestCase):
         ch.close.assert_called_once_with()
 
     def test_build_header(self):
-        head = self._endpoint_unit._build_header({'fake': 'content'})
+        head = self._endpoint_unit._build_header({'fake': 'content'}, {})
         self.assertTrue(isinstance(head, dict))
 
     def test_build_payload(self):
         fakemsg = {'fake':'content'}
-        msg = self._endpoint_unit._build_payload(fakemsg)
+        msg = self._endpoint_unit._build_payload(fakemsg, {'fake':'header'})
         self.assertEquals(msg, fakemsg)
 
     def test_build_msg(self):
         fakemsg = {'fake':'content'}
-        msg = self._endpoint_unit._build_msg(fakemsg)
-    # self.assertTrue(isinstance(msg, dict))
-    # self.assertTrue(msg.has_key('header'))
-    # self.assertTrue(msg.has_key('payload'))
-    # self.assertTrue(isinstance(msg['header'], dict))
-    # self.assertEquals(fakemsg, msg['payload'])
+        msg, headers = self._endpoint_unit._build_msg(fakemsg, {})
+
+        self.assertEquals(msg, fakemsg)
+        self.assertEquals(headers, {'ts':ANY})
 
     def test_intercept_in(self):
         self._endpoint_unit._build_invocation = Mock()
@@ -385,7 +383,7 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
         gl2.join(timeout=5)
 
 @attr('INT', group='COI')
-class TestListeningBaseEndpointIntWithZeroMQ(TestListeningBaseEndpointInt):
+class TestListeningBaseEndpointIntWithLocal(TestListeningBaseEndpointInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
@@ -515,7 +513,7 @@ class TestRequestResponse(PyonTestCase, RecvMockMixin):
         e.channel = Mock()
         e.channel.recv = lambda: sleep(5)   # simulate blocking when recv is called
 
-        self.assertRaises(exception.Timeout, e._send, sentinel.msg, Mock(), timeout=1)
+        self.assertRaises(exception.Timeout, e._send, sentinel.msg, MagicMock(), timeout=1)
 
     def test_rr_client(self):
         rr = RequestResponseClient(node=self._node, to_name="rr")
@@ -553,7 +551,7 @@ class TestRPCRequestEndpoint(PyonTestCase, RecvMockMixin):
     def test_build_msg(self):
         e = RPCRequestEndpointUnit()
         fakemsg = {'fake':'content'}
-        msg = e._build_msg(fakemsg)
+        msg = e._build_msg(fakemsg, {})
 
         # er in json now, how to really check
         self.assertNotEquals(str(msg), str(fakemsg))
@@ -665,8 +663,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                        'format':'list',
                                                        'receiver': ',',
                                                        'msg-rcvd':ANY,
-                                                       'ts': sentinel.ts,
-                                                       'reply-by': 'todo'})
+                                                       'ts': sentinel.ts})
 
     @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
     def test_recv_bad_kwarg(self):
@@ -694,8 +691,7 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                        'format':'NoneType',
                                                        'receiver': ',',
                                                        'msg-rcvd':ANY,
-                                                       'ts': sentinel.ts,
-                                                       'reply-by': 'todo'})
+                                                       'ts': sentinel.ts})
 
     def test__message_received_interceptor_exception(self):
         e = RPCResponseEndpointUnit(routing_obj=self)

@@ -5,6 +5,7 @@ from pyon.core.object import IonObjectBase, walk
 from pyon.core.registry import is_ion_object
 from pyon.util.log import log
 
+
 class ValidateInterceptor(Interceptor):
     """
     Validates IonObject content within message
@@ -37,9 +38,9 @@ class ValidateInterceptor(Interceptor):
 
         if self.enabled:
             payload = invocation.message
-            
+
             # If payload is IonObject, convert from dict to object for processing
-            if "format" in invocation.headers and isinstance(payload,dict):
+            if "format" in invocation.headers and isinstance(payload, dict):
                 clzz = invocation.headers["format"]
                 if is_ion_object(clzz):
                     payload = IonObject(clzz, payload)
@@ -69,4 +70,3 @@ class ValidateInterceptor(Interceptor):
                 raise BadRequest(e.message)
 
         return invocation
-

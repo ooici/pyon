@@ -188,6 +188,7 @@ def main(opts, *args, **kwargs):
 
         # Also set the immediate flag, but only if specified - it is an override
         if opts.immediate:
+            from pyon.util.containers import dict_merge
             dict_merge(pyon_config, {'system':{'immediate':True}}, True)
 
         # Bootstrap pyon's core. Load configuration etc.
@@ -256,9 +257,9 @@ def main(opts, *args, **kwargs):
                 os.kill(os.getpid(), signal.SIGINT)
             import gevent
             ipg = gevent.spawn(is_parent_gone)
-            from pyon.util.containers import dict_merge
-            from pyon.public import CFG
-            dict_merge(CFG, {'system':{'watch_parent': ipg}}, True)
+
+            container.gl_parent_watch = ipg
+
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
             from pyon.container.shell_api import get_shell_api

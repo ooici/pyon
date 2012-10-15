@@ -47,6 +47,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         self_principal = invocation.headers.get('sender-role', None)
         target_principal = invocation.headers.get('receiver-role', None)
         op_type = LocalType.SEND;
+        log.debug("ConversationMonitorInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
 
         if self_principal and target_principal:
         #    target_principal = self._get_receiver(invocation)
@@ -219,4 +220,3 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         receiver_header = invocation.get_header_value('receiver', 'Unknown')
         receiver = invocation.get_service_name(receiver_header)
         return receiver
-

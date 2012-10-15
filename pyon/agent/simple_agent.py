@@ -12,11 +12,12 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core import exception as iex
 from pyon.event.event import EventPublisher
-from pyon.ion.resource import RT
+from pyon.ion.resource import RT, PRED, LCS
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 
 from interface.services.isimple_resource_agent import BaseSimpleResourceAgent, SimpleResourceAgentProcessClient
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 class SimpleResourceAgent(BaseSimpleResourceAgent):
     """
@@ -50,6 +51,23 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 
     def _on_quit(self):
         pass
+
+
+    ##############################################################
+    # Governance interfaces and helpers
+    ##############################################################
+
+    def _get_resource_commitments(self, user_id):
+
+        if not self.container.governance_controller.enabled:
+            return None
+
+        try:
+            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
+        except Exception, e:
+            log.error(e.message)
+            return None
+
 
     def negotiate(self, resource_id="", sap_in=None):
         pass
@@ -160,6 +178,7 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
 
     def _get_names(self, obj, prefix):
         return [name[len(prefix):] for name in dir(obj) if name.startswith(prefix)]
+
 
 class UserAgent(SimpleResourceAgent):
 

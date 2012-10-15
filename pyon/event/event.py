@@ -23,12 +23,14 @@ EVENTS_XP_TYPE = "topic"
 
 PERSIST_ON_PUBLISH = False
 
+
 def get_events_exchange_point():
     return "%s.%s" % (bootstrap.get_sys_name(), EVENTS_XP)
 
 
 class EventError(IonException):
     status_code = 500
+
 
 class EventPublisher(Publisher):
 
@@ -87,7 +89,7 @@ class EventPublisher(Publisher):
         topic = self._topic(event_type, origin, base_types=event_msg.base_types,
             sub_type=event_msg.sub_type, origin_type=event_msg.origin_type)
         to_name = (self._send_name.exchange, topic)
-        log.debug("Publishing event message to %s", to_name)
+        log.trace("Publishing event message to %s", to_name)
 
         try:
             self.publish(event_msg, to_name=to_name)
@@ -120,12 +122,13 @@ class EventPublisher(Publisher):
         success = self._publish_event(event_msg, origin=origin)
         return success
 
+
 class BaseEventSubscriberMixin(object):
     """
     A mixin class for Event subscribers to facilitate inheritance.
 
     EventSubscribers must come in both standard and process level versions, which
-    rely on common base code. It is difficult to multiple inherit due to both of 
+    rely on common base code. It is difficult to multiple inherit due to both of
     them sharing a base class, so this mixin is preferred.
     """
 
@@ -136,11 +139,11 @@ class BaseEventSubscriberMixin(object):
         If either side of the event_id.origin pair are missing, will subscribe to anything.
         """
         if event_type == "Event":
-            event_type  = "Event.#"
+            event_type = "Event.#"
         elif event_type:
-            event_type  = "#.%s.#" % event_type
+            event_type = "#.%s.#" % event_type
         else:
-            event_type  = "#"
+            event_type = "#"
 
         sub_type = sub_type or "*.#"
         origin_type = origin_type or "*"
@@ -169,10 +172,11 @@ class BaseEventSubscriberMixin(object):
         if queue_name is not None:
             if not queue_name.startswith(bootstrap.get_sys_name()):
                 queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
-                log.warn("queue_name specified, prepending sys_name to it: %s" % queue_name)
+                log.warn("queue_name specified, prepending sys_name to it: %s", queue_name)
 
         # set this name to be picked up by inherited folks
         self._ev_recv_name = (xp_name, queue_name)
+
 
 class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
 
@@ -216,6 +220,7 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread = None
         log.info("EventSubscriber stopped. Event pattern=%s" % self.binding)
 
+
 class EventRepository(object):
     """
     Class that uses a data store to provide a persistent repository for ION events.
@@ -235,13 +240,13 @@ class EventRepository(object):
         self.event_store.close()
 
     def put_event(self, event):
-        log.debug("Store event persistently %s", event)
+        log.trace("Store event persistently %s", event)
         if not isinstance(event, Event):
             raise BadRequest("event must be type Event, not %s" % type(event))
         return self.event_store.create(event)
 
     def put_events(self, events):
-        log.info("Store %s events persistently", len(events))
+        log.debug("Store %s events persistently", len(events))
         if type(events) is not list:
             raise BadRequest("events must be type list, not %s" % type(events))
         if not all([isinstance(event, Event) for event in events]):
@@ -253,13 +258,13 @@ class EventRepository(object):
             return None
 
     def get_event(self, event_id):
-        log.debug("Retrieving persistent event for id=%s" % event_id)
+        log.trace("Retrieving persistent event for id=%s", event_id)
         event_obj = self.event_store.read(event_id)
         return event_obj
 
     def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
-        log.debug("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s" % (
-            event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None)))
+        log.trace("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s",
+            event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None))
         events = None
 
         design_name = "event"
@@ -268,20 +273,20 @@ class EventRepository(object):
         end_key = []
         if origin and event_type:
             view_name = "by_origintype"
-            start_key=[origin, event_type]
-            end_key=[origin, event_type]
+            start_key = [origin, event_type]
+            end_key = [origin, event_type]
         elif origin:
             view_name = "by_origin"
-            start_key=[origin]
-            end_key=[origin]
+            start_key = [origin]
+            end_key = [origin]
         elif event_type:
             view_name = "by_type"
-            start_key=[event_type]
-            end_key=[event_type]
+            start_key = [event_type]
+            end_key = [event_type]
         elif start_ts or end_ts:
             view_name = "by_time"
-            start_key=[]
-            end_key=[]
+            start_key = []
+            end_key = []
         else:
             view_name = "by_time"
             if kwargs.get("limit", 0) < 1:
@@ -297,6 +302,7 @@ class EventRepository(object):
             id_only=False, **kwargs)
 
         return events
+
 
 class EventGate(EventSubscriber):
     def __init__(self, *args, **kwargs):

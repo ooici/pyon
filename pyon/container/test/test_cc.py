@@ -8,8 +8,9 @@ from nose.plugins.attrib import attr
 from pyon.container.cc import Container
 import signal
 from gevent.event import Event
-from mock import Mock, patch
+from mock import Mock, patch, ANY
 from interface.services.icontainer_agent import ContainerAgentClient
+from interface.objects import ProcessStateEnum
 
 @attr('UNIT')
 class TestCC(PyonTestCase):
@@ -58,6 +59,7 @@ class TestCCIntProcs(IonIntegrationTestCase):
         self.cc = Container()
         self.cc.resource_registry = Mock()
         self.cc.resource_registry.create.return_value=["ID","rev"]
+        self.cc.event_pub = Mock()
 
         self.cc.proc_manager.start()
 
@@ -66,27 +68,4 @@ class TestCCIntProcs(IonIntegrationTestCase):
 
     def tearDown(self):
         pass
-
-    def test_fail_fast(self):
-
-        # need to install signal protection so we don't kill nosetests!
-        ev = Event()
-        def no_abort(*args):
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-            ev.set()
-
-        signal.signal(signal.SIGTERM, no_abort)
-
-        # spawn the proc, wait for it to die and kill the container
-        def failtarget(*args, **kwargs):
-            raise self.ExpectedFailure("I am supposed to fail!")
-
-        proc = self.cc.proc_manager.proc_sup.spawn(failtarget)
-        # do not ensure ready - ensure ready will blow up with a container error, on purpose
-
-        # wait for the kill signal to happen
-        ev.wait(timeout=5)
-
-        # verify things got called
-        self.cc.stop.assert_called_once_with()
 

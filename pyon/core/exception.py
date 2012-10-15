@@ -13,11 +13,12 @@ CONFLICT = 409
 SERVER_ERROR = 500
 SERVICE_UNAVAILABLE = 503
 
+
 class IonException(ApplicationException):
     status_code = -1
 
     def __init__(self, *a, **b):
-        super(IonException,self).__init__(*a,**b)
+        super(IonException, self).__init__(*a, **b)
 
     def get_status_code(self):
         return self.status_code
@@ -28,11 +29,13 @@ class IonException(ApplicationException):
     def __str__(self):
         return str(self.get_status_code()) + " - " + str(self.get_error_message())
 
+
 class BadRequest(IonException):
     '''
     Incorrectly formatted client request
     '''
     status_code = 400
+
 
 class Unauthorized(IonException):
     '''
@@ -40,11 +43,13 @@ class Unauthorized(IonException):
     '''
     status_code = 401
 
+
 class NotFound(IonException):
     ''''
     Requested resource not found
     '''
     status_code = 404
+
 
 class Timeout(IonException):
     '''
@@ -52,11 +57,13 @@ class Timeout(IonException):
     '''
     status_code = 408
 
+
 class Conflict(IonException):
     '''
     Client request failed due to conflict with the current state of the resource
     '''
     status_code = 409
+
 
 class Inconsistent(IonException):
     '''
@@ -70,93 +77,110 @@ class ServerError(IonException):
     '''
     status_code = 500
 
+
 class ServiceUnavailable(IonException):
     '''
     Requested service not started or otherwise unavailable
     '''
     status_code = 503
 
+
 class ConfigNotFound(IonException):
     '''
     '''
     status_code = 540
+
 
 class ContainerError(IonException):
     '''
     '''
     status_code = 550
 
+
 class ContainerConfigError(ContainerError):
     '''
     '''
     status_code = 551
+
 
 class ContainerStartupError(ContainerError):
     '''
     '''
     status_code = 553
 
+
 class ContainerAppError(ContainerError):
     '''
     '''
     status_code = 554
 
+
 class IonInstrumentError(IonException):
     """
     """
     status_code = 600
-    
+
+
 class InstConnectionError(IonInstrumentError):
     """
     """
     status_code = 610
-    
+
+
 class InstNotImplementedError(IonInstrumentError):
     """
     """
     status_code = 620
-    
+
+
 class InstParameterError(IonInstrumentError):
     """
     """
     status_code = 630
+
 
 class InstProtocolError(IonInstrumentError):
     """
     """
     status_code = 640
 
+
 class InstSampleError(IonInstrumentError):
     """
     """
     status_code = 650
+
 
 class InstStateError(IonInstrumentError):
     """
     """
     status_code = 660
 
+
 class InstUnknownCommandError(IonInstrumentError):
     """
     """
     status_code = 670
+
 
 class InstDriverError(IonInstrumentError):
     """
     """
     status_code = 680
 
+
 class InstTimeoutError(IonInstrumentError):
     """
     """
     status_code = 690
+
 
 class ResourceError(IonException):
     """
     A taskable resource error occurred.
     """
     status_code = 700
-    
+
 
 # must appear after ServerError in python module
 class ExceptionFactory(object):
@@ -167,6 +191,7 @@ class ExceptionFactory(object):
             if inspect.isclass(obj):
                 if hasattr(obj, "status_code"):
                     self._exception_map[str(obj.status_code)] = obj
+
     def create_exception(self, code, message, stacks=None):
         """ build IonException from code, message, and optionally one or more stack traces """
         if str(code) in self._exception_map:
@@ -174,6 +199,6 @@ class ExceptionFactory(object):
         else:
             out = self._default(message)
         if stacks:
-            for label,stack in stacks:
-                out.add_stack(label,stack)
+            for label, stack in stacks:
+                out.add_stack(label, stack)
         return out

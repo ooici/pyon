@@ -10,14 +10,18 @@
 __author__ = 'Edward Hunter'
 __license__ = 'Apache 2.0'
 
+
 class FSMError(Exception):
     pass
+
 
 class FSMStateError(FSMError):
     pass
 
+
 class FSMCommandUnknownError(FSMError):
     pass
+
 
 class InstrumentFSM():
     """
@@ -31,7 +35,6 @@ class InstrumentFSM():
         @param events The list of events that the FSM handles
         @param enter_event The event that indicates a state is being entered
         @param exit_event The event that indicates a state is being exited
-        @param err_unhandled The error code to return on unhandled event
         """
         self.states = states
         self.events = events
@@ -51,18 +54,18 @@ class InstrumentFSM():
         """
         Add an event handler.
         @param state the state to handler the event in.
-        @param the event to handle.
+        @param event the event to handle.
         @retval True if successful, False otherwise.
         """
         if not self.states.has(state):
             return False
-        
+
         if not self.events.has(event):
             return False
 
-        self.state_handlers[(state,event)] = handler
+        self.state_handlers[(state, event)] = handler
         return True
-        
+
     def start(self, state, *args, **kwargs):
         """
         Start the state machine. Initializes current state and fires the
@@ -72,10 +75,10 @@ class InstrumentFSM():
         @param kwargs keyword arguments to pass to the handler.
         @retval True if successful, False otherwise.
         @raises Any exception raised by the enter handler.
-        """        
+        """
         if not self.states.has(state):
             return False
-                
+
         self.current_state = state
         handler = self.state_handlers.get((state, self.enter_event), None)
         if handler:
@@ -92,7 +95,7 @@ class InstrumentFSM():
         @retval result from the handler executed by the current state/event pair.
         @raises InstrumentStateException if no handler for the event exists in current state.
         @raises Any exception raised by the handlers.
-        """        
+        """
         next_state = None
         result = None
         if self.events.has(event):
@@ -103,13 +106,13 @@ class InstrumentFSM():
                 raise FSMStateError('Command not handled in current state.')
         else:
             raise FSMCommandUnknownError('Unknown command.')
-            
+
         #if next_state in self.states:
         if self.states.has(next_state):
             self._on_transition(next_state, *args, **kwargs)
-                
+
         return result
-            
+
     def _on_transition(self, next_state, *args, **kwargs):
         """
         Call the sequence of events to cause a state transition. Called from
@@ -119,7 +122,7 @@ class InstrumentFSM():
         @param kwargs keyword arguments to pass to the handler.
         @raises Any exception raised by the handlers.
         """
-        
+
         handler = self.state_handlers.get((self.current_state, self.exit_event), None)
         if handler:
             handler(*args, **kwargs)
@@ -141,7 +144,7 @@ class InstrumentFSM():
             event = key[1]
             if not ((event == self.enter_event) or (event == self.exit_event)):
                 if current_state:
-                    if (self.current_state==state):
+                    if self.current_state == state:
                         if event not in events:
                             events.append(event)
                 else:

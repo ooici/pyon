@@ -3,13 +3,16 @@
 __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
-from mock import Mock, patch
+from mock import Mock, patch, ANY
 
 from pyon.agent.agent import ResourceAgent
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
+from interface.objects import ProcessStateEnum
+from pyon.ion.endpoint import ProcessRPCServer
+from mock import sentinel
 
 class FakeContainer(object):
     def __init__(self):
@@ -34,6 +37,9 @@ class BadProcess(BaseService):
 
 class SampleAgent(ResourceAgent):
     dependencies = []
+
+class TestRPCServer(ProcessRPCServer):
+    pass
 
 @attr('INT')
 class TestProcManager(IonIntegrationTestCase):
@@ -80,6 +86,26 @@ class TestProcManager(IonIntegrationTestCase):
 
         return pid
 
+    def test_proc_org(self):
+        self._start_container()
+
+        pm = self.container.proc_manager
+
+        config = {'process':{'type':'standalone'}}
+        pid1 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid1)
+
+        config = {'process':{'type':'standalone'}, 'org_name': 'Org2'}
+        pid2 = pm.spawn_process('sample2', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid2)
+
+        proc = pm.procs_by_name['sample1']
+        self.assertEqual(proc.org_name,'ION')
+
+        proc = pm.procs_by_name['sample2']
+        self.assertEqual(proc.org_name,'Org2')
+
+
     def test_procmanager_shutdown(self):
         self.test_procmanager()
         pm = self.container.proc_manager
@@ -113,4 +139,37 @@ class TestProcManager(IonIntegrationTestCase):
         self.container.terminate_process(pid)
 
         self.assertEquals(len(self.container.proc_manager.procs), 0)
+
+    def test_proc_state_change_callback(self):
+        self._start_container()
+
+        m = Mock()
+        pm = self.container.proc_manager
+        pm.add_proc_state_changed_callback(m)
+
+        pid = self._spawnproc(pm, 'service')
+
+        m.assert_called_with(ANY, ProcessStateEnum.RUNNING, self.container)
+        self.assertIsInstance(m.call_args[0][0], SampleProcess)
+
+        self.container.terminate_process(pid)
+
+        m.assert_called_with(ANY, ProcessStateEnum.TERMINATED, self.container)
+        self.assertIsInstance(m.call_args[0][0], SampleProcess)
+
+    def test_create_listening_endpoint(self):
+        self.patch_cfg('pyon.container.procs.CFG', {'container':{'messaging':{'endpoint':{'proc_listening_type':'pyon.container.test.test_procs.TestRPCServer'}}}})
+
+        fakecc = FakeContainer()
+        fakecc.resource_registry = Mock()
+        fakecc.resource_registry.create.return_value=["ID","rev"]
+
+        pm = ProcManager(fakecc)
+
+        ep = pm._create_listening_endpoint(node=sentinel.node,
+                                           service=sentinel.service,
+                                           process=sentinel.process)
+
+        self.assertIsInstance(ep, TestRPCServer)
+
 

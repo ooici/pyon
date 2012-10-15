@@ -9,7 +9,6 @@ __license__ = 'Apache 2.0'
 import base64
 
 from pyon.core import bootstrap
-from pyon.core.bootstrap import CFG
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
@@ -19,7 +18,7 @@ from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
-from interface.objects import Attachment, AttachmentType, ServiceDefinition, ResourceModificationType
+from interface.objects import Attachment, AttachmentType, ResourceModificationType
 
 
 class ResourceRegistry(object):
@@ -83,7 +82,7 @@ class ResourceRegistry(object):
 
         id_list = [create_unique_resource_id() for i in xrange(len(res_list))]
         res = self.rr_store.create_mult(res_list, id_list)
-        res_list = [(rid,rrv) for success,rid,rrv in res]
+        res_list = [(rid, rrv) for success, rid, rrv in res]
 
         # TODO: Publish events (skipped, because this is inefficent one by one for a large list
 #        for rid,rrv in res_list:
@@ -152,7 +151,7 @@ class ResourceRegistry(object):
 
     def _delete_owners(self, resource_id):
         # Delete all owner users.
-        owners,assocs = self.rr_store.find_objects(resource_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
+        owners, assocs = self.rr_store.find_objects(resource_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
         for aid in assocs:
             self.rr_store.delete_association(aid)
 
@@ -172,7 +171,7 @@ class ResourceRegistry(object):
 
         res_obj.lcstate = new_state
         res_obj.ts_updated = get_ion_ts()
-        updres = self.rr_store.update(res_obj)
+        self.rr_store.update(res_obj)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
@@ -227,7 +226,7 @@ class ResourceRegistry(object):
         else:
             raise BadRequest("Unknown attachment-type: %s" % attachment.attachment_type)
 
-        att_id,_ = self.create(attachment)
+        att_id, _ = self.create(attachment)
 
         if resource_id:
             self.rr_store.create_association(resource_id, PRED.hasAttachment, att_id)
@@ -320,10 +319,10 @@ class ResourceRegistry(object):
         assoc = self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
         if not assoc:
             raise NotFound("Association for subject/predicate/object/type %s/%s/%s/%s not found" % (
-                str(subject),str(predicate),str(object),str(assoc_type)))
+                str(subject), str(predicate), str(object), str(assoc_type)))
         elif len(assoc) > 1:
             raise Inconsistent("Duplicate associations found for subject/predicate/object/type %s/%s/%s/%s" % (
-                str(subject),str(predicate),str(object),str(assoc_type)))
+                str(subject), str(predicate), str(object), str(assoc_type)))
         return assoc[0]
 
     def find_resources(self, restype="", lcstate="", name="", id_only=False):
@@ -331,7 +330,10 @@ class ResourceRegistry(object):
 
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
+                           attr_name=None, attr_value=None, alt_id="", alt_id_ns="",
                            limit=None, skip=None, descending=None, id_only=True):
         return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
-            keyword=keyword, nested_type=nested_type, limit=limit, skip=skip, descending=descending,
+            keyword=keyword, nested_type=nested_type,
+            attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
+            limit=limit, skip=skip, descending=descending,
             id_only=id_only)

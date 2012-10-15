@@ -14,8 +14,10 @@ import os
 import signal
 from gevent.event import AsyncResult
 
+
 class PyonThreadError(Exception):
     pass
+
 
 class PyonThreadTraceback(object):
     """
@@ -23,8 +25,12 @@ class PyonThreadTraceback(object):
     """
     def __init__(self, msg):
         self._msg = msg
+
     def __str__(self):
         return self._msg
+
+class PyonHeartbeatError(PyonThreadError):
+    pass
 
 class PyonThread(object):
     """
@@ -49,12 +55,16 @@ class PyonThread(object):
         self.proc = None
         self.supervisor = None
 
+        self.ev_exit = Event()
+
     def _pid(self):
         return id(self.proc)
 
     def _spawn(self):
         # Gevent spawn
-        return spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
+        gl = spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
+        gl.link(lambda _: self.ev_exit.set())
+        return gl
 
     def _join(self, timeout=None):
         return self.proc.join(timeout)
@@ -101,7 +111,7 @@ class PyonThread(object):
         if self.proc is not None and self.running:
             self._join(timeout)
             self.stop()
-            
+
         return self
 
     def get(self):
@@ -124,6 +134,7 @@ class PyonThread(object):
         ev = Event()
         ev.set()
         return ev
+
 
 class ThreadManager(object):
     """
@@ -239,7 +250,7 @@ class ThreadManager(object):
 
         for proc in self.children:
 
-            # if a child thread has already exited, we don't need to wait on anything - 
+            # if a child thread has already exited, we don't need to wait on anything -
             # it's already good to go and can be considered joined. Otherwise we will likely
             # double call notify_stop which is a bad thing.
             if proc.proc.dead:
@@ -299,16 +310,18 @@ class ThreadManager(object):
         self._shutdown_event.set(True)
         unset = shutdown_or_die(timeout)        # Failsafe in case the following doesn't work
         elapsed = self.join_children(timeout)
-        self.stop()
+        #self.stop()
 
         unset()
         return elapsed
+
 
 class PyonThreadManager(ThreadManager, PyonThread):
     """
     A thread manager that runs in a thread and can spawn threads.
     """
     pass
+
 
 def shutdown_or_die(delay_sec=0):
     """

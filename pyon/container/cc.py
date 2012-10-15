@@ -36,6 +36,7 @@ import signal
 import traceback
 from contextlib import contextmanager
 
+
 class Container(BaseContainerAgent):
     """
     The Capability Container. Its purpose is to spawn/monitor processes and services
@@ -59,7 +60,6 @@ class Container(BaseContainerAgent):
         self.name = "cc_agent_%s" % self.id
         self._capabilities = []
 
-        from pyon.core import bootstrap
         bootstrap.container_instance = self
         Container.instance = self
 
@@ -124,7 +124,7 @@ class Container(BaseContainerAgent):
         with open(self.pidfile, 'w') as f:
             pid_contents = {'messaging': dict(CFG.server.amqp),
                             'container-agent': self.name,
-                            'container-xp': bootstrap.get_sys_name() }
+                            'container-xp': bootstrap.get_sys_name()}
             f.write(msgpack.dumps(pid_contents))
             atexit.register(self._cleanup_pid)
             self._capabilities.append("PID_FILE")
@@ -233,7 +233,7 @@ class Container(BaseContainerAgent):
     def serve_forever(self):
         """ Run the container until killed. """
         log.debug("In Container.serve_forever")
-        
+
         if not self.proc_manager.proc_sup.running:
             self.start()
 
@@ -252,9 +252,10 @@ class Container(BaseContainerAgent):
                 self.proc_manager.proc_sup.join_children()
             except (KeyboardInterrupt, SystemExit) as ex:
                 log.info('Received a kill signal, shutting down the container.')
-                watch_parent = CFG.system.get('watch_parent', None)
-                if watch_parent:
-                    watch_parent.kill()
+
+                if hasattr(self, 'gl_parent_watch') and self.gl_parent_watch is not None:
+                    self.gl_parent_watch.kill()
+
             except:
                 log.exception('Unhandled error! Forcing container shutdown')
         else:
@@ -267,7 +268,7 @@ class Container(BaseContainerAgent):
         Returns the internal status.
         """
         return self._status
-            
+
     def _cleanup_pid(self):
         if self.pidfile:
             log.debug("Cleanup pidfile: %s", self.pidfile)
@@ -314,9 +315,9 @@ class Container(BaseContainerAgent):
         with self._push_status("START_REL"):
             return self.app_manager.start_rel(rel=rel)
 
-    def start_rel_from_url(self, rel_url='',config=None):
+    def start_rel_from_url(self, rel_url='', config=None):
         with self._push_status("START_REL_FROM_URL"):
-            return self.app_manager.start_rel_from_url(rel_url=rel_url,config=config)
+            return self.app_manager.start_rel_from_url(rel_url=rel_url, config=config)
 
     def _stop_capability(self, capability):
         if capability == "CONTAINER_AGENT":

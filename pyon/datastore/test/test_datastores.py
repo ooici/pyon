@@ -139,7 +139,7 @@ class Test_DataStores(IonIntegrationTestCase):
         marine_operator_role_ooi_id = marine_operator_role_tuple[0]
 
         role_objs = data_store.read_mult([admin_role_ooi_id, data_provider_role_ooi_id, marine_operator_role_ooi_id])
-            
+
         self.assertTrue(len(role_objs) == 3)
         self.assertTrue(role_objs[0]._id == admin_role_ooi_id)
         self.assertTrue(role_objs[1]._id == data_provider_role_ooi_id)
@@ -147,7 +147,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Construct three user info objects and assign them roles
         hvl_contact_info = {
-            "name": "Heitor Villa-Lobos",
+            "individual_names_given": "Heitor Villa-Lobos",
             "email": "prelude1@heitor.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Legendary Brazilian composer"}
@@ -165,7 +165,7 @@ class Test_DataStores(IonIntegrationTestCase):
         heitor_villa_lobos_ooi_id = hvl_user_info_tuple[0]
 
         ats_contact_info = {
-            "name": "Andres Torres Segovia",
+            "individual_names_given": "Andres Torres Segovia",
             "email": "asturas@andres.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Legendary Concert Guitarist"}
@@ -181,7 +181,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(len(ats_user_info_tuple) == 2)
 
         pok_contact_info = {
-            "name": "Per-Olov Kindgren",
+            "individual_names_given": "Per-Olov Kindgren",
             "email": "etude6@per.com",
             "variables": [
                 {"name": "Claim To Fame", "value": "Composer and YouTube star"}
@@ -326,7 +326,9 @@ class Test_DataStores(IonIntegrationTestCase):
 
         admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
 
-        admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Profile')
+        admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Some User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "John Doe",
+                                                       "email": "johnny@iamdevops.com"}))
 
         other_user_id = self._create_resource(RT.ActorIdentity, 'Paul Smithy', description='Other user')
 
@@ -513,6 +515,7 @@ class Test_DataStores(IonIntegrationTestCase):
         assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
 
+
         # Test regression bug: Inherited resources in associations
         idev1_obj_id = self._create_resource(RT.InstrumentDevice, 'id1', description='')
 
@@ -539,7 +542,53 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEqual(len(res_list), 1)
         self.assertEqual(res_list[0]._get_type(), RT.UserInfo)
 
+        # Find by attribute
+        admin_user2_id = self._create_resource(RT.UserInfo, 'Other User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
+                                                       "email": "frank@mydomain.com"}),
+            alt_ids=["ALT_ID1"])
 
+        admin_user3_id = self._create_resource(RT.UserInfo, 'Different User',
+            contact=IonObject('ContactInformation', **{"individual_names_given": "Frank",
+                                                       "email": "frank@mydomain.com"}),
+            alt_ids=["NS1:ALT_ID2", "ALT_ID2"])
+
+        res_list,key_list = data_store.find_resources(restype="UserInfo")
+        self.assertEqual(len(res_list), 3)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email")
+        self.assertEqual(len(res_list), 3)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email", attr_value="johnny@iamdevops.com")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(restype="UserInfo", attr_name="contact.email", attr_value="DOES NOT EXIST")
+        self.assertEqual(len(res_list), 0)
+
+        # Find by alternate id
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2")
+        self.assertEqual(len(res_list), 2)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="NS1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="_")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id="ALT_ID2", alt_id_ns="BULL")
+        self.assertEqual(len(res_list), 0)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="NS1")
+        self.assertEqual(len(res_list), 1)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="_", id_only=True)
+        self.assertEqual(len(res_list), 2)
+
+        res_list,key_list = data_store.find_resources_ext(alt_id=None, alt_id_ns="_", id_only=False)
+        self.assertEqual(len(res_list), 2)
 
     def _create_resource(self, restype, name, *args, **kwargs):
         res_obj = IonObject(restype, dict(name=name, **kwargs))

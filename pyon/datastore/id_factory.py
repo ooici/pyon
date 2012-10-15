@@ -4,13 +4,16 @@ from uuid import uuid4
 from time import time
 from random import choice
 
+
 class IDFactory(object):
     def create_id(self):
         pass
 
+
 class RandomIDFactory(IDFactory):
     def create_id(self):
         return uuid4().hex
+
 
 class SaltedTimeIDFactory(IDFactory):
     """ generator for minimal-length, increasing ID values for couchdb
@@ -32,7 +35,7 @@ class SaltedTimeIDFactory(IDFactory):
     """
 
     # chars are in ascii order to maintain ID sequence order
-    _CHARSET="-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
+    _CHARSET = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
     def __init__(self, salt_chars=3):
         self._salt_chars = salt_chars
@@ -45,20 +48,20 @@ class SaltedTimeIDFactory(IDFactory):
 
     def create_id(self):
 #        buffer = bytearray((self._salt_bits + 42)/8)
-        time_value = int(time()*1000) # 42bit millisecond value overflows ~ 2112
+        time_value = int(time() * 1000)  # 42bit millisecond value overflows ~ 2112
 
         # there is a slight chance that two IDs are reqeusted within a millisecond
         # if so, increment the time by one MS.
         self._lock.acquire()
-        if time_value<=self._last_time:
-            time_value = self._last_time+1
+        if time_value <= self._last_time:
+            time_value = self._last_time + 1
         self._last_time = time_value
         self._lock.release()
 
         # explicit base64 encoding used b/c our charset differs and time doesn't fall on nice byte boundaries
         bits_used = 0
         id_chars = self._salt[:]
-        while bits_used<42:
+        while bits_used < 42:
             low_six_bits = time_value & 63
             id_chars[0:0] = self._CHARSET[low_six_bits]
             time_value /= 64
