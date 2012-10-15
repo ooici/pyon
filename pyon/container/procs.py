@@ -5,7 +5,7 @@
 __author__ = 'Michael Meisinger'
 
 import time
-#from zope.interface import implementedBy
+from zope.interface import implementedBy
 
 from pyon.agent.agent import ResourceAgent
 from pyon.agent.simple_agent import SimpleResourceAgent
