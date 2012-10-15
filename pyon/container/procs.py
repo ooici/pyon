@@ -14,7 +14,7 @@ from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 
 from pyon.ion.endpoint import ProcessRPCServer, ConversationRPCServer
-from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
+#from pyon.ion.stream import StreamSubscriberRegistrar, StreamPublisherRegistrar
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager
