@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 
 """ION messaging endpoints"""
-<<<<<<< HEAD
+
 from pyon.net.transport import NameTrio
 from pyon.util import log
-=======
->>>>>>> master
+
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
@@ -13,14 +12,10 @@ __license__ = 'Apache 2.0'
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.event.event import BaseEventSubscriberMixin
 from pyon.util.log import log
-<<<<<<< HEAD
 from pyon.core.exception import Unauthorized
 from pyon.net import conversation
-=======
 from pyon.core.exception import Timeout as IonTimeout
 from gevent.timeout import Timeout
-
->>>>>>> master
 
 #############################################################################
 # PROCESS LEVEL ENDPOINTS
@@ -75,19 +70,11 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         header.update({'sender-name': self._process.name or 'unnamed-process',     # @TODO
                        'sender': self._process.id})
 
-<<<<<<< HEAD
         if hasattr(self._process,'process_type' ):
             header.update({'sender-type'  : self._process.process_type or 'unknown-process-type' })
             #@TODO: Fixes
             #if self._process.process_type == 'service':
             #    header.update({ 'sender-service' : "%s,%s" % ( self.channel._send_name.exchange,self._process.name) })
-=======
-        if hasattr(self._process, 'process_type'):
-            header.update({'sender-type': self._process.process_type or 'unknown-process-type'})
-            if self._process.process_type == 'service':
-                header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
->>>>>>> master
-
         context = self._process.get_context()
         log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
 

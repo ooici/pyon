@@ -4,15 +4,14 @@
 
 from pyon.core import bootstrap, exception
 from pyon.core.bootstrap import CFG, IonObject
-<<<<<<< HEAD
 from pyon.core.exception import ExceptionFactory, IonException, BadRequest, ServerError
 from pyon.core.object import IonObjectBase
 from pyon.net import conversation
 from pyon.net.channel import ChannelError, ChannelClosedError, BaseChannel, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel, ChannelShutdownMessage
-=======
+
 from pyon.core.exception import ExceptionFactory, IonException, BadRequest
 from pyon.net.channel import ChannelClosedError, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
->>>>>>> master
+
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
@@ -74,10 +73,6 @@ class EndpointUnit(object):
         self._interceptors = value
 
     def attach_channel(self, channel):
-<<<<<<< HEAD
-    #        log.debug("attach_channel %s", str(channel))
-=======
->>>>>>> master
         self.channel = channel
 
     def _build_invocation(self, **kwargs):
@@ -177,10 +172,6 @@ class EndpointUnit(object):
         return inv_prime
 
     def close(self):
-<<<<<<< HEAD
-    #        log.debug('close endpoint')
-=======
->>>>>>> master
 
         if self.channel is not None:
             ev = self.channel.close()
@@ -194,10 +185,6 @@ class EndpointUnit(object):
         Any headers passed in here are strictly for reference. Headers set in there will take
         precedence and override any headers with the same key.
         """
-<<<<<<< HEAD
-        #        log.debug("EndpointUnit _build_header")
-=======
->>>>>>> master
         return {'ts':get_ion_ts()}
 
     def _build_payload(self, raw_msg, raw_headers):
@@ -206,10 +193,6 @@ class EndpointUnit(object):
 
         @TODO will this be used? seems unlikely right now.
         """
-<<<<<<< HEAD
-        #        log.debug("EndpointUnit _build_payload")
-=======
->>>>>>> master
         return raw_msg
 
     def _build_msg(self, raw_msg, raw_headers):
@@ -220,14 +203,8 @@ class EndpointUnit(object):
 
         @returns A 2-tuple of payload, headers
         """
-<<<<<<< HEAD
-        #        log.debug("EndpointUnit _build_msg")
-        header = self._build_header(raw_msg)
-        payload = self._build_payload(raw_msg)
-=======
         header = self._build_header(raw_msg, raw_headers)
         payload = self._build_payload(raw_msg, raw_headers)
->>>>>>> master
 
         return payload, header
 
@@ -841,20 +818,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
         try:
             result_data, result_headers = self._get_response(sent_headers['conv-id'], timeout)
         except Timeout:
-<<<<<<< HEAD
-            raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.channel._send_name)))
-        finally:
-            pass
-        #            elapsed = time.time() - ts
-        #            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-        #                                                                                     headers.get('conv-seq', 'NOSEQ'),
-        #                                                                                     self.channel._send_name,
-        #                                                                                     elapsed)
-
-        #log.debug("Response data: %s, headers: %s", result_data, result_headers)
-=======
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s, conv %s' % (timeout, str(self.channel._send_name), sent_headers['conv-id']))
->>>>>>> master
         return result_data, result_headers
 
     def _build_header(self, raw_msg, raw_headers):
@@ -884,33 +848,6 @@ class RequestResponseClient(SendingBaseEndpoint):
             e.close()
         return retval
 
-
-<<<<<<< HEAD
-    def request_old(self, msg, headers=None, timeout=None):
-        log.debug("RequestResponseClient.request: %s, headers: %s", msg, headers)
-        e = self.create_endpoint(self._send_name)
-        if CFG.endpoint.conversation_enabled:
-            conv_rpc_client = conversation.RPCClient(self.node, NameTrio('test'),
-                                                     self._send_name, endpoint_unit = e)
-
-            try:
-                #retval, headers = e.send(msg, headers=headers, timeout=timeout)
-                retval, headers = conv_rpc_client.request(msg, header=headers, timeout=timeout)
-
-            finally:
-                # always close, even if endpoint raised a logical exception
-                conv_rpc_client.close()
-                e.close()
-        else:
-            try:
-                retval, headers = e.send(msg, headers=headers, timeout=timeout)
-            finally:
-                # always close, even if endpoint raised a logical exception
-                e.close()
-        return retval
-
-=======
->>>>>>> master
 class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
     """
     The listener side makes one of these.
@@ -1152,15 +1089,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             response_headers['protocol']    = headers.get('protocol', '')
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
-<<<<<<< HEAD
-#            elapsed = int(get_ion_ts()) - int(ts)
-#            log.info("Server-side response (conv id: %s/%s, name: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
-#                                                                                      response_headers.get('conv-seq', 'NOSEQ'),
-#                                                                                      self.channel._recv_name,
-#                                                                                      elapsed)
 
-=======
->>>>>>> master
         # sample (possibly) before we do any sending
         self._sample_request(response_headers['status_code'], response_headers['error_message'], msg, headers, result, response_headers)
 
@@ -1373,10 +1302,6 @@ class RPCServer(RequestResponseServer):
         #log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> master
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """
     Utility function to print an legible comprehensive summary of a received message.
@@ -1384,19 +1309,6 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
     """
     if rpclog.isEnabledFor(logging.DEBUG):
         try:
-<<<<<<< HEAD
-            import msgpack
-            _msg = msgpack.unpackb(msg)
-            _msg = str(_msg)
-        except Exception:
-            _msg = str(msg)
-        _msg = _msg[0:400]+"..." if len(_msg) > 400 else _msg
-        _delivery = "\nDELIVERY: tag=%s"%delivery_tag if delivery_tag else ""
-        log.info("%s: %s%s%s -> %s%s%s %s:\nHEADERS: %s\nCONTENT: %s%s",
-                 prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
-    except Exception as ex:
-        log.warning("%s log error: %s", prefix, str(ex))
-=======
             headers = headers or {}
             _sender = headers.get('sender', '?') + "(" + headers.get('sender-name', '') + ")"
             _send_hl, _recv_hl = ("###", "") if is_send else ("", "###")
@@ -1417,4 +1329,3 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
                 prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
         except Exception as ex:
             log.warning("%s log error: %s", prefix, str(ex))
->>>>>>> master
