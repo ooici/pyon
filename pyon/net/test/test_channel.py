@@ -1031,7 +1031,7 @@ class TestChannelInt(IonIntegrationTestCase):
 
 
 @attr('INT')
-class TestChannelIntZeroMQ(TestChannelInt):
+class TestChannelIntLocalTransport(TestChannelInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
