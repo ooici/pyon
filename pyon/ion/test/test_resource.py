@@ -135,6 +135,7 @@ class TestResources(IonUnitTestCase):
 
         mock_clients.resource_registry.read.return_value = instrument_device
         mock_clients.resource_registry.find_objects.return_value = ([actor_identity], [Instrument_device_to_actor_identity_association])
+        mock_clients.resource_registry.find_subjects.return_value = (None,None)
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123')
         self.assertEquals(extended_res.resource, instrument_device)
