@@ -96,7 +96,7 @@ class Negotiation(object):
 
         return neg_id
 
-    def update_negotiation(self, sap=None):
+    def update_negotiation(self, sap=None, reason=None):
 
         #Find the Negotiation resource associated with this proposal
         if sap is None or sap.negotiation_id == '':
@@ -116,6 +116,9 @@ class Negotiation(object):
             for prop in neg_obj.proposals:
                 if prop.proposal_status == ProposalStatusEnum.ACCEPTED and prop.originator != sap.originator:
                     neg_obj.negotiation_status = NegotiationStatusEnum.ACCEPTED
+
+        if reason is not None:
+            neg_obj.reason = reason
 
         #Add the current proposal to the Negotiation object to keep a record of it - then save it
         neg_obj.proposals.append(sap)

@@ -15,6 +15,7 @@ from interface.services.coi.ipolicy_management_service import PolicyManagementSe
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from interface.services.coi.iorg_management_service import OrgManagementServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized
+from pyon.util.containers import get_ion_ts
 
 DEFAULT_ACTOR_ID = 'anonymous'
 
@@ -197,9 +198,10 @@ class GovernanceController(object):
 
         log.debug("Finding commitments for user_id: %s and resource_id: %s" % (user_id, resource_id))
 
+        cur_time = int(get_ion_ts())
         commitments,_ = self.rr_client.find_objects(resource_id, PRED.hasCommitment, RT.Commitment)
-        for com in commitments:
-            if com.consumer == user_id and com.lcstate != LCS.RETIRED:
+        for com in commitments:  #TODO - replace when Retired is removed from find_objects
+            if com.consumer == user_id and com.lcstate != LCS.RETIRED and com.expiration < cur_time:
                 return com
 
         return None
