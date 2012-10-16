@@ -940,8 +940,10 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         headers['language'] = 'ion-r2'
         headers['encoding'] = 'msgpack'
         headers['format']   = raw_msg.__class__.__name__
-        headers['reply-by'] = 'todo'                        # set by _send override @TODO should be set here
 
+        #TODO: Rumi: Is that correct?
+        timeout = CFG.get_safe('endpoint.receive.timeout', 10)
+        headers['reply-by'] = str(int(headers['ts']) + timeout * 1000)
         return headers
 
 
