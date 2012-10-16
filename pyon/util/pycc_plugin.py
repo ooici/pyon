@@ -191,8 +191,10 @@ class PYCC(Plugin):
     def container_shutdown(self):
         debug.write('Shut down cc process\n')
         for cc in self.ccs:
-            debug.write('\tClosing container with pid:%d\n' % cc.pid)
-            os.kill(cc.pid, signal.SIGINT)
+            pid = cc.pid
+            debug.write('\tClosing container with pid:%d\n' % pid)
+            os.kill(pid, signal.SIGINT)
+            os.waitpid(pid, 0)
 
     def beforeTest(self, test):
         os.environ['BLAME'] = test.id()

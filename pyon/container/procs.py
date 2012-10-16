@@ -25,6 +25,7 @@ from pyon.net.transport import NameTrio, TransportError
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
+from couchdb.http import ResourceNotFound
 
 class ProcManager(object):
     def __init__(self, container):
@@ -95,7 +96,11 @@ class ProcManager(object):
             log.warn("ProcManager procs_by_name not empty: %s", self.procs_by_name)
 
         # Remove Resource registration
-        self.container.resource_registry.delete(self.cc_id, del_associations=True)
+        try:
+            self.container.resource_registry.delete(self.cc_id, del_associations=True)
+        except NotFound:
+            # already gone, this is ok
+            pass
         # TODO: Check associations to processes
 
         stats2 = CouchDB_DataStore._stats.get_stats()
@@ -774,15 +779,29 @@ class ProcManager(object):
     def _unregister_process(self, process_id, process_instance):
         # Remove process registration in resource registry
         if process_instance._proc_res_id:
-            self.container.resource_registry.delete(process_instance._proc_res_id, del_associations=True)
+            try:
+                self.container.resource_registry.delete(process_instance._proc_res_id, del_associations=True)
+            except NotFound: #, HTTPException):
+                # if it's already gone, it's already gone!
+                pass
 
         # Cleanup for specific process types
         if process_instance._proc_type == "service":
             # Check if this is the last process for this service and do auto delete service resources here
-            svcproc_list, _ = self.container.resource_registry.find_objects(process_instance._proc_svc_id,
-                "hasProcess", "Process", id_only=True)
+            svcproc_list = []
+            try:
+                svcproc_list, _ = self.container.resource_registry.find_objects(process_instance._proc_svc_id,
+                    "hasProcess", "Process", id_only=True)
+            except ResourceNotFound:
+                # if it's already gone, it's already gone!
+                pass
+
             if not svcproc_list:
-                self.container.resource_registry.delete(process_instance._proc_svc_id, del_associations=True)
+                try:
+                    self.container.resource_registry.delete(process_instance._proc_svc_id, del_associations=True)
+                except NotFound:
+                    # if it's already gone, it's already gone!
+                    pass
 
         elif process_instance._proc_type == "agent":
             self.container.directory.unregister_safe("/Agents", process_instance.id)
