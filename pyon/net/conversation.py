@@ -438,7 +438,7 @@ class ConversationEndpoint(object):
         Override this method to set any custom settings
         """
         if self.endpoint_unit:
-            header.update(self.endpoint_unit._build_header(msg))
+            header.update(self.endpoint_unit._build_header(msg, header))
         """
         Below headers are set by the base_endpoint classes
         header['language'] = 'ion-r2'
