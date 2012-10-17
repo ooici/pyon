@@ -957,3 +957,16 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         queue_info = self.container.ex_manager.get_queue_info(self.queue_name)
         self.assertEquals(queue_info['name'], self.queue_name)
 
+    def test_delete_queue(self):
+        self.transport.declare_queue_impl(self.queue_name)
+        queues = self.container.ex_manager.list_queues()
+
+        self.assertIn(self.queue_name, queues)
+
+        self.container.ex_manager.delete_queue(self.queue_name)
+
+        new_queues = self.container.ex_manager.list_queues()
+
+        self.assertNotEquals(queues, new_queues)
+        self.assertNotIn(self.queue_name, new_queues)
+

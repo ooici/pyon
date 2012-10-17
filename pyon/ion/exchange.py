@@ -658,6 +658,13 @@ class ExchangeManager(object):
         """
         return self.delete_binding(binding_tuple[0], binding_tuple[1], binding_tuple[3])
 
+    def delete_queue(self, queue):
+        """
+        Rabbit HTTP management API call to delete a queue.
+        """
+        url = self._get_management_url("queues", "%2f", queue)
+        self._call_management_delete(url)
+
     def purge_queue(self, queue):
         """
         Rabbit HTTP management API call to purge a queue.
