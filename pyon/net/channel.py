@@ -73,8 +73,8 @@ class BaseChannel(object):
 
     # exchange related settings @TODO: these should likely come from config instead
     _exchange_type              = 'topic'
-    _exchange_auto_delete       = True
-    _exchange_durable           = False
+    _exchange_auto_delete       = None
+    _exchange_durable           = None
 
     # States, Inputs for FSM
     S_INIT                      = 'INIT'
@@ -103,6 +103,40 @@ class BaseChannel(object):
         self._fsm.add_transition(self.I_CLOSE, self.S_ACTIVE, self._on_close, self.S_CLOSED)
         self._fsm.add_transition(self.I_CLOSE, self.S_CLOSED, lambda *args: self.on_channel_close(None, 0, ""), self.S_CLOSED)              # closed is a goal state, multiple closes are ok
         self._fsm.add_transition(self.I_CLOSE, self.S_INIT, None, self.S_CLOSED)                # INIT to CLOSED is fine too
+
+    @property
+    def exchange_auto_delete(self):
+        if self._exchange_auto_delete is not None:
+            return self._exchange_auto_delete
+
+        if hasattr(self, '_send_name') and hasattr(self._send_name, 'exchange_auto_delete'):
+            return self._send_name.exchange_auto_delete
+
+        if hasattr(self, '_recv_name') and hasattr(self._recv_name, 'exchange_auto_delete'):
+            return self._recv_name.exchange_auto_delete
+
+        return True
+
+    @exchange_auto_delete.setter
+    def exchange_auto_delete(self, value):
+        self._exchange_auto_delete = value
+
+    @property
+    def exchange_durable(self):
+        if self._exchange_durable is not None:
+            return self._exchange_durable
+
+        if hasattr(self, '_send_name') and hasattr(self._send_name, 'exchange_durable'):
+            return self._send_name.exchange_durable
+
+        if hasattr(self, '_recv_name') and hasattr(self._recv_name, 'exchange_durable'):
+            return self._recv_name.exchange_durable
+
+        return False
+
+    @exchange_durable.setter
+    def exchange_durable(self, value):
+        self._exchange_durable = value
 
     def set_close_callback(self, close_callback):
         """
@@ -158,12 +192,12 @@ class BaseChannel(object):
         with self._ensure_transport():
 
 #           log.debug("Exchange declare: %s, TYPE %s, DUR %s AD %s", self._exchange, self._exchange_type,
-#                                                                 self._exchange_durable, self._exchange_auto_delete)
+#                                                                 self.exchange_durable, self.exchange_auto_delete)
 
             self._transport.declare_exchange_impl(self._exchange,
                                                   exchange_type=self._exchange_type,
-                                                  durable=self._exchange_durable,
-                                                  auto_delete=self._exchange_auto_delete)
+                                                  durable=self.exchange_durable,
+                                                  auto_delete=self.exchange_auto_delete)
 
     def get_channel_id(self):
         """
@@ -322,13 +356,21 @@ class SendChannel(BaseChannel):
             testid = os.environ['QUEUE_BLAME'].split(',')
             headers['QUEUE_BLAME'] = testid
 
+        # are we sending to a durable location?
+        # @TODO is this the best way to tell?
+        # basically is checking to see if send_name is an XO
+        durable_msg = False
+        if hasattr(self._send_name, 'queue_durable'):
+            durable_msg = self._send_name.queue_durable
+
         with self._ensure_transport():
-            self._transport.publish_impl(exchange=exchange, #todo
-                                         routing_key=routing_key, #todo
+            self._transport.publish_impl(exchange=exchange,
+                                         routing_key=routing_key,
                                          body=data,
                                          properties=headers,
-                                         immediate=False, #todo
-                                         mandatory=False) #todo
+                                         immediate=False,
+                                         mandatory=False,
+                                         durable_msg=durable_msg)
 
 class RecvChannel(BaseChannel):
     """
@@ -341,9 +383,9 @@ class RecvChannel(BaseChannel):
     _recv_binding   = None      # binding this queue is listening on (set via _bind)
 
     # queue defaults
-    _queue_auto_delete  = False
+    _queue_auto_delete  = None
+    _queue_durable      = None
     _queue_exclusive    = False
-    _queue_durable      = False
 
     # consumer defaults
     _consumer_exclusive = False
@@ -407,6 +449,34 @@ class RecvChannel(BaseChannel):
         self._setup_listener_called = False
 
         BaseChannel.__init__(self, **kwargs)
+
+    @property
+    def queue_durable(self):
+        if self._queue_durable is not None:
+            return self._queue_durable
+
+        if hasattr(self._recv_name, 'queue_durable'):
+            return self._recv_name.queue_durable
+
+        return False        # @TODO config
+
+    @queue_durable.setter
+    def queue_durable(self, value):
+        self._queue_durable = value
+
+    @property
+    def queue_auto_delete(self):
+        if self._queue_auto_delete is not None:
+            return self._queue_auto_delete
+
+        if hasattr(self._recv_name, 'queue_auto_delete'):
+            return self._recv_name.queue_auto_delete
+
+        return False        # @TODO config
+
+    @queue_auto_delete.setter
+    def queue_auto_delete(self, value):
+        self._queue_auto_delete = value
 
     def setup_listener(self, name=None, binding=None):
         """
@@ -503,7 +573,7 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._on_start_consume")
 
         with self._ensure_transport():
-            if self._consumer_tag and (self._queue_auto_delete and isinstance(self._transport, AMQPTransport)):
+            if self._consumer_tag and (self.queue_auto_delete and isinstance(self._transport, AMQPTransport)):
                 log.warn("Attempting to start consuming on a queue that may have been auto-deleted")
 
             self._consumer_tag = self._transport.start_consume_impl(self._on_deliver,
@@ -530,7 +600,7 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._on_stop_consume")
 
         with self._ensure_transport():
-            if self._queue_auto_delete and isinstance(self._transport, AMQPTransport):
+            if self.queue_auto_delete and isinstance(self._transport, AMQPTransport):
                 log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
             self._transport.stop_consume_impl(self._consumer_tag)
@@ -609,8 +679,8 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._declare_queue: %s", queue)
         with self._ensure_transport():
             queue_name = self._transport.declare_queue_impl(queue=queue or '',
-                                                            auto_delete=self._queue_auto_delete,
-                                                            durable=self._queue_durable)
+                                                            auto_delete=self.queue_auto_delete,
+                                                            durable=self.queue_durable)
 
         # save the new recv_name if our queue name differs (anon queue via '', or exchange prefixing)
         if queue_name != self._recv_name.queue:
@@ -842,7 +912,7 @@ class ListenChannel(RecvChannel):
 
         if not self._should_discard and not was_consuming:
             # tune QOS to get exactly n messages
-            if not (self._queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
+            if not (self.queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
                 self._transport.qos_impl(prefetch_count=n)
 
             # start consuming
@@ -855,7 +925,7 @@ class ListenChannel(RecvChannel):
         finally:
             if not was_consuming:
                 # turn consuming back off if we already were off
-                if not (self._queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
+                if not (self.queue_auto_delete and self._transport is not None and isinstance(self._transport, AMQPTransport)):
                     self.stop_consume()
                 else:
                     log.debug("accept should turn consume off, but queue is auto_delete and this would destroy the queue")
@@ -882,7 +952,7 @@ class ListenChannel(RecvChannel):
 
 class SubscriberChannel(ListenChannel):
     def close_impl(self):
-        if not self._queue_auto_delete and self._recv_name and self._transport is not None and isinstance(self._transport, AMQPTransport) and self._recv_name.queue.startswith("amq.gen-"):
+        if not self.queue_auto_delete and self._recv_name and self._transport is not None and isinstance(self._transport, AMQPTransport) and self._recv_name.queue.startswith("amq.gen-"):
             log.debug("Anonymous Subscriber detected, deleting queue (%s)", self._recv_name)
             self._destroy_queue()
 

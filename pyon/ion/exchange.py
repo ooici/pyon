@@ -367,7 +367,7 @@ class ExchangeManager(object):
 
     def _create_xn(self, xn_type, name, xs=None, use_ems=True, **kwargs):
         xs = xs or self.default_xs
-        log.debug("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
+        log.info("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
 
         if xn_type == "service":
             xn = ExchangeNameService(self,
@@ -760,14 +760,22 @@ class ExchangeSpace(XOTransport, NameTrio):
         self._xs_auto_delete   = auto_delete
 
     @property
+    def exchange_durable(self):
+        return self._xs_durable
+
+    @property
+    def exchange_auto_delete(self):
+        return self._xs_auto_delete
+
+    @property
     def exchange(self):
         return "%s.ion.xs.%s" % (bootstrap.get_sys_name(), self._exchange)
 
     def declare(self):
         self.declare_exchange_impl(self.exchange,
                                    exchange_type=self._xs_exchange_type,
-                                   durable=self._xs_durable,
-                                   auto_delete=self._xs_auto_delete)
+                                   durable=self.exchange_durable,
+                                   auto_delete=self.exchange_auto_delete)
 
     def delete(self):
         self.delete_exchange_impl(self.exchange)
@@ -775,19 +783,44 @@ class ExchangeSpace(XOTransport, NameTrio):
 
 class ExchangeName(XOTransport, NameTrio):
 
-    xn_type = "XN_BASE"
-    _xn_durable = False
-    _xn_auto_delete = False
+    xn_type         = "XN_BASE"
+    _xn_durable     = None
+    _xn_auto_delete = None
     _declared_queue = None
 
     def __init__(self, exchange_manager, priviledged_transport, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
         NameTrio.__init__(self, exchange=None, queue=name)
 
-        self._xs = xs
+        self._xs             = xs
 
         if durable is not None:     self._xn_durable = durable
         if auto_delete is not None: self._xn_auto_delete = auto_delete
+
+    @property
+    def queue_durable(self):
+        if self._xn_durable is not None:
+            return self._xn_durable
+
+        if CFG.get_safe('container.exchange.names.durable', False):
+            return True
+
+        return False
+
+    @queue_durable.setter
+    def queue_durable(self, value):
+        self._xn_durable = value
+
+    @property
+    def queue_auto_delete(self):
+        if self._xn_auto_delete is not None:
+            return self._xn_auto_delete
+
+        return False
+
+    @queue_auto_delete.setter
+    def queue_auto_delete(self, value):
+        self._xn_auto_delete = value
 
     @property
     def exchange(self):
@@ -803,7 +836,9 @@ class ExchangeName(XOTransport, NameTrio):
         return queue
 
     def declare(self):
-        self._declared_queue = self.declare_queue_impl(self.queue, durable=self._xn_durable, auto_delete=self._xn_auto_delete)
+        self._declared_queue = self.declare_queue_impl(self.queue,
+                                                       durable=self.queue_durable,
+                                                       auto_delete=self.queue_auto_delete)
         return self._declared_queue
 
     def delete(self):
@@ -898,6 +933,10 @@ class ExchangePointRoute(ExchangeName):
     def __init__(self, exchange_manager, priviledged_transport, name, xp):
         ExchangeName.__init__(self, exchange_manager, priviledged_transport, name, xp)     # xp goes to xs param
 
+    @property
+    def queue_durable(self):
+        return self._xs.queue_durable    # self._xs -> owning xp
+
     def declare(self):
         raise StandardError("ExchangePointRoute does not support declare")
 
@@ -912,9 +951,21 @@ class ExchangeNameProcess(ExchangeName):
 
 class ExchangeNameService(ExchangeName):
     xn_type = "XN_SERVICE"
-    _xn_auto_delete = False
-    pass
 
+    @ExchangeName.queue_durable.getter
+    def queue_durable(self):
+        """
+        Queue durable override for service names.
+
+        Ignores the CFG setting, as these are supposed to be non-durable, unless you specifically
+        ask for it to be.
+
+        See: http://stackoverflow.com/questions/7019643/overriding-properties-in-python
+        """
+        if self._xn_durable is not None:
+            return self._xn_durable
+
+        return False
 
 class ExchangeNameQueue(ExchangeName):
     xn_type = "XN_QUEUE"

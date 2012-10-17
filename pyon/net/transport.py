@@ -73,7 +73,7 @@ class BaseTransport(object):
     def qos_impl(self, prefetch_size=0, prefetch_count=0, global_=False):
         raise NotImplementedError()
 
-    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False, durable_msg=False):
         raise NotImplementedError()
 
     def close(self):
@@ -194,9 +194,9 @@ class ComposableTransport(BaseTransport):
         m = self._methods['qos_impl']
         return m(prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
-    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False, durable_msg=False):
         m = self._methods['publish_impl']
-        return m(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
+        return m(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory, durable_msg=durable_msg)
 
     def close(self):
         for t in self._transports:
@@ -458,20 +458,26 @@ class AMQPTransport(BaseTransport):
         log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", self._client.channel_number, prefetch_size, prefetch_count, global_)
         self._sync_call(self._client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
-    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False, durable_msg=False):
         """
         Publishes a message on an exchange.
         """
         log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
 
-        props = BasicProperties(headers=properties)
+        if durable_msg:
+            delivery_mode = 2
+        else:
+            delivery_mode = None
 
-        self._client.basic_publish(exchange=exchange,  # todo
-                             routing_key=routing_key,  # todo
-                             body=body,
-                             properties=props,
-                             immediate=immediate,      # todo
-                             mandatory=mandatory)      # todo
+        props = BasicProperties(headers=properties,
+                                delivery_mode=delivery_mode)
+
+        self._client.basic_publish(exchange=exchange,       # todo
+                                   routing_key=routing_key, # todo
+                                   body=body,
+                                   properties=props,
+                                   immediate=immediate,     # todo
+                                   mandatory=mandatory)     # todo
 
 
 class NameTrio(object):
@@ -967,7 +973,7 @@ class LocalTransport(BaseTransport):
     def unbind_impl(self, exchange, queue, binding):
         self._broker.unbind(exchange, queue, binding)
 
-    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False):
+    def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False, durable_msg=False):
         self._broker.publish(exchange, routing_key, body, properties, immediate=immediate, mandatory=mandatory)
 
     def start_consume_impl(self, callback, queue, no_ack=False, exclusive=False):

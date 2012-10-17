@@ -462,8 +462,8 @@ class TestRecvChannel(PyonTestCase):
 
         composed = ".".join([str(sentinel.xp), str(sentinel.queue)])
         self.assertIn(composed, self.ch._transport.declare_queue_impl.call_args[1].itervalues())
-        self.assertIn(self.ch._queue_auto_delete, self.ch._transport.declare_queue_impl.call_args[1].itervalues())
-        self.assertIn(self.ch._queue_durable, self.ch._transport.declare_queue_impl.call_args[1].itervalues())
+        self.assertIn(self.ch.queue_auto_delete, self.ch._transport.declare_queue_impl.call_args[1].itervalues())
+        self.assertIn(self.ch.queue_durable, self.ch._transport.declare_queue_impl.call_args[1].itervalues())
 
         # should have set recv_name
         self.assertTrue(hasattr(self.ch._recv_name, 'exchange'))
