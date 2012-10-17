@@ -25,6 +25,7 @@ import os
 import time
 from gevent.timeout import Timeout
 from uuid import uuid4
+import json
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
@@ -684,6 +685,72 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
         self.container.ex_manager.delete_xn(xn)
 
         self.assertNotIn(xn.queue, self.container.ex_manager.list_queues())
+
+@attr('INT', group='exchange')
+@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False, 'names':{'durable':True}}}})
+class TestExchangeObjectsDurableFlag(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+
+    @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'names':{'durable':False}}}})
+    def test_durable_off_on_create(self):
+        xq = self.container.ex_manager.create_xn_queue('belb')
+        self.addCleanup(xq.delete)
+
+        # declared, find it via internal management API call
+        all_queues = self.container.ex_manager._list_queues()
+        filtered = [q['durable'] for q in all_queues if q['name'] == xq.queue]
+
+        self.assertNotEquals([], filtered)
+        self.assertEquals(len(filtered), 1)
+        self.assertFalse(filtered[0])       # not durable
+
+    def test_durable_on_on_create(self):
+        xq = self.container.ex_manager.create_xn_queue('belb')
+        self.addCleanup(xq.delete)
+
+        # declared, find it via internal management API call
+        all_queues = self.container.ex_manager._list_queues()
+        filtered = [q['durable'] for q in all_queues if q['name'] == xq.queue]
+
+        self.assertNotEquals([], filtered)
+        self.assertEquals(len(filtered), 1)
+        self.assertTrue(filtered[0])       # IS durable
+
+    def test_xp_durable_send(self):
+        xp = self.container.ex_manager.create_xp('an_xp')
+        #self.addCleanup(xp.delete)
+
+        xq = self.container.ex_manager.create_xn_queue('no_matter', xp)
+        self.addCleanup(xq.delete)
+        xq.bind('one')
+
+        pub = Publisher(to_name=xp.create_route('one'))
+        pub.publish('test')
+        pub.close()
+
+        url = self.container.ex_manager._get_management_url("queues", "%2f", xq.queue, "get")
+        res = self.container.ex_manager._make_management_call(url,
+                                                              use_ems=False,
+                                                              method='post',
+                                                              data=json.dumps({'count':1, 'requeue':True,'encoding':'auto'}))
+
+        self.assertEquals(len(res), 1)
+        self.assertIn('properties', res[0])
+        self.assertIn('delivery_mode', res[0]['properties'])
+        self.assertEquals(2, res[0]['properties']['delivery_mode'])
+
+    def test_xn_service_is_not_durable_with_cfg_on(self):
+        xns = self.container.ex_manager.create_xn_service('fake_service')
+        self.addCleanup(xns.delete)
+
+        # declared, find it via internal management API call
+        all_queues = self.container.ex_manager._list_queues()
+        filtered = [q['durable'] for q in all_queues if q['name'] == xns.queue]
+
+        self.assertNotEquals([], filtered)
+        self.assertEquals(len(filtered), 1)
+        self.assertFalse(filtered[0])       # not durable, even tho config says base ones are
 
 @attr('UNIT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False, 'management':{'username':'user', 'password':'pass', 'port':'port'}}}})
