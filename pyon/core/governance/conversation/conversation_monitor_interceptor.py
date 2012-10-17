@@ -57,7 +57,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         return invocation
 
     def incoming(self, invocation):
-        print 'I am in conversation interceptor!!!'
+        log.debug('I am in conversation interceptor!!!')
         if invocation.args.has_key('process'):
             log.debug("ConversationMonitorInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
         else:
@@ -89,10 +89,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         builder = parser.walk(res)
         mapping = ConversationProvider.get_protocol_mapping(op)
         return ConversationContext(builder, cid, principals, mapping)
-        #except Exception as inst:
-        #    log.debug("ConversationMonitorInterceptor._initialize_conversation_context: %s",
-        #        "Conversation context cannot be created")
-        #    raise  inst
 
     def _get_control_conv_msg(self, invocation):
             return invocation.get_header_value('conv-msg-type') & MSG_TYPE_MASKS.CONTROL
@@ -101,7 +97,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         return invocation.get_header_value('conv-msg-type') & MSG_TYPE_MASKS.IN_SESSION
 
     def  _check(self, invocation, op_type, self_principal, target_principal):
-        print 'In check'
         operation = invocation.get_header_value('op', '')
         cid = invocation.get_header_value('conv-id', 0)
         conv_seq = invocation.get_header_value('conv-seq', 0)
@@ -112,7 +107,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             not((conversation_key in self.conversation_context))):
 
             role_spec = self._get_protocol_spec(self_principal, operation)
-            print 'role_spec', role_spec
             if not role_spec:
                 self._report_error(invocation, 'No specification given. Message cannot be monitored: %s')
             else:
@@ -120,7 +114,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
                                                                         [self_principal, target_principal],
                                                                         operation)
                 if conversation_context: self.conversation_context[conversation_key] = conversation_context
-                print 'conversation_context', conversation_context
 
         # CHECK
         if (conversation_key in self.conversation_context):
@@ -134,7 +127,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
             control_conv_msg_type = self._get_control_conv_msg(invocation)
 
-            print 'Are they equeal:%s, %s'%(control_conv_msg_type, (control_conv_msg_type == conversation.MSG_TYPE.ACCEPT))
             if (control_conv_msg_type == conversation.MSG_TYPE.ACCEPT):
                 transition = TransitionFactory.create(op_type, 'accept', target_role)
                 (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
@@ -194,8 +186,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         return True
 
     def _get_protocol_spec(self, role, operation ):
-        print 'The role is:', role
-        return self.conversations_for_monitoring[role]
+         return self.conversations_for_monitoring[role]
 
     def _get_sender_queue(self, invocation):
         sender_queue = invocation.get_header_value('reply-to', 'todo')

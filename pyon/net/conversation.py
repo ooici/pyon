@@ -63,7 +63,7 @@ def log_message(recv, msg, headers, delivery_tag=None):
     """
     if getattr(recv, '__iter__', False):
         recv = ".".join(str(item) for item in recv if item)
-    log.info("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
+    log.debug("MESSAGE RECV [S->%s]: len=%s, headers=%s", recv, len(str(msg)), headers)
 
 ######################################################################
 ######################################################################
@@ -120,18 +120,15 @@ class Conversation(object):
         self._id = value
 
     def __getitem__(self, to_role):
-        print "In._get_from_conv_table"
         self._conv_table.setdefault(to_role, AsyncResult())
         if isinstance(self._conv_table[to_role], AsyncResult):
             # @TODO. Need timeout for the AsyncResult
-            print "Wait on the Async Result"
             to_role_addr = self._conv_table[to_role].get()
-            print "get the Async Result, value is:%s" %to_role_addr
             self._conv_table[to_role] = to_role_addr
         return self._conv_table[to_role]
 
     def __setitem__(self, to_role, to_role_addr):
-        print "Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s" %(to_role, to_role_addr)
+        log.debug("Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s" %(to_role, to_role_addr))
         if to_role in self._conv_table and isinstance(self._conv_table[to_role], AsyncResult):
             self._conv_table[to_role].set(to_role_addr)
         else: self._conv_table[to_role] = to_role_addr
@@ -243,9 +240,8 @@ class ConversationEndpoint(object):
 
     def recv(self, from_role = None):
         (msg, header) = self._recv_queues[from_role].get()
-        print 'receive:%s'%header
         msg, header = self._intercept_msg_in(msg, header)
-        log.info("""\n
+        log.debug("""\n
         ----------------Receiving message:-----------------------------------------------
         Message is: %s \n from %s to %s
         Header is: =%s  \n
@@ -264,7 +260,6 @@ class ConversationEndpoint(object):
             # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
             # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
             # @TODO: remove spawn_listener altogether.
-            print 'I am in spawn and will kill the greenlet'
             self._chan._recv_queue.put(ChannelShutdownMessage())
             self._recv_greenlet.join(timeout=1)
             self._recv_greenlet.kill()      # he's dead, jim
@@ -358,7 +353,7 @@ class ConversationEndpoint(object):
         if new_header: header.update(new_header)
         msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
-        log.info("""\n
+        log.debug("""\n
         ----------------Sending message:-----------------------------------------------
         Message is: %s from %s to %s
         Header is: =%s  \n
@@ -490,7 +485,6 @@ class Participant(object):
            # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
            self._chan = self.node.channel(ListenChannel)
            if name and isinstance(name, NameTrio):
-               print 'In listen: before setup_listener'
                self._chan.setup_listener(name)
            else:
                log.debug('Principal.name is not correct: %s', name)
@@ -500,9 +494,7 @@ class Participant(object):
            while True:
                try:
                    newchan =self._chan.accept()
-                   print 'Before receiving invitation msg'
                    msg, header, delivery_tag = newchan.recv()
-                   print 'After receiving invitation msg: %s, %s' %(msg, header)
                    newchan.ack(delivery_tag)
                    self._recv_invitation(msg, header)
                except ChannelClosedError as ex:
@@ -518,7 +510,6 @@ class Participant(object):
         endpoint = ConversationEndpoint(self.node)
         endpoint.join(role, self.base_name, is_originator = True, conversation = c) # join will generate new private channel based on the name
         self._conversations[c.id] = endpoint
-        print 'Conversation id is: %s' %c.id
         return endpoint
 
     def terminate(self):
@@ -539,7 +530,7 @@ class Participant(object):
            self._recv_greenlet.kill()      # he's dead, jim
 
     def get_invitation(self, protocol = None):
-       print 'Wait to get an invitation'
+       log.debug('Wait to get an invitation')
        return self._recv_queue.get() # this returns a conversations
 
     def accept_invitation(self, invitation, merge_with_first_send = False):
@@ -547,7 +538,7 @@ class Participant(object):
        endpoint = ConversationEndpoint(self.node)
        endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
        self._conversations[c.id] = endpoint
-       log.info("""\n
+       log.debug("""\n
         ----------------Accepting invitation:-----------------------------------------------
         Header is: =%s  \n
         ----------------------------------------------------------------------------------
@@ -562,7 +553,7 @@ class Participant(object):
        control_msg_type = get_control_msg_type(header)
        if control_msg_type == MSG_TYPE.INVITE:
            c = Conversation(header['protocol'], header['conv-id'])
-           print '_accept_invitation: Conversation added to the list'
+           log.debug('_accept_invitation: Conversation added to the list')
            self._recv_queue.put((c, msg, header))
            #else: raise ConversationError('Reject invitation is not supported yet.')
 
@@ -621,7 +612,7 @@ class RPCClient(object):
         finally:
             elapsed = time.time() - ts
 
-            log.info("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
+            log.debug("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
                      headers.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
