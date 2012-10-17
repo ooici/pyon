@@ -15,41 +15,9 @@ import signal
 import sys
 
 from nose.plugins import Plugin
+from putil.rabbithelper import clean_by_sysname
 
 debug = sys.stderr
-
-from putil.rabbitmqadmin import Management, make_parser, LISTABLE, DELETABLE
-import shlex
-import simplejson
-
-class RabbitManagementHelper:
-    def __init__(self, parser, options):
-        self.parser = parser
-        self.options = options
-
-    def list_names(self, listable_type):
-        list_str = '%s list %s name' % (self.options, listable_type)
-        (options, args) = self.parser.parse_args(shlex.split(list_str))
-        mgmt = Management(options, args[1:])
-        uri = mgmt.list_show_uri(LISTABLE, 'list', mgmt.args[1:])
-        output_json = mgmt.get(uri)
-        listables = simplejson.loads(output_json)
-        return listables
-
-    def list_names_with_prefix(self, listables, name_prefix):
-        return [l['name'] for l in listables if l['name'].startswith(name_prefix)]
-
-    # This function works on exchange, queue, vhost, user
-    def delete_names_with_prefix(self, deletable_type, deleteable,  name_prefix):
-        deleted = []
-        for d in deleteable:
-            if d['name'].startswith(name_prefix):
-                delete_cmd = '%s delete %s name="%s"' % (self.options, deletable_type, d['name'])
-                (options, args) = self.parser.parse_args(shlex.split(delete_cmd))
-                mgmt = Management(options, args[1:])
-                mgmt.invoke_delete()
-                deleted.append(d['name'])
-        return deleted
 
 class PYCC(Plugin):
     name = 'pycc'
@@ -91,15 +59,16 @@ class PYCC(Plugin):
 
             # Clean exchanges and system queues out there
             try:
-                rmh = RabbitManagementHelper(make_parser(), '-H %s -P 55672 -u %s -p %s -V %s'
-                        % (CFG.server.amqp.host, CFG.server.amqp.username,
-                        CFG.server.amqp.password, CFG.server.amqp.vhost))
-                exchanges = rmh.list_names('exchanges')
-                deleted = rmh.delete_names_with_prefix('exchange', exchanges, self.sysname)
-                debug.write('Deleted exchanges:\n%s \n' % '\n'.join(deleted))
-                queues = rmh.list_names('queues')
-                deleted = rmh.delete_names_with_prefix('queue', queues, self.sysname)
-                debug.write('Deleted queues:\n%s \n' % '\n'.join(deleted))
+                connect_str = '-H %s -P 55672 -u %s -p %s -V %s' % (CFG.server.amqp.host,
+                                                                    CFG.server.amqp.username,
+                                                                    CFG.server.amqp.password,
+                                                                    CFG.server.amqp.vhost)
+
+                deleted_exchanges, deleted_queues = clean_by_sysname(connect_str, self.sysname)
+
+                debug.write('Deleted exchanges:\n%s \n' % '\n'.join(deleted_exchanges))
+                debug.write('Deleted queues:\n%s \n' % '\n'.join(deleted_queues))
+
             except Exception as e:
                 pass
 
