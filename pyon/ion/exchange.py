@@ -705,7 +705,7 @@ class ExchangeManager(object):
         """
         return self._make_management_call(url, method="delete")
 
-    def _make_management_call(self, url, use_ems=True, method="get"):
+    def _make_management_call(self, url, use_ems=True, method="get", data=None):
         """
         Makes a call to the Rabbit HTTP management API using the passed in HTTP method.
         """
@@ -722,7 +722,7 @@ class ExchangeManager(object):
                 password = CFG.get_safe("container.exchange.management.password", "guest")
 
                 with gevent.timeout.Timeout(10):
-                    r = meth(url, auth=(username, password))
+                    r = meth(url, auth=(username, password), data=data)
                 r.raise_for_status()
 
                 if not r.content == "":

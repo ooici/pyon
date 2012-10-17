@@ -711,7 +711,7 @@ class TestManagementAPI(PyonTestCase):
         content = self.ex_manager._call_management(sentinel.url)
 
         self.assertEquals(content, jsonmock.loads.return_value)
-        reqmock.get.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+        reqmock.get.assert_called_once_with(sentinel.url, auth=('user', 'pass'), data=None)
 
     @patch('pyon.ion.exchange.json')
     @patch('pyon.ion.exchange.requests')
@@ -719,14 +719,14 @@ class TestManagementAPI(PyonTestCase):
         content = self.ex_manager._call_management_delete(sentinel.url)
 
         self.assertEquals(content, jsonmock.loads.return_value)
-        reqmock.delete.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+        reqmock.delete.assert_called_once_with(sentinel.url, auth=('user', 'pass'), data=None)
 
     @patch('pyon.ion.exchange.json')
     @patch('pyon.ion.exchange.requests')
     def test__make_management_call(self, reqmock, jsonmock):
         content = self.ex_manager._make_management_call(sentinel.url, method="scoop")
 
-        reqmock.scoop.assert_called_once_with(sentinel.url, auth=('user', 'pass'))
+        reqmock.scoop.assert_called_once_with(sentinel.url, auth=('user', 'pass'), data=None)
 
     def test__make_management_call_delegates_to_ems(self):
         self.ex_manager._ems_available = Mock(return_value=True)
