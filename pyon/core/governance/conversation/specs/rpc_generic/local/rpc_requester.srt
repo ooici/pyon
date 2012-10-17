@@ -2,7 +2,7 @@ protocol RPC at requester(role provider, role requester)
 {
     request to provider;
     choice at provider {
-        accept to provider;
+        accept from provider;
             choice at provider {
                 (inform) from provider;
             } or {
