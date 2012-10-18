@@ -518,12 +518,14 @@ class FakeService(BaseService):
         ar.wait()
 
 @attr('INT', group='coi')
+@unittest.skip("no active tests, 18 oct 2012")
 class TestProcessInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
         self.pid = self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
         self.fsclient = RPCClient(to_name='fake_service')
 
+    @unittest.skip("timeouts removed 18 oct 2012")
     def test_timeout_with_messaging(self):
         with self.assertRaises(IonTimeout) as cm:
             self.fsclient.request({}, op='takes_too_long', timeout=5)

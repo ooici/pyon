@@ -1143,12 +1143,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         May be overridden at a lower level.
         """
-        try:
-            with Timeout(timeout):
-                return call(*op_args, **op_kwargs)
-        except Timeout:
-            # cleanup shouldn't be needed, executes in same greenlet as current
-            raise exception.Timeout("Timed out making call to service (non-ION process)")
+        return call(*op_args, **op_kwargs)       # REMOVED TIMEOUT
+        #try:
+        #    with Timeout(timeout):
+        #        return call(*op_args, **op_kwargs)
+        #except Timeout:
+        #    # cleanup shouldn't be needed, executes in same greenlet as current
+        #    raise exception.Timeout("Timed out making call to service (non-ION process)")
 
     def _sample_request(self, status, status_descr, msg, headers, response, response_headers):
         """

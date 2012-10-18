@@ -199,14 +199,15 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
             return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        try:
-            res = ar.get(timeout=timeout)
-        except Timeout:
-
-            # cancel or abort current processing
-            self._process._process.cancel_or_abort_call(ar)
-
-            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
+        res = ar.get()    # REMOVED TIMEOUT
+        #try:
+        #    res = ar.get(timeout=timeout)
+        #except Timeout:
+        #
+        #    # cancel or abort current processing
+        #    self._process._process.cancel_or_abort_call(ar)
+        #
+        #    raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
 
         # Persistent process state handling
         if hasattr(self._process, "_proc_state"):
@@ -334,7 +335,7 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
             return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        return ar.get(timeout=timeout)
+        return ar.get() # timeout=timeout)  # REMOVED TIMEOUT
 
 
 class ProcessSubscriber(Subscriber):
