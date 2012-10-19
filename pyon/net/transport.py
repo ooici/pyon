@@ -113,6 +113,9 @@ class ComposableTransport(BaseTransport):
 
     def __init__(self, left, right, *methods):
         self._transports = [left]
+
+        log.debug("ComposableTransport.__init__(%s) %s %s", self.channel_number, type(left), left)
+
         self._methods = { 'declare_exchange_impl': left.declare_exchange_impl,
                           'delete_exchange_impl' : left.delete_exchange_impl,
                           'declare_queue_impl'   : left.declare_queue_impl,
@@ -136,6 +139,9 @@ class ComposableTransport(BaseTransport):
     def overlay(self, transport, *methods):
         for m in methods:
             self._methods[m] = getattr(transport, m)
+
+        log.debug("ComposableTransport.overlay(%s) %s %s (%s)", self.channel_number, type(transport), transport, transport.channel_number)
+
         self._transports.append(transport)
 
     def declare_exchange_impl(self, exchange, **kwargs):
@@ -207,7 +213,7 @@ class ComposableTransport(BaseTransport):
 
     @property
     def channel_number(self):
-        return self._transports[0].channel_number
+        return self._transports[-1].channel_number
 
     def add_on_close_callback(self, cb):
         self._close_callbacks.append(cb)
