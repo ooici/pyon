@@ -717,6 +717,8 @@ class Subscriber(ListeningBaseEndpoint):
     def create_endpoint(self, **kwargs):
         return ListeningBaseEndpoint.create_endpoint(self, callback=self._callback, **kwargs)
 
+    def __str__(self):
+        return "Subscriber: recv_name: %s, cb: %s" % (str(self._recv_name), str(self._callback))
 
 #
 # BIDIRECTIONAL ENDPOINTS
@@ -1266,6 +1268,8 @@ class RPCServer(RequestResponseServer):
         #log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
+    def __str__(self):
+        return "RPCServer: recv_name: %s" % (str(self._recv_name))
 
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """

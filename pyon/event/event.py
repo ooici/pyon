@@ -220,6 +220,8 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread = None
         log.info("EventSubscriber stopped. Event pattern=%s" % self.binding)
 
+    def __str__(self):
+        return "EventSubscriber: recv_name: %s, cb: %s" % (str(self._recv_name), str(self._callback))
 
 class EventRepository(object):
     """

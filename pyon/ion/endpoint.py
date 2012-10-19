@@ -247,6 +247,8 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
+    def __str__(self):
+        return "ProcessRPCServer: recv_name: %s, process: %s" % (str(self._recv_name), str(self._process))
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
@@ -362,6 +364,9 @@ class ProcessSubscriber(Subscriber):
         newkwargs['routing_call'] = self._routing_call
         return Subscriber.create_endpoint(self, **newkwargs)
 
+    def __str__(self):
+        return "ProcessSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+
 
 #
 # ProcessEventSubscriber
@@ -376,3 +381,7 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         log.debug("EventPublisher events pattern %s", self.binding)
 
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
+
+    def __str__(self):
+        return "ProcessEventSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+
