@@ -159,7 +159,10 @@ class FileSystem(object):
         @param ext Optional: guarantees the file will have the extension specified
         @return The full path to the desired resource on the file system
         """
-        return os.path.join(FS_DIRECTORY[fs], '%s%s' % (FileSystem._parse_filename(filename), ext))
+        path =  os.path.join(FS_DIRECTORY[fs], '%s%s' % (FileSystem._parse_filename(filename), ext))
+        if not os.path.exists(path=path):
+            os.makedirs(path)
+        return path
 
     @staticmethod
     def get_hierarchical_url(fs, filename, ext=''):
