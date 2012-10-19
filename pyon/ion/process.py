@@ -209,7 +209,7 @@ class IonProcessThread(PyonThread):
         ar = AsyncResult()
 
         if len(callargs) == 0 and len(callkwargs) == 0:
-            log.warn("_routing_call got no arguments for the call %s, check your call's parameters", call)
+            log.trace("_routing_call got no arguments for the call %s, check your call's parameters", call)
 
         self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, callkwargs, context))
         return ar
