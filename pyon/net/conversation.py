@@ -7,7 +7,7 @@ from gevent import coros
 from pyon.core.exception import IonException
 from pyon.util.log import log
 from pyon.net.transport import NameTrio
-from pyon.net.channel import BidirChannel, ListenChannel, ChannelClosedError, ChannelShutdownMessage
+from pyon.net.channel import BidirChannel, ListenChannel, ChannelClosedError, ChannelShutdownMessage, BidirClientChannel, SendChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from gevent import queue as gqueue
 from gevent.event import AsyncResult
@@ -190,12 +190,25 @@ class ConversationEndpoint(object):
     # @TODO: Should we have existing channel
     def join(self, role, base_name, conversation , is_originator = False):
         """principal_addrs is addressable entity for that role (etc. NameTrio)"""
-
         self._conv = conversation
         self._self_role = role
         self._is_originator = is_originator
-        self._chan = self.node.channel(BidirChannel)
-        self._spawn_listener(role, base_name)
+        recv_chan = self.node.channel(BidirClientChannel)
+        self._chan = self.node.channel(SendChannel)
+        self._recv_chan = recv_chan
+        start1 = time.time()
+        #role_addr = recv_chan.setup_listener(NameTrio(base_name))
+        role_addr = recv_chan.setup_listener(NameTrio(base_name))
+        if not role_addr:
+            role_addr = self._recv_chan._recv_name
+        elapsed1 = time.time() - start1
+        self._conv[self._self_role] = role_addr
+        start2 = time.time()
+        self._spawn_listener(recv_chan)
+        elapsed2 = time.time() - start2
+        print 'Elapsed in setup listener', elapsed1
+        print 'Elapsed spawning the role', elapsed2
+
 
     def accept(self, inv_msg, inv_header, c, base_name, auto_reply = False):
         #@TODO: Fix that, nameTrio is too AMQP specific. better have short and long name for principal
@@ -250,6 +263,7 @@ class ConversationEndpoint(object):
         return msg, header
 
     def stop_conversation(self):
+        self._recv_chan.close()
         if self._chan:
             # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
             # we may end up having a duplicate, but I think logically it would never be a problem.
@@ -260,26 +274,22 @@ class ConversationEndpoint(object):
             # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
             # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
             # @TODO: remove spawn_listener altogether.
-            self._chan._recv_queue.put(ChannelShutdownMessage())
+            #self._chan._recv_queue.put(ChannelShutdownMessage())
             self._recv_greenlet.join(timeout=1)
             self._recv_greenlet.kill()      # he's dead, jim
 
     #@TODO: Do we need only one instance of a channel
-    def _spawn_listener(self, role, base_role_addr):
+    def _spawn_listener(self, recv_chan):
         """
         We have preserved the logging from BaseEndpoint._spawn_listener
         """
         def listen():
-            recv_chan = self.node.channel(ListenChannel)
-            role_addr = recv_chan.setup_listener(NameTrio(base_role_addr))
-            self._conv[role] = role_addr # this will block if there is no role in the _conv table, IS IT BAD???
             recv_chan.start_consume()
             while True:
                 try:
                     log.debug("ConversationEndpoint_listen waiting for a message")
                     msg, header, delivery_tag =  recv_chan.recv()
                     log.debug("ConversationEndpoint_listen got a message")
-                    log_message(role_addr , msg, header, delivery_tag)
                     try:
                         self._on_msg_received(msg, header)
                     finally:
@@ -606,21 +616,24 @@ class RPCClient(object):
 
         c.send(self.rpc_conv.server_role, msg, headers)
         try:
+            elapsed = time.time() - ts
+            print 'Tile elasped before receive:', elapsed
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.name)))
         finally:
             elapsed = time.time() - ts
-
             log.debug("Client-side request (conv id: %s/%s, dest: %s): %.2f elapsed", headers.get('conv-id', 'NOCONVID'),
                      headers.get('conv-seq', 'NOSEQ'),
                 self.server_name,
                 elapsed)
             c.stop_conversation()
+            self.endpoint_unit.close()
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
     def close(self):
+        pass
         self.principal.terminate()
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
@@ -657,6 +670,7 @@ class RPCServer(object):
 
     def get_one_msg(self):
         try:
+            ts = time.time()
             c = self.principal.accept_next_invitation(merge_with_first_send = True)
             #log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
             #log_message(self._recv_name, msg, headers, delivery_tag)
@@ -674,6 +688,8 @@ class RPCServer(object):
                 raise
             finally:
                 c.stop_conversation()
+                elapsed = time.time() - ts
+                print 'Time elapsed in get one message', elapsed
         except Empty:
             # only occurs when timeout specified, capture the Empty we get from accept and return False
             #TODO: handle Channel exceptions, not general ones
