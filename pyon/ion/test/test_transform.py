@@ -11,6 +11,7 @@ from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from interface.objects import StreamRoute
 from nose.plugins.attrib import attr
 from gevent.event import Event
+import unittest
 
 @attr('INT',group='dm')
 class TestTrasforms(IonIntegrationTestCase):
@@ -26,7 +27,8 @@ class TestTrasforms(IonIntegrationTestCase):
         for exchange in self.exchange_cleanup:
             xp = self.container.ex_manager.create_xp(exchange)
             xp.delete()
-        
+
+    @unittest.skip('Since transforma is removed, this test needs to be reworked')
     def test_stats(self):
         self.container.spawn_process('test','ion.core.process.transform','TransformBase', {}, 'test_transform')
         test_transform = self.container.proc_manager.procs['test_transform']
