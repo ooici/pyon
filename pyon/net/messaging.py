@@ -164,7 +164,8 @@ class NodeB(BaseNode):
         Explicitly deletes pooled queues in this Node.
         """
         for chan in self._bidir_pool.itervalues():
-            chan._destroy_queue()
+            if chan._recv_name:
+                chan._destroy_queue()
 
     def _new_transport(self, ch_number=None):
         """
@@ -205,7 +206,6 @@ class NodeB(BaseNode):
             else:
                 ch = self._new_channel(ch_type, transport=transport)
             assert ch
-
         return ch
 
     def on_channel_request_close(self, ch):
@@ -216,7 +216,6 @@ class NodeB(BaseNode):
         close callback in order to prevent that Channel from actually closing.
         """
         log.debug("NodeB: on_channel_request_close\n\tChType %s, Ch#: %d", ch.__class__, ch.get_channel_id())
-
         assert ch.get_channel_id() in self._pool_map
         with self._lock:
             chid = self._pool_map.pop(ch.get_channel_id())
