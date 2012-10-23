@@ -103,13 +103,15 @@ class ComposableTransport(BaseTransport):
         - stop_consume_impl
         - qos_impl
         - get_stats_impl
+        - publish_impl      (solely for publish rates, not needed for identity in protocol)
     """
     common_methods = ['ack_impl',
                       'reject_impl',
                       'start_consume_impl',
                       'stop_consume_impl',
                       'qos_impl',
-                      'get_stats_impl']
+                      'get_stats_impl',
+                      'publish_impl']
 
     def __init__(self, left, right, *methods):
         self._transports = [left]
