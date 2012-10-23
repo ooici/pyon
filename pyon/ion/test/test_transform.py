@@ -30,7 +30,7 @@ class TestTrasforms(IonIntegrationTestCase):
 
     @unittest.skip('Since transforma is removed, this test needs to be reworked')
     def test_stats(self):
-        self.container.spawn_process('test','ion.core.process.transform','TransformBase', {}, 'test_transform')
+        self.container.spawn_process('test','pyon.ion.transforma','TransformBase', {}, 'test_transform')
         test_transform = self.container.proc_manager.procs['test_transform']
         test_transform._stats['hits'] = 100
 
