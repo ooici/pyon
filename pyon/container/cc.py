@@ -275,6 +275,12 @@ class Container(BaseContainerAgent):
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
 
+    def has_capability(self, capability):
+        """
+        Returns True if the given capability is in the list of container capabilities.
+        """
+        return capability in self._capabilities
+
     def stop(self):
         log.info("=============== Container stopping... ===============")
 
