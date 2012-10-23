@@ -21,6 +21,7 @@ import traceback
 import sys
 from pyon.util.sflow import SFlowManager
 from types import MethodType
+import threading
 
 # create special logging category for RPC message tracking
 import logging
@@ -453,13 +454,16 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
-    def listen(self, binding=None):
+    def listen(self, binding=None, thread_name=None):
         """
         Main driving method for ListeningBaseEndpoint.
 
         Meant to be spawned in a greenlet. This method creates/sets up a channel to listen,
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
+
+        if thread_name:
+            threading.current_thread().name = thread_name   # monkeypatched to greenlet name
 
         self.prepare_listener(binding=binding)
 
