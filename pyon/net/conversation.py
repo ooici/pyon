@@ -193,22 +193,13 @@ class ConversationEndpoint(object):
         self._conv = conversation
         self._self_role = role
         self._is_originator = is_originator
-        recv_chan = self.node.channel(BidirClientChannel)
-        self._chan = self.node.channel(SendChannel)
-        self._recv_chan = recv_chan
-        start1 = time.time()
+        self._chan = self.node.channel(BidirClientChannel)
         #role_addr = recv_chan.setup_listener(NameTrio(base_name))
-        role_addr = recv_chan.setup_listener(NameTrio(base_name))
+        role_addr = self._chan.setup_listener(NameTrio(base_name))
         if not role_addr:
-            role_addr = self._recv_chan._recv_name
-        elapsed1 = time.time() - start1
+            role_addr = self._chan._recv_name
         self._conv[self._self_role] = role_addr
-        start2 = time.time()
-        self._spawn_listener(recv_chan)
-        elapsed2 = time.time() - start2
-        print 'Elapsed in setup listener', elapsed1
-        print 'Elapsed spawning the role', elapsed2
-
+        self._spawn_listener(self._chan)
 
     def accept(self, inv_msg, inv_header, c, base_name, auto_reply = False):
         #@TODO: Fix that, nameTrio is too AMQP specific. better have short and long name for principal
@@ -263,19 +254,14 @@ class ConversationEndpoint(object):
         return msg, header
 
     def stop_conversation(self):
-        self._recv_chan.close()
-        if self._chan:
-            # related to above, the close here would inject the ChannelShutdownMessage if we are NOT reusing.
-            # we may end up having a duplicate, but I think logically it would never be a problem.
-            # still, need to clean this up.
-            self._chan.close()
+        self._chan.close()
 
         if self._recv_greenlet:
             # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
             # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
             # @TODO: remove spawn_listener altogether.
             #self._chan._recv_queue.put(ChannelShutdownMessage())
-            self._recv_greenlet.join(timeout=1)
+            #self._recv_greenlet.join(timeout=1)
             self._recv_greenlet.kill()      # he's dead, jim
 
     #@TODO: Do we need only one instance of a channel
@@ -342,6 +328,7 @@ class ConversationEndpoint(object):
         header = self._build_control_header(header, to_role, to_role_addr)
         self._send(to_role, to_role_addr, msg, header)
 
+
     def _send_in_session_msg(self, to_role, msg, header = None):
         log.debug("In _send_in_session_msg: %s", msg)
         if not header: header = {}
@@ -356,6 +343,7 @@ class ConversationEndpoint(object):
 
     #@TODO: Shell we combine build_header and _build_conv_header ?
     def _send(self, to_role, to_role_addr, msg, new_header = None):
+        start = time.time()
         header = {}
         header = self._build_conv_header(header, to_role, to_role_addr)
         header = self._build_header(msg, header)
@@ -363,6 +351,7 @@ class ConversationEndpoint(object):
         if new_header: header.update(new_header)
         msg, header = self._intercept_msg_out(msg, header)
         self._chan.connect(to_role_addr)
+        elapsed = time.time() - start
         log.debug("""\n
         ----------------Sending message:-----------------------------------------------
         Message is: %s from %s to %s
@@ -602,22 +591,19 @@ class RPCClient(object):
         # could have a specified timeout in kwargs
         #if 'timeout' in kwargs and kwargs['timeout'] is not None:
         #    timeout = kwargs['timeout']
+        ts = time.time()
         if not timeout:
             timeout = CFG.endpoint.receive.timeout or 10
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
-        ts = time.time()
-
         c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
         if self.endpoint_unit:
             c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
-
         c.send(self.rpc_conv.server_role, msg, headers)
+
         try:
-            elapsed = time.time() - ts
-            print 'Tile elasped before receive:', elapsed
             result_data, result_headers = c.recv(self.rpc_conv.server_role)
         except Timeout:
             raise exception.Timeout('Request timed out (%d sec) waiting for response from %s' % (timeout, str(self.name)))
@@ -628,12 +614,12 @@ class RPCClient(object):
                 self.server_name,
                 elapsed)
             c.stop_conversation()
-            self.endpoint_unit.close()
+            if self.endpoint_unit:
+                self.endpoint_unit.close()
         log.debug("Response data: %s, headers: %s", result_data, result_headers)
         return result_data, result_headers
 
     def close(self):
-        pass
         self.principal.terminate()
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
@@ -688,8 +674,6 @@ class RPCServer(object):
                 raise
             finally:
                 c.stop_conversation()
-                elapsed = time.time() - ts
-                print 'Time elapsed in get one message', elapsed
         except Empty:
             # only occurs when timeout specified, capture the Empty we get from accept and return False
             #TODO: handle Channel exceptions, not general ones
