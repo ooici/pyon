@@ -258,6 +258,7 @@ class ConversationRPCClient(ProcessRPCClient):
                                                     existing_channel=existing_channel,
                                                     **kwargs)
         send_name = to_name or self._send_name
+        self._ensure_node()
         conv_endpoint = conversation.RPCClient(self.node, NameTrio('test'),
                                                send_name, endpoint_unit = base_end)
         return conv_endpoint
@@ -279,9 +280,8 @@ class ConversationRPCServer(ProcessRPCServer):
         self.participant.stop_listening()
 
     def close(self):
-        #TODO(Rumi): to be discussed
-        self._chan = self.participant._chan
-        super(ConversationRPCServer, self).close()
+        self.participant.terminate()
+        #super(ConversationRPCServer, self).close()
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
