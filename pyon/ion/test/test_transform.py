@@ -6,7 +6,8 @@
 '''
 
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.transforma import TransformBase, TransformDataProcess, StreamPublisher, StreamSubscriber
+from ion.core.process.transform import TransformBase, TransformDataProcess
+from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from interface.objects import StreamRoute
 from nose.plugins.attrib import attr
 from gevent.event import Event
@@ -27,7 +28,7 @@ class TestTrasforms(IonIntegrationTestCase):
             xp.delete()
         
     def test_stats(self):
-        self.container.spawn_process('test','pyon.ion.transforma','TransformBase', {}, 'test_transform')
+        self.container.spawn_process('test','ion.core.process.transform','TransformBase', {}, 'test_transform')
         test_transform = self.container.proc_manager.procs['test_transform']
         test_transform._stats['hits'] = 100
 
