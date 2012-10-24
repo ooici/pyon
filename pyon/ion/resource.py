@@ -548,5 +548,5 @@ class ExtendedResourceContainer(object):
                 return None
 
         except Exception, e:
-            log.error(e)
+            log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
