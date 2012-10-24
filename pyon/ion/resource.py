@@ -518,10 +518,10 @@ class ExtendedResourceContainer(object):
     # and also in the class specified by the service_provider
     def execute_method(self, resource_id, method_name):
 
-        #First look to see if this is a remote method
-        if method_name.find('.') > 0:
+        try:
+            #First look to see if this is a remote method
+            if method_name.find('.') > 0:
 
-            try:
                 #This is a remote method.
                 rmi_call = method_name.split('.')
                 #Retrieve service definition
@@ -534,19 +534,19 @@ class ExtendedResourceContainer(object):
                 ret = methodToCall(*param_list)
                 return ret
 
-            except Exception, e:
-                log.error(e)
-                return None
-
-        else:
-            #For local methods, first look for the method in the current class
-            func = getattr(self, method_name, None)
-            if func:
-                return func(resource_id)
             else:
-                #Next look to see if the method exists in the service provider process
-                func = getattr(self.service_provider, method_name, None)
+                #For local methods, first look for the method in the current class
+                func = getattr(self, method_name, None)
                 if func:
                     return func(resource_id)
+                else:
+                    #Next look to see if the method exists in the service provider process
+                    func = getattr(self.service_provider, method_name, None)
+                    if func:
+                        return func(resource_id)
 
+                return None
+
+        except Exception, e:
+            log.error(e)
             return None
