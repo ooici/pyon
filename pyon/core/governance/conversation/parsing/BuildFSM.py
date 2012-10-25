@@ -256,7 +256,7 @@ class BuildFSM(TreeParser):
 
                 self.match(self.input, UP, None)
                 #action start
-                print "ProtocolDefinition"
+                #print "ProtocolDefinition"
                 #action end
 
 

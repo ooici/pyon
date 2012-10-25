@@ -861,6 +861,8 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
 
+        log_message("MESSAGE RECV >>> RPC-reply", res, res_headers, is_send=False)
+
         # Check response header
         if res_headers["status_code"] != 200:
             stacks = None
