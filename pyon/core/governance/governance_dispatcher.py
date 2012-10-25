@@ -13,9 +13,11 @@ from pyon.core.exception import Unauthorized
 class GovernanceDispatcher(object):
 
     #Annotations to be used as the message is passed between interceptors.
+    CONVERSATION__STATUS_ANNOTATION = 'CONVERSATION_STATUS'
     POLICY__STATUS_ANNOTATION = 'POLICY_STATUS'
 
-
+    # The interceptor was skipped for some reason
+    STATUS_SKIPPED = 'skipped'
 
     # Event processing should proceed
     STATUS_STARTED = 'started'

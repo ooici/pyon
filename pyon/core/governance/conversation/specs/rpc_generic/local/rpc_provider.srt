@@ -1,0 +1,7 @@
+protocol RPC at provider(role requester, role provider)
+{   request from requester;
+    choice at provider {
+        accept to requester;
+        choice at provider {(inform) to requester;}
+        or {(failure) to requester;}}
+     or {reject from requester;}}

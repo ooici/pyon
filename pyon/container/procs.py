@@ -299,7 +299,7 @@ class ProcManager(object):
 
         @TODO Leaks implementation detail, should be using XOs
         """
-        if not ep._chan._queue_auto_delete:
+        if  ep._chan is not None and not ep._chan._queue_auto_delete:
             # only need to delete if AMQP didn't handle it for us already!
             # @TODO this will not work with XOs (future)
             try:
