@@ -78,6 +78,9 @@ class ExchangeManager(object):
         self._nodes     = {}
         self._ioloops   = {}
 
+        # public toggle switch for if EMS should be used by default
+        self.use_ems    = True
+
     def start(self):
         log.debug("ExchangeManager.start")
 
@@ -246,7 +249,7 @@ class ExchangeManager(object):
         Has the side effect of bootstrapping the org_id and default_xs's id/rev from the RR.
         Therefore, cannot be a property.
         """
-        if CFG.get_safe('container.exchange.auto_register', False):
+        if CFG.get_safe('container.exchange.auto_register', False) and self.use_ems:
             # ok now make sure it's in the directory
             service_list, _ = self._rr.find_resources(restype="Service", name='exchange_management')
             if service_list is not None and len(service_list) > 0:
