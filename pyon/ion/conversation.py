@@ -68,11 +68,11 @@ class Conversation(object):
 
     @property
     def protocol(self):
-         return self._protocol
+        return self._protocol
 
     @protocol.setter
     def protocol(self, value):
-         self._protocol = value
+        self._protocol = value
 
     @property
     def id(self):
@@ -266,7 +266,7 @@ class ConversationEndpoint(object):
                 self._next_control_msg_type = MSG_TYPE.ACCEPT
         elif control_msg_type == MSG_TYPE.REJECT:
             exception_msg = 'Invitation rejected by role %s on address %s'\
-                             %(header['sender-role'], header['reply-to'])
+                            %(header['sender-role'], header['reply-to'])
             log.exception(exception_msg)
             raise ConversationError(exception_msg)
 
@@ -401,50 +401,50 @@ class Participant(object):
     #@TODO: ensure node, may be by providing default broker connection
 
     def __init__(self, node, name = None):
-       self.node = node
-       self._name = name
-       self._conversations = {}
-       self._recv_queue = gqueue.Queue()
-       self._chan = None
-       self._recv_greenlet = None
+        self.node = node
+        self._name = name
+        self._conversations = {}
+        self._recv_queue = gqueue.Queue()
+        self._chan = None
+        self._recv_greenlet = None
 
 
     @property
     def base_name(self):
-       return self.name.exchange
+        return self.name.exchange
 
     @property
     def name(self):
-       if not isinstance(self._name, NameTrio):
-           self._name = NameTrio(bootstrap.get_sys_name(), self._name)
-       return self._name
+        if not isinstance(self._name, NameTrio):
+            self._name = NameTrio(bootstrap.get_sys_name(), self._name)
+        return self._name
 
     #@TODO: In the endpoint.py implemenataion channel is decoupled from the spawn listener
     #@TODO: Do we need to spawn here? listen() method for all listeners is started in the thread_manager (in the process.py)
     # so may be we need to provide only listen and leave the upper level to take care of spawning?
     def start_listening(self, source_name = None):
-       def listen():
-           name = source_name or self.name
-           #@TODO: Should we have separated create_channel method?, do we need kwargs for creating a channel,
-           # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
-           self._chan = self.node.channel(ListenChannel)
-           if name and isinstance(name, NameTrio):
-               self._chan.setup_listener(name)
-           else:
-               log.debug('Participant.name is not correct: %s', name)
-               raise ParticipantError('Participant.name is not correct: %s', name)
+        def listen():
+            name = source_name or self.name
+            #@TODO: Should we have separated create_channel method?, do we need kwargs for creating a channel,
+            # kwargs is normally set pass for the initialisation of the channel depending on the channel type: chan = ch_type(**kwargs)
+            self._chan = self.node.channel(ListenChannel)
+            if name and isinstance(name, NameTrio):
+                self._chan.setup_listener(name)
+            else:
+                log.debug('Participant.name is not correct: %s', name)
+                raise ParticipantError('Participant.name is not correct: %s', name)
 
-           self._chan.start_consume()
-           while True:
-               try:
-                   newchan =self._chan.accept()
-                   msg, header, delivery_tag = newchan.recv()
-                   newchan.ack(delivery_tag)
-                   self._recv_invitation(msg, header)
-               except ChannelClosedError as ex:
-                   log.debug('Channel was closed during LEF.listen')
-                   break
-       self._recv_greenlet = spawn(listen)
+            self._chan.start_consume()
+            while True:
+                try:
+                    newchan =self._chan.accept()
+                    msg, header, delivery_tag = newchan.recv()
+                    newchan.ack(delivery_tag)
+                    self._recv_invitation(msg, header)
+                except ChannelClosedError as ex:
+                    log.debug('Channel was closed during LEF.listen')
+                    break
+        self._recv_greenlet = spawn(listen)
 
     def stop_listening(self):
         [conv_endpoint.close() for conv_endpoint  in self._conversations.values()]
@@ -466,46 +466,46 @@ class Participant(object):
             self._chan.close()
 
         if self._recv_greenlet is not None:
-           # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
-           # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
-           # @TODO: remove spawn_listener altogether.
-           self._chan._recv_queue.put(ChannelShutdownMessage())
-           self._recv_greenlet.join(timeout=1)
-           self._recv_greenlet.kill()      # he's dead, jim
+            # This is not entirely correct. We do it here because we want the listener's client_recv to exit gracefully
+            # and we may be reusing the channel. This *SEEMS* correct but we're reaching into Channel too far.
+            # @TODO: remove spawn_listener altogether.
+            self._chan._recv_queue.put(ChannelShutdownMessage())
+            self._recv_greenlet.join(timeout=1)
+            self._recv_greenlet.kill()      # he's dead, jim
 
     def get_invitation(self, protocol = None):
-       log.debug('Wait to get an invitation')
-       return self._recv_queue.get() # this returns a conversations
+        log.debug('Wait to get an invitation')
+        return self._recv_queue.get() # this returns a conversations
 
     def accept_invitation(self, invitation, merge_with_first_send = False):
-       (c, msg, header) =  invitation
-       endpoint = ConversationEndpoint(self.node)
-       endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
-       self._conversations[c.id] = endpoint
-       log.debug("""\n
+        (c, msg, header) =  invitation
+        endpoint = ConversationEndpoint(self.node)
+        endpoint.accept(msg, header, c, self.base_name, merge_with_first_send)
+        self._conversations[c.id] = endpoint
+        log.debug("""\n
         ----------------Accepting invitation:-----------------------------------------------
         Header is: =%s  \n
         ----------------------------------------------------------------------------------
         """, header)
-       return endpoint
+        return endpoint
 
     def accept_next_invitation(self, merge_with_first_send = False):
         invitation = self.get_invitation()
         return self.accept_invitation(invitation, merge_with_first_send)
 
     def _recv_invitation(self, msg, header):
-       control_msg_type = get_control_msg_type(header)
-       if control_msg_type == MSG_TYPE.INVITE:
-           c = Conversation(header['protocol'], header['conv-id'])
-           log.debug('_accept_invitation: Conversation added to the list')
-           self._recv_queue.put((c, msg, header))
-           #else: raise ConversationError('Reject invitation is not supported yet.')
+        control_msg_type = get_control_msg_type(header)
+        if control_msg_type == MSG_TYPE.INVITE:
+            c = Conversation(header['protocol'], header['conv-id'])
+            log.debug('_accept_invitation: Conversation added to the list')
+            self._recv_queue.put((c, msg, header))
+            #else: raise ConversationError('Reject invitation is not supported yet.')
 
     def reject_invitation(self, msg, header):
-       pass
+        pass
 
     def check_invitation(self, msg, header):
-       return True
+        return True
 
 #######################################################################################################################
 # OOI specific (Container Specific) conversations
