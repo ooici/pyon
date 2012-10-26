@@ -216,7 +216,7 @@ class ResourceAgent(BaseResourceAgent):
             res_params = []
 
         res_iface_cmds = self._get_resource_interface(current_state)
-        res_cmds.extend(res_iface_cmds)
+        #res_cmds.extend(res_iface_cmds)
         
         caps = []
         for item in agent_cmds:
@@ -230,6 +230,10 @@ class ResourceAgent(BaseResourceAgent):
         for item in res_cmds:
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_CMD)
+            caps.append(cap)
+        for item in res_iface_cmds:
+            cap = IonObject('AgentCapability', name=item,
+                            cap_type=CapabilityType.RES_IFACE)
             caps.append(cap)
         for item in res_params:
             cap = IonObject('AgentCapability', name=item,
