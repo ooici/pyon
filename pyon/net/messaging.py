@@ -86,7 +86,7 @@ class BaseNode(object):
 
         # create overlay transport
         if transport is not None:
-            new_transport = ComposableTransport(transport, new_transport)
+            new_transport = ComposableTransport(transport, new_transport, *ComposableTransport.common_methods)
 
         chan.on_channel_open(new_transport)
         return chan

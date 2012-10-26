@@ -13,7 +13,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.context import LocalContextMixin
 from pyon.core.exception import IonException, NotFound, ContainerError, Timeout as IonTimeout
 from pyon.util.async import spawn
-from mock import sentinel, Mock, MagicMock
+from mock import sentinel, Mock, MagicMock, ANY
 from nose.plugins.attrib import attr
 from pyon.net.endpoint import RPCClient
 from pyon.service.service import BaseService
@@ -27,6 +27,16 @@ class ProcessTest(PyonTestCase):
 
     class ExpectedFailure(StandardError):
         pass
+
+    def _make_service(self):
+        """
+        Test helper to make a passable service.
+        """
+        svc      = LocalContextMixin()
+        svc.id   = "test_id"
+        svc.name = "test_svc"
+
+        return svc
 
     def test_spawn_proc_with_no_listeners(self):
         p = IonProcessThread(name=sentinel.name, listeners=[])
@@ -52,7 +62,7 @@ class ProcessTest(PyonTestCase):
         p.start_listeners()
 
         self.assertEquals(len(p.thread_manager.children), 2)
-        mocklistener.listen.assert_called_once_with()
+        mocklistener.listen.assert_called_once_with(thread_name=ANY)
         self.assertEqual(mocklistener.routing_call, p._routing_call)
 
         p._notify_stop()
@@ -86,7 +96,7 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test__routing_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -101,7 +111,7 @@ class ProcessTest(PyonTestCase):
         p.stop()
 
     def test_competing__routing_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -146,7 +156,7 @@ class ProcessTest(PyonTestCase):
     def test_known_error(self):
 
         # IonExceptions and TypeErrors get forwarded back intact
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -173,7 +183,7 @@ class ProcessTest(PyonTestCase):
     def test_unknown_error(self):
 
         # Unhandled exceptions get handled and then converted to ContainerErrors
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -199,14 +209,14 @@ class ProcessTest(PyonTestCase):
         self.assertEquals(len(p._errors), 1)
 
     def test_has_pending_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
 
         ar = p._routing_call(sentinel.call, MagicMock())
         self.assertTrue(p.has_pending_call(ar))
 
     def test_has_pending_call_with_no_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
 
         ar = p._routing_call(sentinel.call, MagicMock())
@@ -216,7 +226,7 @@ class ProcessTest(PyonTestCase):
         self.assertFalse(p.has_pending_call(ar))
 
     def test__cancel_pending_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
 
         ar = p._routing_call(sentinel.call, MagicMock())
@@ -226,7 +236,7 @@ class ProcessTest(PyonTestCase):
         self.assertTrue(ar.ready())
 
     def test__cancel_pending_call_with_no_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
 
         ar = p._routing_call(sentinel.call, MagicMock())
@@ -238,7 +248,7 @@ class ProcessTest(PyonTestCase):
         self.assertFalse(val)
 
     def test__interrupt_control_thread(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -269,7 +279,7 @@ class ProcessTest(PyonTestCase):
         self.assertEquals(callar.get(), sentinel.val)
 
     def test__control_flow_cancelled_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -303,7 +313,7 @@ class ProcessTest(PyonTestCase):
         self.assertTrue(ar2.ready())
 
     def test__control_flow_expired_call(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -323,7 +333,7 @@ class ProcessTest(PyonTestCase):
         ar2.get(timeout=2)
 
     def test_heartbeat_no_listeners(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -337,7 +347,7 @@ class ProcessTest(PyonTestCase):
 
     def test_heartbeat_with_listeners(self):
         mocklistener = Mock(spec=ProcessRPCServer)
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[mocklistener], service=svc)
         readyev = Event()
         readyev.set()
@@ -370,7 +380,7 @@ class ProcessTest(PyonTestCase):
 
     def test_heartbeat_listener_dead(self):
         mocklistener = Mock(spec=ProcessRPCServer)
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[mocklistener], service=svc)
         readyev = Event()
         readyev.set()
@@ -402,7 +412,7 @@ class ProcessTest(PyonTestCase):
         self.assertIsNone(p._heartbeat_op)
 
     def test_heartbeat_ctrl_thread_dead(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -417,7 +427,7 @@ class ProcessTest(PyonTestCase):
         self.assertIsNone(p._heartbeat_op)
 
     def test_heartbeat_with_current_op(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -448,7 +458,7 @@ class ProcessTest(PyonTestCase):
         self.assertIn("evin.wait", str(p._heartbeat_stack))
 
     def test_heartbeat_with_current_op_multiple_times(self):
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -478,7 +488,7 @@ class ProcessTest(PyonTestCase):
     def test_heartbeat_current_op_over_limit(self):
         self.patch_cfg('pyon.ion.process.CFG', {'cc':{'timeout':{'heartbeat_proc_count_threshold':2}}})
 
-        svc = LocalContextMixin()
+        svc = self._make_service()
         p = IonProcessThread(name=sentinel.name, listeners=[], service=svc)
         p.start()
         p.get_ready_event().wait(timeout=5)
@@ -518,12 +528,14 @@ class FakeService(BaseService):
         ar.wait()
 
 @attr('INT', group='coi')
+@unittest.skip("no active tests, 18 oct 2012")
 class TestProcessInt(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
         self.pid = self.container.spawn_process('fake', 'pyon.ion.test.test_process', 'FakeService')
         self.fsclient = RPCClient(to_name='fake_service')
 
+    @unittest.skip("timeouts removed 18 oct 2012")
     def test_timeout_with_messaging(self):
         with self.assertRaises(IonTimeout) as cm:
             self.fsclient.request({}, op='takes_too_long', timeout=5)

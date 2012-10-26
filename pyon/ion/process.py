@@ -155,7 +155,17 @@ class IonProcessThread(PyonThread):
         """
         if self.proc:
             listener.routing_call           = self._routing_call
-            self._listener_map[listener]    = self.thread_manager.spawn(listener.listen)
+
+            if self.name:
+                svc_name = "unnamed-service"
+                if self.service is not None and hasattr(self.service, 'name'):
+                    svc_name = self.service.name
+
+                listen_thread_name          = "%s-%s-listen-%s" % (svc_name, self.name, len(self.listeners)+1)
+            else:
+                listen_thread_name          = "unknown-listener-%s" % (len(self.listeners)+1)
+
+            self._listener_map[listener]    = self.thread_manager.spawn(listener.listen, thread_name=listen_thread_name)
             self.listeners.append(listener)
         else:
             self._startup_listeners.append(listener)
@@ -165,7 +175,7 @@ class IonProcessThread(PyonThread):
         Control entrypoint. Setup the base properties for this process (mainly a listener).
         """
         if self.name:
-            threading.current_thread().name = self.name
+            threading.current_thread().name = "%s-target" % self.name
 
         # start time
         self._start_time = int(get_ion_ts())
@@ -209,7 +219,7 @@ class IonProcessThread(PyonThread):
         ar = AsyncResult()
 
         if len(callargs) == 0 and len(callkwargs) == 0:
-            log.warn("_routing_call got no arguments for the call %s, check your call's parameters", call)
+            log.trace("_routing_call got no arguments for the call %s, check your call's parameters", call)
 
         self._ctrl_queue.put((greenlet.getcurrent(), ar, call, callargs, callkwargs, context))
         return ar
@@ -265,6 +275,12 @@ class IonProcessThread(PyonThread):
         in the greenlet that originally scheduled the call.  If successful, the AsyncResult
         created at scheduling time is set with the result of the call.
         """
+        if self.name:
+            svc_name = "unnamed-service"
+            if self.service is not None and hasattr(self.service, 'name'):
+                svc_name = self.service.name
+            threading.current_thread().name = "%s-%s-ctrl" % (svc_name, self.name)
+
         self._ready_control.set()
 
         for calltuple in self._ctrl_queue:

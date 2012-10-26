@@ -32,7 +32,8 @@ setup(  name = 'pyon',
                  'capture=pyon.util.capture_plugin:PyccCapture',
                  'insulate=pyon.util.insulate:Insulate',
                  'insulateslave=pyon.util.insulate:InsulateSlave',
-                 'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler'
+                 'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler',
+                 'greenletleak=pyon.util.greenlet_plugin:GreenletLeak'
              ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',

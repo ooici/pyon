@@ -199,14 +199,15 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
             return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        try:
-            res = ar.get(timeout=timeout)
-        except Timeout:
-
-            # cancel or abort current processing
-            self._process._process.cancel_or_abort_call(ar)
-
-            raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
+        res = ar.get()    # REMOVED TIMEOUT
+        #try:
+        #    res = ar.get(timeout=timeout)
+        #except Timeout:
+        #
+        #    # cancel or abort current processing
+        #    self._process._process.cancel_or_abort_call(ar)
+        #
+        #    raise IonTimeout("Process did not execute in allotted time")    # will be returned to caller via messaging
 
         # Persistent process state handling
         if hasattr(self._process, "_proc_state"):
@@ -246,6 +247,8 @@ class ProcessRPCServer(RPCServer):
         newkwargs['routing_call'] = self._routing_call
         return RPCServer.create_endpoint(self, **newkwargs)
 
+    def __str__(self):
+        return "ProcessRPCServer: recv_name: %s, process: %s" % (str(self._recv_name), str(self._process))
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
@@ -334,7 +337,7 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
             return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
         ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
-        return ar.get(timeout=timeout)
+        return ar.get() # timeout=timeout)  # REMOVED TIMEOUT
 
 
 class ProcessSubscriber(Subscriber):
@@ -361,6 +364,9 @@ class ProcessSubscriber(Subscriber):
         newkwargs['routing_call'] = self._routing_call
         return Subscriber.create_endpoint(self, **newkwargs)
 
+    def __str__(self):
+        return "ProcessSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+
 
 #
 # ProcessEventSubscriber
@@ -375,3 +381,7 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         log.debug("EventPublisher events pattern %s", self.binding)
 
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
+
+    def __str__(self):
+        return "ProcessEventSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+

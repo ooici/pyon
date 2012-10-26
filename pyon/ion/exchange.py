@@ -231,7 +231,7 @@ class ExchangeManager(object):
         if name in self._xs_cache:
             return self._xs_cache[name]
 
-        xs_objs, _ = self._rr_client.find_resources(RT.ExchangeSpace, name=name)
+        xs_objs, _ = self._rr.find_resources(RT.ExchangeSpace, name=name)
         if not len(xs_objs) == 1:
             log.warn("Could not find RR XS object with name: %s", name)
             return None
@@ -248,11 +248,11 @@ class ExchangeManager(object):
         """
         if CFG.get_safe('container.exchange.auto_register', False):
             # ok now make sure it's in the directory
-            service_list, _ = self.container.resource_registry.find_resources(restype="Service", name='exchange_management')
+            service_list, _ = self._rr.find_resources(restype="Service", name='exchange_management')
             if service_list is not None and len(service_list) > 0:
                 if not self.org_id:
                     # find the default Org
-                    org_ids = self._rr_client.find_resources(RT.Org, id_only=True)
+                    org_ids = self._rr.find_resources(RT.Org, id_only=True)
                     if not (len(org_ids) and len(org_ids[0]) == 1):
                         log.warn("EMS available but could not find Org")
                         return False
@@ -262,6 +262,19 @@ class ExchangeManager(object):
                 return True
 
         return False
+
+    @property
+    def _rr(self):
+        """
+        Returns the active resource registry instance or client.
+
+        Used to directly contact the resource registry via the container if available,
+        otherwise the messaging client to the RR service is returned.
+        """
+        if self.container.has_capability('RESOURCE_REGISTRY'):
+            return self.container.resource_registry
+
+        return self._rr_client
 
     def get_transport(self, node):
         """
@@ -353,7 +366,7 @@ class ExchangeManager(object):
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xp")
             # find the XP object via RR
-            xpo_ids = self._rr_client.find_resources(RT.ExchangePoint, name=name, id_only=True)
+            xpo_ids = self._rr.find_resources(RT.ExchangePoint, name=name, id_only=True)
             if not (len(xpo_ids) and len(xpo_ids[0]) == 1):
                 log.warn("Could not find XP in RR with name of %s", name)
 
@@ -422,7 +435,7 @@ class ExchangeManager(object):
         if use_ems and self._ems_available():
             log.debug("Using EMS to delete_xn")
             # find the XN object via RR?
-            xno_ids = self._rr_client.find_resources(RT.ExchangeName, name=name, id_only=True)
+            xno_ids = self._rr.find_resources(RT.ExchangeName, name=name, id_only=True)
             if not (len(xno_ids) and len(xno_ids[0]) == 1):
                 log.warn("Could not find XN in RR with name of %s", name)
 

@@ -328,7 +328,8 @@ class TestProcessSubscriberEndpointUnit(PyonTestCase):
         mrc.assert_called_once_with(sentinel.call, sentinel.context, sentinel.arg, kw=sentinel.kwarg)
 
         mrcar = mrc()
-        mrcar.get.assert_called_once_with(timeout=sentinel.timeout)
+        #mrcar.get.assert_called_once_with(timeout=sentinel.timeout)
+        mrcar.get.assert_called_once_with()
 
 
 @attr('UNIT')

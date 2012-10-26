@@ -215,6 +215,9 @@ class ResourceAgent(BaseResourceAgent):
             res_cmds = []
             res_params = []
 
+        res_iface_cmds = self._get_resource_interface(current_state)
+        res_cmds.extend(res_iface_cmds)
+        
         caps = []
         for item in agent_cmds:
             cap = IonObject('AgentCapability', name=item,
@@ -245,6 +248,11 @@ class ResourceAgent(BaseResourceAgent):
         """
         """
         return events
+
+    def _get_resource_interface(self, current_state=True):
+        """
+        """
+        return []
 
     ##############################################################
     # Agent interface.

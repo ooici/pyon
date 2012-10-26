@@ -108,6 +108,19 @@ class GovernanceController(object):
         if self.service_policy_event_subscriber is not None:
             self.service_policy_event_subscriber.stop()
 
+    @property
+    def _rr(self):
+        """
+        Returns the active resource registry instance or client.
+
+        Used to directly contact the resource registry via the container if available,
+        otherwise the messaging client to the RR service is returned.
+        """
+        if self.container.has_capability('RESOURCE_REGISTRY'):
+            return self.container.resource_registry
+
+        return self.rr_client
+
     def is_container_org_boundary(self):
         return self._is_container_org_boundary
 
@@ -154,57 +167,82 @@ class GovernanceController(object):
     def get_role_message_headers(self, org_roles):
 
         role_header = dict()
-        for org in org_roles:
-            role_header[org] = []
-            for role in org_roles[org]:
-                role_header[org].append(role.name)
-        return role_header
+        try:
+            for org in org_roles:
+                role_header[org] = []
+                for role in org_roles[org]:
+                    role_header[org].append(role.name)
+            return role_header
+
+        except Exception, e:
+            log.error(e)
+            return role_header
 
     #Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
     def get_actor_header(self, actor_id):
 
-        if not actor_id or actor_id is None:
-            actor_header = {'ion-actor-id': DEFAULT_ACTOR_ID, 'ion-actor-roles': {} }
-        else:
-            header_roles = self.get_role_message_headers(self.org_client.find_all_roles_by_user(actor_id))
-            actor_header = {'ion-actor-id': actor_id, 'ion-actor-roles': header_roles }
+        actor_header = {'ion-actor-id': DEFAULT_ACTOR_ID, 'ion-actor-roles': {} }
+
+        if actor_id:
+            try:
+                header_roles = self.get_role_message_headers(self.org_client.find_all_roles_by_user(actor_id))
+                actor_header = {'ion-actor-id': actor_id, 'ion-actor-roles': header_roles }
+            except Exception, e:
+                log.error(e)
 
         return actor_header
 
     #Returns the ION System Actor defined in the Resource Registry
     def get_system_actor(self):
-        system_actor, _ = self.rr_client.find_resources(RT.ActorIdentity,name=CFG.system.system_actor, id_only=False)
-        if not system_actor:
-            return None
 
-        return system_actor[0]
+        try:
+            system_actor, _ = self._rr.find_resources(RT.ActorIdentity,name=CFG.system.system_actor, id_only=False)
+            if not system_actor:
+                return None
+
+            return system_actor[0]
+
+        except Exception, e:
+            log.error(e)
+            return None
 
     #Returns the actor related message headers for a the ION System Actor
     def get_system_actor_header(self, system_actor=None):
 
-        if system_actor is None:
-            system_actor = self.get_system_actor()
+        try:
+            if system_actor is None:
+                system_actor = self.get_system_actor()
 
-        if not system_actor or system_actor is None:
-            log.warn('The ION System Actor Identity was not found; defaulting to anonymous actor')
-            actor_header = self.get_actor_header(None)
-        else:
-            actor_header = self.get_actor_header(system_actor._id)
+            if not system_actor or system_actor is None:
+                log.warn('The ION System Actor Identity was not found; defaulting to anonymous actor')
+                actor_header = self.get_actor_header(None)
+            else:
+                actor_header = self.get_actor_header(system_actor._id)
 
-        return actor_header
+            return actor_header
+
+        except Exception, e:
+            log.error(e)
+            return self.get_actor_header(None)
 
     #Returns the list of commitments for the specified user and resource
     def get_resource_commitment(self, user_id, resource_id):
 
         log.debug("Finding commitments for user_id: %s and resource_id: %s" % (user_id, resource_id))
 
-        cur_time = int(get_ion_ts())
-        commitments,_ = self.rr_client.find_objects(resource_id, PRED.hasCommitment, RT.Commitment)
-        for com in commitments:  #TODO - replace when Retired is removed from find_objects
-            if com.consumer == user_id and com.lcstate != LCS.RETIRED and com.expiration < cur_time:
-                return com
+        try:
+            cur_time = int(get_ion_ts())
+            commitments,_ = self._rr.find_objects(resource_id, PRED.hasCommitment, RT.Commitment)
+            for com in commitments:  #TODO - update when Retired is removed from find_objects
+                if com.consumer == user_id and com.lcstate != LCS.RETIRED and com.expiration < cur_time:
+                    return com
 
-        return None
+            return None
+
+        except Exception, e:
+            log.error(e)
+            return None
+
 
     #Manage all of the policies in the container
 

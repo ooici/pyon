@@ -106,7 +106,7 @@ class StreamSubscriber(Subscriber):
         self.xn = self.container.ex_manager.create_xn_queue(exchange_name)
         self.started = False
         self.callback = callback or process.call_process
-        super(StreamSubscriber, self).__init__(name=self.xn, callback=self.preprocess)
+        super(StreamSubscriber, self).__init__(from_name=self.xn, callback=self.preprocess)
 
     def preprocess(self, msg, headers):
         '''

@@ -21,6 +21,7 @@ import traceback
 import sys
 from pyon.util.sflow import SFlowManager
 from types import MethodType
+import threading
 
 # create special logging category for RPC message tracking
 import logging
@@ -453,13 +454,16 @@ class ListeningBaseEndpoint(BaseEndpoint):
     def _setup_listener(self, name, binding=None):
         self._chan.setup_listener(name, binding=binding)
 
-    def listen(self, binding=None):
+    def listen(self, binding=None, thread_name=None):
         """
         Main driving method for ListeningBaseEndpoint.
 
         Meant to be spawned in a greenlet. This method creates/sets up a channel to listen,
         starts listening, and consumes messages in a loop until the Endpoint is closed.
         """
+
+        if thread_name:
+            threading.current_thread().name = thread_name   # monkeypatched to greenlet name
 
         self.prepare_listener(binding=binding)
 
@@ -717,6 +721,8 @@ class Subscriber(ListeningBaseEndpoint):
     def create_endpoint(self, **kwargs):
         return ListeningBaseEndpoint.create_endpoint(self, callback=self._callback, **kwargs)
 
+    def __str__(self):
+        return "Subscriber: recv_name: %s, cb: %s" % (str(self._recv_name), str(self._callback))
 
 #
 # BIDIRECTIONAL ENDPOINTS
@@ -1143,12 +1149,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         May be overridden at a lower level.
         """
-        try:
-            with Timeout(timeout):
-                return call(*op_args, **op_kwargs)
-        except Timeout:
-            # cleanup shouldn't be needed, executes in same greenlet as current
-            raise exception.Timeout("Timed out making call to service (non-ION process)")
+        return call(*op_args, **op_kwargs)       # REMOVED TIMEOUT
+        #try:
+        #    with Timeout(timeout):
+        #        return call(*op_args, **op_kwargs)
+        #except Timeout:
+        #    # cleanup shouldn't be needed, executes in same greenlet as current
+        #    raise exception.Timeout("Timed out making call to service (non-ION process)")
 
     def _sample_request(self, status, status_descr, msg, headers, response, response_headers):
         """
@@ -1265,6 +1272,8 @@ class RPCServer(RequestResponseServer):
         #log.debug("RPCServer.create_endpoint override")
         return RequestResponseServer.create_endpoint(self, routing_obj=self._service, **kwargs)
 
+    def __str__(self):
+        return "RPCServer: recv_name: %s" % (str(self._recv_name))
 
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """

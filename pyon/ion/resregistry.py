@@ -113,8 +113,9 @@ class ResourceRegistry(object):
 
         object.ts_updated = get_ion_ts()
         if res_obj.lcstate != object.lcstate:
-            log.warn("Cannot modify life cycle state in update current=%s given=%s. DO NOT REUSE THE SAME OBJECT IN CREATE THEN UPDATE" % (
-                res_obj.lcstate, object.lcstate))
+            log.warn("Cannot modify %s life cycle state in update current=%s given=%s. " + 
+                     "DO NOT REUSE THE SAME OBJECT IN CREATE THEN UPDATE", 
+                      type(res_obj).__name__, res_obj.lcstate, object.lcstate)
             object.lcstate = res_obj.lcstate
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
