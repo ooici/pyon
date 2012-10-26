@@ -824,6 +824,11 @@ class ServiceObjectGenerator:
 
         if opts.servicedoc:
             doc_file = interface_file.replace(".py", ".html")
+            doc_file = doc_file.replace("/services/", "/service_html/")
+            parent_dir = os.path.dirname(doc_file)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+
             with open(doc_file, 'w') as f1:
                 f1.write(doc_page_contents)
 
