@@ -12,6 +12,7 @@ from nose.plugins.attrib import attr
 
 from interface.objects import Attachment, AttachmentType
 
+
 @attr('INT', group='resource')
 class TestResourceRegistry(IonIntegrationTestCase):
 
@@ -85,12 +86,12 @@ class TestResourceRegistry(IonIntegrationTestCase):
 
         # Owner creation tests
         instrument = IonObject("InstrumentDevice", name='instrument')
-        iid,_ = self.rr.create(instrument)
+        iid, _ = self.rr.create(instrument)
 
         att = Attachment(content=binary, attachment_type=AttachmentType.BLOB)
         aid1 = self.rr.create_attachment(iid, att)
 
-        att1 = self.rr.read_attachment(aid1,include_content=True)
+        att1 = self.rr.read_attachment(aid1, include_content=True)
         self.assertEquals(binary, att1.content)
 
         import base64
@@ -102,7 +103,7 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals('resource.attachment', att1.content)
 
         #tests that the attachment content can be read
-        att1 = self.rr.read_attachment(aid2,include_content=True)
+        att1 = self.rr.read_attachment(aid2, include_content=True)
         self.assertEquals(binary, att1.content)
 
         att_ids = self.rr.find_attachments(iid, id_only=True)
@@ -115,12 +116,12 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(att_ids, [aid2])
 
         #test that content can be included
-        atts = self.rr.find_attachments(iid, id_only=False,include_content=True, limit=1)
+        atts = self.rr.find_attachments(iid, id_only=False, include_content=True, limit=1)
         self.assertEquals(atts[0].content, att1.content)
 
         #test that content can be excluded and is the default
         atts = self.rr.find_attachments(iid, id_only=False, limit=1)
-        self.assertEquals(atts[0].content,'resource.attachment')
+        self.assertEquals(atts[0].content, 'resource.attachment')
 
         self.rr.delete_attachment(aid1)
 
@@ -132,7 +133,8 @@ class TestResourceRegistry(IonIntegrationTestCase):
         att_ids = self.rr.find_attachments(iid, id_only=True)
         self.assertEquals(att_ids, [])
 
-        att = Attachment(content="SOME TEXT", attachment_type=AttachmentType.ASCII, keywords=['BAR','FOO'])
+        att = Attachment(content="SOME TEXT", attachment_type=AttachmentType.ASCII,
+                         keywords=['BAR', 'FOO'])
         aid3 = self.rr.create_attachment(iid, att)
 
         att_ids = self.rr.find_attachments(iid, keyword="NONE", id_only=True)
@@ -146,6 +148,7 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(att_objs[0].content, "SOME TEXT")
 
         #tests that attachments can be retrieved without content
-        att_objs_without_content = self.rr.find_attachments(iid, keyword="FOO", id_only=False,include_content=False)
+        att_objs_without_content = self.rr.find_attachments(iid, keyword="FOO", id_only=False,
+                                                            include_content=False)
         self.assertEquals(len(att_objs_without_content), 1)
         self.assertEquals(att_objs_without_content[0].content, "resource.attachment")

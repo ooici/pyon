@@ -20,6 +20,7 @@ OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
+
 @attr('UNIT', group='datastore')
 class Test_DataStores(IonIntegrationTestCase):
 
@@ -61,6 +62,7 @@ class Test_DataStores(IonIntegrationTestCase):
                 ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
 
             self._do_test_views(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
+            self._do_test_attach(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES))
 
         except socket.error:
             raise SkipTest('Failed to connect to CouchDB')
@@ -227,28 +229,6 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(data_set_read_obj.description == "Real-time water data for Choptank River near Greensboro, MD")
         self.assertTrue('type_' in data_set_read_obj)
 
-        #test attachment related stuff
-        #create attachment
-        ds_id_and_rev={}
-        filename='resource.attachment'
-        ds_id_and_rev['_id']=write_tuple_1[0]
-        ds_id_and_rev['_rev']=write_tuple_1[1]
-        content = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\x08\x03\x00\x00\x00(-\x0fS\x00\x00\x00\x03sBIT\x08\x08\x08\xdb\xe1O\xe0\x00\x00\x00~PLTEf3\x00\xfc\xf7\xe0\xee\xcc\x00\xd3\xa0\x00\xcc\x99\x00\xec\xcdc\x9fl\x00\xdd\xb2\x00\xff\xff\xff|I\x00\xf9\xdb\x00\xdd\xb5\x19\xd9\xad\x10\xb6\x83\x00\xf8\xd6\x00\xf2\xc5\x00\xd8\xab\x00n;\x00\xff\xcc\x00\xd6\xa4\t\xeb\xb8\x00\x83Q\x00\xadz\x00\xff\xde\x00\xff\xd6\x00\xd6\xa3\x00\xdf\xaf\x00\xde\xad\x10\xbc\x8e\x00\xec\xbe\x00\xec\xd4d\xff\xe3\x00tA\x00\xf6\xc4\x00\xf6\xce\x00\xa5u\x00\xde\xa5\x00\xf7\xbd\x00\xd6\xad\x08\xdd\xaf\x19\x8cR\x00\xea\xb7\x00\xee\xe9\xdf\xc5\x00\x00\x00\tpHYs\x00\x00\n\xf0\x00\x00\n\xf0\x01B\xac4\x98\x00\x00\x00\x1ctEXtSoftware\x00Adobe Fireworks CS4\x06\xb2\xd3\xa0\x00\x00\x00\x15tEXtCreation Time\x0029/4/09Oq\xfdE\x00\x00\x00\xadIDAT\x18\x95M\x8f\x8d\x0e\x820\x0c\x84;ZdC~f\x07\xb2\x11D\x86\x89\xe8\xfb\xbf\xa0+h\xe2\x97\\\xd2^\x93\xb6\x07:1\x9f)q\x9e\xa5\x06\xad\xd5\x13\x8b\xac,\xb3\x02\x9d\x12C\xa1-\xef;M\x08*\x19\xce\x0e?\x1a\xeb4\xcc\xd4\x0c\x831\x87V\xca\xa1\x1a\xd3\x08@\xe4\xbd\xb7\x15P;\xc8\xd4{\x91\xbf\x11\x90\xffg\xdd\x8di\xfa\xb6\x0bs2Z\xff\xe8yg2\xdc\x11T\x96\xc7\x05\xa5\xef\x96+\xa7\xa59E\xae\xe1\x84cm^1\xa6\xb3\xda\x85\xc8\xd8/\x17se\x0eN^'\x8c\xc7\x8e\x88\xa8\xf6p\x8e\xc2;\xc6.\xd0\x11.\x91o\x12\x7f\xcb\xa5\xfe\x00\x89]\x10:\xf5\x00\x0e\xbf\x00\x00\x00\x00IEND\xaeB`\x82"
-        data_store.create_attachment(doc=ds_id_and_rev, content=content, filename=filename, content_type=None, datastore_name="")
-        #create attachment with no content
-        #read attachment
-        content_read=data_store.read_attachment(doc_id=ds_id_and_rev['_id'], filename=filename, datastore_name="")
-        self.assertEquals(content, content_read)
-        #update attachment
-        #delete attachment
-        data_store.delete_attachment(doc=ds_id_and_rev, attachment_filename=filename)
-        #try to read the attachment that has been deleted
-        content_read=data_store.read_attachment(doc_id=ds_id_and_rev['_id'], filename=filename, datastore_name="")
-        self.assertIsNone(content_read)
-        #since the attachment tests have updated the data_set, read it again for the subsequent tests
-        #to work as they should
-        data_set_read_obj = data_store.read(data_set_uuid)
-
         # Update DataSet's Description field and write
         data_set_read_obj.description = "Updated Description"
         write_tuple_2 = data_store.update(data_set_read_obj)
@@ -258,39 +238,6 @@ class Test_DataStores(IonIntegrationTestCase):
         data_set_read_obj_2 = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj_2._id == data_set_uuid)
         self.assertTrue(data_set_read_obj_2.description == "Updated Description")
-
-
-        #create attachment to the updated document
-        updated_ds_id_and_rev={}
-        updated_ds_id_and_rev['_id']=write_tuple_2[0]
-        updated_ds_id_and_rev['_rev']=write_tuple_2[1]
-        some_text = "SOME TEXT"
-        updated_filename='updated.attachment'
-        data_store.create_attachment(doc=updated_ds_id_and_rev, content=some_text, filename=updated_filename, content_type=None, datastore_name="")
-
-        #test attachment related stuff
-        #read the attachment
-        content_read=data_store.read_attachment(doc_id=updated_ds_id_and_rev['_id'], filename=updated_filename, datastore_name="")
-        self.assertEquals(some_text, content_read)
-        #delete attachment from the wrong revision
-        self.assertFalse(data_store.delete_attachment(doc=ds_id_and_rev, attachment_filename=updated_filename))
-        #update attachment
-        data_store.update_attachment(updated_ds_id_and_rev, old_filename=updated_filename, new_filename=filename, content=content)
-        #read the old attachment
-        content_read=data_store.read_attachment(doc_id=updated_ds_id_and_rev['_id'], filename=updated_filename, datastore_name="")
-        self.assertIsNone(content_read)
-        #interestingly, deleting an attachment that does not exist works
-        #even though attempting to delete an attachment that exists but for another revision fails
-        self.assertTrue(data_store.delete_attachment(doc=updated_ds_id_and_rev, attachment_filename=updated_filename))
-        #read the new attachment
-        content_read=data_store.read_attachment(doc_id=updated_ds_id_and_rev['_id'], filename=filename, datastore_name="")
-        self.assertEquals(content, content_read)
-        #delete the right attachment from the right revision
-        self.assertTrue(data_store.delete_attachment(doc=updated_ds_id_and_rev, attachment_filename=filename))
-        #since the attachment tests have updated the data_set, read it again for the subsequent tests
-        #to work as they should
-        data_set_read_obj_2 = data_store.read(data_set_uuid)
-
 
         # List all the revisions of DataSet in data store, should be two
         res = data_store.list_object_revisions(data_set_uuid)
@@ -352,6 +299,147 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Assert data store is now gone
         self.assertNotIn('ion_test_ds', data_store.list_datastores())
+
+    def _do_test_attach(self, data_store):
+
+        self.data_store = data_store
+        self.resources = {}
+
+        # Create an Ion object with default values set (if any)
+        data_set = IonObject('DataSet')
+        self.assertTrue(isinstance(data_set, interface.objects.DataSet))
+
+        # Assign values to object fields
+        data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
+
+        # Write DataSet object"
+        write_tuple_1 = data_store.create(data_set)
+
+        # Save off the object UUID
+        data_set_uuid = write_tuple_1[0]
+
+        # Read back the HEAD version of the object
+        data_set_read_obj = data_store.read(data_set_uuid)
+
+        # Update DataSet's Description field and write
+        data_set_read_obj.description = "Updated Description"
+        write_tuple_2 = data_store.update(data_set_read_obj)
+
+        # test attachment related stuff
+        # create attachment
+        ds_id_and_rev = {}
+        attachment_name = 'resource.attachment'
+        ds_id_and_rev['_id'] = write_tuple_2[0]
+        ds_id_and_rev['_rev'] = write_tuple_2[1]
+        data = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x10\x00\x00\x00\x10\x08\x03\x00\x00\x00(-\x0fS\x00\x00\x00\x03sBIT\x08\x08\x08\xdb\xe1O\xe0\x00\x00\x00~PLTEf3\x00\xfc\xf7\xe0\xee\xcc\x00\xd3\xa0\x00\xcc\x99\x00\xec\xcdc\x9fl\x00\xdd\xb2\x00\xff\xff\xff|I\x00\xf9\xdb\x00\xdd\xb5\x19\xd9\xad\x10\xb6\x83\x00\xf8\xd6\x00\xf2\xc5\x00\xd8\xab\x00n;\x00\xff\xcc\x00\xd6\xa4\t\xeb\xb8\x00\x83Q\x00\xadz\x00\xff\xde\x00\xff\xd6\x00\xd6\xa3\x00\xdf\xaf\x00\xde\xad\x10\xbc\x8e\x00\xec\xbe\x00\xec\xd4d\xff\xe3\x00tA\x00\xf6\xc4\x00\xf6\xce\x00\xa5u\x00\xde\xa5\x00\xf7\xbd\x00\xd6\xad\x08\xdd\xaf\x19\x8cR\x00\xea\xb7\x00\xee\xe9\xdf\xc5\x00\x00\x00\tpHYs\x00\x00\n\xf0\x00\x00\n\xf0\x01B\xac4\x98\x00\x00\x00\x1ctEXtSoftware\x00Adobe Fireworks CS4\x06\xb2\xd3\xa0\x00\x00\x00\x15tEXtCreation Time\x0029/4/09Oq\xfdE\x00\x00\x00\xadIDAT\x18\x95M\x8f\x8d\x0e\x820\x0c\x84;ZdC~f\x07\xb2\x11D\x86\x89\xe8\xfb\xbf\xa0+h\xe2\x97\\\xd2^\x93\xb6\x07:1\x9f)q\x9e\xa5\x06\xad\xd5\x13\x8b\xac,\xb3\x02\x9d\x12C\xa1-\xef;M\x08*\x19\xce\x0e?\x1a\xeb4\xcc\xd4\x0c\x831\x87V\xca\xa1\x1a\xd3\x08@\xe4\xbd\xb7\x15P;\xc8\xd4{\x91\xbf\x11\x90\xffg\xdd\x8di\xfa\xb6\x0bs2Z\xff\xe8yg2\xdc\x11T\x96\xc7\x05\xa5\xef\x96+\xa7\xa59E\xae\xe1\x84cm^1\xa6\xb3\xda\x85\xc8\xd8/\x17se\x0eN^'\x8c\xc7\x8e\x88\xa8\xf6p\x8e\xc2;\xc6.\xd0\x11.\x91o\x12\x7f\xcb\xa5\xfe\x00\x89]\x10:\xf5\x00\x0e\xbf\x00\x00\x00\x00IEND\xaeB`\x82"
+        some_text = "SOME TEXT"
+
+        # create attachment with no data
+        with self.assertRaises(BadRequest):
+            data_store.create_attachment(doc=ds_id_and_rev, data=None,
+                                         attachment_name=attachment_name,
+                                         content_type=None, datastore_name="")
+
+        # create attachment with no attachment
+        with self.assertRaises(BadRequest):
+            data_store.create_attachment(doc=ds_id_and_rev, data=data,
+                                         attachment_name=None, content_type=None, datastore_name="")
+
+        #create attachment by passing a doc parameter that
+        # is a dictionary containing _rev and _id elements
+        data_store.create_attachment(doc=ds_id_and_rev, data=data,
+                                     attachment_name=attachment_name,
+                                     content_type=None, datastore_name="")
+
+        # read attachment by passing a doc parameter that is a dictionary
+        # containing _rev and _id elements and verify that the content read
+        # is same as the content put in
+        content_read = data_store.read_attachment(doc=ds_id_and_rev,
+                                                  attachment_name=attachment_name,
+                                                  datastore_name="")
+        self.assertEquals(data, content_read)
+
+        # update attachment by passing a doc parameter that is a dictionary
+        # containing _rev and _id elements
+        data_store.update_attachment(ds_id_and_rev, attachment_name, data=some_text)
+
+        # read the attachment passing only the doc _id and verify that content has changed
+        content_read = data_store.read_attachment(doc=ds_id_and_rev['_id'],
+                                                  attachment_name=attachment_name,
+                                                  datastore_name="")
+        self.assertNotEquals(data, content_read)
+        self.assertEquals(some_text, content_read)
+
+        # delete attachment by passing a doc parameter that is a dictionary containing _rev
+        # and _id elements
+        data_store.delete_attachment(doc=ds_id_and_rev, attachment_name=attachment_name)
+
+        # interestingly, deleting an attachment that does not exist works
+        # pass a doc parameter that is a dictionary containing _rev and _id elements
+        data_store.delete_attachment(doc=ds_id_and_rev['_id'], attachment_name='no_such_file')
+
+        #create attachment by passing a doc parameter that is string indicating _id
+        data_store.create_attachment(doc=ds_id_and_rev['_id'], data=data,
+                                     attachment_name=attachment_name, content_type=None,
+                                     datastore_name="")
+
+        # read attachment by passing a doc parameter that is a string indicating _id
+        # and verify that the content read is same as the content put in
+        content_read = data_store.read_attachment(doc=ds_id_and_rev['_id'],
+                                                  attachment_name=attachment_name,
+                                                  datastore_name="")
+        self.assertEquals(data, content_read)
+
+        # update attachment by passing a doc parameter that is a string indicating _id
+        data_store.update_attachment(ds_id_and_rev['_id'], attachment_name, data=some_text)
+
+        #refer to a previous version of the document
+        updated_ds_id_and_rev = {}
+        updated_ds_id_and_rev['_id'] = write_tuple_1[0]
+        updated_ds_id_and_rev['_rev'] = write_tuple_1[1]
+
+        # deleting attachment from the previous (wrong) revision raises document update conflict
+        with self.assertRaises(Exception):
+            data_store.delete_attachment(doc=updated_ds_id_and_rev, attachment_name=attachment_name)
+
+        # operations on previous versions are not allowed
+        with self.assertRaises(Exception):
+            data_store.create_attachment(doc=updated_ds_id_and_rev, data=some_text,
+                                         attachment_name=attachment_name, content_type=None,
+                                         datastore_name="")
+
+        # send in an incorrect document _id
+        with self.assertRaises(NotFound):
+            data_store.create_attachment(doc="incorrect_id", data=data,
+                                         attachment_name=attachment_name, content_type=None,
+                                         datastore_name="")
+
+        # send in an incorrect document _id
+        with self.assertRaises(NotFound):
+            data_store.read_attachment(doc="incorrect_id", attachment_name=attachment_name,
+                                       datastore_name="")
+
+        # send in an incorrect attachment_name
+        with self.assertRaises(NotFound):
+            data_store.read_attachment(doc=ds_id_and_rev['_id'],
+                                       attachment_name="incorrect_attachment", datastore_name="")
+
+        # send in an incorrect document_id
+        with self.assertRaises(NotFound):
+            data_store.update_attachment(doc="incorrect_id", attachment_name=attachment_name,
+                                         data=some_text)
+
+        # send in an incorrect attachment_name; this should work because update creates an
+        # attachment when it can't find an attachment to update
+        data_store.update_attachment(ds_id_and_rev['_id'], attachment_name="incorrect_attachment",
+                                     data=some_text)
+
+        # send in an incorrect attachment_name; interestingly, this is not an error
+        data_store.delete_attachment(doc=ds_id_and_rev['_id'], attachment_name='no_such_file')
+
+        # send in an incorrect document_id
+        with self.assertRaises(NotFound):
+            data_store.delete_attachment(doc="incorrect_id", attachment_name='no_such_file')
 
     def _do_test_views(self, data_store, is_persistent=False):
         self.data_store = data_store

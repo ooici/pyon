@@ -407,10 +407,10 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             ion_obj = self._obj_registry.new(type)
             for k, v in objc.iteritems():
 
-                #in CouchDB _attachments contains attachment metadata
-                #in pyon we have metadata in the document itself and so we discard _attachments
-
-                if k != "type_" and k!= "_attachments":
+                # CouchDB adds _attachments and puts metadata in it
+                # in pyon metadata is in the document
+                # so we discard _attachments while transforming between the two
+                if k != "type_" and k != "_attachments":
                     setattr(ion_obj, k, v)
 
             return ion_obj
