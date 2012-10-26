@@ -42,6 +42,7 @@ def entry():
     parser.add_argument('-D', '--config_from_directory', action='store_true')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-fc', '--force_clean', action='store_true', help='Force clean system datastores before starting the container')
+    parser.add_argument('-bc', '--broker_clean', action='store_true', help='Force clean broker of queues/exchanges belonging to sysname')
     parser.add_argument('-i', '--immediate', action='store_true', help='Will exit the container if the only procs started are immediate proc types. Sets CFG system.immediate flag.')
     parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file or dict config content.')
     parser.add_argument('-m', '--mx', action='store_true', help='Start a management web UI')
@@ -193,6 +194,21 @@ def main(opts, *args, **kwargs):
 
         # Bootstrap pyon's core. Load configuration etc.
         bootstrap.bootstrap_pyon(pyon_cfg=pyon_config)
+
+        # Delete any queues/exchanges owned by sysname if option "broker_clean" is set
+        if opts.broker_clean:
+            print "pycc: broker_clean=True, sysname:", bootstrap.get_sys_name()
+
+            # build connect str
+            connect_str = "-q -H %s -P 55672 -u %s -p %s -V %s" % (pyon_config.get_safe('server.amqp_priv.host', pyon_config.get_safe('server.amqp.host', 'localhost')),
+                                                                   pyon_config.get_safe('container.exchange.management.username', 'guest'),
+                                                                   pyon_config.get_safe('container.exchange.management.password', 'guest'),
+                                                                   '/')
+
+            from putil.rabbithelper import clean_by_sysname
+            deleted_exchanges, deleted_queues = clean_by_sysname(connect_str, bootstrap.get_sys_name())
+            print "      exchanges deleted (%s): %s" % (len(deleted_exchanges), ",".join(deleted_exchanges))
+            print "         queues deleted (%s): %s" % (len(deleted_queues), ",".join(deleted_queues))
 
         # Auto-bootstrap interfaces
         if bootstrap_config.system.auto_bootstrap:
