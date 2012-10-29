@@ -393,6 +393,14 @@ class Test_DataStores(IonIntegrationTestCase):
         # update attachment by passing a doc parameter that is a string indicating _id
         data_store.update_attachment(ds_id_and_rev['_id'], attachment_name, data=some_text)
 
+        # create another attachment and
+        # list attachments by passing a doc parameter that is a dictionary
+        # containing _rev and _id elements
+        data_store.create_attachment(doc=ds_id_and_rev['_id'], data=data,
+                                     attachment_name=attachment_name+"_01", content_type=None,
+                                     datastore_name="")
+        _attachments = data_store.list_attachments(doc=ds_id_and_rev)
+
         #refer to a previous version of the document
         updated_ds_id_and_rev = {}
         updated_ds_id_and_rev['_id'] = write_tuple_1[0]
