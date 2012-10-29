@@ -203,9 +203,9 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
-    def list_attachments(self,doc,datastore_name=""):
+    def list_attachments(self, doc):
         """ Accepts both a doc as str (meaning an id) or a doc as dict (meaning a full document)
-        -- returns the _attachment from the document, a dict, as it comes from couchdb"""
+            Returns the _attachment from the document, a dict, as it comes from couchdb"""
         if not isinstance(doc, str):
             doc = doc["_id"]
 

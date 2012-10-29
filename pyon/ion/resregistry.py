@@ -273,8 +273,8 @@ class ResourceRegistry(object):
                          limit=0, descending=False, include_content=False, id_only=True):
         key = [resource_id]
         att_res = self.rr_store.find_by_view("attachment", "by_resource", start_key=key,
-                                             end_key=list(key),
-            descending=descending, limit=limit, id_only=True)
+                                             end_key=list(key), descending=descending, limit=limit,
+                                             id_only=True)
 
         att_ids = [att[0] for att in att_res if not keyword or keyword in att[1][2]]
         if id_only:
