@@ -61,23 +61,23 @@ class ResourceRegistry(object):
         cur_time = get_ion_ts()
         object.ts_created = cur_time
         object.ts_updated = cur_time
-
         if object_id is None:
-            object_id = create_unique_resource_id()
-
-            obj = self.rr_store.create(object, object_id, attachments=attachments)
-        obj_id, rev = obj
+            new_res_id = create_unique_resource_id()
+        else:
+            new_res_id = object_id
+        res = self.rr_store.create(object, new_res_id, attachments=attachments)
+        res_id, rev = res
 
         if actor_id and actor_id != 'anonymous':
-            log.debug("Associate resource_id=%s with owner=%s" % (obj_id, actor_id))
-            self.rr_store.create_association(obj_id, PRED.hasOwner, actor_id)
+            log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
+            self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-                                     origin=obj_id, origin_type=object._get_type(),
+                                     origin=res_id, origin_type=object._get_type(),
                                      sub_type="CREATE",
                                      mod_type=ResourceModificationType.CREATE)
 
-        return obj
+        return res
 
     def _create_mult(self, res_list):
         cur_time = get_ion_ts()
