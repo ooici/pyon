@@ -7,7 +7,7 @@ from pyon.core.exception import IonException
 from pyon.util.log import log
 from pyon.net.transport import NameTrio
 from pyon.net.channel import ListenChannel, ChannelClosedError, ChannelShutdownMessage, BidirClientChannel, SendChannel
-from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer
+from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessRPCResponseEndpointUnit, ProcessRPCRequestEndpointUnit
 from pyon.core.interceptor.interceptor import Invocation
 from gevent import queue as gqueue
 from gevent.event import AsyncResult
@@ -35,7 +35,7 @@ class ConversationError(IonException):
     pass
 
 
-class PrincipalError(IonException):
+class ParticipantError(IonException):
     pass
 
 
@@ -128,7 +128,7 @@ class ConversationEndpoint(object):
     def __init__(self, node):
         log.debug("In Conversation.__init__")
         self.node = node
-        # mapping between role and public channels (principals)
+        # mapping between role and public channels (participants)
         self._invitation_table = {}
         self._is_originator = False
         self._next_control_msg_type = 0
@@ -431,8 +431,8 @@ class Participant(object):
            if name and isinstance(name, NameTrio):
                self._chan.setup_listener(name)
            else:
-               log.debug('Principal.name is not correct: %s', name)
-               raise PrincipalError('Principal.name is not correct: %s', name)
+               log.debug('Participant.name is not correct: %s', name)
+               raise ParticipantError('Participant.name is not correct: %s', name)
 
            self._chan.start_consume()
            while True:
@@ -516,19 +516,22 @@ class Participant(object):
 # RPC generic code
 #######################################################################################################################
 
-class RPCRequester(object):
-    """
-    Note: maybe we need RPCConversation and RPCOriginator, RPCPrincipal, they will return RPCClientEndpoint and RPCServerEndpoint
-    """
+class RPCRequesterEndpoint(object):
+
     # Will be nice to have
     # combine requestresponseClient.request and RequestEndpointUnit._send
+
+    def __init__(self, endpoint_unit = None):
+        self.endpoint_unit = endpoint_unit
+
+    '''
     def __init__(self, node, base_name, server_name,
                  rpc_conversation = None, endpoint_unit = None):
         self.node = node
         self.name = base_name
         self.server_name = server_name
         self.rpc_conv = rpc_conversation or RPCConversation()
-        self.principal = Participant(self.node, self.name)
+        self.participant = Participant(self.node, self.name)
         self.endpoint_unit = endpoint_unit
 
 
@@ -547,7 +550,7 @@ class RPCRequester(object):
 
         log.debug("RequestEndpointUnit.send (timeout: %s)", timeout)
 
-        c = self.principal.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
+        c = self.participant.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role)
         if self.endpoint_unit:
             c.attach_endpoint_unit(self.endpoint_unit)
         c.invite(self.rpc_conv.server_role, self.server_name, merge_with_first_send = True)
@@ -570,29 +573,37 @@ class RPCRequester(object):
         return result_data, result_headers
 
     def terminate(self):
-        self.principal.terminate()
+        self.participant.terminate()
 
     def close(self):
         self.terminate()
+    '''
 
 #@TODO; Implement. This is just a quick test, it is not a reasonable implementation of RPCServer
 #@TODO: Headers are not set and _service is not called
-class RPCProvider(object):
+class RPCProviderEndpoint(object):
     """
     Again, headers are missing
     This is indeed listener, and should be started in the process.py
     create_errro_response and make_routing_call are still missing
     """
+    def __init__(self, endpoint_unit = None):
+        self.endpoint_unit = endpoint_unit
+
+
+
+
+    '''
     def __init__(self, node, name, service = None, rpc_conversation = None, endpoint_unit = None):
         self.node = node
         self.name = name
         self._service = service
         self.rpc_conv = rpc_conversation or RPCConversation()
-        self.principal = Participant(self.node, self.name)
+        self.participant = Participant(self.node, self.name)
         self.endpoint_unit = endpoint_unit
 
     def listen(self):
-        self.principal.start_listening()
+        self.participant.start_listening()
 
     def attach_endpoint_unit(self, endpoint_unit):
         self.endpoint_unit = endpoint_unit
@@ -611,7 +622,7 @@ class RPCProvider(object):
     def get_one_msg(self):
         try:
             ts = get_ion_ts()
-            c = self.principal.accept_next_invitation(merge_with_first_send = True)
+            c = self.participant.accept_next_invitation(merge_with_first_send = True)
             #log.debug("LEF %s received message %s, headers %s, delivery_tag %s", self._recv_name, "-", headers, delivery_tag)
             #log_message(self._recv_name, msg, headers, delivery_tag)
             if self.endpoint_unit:
@@ -622,7 +633,7 @@ class RPCProvider(object):
                 msg_to_return = self.MessageObject(reply)
                 c.send(self.rpc_conv.client_role, reply, reply_header)
                 if msg == 'quit':
-                    self.principal.terminate()
+                    self.participant.terminate()
             except Exception:
                 log.exception("Unhandled error while handling received message")
                 raise
@@ -639,7 +650,8 @@ class RPCProvider(object):
         return ''
 
     def terminate(self):
-        self.principal.terminate()
+        self.participant.terminate()
+    '''
 
 class RPCConversation(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
@@ -647,7 +659,7 @@ class RPCConversation(object):
         self.server_role = server_role or 'provider'
         self.client_role = client_role or 'requester'
 
-class PrincipalName(object):
+class ParticipantName(object):
     def __init__(self, namespace, name):
         self.name = NameTrio(namespace, name)
 
@@ -659,21 +671,47 @@ class PrincipalName(object):
     def name(self, value):
         self._name = value
 
+class ConversationProcessRPCRequestEndpointUnit(ProcessRPCRequestEndpointUnit):
+
+    def __init__(self, **kwargs):
+        self.participant = RPCRequesterEndpoint(self)
+        ProcessRPCRequestEndpointUnit.__init__(self, **kwargs)
+
+
+    def send(self, msg, headers=None, **kwargs):
+        return ProcessRPCRequestEndpointUnit.send(self, msg, headers,  **kwargs)
+
 
 class ConversationRPCClient(ProcessRPCClient):
-    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+    endpoint_unit_type = ConversationProcessRPCRequestEndpointUnit
 
-        base_end = ProcessRPCClient.create_endpoint(self, to_name=to_name,
-            existing_channel=existing_channel,
-            **kwargs)
-        send_name = to_name or self._send_name
-        self._ensure_node()
-        conv_endpoint = RPCRequester(self.node, NameTrio('test'),
-            send_name, endpoint_unit = base_end)
-        return conv_endpoint
+    def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        return ProcessRPCClient.create_endpoint(self, to_name, existing_channel, **kwargs)
+
+
+class ConversationProcessRPCResponseEndpointUnit(ProcessRPCResponseEndpointUnit):
+
+    def __init__(self, **kwargs):
+        self.participant = RPCProviderEndpoint(self)
+        ProcessRPCResponseEndpointUnit.__init__(self, **kwargs)
+
+
+    def message_received(self, msg, headers):
+        result, response_headers = ProcessRPCResponseEndpointUnit.message_received(self, msg, headers)
+
+        return result, response_headers
+
+    def send(self, msg, headers=None, **kwargs):
+        return ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
+
 
 class ConversationRPCServer(ProcessRPCServer):
-    participant = None
+    endpoint_unit_type = ConversationProcessRPCResponseEndpointUnit
+
+    def create_endpoint(self, **kwargs):
+        return ProcessRPCServer.create_endpoint(self, **kwargs)
+
+    '''
 
     def get_one_msg(self, num=1, timeout=None):
         e = self.create_endpoint()
@@ -682,7 +720,7 @@ class ConversationRPCServer(ProcessRPCServer):
         return self.participant.get_one_msg()
 
     def prepare_listener(self, binding = None):
-        self.participant =  RPCProvider(self.node, self._recv_name)
+        self.participant =  RPCProviderEndpoint(self.node, self._recv_name)
         self.participant.listen()
 
     def deactivate(self):
@@ -692,3 +730,4 @@ class ConversationRPCServer(ProcessRPCServer):
         self.participant.terminate()
         #super(ConversationRPCServer, self).close()
 
+    '''
