@@ -173,8 +173,8 @@ class CouchDB_DataStore(DataStore):
                                attachments=attachments)
 
     def create_doc(self, doc, object_id=None, attachments=None, datastore_name=""):
-        """Persists the document using the optionally suggested doc_id, and creates attachments
-        to it.
+        """
+        Persists the document using the optionally suggested doc_id, and creates attachments to it.
         Returns the identifier and version number of the document
         """
         ds, datastore_name = self._get_datastore(datastore_name)
@@ -188,7 +188,7 @@ class CouchDB_DataStore(DataStore):
         log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 
-        #Add the attachments if indicated
+        # Add the attachments if indicated
         if not attachments is None:
             if isinstance(attachments, dict):
                 doc['_attachments'] = attachments
@@ -204,8 +204,10 @@ class CouchDB_DataStore(DataStore):
         return (id, version)
 
     def list_attachments(self, doc):
-        """ Accepts both a doc as str (meaning an id) or a doc as dict (meaning a full document)
-            Returns the _attachment from the document, a dict, as it comes from couchdb"""
+        """
+        Accepts both a doc as str (meaning an id) or a doc as dict (meaning a full document)
+        Returns the _attachment from the document, a dict, as it comes from couchdb.
+        """
         if not isinstance(doc, str):
             doc = doc["_id"]
 
@@ -222,8 +224,10 @@ class CouchDB_DataStore(DataStore):
         self._count(update_attachment=1)
 
     def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
-        """ Assumes that the document already exists and creates attachment to it
-            doc can be either id or the whole document """
+        """
+        Assumes that the document already exists and creates attachment to it
+        doc can be either id or the whole document
+        """
         if not isinstance(attachment_name, str):
             raise BadRequest("attachment name is not string")
         if not isinstance(data, str) and not isinstance(data, file):

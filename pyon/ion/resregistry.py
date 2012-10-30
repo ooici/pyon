@@ -43,12 +43,14 @@ class ResourceRegistry(object):
         self.rr_store.close()
 
     def create(self, object=None, actor_id=None, object_id=None, attachments=None):
-        """Accepts object that is to be stored in the data store and tags them with additional data
+        """
+        Accepts object that is to be stored in the data store and tags them with additional data
         (timestamp and such) If actor_id is provided, creates hasOwner association with objects.
         If attachments are provided
         (in dict(att1=dict(data=xyz), att2=dict(data=aaa, content_type='text/plain') form)
         they get attached to the object.
-        Returns a tuple containing object and revision identifiers. """
+        Returns a tuple containing object and revision identifiers.
+        """
         if object is None:
             raise BadRequest("Object not present")
         if not isinstance(object, IonObjectBase):
@@ -215,8 +217,10 @@ class ResourceRegistry(object):
                                      old_state=old_state, new_state=target_lcstate)
 
     def create_attachment(self, resource_id='', attachment=None):
-        """Persists the given attachment and associates it with the given resource.
-        Returns an identifier for the attachment from the data store."""
+        """
+        Persists the given attachment and associates it with the given resource.
+        Returns an identifier for the attachment from the data store.
+        """
 
         if attachment is None:
             raise BadRequest("Object not present")
@@ -251,8 +255,10 @@ class ResourceRegistry(object):
         return att_id
 
     def read_attachment(self, attachment_id='', include_content=False):
-        """Returns the metadata of an attachment. Unless indicated otherwise the content returned
-        is only a name to the actual attachment content"""
+        """
+        Returns the metadata of an attachment. Unless indicated otherwise the content returned
+        is only a name to the actual attachment content.
+        """
         attachment = self.read(attachment_id)
         if not isinstance(attachment, Attachment):
             raise Inconsistent("Object in datastore must be Attachment, not %s" % type(attachment))
