@@ -25,12 +25,16 @@ class RabbitManagementHelper(object):
     def delete_names_with_prefix(self, deletable_type, deleteable,  name_prefix):
         deleted = []
         for d in deleteable:
-            if d['name'].startswith(name_prefix):
-                delete_cmd = '%s delete %s name="%s"' % (self.options, deletable_type, d['name'])
-                (options, args) = self.parser.parse_args(shlex.split(delete_cmd))
-                mgmt = Management(options, args[1:])
-                mgmt.invoke_delete()
-                deleted.append(d['name'])
+            try:
+                if d['name'].startswith(name_prefix):
+                    delete_cmd = '%s delete %s name="%s"' % (self.options, deletable_type, d['name'])
+                    (options, args) = self.parser.parse_args(shlex.split(delete_cmd))
+                    mgmt = Management(options, args[1:])
+                    mgmt.invoke_delete()
+                    deleted.append(d['name'])
+            except KeyError:
+                # Some has no key 'name'
+                pass
         return deleted
 
 def clean_by_sysname(connect_string, sysname):
