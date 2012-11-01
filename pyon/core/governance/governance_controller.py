@@ -179,7 +179,7 @@ class GovernanceController(object):
             return role_header
 
     #Use this to build the message header used by governance to identify the actor and roles.
-    def build_actor_header(self, actor_id, actor_roles):
+    def build_actor_header(self, actor_id=DEFAULT_ACTOR_ID, actor_roles={}):
         return {'ion-actor-id': actor_id, 'ion-actor-roles': actor_roles }
 
     #Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
