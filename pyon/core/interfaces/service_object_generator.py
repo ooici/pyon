@@ -21,6 +21,7 @@ from collections import OrderedDict
 from pyon.core.path import list_files_recursive
 from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
 from pyon.service.service import BaseService
+from pyon.core.bootstrap import CFG, set_config
 from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
 from pyon.ion.directory_standalone import DirectoryStandalone
 
@@ -40,6 +41,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient
 from pyon.ion.endpoint import ProcessRPCClient
+from pyon.ion.conversation import ConversationRPCClient
 from pyon.util.log import log
 ${dep_client_imports}
 
@@ -126,6 +128,8 @@ ${client}
 ${rpcclient}
 
 ${processrpcclient}
+
+${conversationrpcclient}
 ''',
     'class':
 '''class ${name}ClientMixin(object):
@@ -160,6 +164,15 @@ ${methods}
             log.warn("${name}Client: 'name' parameter is deprecated, please use to_name")
         to_name = to_name or name or '${targetname}'
         ProcessRPCClient.__init__(self, process=process, to_name=to_name, node=node, **kwargs)
+        ${name}ClientMixin.__init__(self)
+''',
+    'conversationrpcclient':
+'''class ${name}ProcessClient(ConversationRPCClient, ${name}ClientMixin):
+    def __init__(self, process=None, to_name=None, name=None, node=None, **kwargs):
+        if name is not None:
+            log.warn("${name}Client: 'name' parameter is deprecated, please use to_name")
+        to_name = to_name or name or '${targetname}'
+        ConversationRPCClient.__init__(self, process=process, to_name=to_name, node=node, **kwargs)
         ${name}ClientMixin.__init__(self)
 '''
 }
@@ -237,6 +250,12 @@ class ServiceObjectGenerator:
         data_yaml_text = self.get_object_definition()
         service_yaml_text = self.get_service_definition()
         enum_tag = u'!enum'
+
+        set_config()
+
+        rpv_convos_enabled = CFG.get_safe('container.messaging.endpoint.rpc_conversation_enabled', False)
+        print 'RPC conversations enabled: %s' % rpv_convos_enabled
+
 
         def enum_constructor(loader, node):
             val_str = str(node.value)
@@ -490,7 +509,7 @@ class ServiceObjectGenerator:
 
         for svc in sorted_services:
             svc_name, raw_def = svc
-            self.generate_service(raw_def['interface_file'], raw_def, client_defs, opts)
+            self.generate_service(raw_def['interface_file'], raw_def, client_defs, opts, rpv_convos_enabled)
             count += 1
 
         if count > 0 and not opts.dryrun:
@@ -687,7 +706,7 @@ class ServiceObjectGenerator:
             res.append(cls)
         return res
 
-    def generate_service(self, interface_file, svc_def, client_defs, opts):
+    def generate_service(self, interface_file, svc_def, client_defs, opts, rpv_convos_enabled):
         """
         Generates a single service/client/interface definition.
 
@@ -805,11 +824,25 @@ class ServiceObjectGenerator:
                                                               methods=_client_methods)
         _client_rpcclient = client_templates['rpcclient'].substitute(name=class_name,
                                                                      targetname=service_name)
-        _client_processrpc_client = client_templates['processrpcclient'].substitute(name=class_name,
-                                                                                    targetname=service_name)
-        _client = client_templates['full'].substitute(client=_client_class,
-                                                      rpcclient=_client_rpcclient,
-                                                      processrpcclient=_client_processrpc_client)
+
+        if rpv_convos_enabled:
+
+            _client_convorpc_client = client_templates['conversationrpcclient'].substitute(name=class_name,
+                targetname=service_name)
+            _client = client_templates['full'].substitute(client=_client_class,
+                                                        rpcclient=_client_rpcclient,
+                                                        processrpcclient='',
+                                                        conversationrpcclient=_client_convorpc_client)
+
+        else:
+            _client_processrpc_client = client_templates['processrpcclient'].substitute(name=class_name,
+                                                                                        targetname=service_name)
+            _client = client_templates['full'].substitute(client=_client_class,
+                                                          rpcclient=_client_rpcclient,
+                                                          processrpcclient=_client_processrpc_client,
+                                                          conversationrpcclient='')
+
+
         interface_contents = templates['file'].substitute(dep_client_imports=dep_client_imports_str,
                                                           clientsholder=clients_holder_str,
                                                           classes=_class,

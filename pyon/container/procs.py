@@ -13,6 +13,7 @@ from pyon.core import exception
 from pyon.core.bootstrap import CFG, IonObject, get_sys_name
 from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.conversation import ConversationRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager
 from pyon.net.messaging import IDPool
@@ -338,7 +339,7 @@ class ProcManager(object):
         Creates a listening endpoint for spawning processes.
 
         This method exists to be able to override the type created via configuration.
-        In most cases it will create a ProcessRPCServer.
+        In most cases it will create a ConversationRPCServer.
         """
         eptypestr = CFG.get_safe('container.messaging.endpoint.proc_listening_type', None)
         if eptypestr is not None:
@@ -347,7 +348,11 @@ class ProcManager(object):
             eptype          = getattr(mod, cls)
             ep              = eptype(**kwargs)
         else:
-            ep = ProcessRPCServer(**kwargs)
+            conv_enabled = CFG.get_safe('container.messaging.endpoint.rpc_conversation_enabled', False)
+            if conv_enabled:
+                ep = ConversationRPCServer(**kwargs)
+            else:
+                ep = ProcessRPCServer(**kwargs)
         return ep
 
     # -----------------------------------------------------------------
