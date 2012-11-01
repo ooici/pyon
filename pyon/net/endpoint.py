@@ -915,12 +915,21 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         """
         headers = RequestEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['protocol'] = 'rpc'
-        headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
-        headers['conv-id']  = self._build_conv_id()
         headers['language'] = 'ion-r2'
         headers['encoding'] = 'msgpack'
         headers['format']   = raw_msg.__class__.__name__
         headers['reply-by'] = 'todo'                        # set by _send override @TODO should be set here
+
+        #Use the headers for conv-id and conv-seq if passed in from higher level API
+        if raw_headers.has_key('conv-id'):
+            headers['conv-id'] = raw_headers['conv-id']
+        else:
+            headers['conv-id']  = self._build_conv_id()
+
+        if raw_headers.has_key('conv-seq'):
+            headers['conv-seq'] = raw_headers['conv-seq']
+        else:
+            headers['conv-seq']  = 1 # @TODO will not work well with agree/status etc
 
         return headers
 
