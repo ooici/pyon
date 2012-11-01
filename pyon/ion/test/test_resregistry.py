@@ -93,12 +93,15 @@ class TestResourceRegistry(IonIntegrationTestCase):
 
         att1 = self.rr.read_attachment(aid1)
         self.assertEquals(binary, att1.content)
+        self.assertEquals(len(binary), att1.attachment_size)
 
         import base64
-        att = Attachment(content=base64.encodestring(binary), attachment_type=AttachmentType.ASCII)
+        enc_content = base64.encodestring(binary)
+        att = Attachment(content=enc_content, attachment_type=AttachmentType.ASCII)
         aid2 = self.rr.create_attachment(iid, att)
 
         att1 = self.rr.read_attachment(aid2)
+        self.assertEquals(len(enc_content), att1.attachment_size)
         self.assertEquals(binary, base64.decodestring(att1.content))
 
         att_ids = self.rr.find_attachments(iid, id_only=True)
