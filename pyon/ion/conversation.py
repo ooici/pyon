@@ -86,10 +86,13 @@ class ConversationEndpoint(object):
 
         # mapping between role and public channels (participants)
         self._invitation_table = {}
-        self._recv_queues = {}
         self._is_originator = False
         self._next_control_msg_type = 0
 
+    def get_conversation_id(self):
+        if self._conversation:
+            return self._conversation.id
+        return None
 
     def join(self, role, conversation, is_originator = False):
         self._conversation = conversation
@@ -112,7 +115,6 @@ class ConversationEndpoint(object):
 
     def invite(self, to_role, to_role_name, merge_with_first_send = False):
         self._invitation_table.setdefault(to_role, (to_role_name, False))
-        #self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
             headers = {}
             to_role_name = self._conversation[to_role]
@@ -178,7 +180,6 @@ class ConversationEndpoint(object):
         in_session_msg_type = get_in_session_msg_type(headers)
         sender_role = headers['sender-role']
         if control_msg_type == MSG_TYPE.ACCEPT or control_msg_type == MSG_TYPE.INVITE:
-            #self._recv_queues.setdefault(sender_role, gqueue.Queue())
             self._conversation[sender_role] = headers['sender-name']
             if control_msg_type == MSG_TYPE.INVITE:
                 self.inviter_role = sender_role
@@ -195,7 +196,6 @@ class ConversationEndpoint(object):
             raise ConversationError(exception_msg)
 
         if in_session_msg_type == MSG_TYPE.TRANSMIT:
-            #self._recv_queues[sender_role].put((msg, header))
             pass
 
 
@@ -205,7 +205,7 @@ class Participant(object):
 
     def __init__(self, name):
         self._name = name
-        self._conversations = {}
+        self._conversation_end_points = {}
         self._recv_queue = gqueue.Queue()
 
     @property
@@ -219,18 +219,22 @@ class Participant(object):
         return self._name
 
 
-    def start_conversation(self, protocol, role, end_point_unit, conversation_id = None):
+    def start_conversation_endpoint(self, protocol, role, end_point_unit, conversation_id = None):
 
         convo_id = conversation_id if conversation_id else end_point_unit._build_conv_id()
         c = Conversation(protocol, cid=convo_id)
         conv_endpoint = ConversationEndpoint(end_point_unit)
         conv_endpoint.join(role, c, True)
-        self._conversations[c.id] = conv_endpoint
+        self._conversation_end_points[c.id] = conv_endpoint
         return conv_endpoint
 
-    def get_conversation(self, id):
-        if self._conversations.has_key(id):
-            return self._conversations[id]
+    def end_conversation_endpoint(self, conversation):
+        del self._conversation_end_points[conversation.get_conversation_id()]
+        return
+
+    def get_conversation_endpoint(self, id):
+        if self._conversation_end_points.has_key(id):
+            return self._conversation_end_points[id]
         return None
 
     def get_invitation(self, protocol = None):
@@ -241,7 +245,7 @@ class Participant(object):
         (c, msg, header) =  invitation
         conv_endpoint = ConversationEndpoint(end_point_unit)
         conv_endpoint.accept(msg, header, c, merge_with_first_send)
-        self._conversations[c.id] = conv_endpoint
+        self._conversation_end_points[c.id] = conv_endpoint
         log.debug("""\n
         ----------------Accepting invitation:-----------------------------------------------
         Header is: =%s  \n
@@ -259,7 +263,7 @@ class Participant(object):
             c = Conversation(header['protocol'], header['conv-id'])
             log.debug('_accept_invitation: Conversation added to the list')
             self._recv_queue.put((c, msg, header))
-            #else: raise ConversationError('Reject invitation is not supported yet.')
+
 
     def reject_invitation(self, msg, headers):
         pass
@@ -298,7 +302,7 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
     def _get_response(self, conv_id, timeout):
         result_data, result_headers = ProcessRPCRequestEndpointUnit._get_response(self, conv_id, timeout)
 
-        c = self.participant.get_conversation(conv_id)
+        c = self.participant.get_conversation_endpoint(conv_id)
         if c:
             c._msg_received( result_data, result_headers)
 
@@ -308,9 +312,15 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
     def send(self, msg, headers=None, **kwargs):
 
         convo_id = headers['conv-id'] if 'conv-id' in headers else None
-        c = self.participant.start_conversation(self.conv_type.protocol, self.conv_type.client_role, self, convo_id)
+
+        c = self.participant.start_conversation_endpoint(self.conv_type.protocol, self.conv_type.client_role, self, convo_id)
+
         c.invite(self.conv_type.server_role, self._endpoint._send_name, merge_with_first_send = True)
         result_data, result_headers = c.send(self.conv_type.server_role, msg, headers)
+
+        c = self.participant.get_conversation_endpoint(convo_id)
+        if c:
+            self.participant.end_conversation_endpoint(c)
 
         return result_data, result_headers
 
@@ -348,6 +358,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
     def message_received(self, msg, headers):
 
         self.participant.receive_invitation(msg, headers)
+        #TODO = reject an invitation is not supported yet
         self.participant.accept_next_invitation(self, merge_with_first_send = True)
 
         result, response_headers = ProcessRPCResponseEndpointUnit.message_received(self, msg, headers)
@@ -356,9 +367,10 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
     def send(self, msg, headers=None, **kwargs):
 
-        c = self.participant.get_conversation(headers['conv-id'])
+        c = self.participant.get_conversation_endpoint(headers['conv-id'])
         if c:
             c.send(self.conv_type.client_role, msg, headers)
+            self.participant.end_conversation_endpoint(c)
 
     def _message_send(self, msg, headers=None, **kwargs):
         return ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
