@@ -1008,7 +1008,12 @@ class RPCClient(RequestResponseClient):
         """
         assert op
         assert headers is None or isinstance(headers, dict)
-        headers = headers or {}
+
+        if headers is not None:
+            headers = headers.copy()
+        else:
+            headers = {}
+
         headers['op'] = op
 
         return RequestResponseClient.request(self, msg, headers=headers, timeout=timeout)

@@ -8,13 +8,6 @@ from gevent import queue as gqueue
 from gevent.event import AsyncResult
 
 
-def enum(**enums):
-    return type('Enum', (), enums)
-
-MSG_TYPE = enum(TRANSMIT = 1, INVITE=8, ACCEPT=16, REJECT = 24)
-MSG_TYPE_MASKS = enum(IN_SESSION = 7, CONTROL= 56)
-
-
 ####################################################
 
 class ConversationError(IonException):
@@ -121,25 +114,29 @@ class ConversationEndpoint(object):
         self._invitation_table.setdefault(to_role, (to_role_name, False))
         #self._recv_queues.setdefault(to_role, gqueue.Queue())
         if not merge_with_first_send:
-            header = {}
+            headers = {}
             to_role_name = self._conversation[to_role]
-            header['conv-msg-type'] =  MSG_TYPE.INVITE
-            self._send(to_role, to_role_name, "", header)
+            headers['conv-msg-type'] =  MSG_TYPE.INVITE
+            self._send(to_role, to_role_name, "", headers)
 
-    def send(self, to_role, msg, header = None):
-        header = header if header else {}
+    def send(self, to_role, msg, headers = None):
+
+        #To prevent original headers from being corrupted
+        _headers = {}
+        if headers: _headers.update(headers)
+
         if self._is_originator and not self._conversation.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
-                return self._send_in_session_msg(to_role, msg, header)
+                return self._send_in_session_msg(to_role, msg, _headers)
             else:
-                return self._invite_and_send(to_role, msg, header)
+                return self._invite_and_send(to_role, msg, _headers)
         else:
-            return self._send_in_session_msg(to_role, msg, header)
+            return self._send_in_session_msg(to_role, msg, _headers)
 
     def _invite_and_send(self, to_role, msg, header = None, to_role_name = None):
         log.debug("In _invite_and_send for msg: %s", msg)
-
+        header = header if header else {}
         if to_role_name:
             self._invitation_table[to_role] =  (to_role_name, False)
         elif to_role in self._invitation_table:
@@ -149,7 +146,7 @@ class ConversationEndpoint(object):
             log.debug(msg)
             raise ConversationError(msg)
 
-        if not header: header = {}
+
         header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_name, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_name, True)
@@ -158,7 +155,7 @@ class ConversationEndpoint(object):
 
     def _send_in_session_msg(self, to_role, msg, header = None):
         log.debug("In _send_in_session_msg: %s", msg)
-        if not header: header = {}
+        header = header if header else {}
         log.debug("In _send for msg: %s", msg)
         to_role_name = self._conversation[to_role]
         header['conv-msg-type']  = MSG_TYPE.TRANSMIT
@@ -167,7 +164,8 @@ class ConversationEndpoint(object):
             self._next_control_msg_type = 0
         return self._send(to_role, to_role_name, msg, header)
 
-    def _build_conv_header(self, header, to_role):
+    def _build_conv_header(self, raw_header, to_role):
+        header = raw_header
         header['sender-role'] = self._self_role
         header['receiver-role'] = to_role
         header['protocol'] = self._conversation.protocol
@@ -175,7 +173,7 @@ class ConversationEndpoint(object):
         return header
 
     def _send(self, to_role, to_role_name, msg, header = None):
-
+        header = header if header else {}
         header = self._build_conv_header(header, to_role)
         return self._end_point_unit._message_send(msg, header)
 
@@ -210,9 +208,8 @@ class ConversationEndpoint(object):
 
 class Participant(object):
 
-    def __init__(self, name, end_point_unit):
+    def __init__(self, name):
         self._name = name
-        self._end_point_unit = end_point_unit
         self._conversations = {}
         self._recv_queue = gqueue.Queue()
 
@@ -226,11 +223,12 @@ class Participant(object):
             self._name = NameTrio(bootstrap.get_sys_name(), self._name)
         return self._name
 
-    def start_conversation(self, protocol, role, conversation_id = None):
 
-        convo_id = conversation_id if conversation_id else self._end_point_unit._build_conv_id()
+    def start_conversation(self, protocol, role, end_point_unit, conversation_id = None):
+
+        convo_id = conversation_id if conversation_id else end_point_unit._build_conv_id()
         c = Conversation(protocol, cid=convo_id)
-        conv_endpoint = ConversationEndpoint(self._end_point_unit)
+        conv_endpoint = ConversationEndpoint(end_point_unit)
         conv_endpoint.join(role, c, True)
         self._conversations[c.id] = conv_endpoint
         return conv_endpoint
@@ -244,9 +242,9 @@ class Participant(object):
         log.debug('Wait to get an invitation')
         return self._recv_queue.get() # this returns a conversations
 
-    def accept_invitation(self, invitation, merge_with_first_send = False):
+    def accept_invitation(self, invitation, end_point_unit, merge_with_first_send = False):
         (c, msg, header) =  invitation
-        conv_endpoint = ConversationEndpoint(self._end_point_unit)
+        conv_endpoint = ConversationEndpoint(end_point_unit)
         conv_endpoint.accept(msg, header, c, merge_with_first_send)
         self._conversations[c.id] = conv_endpoint
         log.debug("""\n
@@ -256,11 +254,11 @@ class Participant(object):
         """, header)
         return conv_endpoint
 
-    def accept_next_invitation(self, merge_with_first_send = False):
+    def accept_next_invitation(self, end_point_unit, merge_with_first_send = False):
         invitation = self.get_invitation()
-        return self.accept_invitation(invitation, merge_with_first_send)
+        return self.accept_invitation(invitation, end_point_unit, merge_with_first_send)
 
-    def _recv_invitation(self, msg, header):
+    def receive_invitation(self, msg, header):
         control_msg_type = get_control_msg_type(header)
         if control_msg_type == MSG_TYPE.INVITE:
             c = Conversation(header['protocol'], header['conv-id'])
@@ -278,30 +276,27 @@ class Participant(object):
 # OOI specific (Container Specific) conversations
 #######################################################################################################################
 
-class RPCConversation(object):
+#TODO - this may ultimately me loaded from ConversationType Resouce object
+class RPCConversationType(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
         self.protocol = protocol or 'rpc'
         self.server_role = server_role or 'provider'
         self.client_role = client_role or 'requester'
 
-class ParticipantName(object):
-    def __init__(self, namespace, name):
-        self.name = NameTrio(namespace, name)
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
+############
 
 class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
 
     def __init__(self, **kwargs):
         ProcessRPCRequestEndpointUnit.__init__(self, **kwargs)
-        self.rpc_conv = RPCConversation()
-        self.participant = Participant(self._endpoint._send_name, self)
+
+    @property
+    def participant(self):
+        return self._endpoint._participant
+
+    @property
+    def conv_type(self):
+        return self._endpoint._conv_type
 
     def _message_send(self, msg, headers=None, **kwargs):
         return ProcessRPCRequestEndpointUnit.send(self, msg, headers,  **kwargs)
@@ -319,9 +314,10 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
 
     def send(self, msg, headers=None, **kwargs):
 
-        c = self.participant.start_conversation(self.rpc_conv.protocol, self.rpc_conv.client_role, headers.setdefault('conv-id', None))
-        c.invite(self.rpc_conv.server_role, self._endpoint._send_name, merge_with_first_send = True)
-        result_data, result_headers = c.send(self.rpc_conv.server_role, msg, headers)
+        convo_id = headers['conv-id'] if 'conv-id' in headers else None
+        c = self.participant.start_conversation(self.conv_type.protocol, self.conv_type.client_role, self, convo_id)
+        c.invite(self.conv_type.server_role, self._endpoint._send_name, merge_with_first_send = True)
+        result_data, result_headers = c.send(self.conv_type.server_role, msg, headers)
 
         return result_data, result_headers
 
@@ -330,23 +326,36 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
 class ConversationRPCClient(ProcessRPCClient):
     endpoint_unit_type = RPCRequesterEndpointUnit
 
+    def __init__(self, **kwargs):
+        ProcessRPCClient.__init__(self, **kwargs)
+        self._conv_type = RPCConversationType()
+        self._participant = Participant(self._process.name)
+
+
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         return ProcessRPCClient.create_endpoint(self, to_name, existing_channel, **kwargs)
+
+
+###############
 
 
 class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
     def __init__(self, **kwargs):
         ProcessRPCResponseEndpointUnit.__init__(self, **kwargs)
-        self.rpc_conv = RPCConversation()
-        self.participant = Participant(self._endpoint._recv_name, self)
 
+    @property
+    def participant(self):
+        return self._endpoint._participant
+
+    @property
+    def conv_type(self):
+        return self._endpoint._conv_type
 
     def message_received(self, msg, headers):
 
-
-        self.participant._recv_invitation(msg, headers)
-        self.participant.accept_next_invitation(merge_with_first_send = True)
+        self.participant.receive_invitation(msg, headers)
+        self.participant.accept_next_invitation(self, merge_with_first_send = True)
 
         result, response_headers = ProcessRPCResponseEndpointUnit.message_received(self, msg, headers)
 
@@ -356,7 +365,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
         c = self.participant.get_conversation(headers['conv-id'])
         if c:
-            c.send(self.rpc_conv.client_role, msg, headers)
+            c.send(self.conv_type.client_role, msg, headers)
 
     def _message_send(self, msg, headers=None, **kwargs):
         return ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
@@ -365,6 +374,11 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 class ConversationRPCServer(ProcessRPCServer):
     endpoint_unit_type = RPCProviderEndpointUnit
 
+    def __init__(self, **kwargs):
+        ProcessRPCServer.__init__(self, **kwargs)
+        self._conv_type = RPCConversationType()
+        self._participant = Participant(self._process.name)
+
+
     def create_endpoint(self, **kwargs):
         return ProcessRPCServer.create_endpoint(self, **kwargs)
-

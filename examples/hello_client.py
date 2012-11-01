@@ -42,10 +42,10 @@ def hello_client(container, actor_id='anonymous', text='mytext 123'):
         client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
         actor_headers = container.governance_controller.build_actor_header(actor_id)
-        ret = client.hello(text, headers=actor_headers)
+        ret = client.hello(text, headers={'conv-id':'1234'})
         print "Returned: " + str(ret)
 
-        ret = client.hello('second message text', headers=actor_headers)
+        ret = client.hello('second message text', headers={'conv-id':'1234'})
         print "Returned: " + str(ret)
 
     except Exception, e:
@@ -67,5 +67,5 @@ if __name__ == '__main__':
 
     container = Container()
     container.start() # :(
-    hello_client(container, actor_id='shenrie',org_id='ooi')
+    hello_client(container, actor_id='shenrie')
     container.stop()
