@@ -96,9 +96,9 @@ class ConversationEndpoint(object):
         self._self_role = role
         self._is_originator = is_originator
 
-    def accept(self, invite_msg, invite_header, c, auto_reply = False):
-        self.join(invite_header['receiver-role'], c)
-        self._msg_received(invite_msg, invite_header)
+    def accept(self, invite_msg, invite_headers, c, auto_reply = False):
+        self.join(invite_headers['receiver-role'], c)
+        self._msg_received(invite_msg, invite_headers)
         if not auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
 
@@ -120,23 +120,19 @@ class ConversationEndpoint(object):
             self._send(to_role, to_role_name, "", headers)
 
     def send(self, to_role, msg, headers = None):
-
-        #To prevent original headers from being corrupted
-        _headers = {}
-        if headers: _headers.update(headers)
-
+        header = headers if headers else {}
         if self._is_originator and not self._conversation.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
-                return self._send_in_session_msg(to_role, msg, _headers)
+                return self._send_in_session_msg(to_role, msg, headers)
             else:
-                return self._invite_and_send(to_role, msg, _headers)
+                return self._invite_and_send(to_role, msg, headers)
         else:
-            return self._send_in_session_msg(to_role, msg, _headers)
+            return self._send_in_session_msg(to_role, msg, headers)
 
-    def _invite_and_send(self, to_role, msg, header = None, to_role_name = None):
+    def _invite_and_send(self, to_role, msg, headers = None, to_role_name = None):
         log.debug("In _invite_and_send for msg: %s", msg)
-        header = header if header else {}
+        header = headers if headers else {}
         if to_role_name:
             self._invitation_table[to_role] =  (to_role_name, False)
         elif to_role in self._invitation_table:
@@ -153,38 +149,37 @@ class ConversationEndpoint(object):
         return self._send(to_role, to_role_name, msg, header)
 
 
-    def _send_in_session_msg(self, to_role, msg, header = None):
+    def _send_in_session_msg(self, to_role, msg, headers = None):
         log.debug("In _send_in_session_msg: %s", msg)
-        header = header if header else {}
+        headers = headers if headers else {}
         log.debug("In _send for msg: %s", msg)
         to_role_name = self._conversation[to_role]
-        header['conv-msg-type']  = MSG_TYPE.TRANSMIT
+        headers['conv-msg-type']  = MSG_TYPE.TRANSMIT
         if self._next_control_msg_type == MSG_TYPE.ACCEPT:
-            header['conv-msg-type']  = header.get('conv-msg-type', 0) | MSG_TYPE.ACCEPT
+            headers['conv-msg-type']  = headers.get('conv-msg-type', 0) | MSG_TYPE.ACCEPT
             self._next_control_msg_type = 0
-        return self._send(to_role, to_role_name, msg, header)
+        return self._send(to_role, to_role_name, msg, headers)
 
-    def _build_conv_header(self, raw_header, to_role):
-        header = raw_header
-        header['sender-role'] = self._self_role
-        header['receiver-role'] = to_role
-        header['protocol'] = self._conversation.protocol
-        header['conv-id'] = self._conversation.id
-        return header
+    def _build_conv_header(self, headers, to_role):
+        headers['sender-role'] = self._self_role
+        headers['receiver-role'] = to_role
+        headers['protocol'] = self._conversation.protocol
+        headers['conv-id'] = self._conversation.id
+        return headers
 
-    def _send(self, to_role, to_role_name, msg, header = None):
-        header = header if header else {}
-        header = self._build_conv_header(header, to_role)
+    def _send(self, to_role, to_role_name, msg, headers = None):
+        header = headers if headers else {}
+        header = self._build_conv_header(headers, to_role)
         return self._end_point_unit._message_send(msg, header)
 
 
-    def _msg_received(self, msg, header):
-        control_msg_type = get_control_msg_type(header)
-        in_session_msg_type = get_in_session_msg_type(header)
-        sender_role = header['sender-role']
+    def _msg_received(self, msg, headers):
+        control_msg_type = get_control_msg_type(headers)
+        in_session_msg_type = get_in_session_msg_type(headers)
+        sender_role = headers['sender-role']
         if control_msg_type == MSG_TYPE.ACCEPT or control_msg_type == MSG_TYPE.INVITE:
             #self._recv_queues.setdefault(sender_role, gqueue.Queue())
-            self._conversation[sender_role] = header['sender-name']
+            self._conversation[sender_role] = headers['sender-name']
             if control_msg_type == MSG_TYPE.INVITE:
                 self.inviter_role = sender_role
 
@@ -195,7 +190,7 @@ class ConversationEndpoint(object):
                 self._next_control_msg_type = MSG_TYPE.ACCEPT
         elif control_msg_type == MSG_TYPE.REJECT:
             exception_msg = 'Invitation rejected by role %s on address %s'\
-                            %(header['sender-role'], header['reply-to'])
+                            %(headers['sender-role'], headers['reply-to'])
             log.exception(exception_msg)
             raise ConversationError(exception_msg)
 
@@ -266,11 +261,9 @@ class Participant(object):
             self._recv_queue.put((c, msg, header))
             #else: raise ConversationError('Reject invitation is not supported yet.')
 
-    def reject_invitation(self, msg, header):
+    def reject_invitation(self, msg, headers):
         pass
 
-    def check_invitation(self, msg, header):
-        return True
 
 #######################################################################################################################
 # OOI specific (Container Specific) conversations

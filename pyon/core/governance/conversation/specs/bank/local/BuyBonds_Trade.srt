@@ -1,6 +1,0 @@
-protocol BuyBonds at trade(role client, role resource_registry) {
-	    exercise(Order) from client;
-	    create(Order) to resource_registry;
-	    (Order) from resource_registry;
-	    (Confirmation) to client;
-}
