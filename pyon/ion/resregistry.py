@@ -215,13 +215,17 @@ class ResourceRegistry(object):
 
         attachment.object_id = resource_id if resource_id else ""
 
+        attachment.attachment_size = -1
+
         if attachment.attachment_type == AttachmentType.BLOB:
             if type(attachment.content) is not str:
                 raise BadRequest("Attachment content must be str")
+            attachment.attachment_size = len(attachment.content)
             attachment.content = base64.encodestring(attachment.content)
         elif attachment.attachment_type == AttachmentType.ASCII:
             if type(attachment.content) is not str:
                 raise BadRequest("Attachment content must be str")
+            attachment.attachment_size = len(attachment.content)
         elif attachment.attachment_type == AttachmentType.OBJECT:
             pass
         else:
