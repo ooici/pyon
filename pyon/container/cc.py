@@ -199,7 +199,7 @@ class Container(BaseContainerAgent):
         self._is_started    = True
         self._status        = "RUNNING"
 
-        log.info("Container (%s) started, OK." % self.id)
+        log.info("Container (%s) started, OK." , self.id)
 
     @property
     def node(self):

@@ -61,18 +61,11 @@ class Conversation(object):
         self._id = value
 
     def __getitem__(self, to_role):
-        self._conv_table.setdefault(to_role, AsyncResult())
-        if isinstance(self._conv_table[to_role], AsyncResult):
-            # @TODO. Need timeout for the AsyncResult
-            to_role_name = self._conv_table[to_role].get()
-            self._conv_table[to_role] = to_role_name
-        return self._conv_table[to_role]
+        self._conv_table[to_role]
 
     def __setitem__(self, to_role, to_role_name):
         log.debug("Conversation._add_to_conv_table: to_role:%s, to_role_addr:%s" %(to_role, to_role_name))
-        if to_role in self._conv_table and isinstance(self._conv_table[to_role], AsyncResult):
-            self._conv_table[to_role].set(to_role_name)
-        else: self._conv_table[to_role] = to_role_name
+        self._conv_table[to_role] = to_role_name
 
     def has_role(self, role):
         return role in self._conv_table
@@ -211,13 +204,7 @@ class Participant(object):
         self._recv_queue = gqueue.Queue()
 
     @property
-    def base_name(self):
-        return self.name.exchange
-
-    @property
     def name(self):
-        if not isinstance(self._name, NameTrio):
-            self._name = NameTrio(bootstrap.get_sys_name(), self._name)
         return self._name
 
 
@@ -276,6 +263,7 @@ class Participant(object):
 # OOI specific (Container Specific) conversations
 #######################################################################################################################
 
+
 #TODO - this may ultimately me loaded from ConversationType Resouce object
 class RPCConversationType(object):
     def __init__(self, protocol = None, server_role = None, client_role = None):
@@ -301,7 +289,7 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
     def _message_send(self, msg, headers=None, **kwargs):
         return ProcessRPCRequestEndpointUnit.send(self, msg, headers,  **kwargs)
 
-    #TODO - discuss with Dave to make sure this is the best way to hook into the returned message
+    #Overridden method to hook into message received process
     def _get_response(self, conv_id, timeout):
         result_data, result_headers = ProcessRPCRequestEndpointUnit._get_response(self, conv_id, timeout)
 
@@ -312,7 +300,7 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
 
         return result_data, result_headers
 
-
+    #Overridden method to hook into message sending process
     def send(self, msg, headers=None, **kwargs):
 
         convo_id = headers['conv-id'] if 'conv-id' in headers else None
@@ -364,6 +352,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
     def conv_type(self):
         return self._endpoint._conv_type
 
+    #Overridden method to hook into message received process
     def message_received(self, msg, headers):
 
         #Try to be backward compatiable with non conversation endpoints
@@ -376,6 +365,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
         return result, response_headers
 
+    #Overridden method to hook into message sending process
     def send(self, msg, headers=None, **kwargs):
 
         c = self.participant.get_conversation_endpoint(headers['conv-id'])
