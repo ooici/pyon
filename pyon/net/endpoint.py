@@ -921,8 +921,8 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         headers['reply-by'] = 'todo'                        # set by _send override @TODO should be set here
 
         #Use the headers for conv-id and conv-seq if passed in from higher level API
-        headers['conv-id'] = raw_headers['conv-id'] if 'conv-id' in raw_headers else self._build_conv_id()
-        headers['conv-seq'] = raw_headers['conv-seq'] if 'conv-seq' in raw_headers else 1 #@TODO will not work well with agree/status etc
+        headers['conv-id'] = raw_headers['conv-id'] if raw_headers and 'conv-id' in raw_headers else self._build_conv_id()
+        headers['conv-seq'] = raw_headers['conv-seq'] if raw_headers and 'conv-seq' in raw_headers else 1 #@TODO will not work well with agree/status etc
 
         return headers
 
