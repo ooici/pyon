@@ -229,6 +229,14 @@ function(doc) {
     emit(doc.s, doc.o);
   }
 }""",
+            },
+        'by_subject_bulk':{
+            'map':"""
+function(doc) {
+  if(doc.type_ == "Association") {
+    emit(doc.o, doc.s);
+  }
+}""",
             }
     },
 
