@@ -46,12 +46,12 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         else:
             log.debug("ConversationMonitorInterceptor.outgoing: %s" % invocation)
 
-        #TODO - should this be set to default values for consumer/provider
-        self_principal = invocation.headers.get('sender-role', None)
+        conv_msg_type = invocation.headers.get('conv-msg-type', None)
+        self_principal = invocation.headers.get('sender-role', None) #TODO - should these be set to default values?
         target_principal = invocation.headers.get('receiver-role', None)
         op_type = LocalType.SEND;
 
-        if self_principal and target_principal:
+        if conv_msg_type and self_principal and target_principal:
         #    target_principal = self._get_receiver(invocation)
         #    op_type = LocalType.SEND;
             self._check(invocation, op_type, self_principal, target_principal)
@@ -65,12 +65,12 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         else:
             log.debug("ConversationMonitorInterceptor.incoming: %s" % invocation)
 
-            #TODO - should this be set to default values for provider/consumer
-
+        conv_msg_type = invocation.headers.get('conv-msg-type', None)
         self_principal = invocation.headers.get('receiver-role', None)
         target_principal = invocation.headers.get('sender-role', None)
+
         op_type = LocalType.RESV
-        if self_principal and target_principal:
+        if conv_msg_type and self_principal and target_principal:
         #if self_principal:
         #    target_principal = self._get_sender(invocation)
         #    target_principal_queue = self._get_sender_queue(invocation)
@@ -173,8 +173,10 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
     #TODO -change this to properly annotate message
     def _report_error(self, invocation, dispatcher_status, error):
         cur_label = invocation.get_header_value('op', None)
-        if not cur_label: cur_label = invocation.message
-        err_msg = 'Conversation interceptor error for message %s: %s' %(cur_label, error)
+        if not cur_label: invocation.get_header_value('conv-id', 'Unknown')
+        msg_from = self._get_sender(invocation)
+
+        err_msg = 'Conversation interceptor error for message %s from %s: %s' %(cur_label, msg_from, error)
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = dispatcher_status
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION] = err_msg
         log.debug("ConversationMonitorInterceptor error: %s", err_msg)

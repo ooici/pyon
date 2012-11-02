@@ -308,9 +308,10 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
     def _get_response(self, conv_id, timeout):
         result_data, result_headers = ProcessRPCRequestEndpointUnit._get_response(self, conv_id, timeout)
 
-        c = self.participant.get_conversation_endpoint(conv_id)
-        if c:
-            c._msg_received( result_data, result_headers)
+        if 'conv-msg-type' in result_headers:
+            c = self.participant.get_conversation_endpoint(conv_id)
+            if c:
+                c._msg_received( result_data, result_headers)
 
         return result_data, result_headers
 
