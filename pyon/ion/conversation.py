@@ -90,7 +90,7 @@ class ConversationEndpoint(object):
         self._next_control_msg_type = 0
 
     def get_conversation_id(self):
-        if self._conversation:
+        if hasattr(self, '_conversation') and self._conversation:
             return self._conversation.id
         return None
 
@@ -100,7 +100,9 @@ class ConversationEndpoint(object):
         self._is_originator = is_originator
 
     def accept(self, invite_msg, invite_headers, c, auto_reply = False):
-        self.join(invite_headers['receiver-role'], c)
+        if invite_headers.has_key('receiver-role'):
+            self.join(invite_headers['receiver-role'], c)
+
         self._msg_received(invite_msg, invite_headers)
         if not auto_reply:
             self.send_ack(self.inviter_role, 'I am joining')
@@ -155,6 +157,9 @@ class ConversationEndpoint(object):
         log.debug("In _send_in_session_msg: %s", msg)
         headers = headers if headers else {}
         log.debug("In _send for msg: %s", msg)
+        if not headers.has_key('conv-msg-type'):
+            return self._end_point_unit._message_send(msg, headers)
+
         to_role_name = self._conversation[to_role]
         headers['conv-msg-type']  = MSG_TYPE.TRANSMIT
         if self._next_control_msg_type == MSG_TYPE.ACCEPT:
@@ -170,9 +175,9 @@ class ConversationEndpoint(object):
         return headers
 
     def _send(self, to_role, to_role_name, msg, headers = None):
-        header = headers if headers else {}
-        header = self._build_conv_header(headers, to_role)
-        return self._end_point_unit._message_send(msg, header)
+        headers = headers if headers else {}
+        headers = self._build_conv_header(headers, to_role)
+        return self._end_point_unit._message_send(msg, headers)
 
 
     def _msg_received(self, msg, headers):
@@ -228,8 +233,9 @@ class Participant(object):
         self._conversation_end_points[c.id] = conv_endpoint
         return conv_endpoint
 
-    def end_conversation_endpoint(self, conversation):
-        del self._conversation_end_points[conversation.get_conversation_id()]
+    def end_conversation_endpoint(self, conversation_endpoint):
+        if conversation_endpoint.get_conversation_id() is not None:
+            del self._conversation_end_points[conversation_endpoint.get_conversation_id()]
         return
 
     def get_conversation_endpoint(self, id):
@@ -357,9 +363,11 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
     def message_received(self, msg, headers):
 
-        self.participant.receive_invitation(msg, headers)
-        #TODO = reject an invitation is not supported yet
-        self.participant.accept_next_invitation(self, merge_with_first_send = True)
+        #Try to be backward compatiable with non conversation endpoints
+        if 'conv-msg-type' in headers:
+            self.participant.receive_invitation(msg, headers)
+            #TODO = reject an invitation is not supported yet
+            self.participant.accept_next_invitation(self, merge_with_first_send = True)
 
         result, response_headers = ProcessRPCResponseEndpointUnit.message_received(self, msg, headers)
 
@@ -367,10 +375,16 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
     def send(self, msg, headers=None, **kwargs):
 
+        #Try to be backward compatiable with non conversation endpoints
+        if not 'conv-msg-type' in headers:
+            ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
+
         c = self.participant.get_conversation_endpoint(headers['conv-id'])
         if c:
             c.send(self.conv_type.client_role, msg, headers)
             self.participant.end_conversation_endpoint(c)
+        else:
+            ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
 
     def _message_send(self, msg, headers=None, **kwargs):
         return ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)

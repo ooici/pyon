@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 
 import os
 from pyon.core.governance.governance_interceptor import BaseInternalGovernanceInterceptor
+from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.ion.conversation import MSG_TYPE, MSG_TYPE_MASKS
 from parsing.base_parser import ANTLRScribbleParser
@@ -54,7 +55,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         #    target_principal = self._get_receiver(invocation)
         #    op_type = LocalType.SEND;
             self._check(invocation, op_type, self_principal, target_principal)
-        else: self._report_error(invocation, 'Message cannot be checked. There is no associated process')
+        else: self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the conversation roles are not in the headers')
         return invocation
 
     def incoming(self, invocation):
@@ -81,7 +82,9 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         #    else: self._check(invocation, op_type, self_principal, target_principal, target_principal_queue)
 
             self._check(invocation, op_type, self_principal, target_principal)
-        else: self._report_error(invocation, 'Message cannot be checked. There is no associated process')
+            invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
+        else:
+            self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the conversation roles are not in the headers')
 
         return invocation
 
@@ -111,7 +114,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
             role_spec = self._get_protocol_spec(self_principal, operation)
             if not role_spec:
-                self._report_error(invocation, 'No specification given. Message cannot be monitored: %s')
+                self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the protocol specification was not found: %s')
             else:
                 conversation_context = self._initialize_conversation_context(cid, role_spec,
                                                                         [self_principal, target_principal],
@@ -134,7 +137,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
                 transition = TransitionFactory.create(op_type, 'accept', target_role)
                 (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
                 if not msg_correct:
-                    self._report_error(invocation, error)
+                    self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
                     return
 
             transition = TransitionFactory.create(op_type, operation, target_role)
@@ -142,7 +145,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         #Check the message by running the fsm.
             (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
             if not msg_correct:
-                self._report_error(invocation, error)
+                self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
 
             # Stop monitoring if msg is wrong or this is the response of the request that had started the conversation
             if (not msg_correct) or ((conv_seq != 1) and (conversation_context.get_conversation_id() == cid)):
@@ -168,12 +171,17 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             """, invocation.headers, status, details)
 
     #TODO -change this to properly annotate message
-    def _report_error(self, invocation, error):
+    def _report_error(self, invocation, dispatcher_status, error):
         cur_label = invocation.get_header_value('op', None)
         if not cur_label: cur_label = invocation.message
-        msg = 'Conversation error for message %s \n  Error: %s' %(cur_label, error)
-        invocation.message_annotations.setdefault(msg)
-        #log.debug("ConversationMonitorInterceptor error: %s", msg)
+        err_msg = 'Conversation interceptor error for message %s: %s' %(cur_label, error)
+        invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = dispatcher_status
+        invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION] = err_msg
+        log.debug("ConversationMonitorInterceptor error: %s", err_msg)
+
+
+        #TODO - maybe raise exception for dispatcher_status of REJECT here??
+
 
     def _get_conversation_context_key(self, principal, invocation):
         #initiating_conv_id = invocation.get_header_value('initiating-conv-id', None)
