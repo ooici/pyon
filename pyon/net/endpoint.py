@@ -143,15 +143,25 @@ class EndpointUnit(object):
         @returns    A 2-tuple of the message body sent and the message headers sent. These are
                     post-interceptor. Derivations will likely override the return value.
         """
-        # interceptor point
+        new_msg, new_headers = self.intercept_out(msg, headers)
+        self.channel.send(new_msg, new_headers)
+
+        return new_msg, new_headers
+
+    def intercept_out(self, msg, headers):
+        """
+        Builds an invocation and runs interceptors on it, direction: out.
+
+        This is called manually by the endpoint layer at sending points.
+
+        @returns    A 2-tuple of message, headers after going through the interceptors.
+        """
         inv = self._build_invocation(path=Invocation.PATH_OUT,
-                                     message=msg,
-                                     headers=headers)
+            message=msg,
+            headers=headers)
         inv_prime = self._intercept_msg_out(inv)
         new_msg = inv_prime.message
         new_headers = inv_prime.headers
-
-        self.channel.send(new_msg, new_headers)
 
         return new_msg, new_headers
 
@@ -826,7 +836,8 @@ class ResponseEndpointUnit(BidirectionalListeningEndpointUnit):
         """
         headers = BidirectionalListeningEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['performative'] = 'inform-result'                       # overriden by response pattern, feels wrong
-        if self.channel and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
+        #TODO - figure out why _send_name would not be there
+        if self.channel and hasattr(self.channel, '_send_name') and self.channel._send_name and isinstance(self.channel._send_name, NameTrio):
             headers['receiver'] = "%s,%s" % (self.channel._send_name.exchange, self.channel._send_name.queue)       # @TODO: correct?
         headers['language']     = 'ion-r2'
         headers['encoding']     = 'msgpack'
@@ -849,6 +860,8 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
 
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
+
+        log_message("MESSAGE RECV >>> RPC-reply", res, res_headers, is_send=False)
 
         # Check response header
         if res_headers["status_code"] != 200:
@@ -902,12 +915,14 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         """
         headers = RequestEndpointUnit._build_header(self, raw_msg, raw_headers)
         headers['protocol'] = 'rpc'
-        headers['conv-seq'] = 1     # @TODO will not work well with agree/status etc
-        headers['conv-id']  = self._build_conv_id()
         headers['language'] = 'ion-r2'
         headers['encoding'] = 'msgpack'
         headers['format']   = raw_msg.__class__.__name__
         headers['reply-by'] = 'todo'                        # set by _send override @TODO should be set here
+
+        #Use the headers for conv-id and conv-seq if passed in from higher level API
+        headers['conv-id'] = raw_headers['conv-id'] if raw_headers and 'conv-id' in raw_headers else self._build_conv_id()
+        headers['conv-seq'] = raw_headers['conv-seq'] if raw_headers and 'conv-seq' in raw_headers else 1 #@TODO will not work well with agree/status etc
 
         return headers
 
