@@ -207,7 +207,7 @@ class ResourceRegistry(object):
                                      sub_type=target_lcstate,
                                      old_state=old_state, new_state=target_lcstate)
 
-    def create_attachment(self, resource_id='', attachment=None):
+    def create_attachment(self, resource_id='', attachment=None, actor_id=None):
         if attachment is None:
             raise BadRequest("Object not present")
         if not isinstance(attachment, Attachment):
@@ -231,7 +231,7 @@ class ResourceRegistry(object):
         else:
             raise BadRequest("Unknown attachment-type: %s" % attachment.attachment_type)
 
-        att_id, _ = self.create(attachment)
+        att_id, _ = self.create(attachment, actor_id=actor_id)
 
         if resource_id:
             self.rr_store.create_association(resource_id, PRED.hasAttachment, att_id)
