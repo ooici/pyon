@@ -164,7 +164,8 @@ class NodeB(BaseNode):
         Explicitly deletes pooled queues in this Node.
         """
         for chan in self._bidir_pool.itervalues():
-            chan._destroy_queue()
+            if chan._recv_name:
+                chan._destroy_queue()
 
     def _new_transport(self, ch_number=None):
         """

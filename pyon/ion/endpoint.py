@@ -67,7 +67,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         if hasattr(self._process, 'process_type'):
             header.update({'sender-type': self._process.process_type or 'unknown-process-type'})
-            if self._process.process_type == 'service':
+            if self._process.process_type == 'service' and hasattr(self.channel, '_send_name'):
                 header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
 
         context = self._process.get_context()

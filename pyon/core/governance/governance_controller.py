@@ -178,15 +178,20 @@ class GovernanceController(object):
             log.error(e)
             return role_header
 
+    #Use this to build the message header used by governance to identify the actor and roles.
+    def build_actor_header(self, actor_id=DEFAULT_ACTOR_ID, actor_roles=None):
+        actor_roles = actor_roles or {}
+        return {'ion-actor-id': actor_id, 'ion-actor-roles': actor_roles }
+
     #Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
     def get_actor_header(self, actor_id):
 
-        actor_header = {'ion-actor-id': DEFAULT_ACTOR_ID, 'ion-actor-roles': {} }
+        actor_header = self.build_actor_header(DEFAULT_ACTOR_ID, {})
 
         if actor_id:
             try:
                 header_roles = self.get_role_message_headers(self.org_client.find_all_roles_by_user(actor_id))
-                actor_header = {'ion-actor-id': actor_id, 'ion-actor-roles': header_roles }
+                actor_header = self.build_actor_header(actor_id, header_roles)
             except Exception, e:
                 log.error(e)
 
