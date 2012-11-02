@@ -1,0 +1,11 @@
+global protocol RPC (role provider, role requester)
+{
+   request from requester to provider;
+   choice at provider {
+       accept from provider to requester;
+           choice at provider {
+               (inform) from provider to requester;
+           } or {
+               (failure) from provider to requester;}
+   } or {
+       reject from provider to requester;}}
