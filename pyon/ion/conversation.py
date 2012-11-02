@@ -157,9 +157,6 @@ class ConversationEndpoint(object):
         log.debug("In _send_in_session_msg: %s", msg)
         headers = headers if headers else {}
         log.debug("In _send for msg: %s", msg)
-        if not headers.has_key('conv-msg-type'):
-            return self._end_point_unit._message_send(msg, headers)
-
         to_role_name = self._conversation[to_role]
         headers['conv-msg-type']  = MSG_TYPE.TRANSMIT
         if self._next_control_msg_type == MSG_TYPE.ACCEPT:
@@ -339,7 +336,12 @@ class ConversationRPCClient(ProcessRPCClient):
     def __init__(self, **kwargs):
         ProcessRPCClient.__init__(self, **kwargs)
         self._conv_type = RPCConversationType()
-        self._participant = Participant(self._process.name)
+
+        if hasattr(self._process, 'name'):
+            self._participant = Participant(self._process.name)
+        else:
+            self._participant = Participant(self._send_name)
+
 
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
@@ -376,15 +378,12 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
     def send(self, msg, headers=None, **kwargs):
 
-        #Try to be backward compatiable with non conversation endpoints
-        if not 'conv-msg-type' in headers:
-            ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
-
         c = self.participant.get_conversation_endpoint(headers['conv-id'])
         if c:
             c.send(self.conv_type.client_role, msg, headers)
             self.participant.end_conversation_endpoint(c)
         else:
+            #Try to be backward compatiable with non conversation endpoints
             ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
 
     def _message_send(self, msg, headers=None, **kwargs):
@@ -397,7 +396,10 @@ class ConversationRPCServer(ProcessRPCServer):
     def __init__(self, **kwargs):
         ProcessRPCServer.__init__(self, **kwargs)
         self._conv_type = RPCConversationType()
-        self._participant = Participant(self._process.name)
+        if hasattr(self._process, 'name'):
+            self._participant = Participant(self._process.name)
+        else:
+            self._participant = Participant(self._recv_name)
 
 
     def create_endpoint(self, **kwargs):
