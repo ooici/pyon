@@ -508,7 +508,7 @@ class CouchDB_DataStore(DataStore):
 
         return False
 
-    def find_associations_mult(self, subjects, id_only=False):
+    def find_objects_mult(self, subjects, id_only=False):
         """
         Returns a list of associations for a given list of subjects
         """
@@ -523,6 +523,23 @@ class CouchDB_DataStore(DataStore):
             return ids, assocs
         else:
             return self.read_mult(ids), assocs
+
+    def find_subjects_mult(self, objects, id_only=False):
+        """
+        Returns a list of associations for a given list of objects
+        """
+        ds, datastore_name = self._get_datastore()
+        validate_is_instance(objects, list, 'objects is not a list of resource_ids')
+        view_args = dict(keys=objects, include_docs=True)
+        results = self.query_view(self._get_viewname("association", "by_subject_bulk"), view_args)
+        ids = [i['value'] for i in results]
+        assocs = [i['doc'] for i in results]
+        self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
+        if id_only:
+            return ids, assocs
+        else:
+            return self.read_mult(ids), assocs
+
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
