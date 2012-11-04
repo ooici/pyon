@@ -116,18 +116,18 @@ class ConversationEndpoint(object):
             headers['conv-msg-type'] =  MSG_TYPE.INVITE
             self._send(to_role, to_role_name, "", headers)
 
-    def send(self, to_role, msg, headers = None):
+    def send(self, to_role, msg, headers = None, **kwargs):
         header = headers if headers else {}
         if self._is_originator and not self._conversation.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
-                return self._send_in_session_msg(to_role, msg, headers)
+                return self._send_in_session_msg(to_role, msg, headers, **kwargs)
             else:
-                return self._invite_and_send(to_role, msg, headers)
+                return self._invite_and_send(to_role, msg, headers, **kwargs)
         else:
-            return self._send_in_session_msg(to_role, msg, headers)
+            return self._send_in_session_msg(to_role, msg, headers, **kwargs)
 
-    def _invite_and_send(self, to_role, msg, headers = None, to_role_name = None):
+    def _invite_and_send(self, to_role, msg, headers = None, to_role_name = None, **kwargs):
         log.debug("In _invite_and_send for msg: %s", msg)
         header = headers if headers else {}
         if to_role_name:
@@ -139,14 +139,13 @@ class ConversationEndpoint(object):
             log.debug(msg)
             raise ConversationError(msg)
 
-
         header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_name, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_name, True)
-        return self._send(to_role, to_role_name, msg, header)
+        return self._send(to_role, to_role_name, msg, header, **kwargs)
 
 
-    def _send_in_session_msg(self, to_role, msg, headers = None):
+    def _send_in_session_msg(self, to_role, msg, headers = None, **kwargs):
         log.debug("In _send_in_session_msg: %s", msg)
         headers = headers if headers else {}
         log.debug("In _send for msg: %s", msg)
@@ -155,7 +154,7 @@ class ConversationEndpoint(object):
         if self._next_control_msg_type == MSG_TYPE.ACCEPT:
             headers['conv-msg-type']  = headers.get('conv-msg-type', 0) | MSG_TYPE.ACCEPT
             self._next_control_msg_type = 0
-        return self._send(to_role, to_role_name, msg, headers)
+        return self._send(to_role, to_role_name, msg, headers, **kwargs)
 
     def _build_conv_header(self, headers, to_role):
         headers['sender-role'] = self._self_role
@@ -164,10 +163,10 @@ class ConversationEndpoint(object):
         headers['conv-id'] = self._conversation.id
         return headers
 
-    def _send(self, to_role, to_role_name, msg, headers = None):
+    def _send(self, to_role, to_role_name, msg, headers = None, **kwargs):
         headers = headers if headers else {}
         headers = self._build_conv_header(headers, to_role)
-        return self._end_point_unit._message_send(msg, headers)
+        return self._end_point_unit._message_send(msg, headers, **kwargs)
 
 
     def _msg_received(self, msg, headers):
@@ -308,7 +307,7 @@ class RPCRequesterEndpointUnit(ProcessRPCRequestEndpointUnit):
         c = self.participant.start_conversation_endpoint(self.conv_type.protocol, self.conv_type.client_role, self, convo_id)
 
         c.invite(self.conv_type.server_role, self._endpoint._send_name, merge_with_first_send = True)
-        result_data, result_headers = c.send(self.conv_type.server_role, msg, headers)
+        result_data, result_headers = c.send(self.conv_type.server_role, msg, headers, **kwargs)
 
         c = self.participant.get_conversation_endpoint(convo_id)
         if c:
@@ -377,7 +376,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
             ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
 
     def _message_send(self, msg, headers=None, **kwargs):
-        return ProcessRPCResponseEndpointUnit.send(self, msg, headers,  **kwargs)
+        return ProcessRPCResponseEndpointUnit.send(self, msg, headers, **kwargs)
 
 
 class ConversationRPCServer(ProcessRPCServer):
