@@ -369,7 +369,7 @@ class RPCProviderEndpointUnit(ProcessRPCResponseEndpointUnit):
 
         c = self.participant.get_conversation_endpoint(headers['conv-id'])
         if c:
-            c.send(self.conv_type.client_role, msg, headers)
+            c.send(self.conv_type.client_role, msg, headers, **kwargs)
             self.participant.end_conversation_endpoint(c)
         else:
             #Try to be backward compatiable with non conversation endpoints
