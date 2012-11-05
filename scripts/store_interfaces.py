@@ -79,6 +79,11 @@ def main():
         config.apply_configuration(bootstrap_config, config_override)
     config.apply_configuration(bootstrap_config, command_line_config)
 
+    # Override sysname from config file or command line
+    if not options.sysname and bootstrap_config.get_safe("system.name", None):
+        new_sysname = bootstrap_config.get_safe("system.name")
+        bootstrap.set_sys_name(new_sysname)
+
     # Delete sysname datastores if option "force_clean" is set
     if options.force_clean:
         from pyon.datastore import clear_couch_util
