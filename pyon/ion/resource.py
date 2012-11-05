@@ -317,7 +317,7 @@ class ExtendedResourceContainer(object):
 
 
 
-    def create_extended_resource_container_list(self, extended_resource_type, resource_id_list, computed_resource_type=None,
+    def create_extended_resource_container_list(self, extended_resource_type, resource_id_list, computed_resource_type=None, origin_resource_type=None,
                                                 ext_associations=None, ext_exclude=None):
 
         if not isinstance(resource_id_list, types.ListType):
@@ -325,14 +325,14 @@ class ExtendedResourceContainer(object):
 
         ret = list()
         for res_id in resource_id_list:
-            ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type,
+            ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type, origin_resource_type,
                                                                 ext_associations, ext_exclude )
             ret.append(ext_res)
 
         return ret
 
 
-    def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None, focus_resource_type=None,
+    def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None, origin_resource_type=None,
                                            ext_associations=None, ext_exclude=None):
 
         if not isinstance(resource_id, types.StringType):
@@ -348,8 +348,8 @@ class ExtendedResourceContainer(object):
             raise BadRequest('Requested resource %s is not extended from %s' % (computed_resource_type, OT.ComputedAttributes))
 
         resource_object = self.resource_registry.read(resource_id)
-        if focus_resource_type and resource_object.type_ != focus_resource_type:
-            raise NotFound("Resource %s is not of type %s" % (resource_id, focus_resource_type))
+        if origin_resource_type and resource_object.type_ != origin_resource_type:
+            raise NotFound("Resource %s is not of type %s" % (resource_id, origin_resource_type))
         if not resource_object:
             raise NotFound("Resource %s does not exist" % resource_id)
 
