@@ -135,7 +135,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
             if (control_conv_msg_type == MSG_TYPE.ACCEPT):
                 transition = TransitionFactory.create(op_type, 'accept', target_role)
-                (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
+                (msg_correct, error, should_pop)= self._is_msg_correct(invocation, fsm, transition)
                 if not msg_correct:
                     self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
                     return
@@ -143,12 +143,12 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             transition = TransitionFactory.create(op_type, operation, target_role)
 
         #Check the message by running the fsm.
-            (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
+            (msg_correct, error, should_pop)= self._is_msg_correct(invocation, fsm, transition)
             if not msg_correct:
                 self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
 
             # Stop monitoring if msg is wrong or this is the response of the request that had started the conversation
-            if (not msg_correct) or ((conv_seq != 1) and (conversation_context.get_conversation_id() == cid)):
+            if (should_pop) and (conversation_context.get_conversation_id() == cid):
                 self.conversation_context.pop(conversation_key)
 
     def _is_msg_correct(self, invocation, fsm, transition):
@@ -156,12 +156,16 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         try:
             fsm.process(transition)
             status = 'CORRECT'
-            return (True, None)
+            if fsm.test_for_end_state(fsm.current_state):
+                return (True, None, True)
+            else:
+                return (True, None, False)
         except ExceptionFSM as e:
             status = 'WRONG'
             details = e.value
-            return (False, e.value)
+            return (False, e.value, True)
         finally:
+            print status
             log.debug("""\n
         ----------------Checking message:-----------------------------------------------
         Message is: =%s  \n
