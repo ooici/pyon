@@ -78,9 +78,9 @@ class CouchDB_DataStore(DataStore):
         self.profile = profile
 
         # serializers
-        self._io_serializer    = IonObjectSerializer()
+        self._io_serializer = IonObjectSerializer()
         # TODO: Not nice to have this class depend on ION objects
-        self._io_deserializer  = IonObjectDeserializer(obj_registry=get_obj_registry())
+        self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
     def close(self):
@@ -159,13 +159,24 @@ class CouchDB_DataStore(DataStore):
         log.debug('Object versions: %s', str(res))
         return res
 
-    def create(self, obj, object_id=None, datastore_name=""):
+    def create(self, obj, object_id=None, attachments=None, datastore_name=""):
+        """
+        Converts ion objects to python dictionary before persisting them using the optional
+        suggested identifier and creates attachments to the object.
+        Returns an identifier and revision number of the object
+        """
         if not isinstance(obj, IonObjectBase):
             raise BadRequest("Obj param is not instance of IonObjectBase")
-        return self.create_doc(self._ion_object_to_persistence_dict(obj),
-                               object_id=object_id, datastore_name=datastore_name)
 
-    def create_doc(self, doc, object_id=None, datastore_name=""):
+        return self.create_doc(self._ion_object_to_persistence_dict(obj),
+                               object_id=object_id, datastore_name=datastore_name,
+                               attachments=attachments)
+
+    def create_doc(self, doc, object_id=None, attachments=None, datastore_name=""):
+        """
+        Persists the document using the optionally suggested doc_id, and creates attachments to it.
+        Returns the identifier and version number of the document
+        """
         ds, datastore_name = self._get_datastore(datastore_name)
         if '_id' in doc:
             raise BadRequest("Doc must not have '_id'")
@@ -177,7 +188,13 @@ class CouchDB_DataStore(DataStore):
         log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
         log.debug('create doc contents: %s', doc)
 
-        # Save doc.  CouchDB will assign version to doc.
+        # Add the attachments if indicated
+        if attachments is not None:
+            pass   # Does not work with binary attachments
+#            if isinstance(attachments, dict):
+#                doc['_attachments'] = attachments
+#            else:
+#                raise BadRequest('Improper attachment given')
         try:
             res = ds.save(doc)
             self._count(create=1)
@@ -185,6 +202,12 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
         id, version = res
+        if attachments is not None:
+            # Need to iterate through attachments because couchdb_python does not support binary
+            # content in db.save()
+            for att_name, att_value in attachments.iteritems():
+                self.create_attachment(id, att_name, att_value['data'],
+                    content_type=att_value.get('content_type', ''), datastore_name=datastore_name)
         return (id, version)
 
     def create_mult(self, objects, object_ids=None, allow_ids=False):
@@ -217,10 +240,26 @@ class CouchDB_DataStore(DataStore):
         self._count(create_mult_call=1, create_mult_obj=len(docs))
         if not all([success for success, oid, rev in res]):
             errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
-            log.error('create_doc_mult had errors. Successful: %s, Errors: %s' % (len(res) - len(errors), "\n".join(errors)))
+            log.error('create_doc_mult had errors. Successful: %s, Errors: %s'
+                      % (len(res) - len(errors), "\n".join(errors)))
         else:
             log.debug('create_doc_mult result: %s', str(res))
         return res
+
+    def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
+        """
+        Assumes that the document already exists and creates attachment to it.
+        @param doc can be either id or a document
+        """
+        if not isinstance(attachment_name, str):
+            raise BadRequest("attachment name is not string")
+        if not isinstance(data, str) and not isinstance(data, file):
+            raise BadRequest("data to create attachment is not a str or file")
+        if isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc)
+        ds, _ = self._get_datastore(datastore_name)
+        ds.put_attachment(doc=doc, content=data, filename=attachment_name, content_type=content_type)
+        self._count(create_attachment=1)
 
     def read(self, object_id, rev_id="", datastore_name=""):
         if not isinstance(object_id, str):
@@ -261,13 +300,52 @@ class CouchDB_DataStore(DataStore):
         log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
         docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
         # Check for docs not found
-        notfound_list = ['Object with id %s does not exist.' % str(row.key) for row in docs if row.doc is None]
+        notfound_list = ['Object with id %s does not exist.' % str(row.key)
+                         for row in docs if row.doc is None]
         if notfound_list:
             raise NotFound("\n".join(notfound_list))
 
         doc_list = [row.doc.copy() for row in docs]
         self._count(read_mult_call=1, read_mult_obj=len(doc_list))
         return doc_list
+
+    def read_attachment(self, doc, attachment_name, datastore_name=""):
+        if not isinstance(attachment_name, str):
+            raise BadRequest("Attachment_name param is not str")
+
+        ds, datastore_name = self._get_datastore(datastore_name)
+
+        log.debug('Fetching attachment %s of document %s/%s', attachment_name, datastore_name, doc)
+        attachment = ds.get_attachment(doc, attachment_name)
+
+        if attachment is None:
+            raise NotFound('Attachment %s does not exist in document %s.%s.',
+                attachment_name, datastore_name, doc)
+        else:
+            log.debug('Reading attachment content: %s', attachment)
+            attachment = attachment.read()
+
+        if not isinstance(attachment, str):
+            raise NotFound('Attachment read is not a string')
+
+        log.debug('Read content of attachment: %s of document %s/%s', attachment_name, datastore_name, doc)
+
+        self._count(read_attachment=1)
+        return attachment
+
+    def list_attachments(self, doc):
+        """
+        Returns the a list of attachments for the document, as a dict of dicts, key'ed by name with
+        nested keys 'data' for the content and 'content-type'.
+        @param doc  accepts either str (meaning an id) or dict (meaning a full document).
+        """
+        if isinstance(doc, dict) and '_attachments' not in doc:
+            # Need to reread again, because it did not contain the _attachments
+            doc = self.read_doc(doc_id=doc["_id"])
+        elif isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc)
+
+        return doc.get("_attachments", None)
 
     def update(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase):
@@ -290,6 +368,14 @@ class CouchDB_DataStore(DataStore):
         log.debug('Update result: %s', str(res))
         id, version = res
         return (id, version)
+
+    def update_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
+        log.debug("updating attachment %s", attachment_name)
+        self.create_attachment(doc=doc, attachment_name=attachment_name, data=data,
+            content_type=content_type,
+            datastore_name=datastore_name)
+        log.debug("updated attachment %s", attachment_name)
+        self._count(update_attachment=1)
 
     def delete(self, obj, datastore_name="", del_associations=False):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
@@ -342,6 +428,23 @@ class CouchDB_DataStore(DataStore):
             obj['_deleted'] = True
         self.create_doc_mult(obj_list, allow_ids=True)
         self._count(delete_mult_call=1, delete_mult_obj=len(obj_list))
+
+    def delete_attachment(self, doc, attachment_name, datastore_name=""):
+        """
+        Deletes an attachment from a document.
+        """
+        if not isinstance(attachment_name, str):
+            raise BadRequest("attachment_name is not a string")
+
+        if isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc)
+
+        ds, datastore_name = self._get_datastore(datastore_name)
+
+        log.debug('Deleting attachment of document %s/%s', datastore_name, doc["_id"])
+        ds.delete_attachment(doc, attachment_name)
+        log.debug('Deleted attachment: %s', attachment_name)
+        self._count(delete_attachment=1)
 
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type='H2H'):
         """
