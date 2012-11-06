@@ -7,7 +7,7 @@ __license__ = 'Apache 2.0'
 
 
 from pyon.util.log import log
-from pyon.core.exception import Unauthorized
+from pyon.core.exception import Unauthorized, Inconsistent
 
 
 class GovernanceDispatcher(object):
@@ -45,13 +45,14 @@ class GovernanceDispatcher(object):
         op = invocation.get_header_value('op', 'Unknown')
         actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
 
-        #Raise Unauthorized message
+        #Raise Inconsistent message if conversation interceptor found a problem
+        #TODO - May just want to drop this message instead of returning in case of DOS attack
         if invocation.message_annotations.has_key(GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION) and\
            invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT:
             if invocation.message_annotations.has_key(GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION):
-                raise Unauthorized("The request from user %s for operation %s(%s) is denied for unknown error: %s" % (actor_id,receiver, op, invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION]) )
+                raise Inconsistent("The message from user %s for operation %s(%s) has an error: %s" % (actor_id,receiver, op, invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION]) )
             else:
-                raise Unauthorized("The request from user %s for operation %s(%s) is denied for unknown error" % (actor_id,receiver, op))
+                raise Inconsistent("The message from user %s for operation %s(%s) is inconsistent with the specified protocol" % (actor_id,receiver, op))
 
         #Raise Unauthorized exception if policy denies access.
         if invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_ANNOTATION) and \
