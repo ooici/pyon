@@ -6,6 +6,7 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 import types
+import time
 from pyon.core.registry import getextends, issubtype
 from pyon.core.bootstrap import IonObject, get_service_registry
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
@@ -393,6 +394,8 @@ class ExtendedResourceContainer(object):
             #Iterate over all of the decorators for the field
             for decorator in obj._schema[field]['decorators']:
 
+                start_time = time.time()
+
                 #Handle any fields that are declared to get their values from local methods
                 if decorator == 'Method':
                     deco_value = obj.get_decorator_value(field, decorator)
@@ -415,6 +418,10 @@ class ExtendedResourceContainer(object):
                     deco_value = obj.get_decorator_value(field, decorator)
                     assoc = self.find_associations(resource, decorator, deco_value)
                     self.set_field_associations(obj, field, assoc)
+
+                stop_time = time.time()
+
+                log.debug("Time to process field %s(%s) %f secs", field, decorator, stop_time - start_time )
 
     #Helper function for walking a chain of predicates
     def walk_associations(self, object, predicates, deco_value=None, index=0):
