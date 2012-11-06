@@ -287,7 +287,6 @@ class IonObjectBase(object):
 class IonMessageObjectBase(IonObjectBase):
     pass
 
-
 def walk(o, cb):
     """
     Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
@@ -407,7 +406,11 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
             ion_obj = self._obj_registry.new(type)
             for k, v in objc.iteritems():
-                if k != "type_":
+
+                # CouchDB adds _attachments and puts metadata in it
+                # in pyon metadata is in the document
+                # so we discard _attachments while transforming between the two
+                if k != "type_" and k != "_attachments":
                     setattr(ion_obj, k, v)
 
             return ion_obj
