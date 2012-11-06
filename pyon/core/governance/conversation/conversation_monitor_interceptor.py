@@ -27,6 +27,8 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         self._initialize_conversation_for_monitoring()
         #map principal to conversation_context
         self.conversation_context = {}
+        self.parsed_conversation_protocols = {}
+        self.parser = ANTLRScribbleParser()
 
     def _initialize_conversation_for_monitoring(self):
         #self.conversations_for_monitoring = {'bank':{'buy_bonds':'bank/local/BuyBonds_Bank.srt',
@@ -46,6 +48,8 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         else:
             log.debug("ConversationMonitorInterceptor.outgoing: %s" % invocation)
 
+        invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
+
         conv_msg_type = invocation.headers.get('conv-msg-type', None)
         self_principal = invocation.headers.get('sender-role', None) #TODO - should these be set to default values?
         target_principal = invocation.headers.get('receiver-role', None)
@@ -55,7 +59,10 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         #    target_principal = self._get_receiver(invocation)
         #    op_type = LocalType.SEND;
             self._check(invocation, op_type, self_principal, target_principal)
-        else: self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the conversation roles are not in the headers')
+            if invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_STARTED:
+                invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
+        else:
+            self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the conversation roles are not in the headers')
         return invocation
 
     def incoming(self, invocation):
@@ -64,6 +71,8 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             log.debug("ConversationMonitorInterceptor.incoming: %s" % invocation.get_arg_value('process',invocation).name)
         else:
             log.debug("ConversationMonitorInterceptor.incoming: %s" % invocation)
+
+        invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
         conv_msg_type = invocation.headers.get('conv-msg-type', None)
         self_principal = invocation.headers.get('receiver-role', None)
@@ -82,19 +91,32 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         #    else: self._check(invocation, op_type, self_principal, target_principal, target_principal_queue)
 
             self._check(invocation, op_type, self_principal, target_principal)
-            invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
+
+            if invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_STARTED:
+                invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
         else:
             self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the conversation roles are not in the headers')
 
         return invocation
-
-    def _initialize_conversation_context(self, cid, role_spec, principals, op):
-        #try:
+    '''
+    def _initialize_conversation_context(self, cid, role_spec, self_principal, target_principal, op):
         parser = ANTLRScribbleParser()
         res = parser.parse(os.path.join(self.spec_path,role_spec))
         builder = parser.walk(res)
         mapping = ConversationProvider.get_protocol_mapping(op)
-        return ConversationContext(builder, cid, principals, mapping)
+        return ConversationContext(builder, cid, [self_principal, target_principal], mapping)
+    '''
+
+    def _initialize_conversation_context(self, cid, role_spec, self_principal, target_principal, op):
+
+        #Cache the parsing of static protocol specifications
+        if not self.parsed_conversation_protocols.has_key(self_principal):
+            self.parsed_conversation_protocols[self_principal] = self.parser.parse(os.path.join(self.spec_path,role_spec))
+
+        builder = self.parser.walk(self.parsed_conversation_protocols[self_principal])
+        mapping = ConversationProvider.get_protocol_mapping(op)
+        return ConversationContext(builder, cid, [self_principal, target_principal], mapping)
+
 
     def _get_control_conv_msg(self, invocation):
             return invocation.get_header_value('conv-msg-type') & MSG_TYPE_MASKS.CONTROL
@@ -117,7 +139,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
                 self._report_error(invocation, GovernanceDispatcher.STATUS_SKIPPED, 'The message cannot be monitored since the protocol specification was not found: %s')
             else:
                 conversation_context = self._initialize_conversation_context(cid, role_spec,
-                                                                        [self_principal, target_principal],
+                                                                        self_principal, target_principal,
                                                                         operation)
                 if conversation_context: self.conversation_context[conversation_key] = conversation_context
 
@@ -135,7 +157,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
             if (control_conv_msg_type == MSG_TYPE.ACCEPT):
                 transition = TransitionFactory.create(op_type, 'accept', target_role)
-                (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
+                (msg_correct, error, should_pop)= self._is_msg_correct(invocation, fsm, transition)
                 if not msg_correct:
                     self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
                     return
@@ -143,24 +165,28 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
             transition = TransitionFactory.create(op_type, operation, target_role)
 
         #Check the message by running the fsm.
-            (msg_correct, error)= self._is_msg_correct(invocation, fsm, transition)
+            (msg_correct, error, should_pop)= self._is_msg_correct(invocation, fsm, transition)
             if not msg_correct:
                 self._report_error(invocation, GovernanceDispatcher.STATUS_REJECT, error)
 
             # Stop monitoring if msg is wrong or this is the response of the request that had started the conversation
-            if (not msg_correct) or ((conv_seq != 1) and (conversation_context.get_conversation_id() == cid)):
+            if (should_pop) and (conversation_context.get_conversation_id() == cid):
                 self.conversation_context.pop(conversation_key)
 
     def _is_msg_correct(self, invocation, fsm, transition):
         details = ''
+        status = ''
         try:
             fsm.process(transition)
             status = 'CORRECT'
-            return (True, None)
+            if fsm.test_for_end_state(fsm.current_state):
+                return (True, None, True)
+            else:
+                return (True, None, False)
         except ExceptionFSM as e:
             status = 'WRONG'
             details = e.value
-            return (False, e.value)
+            return (False, e.value, True)
         finally:
             log.debug("""\n
         ----------------Checking message:-----------------------------------------------

@@ -15,7 +15,7 @@ class FakeProcess(LocalContextMixin):
 
 class HelloClientProcess(ImmediateProcess):
     """
-    bin/pycc -x ion.processes.bootstrap.load_system_policy.LoadSystemPolicy op=load
+    bin/pycc -x examples.hello_client.HelloClientProcess
     """
     def on_init(self):
         pass
@@ -42,10 +42,10 @@ def hello_client(container, actor_id='anonymous', text='mytext 123'):
         client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
         actor_headers = container.governance_controller.build_actor_header(actor_id)
-        ret = client.hello(text, headers={'conv-id':'1234'}, timeout=22)
+        ret = client.hello(text)
         print "Returned: " + str(ret)
 
-        ret = client.hello('second message text', headers={'conv-id':'1234'})
+        ret = client.hello('second message text')
         print "Returned: " + str(ret)
 
     except Exception, e:

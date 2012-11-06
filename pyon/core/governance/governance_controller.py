@@ -158,6 +158,11 @@ class GovernanceController(object):
             class_inst = self.interceptor_by_name_dict[int_name]
             getattr(class_inst, method)(invocation)
 
+            #Stop processing message if an issue with the message was found by an interceptor.
+            if ( invocation.message_annotations.has_key(GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION) and invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT) or\
+               ( invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_ANNOTATION) and invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT) :
+                break
+
         return invocation
 
     #Helper methods

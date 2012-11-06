@@ -58,7 +58,8 @@ class FSM:
         self.interrupt_transition = None
         self.interrupt_start_state = None
         self.final_state = -1
-     
+        self.end_states = set()
+
     def set_assertion_check_on(self):
         self.check_assertions = True 
 
@@ -108,6 +109,12 @@ class FSM:
 
         if next_state is None:
             next_state = state
+
+        if state in self.end_states:
+            self.end_states.remove(state)
+
+        self.end_states.add(next_state)
+
         self.state_transitions[(input_symbol, state)] = (transition_context, action, next_state)
 
     def add_transition_list (self, list_input_symbols, state, next_state=None, 
@@ -292,6 +299,12 @@ class FSM:
                 raise ExceptionFSM ('Transition is undefined: (%s, %s).' %
                                     (str(input_symbol), str(state)) )
 
+    def test_for_end_state(self, state):
+        while  (((self.empty_transition, state) in self.state_transitions) and \
+                state not in self.end_states):
+                (current_context, action, state) = self.state_transitions[(self.EMPTY_TRANSITION, state)]
+        return state in self.end_states
+
     def process_list (self, inputs, payloads = None):
         if payloads is not None:
             if (len(inputs)!=len(payloads)):
@@ -313,7 +326,7 @@ class FSM:
         (or a string) by calling process_list(). """
 
         if (self.current_state == self.final_state):
-            raise ExceptionFSM('What are you sending?.The communication has finished.')
+            raise ExceptionFSM('What are you sending?The communication has finished.')
         
         #First, check for global interrupt
         start_interrupt_state = self.get_interrupt_transition(input_transition)
