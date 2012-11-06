@@ -47,7 +47,7 @@ class Test_DataStores(IonIntegrationTestCase):
                 ds.list_object_revisions("badid", "BadDataStoreNamePerCouchDB")
 
             with self.assertRaises(BadRequest):
-                ds.create_doc({"foo": "bar"}, "", "BadDataStoreNamePerCouchDB")
+                ds.create_doc({"foo": "bar"}, "", datastore_name="BadDataStoreNamePerCouchDB")
 
             with self.assertRaises(BadRequest):
                 ds.read_doc("badid", "3", "BadDataStoreNamePerCouchDB")
