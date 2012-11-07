@@ -36,11 +36,11 @@ def read_standard_configuration():
     return pyon_cfg
 
 
-def apply_remote_config(system_cfg):
+def apply_remote_config(bootstrap_cfg, system_cfg):
     from pyon.core.bootstrap import get_sys_name
     from pyon.core.exception import Conflict
     from pyon.ion.directory_standalone import DirectoryStandalone
-    directory = DirectoryStandalone(sysname=get_sys_name(), config=system_cfg)
+    directory = DirectoryStandalone(sysname=get_sys_name(), config=bootstrap_cfg)
 
     de = directory.lookup("/Config/CFG")
     if not de:

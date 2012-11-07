@@ -183,8 +183,8 @@ def main(opts, *args, **kwargs):
         # - Start from standard config already set (pyon.yml + local YML files)
         # - Optionally load config from directory
         if opts.config_from_directory:
-            config.apply_remote_config(pyon_config)
-            config.apply_local_configuration(bootstrap_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)     # apply pyon.local.yml again over top
+            config.apply_remote_config(bootstrap_cfg=bootstrap_config, system_cfg=pyon_config)
+            config.apply_local_configuration(pyon_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)     # apply pyon.local.yml again over top
         # - Last apply any separate command line config overrides
         config.apply_configuration(pyon_config, config_override)
         config.apply_configuration(pyon_config, command_line_config)
