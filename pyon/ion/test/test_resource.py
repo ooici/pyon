@@ -119,8 +119,7 @@ class TestResources(IonUnitTestCase):
 
         with self.assertRaises(BadRequest) as cm:
             extended_user = extended_resource_handler.create_extended_resource_container(RT.ActorIdentity, '111')
-        self.assertIn( 'Requested resource ActorIdentity is not extended from ResourceContainer',cm.exception.message)
-
+        self.assertIn( 'The requested resource ActorIdentity is not extended from ResourceContainer',cm.exception.message)
 
 
         obj = IonObject(OT.TestExtendedResource)
@@ -141,12 +140,14 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource, instrument_device)
         self.assertEquals(len(extended_res.owners),1)
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
+        self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
         #Test field exclusion
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123',ext_exclude=['owners'])
         self.assertEquals(extended_res.resource, instrument_device)
         self.assertEquals(len(extended_res.owners),0)
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
+        self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
         #Test the list of ids interface
         extended_res_list = extended_resource_handler.create_extended_resource_container_list(OT.TestExtendedResource, ['123','456'])
@@ -154,6 +155,7 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res_list[0].resource, instrument_device)
         self.assertEquals(len(extended_res_list[0].owners),1)
         self.assertEquals(extended_res_list[0].resource_object.type_, RT.SystemResource)
+        self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
 
     def get_resource_object(self, resource_id):
