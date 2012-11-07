@@ -4,6 +4,7 @@
 
 __author__ = 'Michael Meisinger'
 
+from copy import deepcopy
 from pyon.core.exception import ContainerAppError, ConfigNotFound
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, dict_merge
@@ -71,7 +72,7 @@ class AppManager(object):
 
                 rel_cfg = None
                 if 'config' in rel_app_cfg:
-                    rel_cfg = rel_app_cfg.config.copy()
+                    rel_cfg = deepcopy(rel_app_cfg.config)
                     if config:
                         dict_merge(rel_cfg, config, inplace=True)
 
@@ -116,7 +117,7 @@ class AppManager(object):
         appdef = DotDict(appdef)
 
         if 'config' in appdef:
-            app_cfg = appdef.config.copy()
+            app_cfg = deepcopy(appdef.config)
             if config:
                 dict_merge(app_cfg, config, inplace=True)
             config = app_cfg

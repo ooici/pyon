@@ -4,6 +4,7 @@
 
 __author__ = 'Michael Meisinger'
 
+from copy import deepcopy
 import time
 from zope.interface import implementedBy
 
@@ -124,7 +125,7 @@ class ProcManager(object):
         process_id = process_id or "%s.%s" % (self.container.id, self.proc_id_pool.get_id())
         log.debug("ProcManager.spawn_process(name=%s, module.cls=%s.%s, config=%s) as pid=%s", name, module, cls, config, process_id)
 
-        process_cfg = CFG.copy()
+        process_cfg = deepcopy(CFG)
         if config:
             # Use provided config. Must be dict or DotDict
             if not isinstance(config, DotDict):

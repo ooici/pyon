@@ -7,6 +7,7 @@ __license__ = 'Apache 2.0'
 
 import argparse
 import ast
+from copy import deepcopy
 import yaml
 import sys
 import traceback
@@ -122,7 +123,7 @@ def main(opts, *args, **kwargs):
         bootstrap_config = None
 
         # This holds the new CFG object for pyon. Build it up in proper sequence and conditions.
-        pyon_config = config.read_standard_configuration()
+        pyon_config = config.read_standard_configuration()      # Initial pyon.yml + pyon.local.yml
 
         # Load config override if provided. Supports variants literal and list of paths
         config_override = None
@@ -149,7 +150,7 @@ def main(opts, *args, **kwargs):
             print "pycc: config_from_directory=True. Minimal bootstrap configuration:", bootstrap_config
         else:
             # Otherwise: Set to standard set of local config files plus command line overrides
-            bootstrap_config = pyon_config.copy()
+            bootstrap_config = deepcopy(pyon_config)
             config.apply_configuration(bootstrap_config, config_override)
             config.apply_configuration(bootstrap_config, command_line_config)
 
@@ -172,7 +173,7 @@ def main(opts, *args, **kwargs):
         # Note: this is idempotent and will not alter anything if this is not the first container to run
         if bootstrap_config.system.auto_bootstrap:
             print "pycc: auto_bootstrap=True."
-            stored_config = pyon_config.copy()
+            stored_config = deepcopy(pyon_config)
             config.apply_configuration(stored_config, config_override)
             config.apply_configuration(stored_config, command_line_config)
             iadm.create_core_datastores()

@@ -4,6 +4,7 @@
 
 __author__ = 'Seman Said, Michael Meisinger'
 
+from copy import deepcopy
 import os
 from collections import OrderedDict
 
@@ -59,7 +60,7 @@ class InterfaceAdmin:
             #print "store_interfaces: WARN: Config already exists. Overwrite"
             return
         print "store_interfaces: Storing system config in directory..."
-        self.dir.register(self.DIR_CONFIG_PATH, "CFG", **system_cfg.copy())
+        self.dir.register(self.DIR_CONFIG_PATH, "CFG", **deepcopy(system_cfg))
 
     def store_interfaces(self, object_definition_file=None,
                          service_definition_file=None, idempotent=False):
