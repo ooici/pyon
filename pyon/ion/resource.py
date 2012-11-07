@@ -310,11 +310,13 @@ class ExtendedResourceContainer(object):
 
     def __init__(self, serv_prov, res_registry=None):
         self.service_provider = serv_prov
-        if res_registry is None:
-            self.resource_registry = self.service_provider.clients.resource_registry
+        if res_registry is not None:
+            self._rr = res_registry
         else:
-            self.resource_registry = res_registry
-
+            if serv_prov.container.has_capability('RESOURCE_REGISTRY'):
+                self._rr = serv_prov.container.resource_registry
+            else:
+                self._rr = self.service_provider.clients.resource_registry
 
 
 
@@ -326,35 +328,42 @@ class ExtendedResourceContainer(object):
 
         ret = list()
         for res_id in resource_id_list:
-            ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type, origin_resource_type,
+            ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type,
                                                                 ext_associations, ext_exclude )
             ret.append(ext_res)
 
         return ret
 
-
-    def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None, origin_resource_type=None,
+    def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
                                            ext_associations=None, ext_exclude=None):
 
-        if not isinstance(resource_id, types.StringType):
-            raise Inconsistent("The paramater resource_id is not a single resource id string")
+        overall_start_time = time.time()
 
-        if not self.service_provider or not self.resource_registry:
+        if not isinstance(resource_id, types.StringType):
+            raise Inconsistent("The parameter resource_id is not a single resource id string")
+
+        if not self.service_provider or not self._rr:
             raise Inconsistent("This class is not initialized properly")
 
         if extended_resource_type not in getextends(OT.ResourceContainer):
-            raise BadRequest('Requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourceContainer))
+            raise BadRequest('The requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourceContainer))
 
         if computed_resource_type and computed_resource_type not in getextends(OT.ComputedAttributes):
-            raise BadRequest('Requested resource %s is not extended from %s' % (computed_resource_type, OT.ComputedAttributes))
+            raise BadRequest('The requested resource %s is not extended from %s' % (computed_resource_type, OT.ComputedAttributes))
 
-        resource_object = self.resource_registry.read(resource_id)
-        if origin_resource_type and resource_object.type_ != origin_resource_type:
-            raise NotFound("Resource %s is not of type %s" % (resource_id, origin_resource_type))
+        resource_object = self._rr.read(resource_id)
+
         if not resource_object:
-            raise NotFound("Resource %s does not exist" % resource_id)
+            raise NotFound("The Resource %s does not exist" % resource_id)
 
         res_container = IonObject(extended_resource_type)
+
+        if not hasattr(res_container, 'origin_resource_type'):
+            raise Inconsistent('The requested resource %s does not contain a properly set origin_resource_type field.' % extended_resource_type)
+
+        if res_container.origin_resource_type != resource_object.type_:
+            raise Inconsistent('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
+
         res_container._id = resource_object._id
         res_container.resource = resource_object
 
@@ -365,6 +374,10 @@ class ExtendedResourceContainer(object):
         self.set_extended_associations(res_container, ext_associations, ext_exclude)
 
         res_container.ts_created = get_ion_ts()
+
+        overall_stop_time = time.time()
+
+        log.debug("Time to process extended resource container %s %f secs", extended_resource_type, overall_stop_time - overall_start_time )
 
         return res_container
 
@@ -394,7 +407,7 @@ class ExtendedResourceContainer(object):
             #Iterate over all of the decorators for the field
             for decorator in obj._schema[field]['decorators']:
 
-                start_time = time.time()
+                field_start_time = time.time()
 
                 #Handle any fields that are declared to get their values from local methods
                 if decorator == 'Method':
@@ -419,9 +432,9 @@ class ExtendedResourceContainer(object):
                     assoc = self.find_associations(resource, decorator, deco_value)
                     self.set_field_associations(obj, field, assoc)
 
-                stop_time = time.time()
+                field_stop_time = time.time()
 
-                log.debug("Time to process field %s(%s) %f secs", field, decorator, stop_time - start_time )
+                log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time )
 
     #Helper function for walking a chain of predicates
     def walk_associations(self, object, predicates, deco_value=None, index=0):
@@ -502,24 +515,24 @@ class ExtendedResourceContainer(object):
 
         #Need to check through all of these in this order to account for specific vs base class inclusions
         if self.is_predicate_association(pred, 'domain', resource.type_):
-            objs, _ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+            objs, _ = self._rr.find_objects(resource._id, association_predicate, associated_resource, False)
 
             #If no objects were found, try finding as subjects just in case.
             if not objs:
-                self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
+                self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
 
         elif self.is_predicate_association(pred, 'range', resource.type_):
-            objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
+            objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
 
         elif self.is_predicate_association_extension(pred, 'domain', resource.type_):
-            objs, _ = self.resource_registry.find_objects(resource._id, association_predicate, associated_resource, False)
+            objs, _ = self._rr.find_objects(resource._id, association_predicate, associated_resource, False)
 
             #If no objects were found, try finding as subjects just in case.
             if not objs:
-                objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
+                objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
 
         elif self.is_predicate_association_extension(pred, 'range', resource.type_):
-            objs, _ = self.resource_registry.find_subjects(associated_resource, association_predicate, resource._id, False)
+            objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
 
         return objs
 
@@ -536,9 +549,13 @@ class ExtendedResourceContainer(object):
                 #Retrieve service definition
                 service_name = rmi_call[0]
                 operation = rmi_call[1]
-                target_service = get_service_registry().get_service_by_name(service_name)
-                client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
-                methodToCall = getattr(client, operation)
+                if service_name == 'resource_registry':
+                    service_client = self._rr
+                else:
+                    target_service = get_service_registry().get_service_by_name(service_name)
+                    service_client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
+
+                methodToCall = getattr(service_client, operation)
                 param_list = [resource_id]
                 ret = methodToCall(*param_list)
                 return ret
