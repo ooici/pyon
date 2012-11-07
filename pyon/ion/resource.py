@@ -313,7 +313,7 @@ class ExtendedResourceContainer(object):
         if res_registry is not None:
             self._rr = res_registry
         else:
-            if serv_prov.container.has_capability('RESOURCE_REGISTRY'):
+            if hasattr(serv_prov.container, 'has_capability') and serv_prov.container.has_capability('RESOURCE_REGISTRY'):
                 self._rr = serv_prov.container.resource_registry
             else:
                 self._rr = self.service_provider.clients.resource_registry
