@@ -1,10 +1,10 @@
 """
 @author Luke Campbell
 @file pyon/util/file_sys.py
-@description Utility for manageing relative file system paths
+@description Utility for managing relative file system paths
 """
 
-
+import errno
 import StringIO
 import tempfile
 import shutil
@@ -14,6 +14,7 @@ import random
 import string
 from pyon.util.log import log
 from pyon.util.containers import DotDict
+
 
 class FileSystemError(Exception):
     '''
@@ -60,11 +61,21 @@ class FileSystem(object):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
             if not os.path.exists(FS_DIRECTORY[k]):
                 log.info('Making path: %s', FS_DIRECTORY[k])
-                os.makedirs(FileSystem.FS_DIRECTORY[k])
+                try:
+                    os.makedirs(FileSystem.FS_DIRECTORY[k])
+                except OSError as ose:
+                    if ose.errno != errno.EEXIST:
+                        raise
+                    # Catches race condition where concurrent container does the same thing
             elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
                 log.info('Removing %s' , FS_DIRECTORY[k])
                 shutil.rmtree(FS_DIRECTORY[k])
-                os.makedirs(FileSystem.FS_DIRECTORY[k])
+                try:
+                    os.makedirs(FileSystem.FS_DIRECTORY[k])
+                except OSError as ose:
+                    if ose.errno != errno.EEXIST:
+                        raise
+                        # Catches race condition where concurrent container does the same thing
 
     @staticmethod
     def get(path):
