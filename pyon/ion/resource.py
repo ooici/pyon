@@ -358,11 +358,14 @@ class ExtendedResourceContainer(object):
 
         res_container = IonObject(extended_resource_type)
 
-#        if not hasattr(res_container, 'origin_resource_type'):
-#            raise Inconsistent('The requested resource %s does not contain a properly set origin_resource_type field.' % extended_resource_type)
-#
-#        if res_container.origin_resource_type != resource_object.type_:
-#            raise Inconsistent('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
+        #TODO - replace with object level decorators and raise exceptions
+        if not hasattr(res_container, 'origin_resource_type'):
+            log.error('The requested resource %s does not contain a properly set origin_resource_type field.' , extended_resource_type)
+            #raise Inconsistent('The requested resource %s does not contain a properly set origin_resource_type field.' % extended_resource_type)
+
+        if res_container.origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, res_container.origin_resource_type):
+            log.error('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
+            #raise Inconsistent('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
 
         res_container._id = resource_object._id
         res_container.resource = resource_object
