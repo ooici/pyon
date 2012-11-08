@@ -186,6 +186,20 @@ class FileSystem(object):
 
             return os.path.join(path, '%s%s' % (clean_name[4:], ext))
 
+    @staticmethod
+    def get_extended_url(path):
+        if ':' in path:
+            s = path.split(':')
+            base = FileSystem.FS_DIRECTORY[s[0]]
+            path = os.path.join(base, s[1])
+            try:
+                os.makedirs(path)
+            except OSError:
+                pass
+        return path
+
+
+
 
     @staticmethod
     def mktemp(filename='', ext=''):
