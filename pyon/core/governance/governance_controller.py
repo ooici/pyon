@@ -293,7 +293,7 @@ class GovernanceController(object):
 
                 except Exception, e:
                     #If the resource does not exist, just ignore it - but log a warning.
-                    log.error("There was an error applying access policy: %s" % e.message)
+                    log.warn("There was an error applying access policy: %s" % e.message)
 
 
     def safe_update_resource_access_policy(self, resource_id):
@@ -311,7 +311,7 @@ class GovernanceController(object):
 
             except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
-                log.error("The resource %s is not found or there was an error applying access policy: %s" % ( resource_id, e.message))
+                log.warn("The resource %s is not found or there was an error applying access policy: %s" % ( resource_id, e.message))
 
 
     def safe_update_service_access_policy(self, service_name, service_op=''):
@@ -330,7 +330,7 @@ class GovernanceController(object):
 
             except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
-                log.error("The service %s is not found or there was an error applying access policy: %s" % ( service_name, e.message))
+                log.warn("The service %s is not found or there was an error applying access policy: %s" % ( service_name, e.message))
 
             #Next update any precondition policies
             try:
@@ -347,7 +347,7 @@ class GovernanceController(object):
 
             except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
-                log.error("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
+                log.warn("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
 
 
     def _is_policy_management_service_available(self):
@@ -356,11 +356,12 @@ class GovernanceController(object):
         the RR then assume it is remote container so do not try to access Policy Management Service
         """
         try:
-            policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-            if policy_services:
-                return True
+            if hasattr(self.container, 'has_capability') and self.container.has_capability('RESOURCE_REGISTRY'):
+                policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
+                if policy_services:
+                    return True
             return False
-        except:
+        except Exception:
             return False
 
     # Methods for managing operation specific policy
