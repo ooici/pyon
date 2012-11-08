@@ -264,12 +264,13 @@ class ExchangeManager(object):
         """
         if not self.org_id:
             # find the default Org
-            org_ids = self._rr.find_resources(RT.Org, id_only=True)
-            if not (len(org_ids) and len(org_ids[0]) == 1):
-                log.warn("EMS available but could not find Org")
+            root_orgname = CFG.get_safe("system.root_org", "ION")
+            org_ids,_ = self._rr.find_resources(RT.Org, name=root_orgname, id_only=True)
+            if not org_ids or len(org_ids) != 1:
+                log.warn("EMS available but could not find ION root Org")
                 return None
 
-            self.org_id = org_ids[0][0]
+            self.org_id = org_ids[0]
             log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
 
         return self.org_id
