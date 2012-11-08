@@ -246,25 +246,33 @@ class ExchangeManager(object):
         """
         Returns True if the EMS is (likely) available and the auto_register CFG entry is True.
 
-        Has the side effect of bootstrapping the org_id and default_xs's id/rev from the RR.
-        Therefore, cannot be a property.
+        @TODO: make a property
         """
         if CFG.get_safe('container.exchange.auto_register', False) and self.use_ems:
             # ok now make sure it's in the directory
             service_list, _ = self._rr.find_resources(restype="Service", name='exchange_management')
             if service_list is not None and len(service_list) > 0:
-                if not self.org_id:
-                    # find the default Org
-                    org_ids = self._rr.find_resources(RT.Org, id_only=True)
-                    if not (len(org_ids) and len(org_ids[0]) == 1):
-                        log.warn("EMS available but could not find Org")
-                        return False
-
-                    self.org_id = org_ids[0][0]
-                    log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
                 return True
 
         return False
+
+    def _bootstrap_default_org(self):
+        """
+        Finds an Org resource to be used by create_xs.
+
+        @TODO: create_xs is being removed, so this will not be needed
+        """
+        if not self.org_id:
+            # find the default Org
+            org_ids = self._rr.find_resources(RT.Org, id_only=True)
+            if not (len(org_ids) and len(org_ids[0]) == 1):
+                log.warn("EMS available but could not find Org")
+                return None
+
+            self.org_id = org_ids[0][0]
+            log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
+
+        return self.org_id
 
     @property
     def _rr(self):
@@ -298,18 +306,22 @@ class ExchangeManager(object):
                            durable=durable,
                            auto_delete=auto_delete)
 
-        self.xs_by_name[name] = xs
-
         if use_ems and self._ems_available():
             log.debug("Using EMS to create_xs")
+            org_id = self._bootstrap_default_org()
+            if org_id is None:
+                raise ExchangeManagerError("Could not find org, refusing to create_xs")
+
             # create a RR object
             xso = ResExchangeSpace(name=name)
-            xso_id = self._ems_client.create_exchange_space(xso, self.org_id)
+            xso_id = self._ems_client.create_exchange_space(xso, org_id)
 
             log.debug("Created RR XS object, id: %s", xso_id)
         else:
             self._ensure_default_declared()
             xs.declare()
+
+        self.xs_by_name[name] = xs
 
         return xs
 
