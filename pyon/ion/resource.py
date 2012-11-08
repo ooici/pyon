@@ -438,16 +438,23 @@ class ExtendedResourceContainer(object):
 
     #Helper function for walking a chain of predicates
     def walk_associations(self, object, predicates, deco_value=None, index=0):
-        ret_list = list()
+
+        #Only pass in the decorator filter value at the first level
         assoc = self.find_associations(object, predicates[index], deco_value)
+
+        #If this is the last predicate then just return whatever was found
+        if index == len(predicates)-1:
+            return assoc
+
+        ret_list = list()
+        #For each object found, walk the next predicate in the list
         for obj in assoc:
-            if index + 1 == len(predicates):
-                return obj
-            else:
-                #Only pass in the decorator filter value at the first level
-                ret_obj = self.walk_associations(obj, predicates, None, index + 1)
-                if index == 0:
-                    ret_list.append(ret_obj)
+            #Only pass in the decorator filter value at the first level
+            ret_obj = self.walk_associations(obj, predicates, None, index + 1)
+
+            #We only care about the path from the first level
+            if index == 0:
+                ret_list.append(ret_obj)
 
         return ret_list
 
