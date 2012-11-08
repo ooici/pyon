@@ -84,10 +84,19 @@ class TestResources(IonUnitTestCase):
 
 
         user_info = Mock()
+        user_info._id = '444'
         user_info.name = "John Doe"
         user_info.email = "John.Doe@devnull.com"
         user_info.phone = "555-555-5555"
         user_info.variables = [{"name": "subscribeToMailingList", "value": "False"}]
+
+        user_info2 = Mock()
+        user_info2._id = '445'
+        user_info2.name = "aka Evil Twin"
+        user_info2.email = "Evil.Twin@devnull.com"
+        user_info2.phone = "555-555-5555"
+        user_info2.variables = [{"name": "subscribeToMailingList", "value": "False"}]
+
 
         # ActorIdentity to UserInfo association
         actor_identity_to_info_association = Mock()
@@ -97,6 +106,15 @@ class TestResources(IonUnitTestCase):
         actor_identity_to_info_association.p = PRED.hasInfo
         actor_identity_to_info_association.o = "444"
         actor_identity_to_info_association.ot = RT.UserInfo
+
+        # ActorIdentity to UserInfo association
+        actor_identity_to_info_association2 = Mock()
+        actor_identity_to_info_association2._id = '556'
+        actor_identity_to_info_association2.s = "111"
+        actor_identity_to_info_association2.st = RT.ActorIdentity
+        actor_identity_to_info_association2.p = PRED.hasInfo
+        actor_identity_to_info_association2.o = "445"
+        actor_identity_to_info_association2.ot = RT.UserInfo
 
         # ActorIdentity to Instrument Device association
         Instrument_device_to_actor_identity_association = Mock()
@@ -109,13 +127,13 @@ class TestResources(IonUnitTestCase):
 
 
         # ActorIdentity to Instrument Device association
-        Instrument_device_to_actor_identity_association = Mock()
-        Instrument_device_to_actor_identity_association._id = '666'
-        Instrument_device_to_actor_identity_association.s = "456"
-        Instrument_device_to_actor_identity_association.st = RT.InstumentDevice
-        Instrument_device_to_actor_identity_association.p = PRED.hasOwner
-        Instrument_device_to_actor_identity_association.o = "111"
-        Instrument_device_to_actor_identity_association.ot = RT.ActorIdentity
+        Instrument_device_to_actor_identity_association2 = Mock()
+        Instrument_device_to_actor_identity_association2._id = '667'
+        Instrument_device_to_actor_identity_association2.s = "456"
+        Instrument_device_to_actor_identity_association2.st = RT.InstumentDevice
+        Instrument_device_to_actor_identity_association2.p = PRED.hasOwner
+        Instrument_device_to_actor_identity_association2.o = "111"
+        Instrument_device_to_actor_identity_association2.ot = RT.ActorIdentity
 
         with self.assertRaises(BadRequest) as cm:
             extended_user = extended_resource_handler.create_extended_resource_container(RT.ActorIdentity, '111')
