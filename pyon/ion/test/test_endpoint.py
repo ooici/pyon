@@ -67,7 +67,7 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
     @patch('pyon.net.endpoint.BaseEndpoint._get_container_instance')
     def test__build_header_no_context(self, mockgci):
         ep = ProcessEndpointUnitMixin(process=Mock())
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertIn('sender-name', header)
         self.assertIn('sender', header)
@@ -88,7 +88,7 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
 
         ep = ProcessEndpointUnitMixin(process=procmock)
         ep.channel = Mock(spec=SendChannel)
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertIn('sender-name', header)
         self.assertIn('sender', header)
@@ -113,7 +113,7 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
 
         ep = ProcessEndpointUnitMixin(process=procmock)
         ep.channel = Mock(spec=SendChannel)
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertIn('ion-actor-id', header)
         self.assertIn('ion-actor-roles', header)
@@ -146,7 +146,7 @@ class TestProcessRPCRequestEndpointUnit(PyonTestCase):
         mockp.return_value = {'two':-2, 'three':3}
 
         ep = ProcessRPCRequestEndpointUnit()
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
 
@@ -183,7 +183,7 @@ class TestProcessRPCResponseEndpointUnit(PyonTestCase):
         mockp.return_value = {'two':-2, 'three':3}
 
         ep = ProcessRPCResponseEndpointUnit()
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
 
@@ -253,7 +253,7 @@ class TestProcessPublisherEndpointUnit(PyonTestCase):
         mockp.return_value = {'two':-2, 'three':3}
 
         ep = ProcessPublisherEndpointUnit()
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
 
@@ -294,7 +294,7 @@ class TestProcessSubscriberEndpointUnit(PyonTestCase):
         mockp.return_value = {'two':-2, 'three':3}
 
         ep = ProcessSubscriberEndpointUnit()
-        header = ep._build_header(sentinel.raw_msg, sentinel.raw_headers)
+        header = ep._build_header(sentinel.raw_msg, {})
 
         self.assertEquals(header, {'one':1, 'two':-2, 'three':3})
 
