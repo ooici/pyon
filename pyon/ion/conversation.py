@@ -117,7 +117,7 @@ class ConversationEndpoint(object):
             self._send(to_role, to_role_name, "", headers)
 
     def send(self, to_role, msg, headers = None, **kwargs):
-        header = headers if headers else {}
+        headers = headers if headers else {}
         if self._is_originator and not self._conversation.has_role(to_role):
             _, is_invited  = self._invitation_table.get(to_role)
             if is_invited:
@@ -129,7 +129,7 @@ class ConversationEndpoint(object):
 
     def _invite_and_send(self, to_role, msg, headers = None, to_role_name = None, **kwargs):
         log.debug("In _invite_and_send for msg: %s", msg)
-        header = headers if headers else {}
+        headers = headers if headers else {}
         if to_role_name:
             self._invitation_table[to_role] =  (to_role_name, False)
         elif to_role in self._invitation_table:
@@ -139,10 +139,10 @@ class ConversationEndpoint(object):
             log.debug(msg)
             raise ConversationError(msg)
 
-        header['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
+        headers['conv-msg-type'] = MSG_TYPE.INVITE | MSG_TYPE.TRANSMIT
         to_role_name, _ = self._invitation_table.get(to_role)
         self._invitation_table[to_role] = (to_role_name, True)
-        return self._send(to_role, to_role_name, msg, header, **kwargs)
+        return self._send(to_role, to_role_name, msg, headers, **kwargs)
 
 
     def _send_in_session_msg(self, to_role, msg, headers = None, **kwargs):
