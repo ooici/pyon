@@ -61,21 +61,19 @@ class FileSystem(object):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
             if not os.path.exists(FS_DIRECTORY[k]):
                 log.info('Making path: %s', FS_DIRECTORY[k])
-                try:
-                    os.makedirs(FileSystem.FS_DIRECTORY[k])
-                except OSError as ose:
-                    if ose.errno != errno.EEXIST:
-                        raise
-                    # Catches race condition where concurrent container does the same thing
+                self.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
             elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
                 log.info('Removing %s' , FS_DIRECTORY[k])
                 shutil.rmtree(FS_DIRECTORY[k])
-                try:
-                    os.makedirs(FileSystem.FS_DIRECTORY[k])
-                except OSError as ose:
-                    if ose.errno != errno.EEXIST:
-                        raise
-                        # Catches race condition where concurrent container does the same thing
+                self.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
+
+    @classmethod
+    def __makedirs(cls,path):
+        try:
+            os.makedirs(path)
+        except OSError as ose:
+            if ose.errno != errno.EEXIST:
+                raise
 
     @staticmethod
     def get(path):
@@ -162,8 +160,8 @@ class FileSystem(object):
         # Limit 64 chars
         return ret[:64]
 
-    @staticmethod
-    def get_url(fs, filename, ext=''):
+    @classmethod
+    def get_url(cls,fs, filename, ext=''):
         """
         @param fs The file system enumeration for the resource where this file belongs. 'TEMP', 'LIBRARY' etc.
         @param file The filename to be used
@@ -171,12 +169,11 @@ class FileSystem(object):
         @return The full path to the desired resource on the file system
         """
         path =  os.path.join(FS_DIRECTORY[fs], '%s%s' % (FileSystem._parse_filename(filename), ext))
-        if not os.path.exists(path=path):
-            os.makedirs(path)
+        cls.__makedirs(path)
         return path
 
-    @staticmethod
-    def get_hierarchical_url(fs, filename, ext=''):
+    @classmethod
+    def get_hierarchical_url(cls,fs, filename, ext=''):
         """
         @param fs The file system enumeration for the resource where this file belongs. 'TEMP', 'LIBRARY' etc.
         @param file The filename to be turned into a path and name
@@ -192,21 +189,17 @@ class FileSystem(object):
 
             path = os.path.join(FS_DIRECTORY[fs], "%s/%s" % (clean_name[0:2], clean_name[2:4]))
 
-            if not os.path.exists(path=path):
-                os.makedirs(path)
+            cls.__makedirs(path)
 
             return os.path.join(path, '%s%s' % (clean_name[4:], ext))
 
-    @staticmethod
-    def get_extended_url(path):
+    @classmethod
+    def get_extended_url(cls,path):
         if ':' in path:
             s = path.split(':')
             base = FileSystem.FS_DIRECTORY[s[0]]
             path = os.path.join(base, s[1])
-            try:
-                os.makedirs(path)
-            except OSError:
-                pass
+            cls.__makedirs(path)
         return path
 
 
