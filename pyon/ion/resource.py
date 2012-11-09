@@ -363,7 +363,7 @@ class ExtendedResourceContainer(object):
             log.error('The requested resource %s does not contain a properly set origin_resource_type field.' , extended_resource_type)
             #raise Inconsistent('The requested resource %s does not contain a properly set origin_resource_type field.' % extended_resource_type)
 
-        if res_container.origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, res_container.origin_resource_type):
+        if hasattr(res_container, 'origin_resource_type') and res_container.origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, res_container.origin_resource_type):
             log.error('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
             #raise Inconsistent('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
 

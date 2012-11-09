@@ -81,6 +81,8 @@ class ProcessEndpointUnitMixin(EndpointUnit):
             actor_tokens        = context.get('ion-actor-tokens', None)
             expiry              = context.get('expiry', None)
             container_id        = context.get('origin-container-id', None)
+            original_conv_id    = context.get('original-conv-id', None)
+            conv_id             = context.get('conv-id', None)
 
             #If an actor-id is specified then there may be other associated data that needs to be passed on
             if actor_id:
@@ -92,10 +94,24 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
             if expiry:          header['expiry']                = expiry
             if container_id:    header['origin-container-id']   = container_id
+
+            #Since this is not the originating message, this must be a requests within an existing conversation,
+            #so track original conversation
+            if original_conv_id:
+                header['original-conv-id'] = original_conv_id
+            else:
+                if conv_id:
+                    header['original-conv-id'] = conv_id
+
         else:
             # no context? we're the originator of the message then
             container_id                    = BaseEndpoint._get_container_instance().id
             header['origin-container-id']   = container_id
+
+            #This is the originating conversation
+            if 'conv-id' in raw_headers:
+                header['original-conv-id'] = raw_headers['conv-id']
+
 
         return header
 
