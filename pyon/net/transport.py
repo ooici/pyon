@@ -799,6 +799,8 @@ class LocalRouter(object):
                     if ex in self._exchanges:
                         self._exchanges[ex].remove_topic_tree(binding, queue)
 
+                self._bindings_by_queue.pop(queue)
+
     def bind(self, exchange, queue, binding):
         log.info("Bind: ex %s, q %s, b %s", exchange, queue, binding)
         with self._lock_declarables:
