@@ -8,7 +8,7 @@ from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonT
 from pyon.service.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
-from gevent import greenlet
+from gevent import greenlet, Timeout
 from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError
 from pyon.util.containers import get_ion_ts
@@ -24,6 +24,9 @@ class OperationInterruptedException(BaseException):
     Derived from BaseException to specifically avoid try/except Exception blocks,
     such as in Publisher's publish_event.
     """
+    pass
+
+class IonProcessError(StandardError):
     pass
 
 class IonProcessThread(PyonThread):
@@ -347,20 +350,30 @@ class IonProcessThread(PyonThread):
         will handle this for you, but if using an IonProcess manually, you must remember to call
         this method or no attached listeners will run.
         """
+        try:
+            # disable normal error reporting, this method should only be called from startup
+            self.thread_manager._failure_notify_callback = None
 
-        # spawn all listeners in startup listeners (from initializer, or added later)
-        for listener in self._startup_listeners:
-            self.add_endpoint(listener)
+            # spawn all listeners in startup listeners (from initializer, or added later)
+            for listener in self._startup_listeners:
+                self.add_endpoint(listener)
 
-        ev = Event()
+            with Timeout(10):
+                waitall([x.get_ready_event() for x in self.listeners])
 
-        def allready(ev):
-            waitall([x.get_ready_event() for x in self.listeners])
-            ev.set()
+        except Timeout:
 
-        spawn(allready, ev)
+            # remove failed endpoints before reporting failure above
+            for listener, proc in self._listener_map.iteritems():
+                if proc.proc.dead:
+                    log.info("removed dead listener: %s", listener)
+                    self.listeners.remove(listener)
+                    self.thread_manager.children.remove(proc)
 
-        ev.wait(timeout=10)
+            raise IonProcessError("start_listeners did not complete in expected time")
+
+        finally:
+            self.thread_manager._failure_notify_callback = self._child_failed
 
     def _notify_stop(self):
         """
@@ -369,7 +382,12 @@ class IonProcessThread(PyonThread):
         Instructs all listeners to close, puts a StopIteration into the synchronized queue,
         and waits for the listeners to close and for the control queue to exit.
         """
-        map(lambda x: x.close(), self.listeners)
+        for listener in self.listeners:
+            try:
+                listener.close()
+            except Exception as ex:
+                log.warn("Could not close listener, attempting to ignore: %s", ex)
+
         self._ctrl_queue.put(StopIteration)
 
         # wait_children will join them and then get() them, which may raise an exception if any of them
@@ -380,7 +398,10 @@ class IonProcessThread(PyonThread):
 
         # run the cleanup method if we have one
         if self._cleanup_method is not None:
-            self._cleanup_method(self)
+            try:
+                self._cleanup_method(self)
+            except Exception as ex:
+                log.warn("Cleanup method error, attempting to ignore: %s", ex)
 
     def get_ready_event(self):
         """

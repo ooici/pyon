@@ -16,7 +16,7 @@ from pyon.core.exception import ContainerConfigError, BadRequest, NotFound
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.conversation import ConversationRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
-from pyon.ion.process import IonProcessThreadManager
+from pyon.ion.process import IonProcessThreadManager, IonProcessError
 from pyon.net.messaging import IDPool
 from pyon.service.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
@@ -24,6 +24,7 @@ from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
 from pyon.net.channel import RecvChannel
 from pyon.net.transport import NameTrio, TransportError
+from gevent import Timeout
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
 
@@ -191,6 +192,11 @@ class ProcManager(object):
 
             return process_instance.id
 
+        except IonProcessError:
+            errcause = process_instance.errcause if process_instance else "instantiating process"
+            log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
+            return None
+
         except Exception:
             errcause = process_instance.errcause if process_instance else "instantiating process"
             log.exception("Error spawning %s %s process (process_id: %s): %s", name, process_type, process_id, errcause)
@@ -332,6 +338,7 @@ class ProcManager(object):
         """
         Internal method to call all registered process state change callbacks.
         """
+        log.debug("Proc State Changed (%s): %s", ProcessStateEnum._str_map.get(state, state), svc)
         for cb in self._proc_state_change_callbacks:
             cb(svc, state, self.container)
 
@@ -400,7 +407,12 @@ class ProcManager(object):
         self._process_init(process_instance)
         self._process_start(process_instance)
 
-        proc.start_listeners()
+        try:
+            proc.start_listeners()
+        except IonProcessError:
+            self._process_quit(process_instance)
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
+            raise
 
         return process_instance
 
@@ -447,7 +459,12 @@ class ProcManager(object):
         self._process_init(process_instance)
         self._process_start(process_instance)
 
-        proc.start_listeners()
+        try:
+            proc.start_listeners()
+        except IonProcessError:
+            self._process_quit(process_instance)
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
+            raise
 
         return process_instance
 
@@ -509,7 +526,12 @@ class ProcManager(object):
 
         self._process_start(process_instance)
 
-        proc.start_listeners()
+        try:
+            proc.start_listeners()
+        except IonProcessError:
+            self._process_quit(process_instance)
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
+            raise
 
         if not process_instance.resource_id:
             log.warn("Agent process id=%s does not define resource_id!!" % process_instance.id)
@@ -552,7 +574,12 @@ class ProcManager(object):
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(process_instance, publish_streams)
 
-        proc.start_listeners()
+        try:
+            proc.start_listeners()
+        except IonProcessError:
+            self._process_quit(process_instance)
+            self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
+            raise
 
         return process_instance
 
@@ -677,6 +704,21 @@ class ProcManager(object):
         process_instance.errcause = "starting service"
         process_instance.start()
 
+    def _process_quit(self, process_instance):
+        """
+        Common method to handle process stopping.
+        """
+        process_instance.errcause = "quitting process"
+
+        # Give the process notice to quit doing stuff.
+        process_instance.quit()
+
+        # Terminate IonProcessThread (may not have one, i.e. simple process)
+        # @TODO: move this into process' on_quit()
+        if getattr(process_instance, '_process', None) is not None and process_instance._process and process_instance._process.running:
+            process_instance._process.notify_stop()
+            process_instance._process.stop()
+
     def _set_publisher_endpoints(self, process_instance, publisher_streams=None):
 
         publisher_streams = publisher_streams or {}
@@ -769,13 +811,7 @@ class ProcManager(object):
         if do_notifications:
             self._call_proc_state_changed(process_instance, ProcessStateEnum.TERMINATING)
 
-        # Give the process notice to quit doing stuff.
-        process_instance.quit()
-
-        # Terminate IonProcessThread (may not have one, i.e. simple process)
-        if getattr(process_instance, '_process', None) is not None and process_instance._process and process_instance._process.running:
-            process_instance._process.notify_stop()
-            process_instance._process.stop()
+        self._process_quit(process_instance)
 
         self._unregister_process(process_id, process_instance)
 
