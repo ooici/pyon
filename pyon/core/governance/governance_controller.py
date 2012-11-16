@@ -5,7 +5,7 @@ __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
 
 import types
-from pyon.core.bootstrap import CFG
+from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED, LCS
@@ -355,14 +355,10 @@ class GovernanceController(object):
         Method to verify if the Policy Management Service is running in the system. If the container cannot connect to
         the RR then assume it is remote container so do not try to access Policy Management Service
         """
-        try:
-            if hasattr(self.container, 'has_capability') and self.container.has_capability('RESOURCE_REGISTRY'):
-                policy_services, _ = self.container.resource_registry.find_resources(restype=RT.Service,name='policy_management')
-                if policy_services:
-                    return True
-            return False
-        except Exception:
-            return False
+        policy_service = get_service_registry().is_service_available('policy_management', True)
+        if policy_service:
+            return True
+        return False
 
     # Methods for managing operation specific policy
     def get_process_operation_dict(self, process_name):

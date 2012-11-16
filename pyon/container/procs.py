@@ -24,9 +24,8 @@ from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
 from pyon.net.channel import RecvChannel
 from pyon.net.transport import NameTrio, TransportError
-from gevent import Timeout
 
-from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process
+from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process, ServiceStateEnum
 
 from couchdb.http import ResourceNotFound
 
@@ -765,7 +764,7 @@ class ProcManager(object):
             else:
                 # We are starting the first process of a service instance
                 # TODO: This should be created by the HA Service agent in the future
-                svc_obj = Service(name=process_instance.name, exchange_name=process_instance._proc_listen_name)
+                svc_obj = Service(name=process_instance.name, exchange_name=process_instance._proc_listen_name, state=ServiceStateEnum.READY)
                 process_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
 
                 # Create association to service definition resource
