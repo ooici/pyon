@@ -6,7 +6,7 @@ __author__ = 'Michael Meisinger, Dave Foster'
 __license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
-from pyon.core.bootstrap import CFG
+from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.net import messaging
 from pyon.net.transport import NameTrio, TransportError, ComposableTransport
 from pyon.util.log import log
@@ -242,6 +242,7 @@ class ExchangeManager(object):
         self._xs_cache[name] = xs_objs[0]
         return xs_objs[0]
 
+
     def _ems_available(self):
         """
         Returns True if the EMS is (likely) available and the auto_register CFG entry is True.
@@ -250,11 +251,13 @@ class ExchangeManager(object):
         """
         if CFG.get_safe('container.exchange.auto_register', False) and self.use_ems:
             # ok now make sure it's in the directory
-            service_list, _ = self._rr.find_resources(restype="Service", name='exchange_management')
-            if service_list is not None and len(service_list) > 0:
+            exchange_service = get_service_registry().is_service_available('exchange_management')
+            if exchange_service:
                 return True
 
         return False
+
+
 
     def _bootstrap_default_org(self):
         """
@@ -274,6 +277,8 @@ class ExchangeManager(object):
             log.debug("Bootstrapped Container exchange manager with org id: %s", self.org_id)
 
         return self.org_id
+
+
 
     @property
     def _rr(self):
