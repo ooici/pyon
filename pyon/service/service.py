@@ -268,3 +268,27 @@ class IonServiceRegistry(object):
             return self.services[name]
         else:
             return None
+
+    def is_service_available(self, service_name, local_rr_only=False):
+
+        try:
+            service_resource = None
+            from pyon.core.bootstrap import container_instance
+            from interface.objects import ServiceStateEnum
+            #Use container direct RR connection if available, otherwise use messaging to the RR service
+            if hasattr(container_instance, 'has_capability') and container_instance.has_capability('RESOURCE_REGISTRY'):
+                service_resource, _ = container_instance.resource_registry.find_resources(restype='Service', name=service_name)
+            else:
+                if not local_rr_only:
+                    from interface.services.coi.iresource_registry_service import ResourceRegistryServiceClient
+                    rr_client = ResourceRegistryServiceClient(container_instance.node)
+                    service_resource, _ = rr_client.find_resources(restype='Service', name=service_name)
+
+            #The service is available only of there is a single RR object for it and it is in one of these states:
+            if service_resource and ( service_resource[0].state == ServiceStateEnum.READY or service_resource[0].state == ServiceStateEnum.STEADY ):
+                return True
+
+            return False
+
+        except Exception, e:
+            return False
