@@ -255,7 +255,7 @@ class ExchangeManager(object):
             if exchange_service:
                 return True
 
-            return False
+        return False
 
 
 
