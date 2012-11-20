@@ -828,6 +828,7 @@ class ResourceAgentClient(ResourceAgentProcessClient):
         if not 'name' in kwargs:
             process_id = self._get_agent_process_id(self.resource_id)
             if process_id:
+                kwargs = kwargs.copy()
                 kwargs['name'] = process_id
                 log.debug("Use agent process %s for resource_id=%s" % (process_id, self.resource_id))
             else:
@@ -836,6 +837,9 @@ class ResourceAgentClient(ResourceAgentProcessClient):
                 raise NotFound("No agent process found for resource_id %s" % self.resource_id)
 
         assert "name" in kwargs, "Name argument for agent target not set"
+
+        # transpose name -> to_name to make underlying layer happy
+        kwargs["to_name"] = kwargs.pop("name")
 
         # Superclass constructor.
         ResourceAgentProcessClient.__init__(self, *args, **kwargs)
