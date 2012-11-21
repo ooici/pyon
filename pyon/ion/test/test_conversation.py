@@ -79,7 +79,7 @@ class ProviderService(BaseService):
     id = 'provider_service'
     dependencies = []
 
-    def reverse_string(self, text=''):
+    def reverse_string(self, text='', send_twice = False):
         string_client = ConversationRPCClient(to_name='string_service', process=self)
 
         #By specifying a conversation id, a caller that uses the same id will cause the conversation
@@ -106,7 +106,7 @@ class TestConversationInterceptor(IonIntegrationTestCase):
         #Check to see if the text has been reversed.
         self.assertEqual(ret,'dlrow olleh')
 
-    def test_interceptor_fails(self):
+    def test_interceptor_fails_with_bad_convo_id(self):
 
         #Should throw an exception by intentionally passing in a conversation id already in use within the service
         #This is not allowed.
