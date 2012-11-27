@@ -196,7 +196,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         --------------------------------------------------------------------------------
             """, invocation.headers, status, details)
 
-    #TODO -change this to properly annotate message
     def _report_error(self, invocation, dispatcher_status, error):
         cur_label = invocation.get_header_value('op', None)
         if not cur_label: invocation.get_header_value('conv-id', 'Unknown')
@@ -207,8 +206,6 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION] = err_msg
         log.debug("ConversationMonitorInterceptor error: %s", err_msg)
 
-
-        #TODO - maybe raise exception for dispatcher_status of REJECT here??
 
 
     def _get_conversation_context_key(self, principal, invocation):
