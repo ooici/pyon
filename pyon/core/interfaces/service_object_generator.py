@@ -54,8 +54,10 @@ ${client}
     , 'clientsholder':
 '''class ${name}DependentClients(BaseClients):
     def __init__(self, process=None):
+        self._process = process
         BaseClients.__init__(self)
 ${dep_clients}
+${dep_clients_extra}
 '''
     , 'client_file':
 '''#!/usr/bin/env python
@@ -85,6 +87,14 @@ ${classmethods}
 '''        self.${svc} = ${clientclass}(process=process)'''
     , 'dep_client_imports':
 '''from ${clientmodule} import ${clientclass}'''
+    , 'rr_client_prop':
+'''
+    @property
+    def resource_registry(self):
+        if self._process.container is not None and self._process.container.has_capability("RESOURCE_REGISTRY"):
+            return self._process.container.resource_registry
+        return self._resource_registry
+'''
     , 'clssdocstr':
 '    """${classdocstr}\n\
     """'
@@ -796,8 +806,15 @@ class ServiceObjectGenerator:
                 doc_methods.append(html_doc_templates['method_doc'].substitute(name=op_name, inargs=doc_inargs_str, methoddocstring=methoddocstring, outargs=doc_outargs_str, exceptions=doc_exceptions_str))
 
         # dep client names
+
+        # special casing for resource_registry - include a property that redirects to container RR if exists
+        if "resource_registry" in dependencies:
+            dep_clients_extra = templates['rr_client_prop'].substitute()
+        else:
+            dep_clients_extra = ""
+
         dep_clients = [(x, client_defs[x][1]) for x in dependencies]
-        dep_clients_str = "\n".join(map(lambda x2: templates['dep_client'].substitute(svc=x2[0], clientclass=x2[1]), dep_clients))
+        dep_clients_str = "\n".join(map(lambda x2: templates['dep_client'].substitute(svc="_%s" % x2[0] if x2[0] == "resource_registry" else x2[0], clientclass=x2[1]), dep_clients))
         dep_client_imports_str = "\n".join([templates['dep_client_imports'].substitute(clientmodule=client_defs[x][0], clientclass=client_defs[x][1]) for x in dependencies])
 
         service_name_str = templates['svcname'].substitute(name=service_name)
@@ -815,7 +832,8 @@ class ServiceObjectGenerator:
 
         # dependent clients generation
         clients_holder_str = templates['clientsholder'].substitute(name=class_name,
-                                                                   dep_clients=dep_clients_str)
+                                                                   dep_clients=dep_clients_str,
+                                                                   dep_clients_extra=dep_clients_extra)
 
         # this service's client generation
         _client_methods = ''.join(client_methods)
