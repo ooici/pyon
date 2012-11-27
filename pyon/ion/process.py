@@ -386,7 +386,8 @@ class IonProcessThread(PyonThread):
             try:
                 listener.close()
             except Exception as ex:
-                log.warn("Could not close listener, attempting to ignore: %s", ex)
+                tb = traceback.format_exc()
+                log.warn("Could not close listener, attempting to ignore: %s\nTraceback:\n%s", ex, tb)
 
         self._ctrl_queue.put(StopIteration)
 
