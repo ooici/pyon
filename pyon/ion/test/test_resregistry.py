@@ -155,3 +155,38 @@ class TestResourceRegistry(IonIntegrationTestCase):
                                                             include_content=False)
         self.assertEquals(len(att_objs_without_content), 1)
         self.assertEquals(att_objs_without_content[0].content, '')
+
+    def test_get_resource_extension(self):
+
+
+        #Testing multiple instrument owners
+        subject1 = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
+
+        actor_identity_obj1 = IonObject("ActorIdentity", {"name": subject1})
+        user_id1,_ = self.rr.create(actor_identity_obj1)
+
+        user_info_obj1 = IonObject("UserInfo", {"name": "Foo"})
+        user_info_id1,_ = self.rr.create(user_info_obj1)
+        self.rr.create_association(user_id1, PRED.hasInfo, user_info_id1)
+
+        subject2 = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Bob Cumbers A256"
+
+        actor_identity_obj2 = IonObject("ActorIdentity", {"name": subject2})
+        user_id2,_ = self.rr.create(actor_identity_obj2)
+
+        user_info_obj2 = IonObject("UserInfo", {"name": "Foo2"})
+        user_info_id2,_ = self.rr.create(user_info_obj2)
+        self.rr.create_association(user_id2, PRED.hasInfo, user_info_id2)
+
+        test_obj = IonObject('InformationResource',  {"name": "TestResource"})
+        test_obj_id,_ = self.rr.create(test_obj)
+        self.rr.create_association(test_obj_id, PRED.hasOwner, user_id1)
+        self.rr.create_association(test_obj_id, PRED.hasOwner, user_id2)
+
+        extended_resource = self.rr.get_resource_extension(test_obj_id, 'ExtendedInformationResource')
+
+        self.assertEqual(test_obj_id,extended_resource._id)
+        self.assertEqual(len(extended_resource.owners),2)
+
+        extended_resource_list = self.rr.get_resource_extension(str([user_info_id1,user_info_id2]), 'ExtendedInformationResource')
+        self.assertEqual(len(extended_resource_list), 2)
