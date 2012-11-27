@@ -364,7 +364,7 @@ class ResourceRegistry(object):
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id="", alt_id_ns="",
-                           limit=None, skip=None, descending=None, id_only=True):
+                           limit=None, skip=None, descending=None, id_only=False):
         return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
             keyword=keyword, nested_type=nested_type,
             attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
