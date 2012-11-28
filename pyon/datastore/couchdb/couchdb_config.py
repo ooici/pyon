@@ -46,7 +46,7 @@ COUCHDB_VIEWS = {
             'map':"""
 function(doc) {
   if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
-    emit([doc.type_, doc.lcstate, doc.name], null);
+    emit([doc.type_, doc.lcstate, doc.name], doc);
   }
 }""",
         },
