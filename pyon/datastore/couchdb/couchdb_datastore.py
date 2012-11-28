@@ -592,8 +592,8 @@ class CouchDB_DataStore(DataStore):
         @brief From given all_args dict, extract all entries that are valid CouchDB view options.
         @see http://wiki.apache.org/couchdb/HTTP_view_API
         """
-        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
-        limit = int(all_args.get('limit', 0))
+        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq') and v is not None)
+        limit = int(all_args.get('limit', 0)) if all_args.get('limit', None) is not None else 0
         if limit > 0:
             view_args['limit'] = limit
         return view_args
@@ -797,33 +797,35 @@ class CouchDB_DataStore(DataStore):
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id=None, alt_id_ns=None,
                            limit=None, skip=None, descending=None, id_only=True):
+        filter_kwargs = self._get_view_args(dict(limit=limit, skip=skip, descending=descending))
         if name:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
-            return self.find_res_by_name(name, restype, id_only)
+            return self.find_res_by_name(name, restype, id_only, filter=filter_kwargs)
         elif keyword:
-            return self.find_res_by_keyword(keyword, restype, id_only)
+            return self.find_res_by_keyword(keyword, restype, id_only, filter=filter_kwargs)
         elif alt_id or alt_id_ns:
-            return self.find_res_by_alternative_id(alt_id, alt_id_ns, id_only)
+            return self.find_res_by_alternative_id(alt_id, alt_id_ns, id_only, filter=filter_kwargs)
         elif nested_type:
-            return self.find_res_by_nested_type(nested_type, restype, id_only)
+            return self.find_res_by_nested_type(nested_type, restype, id_only, filter=filter_kwargs)
         elif restype and attr_name:
-            return self.find_res_by_attribute(restype, attr_name, attr_value, id_only=id_only)
+            return self.find_res_by_attribute(restype, attr_name, attr_value, id_only=id_only, filter=filter_kwargs)
         elif restype and lcstate:
-            return self.find_res_by_lcstate(lcstate, restype, id_only)
+            return self.find_res_by_lcstate(lcstate, restype, id_only, filter=filter_kwargs)
         elif restype:
-            return self.find_res_by_type(restype, lcstate, id_only)
+            return self.find_res_by_type(restype, lcstate, id_only, filter=filter_kwargs)
         elif lcstate:
-            return self.find_res_by_lcstate(lcstate, restype, id_only)
+            return self.find_res_by_lcstate(lcstate, restype, id_only, filter=filter_kwargs)
         elif not restype and not lcstate and not name:
-            return self.find_res_by_type(None, None, id_only)
+            return self.find_res_by_type(None, None, id_only, filter=filter_kwargs)
 
-    def find_res_by_type(self, restype, lcstate=None, id_only=False):
+    def find_res_by_type(self, restype, lcstate=None, id_only=False, filter=None):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)", restype, lcstate)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_type"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_type"), include_docs=(not id_only), **filter)
         if restype:
             key = [restype]
             if lcstate:
@@ -844,12 +846,13 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_lcstate(self, lcstate, restype=None, id_only=False):
+    def find_res_by_lcstate(self, lcstate, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_lcstate(lcstate=%s, restype=%s)", lcstate, restype)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_lcstate"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_lcstate"), include_docs=(not id_only), **filter)
         is_hierarchical = (lcstate in CommonResourceLifeCycleSM.STATE_ALIASES)
         # lcstate is a hiearachical state and we need to treat the view differently
         if is_hierarchical:
@@ -876,12 +879,13 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_name(self, name, restype=None, id_only=False):
+    def find_res_by_name(self, name, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_name(name=%s, restype=%s)", name, restype)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_name"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_name"), include_docs=(not id_only), **filter)
         key = [name]
         if restype:
             key.append(restype)
@@ -899,14 +903,15 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_keyword(self, keyword, restype=None, id_only=False):
+    def find_res_by_keyword(self, keyword, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_keyword(keyword=%s, restype=%s)", keyword, restype)
         if not keyword or type(keyword) is not str:
             raise BadRequest('Argument keyword illegal')
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_keyword"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_keyword"), include_docs=(not id_only), **filter)
         key = [keyword]
         if restype:
             key.append(restype)
@@ -924,14 +929,15 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_nested_type(self, nested_type, restype=None, id_only=False):
+    def find_res_by_nested_type(self, nested_type, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_nested_type(nested_type=%s, restype=%s)", nested_type, restype)
         if not nested_type or type(nested_type) is not str:
             raise BadRequest('Argument nested_type illegal')
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_nestedtype"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_nestedtype"), include_docs=(not id_only), **filter)
         key = [nested_type]
         if restype:
             key.append(restype)
@@ -949,14 +955,15 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_attribute(self, restype, attr_name, attr_value=None, id_only=False):
+    def find_res_by_attribute(self, restype, attr_name, attr_value=None, id_only=False, filter=None):
         log.debug("find_res_by_attribute(restype=%s, attr_name=%s, attr_value=%s)", restype, attr_name, attr_value)
         if not attr_name or type(attr_name) is not str:
             raise BadRequest('Argument attr_name illegal')
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_attribute"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_attribute"), include_docs=(not id_only), **filter)
         key = [restype, attr_name]
         if attr_value:
             key.append(attr_value)
@@ -974,7 +981,7 @@ class CouchDB_DataStore(DataStore):
             res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
             return (res_docs, res_assocs)
 
-    def find_res_by_alternative_id(self, alt_id=None, alt_id_ns=None, id_only=False):
+    def find_res_by_alternative_id(self, alt_id=None, alt_id_ns=None, id_only=False, filter=None):
         log.debug("find_res_by_alternative_id(restype=%s, alt_id_ns=%s)", alt_id, alt_id_ns)
         if alt_id and type(alt_id) is not str:
             raise BadRequest('Argument alt_id illegal')
@@ -982,8 +989,9 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest('Argument alt_id_ns illegal')
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_altid"), include_docs=(not id_only))
+        view = ds.view(self._get_viewname("resource", "by_altid"), include_docs=(not id_only), **filter)
         key = []
         if alt_id:
             key.append(alt_id)
