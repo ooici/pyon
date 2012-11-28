@@ -4,7 +4,7 @@ __author__ = 'Stephen Henrie'
 __license__ = 'Apache 2.0'
 
 
-from pyon.ion.conversation import ConversationRPCClient, ConversationRPCServer, RPCRequesterEndpointUnit
+from pyon.ion.conversation import ConversationRPCClient, ConversationRPCServer, RPCRequesterEndpointUnit, RPCProviderEndpointUnit
 from mock import Mock, sentinel, patch, ANY, call, MagicMock
 from pyon.util.unit_test import PyonTestCase
 from pyon.util.int_test import IonIntegrationTestCase
@@ -12,6 +12,7 @@ from pyon.core.exception import Inconsistent
 from nose.plugins.attrib import attr
 from pyon.service.service import BaseService
 from pyon.net.endpoint import RPCClient
+from pyon.net.channel import BidirClientChannel
 from pyon.util.context import LocalContextMixin
 
 @attr('UNIT')
@@ -79,12 +80,16 @@ class ProviderService(BaseService):
     id = 'provider_service'
     dependencies = []
 
-    def reverse_string(self, text='', send_twice = False):
+    def reverse_string(self, text='', set_convo_id = None):
         string_client = ConversationRPCClient(to_name='string_service', process=self)
+
 
         #By specifying a conversation id, a caller that uses the same id will cause the conversation
         #monitor to detect an error in the use of the RPC protocol defined in Scribble.
-        return string_client.request({'text': text}, op='reverse', headers = {'conv-id':1234})
+        if set_convo_id is not None:
+            return string_client.request({'text': text}, op='reverse', headers = {'conv-id':set_convo_id})
+        else:
+            return string_client.request({'text': text}, op='reverse')
 
 @attr('INT', group='coi')
 
@@ -108,9 +113,91 @@ class TestConversationInterceptor(IonIntegrationTestCase):
 
     def test_interceptor_fails_with_bad_convo_id(self):
 
+        forced_convo_id = '1234'
+
         #Should throw an exception by intentionally passing in a conversation id already in use within the service
         #This is not allowed.
         with self.assertRaises(Inconsistent) as cm:
-            ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string', headers = {'conv-id':1234} )
+            ret = self.provider_client.request({'text': 'hello world', 'set_convo_id': forced_convo_id}, op='reverse_string', headers = {'conv-id': forced_convo_id} )
         self.assertIn( 'Conversation interceptor error for message reverse from provider_service: Transition is undefined: (RESV_reverse_requester, 2)',cm.exception.message)
 
+    def test_interceptor_fails_when_send_multiple_messages(self):
+
+        '''
+        # save off old send
+        old_message_send = RPCRequesterEndpointUnit._message_send
+
+        # make new send to patch on that duplicates send
+        def new_message_send(*args, **kwargs):
+            print 'In the patched new_message_send'
+
+            #Only duplicate the message send from the initial client
+            if args[0]._endpoint._process.name != 'conv_test':
+                old_message_send(*args, **kwargs)
+
+            return old_message_send(*args, **kwargs)
+
+        # patch it into place with auto-cleanup
+        patcher = patch('pyon.ion.conversation.RPCRequesterEndpointUnit._message_send', new_message_send)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        '''
+
+        # save off old send
+        old_send = BidirClientChannel._send
+
+        # make new send to patch on that duplicates send
+        def new_send(*args, **kwargs):
+            print 'In the patched new_send'
+
+            #Only duplicate the message send from the initial client call
+            msg_headers = kwargs['headers']
+            if msg_headers['conv-id'] == msg_headers['original-conv-id']:
+                old_send(*args, **kwargs)
+
+            return old_send(*args, **kwargs)
+
+        # patch it into place with auto-cleanup to send a duplicate message at the channel layer which
+        #is below the interceptors
+        patcher = patch('pyon.net.channel.BidirClientChannel._send', new_send)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+
+
+        #Should throw an exception by intentionally forcing the message to be sent twice.
+        #This is not allowed.
+        ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
+
+        #Check to see if the text has been reversed.
+        self.assertEqual(ret,'dlrow olleh')
+
+    '''
+
+    def test_interceptor_fails_when_recv_multiple_messages(self):
+
+        # save off old send
+        old_message_send = RPCProviderEndpointUnit._message_send
+
+        # make new send to patch on that duplicates send
+        def new_message_send(*args, **kwargs):
+            print 'In the patched new_message_send'
+            old_message_send(*args, **kwargs)
+            return old_message_send(*args, **kwargs)
+
+        # patch it into place with auto-cleanup
+        patcher = patch('pyon.ion.conversation.RPCProviderEndpointUnit._message_send', new_message_send)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+
+        #Should throw an exception by intentionally forcing the message to be sent twice.
+        #This is not allowed.
+        ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
+
+        #Check to see if the text has been reversed.
+        self.assertEqual(ret,'dlrow olleh')
+
+    '''
