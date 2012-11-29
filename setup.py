@@ -74,7 +74,7 @@ setup(  name = 'pyon',
             'readline==6.2.1',
             'mock==0.8',
             'ndg-xacml==0.5.1',
-            'h5py==2.0.1', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
+            'h5py==2.1.0', # see: http://www.hdfgroup.org/HDF5/release/obtain5.html
             'python-gevent-profiler',
             'lxml==2.3.4', # Fails to compile on Linux ??!??
             'requests==0.13.5',
