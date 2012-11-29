@@ -375,6 +375,22 @@ def main(opts, *args, **kwargs):
 
         zmq.device = device_patch
 
+        # patch in auto-completion support
+        # added in https://github.com/ipython/ipython/commit/f4be28f06c2b23cd8e4a3653b9e84bde593e4c86
+        # we effectively make the same patches via monkeypatching
+        from IPython.core.interactiveshell import InteractiveShell
+        from IPython.zmq.ipkernel import IPKernelApp
+        old_start = IPKernelApp.start
+        old_set_completer_frame = InteractiveShell.set_completer_frame
+
+        def new_start(appself):
+            # restore old set_completer_frame that gets no-op'd out in ZmqInteractiveShell.__init__
+            bound_scf = old_set_completer_frame.__get__(appself.shell, InteractiveShell)
+            appself.shell.set_completer_frame = bound_scf
+            appself.shell.set_completer_frame()
+            old_start(appself)
+
+        IPKernelApp.start = new_start
 
         from IPython import embed_kernel
         ipy_config = _setup_ipython_config()
@@ -389,6 +405,7 @@ def main(opts, *args, **kwargs):
         ipy_config.PromptManager.in2_template = '... '
         ipy_config.PromptManager.out_template = '--> '
         ipy_config.InteractiveShellEmbed.confirm_exit = False
+        #ipy_config.Application.log_level = 10      # uncomment for debug level ipython logging
 
         return ipy_config
 
