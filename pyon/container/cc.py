@@ -22,6 +22,7 @@ from pyon.util.containers import get_default_container_id
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
 from pyon.util.sflow import SFlowManager
+from pyon.util.context import LocalContextMixin
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
@@ -104,6 +105,9 @@ class Container(BaseContainerAgent):
 
         # publisher, initialized in start()
         self.event_pub = None
+
+        # context-local storage
+        self.context = LocalContextMixin()
 
         log.debug("Container initialized, OK.")
 
