@@ -32,9 +32,11 @@ class ProcessTest(PyonTestCase):
         """
         Test helper to make a passable service.
         """
-        svc      = LocalContextMixin()
-        svc.id   = "test_id"
-        svc.name = "test_svc"
+        svc           = LocalContextMixin()
+        svc.id        = "test_id"
+        svc.name      = "test_svc"
+        svc.container = Mock()
+        svc.container.context = LocalContextMixin()
 
         return svc
 
