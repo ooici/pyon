@@ -306,8 +306,9 @@ class IonProcessThread(PyonThread):
 
             try:
                 with self.service.push_context(context):
-                    self._ctrl_current = ar
-                    res = call(*callargs, **callkwargs)
+                    with self.service.container.context.push_context(context):
+                        self._ctrl_current = ar
+                        res = call(*callargs, **callkwargs)
             except OperationInterruptedException:
                 # endpoint layer takes care of response as it's the one that caused this
                 log.debug("Operation interrupted")

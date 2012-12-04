@@ -25,6 +25,14 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         EndpointUnit.__init__(self, **kwargs)
         self._process = process
 
+    def get_context(self):
+        """
+        Gets context used to build headers for the conversation.
+
+        This method may be overridden for advanced purposes.
+        """
+        return self._process.get_context()
+
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
         newkwargs.update({'process': self._process})
@@ -70,39 +78,13 @@ class ProcessEndpointUnitMixin(EndpointUnit):
             if self._process.process_type == 'service' and hasattr(self.channel, '_send_name'):
                 header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
 
-        context = self._process.get_context()
+        context = self.get_context()
         log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
 
         # use context to set security attributes forward
         if isinstance(context, dict):
-            # fwd on actor specific information, according to common message format spec
-            actor_id            = context.get('ion-actor-id', None)
-            actor_roles         = context.get('ion-actor-roles', None)
-            actor_tokens        = context.get('ion-actor-tokens', None)
-            expiry              = context.get('expiry', None)
-            container_id        = context.get('origin-container-id', None)
-            original_conv_id    = context.get('original-conv-id', None)
-            conv_id             = context.get('conv-id', None)
-
-            #If an actor-id is specified then there may be other associated data that needs to be passed on
-            if actor_id:
-                header['ion-actor-id'] = actor_id
-                if actor_roles:     header['ion-actor-roles']   = actor_roles
-
-            #This set of tokens is set independently of the actor
-            if actor_tokens:    header['ion-actor-tokens']   = actor_tokens
-
-            if expiry:          header['expiry']                = expiry
-            if container_id:    header['origin-container-id']   = container_id
-
-            #Since this is not the originating message, this must be a requests within an existing conversation,
-            #so track original conversation
-            if original_conv_id:
-                header['original-conv-id'] = original_conv_id
-            else:
-                if conv_id:
-                    header['original-conv-id'] = conv_id
-
+            new_header = self.build_security_headers(context)
+            header.update(new_header)
         else:
             # no context? we're the originator of the message then
             container_id                    = BaseEndpoint._get_container_instance().id
@@ -112,6 +94,44 @@ class ProcessEndpointUnitMixin(EndpointUnit):
             if 'conv-id' in raw_headers:
                 header['original-conv-id'] = raw_headers['conv-id']
 
+        return header
+
+    @classmethod
+    def build_security_headers(cls, context):
+        """
+        Examining context, builds a set of headers containing necessary forwarded items.
+
+        @return     A new dictionary containing headers from the context that are important.
+        """
+        header = {}
+
+        # fwd on actor specific information, according to common message format spec
+        actor_id            = context.get('ion-actor-id', None)
+        actor_roles         = context.get('ion-actor-roles', None)
+        actor_tokens        = context.get('ion-actor-tokens', None)
+        expiry              = context.get('expiry', None)
+        container_id        = context.get('origin-container-id', None)
+        original_conv_id    = context.get('original-conv-id', None)
+        conv_id             = context.get('conv-id', None)
+
+        #If an actor-id is specified then there may be other associated data that needs to be passed on
+        if actor_id:
+            header['ion-actor-id'] = actor_id
+            if actor_roles:     header['ion-actor-roles']   = actor_roles
+
+        #This set of tokens is set independently of the actor
+        if actor_tokens:    header['ion-actor-tokens']   = actor_tokens
+
+        if expiry:          header['expiry']                = expiry
+        if container_id:    header['origin-container-id']   = container_id
+
+        #Since this is not the originating message, this must be a requests within an existing conversation,
+        #so track original conversation
+        if original_conv_id:
+            header['original-conv-id'] = original_conv_id
+        else:
+            if conv_id:
+                header['original-conv-id'] = conv_id
 
         return header
 

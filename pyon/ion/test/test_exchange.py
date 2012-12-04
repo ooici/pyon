@@ -800,7 +800,7 @@ class TestManagementAPI(PyonTestCase):
 
         content = self.ex_manager._make_management_call(sentinel.url, method=sentinel.anymeth)
 
-        self.ex_manager._ems_client.call_management.assert_called_once_with(sentinel.url, sentinel.anymeth)
+        self.ex_manager._ems_client.call_management.assert_called_once_with(sentinel.url, sentinel.anymeth, headers=None)
 
     def test__make_management_call_raises_exceptions(self):
         rmock = Mock()
