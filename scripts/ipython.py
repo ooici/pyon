@@ -10,7 +10,7 @@ def main():
     from pkg_resources import load_entry_point
 
     sys.exit(
-       load_entry_point('ipython==0.11', 'console_scripts', 'ipython')()
+       load_entry_point('ipython', 'console_scripts', 'ipython')()
     )
 
 if __name__ == '__main__':
