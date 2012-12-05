@@ -8,7 +8,6 @@ __license__ = 'Apache 2.0'
 import argparse
 import ast
 from copy import deepcopy
-import yaml
 import sys
 import traceback
 from uuid import uuid4
@@ -48,6 +47,7 @@ def entry():
     parser.add_argument('-l', '--logcfg', type=str, help='Path to logging configuration file or dict config content.')
     parser.add_argument('-m', '--mx', action='store_true', help='Start a management web UI')
     parser.add_argument('-n', '--noshell', action='store_true')
+    parser.add_argument('-o', '--nomanhole', action='store_true', help="Do not start a shell or a remote-able manhole shell. Implies -n")
     parser.add_argument('-p', '--pidfile', type=str, help='PID file to use when --daemon specified. Defaults to cc-<rand>.pid')
     parser.add_argument('-r', '--rel', type=str, help='Path to a rel file to launch.')
     parser.add_argument('-s', '--sysname', type=str, help='System name')
@@ -59,6 +59,10 @@ def entry():
     args, kwargs = parse_args(extra)
 
     print "pycc: ION Container starter with command line options:" , str(opts)
+
+    # -o or --nomanhole implies --noshell
+    if opts.nomanhole:
+        opts.noshell = True
 
     if opts.daemon:
         # TODO: The daemonizing code may need to be moved inside the Container class (so it happens per-process)
@@ -260,7 +264,6 @@ def main(opts, *args, **kwargs):
             port = CFG.get_safe('container.flask_webapp.port',8080)
             container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
             print "pycc: Container UI started ... listening on http://localhost:%s" % port
-            
 
         if opts.signalparent:
             import os
@@ -281,9 +284,11 @@ def main(opts, *args, **kwargs):
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
             from pyon.container.shell_api import get_shell_api
-            setup_ipython(get_shell_api(container))
+            setup_ipython_shell(get_shell_api(container))
+        elif not opts.nomanhole:
+            from pyon.container.shell_api import get_shell_api
+            setup_ipython_embed(get_shell_api(container))
         else:
-            # Keep container running until process terminated
             container.serve_forever()
 
     def stop_container(container):
@@ -296,6 +301,113 @@ def main(opts, *args, **kwargs):
             print "pycc: CONTAINER STOP ERROR"
             traceback.print_exc()
             return False
+
+    def setup_ipython_shell(shell_api=None):
+        ipy_config = _setup_ipython_config()
+
+        # monkeypatch the ipython inputhook to be gevent-friendly
+        import gevent   # should be auto-monkey-patched by pyon already.
+        import select
+        import sys
+        def stdin_ready():
+            infds, outfds, erfds = select.select([sys.stdin], [], [], 0)
+            if infds:
+                return True
+            else:
+                return False
+
+        def inputhook_gevent():
+            try:
+                while not stdin_ready():
+                    gevent.sleep(0.05)
+            except KeyboardInterrupt:
+                pass
+
+            return 0
+
+        # install the gevent inputhook
+        from IPython.lib.inputhook import inputhook_manager
+        inputhook_manager.set_inputhook(inputhook_gevent)
+        inputhook_manager._current_gui = 'gevent'
+
+        # First import the embeddable shell class
+        from IPython.frontend.terminal.embed import InteractiveShellEmbed
+
+        # Update namespace of interactive shell
+        # TODO: Cleanup namespace even further
+        if shell_api is not None:
+            locals().update(shell_api)
+
+        # Now create an instance of the embeddable shell. The first argument is a
+        # string with options exactly as you would type them if you were starting
+        # IPython at the system command line. Any parameters you want to define for
+        # configuration can thus be specified here.
+        ipshell = InteractiveShellEmbed(config=ipy_config,
+            banner1 =\
+            """          ____                                ________  _   __   ____________   ____  ___
+         / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
+        / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
+       / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
+      /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
+            /____/""",
+            exit_msg = 'Leaving ION shell, shutting down container.')
+
+        ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
+
+    def setup_ipython_embed(shell_api=None):
+        from gevent_zeromq import monkey_patch
+        monkey_patch()
+
+        # patch in device:
+        # gevent-zeromq does not support devices, which block in the C layer.
+        # we need to support the "heartbeat" which is a simple bounceback, so we
+        # simulate it using the following method.
+        import zmq
+        orig_device = zmq.device
+
+        def device_patch(dev_type, insock, outsock, *args):
+            if dev_type == zmq.FORWARDER:
+                while True:
+                    m = insock.recv()
+                    outsock.send(m)
+            else:
+                orig_device.device(dev_type, insock, outsock, *args)
+
+        zmq.device = device_patch
+
+        # patch in auto-completion support
+        # added in https://github.com/ipython/ipython/commit/f4be28f06c2b23cd8e4a3653b9e84bde593e4c86
+        # we effectively make the same patches via monkeypatching
+        from IPython.core.interactiveshell import InteractiveShell
+        from IPython.zmq.ipkernel import IPKernelApp
+        old_start = IPKernelApp.start
+        old_set_completer_frame = InteractiveShell.set_completer_frame
+
+        def new_start(appself):
+            # restore old set_completer_frame that gets no-op'd out in ZmqInteractiveShell.__init__
+            bound_scf = old_set_completer_frame.__get__(appself.shell, InteractiveShell)
+            appself.shell.set_completer_frame = bound_scf
+            appself.shell.set_completer_frame()
+            old_start(appself)
+
+        IPKernelApp.start = new_start
+
+        from IPython import embed_kernel
+        ipy_config = _setup_ipython_config()
+        embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
+
+    def _setup_ipython_config():
+        from IPython.config.loader import Config
+        ipy_config = Config()
+        import os
+        ipy_config.KernelApp.connection_file = os.path.join(os.path.abspath(os.curdir), "manhole-%s.json" % os.getpid())
+        ipy_config.PromptManager.in_template = '><> '
+        ipy_config.PromptManager.in2_template = '... '
+        ipy_config.PromptManager.out_template = '--> '
+        ipy_config.InteractiveShellEmbed.confirm_exit = False
+        #ipy_config.Application.log_level = 10      # uncomment for debug level ipython logging
+
+        return ipy_config
 
     # main() -----> ENTER
     # ----------------------------------------------------------------------------------
@@ -327,66 +439,6 @@ def main(opts, *args, **kwargs):
     stop_ok = stop_container(container)
     if not stop_ok:
         sys.exit(1)
-
-def setup_ipython(shell_api=None):
-    from IPython.config.loader import Config
-    ipython_cfg = Config()
-    shell_config = ipython_cfg.InteractiveShellEmbed
-    shell_config.prompt_in1 = '><> '
-    shell_config.prompt_in2 = '... '
-    shell_config.prompt_out = '--> '
-    shell_config.confirm_exit = False
-
-    # monkeypatch the ipython inputhook to be gevent-friendly
-    import gevent   # should be auto-monkey-patched by pyon already.
-    import select
-    import sys
-    def stdin_ready():
-        infds, outfds, erfds = select.select([sys.stdin], [], [], 0)
-        if infds:
-            return True
-        else:
-            return False
-
-    def inputhook_gevent():
-        try:
-            while not stdin_ready():
-                gevent.sleep(0.05)
-        except KeyboardInterrupt:
-            pass
-
-        return 0
-
-    # install the gevent inputhook
-    from IPython.lib.inputhook import inputhook_manager
-    inputhook_manager.set_inputhook(inputhook_gevent)
-    inputhook_manager._current_gui = 'gevent'
-
-    # First import the embeddable shell class
-    from IPython.frontend.terminal.embed import InteractiveShellEmbed
-
-    # Update namespace of interactive shell
-    # TODO: Cleanup namespace even further
-    if shell_api is not None:
-        locals().update(shell_api)
-
-    # Now create an instance of the embeddable shell. The first argument is a
-    # string with options exactly as you would type them if you were starting
-    # IPython at the system command line. Any parameters you want to define for
-    # configuration can thus be specified here.
-    ipshell = InteractiveShellEmbed(config=ipython_cfg,
-        banner1 =\
-        """      ____                                ________  _   __   ____________   ____  ___
-     / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
-    / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
-   / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
-  /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
-        /____/""",
-        exit_msg = 'Leaving ION shell, shutting down container.')
-
-    ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
-
-
 
 # START HERE:
 # PYCC STEP 1
