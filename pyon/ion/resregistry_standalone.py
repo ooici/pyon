@@ -64,7 +64,7 @@ class ResourceRegistryStandalone(object):
         return self.datastore.read_doc(object_id, rev_id)
 
     def read_mult(self, object_ids=None):
-        if not object_ids:
+        if object_ids is None:
             raise BadRequest("The object_ids parameter is empty")
         return self.datastore.read_doc_mult(object_ids)
 
