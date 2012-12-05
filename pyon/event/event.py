@@ -209,7 +209,8 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         assert not self._cbthread, "start called twice on EventSubscriber"
         gl = spawn(self.listen)
         self._cbthread = gl
-        self._ready_event.wait(timeout=5)
+        if not self._ready_event.wait(timeout=5):
+            log.warning('EventSubscriber start timed out.')
         log.info("EventSubscriber started. Event pattern=%s" % self.binding)
         return gl
 

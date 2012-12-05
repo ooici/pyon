@@ -62,7 +62,10 @@ class GreenletLeak(Plugin):
                     table.append(["", "    (dead)"])
                 else:
                     # self of method greenlet is running (hopefully __repr__ is defined)
-                    table.append(["", "self: " + str(gl._run.im_self)])
+                    selfstr = "(none)"
+                    if hasattr(gl._run.im_self):
+                        selfstr = str(gl._run.im_self)
+                    table.append(["", "self: " + selfstr])
 
                     # greenlet traceback (maybe interesting)
                     gltb = traceback.format_stack(gl.gr_frame)

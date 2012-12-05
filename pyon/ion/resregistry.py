@@ -14,7 +14,7 @@ from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource
+from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource, ExtendedResourceContainer
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -370,3 +370,35 @@ class ResourceRegistry(object):
             attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
             id_only=id_only)
+
+
+    def get_resource_extension(self, resource_id='', resource_extension='', ext_associations=None, ext_exclude=None):
+        """Returns any ExtendedResource object containing additional related information derived from associations
+
+        @param resource_id    str
+        @param resource_extension    str
+        @param ext_associations    dict
+        @param ext_exclude    list
+        @retval actor_identity    ExtendedResource
+        @throws BadRequest    A parameter is missing
+        @throws NotFound    An object with the specified resource_id does not exist
+        """
+        if not resource_id:
+            raise BadRequest("The resource_id parameter is empty")
+
+        if not resource_extension:
+            raise BadRequest("The extended_resource parameter not set")
+
+        extended_resource_handler = ExtendedResourceContainer(self, self)
+
+        #Handle differently if the resource_id parameter is a list of ids
+        if resource_id.find('[') > -1:
+            res_input = eval(resource_id)
+            extended_resource_list = extended_resource_handler.create_extended_resource_container_list(resource_extension,
+                res_input, computed_resource_type=None, origin_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude)
+            return extended_resource_list
+
+        extended_resource = extended_resource_handler.create_extended_resource_container(resource_extension,
+            resource_id, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude)
+
+        return extended_resource

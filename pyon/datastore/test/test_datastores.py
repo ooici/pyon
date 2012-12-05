@@ -684,6 +684,10 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEqual(len(res_list), 2)
         res_list,key_list = data_store.find_resources_ext(restype=RT.Attachment, keyword="FOO")
         self.assertEqual(len(res_list), 2)
+        res_list,key_list = data_store.find_resources_ext(restype=RT.Attachment, keyword="FOO", limit=1)
+        self.assertEqual(len(res_list), 1)
+        res_list,key_list = data_store.find_resources_ext(restype=RT.Attachment, keyword="FOO", limit=1, skip=1)
+        self.assertEqual(len(res_list), 1)
 
         res_list,key_list = data_store.find_resources_ext(restype="NONE", nested_type="ContactInformation")
         self.assertEqual(len(res_list), 0)
