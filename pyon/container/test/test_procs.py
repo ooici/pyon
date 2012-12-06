@@ -5,7 +5,7 @@ __author__ = 'Michael Meisinger'
 from unittest import SkipTest
 from mock import Mock, patch, ANY, sentinel, call
 
-from pyon.agent.agent import ResourceAgent
+from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
@@ -42,7 +42,7 @@ class BadProcess(BaseService):
         bad = 3 / 0     # boom
         return bad
 
-class SampleAgent(ResourceAgent):
+class SampleAgent(SimpleResourceAgent):
     dependencies = []
 
 class TestRPCServer(ProcessRPCServer):
@@ -342,7 +342,7 @@ class TestProcManagerInt(IonIntegrationTestCase):
 
         self._spawnproc(pm, 'stream_process')
 
-        #self._spawnproc(pm, 'agent', 'SampleAgent')
+        self._spawnproc(pm, 'agent', 'SampleAgent')
 
         self._spawnproc(pm, 'standalone')
 
@@ -355,7 +355,7 @@ class TestProcManagerInt(IonIntegrationTestCase):
             pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
             self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
-        self.assertEquals(len(pm.procs), 4)     # service, stream_proc, (no agent), standalone, simple.  NO IMMEDIATE
+        self.assertEquals(len(pm.procs), 5)     # service, stream_proc, (no agent), standalone, simple.  NO IMMEDIATE
 
     def _spawnproc(self, pm, ptype, pcls=None):
         pcls = pcls or 'SampleProcess'
