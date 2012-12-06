@@ -3,16 +3,23 @@
 __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
-from mock import Mock, patch, ANY
+from mock import Mock, patch, ANY, sentinel, call
 
-from pyon.agent.agent import ResourceAgent
+from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.container.procs import ProcManager
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from interface.objects import ProcessStateEnum
 from pyon.ion.endpoint import ProcessRPCServer
-from mock import sentinel
+from pyon.core.exception import BadRequest, NotFound
+from couchdb.http import ResourceNotFound
+from pyon.public import PRED
+from gevent.event import AsyncResult
+from pyon.ion.process import IonProcessError
+from pyon.net.transport import NameTrio, TransportError
+from pyon.ion.conversation import ConversationRPCServer
 
 class FakeContainer(object):
     def __init__(self):
@@ -35,14 +42,286 @@ class BadProcess(BaseService):
         bad = 3 / 0     # boom
         return bad
 
-class SampleAgent(ResourceAgent):
+class SampleAgent(SimpleResourceAgent):
     dependencies = []
 
 class TestRPCServer(ProcessRPCServer):
     pass
 
+@attr('UNIT')
+class TestProcManager(PyonTestCase):
+    def setUp(self):
+        self.container = Mock()
+        self.pm = ProcManager(self.container)
+
+        self.container.resource_registry.create.return_value = (sentinel.rid, sentinel.rev)
+        self.container.resource_registry.find_resources.return_value = ([sentinel.oid], [sentinel.orev])
+
+    def test_start(self):
+        self.pm.start()
+
+        self.assertEquals(self.pm.cc_id, sentinel.rid)
+
+    def test_start_with_org(self):
+        self.patch_cfg('pyon.container.procs.CFG', {'container':{'org_name':'NOT_DEFAULT'}})
+        self.pm.start()
+
+        self.container.resource_registry.create_association.assert_called_once_with(sentinel.oid, PRED.hasResource, sentinel.rid)
+
+    @patch('pyon.datastore.couchdb.couchdb_datastore.CouchDB_DataStore._stats')
+    def test_stop(self, statsmock):
+        self.pm.start()
+
+        self.pm.stop()
+
+        self.assertEquals(statsmock.get_stats.call_count, 2)
+
+    def test__cleanup_method(self):
+        ep = Mock()
+        ep._chan._queue_auto_delete = False
+
+        self.pm._cleanup_method(sentinel.queue, ep)
+
+        ch = self.container.node.channel.return_value
+        ch._destroy_queue.assert_called_once_with()
+        self.assertIsInstance(ch._recv_name, NameTrio)
+        self.assertIn(str(sentinel.queue), str(ch._recv_name))
+
+    @patch('pyon.container.procs.log')
+    def test__cleanup_method_raises_error(self, mocklog):
+        ep = Mock()
+        ep._chan._queue_auto_delete = False
+        ch = self.container.node.channel.return_value
+        ch._destroy_queue.side_effect = TransportError
+
+        self.pm._cleanup_method(sentinel.queue, ep)
+
+        self.assertEquals(mocklog.warn.call_count, 1)
+
+    @patch('pyon.datastore.couchdb.couchdb_datastore.CouchDB_DataStore._stats', Mock())
+    @patch('pyon.container.procs.log')
+    def test_stop_with_error(self, mocklog):
+        self.pm.start()
+        self.pm.terminate_process = Mock(side_effect=BadRequest)
+
+        procmock = Mock()
+        procmock._proc_start_time = 0
+        procmock.id = sentinel.pid
+        self.pm.procs[sentinel.pid] = procmock
+        self.pm.procs_by_name['dummy'] = procmock
+
+        self.pm.stop()
+
+        self.pm.terminate_process.assert_called_once_with(sentinel.pid)
+        mocklog.warn.assert_has_calls([call("Failed to terminate process (%s): %s", sentinel.pid, ANY),
+                                       call("ProcManager procs not empty: %s", self.pm.procs),
+                                       call("ProcManager procs_by_name not empty: %s", self.pm.procs_by_name)])
+
+    def test_list_local_processes(self):
+        pmock = Mock()
+        pmock.process_type = sentinel.ptype
+        pmock2 = Mock()
+        pmock2.process_type = sentinel.ptype2
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2,
+                         'three':pmock}
+
+        self.assertEquals(self.pm.list_local_processes(),
+                          [pmock, pmock2, pmock])
+
+    def test_list_local_processes_proc_type_filter(self):
+        pmock = Mock()
+        pmock.process_type = sentinel.ptype
+        pmock2 = Mock()
+        pmock2.process_type = sentinel.ptype2
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2,
+                         'three':pmock}
+
+        self.assertEquals(self.pm.list_local_processes(sentinel.ptype2),
+                          [pmock2])
+
+    def test_get_a_local_process(self):
+        pmock = Mock()
+        pmock.name = sentinel.name
+        pmock2 = Mock()
+        pmock2.name = sentinel.name2
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2}
+
+        self.assertEquals(self.pm.get_a_local_process(sentinel.name2),
+                          pmock2)
+
+    def test_get_a_local_process_for_agent_res_id(self):
+        pmock = Mock()
+        pmock.process_type = 'agent'
+        pmock.resource_type = sentinel.rtype
+        pmock2 = Mock()
+        pmock2.process_type = 'agent'
+        pmock2.resource_type = sentinel.rtype2
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2}
+
+        self.assertEquals(self.pm.get_a_local_process(sentinel.rtype2),
+                          pmock2)
+
+    def test_get_a_local_process_no_match(self):
+        self.assertIsNone(self.pm.get_a_local_process())
+
+    def test_is_local_service_process(self):
+        pmock = Mock()
+        pmock.name          = sentinel.name
+        pmock.process_type = 'simple'
+        pmock2 = Mock()
+        pmock2.name         = sentinel.name2
+        pmock2.process_type = 'service'
+        pmock3 = Mock()
+        pmock3.name         = sentinel.name3
+        pmock3.process_type = 'service'
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2,
+                         'three':pmock3}
+
+        self.assertTrue(self.pm.is_local_service_process(sentinel.name3))
+
+    def test_is_local_service_process_name_matches_but_type_doesnt(self):
+        pmock = Mock()
+        pmock.name          = sentinel.name
+        pmock.process_type = 'simple'
+        pmock2 = Mock()
+        pmock2.name         = sentinel.name2
+        pmock2.process_type = 'notservice'
+        pmock3 = Mock()
+        pmock3.name         = sentinel.name3
+        pmock3.process_type = 'notservice'
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2,
+                         'three':pmock3}
+
+        self.assertFalse(self.pm.is_local_service_process(sentinel.name3))
+
+    def test_is_local_agent_process(self):
+        # agent is similar to above, but checks resource_type instead
+        pmock = Mock()
+        pmock.name          = sentinel.name
+        pmock.process_type = 'simple'
+        pmock2 = Mock()
+        pmock2.resource_type = sentinel.name2
+        pmock2.process_type = 'agent'
+        pmock3 = Mock()
+        pmock3.name         = sentinel.name3
+        pmock3.process_type = 'notservice'
+
+        self.pm.procs = {'one':pmock,
+                         'two':pmock2,
+                         'three':pmock3}
+
+        self.assertTrue(self.pm.is_local_agent_process(sentinel.name2))
+
+    def test_is_local_agent_process_not_found(self):
+        self.assertFalse(self.pm.is_local_agent_process(sentinel.one))
+
+    def test__unregister_process_errors(self):
+        pmock = Mock()
+        pmock._proc_name = '1'
+        pmock._proc_type = 'service'
+        pmock._proc_res_id = sentinel.presid
+        pmock._proc_svc_id = sentinel.psvcid
+
+        self.container.resource_registry.delete.side_effect = NotFound
+        self.container.resource_registry.find_objects.side_effect = ResourceNotFound
+
+        self.pm.procs[sentinel.pid] = pmock
+        self.pm.procs_by_name['1'] = pmock
+
+        self.pm._unregister_process(sentinel.pid, pmock)
+
+        # show we tried to interact with the RR
+        self.container.resource_registry.delete.assert_call(sentinel.presid, del_associations=True)
+        self.container.resource_registry.find_objects.assert_called_once_with(sentinel.psvcid, "hasProcess", "Process", id_only=True)
+        self.assertEquals(self.pm.procs, {})
+        self.assertEquals(self.pm.procs_by_name, {})
+
+        # NEXT: find_objects works fine and gives us an error deletion
+        self.container.resource_registry.delete.reset_mock()
+        self.container.resource_registry.find_objects.reset_mock()
+        self.container.resource_registry.find_objects.side_effect = None
+        self.container.resource_registry.find_objects.return_value = ([sentinel.svcid],[None])
+
+        self.pm.procs[sentinel.pid] = pmock
+        self.pm.procs_by_name['1'] = pmock
+
+        self.pm._unregister_process(sentinel.pid, pmock)
+
+        self.container.resource_registry.delete.assert_calls([call(sentinel.presid, del_associations=True),
+                                                              call(sentinel.psvcid, del_associations=True)])
+
+        # NEXT: agent
+        pmock = Mock()
+        pmock.id = sentinel.pid
+        pmock._proc_name = '1'
+        pmock._proc_type = 'agent'
+
+        self.pm.procs[sentinel.pid] = pmock
+        self.pm.procs_by_name['1'] = pmock
+
+        self.pm._unregister_process(sentinel.pid, pmock)
+
+        self.container.directory.unregister_safe.assert_called_once_with("/Agents", sentinel.pid)
+
+    def test__create_listening_endpoint_with_cfg(self):
+        self.patch_cfg('pyon.container.procs.CFG', container=dict(messaging=dict(endpoint=dict(proc_listening_type='pyon.container.test.test_procs.TestRPCServer'))))
+
+        ep = self.pm._create_listening_endpoint(process=sentinel.process)
+
+        self.assertIsInstance(ep, TestRPCServer)
+
+    def test__create_listening_endpoint_without_cfg_and_no_conv(self):
+        self.patch_cfg('pyon.container.procs.CFG', container=dict(messaging=dict(endpoint=dict(proc_listening_type=None, rpc_conversation_enabled=False))))
+
+        ep = self.pm._create_listening_endpoint(process=sentinel.process)
+
+        self.assertIsInstance(ep, ProcessRPCServer)
+
+    def test__create_listening_endpoint_without_cfg_and_conv(self):
+        self.patch_cfg('pyon.container.procs.CFG', container=dict(messaging=dict(endpoint=dict(proc_listening_type=None, rpc_conversation_enabled=True))))
+
+        ep = self.pm._create_listening_endpoint(process=sentinel.process)
+
+        self.assertIsInstance(ep, ConversationRPCServer)
+
 @attr('INT')
-class TestProcManager(IonIntegrationTestCase):
+class TestProcManagerInt(IonIntegrationTestCase):
+
+    class ExpectedFailure(Exception):
+        pass
+
+    def test_proc_fails(self):
+        self._start_container()
+        pm = self.container.proc_manager
+
+        ar = AsyncResult()
+        def failedhandler(proc, state, container):
+            if state == ProcessStateEnum.FAILED:
+                ar.set()
+        pm.add_proc_state_changed_callback(failedhandler)
+
+        pid = self._spawnproc(pm, 'service')
+
+        # cause a failure
+        pm.procs[pid]._process._ctrl_thread.proc.kill(exception=self.ExpectedFailure, block=False)
+
+        # wait for proc state changed notification
+        ar.get(timeout=5)
+
+        # make sure removed
+        self.assertNotIn(pid, pm.procs)
 
     def test_procmanager_iso(self):
         fakecc = FakeContainer()
@@ -63,7 +342,7 @@ class TestProcManager(IonIntegrationTestCase):
 
         self._spawnproc(pm, 'stream_process')
 
-        #self._spawnproc(pm, 'agent', 'SampleAgent')
+        self._spawnproc(pm, 'agent', 'SampleAgent')
 
         self._spawnproc(pm, 'standalone')
 
@@ -76,7 +355,7 @@ class TestProcManager(IonIntegrationTestCase):
             pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
             self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
-        self.assertEquals(len(pm.procs), 4)     # service, stream_proc, (no agent), standalone, simple.  NO IMMEDIATE
+        self.assertEquals(len(pm.procs), 5)     # service, stream_proc, (no agent), standalone, simple.  NO IMMEDIATE
 
     def _spawnproc(self, pm, ptype, pcls=None):
         pcls = pcls or 'SampleProcess'
@@ -140,6 +419,9 @@ class TestProcManager(IonIntegrationTestCase):
 
         self.assertEquals(len(self.container.proc_manager.procs), 0)
 
+        # now try to terminate it again, it shouldn't exist
+        self.assertRaises(BadRequest, self.container.terminate_process, pid)
+
     def test_proc_state_change_callback(self):
         self._start_container()
 
@@ -157,6 +439,17 @@ class TestProcManager(IonIntegrationTestCase):
         m.assert_called_with(ANY, ProcessStateEnum.TERMINATED, self.container)
         self.assertIsInstance(m.call_args[0][0], SampleProcess)
 
+        pm.remove_proc_state_changed_callback(m)
+
+        cur_call_count = m.call_count
+        pid = self._spawnproc(pm, 'service')
+
+        self.assertEquals(m.call_count, cur_call_count) # should not have been touched
+
+        self.container.terminate_process(pid)
+
+        self.assertEquals(m.call_count, cur_call_count) # should not have been touched
+
     def test_create_listening_endpoint(self):
         self.patch_cfg('pyon.container.procs.CFG', {'container':{'messaging':{'endpoint':{'proc_listening_type':'pyon.container.test.test_procs.TestRPCServer'}}}})
 
@@ -172,4 +465,25 @@ class TestProcManager(IonIntegrationTestCase):
 
         self.assertIsInstance(ep, TestRPCServer)
 
+    def test_error_on_start_listeners_of_proc(self):
+        self._start_container()
+
+        m = Mock()
+
+        pm = self.container.proc_manager
+        pm.add_proc_state_changed_callback(m)
+
+        with patch('pyon.ion.process.IonProcessThread.start_listeners', Mock(side_effect=IonProcessError)):
+            pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', {'process':{'type':'service'}})
+            self.assertIsNone(pid)
+
+            pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', {'process':{'type':'stream_process'}})
+            self.assertIsNone(pid)
+
+            pid = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', {'process':{'type':'standalone'}})
+            self.assertIsNone(pid)
+
+            m.assert_calls([call(ANY, ProcessStateEnum.FAILED),
+                            call(ANY, ProcessStateEnum.FAILED),
+                            call(ANY, ProcessStateEnum.FAILED)])
 

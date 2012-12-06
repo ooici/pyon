@@ -235,7 +235,7 @@ class ProcManager(object):
         Returns a list of the running ION processes in the container or filtered by the process_type
         """
         if not process_type:
-            return self.proc.values()
+            return self.procs.values()
 
         return [p for p in self.procs.itervalues() if p.process_type == process_type]
 
