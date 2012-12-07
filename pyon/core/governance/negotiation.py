@@ -59,6 +59,9 @@ class Negotiation(object):
 
     def create_negotiation(self, sap=None):
 
+        if sap is None or ( sap.type_ != OT.ServiceAgreementProposal and not issubtype(sap.type_, OT.ServiceAgreementProposal)):
+            raise BadRequest('The sap parameter must be a valid Service Agreement Proposal object')
+
         if sap.proposal_status != ProposalStatusEnum.INITIAL or sap.sequence_num != 0:
             raise Inconsistent('The specified Service Agreement Proposal has inconsistent status fields')
 
@@ -138,10 +141,13 @@ class Negotiation(object):
 
     def _execute_accept_action(self, sap):
 
-        action = self.negotiation_rules[sap.type_]['accept_action']
-        action_result = eval("self.service_provider."+action)
+        if self.negotiation_rules.has_key(sap.type_):
+            action = self.negotiation_rules[sap.type_]['accept_action']
+            action_result = eval("self.service_provider."+action)
 
-        return action_result
+            return action_result
+
+        return None
 
     def _publish_status_event(self, negotiation, status=None):
         #Sent request opened event

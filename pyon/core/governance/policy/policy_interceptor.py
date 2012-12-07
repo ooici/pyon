@@ -61,8 +61,16 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #If missing default to request just to be safe
         msg_performative = invocation.get_header_value('performative', 'request')
 
-        #No need to check policy for response or failure messages
-        if msg_performative != 'inform-result' and msg_performative != 'failure':
+        #TODO - This should be removed once better process security is implemented
+        #THis fix infers that all messages that do not specify an actor id are TRUSTED wihtin the system
+        policy_loaded = CFG.get_safe('system.load_policy', False)
+        if policy_loaded:
+            actor_id = invocation.get_header_value('ion-actor-id', None)
+        else:
+            actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
+
+        #No need to check policy for response or failure messages  - TODO - remove the last check at some point
+        if msg_performative != 'inform-result' and msg_performative != 'failure' and actor_id is not None:
 
             #checking policy - if needed
             receiver = invocation.get_message_receiver()
