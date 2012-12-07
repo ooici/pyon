@@ -296,6 +296,7 @@ class CouchDB_DataStore(DataStore):
         return obj_list
 
     def read_doc_mult(self, object_ids, datastore_name=""):
+        if not object_ids: return []
         ds, datastore_name = self._get_datastore(datastore_name)
         log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
         docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
