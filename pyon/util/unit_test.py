@@ -29,6 +29,12 @@ def pop_last_call(mock):
 class PyonTestCase(unittest.TestCase):
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
+
+    # @see
+    # http://www.saltycrane.com/blog/2012/07/how-prevent-nose-unittest-using-docstring-when-verbosity-2/
+    def shortDescription(self):
+        return None
+
     def _create_IonObject_mock(self, name):
         mock_ionobj = Mock(name='IonObject')
         def side_effect(_def, _dict=None, **kwargs):

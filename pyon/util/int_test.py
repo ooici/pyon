@@ -40,6 +40,11 @@ class IonIntegrationTestCase(unittest.TestCase):
     TODO: Integrate with IonUnitTestCase
     """
 
+    # @see
+    # http://www.saltycrane.com/blog/2012/07/how-prevent-nose-unittest-using-docstring-when-verbosity-2/
+    def shortDescription(self):
+        return None
+
     def run(self, result=None):
         unittest.TestCase.run(self, result)
 
