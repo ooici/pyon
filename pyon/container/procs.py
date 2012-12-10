@@ -590,12 +590,12 @@ class ProcManager(object):
         No attachments.
         """
         process_instance = self._create_process_instance(process_id, name, module, cls, config)
-        self._process_init(process_instance)
-        self._process_start(process_instance)
-
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         self._set_publisher_endpoints(process_instance, publish_streams)
+        self._process_init(process_instance)
+        self._process_start(process_instance)
+
 
         return process_instance
 
