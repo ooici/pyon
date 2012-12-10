@@ -2,7 +2,7 @@
 
 """Resource specific definitions"""
 
-__author__ = 'Michael Meisinger'
+__author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
 
 import types
@@ -297,7 +297,7 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
                     self.transitions[(state, ev)] = s1
             else:
                 self.transitions[(s0, ev)] = s1
-        #import pprint; pprint.pprint(self.transitions)
+                #import pprint; pprint.pprint(self.transitions)
 
     def _create_basic_transitions(self):
         pass
@@ -320,7 +320,8 @@ class ExtendedResourceContainer(object):
 
 
 
-    def create_extended_resource_container_list(self, extended_resource_type, resource_id_list, computed_resource_type=None, origin_resource_type=None,
+    def create_extended_resource_container_list(self, extended_resource_type, resource_id_list,
+                                                computed_resource_type=None, origin_resource_type=None,
                                                 ext_associations=None, ext_exclude=None):
 
         if not isinstance(resource_id_list, types.ListType):
@@ -329,7 +330,7 @@ class ExtendedResourceContainer(object):
         ret = list()
         for res_id in resource_id_list:
             ext_res = self.create_extended_resource_container(extended_resource_type, res_id, computed_resource_type,
-                                                                ext_associations, ext_exclude )
+                ext_associations, ext_exclude )
             ret.append(ext_res)
 
         return ret
@@ -358,17 +359,21 @@ class ExtendedResourceContainer(object):
 
         res_container = IonObject(extended_resource_type)
 
-        #TODO - replace with object level decorators and raise exceptions
+        # @TODO - replace with object level decorators and raise exceptions
         if not hasattr(res_container, 'origin_resource_type'):
             log.error('The requested resource %s does not contain a properly set origin_resource_type field.' , extended_resource_type)
             #raise Inconsistent('The requested resource %s does not contain a properly set origin_resource_type field.' % extended_resource_type)
 
-        if hasattr(res_container, 'origin_resource_type') and res_container.origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, res_container.origin_resource_type):
-            log.error('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
+        if hasattr(res_container, 'origin_resource_type') and res_container.origin_resource_type != resource_object.type_\
+        and not issubtype(resource_object.type_, res_container.origin_resource_type):
+            log.error('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (
+                extended_resource_type, res_container.origin_resource_type, resource_object.type_))
             #raise Inconsistent('The origin_resource_type of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (extended_resource_type, res_container.origin_resource_type, resource_object.type_))
 
         res_container._id = resource_object._id
         res_container.resource = resource_object
+
+        self.set_container_lcstate_info(res_container)
 
         self.set_container_field_values(res_container, ext_exclude)
 
@@ -384,8 +389,16 @@ class ExtendedResourceContainer(object):
 
         return res_container
 
-    #If there is a specified ComputedAttributes object, then create it and iterate over the fields to set the values
+    def set_container_lcstate_info(self, res_container):
+        """Sets lcstate related fields in container"""
+        restype_workflow = get_restype_lcsm(res_container.resource._get_type())
+        if restype_workflow:
+            res_container.lcstate_transitions = restype_workflow.get_successors(res_container.resource.lcstate)
+        else:
+            res_container.lcstate_transitions = {"retire": "RETIRED"}
+
     def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude):
+        #If there is a specified ComputedAttributes object, then create it and iterate over the fields to set the values
 
         if not computed_resource_type or computed_resource_type is None:
             return
