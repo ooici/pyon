@@ -394,7 +394,19 @@ def main(opts, *args, **kwargs):
 
         from IPython import embed_kernel
         ipy_config = _setup_ipython_config()
+
+        # set specific manhole options
+        import tempfile#, shutil
+        temp_dir = tempfile.mkdtemp()
+        ipy_config.Application.ipython_dir = temp_dir
+
         embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
+
+        # @TODO: race condition here versus ipython, this will leave junk in tmp dir
+        #try:
+        #    shutil.rmtree(temp_dir)
+        #except shutil.Error:
+        #    pass
 
     def _setup_ipython_config():
         from IPython.config.loader import Config
