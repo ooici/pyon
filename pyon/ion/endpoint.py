@@ -135,9 +135,6 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         return header
 
-    def _get_sample_name(self):
-        return str(self._process.id)
-
     def _get_sflow_manager(self):
         return self._process.container.sflow_manager
 

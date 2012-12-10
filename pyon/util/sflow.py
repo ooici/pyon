@@ -14,7 +14,6 @@ from socket import socket, AF_INET, SOCK_DGRAM
 import os
 from random import random
 import resource
-import md5
 
 class SFlowManager(object):
     """
@@ -92,7 +91,7 @@ class SFlowManager(object):
 
             # build and send counter structure
             csample = { 'counter_sample': {
-                            'app_name': str(self._container.id),
+                            'app_name': get_sys_name(),
                             'app_resources': {
                                 'user_time': int(res.ru_utime * 1000),
                                 'system_time': int(res.ru_stime * 1000),
@@ -181,11 +180,8 @@ class SFlowManager(object):
 
         log.debug("SFlowManager.transaction: %s.%s", app_name, op)
 
-        # hash the app_name because we only have 32 chars to work with
-        hash_app_name = md5.new(app_name).hexdigest()
-
         tsample = { 'flow_sample':{
-                        'app_name': hash_app_name,
+                        'app_name': app_name,
                         'sampling_rate': self._trans_sample_rate,
                         'app_operation': {
                             'operation': op,
@@ -213,3 +209,4 @@ class SFlowManager(object):
         """
         json_data = json.dumps(data)
         self._udp_socket.sendto(json_data, (self._hsflowd_addr, self._hsflowd_port))
+

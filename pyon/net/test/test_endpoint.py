@@ -764,10 +764,6 @@ Routing method for next test, raises an IonException.
         self.assertRaises(exception.Timeout, e._send, sentinel.msg, sentinel.headers, timeout=1)
         e._sample_request.assert_called_once_with(-1, 'Timeout', sentinel.msg, sentinel.headers, '', {})
 
-    def test__get_sample_name(self):
-        e = RPCResponseEndpointUnit(interceptors={})
-        self.assertEquals(e._get_sample_name(), "unknown-rpc-server")
-
     def test__get_sflow_manager(self):
         Container.instance = None
         e = RPCResponseEndpointUnit(interceptors={})
@@ -788,14 +784,14 @@ Routing method for next test, raises an IonException.
         heads = {'conv-id': sentinel.conv_id,
                  'ts': '1',
                  'op': 'remove_femur',
-                 'sender': sentinel.sender,
-                 'receiver': sentinel.receiver}
+                 'sender': 'sender',
+                 'receiver': 'getter'}
         resp_heads = {'sender-service': 'theservice'}
 
-        samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads, sentinel.qlen)
+        samp = e._build_sample("app_name", 200, "Ok", "msg", heads, "response", resp_heads, sentinel.qlen)
 
         self.assertEquals(samp, {
-            'app_name' : sentinel.name,
+            'app_name' : "app_name",
             'op' : 'remove_femur',
             'attrs' : {'ql':sentinel.qlen},
             'status_descr' : "Ok",
@@ -803,7 +799,7 @@ Routing method for next test, raises an IonException.
             'req_bytes' : len('msg'),
             'resp_bytes': len('response'),
             'uS' : 999000, # it's in microseconds!
-            'initiator' : sentinel.sender,
+            'initiator' : 'sender',
             'target' : 'theservice'
         })
 

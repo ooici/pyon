@@ -1190,28 +1190,18 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         if CFG.get_safe('container.sflow.enabled', False):
             sm = self._get_sflow_manager()
             if sm and sm.should_sample:
-                app_name = self._get_sample_name()
                 try:
                     # get queue length
                     qlen, _ = self.channel.get_stats()
                     qlen += self.channel._recv_queue.qsize()      # add delivered but unproc'd msgs, @TODO correct?
 
-                    trans_kwargs = self._build_sample(app_name, status, status_descr, msg, headers, response, response_headers, qlen)
+                    trans_kwargs = self._build_sample(bootstrap.get_sys_name(), status, status_descr, msg, headers, response, response_headers, qlen)
                     sm.transaction(**trans_kwargs)
                 except Exception:
                     log.exception("Could not sample, ignoring")
 
             else:
                 log.debug("No SFlowManager or it told us not to sample this transaction")
-
-    def _get_sample_name(self):
-        """
-        Gets the app_name that should be used for the sample.
-
-        Typically this would be a process id.
-        """
-        # at the rpc level we really don't know, we're not a process.
-        return "unknown-rpc-server"
 
     def _get_sflow_manager(self):
         """
@@ -1229,6 +1219,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         Builds a transaction sample.
 
         Should return a dict in the form of kwargs to be passed to SFlowManager.transaction.
+        @see sFlow application spec: http://sflow.org/sflow_application.txt
         """
         # build args to pass to transaction
         #extra_attrs = {'conv-id': headers.get('conv-id', ''),
@@ -1263,16 +1254,16 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # status code map => ours to sFlow (defaults to 3 aka INTERNAL_ERROR)
         status = SFlowManager.status_map.get(status, 3)
 
-        sample = {  'app_name':     name,
-                    'op':           op,
-                    'attrs':        extra_attrs,
-                    'status_descr': status_descr,
-                    'status':       str(status),
-                    'req_bytes':    len(str(msg)),
-                    'resp_bytes':   len(str(response)),
-                    'uS':           time_taken,
-                    'initiator':    headers.get('sender', ''),
-                    'target':       svc_name }
+        sample = {'app_name':     name[0:64],
+                  'op':           op[0:32],
+                  'attrs':        extra_attrs,
+                  'status_descr': status_descr[0:64],
+                  'status':       str(status),
+                  'req_bytes':    len(str(msg)),
+                  'resp_bytes':   len(str(response)),
+                  'uS':           time_taken,
+                  'initiator':    headers.get('sender', '')[0:64],
+                  'target':       svc_name[0:64] }
 
         return sample
 
