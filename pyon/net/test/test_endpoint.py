@@ -20,6 +20,7 @@ from pyon.core.interceptor.interceptor import Invocation
 from pyon.net.transport import NameTrio, BaseTransport
 from pyon.util.sflow import SFlowManager
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.core.bootstrap import get_sys_name
 from gevent import sleep
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
@@ -764,6 +765,10 @@ Routing method for next test, raises an IonException.
         self.assertRaises(exception.Timeout, e._send, sentinel.msg, sentinel.headers, timeout=1)
         e._sample_request.assert_called_once_with(-1, 'Timeout', sentinel.msg, sentinel.headers, '', {})
 
+    def test__get_sample_name(self):
+        e = RPCResponseEndpointUnit(interceptors={})
+        self.assertEquals(e._get_sample_name(), "unknown-rpc-server")
+
     def test__get_sflow_manager(self):
         Container.instance = None
         e = RPCResponseEndpointUnit(interceptors={})
@@ -788,12 +793,12 @@ Routing method for next test, raises an IonException.
                  'receiver': 'getter'}
         resp_heads = {'sender-service': 'theservice'}
 
-        samp = e._build_sample("app_name", 200, "Ok", "msg", heads, "response", resp_heads, sentinel.qlen)
+        samp = e._build_sample(sentinel.name, 200, "Ok", "msg", heads, "response", resp_heads, sentinel.qlen)
 
         self.assertEquals(samp, {
-            'app_name' : "app_name",
+            'app_name' : get_sys_name(),
             'op' : 'remove_femur',
-            'attrs' : {'ql':sentinel.qlen},
+            'attrs' : {'ql':sentinel.qlen, 'pid':sentinel.name},
             'status_descr' : "Ok",
             'status' : '0',
             'req_bytes' : len('msg'),

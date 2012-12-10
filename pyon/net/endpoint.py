@@ -1190,18 +1190,28 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         if CFG.get_safe('container.sflow.enabled', False):
             sm = self._get_sflow_manager()
             if sm and sm.should_sample:
+                sample_name = self._get_sample_name()
                 try:
                     # get queue length
                     qlen, _ = self.channel.get_stats()
                     qlen += self.channel._recv_queue.qsize()      # add delivered but unproc'd msgs, @TODO correct?
 
-                    trans_kwargs = self._build_sample(bootstrap.get_sys_name(), status, status_descr, msg, headers, response, response_headers, qlen)
+                    trans_kwargs = self._build_sample(sample_name, status, status_descr, msg, headers, response, response_headers, qlen)
                     sm.transaction(**trans_kwargs)
                 except Exception:
                     log.exception("Could not sample, ignoring")
 
             else:
                 log.debug("No SFlowManager or it told us not to sample this transaction")
+
+    def _get_sample_name(self):
+        """
+        Gets the app_name that should be used for the sample.
+
+        Typically this would be a process id.
+        """
+        # at the rpc level we really don't know, we're not a process.
+        return "unknown-rpc-server"
 
     def _get_sflow_manager(self):
         """
@@ -1239,6 +1249,10 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         if 'process-saturation' in response_headers:
             extra_attrs['ps'] = response_headers['process-saturation']
 
+        # Process ID
+        # for mapping extra attrs to a pid -> passed in as name here
+        extra_attrs['pid'] = name
+
         # uS: process latency
         # 1-way message latency (req to svc ONLY) + processing time
         cur_time_ms = int(get_ion_ts())
@@ -1254,7 +1268,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # status code map => ours to sFlow (defaults to 3 aka INTERNAL_ERROR)
         status = SFlowManager.status_map.get(status, 3)
 
-        sample = {'app_name':     name[0:64],
+        sample = {'app_name':     bootstrap.get_sys_name()[0:64],
                   'op':           op[0:32],
                   'attrs':        extra_attrs,
                   'status_descr': status_descr[0:64],

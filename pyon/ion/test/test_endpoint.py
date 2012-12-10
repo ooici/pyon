@@ -56,6 +56,10 @@ class TestProcessEndpointUnitMixin(PyonTestCase):
         mockipi.assert_has_calls([call(sentinel.proc_outgoing, sentinel.inv)])
         mocknpi.assert_has_calls([call(sentinel.msg_outgoing, sentinel.inv2)])
 
+    def test__get_sample_name(self):
+        ep = ProcessEndpointUnitMixin(process=Mock())
+        self.assertEquals(ep._get_sample_name(), str(ep._process.id))
+
     def test__get_sflow_manager(self):
         ep = ProcessEndpointUnitMixin(process=Mock())
         self.assertEquals(ep._get_sflow_manager(), ep._process.container.sflow_manager)
