@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Resource specific definitions"""
+"""ION Resource definitions and functions. Extended resource framework"""
 
 __author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
