@@ -13,11 +13,9 @@ def get_console_dimensions():
     rows, columns = os.popen('stty size', 'r').read().split()
     return int(rows), int(columns)
 
-
 def get_max_width(table, index):
     """Get the maximum width of the given column index"""
     return max([len(str(row[index])) for row in table])
-
 
 def pprint_table(table, pad=1, indent=0, trunc=None):
     """Prints out a table of data, padded for alignment
@@ -52,7 +50,6 @@ def pprint_table(table, pad=1, indent=0, trunc=None):
 
     return "".join(strl)
 
-
 def pprint_list(l, c, pad=1, indent=0):
     """Pretty prints a list as table and returns string.
     @param l list to print
@@ -85,9 +82,7 @@ def pprint_list(l, c, pad=1, indent=0):
 
     return pprint_table(table, pad, indent)
 
-
 # -------------------------------------------------
-
 
 def ps(ret=False):
     print "List of ION processes"
@@ -96,14 +91,12 @@ def ps(ret=False):
     if ret:
         return container.proc_manager.procs
 
-
 def procs(ret=False):
     print "\nList of pyon processes"
     print "----------------------"
     print "\n".join((str(p) for p in container.proc_manager.proc_sup.children))
     if ret:
         return container.proc_manager.proc_sup.children
-
 
 def ms():
     print "List of messaging endpoints"
@@ -125,12 +118,10 @@ def ms():
         print "\n".join(("  %s, %s" % (ed.name if hasattr(ed, 'name') else '', ed) for ed in sorted(endpoint_by_group[name],
                                         key=lambda ep: (ep.__class__.__name__, getattr(ep, 'name')))))
 
-
 def apps():
     print "List of active pyon apps"
     print "------------------------"
     print "\n".join(("%s: %s" % (appdef.name, appdef) for appdef in container.app_manager.apps))
-
 
 def svc_defs(svcs=None, op=None):
     """Returns service definitions for service name(s)
@@ -164,7 +155,6 @@ def svc_defs(svcs=None, op=None):
 
         print "\nType svc_defs('name') or svc_defs(['name1','name2']) for definition"
         return None
-
 
 def obj_defs(ob=None):
     """Returns object definitions for object name(s)
@@ -235,6 +225,12 @@ def spawn(proc, procname=None):
     procname = procname or proccls
     container.spawn_process(procname, procmod, proccls)
 
+def start_mx():
+    from pyon.public import CFG
+    port = CFG.get_safe('container.flask_webapp.port',8080)
+    container.spawn_process("ContainerUI", "ion.core.containerui", "ContainerUI")
+    print "pycc: Container UI started ... listening on http://localhost:%s" % port
+
 
 def ionhelp():
     print "ION R2 CC interactive shell"
@@ -243,7 +239,7 @@ def ionhelp():
     print "Available variables: %s" % ", ".join(sorted(public_vars.keys()))
 
 # This defines the public API of functions
-public_api = [ionhelp, ps, procs, ms, apps, svc_defs, obj_defs, type_defs, lsdir, spawn]
+public_api = [ionhelp, ps, procs, ms, apps, svc_defs, obj_defs, type_defs, lsdir, spawn, start_mx]
 public_vars = None
 
 
