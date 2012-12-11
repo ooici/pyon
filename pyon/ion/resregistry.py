@@ -402,3 +402,31 @@ class ResourceRegistry(object):
             resource_id, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude)
 
         return extended_resource
+
+class ResourceRegistryServiceWrapper(object):
+    """
+    The purpose of this class is to provide the exact service interface of the resource_registry (YML)
+    interface definition. In particular for create that takes the owner out of the actor header.
+    """
+    def __init__(self, rr, process):
+        self._rr = rr
+        self._process = process
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return getattr(self, attr)
+        return getattr(self._rr, attr)
+
+    def create(self, object=None):
+        ion_actor_id = None
+        if self._process:
+            ctx = self._process.get_context()
+            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
+        return self._rr.create(object=object, actor_id=ion_actor_id)
+
+    def create_attachment(self, resource_id='', attachment=None):
+        ion_actor_id = None
+        if self._process:
+            ctx = self._process.get_context()
+            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
+        return self._rr.create_attachment(resource_id=resource_id, attachment=attachment, actor_id=ion_actor_id)

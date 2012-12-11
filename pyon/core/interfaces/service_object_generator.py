@@ -38,6 +38,7 @@ from collections import OrderedDict, defaultdict
 
 import interface.objects
 from pyon.core.bootstrap import IonObject
+from pyon.ion.resregistry import ResourceRegistryServiceWrapper
 from pyon.service.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient
 from pyon.ion.endpoint import ProcessRPCClient
@@ -92,7 +93,7 @@ ${classmethods}
     @property
     def resource_registry(self):
         if self._process.container is not None and self._process.container.has_capability("RESOURCE_REGISTRY"):
-            return self._process.container.resource_registry
+            return ResourceRegistryServiceWrapper(self._process.container.resource_registry, self._process)
         return self._resource_registry
 '''
     , 'clssdocstr':
