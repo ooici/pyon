@@ -714,7 +714,7 @@ class ProcManager(object):
 
         # Terminate IonProcessThread (may not have one, i.e. simple process)
         # @TODO: move this into process' on_quit()
-        if getattr(process_instance, '_process', None) is not None and process_instance._process and process_instance._process.running:
+        if getattr(process_instance, '_process', None) is not None and process_instance._process:
             process_instance._process.notify_stop()
             process_instance._process.stop()
 
