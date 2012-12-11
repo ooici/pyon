@@ -8,6 +8,7 @@ import types
 from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
+from pyon.core.exception import BadRequest, Inconsistent
 from pyon.ion.resource import RT, PRED, LCS
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
@@ -17,7 +18,11 @@ from interface.services.coi.iorg_management_service import OrgManagementServiceP
 from pyon.core.exception import NotFound, Unauthorized
 from pyon.util.containers import get_ion_ts
 
+#These constants are ubiquitous, so define in the container
 DEFAULT_ACTOR_ID = 'anonymous'
+ORG_MANAGER_ROLE = 'ORG_MANAGER'  # Can only act upon resource within the specific Org
+ORG_MEMBER_ROLE = 'ORG_MEMBER'    # Can only access resources within the specific Org
+ION_MANAGER = 'ION_MANAGER'   # Can act upon resources across all Orgs - like a Super User access
 
 class GovernanceController(object):
 
@@ -136,7 +141,7 @@ class GovernanceController(object):
             return None
 
         if self._container_org_id is None:
-            org, _ = self.container.resource_registry.find_resources(restype=RT.Org,name=self._container_org_name)
+            org, _ = self._rr.find_resources(restype=RT.Org,name=self._container_org_name)
 
             if org:
                 self._container_org_id = org[0]._id
@@ -195,12 +200,40 @@ class GovernanceController(object):
 
         if actor_id:
             try:
-                header_roles = self.get_role_message_headers(self.org_client.find_all_roles_by_user(actor_id))
+                header_roles = self.find_roles_by_actor(actor_id)
                 actor_header = self.build_actor_header(actor_id, header_roles)
             except Exception, e:
                 log.error(e)
 
         return actor_header
+
+
+    def find_roles_by_actor(self, actor_id=None):
+        """Returns a dict of all User Roles roles by Org Name associated with the specified user
+        """
+        if actor_id is None or not len(actor_id):
+            raise BadRequest("The actor_id parameter is missing")
+
+        role_dict = dict()
+
+        role_list,_ = self._rr.find_objects(actor_id, PRED.hasRole, RT.UserRole)
+
+        for role in role_list:
+
+            if not role_dict.has_key(role.org_name):
+                role_dict[role.org_name] = list()
+
+            role_dict[role.org_name].append(role.name)
+
+        #Membership in ION Org is implied
+        if not role_dict.has_key(self._system_root_org_name):
+            role_dict[self._system_root_org_name] = list()
+
+        role_dict[self._system_root_org_name].append(ORG_MEMBER_ROLE)
+
+
+        return role_dict
+
 
     #Returns the ION System Actor defined in the Resource Registry
     def get_system_actor(self):

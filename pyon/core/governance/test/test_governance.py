@@ -10,6 +10,17 @@ from nose.plugins.attrib import attr
 from pyon.core.governance.governance_controller import GovernanceController
 from pyon.core.exception import NotFound, Unauthorized
 from pyon.service.service import BaseService
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.core.bootstrap import IonObject
+from pyon.core.exception import NotFound, Inconsistent
+from pyon.ion.resource import PRED, RT
+from pyon.core.governance.governance_controller import ORG_MANAGER_ROLE, ORG_MEMBER_ROLE, ION_MANAGER
+
+class FakeContainer(object):
+    def __init__(self):
+        self.id = "containerid"
+        self.node = None
+
 
 class UnitTestService(BaseService):
     name = 'UnitTestService'
@@ -34,7 +45,7 @@ class UnitTestService(BaseService):
         return True
 
 @attr('UNIT')
-class GovernanceTest(PyonTestCase):
+class GovernanceUnitTest(PyonTestCase):
 
     governance_controller = None
     
@@ -217,7 +228,91 @@ class GovernanceTest(PyonTestCase):
         self.governance_controller.check_process_operation_preconditions(bs,{}, {'op': 'test_op'})
         self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', self.bad_pre_func2)
 
-class FakeContainer(object):
-    def __init__(self):
-        self.id = "containerid"
-        self.node = None
+
+
+@attr('INT')
+class GovernanceIntTest(IonIntegrationTestCase):
+
+    def setUp(self):
+        self._start_container()
+
+        self.rr = self.container.resource_registry
+
+
+    def add_user_role(self, org='', user_role=None):
+        """Adds a UserRole to an Org. Will call Policy Management Service to actually
+        create the role object that is passed in, if the role by the specified
+        name does not exist. Throws exception if either id does not exist.
+        """
+        user_role.org_id = org._id
+        user_role.org_name = org.name
+        user_role_id,_ = self.rr.create(user_role)
+
+        aid = self.rr.create_association(org._id, PRED.hasRole, user_role_id)
+
+        return user_role_id
+
+    def test_get_actor_header(self):
+
+
+        #Setup data
+        actor = IonObject(RT.ActorIdentity, name='actor1')
+
+        actor_id,_ = self.rr.create(actor)
+
+        ion_org = IonObject(RT.Org, name='ION')
+
+        ion_org_id,_ = self.rr.create(ion_org)
+        ion_org._id = ion_org_id
+
+        manager_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE,label='Org Manager', description='Org Manager')
+        manager_role_id = self.add_user_role(ion_org, manager_role)
+
+        member_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE,label='Org Member', description='Org Member')
+        member_role_id = self.add_user_role(ion_org, member_role)
+
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
+        self.assertDictEqual(actor_roles, {'ION': [ORG_MEMBER_ROLE]})
+
+        actor_header = self.container.governance_controller.get_actor_header(actor_id)
+        self.assertDictEqual(actor_header, {'ion-actor-id': actor_id, 'ion-actor-roles': {'ION': [ORG_MEMBER_ROLE]}})
+
+
+        #Add Org Manager Role
+        aid = self.rr.create_association(actor_id, PRED.hasRole, manager_role_id)
+
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
+        self.assertDictEqual(actor_roles, {'ION': [ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]})
+
+        org2 = IonObject(RT.Org, name='Org2')
+
+        org2_id,_ = self.rr.create(org2)
+        org2._id = org2_id
+
+        manager2_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE,label='Org Manager', description='Org Manager')
+        manager2_role_id = self.add_user_role(org2, manager_role)
+
+        member2_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE,label='Org Member', description='Org Member')
+        member2_role_id = self.add_user_role(org2, member2_role)
+
+        operator2_role = IonObject(RT.UserRole, name='INSTRUMENT_OPERATOR',label='Instrument Operator', description='Instrument Operator')
+        operator2_role_id = self.add_user_role(org2, operator2_role)
+
+        aid = self.rr.create_association(actor_id, PRED.hasRole, member2_role_id)
+
+        aid = self.rr.create_association(actor_id, PRED.hasRole, operator2_role_id)
+
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
+        self.assertEqual(len(actor_roles), 2)
+        self.assertIn('Org2', actor_roles)
+        self.assertEqual(len(actor_roles['Org2']), 2)
+        self.assertIn('INSTRUMENT_OPERATOR', actor_roles['Org2'])
+        self.assertIn(ORG_MEMBER_ROLE, actor_roles['Org2'])
+        self.assertIn('ION', actor_roles)
+        self.assertIn(ORG_MANAGER_ROLE, actor_roles['ION'])
+        self.assertIn(ORG_MEMBER_ROLE, actor_roles['ION'])
+
+        actor_header = self.container.governance_controller.get_actor_header(actor_id)
+
+        self.assertEqual(actor_header['ion-actor-id'], actor_id)
+        self.assertEqual(actor_header['ion-actor-roles'], actor_roles)
