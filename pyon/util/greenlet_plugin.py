@@ -63,7 +63,7 @@ class GreenletLeak(Plugin):
                 else:
                     # self of method greenlet is running (hopefully __repr__ is defined)
                     selfstr = "(none)"
-                    if hasattr(gl._run.im_self):
+                    if hasattr(gl._run, 'im_self'):
                         selfstr = str(gl._run.im_self)
                     table.append(["", "self: " + selfstr])
 
