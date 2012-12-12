@@ -707,13 +707,14 @@ class ResourceAgent(BaseResourceAgent):
         Common work upon every state entry.
         """
         state = self._fsm.get_current_state()
-        log.info('Resource agent %s publsihing state change: %s, time: %s', self.id, state, get_ion_ts())
 
         event_data = {
             'state': state
         }
-        self._event_publisher.publish_event(event_type='ResourceAgentStateEvent',
+        result = self._event_publisher.publish_event(event_type='ResourceAgentStateEvent',
                               origin=self.resource_id, **event_data)
+        log.info('Resource agent %s publsihed state change: %s, time: %s result: %s',
+                 self.id, state, get_ion_ts(), str(result))
 
     def _common_state_exit(self, *args, **kwargs):
         """
