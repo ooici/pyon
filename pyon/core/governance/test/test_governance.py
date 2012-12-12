@@ -244,7 +244,6 @@ class GovernanceIntTest(IonIntegrationTestCase):
         create the role object that is passed in, if the role by the specified
         name does not exist. Throws exception if either id does not exist.
         """
-        user_role.org_id = org._id
         user_role.org_name = org.name
         user_role_id,_ = self.rr.create(user_role)
 

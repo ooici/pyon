@@ -76,7 +76,6 @@ class GovernanceController(object):
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
-            self.org_client = OrgManagementServiceProcessClient(node=self.container.node, process=self.container)
 
     def initialize_from_config(self, config):
 
