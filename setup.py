@@ -20,9 +20,9 @@ setup(  name = 'pyon',
         url = 'https://github.com/ooici/pyon',
         download_url = 'http://sddevrepo.oceanobservatories.org/releases/',
         license = 'Apache 2.0',
-        author = 'Adam R. Smith',
-        author_email = 'a2smith@ucsd.edu',
-        keywords = ['ooici','ioncore', 'pyon'],
+        author = 'Ocean Observatories Initiative',
+        author_email = 'contactooici@oceanobservatories.org',
+        keywords = ['ooi','ooici','pyon'],
         packages = find_packages(),
         entry_points = {
              'nose.plugins.0.10': [
