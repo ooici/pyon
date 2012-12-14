@@ -151,9 +151,13 @@ class StandaloneStreamPublisher(Publisher):
         @param stream_route The StreamRoute to publish on.
         '''
         super(StandaloneStreamPublisher, self).__init__()
+        from pyon.container.cc import Container
         self.stream_id = stream_id
         validate_is_instance(stream_route, StreamRoute, 'stream route is not valid')
         self.stream_route = stream_route
+
+        self.xp = Container.instance.ex_manager.create_xp(stream_route.exchange_point)
+
 
     def publish(self, msg, stream_id='', stream_route=None):
         '''
@@ -165,9 +169,10 @@ class StandaloneStreamPublisher(Publisher):
         '''
         from pyon.container.cc import Container
         stream_id = stream_id or self.stream_id
+        if stream_route:
+            xp = Container.instance.ex_manager.create_xp(stream_route.exchange_point)
         stream_route = stream_route or self.stream_route
-        container = Container.instance
-        xp = container.ex_manager.create_xp(stream_route.exchange_point)
+        xp = self.xp
         super(StandaloneStreamPublisher, self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point': stream_route.exchange_point, 'stream': stream_id or self.stream_id})
 
 
