@@ -740,8 +740,8 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not (subject or obj or predicate or anyside):
             raise BadRequest("Illegal parameters: No S/P/O or anyside")
-        if assoc_type:
-            raise BadRequest("Illegal parameters: assoc_type deprecated")
+        #if assoc_type:
+        #    raise BadRequest("Illegal parameters: assoc_type deprecated")
         if anyside and (subject or obj):
             raise BadRequest("Illegal parameters: anyside cannot be combined with S/O")
         if anyside and predicate and type(anyside) in (list, tuple):
