@@ -744,7 +744,7 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Illegal parameters: assoc_type deprecated")
         if anyside and (subject or obj):
             raise BadRequest("Illegal parameters: anyside cannot be combined with S/O")
-        if anyside and predicate and type(anyside) is list:
+        if anyside and predicate and type(anyside) in (list, tuple):
             raise BadRequest("Illegal parameters: anyside list cannot be combined with P")
 
         if subject:
@@ -766,9 +766,9 @@ class CouchDB_DataStore(DataStore):
         if anyside:
             if type(anyside) is str:
                 anyside_ids = [anyside]
-            elif type(anyside) is list:
-                if not all([type(o) is str for o in anyside]):
-                    raise BadRequest("List of object ids expected")
+            elif type(anyside) in (list, tuple):
+                if not all([type(o) in (str, list, tuple) for o in anyside]):
+                    raise BadRequest("List of object ids or (object id, predicate) expected")
                 anyside_ids = anyside
             else:
                 if "_id" not in anyside:
@@ -800,13 +800,16 @@ class CouchDB_DataStore(DataStore):
                 key.append(predicate)
             endkey = self._get_endkey(key)
             rows = view[key:endkey]
-        elif anyside and predicate:
-            view = ds.view(self._get_viewname("association", "by_idpred"), **view_args)
-            key = [anyside, predicate]
-            endkey = self._get_endkey(key)
-            rows = view[key:endkey]
         elif anyside:
-            rows = ds.view(self._get_viewname("association", "by_id"), keys=anyside_ids, **view_args)
+            if predicate:
+                view = ds.view(self._get_viewname("association", "by_idpred"), **view_args)
+                key = [anyside, predicate]
+                endkey = self._get_endkey(key)
+                rows = view[key:endkey]
+            elif type(anyside_ids[0]) is str:
+                rows = ds.view(self._get_viewname("association", "by_id"), keys=anyside_ids, **view_args)
+            else:
+                rows = ds.view(self._get_viewname("association", "by_idpred"), keys=anyside_ids, **view_args)
         elif predicate:
             view = ds.view(self._get_viewname("association", "by_pred"), **view_args)
             key = [predicate]
