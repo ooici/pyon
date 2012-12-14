@@ -85,7 +85,7 @@ class CouchDB_DataStore(DataStore):
         self._datastore_cache = {}
 
         # Cache to keep resource_id to resource type mappings (for associations)
-        self._restype_cache = LRUCache(maxSize=10000)
+        self._restype_cache = LRUCache(maxSize=10000, maxAgeMs=1800000.0, sizeElasticity=1000)
 
     def close(self):
         log.debug("Closing connection to CouchDB")
