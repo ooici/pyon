@@ -460,6 +460,7 @@ class ExtendedResourceContainer(object):
         assoc_needs = set()
         for field in obj._schema:
 
+
             # Skip any fields that were specifically to be excluded
             if ext_exclude is not None and field in ext_exclude:
                 continue
@@ -484,7 +485,7 @@ class ExtendedResourceContainer(object):
                 elif self.is_compound_association(decorator):
                     deco_value = obj.get_decorator_value(field, decorator)
                     predicates = self.get_compound_association_predicates(decorator)
-                    assoc_list = self.find_associations(object, predicates[0], deco_value)
+                    assoc_list = self.find_associations(resource, predicates[0], deco_value)
                     self.ctx['field_needs'].append((field, "A", (assoc_list, predicates)))
                     for target, dir, assoc in assoc_list:
                         assoc_needs.add((target, predicates[1]))
@@ -499,90 +500,70 @@ class ExtendedResourceContainer(object):
 
                 log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time )
 
-        # Step 2: Read second level of associations as needed
-        # @TODO Can only do 2 level compounds for now. Make recursive
-        if assoc_needs:
-            assocs = self._rr.rr_store.find_associations(anyside=assoc_needs, id_only=False)
-            self._add_associations(assocs)
+        if self.ctx['field_needs']:
+            # Step 2: Read second level of associations as needed
+            # @TODO Can only do 2 level compounds for now. Make recursive
+            if assoc_needs:
+                assocs = self._rr.rr_store.find_associations(anyside=list(assoc_needs), id_only=False)
+                self._add_associations(assocs)
 
-        # Step 3: Determine resource ids to load
-        res_objs = {}
-        resource_ids = set()
-        for field, need_type, needs in self.ctx['field_needs']:
-            if need_type == 'L':
-                for need in needs:
-                    target, dir, assoc = need
-                    resource_ids.add(target)
-            elif need_type == 'O':
-                target, dir, assoc = needs
-                resource_ids.add(target)
-            elif need_type == 'A':
-                assoc_list, predicates = needs
-                for target, dir, assoc in assoc_list:
-                    assoc_list1 = self.find_associations(target, predicates[1], None)
-                    for target1,dir1,assoc1 in assoc_list1:
+            # Step 3: Determine resource ids to load
+            res_objs = {}
+            resource_ids = set()
+            for field, need_type, needs in self.ctx['field_needs']:
+                if need_type == 'L':
+                    for need in needs:
+                        target, dir, assoc = need
                         resource_ids.add(target)
+                elif need_type == 'O':
+                    target, dir, assoc = needs
+                    resource_ids.add(target)
+                elif need_type == 'A':
+                    assoc_list, predicates = needs
+                    for target, dir, assoc in assoc_list:
+                        res_type = assoc.ot if target == assoc.o else assoc.st
+                        assoc_list1 = self.find_associations(target, predicates[1], None, res_type)
+                        for target1,dir1,assoc1 in assoc_list1:
+                            resource_ids.add(target1)
 
-        res_list = self._rr.read_mult(resource_ids)
-        res_objs.update(zip(resource_ids, res_list))
+            res_list = self._rr.read_mult(list(resource_ids))
+            res_objs.update(zip(resource_ids, res_list))
 
-        # Step 4: Set fields with loaded resources
-        for field, need_type, needs in self.ctx['field_needs']:
-            if need_type == 'L':
-                obj_list = []
-                for need in needs:
-                    target, dir, assoc = need
-                    obj_list.append(res_objs[target])
-                setattr(obj, field, obj_list)
-            elif need_type == 'O':
-                target, dir, assoc = needs
-                setattr(obj, field, res_objs[target])
-            elif need_type == 'A':
-                assoc_list, predicates = needs
-                obj_list = []
-                for target, dir, assoc in assoc_list:
-                    assoc_list1 = self.find_associations(target, predicates[1], None)
-                    for target1,dir1,assoc1 in assoc_list1:
-                        obj_list.append(res_objs[target1])
-                setattr(obj, field, obj_list)
+            # Step 4: Set fields with loaded resources
+            for field, need_type, needs in self.ctx['field_needs']:
+                if need_type == 'L':
+                    obj_list = []
+                    for need in needs:
+                        target, dir, assoc = need
+                        obj_list.append(res_objs[target])
+                    setattr(obj, field, obj_list)
+                elif need_type == 'O':
+                    target, dir, assoc = needs
+                    setattr(obj, field, res_objs[target])
+                elif need_type == 'A':
+                    assoc_list, predicates = needs
+                    obj_list = []
+                    for target, dir, assoc in assoc_list:
+                        res_type = assoc.ot if target == assoc.o else assoc.st
+                        assoc_list1 = self.find_associations(target, predicates[1], None, res_type)
+                        obj_list1 = []
+                        for target1,dir1,assoc1 in assoc_list1:
+                            obj_list1.append(res_objs[target1])
+                        obj_list.append(obj_list1)
+                    setattr(obj, field, obj_list)
 
+            self.ctx['field_needs'] = {}
 
-#    def walk_associations(self, object, predicates, deco_value=None, index=0):
-#        """Helper function for walking a chain of predicates"""
-#
-#        #Only pass in the decorator filter value at the first level
-#        assoc_list = self.find_associations(object, predicates[index], deco_value)
-#
-#        #If this is the last predicate then just return whatever was found
-#        if index == len(predicates)-1:
-#            return assoc_list
-#
-#        ret_list = list()
-#        #For each object found, walk the next predicate in the list
-#        for target,dir,assoc in assoc_list:
-#
-#            self.ctx['assoc_needs'].append((field, "L", assoc_list))
-#            #Only pass in the decorator filter value at the first level
-#            ret_obj = self.walk_associations(obj, predicates, None, index + 1)
-#
-#            #We only care about the path from the first level
-#            if index == 0:
-#                ret_list.append(ret_obj)
-#
-#        return ret_list
 
     def set_field_associations(self, obj, field, assoc_list):
         """Sets the field value based on the schema field type"""
         if assoc_list:
             if obj._schema[field]['type'] == 'list':
-                #setattr(obj, field, assoc_list)
                 self.ctx['field_needs'].append((field, "L", assoc_list))
-
             elif obj._schema[field]['type'] == 'int':
                 setattr(obj, field, len(assoc_list))
             else:
                 self.ctx['field_needs'].append((field, "O", assoc_list[0]))
-                #setattr(obj, field, assoc_list[0])
 
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         """This method iterates over the dict of extended field names and associations dynamically passed in."""
@@ -622,13 +603,15 @@ class ExtendedResourceContainer(object):
 
         return list()  # If not found then return empty list
 
-    def find_associations(self, resource, association_predicate, associated_resource=None):
+    def find_associations(self, resource, association_predicate, associated_resource=None, res_type=None):
         """
         Returns a list of associations based on predicates.
         This method figures out appropriate association call based on the predicate definitions
         """
 
         assoc_list = []
+        res_type = res_type or resource.type_
+        resource_id = resource if type(resource) is str else resource._id
 
         #First validate the association predicate
         pred = Predicates[association_predicate]
@@ -640,24 +623,24 @@ class ExtendedResourceContainer(object):
             associated_resource = None
 
         #Need to check through all of these in this order to account for specific vs base class inclusions
-        if self.is_predicate_association(pred, 'domain', resource.type_):
-            assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='>'))
+        if self.is_predicate_association(pred, 'domain', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='>'))
 
             # If no objects were found, try finding as subjects just in case.
             # Note: this was non-functional in current code. Ignore.
-            #assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='<'))
+            #assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='<'))
 
-        elif self.is_predicate_association(pred, 'range', resource.type_):
-            assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='<'))
+        elif self.is_predicate_association(pred, 'range', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='<'))
 
-        elif self.is_predicate_association_extension(pred, 'domain', resource.type_):
-            assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='>'))
+        elif self.is_predicate_association_extension(pred, 'domain', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='>'))
 
             # If no objects were found, try finding as subjects just in case.
-            assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='<'))
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='<'))
 
-        elif self.is_predicate_association_extension(pred, 'range', resource.type_):
-            assoc_list.extend(self._find_associations(resource._id, association_predicate, associated_resource, direction='<'))
+        elif self.is_predicate_association_extension(pred, 'range', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, associated_resource, direction='<'))
 
         return assoc_list
 
