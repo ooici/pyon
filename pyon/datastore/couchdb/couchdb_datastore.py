@@ -21,6 +21,7 @@ from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.containers import get_ion_ts
 from pyon.util.stats import StatsCounter
+from pyon.util.lru_cache import LRUCache
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
 # prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
@@ -83,10 +84,14 @@ class CouchDB_DataStore(DataStore):
         self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
+        # Cache to keep resource_id to resource type mappings (for associations)
+        self._restype_cache = LRUCache(maxSize=10000)
+
     def close(self):
         log.debug("Closing connection to CouchDB")
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
+        self._restype_cache.clear()
 
     def _get_datastore(self, datastore_name=None):
         datastore_name = datastore_name or self.datastore_name
@@ -168,6 +173,7 @@ class CouchDB_DataStore(DataStore):
         if not isinstance(obj, IonObjectBase):
             raise BadRequest("Obj param is not instance of IonObjectBase")
 
+
         return self.create_doc(self._ion_object_to_persistence_dict(obj),
                                object_id=object_id, datastore_name=datastore_name,
                                attachments=attachments)
@@ -201,14 +207,16 @@ class CouchDB_DataStore(DataStore):
         except ResourceConflict:
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
-        id, version = res
+        obj_id, version = res
+        if "type_" in doc:
+            self._restype_cache.put(obj_id, doc["type_"])
         if attachments is not None:
             # Need to iterate through attachments because couchdb_python does not support binary
             # content in db.save()
             for att_name, att_value in attachments.iteritems():
-                self.create_attachment(id, att_name, att_value['data'],
+                self.create_attachment(obj_id, att_name, att_value['data'],
                     content_type=att_value.get('content_type', ''), datastore_name=datastore_name)
-        return (id, version)
+        return obj_id, version
 
     def create_mult(self, objects, object_ids=None, allow_ids=False):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
@@ -244,6 +252,10 @@ class CouchDB_DataStore(DataStore):
                       % (len(res) - len(errors), "\n".join(errors)))
         else:
             log.debug('create_doc_mult result: %s', str(res))
+            for doc in docs:
+                if "type_" in doc:
+                    self._restype_cache.put(doc["_id"], doc["type_"])
+
         return res
 
     def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
@@ -285,6 +297,8 @@ class CouchDB_DataStore(DataStore):
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         log.debug('read doc contents: %s', doc)
         self._count(read=1)
+        if "type_" in doc:
+            self._restype_cache.put(doc["_id"], doc["type_"])
         return doc
 
     def read_mult(self, object_ids, datastore_name=""):
@@ -307,6 +321,9 @@ class CouchDB_DataStore(DataStore):
             raise NotFound("\n".join(notfound_list))
 
         doc_list = [row.doc.copy() for row in docs]
+        for doc in doc_list:
+            if "type_" in doc:
+                self._restype_cache.put(doc["_id"], doc["type_"])
         self._count(read_mult_call=1, read_mult_obj=len(doc_list))
         return doc_list
 
@@ -396,7 +413,7 @@ class CouchDB_DataStore(DataStore):
         log.debug('Deleting object %s/%s', datastore_name, doc_id)
 
         if del_associations:
-            assoc_ids = self.find_associations(anyobj=doc_id, id_only=True)
+            assoc_ids = self.find_associations(anyside=doc_id, id_only=True)
             self.delete_doc_mult(assoc_ids)
 #            for aid in assoc_ids:
 #                self.delete(aid, datastore_name=datastore_name)
@@ -447,33 +464,37 @@ class CouchDB_DataStore(DataStore):
         log.debug('Deleted attachment: %s', attachment_name)
         self._count(delete_attachment=1)
 
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type='H2H'):
+    def create_association(self, subject=None, predicate=None, obj=None, assoc_type=None):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if not subject or not predicate or not obj:
+        #if assoc_type:
+        #    raise BadRequest("assoc_type deprecated")
+        if not (subject and predicate and obj):
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
-            subject = self.read(subject_id)
+            subject_type = self._restype_cache.get(subject_id, None)
+            if not subject_type:
+                subject = self.read(subject_id)
+                subject_type = subject._get_type()
         else:
             if "_id" not in subject or "_rev" not in subject:
                 raise BadRequest("Subject id or rev not available")
             subject_id = subject._id
-        st = type(subject).__name__
+            subject_type = subject._get_type()
 
         if type(obj) is str:
             object_id = obj
-            obj = self.read(object_id)
+            object_type = self._restype_cache.get(object_id, None)
+            if not object_type:
+                obj = self.read(object_id)
+                object_type = obj._get_type()
         else:
             if "_id" not in obj or "_rev" not in obj:
                 raise BadRequest("Object id or rev not available")
             object_id = obj._id
-        ot = type(obj).__name__
-
-        assoc_type = assoc_type or 'H2H'
-        if not assoc_type in AT:
-            raise BadRequest("Unsupported assoc_type: %s" % assoc_type)
+            object_type = obj._get_type()
 
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
@@ -485,38 +506,33 @@ class CouchDB_DataStore(DataStore):
             pt = Predicates.get(predicate)
         except AttributeError:
             raise BadRequest("Predicate unknown %s" % predicate)
-        if not st in pt['domain']:
+        if not subject_type in pt['domain']:
             found_st = False
             for domt in pt['domain']:
-                if st in getextends(domt):
+                if subject_type in getextends(domt):
                     found_st = True
                     break
             if not found_st:
-                raise BadRequest("Illegal subject type %s for predicate %s" % (st, predicate))
-        if not ot in pt['range']:
+                raise BadRequest("Illegal subject type %s for predicate %s" % (subject_type, predicate))
+        if not object_type in pt['range']:
             found_ot = False
             for rant in pt['range']:
-                if ot in getextends(rant):
+                if object_type in getextends(rant):
                     found_ot = True
                     break
             if not found_ot:
-                raise BadRequest("Illegal object type %s for predicate %s" % (ot, predicate))
+                raise BadRequest("Illegal object type %s for predicate %s" % (object_type, predicate))
 
         # Finally, ensure this isn't a duplicate
-        assoc_list = self.find_associations(subject, predicate, obj, assoc_type, False)
+        assoc_list = self.find_associations(subject, predicate, obj, id_only=False)
         if len(assoc_list) != 0:
             assoc = assoc_list[0]
-            if assoc_type == 'H2H':
-                raise BadRequest("Association between %s and %s with predicate %s and type %s already exists" % (subject, obj, predicate, assoc_type))
-            else:
-                if subject._rev == assoc.srv and obj._rev == assoc.orv:
-                    raise BadRequest("Association between %s and %s with predicate %s and type %s already exists" % (subject, obj, predicate, assoc_type))
+            raise BadRequest("Association between %s and %s with predicate %s already exists" % (subject, obj, predicate))
 
         assoc = IonObject("Association",
-            at=assoc_type,
-            s=subject_id, st=st, srv=subject._rev,
+            s=subject_id, st=subject_type,
             p=predicate,
-            o=object_id, ot=ot, orv=obj._rev,
+            o=object_id, ot=object_type,
             ts=get_ion_ts())
         self._count(_create_assoc=1)
         return self.create(assoc, create_unique_association_id())
@@ -605,7 +621,7 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Must provide object id")
         ds, datastore_name = self._get_datastore(datastore_name)
 
-        assoc_ids = self.find_associations(anyobj=obj_id, id_only=True, limit=1)
+        assoc_ids = self.find_associations(anyside=obj_id, id_only=True, limit=1)
         if assoc_ids:
             log.debug("Object found as object in associations: %s", assoc_ids)
             return True
@@ -644,7 +660,6 @@ class CouchDB_DataStore(DataStore):
         else:
             return self.read_mult(ids), assocs
 
-
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
         if type(id_only) is not bool:
@@ -668,8 +683,7 @@ class CouchDB_DataStore(DataStore):
             key.append(predicate)
             if object_type:
                 key.append(object_type)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         obj_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
@@ -706,8 +720,7 @@ class CouchDB_DataStore(DataStore):
             key.append(predicate)
             if subject_type:
                 key.append(subject_type)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         sub_assocs = [self._persistence_dict_to_ion_object(row['value']) for row in rows]
@@ -721,18 +734,18 @@ class CouchDB_DataStore(DataStore):
         sub_list = self.read_mult(sub_ids)
         return (sub_list, sub_assocs)
 
-    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True, anyobj=None, **kwargs):
-        log.debug("find_associations(subject=%s, predicate=%s, object=%s)", subject, predicate, obj)
+    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True, anyside=None, **kwargs):
+        log.debug("find_associations(subject=%s, predicate=%s, object=%s, anyside=%s)", subject, predicate, obj, anyside)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
-        if not (subject and obj or predicate or anyobj):
-            raise BadRequest("Illegal parameters")
-        if assoc_type and not predicate:
-            raise BadRequest("Illegal parameters")
-
-        # Support
-        if subject is None and obj is None and anyobj:
-            subject = anyobj
+        if not (subject or obj or predicate or anyside):
+            raise BadRequest("Illegal parameters: No S/P/O or anyside")
+        if assoc_type:
+            raise BadRequest("Illegal parameters: assoc_type deprecated")
+        if anyside and (subject or obj):
+            raise BadRequest("Illegal parameters: anyside cannot be combined with S/O")
+        if anyside and predicate and type(anyside) is list:
+            raise BadRequest("Illegal parameters: anyside list cannot be combined with P")
 
         if subject:
             if type(subject) is str:
@@ -750,35 +763,54 @@ class CouchDB_DataStore(DataStore):
                     raise BadRequest("Object id not available in object")
                 else:
                     object_id = obj._id
+        if anyside:
+            if type(anyside) is str:
+                anyside_ids = [anyside]
+            elif type(anyside) is list:
+                if not all([type(o) is str for o in anyside]):
+                    raise BadRequest("List of object ids expected")
+                anyside_ids = anyside
+            else:
+                if "_id" not in anyside:
+                    raise BadRequest("Object id not available in anyside")
+                else:
+                    anyside_ids = [anyside._id]
 
         ds, datastore_name = self._get_datastore()
         view_args = self._get_view_args(kwargs)
 
         if subject and obj:
-            view = ds.view(self._get_viewname("association", "by_ids"), **view_args)
+            view = ds.view(self._get_viewname("association", "by_match"), **view_args)
             key = [subject_id, object_id]
             if predicate:
                 key.append(predicate)
-            if assoc_type:
-                key.append(assoc_type)
-            endkey = list(key)
-            endkey.append(END_MARKER)
+            endkey = self._get_endkey(key)
             rows = view[key:endkey]
         elif subject:
-            view = ds.view(self._get_viewname("association", "by_id"), **view_args)
+            view = ds.view(self._get_viewname("association", "by_sub"), **view_args)
             key = [subject_id]
             if predicate:
                 key.append(predicate)
-            if assoc_type:
-                key.append(assoc_type)
-            endkey = list(key)
-            endkey.append(END_MARKER)
+            endkey = self._get_endkey(key)
             rows = view[key:endkey]
+        elif obj:
+            view = ds.view(self._get_viewname("association", "by_obj"), **view_args)
+            key = [object_id]
+            if predicate:
+                key.append(predicate)
+            endkey = self._get_endkey(key)
+            rows = view[key:endkey]
+        elif anyside and predicate:
+            view = ds.view(self._get_viewname("association", "by_idpred"), **view_args)
+            key = [anyside, predicate]
+            endkey = self._get_endkey(key)
+            rows = view[key:endkey]
+        elif anyside:
+            rows = ds.view(self._get_viewname("association", "by_id"), keys=anyside_ids, **view_args)
         elif predicate:
             view = ds.view(self._get_viewname("association", "by_pred"), **view_args)
             key = [predicate]
-            endkey = list(key)
-            endkey.append(END_MARKER)
+            endkey = self._get_endkey(key)
             rows = view[key:endkey]
         else:
             raise BadRequest("Illegal arguments")
@@ -831,8 +863,7 @@ class CouchDB_DataStore(DataStore):
             key = [restype]
             if lcstate:
                 key.append(lcstate)
-            endkey = list(key)
-            endkey.append(END_MARKER)
+            endkey = self._get_endkey(key)
             rows = view[key:endkey]
         else:
             rows = view
@@ -862,8 +893,7 @@ class CouchDB_DataStore(DataStore):
             key = [0, lcstate]
         if restype:
             key.append(restype)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         if is_hierarchical:
@@ -890,8 +920,7 @@ class CouchDB_DataStore(DataStore):
         key = [name]
         if restype:
             key.append(restype)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         res_assocs = [dict(name=row['key'][0], type=row['key'][1], lcstate=row['key'][2], id=row.id) for row in rows]
@@ -916,8 +945,7 @@ class CouchDB_DataStore(DataStore):
         key = [keyword]
         if restype:
             key.append(restype)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         res_assocs = [dict(keyword=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
@@ -942,8 +970,7 @@ class CouchDB_DataStore(DataStore):
         key = [nested_type]
         if restype:
             key.append(restype)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         res_assocs = [dict(nested_type=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
@@ -968,8 +995,7 @@ class CouchDB_DataStore(DataStore):
         key = [restype, attr_name]
         if attr_value:
             key.append(attr_value)
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         res_assocs = [dict(type=row['key'][0], attr_name=row['key'][1], attr_value=row['key'][2], id=row.id) for row in rows]
@@ -999,8 +1025,7 @@ class CouchDB_DataStore(DataStore):
             if alt_id_ns is not None:
                 key.append(alt_id_ns)
 
-        endkey = list(key)
-        endkey.append(END_MARKER)
+        endkey = self._get_endkey(key)
         rows = view[key:endkey]
 
         if alt_id_ns and not alt_id:
@@ -1073,6 +1098,13 @@ class CouchDB_DataStore(DataStore):
 
         log.info("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
+
+    def _get_endkey(self, startkey):
+        if startkey is None or type(startkey) is not list:
+            raise BadRequest("Cannot create endkey for type %s" % type(startkey))
+        endkey = list(startkey)
+        endkey.append(END_MARKER)
+        return endkey
 
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None
