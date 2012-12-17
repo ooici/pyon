@@ -244,10 +244,11 @@ class ResourceAgent(BaseResourceAgent):
 
     def get_agent_parameters(self):
         """
-        """
-        params = [x.lstrip('aparam_') for x in vars(self).keys() if x.startswith('aparam_')]
+        """            
+        params = [x[7:] for x in vars(self).keys() if x.startswith('aparam_') \
+                  and not x.startswith('aparam_set_')]
         return params
-
+    
     def _filter_capabilities(self, events):
         """
         """
