@@ -661,13 +661,26 @@ class Publisher(SendingBaseEndpoint):
             if not isinstance(to_name, NameTrio):
                 to_name = NameTrio(bootstrap.get_sys_name(), to_name)   # ensure NT before
 
-        if self._pub_ep is None or (to_name is not None and self._pub_ep.channel._send_name.exchange != to_name.exchange):
-            self._pub_ep = self.create_endpoint(to_name or self._send_name)
+        # only use the cached pub_ep if to_name is None
+        ep = None
+        if to_name is None:
 
-        if to_name is not None:
-            self._pub_ep.channel.connect(to_name)
+            # we may have to create the cached ep
+            if self._pub_ep is None:
 
-        self._pub_ep.send(msg, headers)
+                # send_name better have been specified in the constructor then
+                if self._send_name is None:
+                    raise EndpointError("Publisher has no address to send to, specify to_name on publish or send_name in initializer")
+
+                self._pub_ep = self.create_endpoint(self._send_name)
+                self._pub_ep.channel.connect(self._send_name)
+
+            ep = self._pub_ep
+        else:
+            ep = self.create_endpoint(to_name)
+            ep.channel.connect(to_name)
+
+        ep.send(msg, headers)
 
     def close(self):
         """

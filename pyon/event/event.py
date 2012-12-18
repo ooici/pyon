@@ -91,12 +91,6 @@ class EventPublisher(Publisher):
         to_name = (self._send_name.exchange, topic)
         log.trace("Publishing event message to %s", to_name)
 
-        ###
-        ### evil debugging
-        ###
-        if event_type == 'ResourceAgentStateEvent':
-            log.info("Pubbing RAE to %s: %s", to_name, event_msg)
-
         try:
             self.publish(event_msg, to_name=to_name)
         except Exception as ex:
