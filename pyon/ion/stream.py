@@ -157,6 +157,7 @@ class StandaloneStreamPublisher(Publisher):
         self.stream_route = stream_route
 
         self.xp = Container.instance.ex_manager.create_xp(stream_route.exchange_point)
+        self.xp_route = self.xp.create_route(stream_route.routing_key)
 
 
     def publish(self, msg, stream_id='', stream_route=None):
@@ -170,10 +171,12 @@ class StandaloneStreamPublisher(Publisher):
         from pyon.container.cc import Container
         stream_id = stream_id or self.stream_id
         xp = self.xp
+        xp_route = self.xp_route
         if stream_route:
             xp = Container.instance.ex_manager.create_xp(stream_route.exchange_point)
+            xp_route = xp.create_route(stream_route.routing_key)
         stream_route = stream_route or self.stream_route
-        super(StandaloneStreamPublisher, self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point': stream_route.exchange_point, 'stream': stream_id or self.stream_id})
+        super(StandaloneStreamPublisher, self).publish(msg, to_name=xp_route, headers={'exchange_point': stream_route.exchange_point, 'stream': stream_id or self.stream_id})
 
 
 class StandaloneStreamSubscriber(Subscriber):
