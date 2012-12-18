@@ -681,6 +681,8 @@ class Publisher(SendingBaseEndpoint):
             ep.channel.connect(to_name)
 
         ep.send(msg, headers)
+        if ep != self._pub_ep:
+            ep.close()
 
     def close(self):
         """
