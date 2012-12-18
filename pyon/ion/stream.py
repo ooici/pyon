@@ -169,10 +169,10 @@ class StandaloneStreamPublisher(Publisher):
         '''
         from pyon.container.cc import Container
         stream_id = stream_id or self.stream_id
+        xp = self.xp
         if stream_route:
             xp = Container.instance.ex_manager.create_xp(stream_route.exchange_point)
         stream_route = stream_route or self.stream_route
-        xp = self.xp
         super(StandaloneStreamPublisher, self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point': stream_route.exchange_point, 'stream': stream_id or self.stream_id})
 
 
