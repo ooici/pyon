@@ -59,6 +59,7 @@ class IonProcessThread(PyonThread):
         self._cleanup_method    = cleanup_method
 
         self.thread_manager     = ThreadManager(failure_notify_callback=self._child_failed) # bubbles up to main thread manager
+        self._dead_children     = []        # save any dead children for forensics
         self._ctrl_thread       = None
         self._ctrl_queue        = Queue()
         self._ready_control     = Event()
@@ -146,6 +147,14 @@ class IonProcessThread(PyonThread):
 
         Propogates the error up to the process supervisor.
         """
+        # remove the child from the list of children (so we can shut down cleanly)
+        for x in self.thread_manager.children:
+            if x.proc == child:
+                self.thread_manager.children.remove(x)
+                break
+        self._dead_children.append(child)
+
+        # kill this main, we should be noticed by the container's proc manager
         self.proc.kill(child.exception)
 
     def add_endpoint(self, listener):
