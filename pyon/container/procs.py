@@ -432,7 +432,7 @@ class ProcManager(object):
 
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
-        self._set_publisher_endpoints(process_instance, publish_streams)
+        pub_names = self._set_publisher_endpoints(process_instance, publish_streams)
 
         rsvc = self._create_listening_endpoint(node=self.container.node,
                                                from_name=process_instance.id,
@@ -440,7 +440,11 @@ class ProcManager(object):
                                                process=process_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc)
+        def cleanup(*args):
+            self._cleanup_method(process_instance.id, rsvc)
+            for name in pub_names:
+                p = getattr(process_instance, name)
+                p.close()
 
         proc = self.proc_sup.spawn(name=process_instance.id,
                                    service=process_instance,
@@ -550,8 +554,16 @@ class ProcManager(object):
                                                service=process_instance,
                                                process=process_instance)
 
+        # Add publishers if any...
+        publish_streams = get_safe(config, "process.publish_streams")
+        pub_names = self._set_publisher_endpoints(process_instance, publish_streams)
+
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
-        cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc)
+        def cleanup(*args):
+            self._cleanup_method(process_instance.id, rsvc)
+            for name in pub_names:
+                p = getattr(process_instance, name)
+                p.close()
 
         proc = self.proc_sup.spawn(name=process_instance.id,
                                    service=process_instance,
@@ -568,10 +580,6 @@ class ProcManager(object):
 
         self._process_init(process_instance)
         self._process_start(process_instance)
-
-        # Add publishers if any...
-        publish_streams = get_safe(config, "process.publish_streams")
-        self._set_publisher_endpoints(process_instance, publish_streams)
 
         try:
             proc.start_listeners()
@@ -592,10 +600,24 @@ class ProcManager(object):
         process_instance = self._create_process_instance(process_id, name, module, cls, config)
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
-        self._set_publisher_endpoints(process_instance, publish_streams)
+        pub_names = self._set_publisher_endpoints(process_instance, publish_streams)
+
+        # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
+        def cleanup(*args):
+            self._cleanup_method(process_instance.id, rsvc)
+            for name in pub_names:
+                p = getattr(process_instance, name)
+                p.close()
+
+        proc = self.proc_sup.spawn(name=process_instance.id,
+                                   service=process_instance,
+                                   listeners=[],
+                                   proc_name=process_instance._proc_name,
+                                   cleanup_method=cleanup)
+        self.proc_sup.ensure_ready(proc, "_spawn_simple_process for %s" % process_instance.id)
+
         self._process_init(process_instance)
         self._process_start(process_instance)
-
 
         return process_instance
 
@@ -721,12 +743,16 @@ class ProcManager(object):
     def _set_publisher_endpoints(self, process_instance, publisher_streams=None):
 
         publisher_streams = publisher_streams or {}
+        names = []
 
         for name, stream_id in publisher_streams.iteritems():
             # problem is here
             pub = StreamPublisher(process=process_instance, stream_id=stream_id)
 
             setattr(process_instance, name, pub)
+            names.append(name)
+
+        return names
 
     def _register_process(self, process_instance, name):
         """
