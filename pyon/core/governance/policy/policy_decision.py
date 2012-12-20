@@ -201,16 +201,19 @@ class PolicyDecisionPointManager(object):
         #If this process is not associated wiht the root Org, then iterate over the roles associated with the user only for
         #the Org that this process is associated with otherwise include all roles and create attributes for each
         if org_name == self.governance_controller._system_root_org_name:
+            log.debug("Including roles for all Orgs")
             #If the process Org name is the same for the System Root Org, then include all of them to be safe
             for org in actor_roles:
                 self.create_org_role_attribute(actor_roles[org],subject)
         else:
             if actor_roles.has_key(org_name):
+                log.debug("Org Roles: ", actor_roles[org_name])
                 self.create_org_role_attribute(actor_roles[org_name],subject)
 
             #Handle the special case for the ION system actor
             if actor_roles.has_key(self.governance_controller._system_root_org_name):
                 if 'ION_MANAGER' in actor_roles[self.governance_controller._system_root_org_name]:
+                    log.debug("Including ION_MANAGER role")
                     self.create_org_role_attribute(['ION_MANAGER'],subject)
 
 
