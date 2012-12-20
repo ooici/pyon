@@ -85,6 +85,13 @@ class ResourceAgentEvent(BaseEnum):
     DONE = 'RESOURCE_AGENT_EVENT_DONE'
     PING_RESOURCE = 'RESOURCE_AGENT_PING_RESOURCE'
 
+class ResourceAgentStreamStatus(BaseEnum):
+    """
+    Status values for stream monitors and alerts.
+    """
+    ALL_CLEAR = 'RESOURCE_AGENT_STREAM_STATUS_ALL_CLEAR'
+    WARNING = 'RESOURCE_AGENT_STREAM_STATUS_WARNING'
+    ALARM = 'RESOURCE_AGENT_STREAM_STATUS_ALARM'
 
 class ResourceAgent(BaseResourceAgent):
     """
