@@ -305,45 +305,43 @@ class ResourceAgent(BaseResourceAgent):
                 val = getattr(self, key)
                 result[x] = val
 
-            except TypeError:
-                raise BadRequest('Bad agent parameter name: %s' % str(x))
-
-            except AttributeError:
-                raise BadRequest('Unknown agent parameter: %s' % x)
+            except (TypeError, AttributeError):
+                raise BadRequest('Bad agent parameter: %s.', str(x))
 
         return result
 
     def set_agent(self, resource_id='', params={}):
         """
         """
+        retval = {}
         for (x, val) in params.iteritems():
             try:
+                
                 key = 'aparam_' + x
                 getattr(self, key)
 
-                set_key = 'aparam_set_' + x
-                try:
-                    set_func = getattr(self, set_key)
+            except (TypeError, AttributeError):
+                raise BadRequest('Bad agent parameter: %s', str(x))
 
-                except AttributeError:
-                    set_func = None
-
-                else:
-                    if not callable(set_func):
-                        set_func = None
-
-                if set_func:
-                    set_func(val)
-
-                else:
-                    setattr(self, key, val)
-
-            except TypeError:
-                raise BadRequest('Bad agent parameter name: %s' % str(x))
-
+        for (x, val) in params.iteritems():
+                
+            key = 'aparam_' + x
+            set_key = 'aparam_set_' + x
+            try:
+                set_func = getattr(self, set_key)
             except AttributeError:
-                raise BadRequest('Unknown agent parameter: %s' % x)
+                set_func = None
+            
+            if set_func and callable(set_func):
+                retval[x] = set_func(val)
 
+            elif set_func:
+                retval[x] = -1
+                    
+            else:
+                setattr(self, key, val)
+                retval[x] = 0
+                    
     def get_agent_state(self, resource_id=''):
         """
         Return resource agent current common fsm state.
