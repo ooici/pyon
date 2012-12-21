@@ -604,7 +604,6 @@ class ProcManager(object):
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
         def cleanup(*args):
-            self._cleanup_method(process_instance.id, rsvc)
             for name in pub_names:
                 p = getattr(process_instance, name)
                 p.close()

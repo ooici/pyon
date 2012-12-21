@@ -412,7 +412,7 @@ class IonProcessThread(PyonThread):
             try:
                 self._cleanup_method(self)
             except Exception as ex:
-                log.warn("Cleanup method error, attempting to ignore: %s", ex)
+                log.warn("Cleanup method error, attempting to ignore: %s\nTraceback: %s", ex, traceback.format_exc())
 
     def get_ready_event(self):
         """
