@@ -207,7 +207,7 @@ class PolicyDecisionPointManager(object):
                 self.create_org_role_attribute(actor_roles[org],subject)
         else:
             if actor_roles.has_key(org_name):
-                log.debug("Org Roles: ", actor_roles[org_name])
+                log.debug("Org Roles (%s): %s" , org_name, ' '.join(actor_roles[org_name]))
                 self.create_org_role_attribute(actor_roles[org_name],subject)
 
             #Handle the special case for the ION system actor
