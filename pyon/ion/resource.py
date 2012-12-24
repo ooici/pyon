@@ -7,13 +7,13 @@ __license__ = 'Apache 2.0'
 
 import types
 import time
+
 from pyon.core.registry import getextends, issubtype
 from pyon.core.bootstrap import IonObject, get_service_registry
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
 from pyon.util.log import log
-from interface.objects import ComputedValueAvailability
 
 
 # Object Types
@@ -37,7 +37,6 @@ AT = AssociationType
 
 #Compound Associations
 CompoundAssociations = DotDict()
-
 
 # Life cycle states
 LifeCycleStates = DotDict()
@@ -307,7 +306,10 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
 
 
 class ExtendedResourceContainer(object):
-
+    """
+    Class to support creating and filling extended resource containers.
+    @todo rename to ExtendedResourceUtil
+    """
     def __init__(self, serv_prov, res_registry=None):
         self.service_provider = serv_prov
         if res_registry is not None:
@@ -318,14 +320,17 @@ class ExtendedResourceContainer(object):
             else:
                 self._rr = self.service_provider.clients.resource_registry
 
-
+        # Keeps a context used during evaluation of the resource container fields
+        self.ctx = None
 
     def create_extended_resource_container_list(self, extended_resource_type, resource_id_list,
                                                 computed_resource_type=None, origin_resource_type=None,
                                                 ext_associations=None, ext_exclude=None):
-
+        """
+        Returns a list of extended resource containers for given list of resource_ids.
+        """
         if not isinstance(resource_id_list, types.ListType):
-            raise Inconsistent("The paramater resource_id_list is not a list of resource_ids")
+            raise Inconsistent("The parameter resource_id_list is not a list of resource_ids")
 
         ret = list()
         for res_id in resource_id_list:
@@ -337,8 +342,11 @@ class ExtendedResourceContainer(object):
 
     def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
                                            ext_associations=None, ext_exclude=None):
-
+        """
+        Returns an extended resource container for a given resource_id.
+        """
         overall_start_time = time.time()
+        self.ctx = None  # Clear the context in case this instance gets reused
 
         if not isinstance(resource_id, types.StringType):
             raise Inconsistent("The parameter resource_id is not a single resource id string")
@@ -373,12 +381,19 @@ class ExtendedResourceContainer(object):
         res_container._id = resource_object._id
         res_container.resource = resource_object
 
+        # Initialize context object field and load resource associations
+        self._prepare_context(resource_object._id)
+
+        # Fill lcstate related resource container fields
         self.set_container_lcstate_info(res_container)
 
+        # Fill resource container fields
         self.set_container_field_values(res_container, ext_exclude)
 
+        # Fill computed attributes
         self.set_computed_attributes(res_container, computed_resource_type, ext_exclude)
 
+        # Fill additional associations
         self.set_extended_associations(res_container, ext_associations, ext_exclude)
 
         res_container.ts_created = get_ion_ts()
@@ -390,16 +405,27 @@ class ExtendedResourceContainer(object):
         return res_container
 
     def set_container_lcstate_info(self, res_container):
-        """Sets lcstate related fields in container"""
+        """
+        Set lcstate related fields in resource container, such as available lcstate transitions.
+        This is true for all resources, independent of the type.
+        """
         restype_workflow = get_restype_lcsm(res_container.resource._get_type())
         if restype_workflow:
             res_container.lcstate_transitions = restype_workflow.get_successors(res_container.resource.lcstate)
         else:
             res_container.lcstate_transitions = {"retire": "RETIRED"}
 
-    def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude):
-        #If there is a specified ComputedAttributes object, then create it and iterate over the fields to set the values
+    def set_container_field_values(self, res_container, ext_exclude):
+        """
+        Sets resource container fields that are not extended or computed.
+        """
+        self.set_object_field_values(res_container, res_container.resource, ext_exclude)
 
+    def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude):
+        """
+        Creates the specified ComputedAttributes object if given and iterate over the fields
+        to set the computed values.
+        """
         if not computed_resource_type or computed_resource_type is None:
             return
 
@@ -407,25 +433,29 @@ class ExtendedResourceContainer(object):
 
         self.set_object_field_values(res_container.computed, res_container.resource, ext_exclude)
 
-    #Wrapper method
-    def set_container_field_values(self, res_container, ext_exclude):
-        self.set_object_field_values(res_container, res_container.resource, ext_exclude)
-
-    #Iterate through all of the fields of the resource container object and set accordingly
     def set_object_field_values(self, obj, resource, ext_exclude):
+        """
+        Iterate through all fields of the given object and set values according
+        to the field type and decorator definition in the object type schema.
+        """
+
+        # Step 1: Determine needs to fill fields with resource objects.
+        field_needs = []         # Fields that need to be set in a subsequent step
+        resource_needs = set()   # Resources to read by id based on needs
+        assoc_needs = set()      # Compound associations to follow
 
         for field in obj._schema:
 
-            #Skip any fields that were specifically to be excluded
+            # Skip any fields that were specifically to be excluded
             if ext_exclude is not None and field in ext_exclude:
                 continue
 
-            #Iterate over all of the decorators for the field
+            # Iterate over all of the decorators for the field
             for decorator in obj._schema[field]['decorators']:
 
                 field_start_time = time.time()
 
-                #Handle any fields that are declared to get their values from local methods
+                # Field gets value from method or service call (local to current executing process)
                 if decorator == 'Method':
                     deco_value = obj.get_decorator_value(field, decorator)
                     if deco_value:
@@ -436,67 +466,117 @@ class ExtendedResourceContainer(object):
                     if ret_val is not None:
                         setattr(obj, field, ret_val)
 
-                #Handle compound association chains
+                # Fill field based on compound association chains. Results in nested lists of resource objects
                 elif self.is_compound_association(decorator):
-                    deco_value = obj.get_decorator_value(field, decorator)
-                    assoc = self.walk_associations(resource, self.get_compound_association_predicates(decorator), deco_value)
-                    self.set_field_associations(obj, field,  assoc)
+                    target_type = obj.get_decorator_value(field, decorator)
+                    predicates = self.get_compound_association_predicates(decorator)
+                    assoc_list = self._find_associated_resources(resource, predicates[0], target_type)
+                    field_needs.append((field, "A", (assoc_list, predicates)))
+                    for target_id, assoc in assoc_list:
+                        assoc_needs.add((target_id, predicates[1]))
 
-                #If the decorator is a valid association, then get any associated objects
+                # Fill field based on association with list of resource objects
                 elif self.is_association_predicate(decorator):
-                    deco_value = obj.get_decorator_value(field, decorator)
-                    assoc = self.find_associations(resource, decorator, deco_value)
-                    self.set_field_associations(obj, field, assoc)
+                    target_type = obj.get_decorator_value(field, decorator)
+                    assoc_list = self._find_associated_resources(resource, decorator, target_type)
+                    if assoc_list:
+                        if obj._schema[field]['type'] == 'list':
+                            field_needs.append((field, "L", assoc_list))
+                            [resource_needs.add(target_id) for target_id, assoc in assoc_list]
+                        elif obj._schema[field]['type'] == 'int':
+                            setattr(obj, field, len(assoc_list))
+                        else:
+                            first_assoc = assoc_list[0]
+                            # WARNING: May swallow random further objects here!
+                            log.warn("Extended object field %s uses only 1 of %n associated resources", field, len(assoc_list))
+                            field_needs.append((field, "O", first_assoc))
+                            resource_needs.add(first_assoc)
 
                 field_stop_time = time.time()
 
-                log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time )
+                log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time)
 
-    #Helper function for walking a chain of predicates
-    def walk_associations(self, object, predicates, deco_value=None, index=0):
+        # field_needs contains a list of what's needed to load in next step (different cases)
+        if not field_needs:
+            return
 
-        #Only pass in the decorator filter value at the first level
-        assoc = self.find_associations(object, predicates[index], deco_value)
+        # Step 2: Read second level of compound associations as needed
+        # @TODO Can only do 2 level compounds for now. Make recursive
+        if assoc_needs:
+            assocs = self._rr.find_associations(anyside=list(assoc_needs), id_only=False)
+            self._add_associations(assocs)
 
-        #If this is the last predicate then just return whatever was found
-        if index == len(predicates)-1:
-            return assoc
+            # Determine resource ids to read for compound associations
+            for field, need_type, needs in field_needs:
+                if need_type == 'A':
+                    assoc_list, predicates = needs
+                    for target_id, assoc in assoc_list:
+                        res_type = assoc.ot if target_id == assoc.o else assoc.st
+                        assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
+                        for target_id1, assoc1 in assoc_list1:
+                            resource_needs.add(target_id1)
 
-        ret_list = list()
-        #For each object found, walk the next predicate in the list
-        for obj in assoc:
-            #Only pass in the decorator filter value at the first level
-            ret_obj = self.walk_associations(obj, predicates, None, index + 1)
+        # Step 3: Read resource objects based on needs
+        res_list = self._rr.read_mult(list(resource_needs))
+        res_objs = dict(zip(resource_needs, res_list))
 
-            #We only care about the path from the first level
-            if index == 0:
-                ret_list.append(ret_obj)
+        # Step 4: Set fields to loaded resource objects based on type
+        for field, need_type, needs in field_needs:
+            if need_type == 'L':
+                obj_list = [res_objs[target_id] for target_id, assoc in needs]
+                setattr(obj, field, obj_list)
+            elif need_type == 'O':
+                target_id, assoc = needs
+                setattr(obj, field, res_objs[target_id])
+            elif need_type == 'A':
+                assoc_list, predicates = needs
+                obj_list = []
+                for target_id, assoc in assoc_list:
+                    res_type = assoc.ot if target_id == assoc.o else assoc.st
+                    assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
+                    obj_list.append([res_objs[target_id1] for target_id1, assoc1 in assoc_list1])
+                setattr(obj, field, obj_list)
 
-        return ret_list
-
-    # Helper method for setting the field value based on the decorator association
-    def set_field_associations(self, obj, field, assoc):
-        if assoc:
-            if obj._schema[field]['type'] == 'list':
-                setattr(obj, field, assoc)
-            elif obj._schema[field]['type'] == 'int':
-                setattr(obj, field, len(assoc))
-            else:
-                setattr(obj, field, assoc[0])
-
-    #This method iterates over the dict of extended field names and associations dynamically passed in
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
+        """
+        Iterates over the dict of extended field names and associations dynamically passed in.
+        """
         if ext_associations is not None:
             for ext_field in ext_associations:
 
                 if ext_exclude is not None and ext_field in ext_exclude:
                     continue
 
-                objs = self.find_associations(res_container.resource, ext_associations[ext_field])
+                objs = self._find_associated_resources(res_container.resource, ext_associations[ext_field])
                 if objs:
                     res_container.ext_associations[ext_field] = objs
                 else:
                     res_container.ext_associations[ext_field] = list()
+
+    def _prepare_context(self, resource_id):
+        """
+        Initializes the context object and loads associations for resource id.
+        """
+        self.ctx = dict(by_subject={}, by_object={})
+        assocs = self._rr.find_associations(anyside=resource_id, id_only=False)
+        self._add_associations(assocs)
+
+    def _add_associations(self, assocs):
+        """
+        Adds a list of Association objects to the context memory structure, indexed by
+        (resource_id, predicate).
+        """
+        by_subject = self.ctx['by_subject']
+        by_object = self.ctx['by_object']
+        for assoc in assocs:
+            sub_key = (assoc.s, assoc.p)
+            if sub_key not in by_subject:
+                by_subject[sub_key] = []
+            by_subject[sub_key].append(assoc)
+            obj_key = (assoc.o, assoc.p)
+            if obj_key not in by_object:
+                by_object[obj_key] = []
+            by_object[obj_key].append(assoc)
 
     def is_predicate_association(self, predicate,  predicate_type, res):
         for predt in predicate[predicate_type]:
@@ -522,42 +602,57 @@ class ExtendedResourceContainer(object):
 
         return list()  # If not found then return empty list
 
-    #This method figures out appropriate association call based on the predicate definitions
-    def find_associations(self, resource, association_predicate, associated_resource=None):
+    def _find_associated_resources(self, resource, association_predicate, target_type=None, res_type=None):
+        """
+        Returns a list of tuples (target_id, Association) based on associations for the given
+        resource (object), predicate and optional target object type.
+        This method figures out appropriate association lookup based on the predicate definitions
+        @param resource Either a resource object or a resource id (then res_type is needed)
+        """
+        assoc_list = []
+        res_type = res_type or resource.type_
+        resource_id = resource if type(resource) is str else resource._id
 
-        objs = list()
-
-        #First validate the association predicate
+        # First validate the association predicate
         pred = Predicates[association_predicate]
         if not pred:
-            return objs  # Unknown association type so return empty list
+            return assoc_list  # Unknown association type so return empty list
 
-        #Resource Registry finds take a None if not set
-        if associated_resource == '':
-            associated_resource = None
+        # Need to check through all of these in this order to account for specific vs base class inclusions
+        if self.is_predicate_association(pred, 'domain', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
 
-        #Need to check through all of these in this order to account for specific vs base class inclusions
-        if self.is_predicate_association(pred, 'domain', resource.type_):
-            objs, _ = self._rr.find_objects(resource._id, association_predicate, associated_resource, False)
+            # If no objects were found, try finding as subjects just in case.
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-            #If no objects were found, try finding as subjects just in case.
-            if not objs:
-                self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
+        elif self.is_predicate_association(pred, 'range', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-        elif self.is_predicate_association(pred, 'range', resource.type_):
-            objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
+        elif self.is_predicate_association_extension(pred, 'domain', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
 
-        elif self.is_predicate_association_extension(pred, 'domain', resource.type_):
-            objs, _ = self._rr.find_objects(resource._id, association_predicate, associated_resource, False)
+            # If no objects were found, try finding as subjects just in case.
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-            #If no objects were found, try finding as subjects just in case.
-            if not objs:
-                objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
+        elif self.is_predicate_association_extension(pred, 'range', res_type):
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-        elif self.is_predicate_association_extension(pred, 'range', resource.type_):
-            objs, _ = self._rr.find_subjects(associated_resource, association_predicate, resource._id, False)
+        return assoc_list
 
-        return objs
+    def _find_associations(self, resource_id, predicate, target_type=None, backward=False):
+        """
+        Searches through associations in context either objects (from as subject) or subjects (from an object).
+        Filters by target type if given.
+        @retval a list of tuples (target resource id, Association object)
+        """
+        assoc_list = []
+        if backward:
+            by_object = self.ctx['by_object'].get((resource_id,predicate), [])
+            assoc_list.extend([(assoc.s, assoc) for assoc in by_object if not target_type or assoc.st == target_type])
+        else:
+            by_subject = self.ctx['by_subject'].get((resource_id,predicate), [])
+            assoc_list.extend([(assoc.o, assoc) for assoc in by_subject if not target_type or assoc.ot == target_type])
+        return assoc_list
 
     # This method will dynamically call the specified method. It will look for the method in the current class
     # and also in the class specified by the service_provider

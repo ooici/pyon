@@ -193,22 +193,32 @@ function(doc) {
   }
 }""",
             },
-        # For directed association lookup
-        'by_ids':{
+        # For matching association lookup (for range queries)
+        'by_match':{
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.s, doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
+    emit([doc.s, doc.o, doc.p], doc);
   }
 }""",
             },
-        # For undirected association lookup
+        # For undirected association lookup with predicate (range queries)
+        'by_idpred':{
+            'map':"""
+function(doc) {
+  if (doc.type_ == "Association") {
+    emit([doc.s, doc.p], doc);
+    emit([doc.o, doc.p], doc);
+  }
+}""",
+            },
+        # For undirected association lookup with id only (multi key queries)
         'by_id':{
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.s, doc.p, doc.at, doc.srv, doc.orv], doc);
-    emit([doc.o, doc.p, doc.at, doc.srv, doc.orv], doc);
+    emit(doc.s, doc);
+    emit(doc.o, doc);
   }
 }""",
             },
@@ -217,7 +227,7 @@ function(doc) {
             'map':"""
 function(doc) {
   if (doc.type_ == "Association") {
-    emit([doc.p, doc.s, doc.o, doc.at, doc.srv, doc.orv], doc);
+    emit([doc.p, doc.s, doc.o], doc);
   }
 }""",
             },
