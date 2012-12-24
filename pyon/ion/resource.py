@@ -402,6 +402,8 @@ class ExtendedResourceContainer(object):
 
         log.debug("Time to process extended resource container %s %f secs", extended_resource_type, overall_stop_time - overall_start_time )
 
+        #log.info("ResourceContainer: %s" % res_container)
+
         return res_container
 
     def set_container_lcstate_info(self, res_container):
@@ -487,10 +489,11 @@ class ExtendedResourceContainer(object):
                             setattr(obj, field, len(assoc_list))
                         else:
                             first_assoc = assoc_list[0]
-                            # WARNING: May swallow random further objects here!
-                            log.warn("Extended object field %s uses only 1 of %n associated resources", field, len(assoc_list))
+                            if len(assoc_list) != 1:
+                                # WARNING: Swallow random further objects here!
+                                log.warn("Extended object field %s uses only 1 of %d associated resources", field, len(assoc_list))
                             field_needs.append((field, "O", first_assoc))
-                            resource_needs.add(first_assoc)
+                            resource_needs.add(first_assoc[0])
 
                 field_stop_time = time.time()
 
@@ -535,7 +538,16 @@ class ExtendedResourceContainer(object):
                     res_type = assoc.ot if target_id == assoc.o else assoc.st
                     assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
                     obj_list.append([res_objs[target_id1] for target_id1, assoc1 in assoc_list1])
-                setattr(obj, field, obj_list)
+
+                if obj._schema[field]['type'] == 'list':
+                    setattr(obj, field, obj_list)
+                elif obj._schema[field]['type'] == 'int':
+                    setattr(obj, field, len(obj_list))
+                else:
+                    if len(obj_list) != 1:
+                        # WARNING: Swallow random further objects here!
+                        log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(obj_list))
+                    setattr(obj, field, obj_list[0])
 
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         """
@@ -623,7 +635,8 @@ class ExtendedResourceContainer(object):
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
 
             # If no objects were found, try finding as subjects just in case.
-            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
+            if not assoc_list:
+                assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
         elif self.is_predicate_association(pred, 'range', res_type):
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
@@ -632,7 +645,8 @@ class ExtendedResourceContainer(object):
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
 
             # If no objects were found, try finding as subjects just in case.
-            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
+            if not assoc_list:
+                assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
         elif self.is_predicate_association_extension(pred, 'range', res_type):
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))

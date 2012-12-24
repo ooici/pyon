@@ -303,7 +303,7 @@ class CouchDB_DataStore(DataStore):
 
     def read_mult(self, object_ids, datastore_name=""):
         if any([not isinstance(object_id, str) for object_id in object_ids]):
-            raise BadRequest("Object id param is not string")
+            raise BadRequest("Object ids are not string: %s" % str(object_ids))
         docs = self.read_doc_mult(object_ids, datastore_name)
         # Convert docs into Ion objects
         obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
