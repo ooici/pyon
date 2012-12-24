@@ -337,8 +337,8 @@ class ResourceRegistry(object):
     def find_subjects(self, subject_type="", predicate="", object="", id_only=False):
         return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only)
 
-    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
-        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
+    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None):
+        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside)
 
     def find_objects_mult(self, subjects=[], id_only=False):
         return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only)

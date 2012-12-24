@@ -663,9 +663,29 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(assocs), 1)
         self.assertEquals(assocs[0], aid1)
 
+        assocs = data_store.find_associations(subject=inst1_obj_id, id_only=True)
+        self.assertEquals(len(assocs), 1)
+
+        assocs = data_store.find_associations(obj=inst1_obj_id, id_only=True)
+        self.assertEquals(len(assocs), 2)
+
         assocs = data_store.find_associations(None, OWNER_OF, None, id_only=True)
         self.assertEquals(len(assocs), 3)
 
+        assocs = data_store.find_associations(anyside=inst1_obj_id, id_only=True)
+        self.assertEquals(len(assocs), 3)
+
+        assocs = data_store.find_associations(anyside=inst1_obj_id, predicate=HAS_A, id_only=True)
+        self.assertEquals(len(assocs), 2)
+
+        assocs = data_store.find_associations(anyside=[inst1_obj_id,other_user_id], id_only=True)
+        self.assertEquals(len(assocs), 4)
+
+        assocs = data_store.find_associations(anyside=[[inst1_obj_id, HAS_A], [other_user_id, OWNER_OF]], id_only=True)
+        self.assertEquals(len(assocs), 3)
+
+        assocs = data_store.find_associations(anyside=[(inst1_obj_id, HAS_A), (other_user_id, OWNER_OF)], id_only=True)
+        self.assertEquals(len(assocs), 3)
 
         # Test regression bug: Inherited resources in associations
         idev1_obj_id = self._create_resource(RT.InstrumentDevice, 'id1', description='')
