@@ -539,15 +539,16 @@ class ExtendedResourceContainer(object):
                     assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
                     obj_list.append([res_objs[target_id1] for target_id1, assoc1 in assoc_list1])
 
-                if obj._schema[field]['type'] == 'list':
-                    setattr(obj, field, obj_list)
-                elif obj._schema[field]['type'] == 'int':
-                    setattr(obj, field, len(obj_list))
-                else:
-                    if len(obj_list) != 1:
-                        # WARNING: Swallow random further objects here!
-                        log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(obj_list))
-                    setattr(obj, field, obj_list[0])
+                if obj_list:
+                    if obj._schema[field]['type'] == 'list':
+                        setattr(obj, field, obj_list)
+                    elif obj._schema[field]['type'] == 'int':
+                        setattr(obj, field, len(obj_list))
+                    else:
+                        if len(obj_list) != 1:
+                            # WARNING: Swallow random further objects here!
+                            log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(obj_list))
+                        setattr(obj, field, obj_list[0])
 
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         """
