@@ -64,6 +64,7 @@ class StreamPublisher(Publisher):
 
         self.container = process.container
         self.xp = self.container.ex_manager.create_xp(self.stream_route.exchange_point)
+        self.xp_route = self.xp.create_route(self.stream_route.routing_key)
 
     def publish(self, msg, stream_id='', stream_route=None):
         '''
@@ -71,13 +72,15 @@ class StreamPublisher(Publisher):
         stream/route or the stream/route specified at instantiation
         '''
         xp = self.xp
+        xp_route = self.xp_route
         log.trace('Exchange: %s', xp.exchange)
         if stream_route:
             xp = self.container.ex_manager.create_xp(stream_route.exchange_point)
+            xp_route = xp.create_route(stream_route.routing_key)
         else:
             stream_route = self.stream_route
         log.trace('Publishing (%s,%s)', xp.exchange, stream_route.routing_key)
-        super(StreamPublisher,self).publish(msg, to_name=xp.create_route(stream_route.routing_key), headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id or self.stream_id})
+        super(StreamPublisher,self).publish(msg, to_name=xp_route, headers={'exchange_point':stream_route.exchange_point, 'stream':stream_id or self.stream_id})
 
 
 class StreamSubscriber(Subscriber):
