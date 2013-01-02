@@ -56,7 +56,7 @@ class OrderedSet(collections.MutableSet):
         self.discard(key)
         return key
 
-    def __repr__(self):
+    def __repr__(self): #pragma no cover
         if not self:
             return '%s()' % (self.__class__.__name__,)
         return '%s(%r)' % (self.__class__.__name__, list(self))
