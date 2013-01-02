@@ -309,6 +309,7 @@ def main(opts, *args, **kwargs):
         import gevent   # should be auto-monkey-patched by pyon already.
         import select
         import sys
+        import os
         def stdin_ready():
             infds, outfds, erfds = select.select([sys.stdin], [], [], 0)
             if infds:
@@ -352,7 +353,7 @@ def main(opts, *args, **kwargs):
             /____/""",
             exit_msg = 'Leaving ION shell, shutting down container.')
 
-        ipshell('Pyon - ION R2 CC interactive IPython shell. Type ionhelp() for help')
+        ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
 
     def setup_ipython_embed(shell_api=None):
         from gevent_zeromq import monkey_patch
