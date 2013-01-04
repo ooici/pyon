@@ -11,6 +11,7 @@ from gevent.queue import Queue
 from gevent import greenlet, Timeout
 from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError
+from pyon.core.exception import Timeout as IonTimeout
 from pyon.util.containers import get_ion_ts
 from pyon.core.bootstrap import CFG
 import threading
@@ -306,6 +307,11 @@ class IonProcessThread(PyonThread):
             if context is not None and 'reply-by' in context:
                 if start_proc_time >= int(context['reply-by']):
                     log.info("control_flow: attempting to process message already exceeding reply-by, ignore")
+
+                    # raise a timeout in the calling thread to allow endpoints to continue processing
+                    e = IonTimeout("Reply-by time has already occurred (reply-by: %s, op start time: %s)" % (context['reply-by'], start_proc_time))
+                    calling_gl.kill(exception=e, block=False)
+
                     continue
 
             # also check ar if it is set, if it is, that means it is cancelled
