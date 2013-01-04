@@ -322,12 +322,20 @@ class ProcessTest(PyonTestCase):
         p.get_ready_event().wait(timeout=5)
         self.addCleanup(p.stop)
 
+        def make_call(call, ctx, val):
+            ar = p._routing_call(call, ctx, val)
+            return ar.get(timeout=10)
+
         ctx = { 'reply-by' : 0 }        # no need for real time, as it compares by CURRENT >= this value
         futurear = AsyncResult()
-        ar = p._routing_call(futurear.set, ctx, sentinel.val)
+        gl = spawn(make_call, futurear.set, ctx, sentinel.val)
+        gl.join(timeout=10)
 
-        # ar won't be set, nor will futurear, but we'll be unblocked, so prove we can
-        self.assertRaises(Timeout, ar.get, timeout=2)
+        # reply-by raises an IonTimeout in the calling greenlet
+        self.assertTrue(hasattr(gl, "exception"))
+        self.assertIsInstance(gl.exception, IonTimeout)
+
+        # futurear will never get set
         self.assertFalse(futurear.ready())
 
         # put a new call through
