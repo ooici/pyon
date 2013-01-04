@@ -59,7 +59,6 @@ class TestResources(IonUnitTestCase):
 
 
     def test_create_extended_resource_container(self):
-        raise SkipTest("extended resource impl has changed - Stephen, please help fix")
 
         mock_clients = self._create_service_mock('resource_registry')
 
@@ -143,19 +142,11 @@ class TestResources(IonUnitTestCase):
         self.assertIn( 'The requested resource ActorIdentity is not extended from ResourceContainer',cm.exception.message)
 
 
-        obj = IonObject(OT.TestExtendedResource)
-        list_objs = ['123', '456', '789']
-        extended_resource_handler.set_field_associations(obj, 'policies', list_objs)
-        extended_resource_handler.set_field_associations(obj, 'policy_count', list_objs)
-        extended_resource_handler.set_field_associations(obj, 'resource_object', list_objs)
-
-        self.assertEquals(obj.policies, list_objs)
-        self.assertEquals(obj.policy_count, 3)
-        self.assertEquals(obj.resource_object, '123')
-
         mock_clients.resource_registry.read.return_value = instrument_device
         mock_clients.resource_registry.find_objects.return_value = ([actor_identity], [Instrument_device_to_actor_identity_association])
         mock_clients.resource_registry.find_subjects.return_value = (None,None)
+        mock_clients.resource_registry.find_associations.return_value = [actor_identity_to_info_association, Instrument_device_to_actor_identity_association]
+        mock_clients.resource_registry.read_mult.return_value = [user_info]
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123')
         self.assertEquals(extended_res.resource, instrument_device)
