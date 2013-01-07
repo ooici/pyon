@@ -13,7 +13,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.context import LocalContextMixin
 from pyon.core.exception import IonException, NotFound, ContainerError, Timeout as IonTimeout
 from pyon.util.async import spawn
-from mock import sentinel, Mock, MagicMock, ANY
+from mock import sentinel, Mock, MagicMock, ANY, patch
 from nose.plugins.attrib import attr
 from pyon.net.endpoint import RPCClient
 from pyon.service.service import BaseService
@@ -328,17 +328,25 @@ class ProcessTest(PyonTestCase):
 
         ctx = { 'reply-by' : 0 }        # no need for real time, as it compares by CURRENT >= this value
         futurear = AsyncResult()
-        gl = spawn(make_call, futurear.set, ctx, sentinel.val)
-        gl.join(timeout=10)
+        with patch('pyon.ion.process.greenlet') as gcm:
+            waitar = AsyncResult()
+            gcm.getcurrent().kill.side_effect = lambda *a, **k: waitar.set()
 
-        # reply-by raises an IonTimeout in the calling greenlet
-        self.assertTrue(hasattr(gl, "exception"))
-        self.assertIsInstance(gl.exception, IonTimeout)
+            ar = p._routing_call(futurear.set, ctx, sentinel.val)
 
-        # futurear will never get set
-        self.assertFalse(futurear.ready())
+            waitar.get(timeout=10)
 
-        # put a new call through
+            # futurear is not set
+            self.assertFalse(futurear.ready())
+
+            # neither is the ar we got back from routing_call
+            self.assertFalse(ar.ready())
+
+            # we should've been killed, though
+            self.assertEquals(gcm.getcurrent().kill.call_count, 1)
+            self.assertIsInstance(gcm.getcurrent().kill.call_args[1]['exception'], IonTimeout)
+
+        # put a new call through (to show unblocked)
         futurear2 = AsyncResult()
         ar2 = p._routing_call(futurear2.set, MagicMock(), sentinel.val2)
         ar2.get(timeout=2)
