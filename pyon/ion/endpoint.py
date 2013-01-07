@@ -234,7 +234,8 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         if not self._routing_call:
             return RPCResponseEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
-        ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
+        ctx = self._process.get_context()       # pull onto the locals here, for debuggability with manhole
+        ar = self._routing_call(call, ctx, *op_args, **op_kwargs)
         res = ar.get()    # REMOVED TIMEOUT
         #try:
         #    res = ar.get(timeout=timeout)
