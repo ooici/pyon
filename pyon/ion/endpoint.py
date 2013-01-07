@@ -285,7 +285,7 @@ class ProcessRPCServer(RPCServer):
         return RPCServer.create_endpoint(self, **newkwargs)
 
     def __str__(self):
-        return "ProcessRPCServer: recv_name: %s, process: %s" % (str(self._recv_name), str(self._process))
+        return "ProcessRPCServer at %s:\n\trecv_name: %s\n\tprocess: %s" % (hex(id(self)), str(self._recv_name), str(self._process))
 
 class ProcessPublisherEndpointUnit(ProcessEndpointUnitMixin, PublisherEndpointUnit):
     def __init__(self, process=None, **kwargs):
@@ -403,7 +403,7 @@ class ProcessSubscriber(Subscriber):
         return Subscriber.create_endpoint(self, **newkwargs)
 
     def __str__(self):
-        return "ProcessSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+        return "ProcessSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (hex(id(self)), str(self._recv_name), str(self._process), str(self._callback))
 
 
 #
@@ -421,5 +421,5 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
 
     def __str__(self):
-        return "ProcessEventSubscriber: recv_name: %s, process: %s, cb: %s" % (str(self._recv_name), str(self._process), str(self._callback))
+        return "ProcessEventSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (hex(id(self)), str(self._recv_name), str(self._process), str(self._callback))
 
