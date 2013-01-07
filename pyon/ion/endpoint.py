@@ -372,7 +372,8 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
         if not self._routing_call:
             return SubscriberEndpointUnit._make_routing_call(self, call, timeout, *op_args, **op_kwargs)
 
-        ar = self._routing_call(call, self._process.get_context(), *op_args, **op_kwargs)
+        ctx = self._process.get_context()       # pull onto the locals here, for debuggability with manhole
+        ar = self._routing_call(call, ctx, *op_args, **op_kwargs)
         return ar.get() # timeout=timeout)  # REMOVED TIMEOUT
 
 
