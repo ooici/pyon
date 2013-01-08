@@ -615,6 +615,12 @@ class ProcManager(object):
                                    cleanup_method=cleanup)
         self.proc_sup.ensure_ready(proc, "_spawn_simple_process for %s" % process_instance.id)
 
+        # map gproc to process_instance
+        self._spawned_proc_to_process[proc.proc] = process_instance
+
+        # set service's reference to process
+        process_instance._process = proc
+
         self._process_init(process_instance)
         self._process_start(process_instance)
 
