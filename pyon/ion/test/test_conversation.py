@@ -11,8 +11,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.exception import Inconsistent
 from nose.plugins.attrib import attr
 from pyon.service.service import BaseService
-from pyon.net.endpoint import RPCClient
-from pyon.net.channel import BidirClientChannel
+from pyon.net.endpoint import RPCClient, BidirectionalEndpointUnit
 from pyon.util.context import LocalContextMixin
 
 @attr('UNIT')
@@ -144,7 +143,7 @@ class TestConversationInterceptor(IonIntegrationTestCase):
         '''
 
         # save off old send
-        old_send = BidirClientChannel._send
+        old_send = BidirectionalEndpointUnit._send
 
         # make new send to patch on that duplicates send
         def new_send(*args, **kwargs):
@@ -159,12 +158,9 @@ class TestConversationInterceptor(IonIntegrationTestCase):
 
         # patch it into place with auto-cleanup to send a duplicate message at the channel layer which
         #is below the interceptors
-        patcher = patch('pyon.net.channel.BidirClientChannel._send', new_send)
+        patcher = patch('pyon.net.endpoint.BidirectionalEndpointUnit._send', new_send)
         patcher.start()
         self.addCleanup(patcher.stop)
-
-
-
 
         #Should throw an exception by intentionally forcing the message to be sent twice.
         #This is not allowed.
