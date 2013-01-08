@@ -160,7 +160,7 @@ class IonProcessThread(PyonThread):
 
     def add_endpoint(self, listener):
         """
-        Adds a listening endpoint to this ION process.
+        Adds a listening endpoint to be managed by this ION process.
 
         Spawns the listen loop and sets the routing call to synchronize incoming messages
         here. If this process hasn't been started yet, adds it to the list of listeners
@@ -182,6 +182,25 @@ class IonProcessThread(PyonThread):
             self.listeners.append(listener)
         else:
             self._startup_listeners.append(listener)
+
+    def remove_endpoint(self, listener):
+        """
+        Removes a listening endpoint from management by this ION process.
+
+        If the endpoint is unknown to this ION process, raises an error.
+
+        @return The PyonThread running the listen loop, if it exists. You are
+                responsible for closing it when appropriate.
+        """
+
+        if listener in self.listeners:
+            self.listeners.remove(listener)
+            return self._listener_map.pop(listener)
+        elif listener in self._startup_listeners:
+            self._startup_listeners.remove(listener)
+            return None
+        else:
+            raise IonProcessError("Cannot remove unrecognized listener: %s" % listener)
 
     def target(self, *args, **kwargs):
         """
