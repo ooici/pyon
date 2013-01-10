@@ -378,12 +378,10 @@ class ProcManager(object):
         # Service RPC endpoint
         rsvc1 = self._create_listening_endpoint(node=self.container.node,
                                                 from_name=listen_name,
-                                                service=process_instance,
                                                 process=process_instance)
         # Named local RPC endpoint
         rsvc2 = self._create_listening_endpoint(node=self.container.node,
                                                 from_name=process_instance.id,
-                                                service=process_instance,
                                                 process=process_instance)
 
         # cleanup method to delete process queue
@@ -436,7 +434,6 @@ class ProcManager(object):
 
         rsvc = self._create_listening_endpoint(node=self.container.node,
                                                from_name=process_instance.id,
-                                               service=process_instance,
                                                process=process_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
@@ -490,14 +487,12 @@ class ProcManager(object):
 
             alistener = self._create_listening_endpoint(node=self.container.node,
                                                         from_name=resource_id,
-                                                        service=process_instance,
                                                         process=process_instance)
 
             listeners.append(alistener)
 
         rsvc = self._create_listening_endpoint(node=self.container.node,
                                                from_name=process_instance.id,
-                                               service=process_instance,
                                                process=process_instance)
 
         listeners.append(rsvc)
@@ -551,7 +546,6 @@ class ProcManager(object):
         process_instance = self._create_process_instance(process_id, name, module, cls, config)
         rsvc = self._create_listening_endpoint(node=self.container.node,
                                                from_name=process_instance.id,
-                                               service=process_instance,
                                                process=process_instance)
 
         # Add publishers if any...
