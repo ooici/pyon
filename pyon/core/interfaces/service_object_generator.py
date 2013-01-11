@@ -261,6 +261,7 @@ class ServiceObjectGenerator:
         data_yaml_text = self.get_object_definition()
         service_yaml_text = self.get_service_definition()
         enum_tag = u'!enum'
+        self.opts = opts
 
         set_config()
 
@@ -389,11 +390,11 @@ class ServiceObjectGenerator:
                         parent = os.path.split(os.path.abspath(parent))[0]
 
                         pkg_file = os.path.join(parent, '__init__.py')
-                        if not os.path.exists(pkg_file):
+                        if not self.opts.dryrun and not os.path.exists(pkg_file):
                             open(pkg_file, 'w').close()
 
             pkg_file = os.path.join(parent_dir, '__init__.py')
-            if not os.path.exists(pkg_file):
+            if not self.opts.dryrun and not os.path.exists(pkg_file):
                 open(pkg_file, 'w').close()
 
             skip_file = False
@@ -868,13 +869,14 @@ class ServiceObjectGenerator:
                                                           when_generated=self.currtime,
                                                           client=_client)
 
-        with open(interface_file, 'w') as f:
-            f.write(interface_contents)
+        if not self.opts.dryrun:
+            with open(interface_file, 'w') as f:
+                f.write(interface_contents)
 
         doc_methods_str = ''.join(doc_methods)
         doc_page_contents = html_doc_templates['confluence_service_page_include'].substitute(name=class_name, methods=doc_methods_str)
 
-        if opts.servicedoc:
+        if not self.opts.dryrun and opts.servicedoc:
             doc_file = interface_file.replace(".py", ".html")
             doc_file = doc_file.replace("/services/", "/service_html/")
             parent_dir = os.path.dirname(doc_file)
@@ -1052,8 +1054,9 @@ class ServiceObjectGenerator:
         except:
             pass
         print " Writing service implementation validation report to '" + reportfile + "'"
-        with open(reportfile, 'w') as f:
-            f.write(validation_results)
+        if self.opts.dryrun:
+            with open(reportfile, 'w') as f:
+                f.write(validation_results)
 
     def load_mods(self, path, interfaces):
         mod_prefix = string.replace(path, "/", ".")
