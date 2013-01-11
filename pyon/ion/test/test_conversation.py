@@ -138,7 +138,6 @@ class TestConversationInterceptor(IonIntegrationTestCase):
 
         # make new send to patch on that duplicates send
         def new_send(*args, **kwargs):
-            print 'In the patched new_send'
 
             #Only duplicate the message send from the initial client call
             msg_headers = kwargs['headers']
@@ -153,42 +152,14 @@ class TestConversationInterceptor(IonIntegrationTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-
+        # patch to throw an exception to be caught by the test
         patcher = patch('pyon.core.governance.governance_dispatcher.GovernanceDispatcher.handle_outgoing_message',
                         handle_outgoing_message)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        #Should throw an exception by intentionally forcing the message to be sent twice.
+        #The above patch will intentionally forcing the message to be sent twice which will cause the conversation monitor
+        # to detect a duplicate message for the same conversation id and throw an exception.
         #This is not allowed.
-        self.assertRaises(WrongMessageAssertion, self.provider_client.request,
-                            {'text': 'hello world'}, op='reverse_string')
-
-    '''
-
-    def test_interceptor_fails_when_recv_multiple_messages(self):
-
-        # save off old send
-        old_message_send = RPCProviderEndpointUnit._message_send
-
-        # make new send to patch on that duplicates send
-        def new_message_send(*args, **kwargs):
-            print 'In the patched new_message_send'
-            old_message_send(*args, **kwargs)
-            return old_message_send(*args, **kwargs)
-
-        # patch it into place with auto-cleanup
-        patcher = patch('pyon.ion.conversation.RPCProviderEndpointUnit._message_send', new_message_send)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-
-
-        #Should throw an exception by intentionally forcing the message to be sent twice.
-        #This is not allowed.
-        ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
-
-        #Check to see if the text has been reversed.
-        self.assertEqual(ret,'dlrow olleh')
-
-    '''
+        with self.assertRaises(WrongMessageAssertion) as cm:
+            ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
