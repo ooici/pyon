@@ -290,6 +290,7 @@ class GovernanceController(object):
 
     def resource_policy_event_callback(self, *args, **kwargs):
         resource_policy_event = args[0]
+        log.debug('Resouce related policy event received: %s', str(resource_policy_event.__dict__))
 
         policy_id = resource_policy_event.origin
         resource_id = resource_policy_event.resource_id
@@ -300,6 +301,7 @@ class GovernanceController(object):
 
     def service_policy_event_callback(self, *args, **kwargs):
         service_policy_event = args[0]
+        log.debug('Service related policy event received: %s', str(service_policy_event.__dict__))
 
         policy_id = service_policy_event.origin
         service_name = service_policy_event.service_name
