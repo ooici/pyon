@@ -662,10 +662,14 @@ class CouchDB_DataStore(DataStore):
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
+
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not subject:
             raise BadRequest("Must provide subject")
+        if object_type and not predicate:
+            raise BadRequest("Cannot provide object type without a predictate")
+
         ds, datastore_name = self._get_datastore()
 
         if type(subject) is str:
@@ -698,11 +702,16 @@ class CouchDB_DataStore(DataStore):
         return (obj_list, obj_assocs)
 
     def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, **kwargs):
+
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s", subject_type, predicate, obj, id_only)
+
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not obj:
             raise BadRequest("Must provide object")
+        if subject_type and not predicate:
+            raise BadRequest("Cannot provide subject type without a predicate")
+
         ds, datastore_name = self._get_datastore()
 
         if type(obj) is str:
