@@ -417,12 +417,13 @@ class Container(BaseContainerAgent):
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
 
-    def fail_fast(self, err_msg=""):
+    def fail_fast(self, err_msg="", skip_stop=False):
         """
         Container needs to shut down and NOW.
         """
         log.error("Fail Fast: %s", err_msg)
-        self.stop()
+        if not skip_stop:
+            self.stop()
         log.error("Fail Fast: killing container")
 
         traceback.print_exc()

@@ -29,6 +29,13 @@ class TestCC(PyonTestCase):
         self.cc.stop.assert_called_once_with()
         osmock.kill.assert_called_once_with(osmock.getpid(), signal.SIGTERM)
 
+    @patch('pyon.container.cc.os')
+    def test_fail_fast_no_stop(self, osmock):
+        self.cc.stop = Mock()
+
+        self.cc.fail_fast("icecream (of the future)", True)
+        self.assertEquals(self.cc.stop.call_count, 0)
+
     def test_node_when_not_started(self):
         self.assertEquals(self.cc.node, None)
 
