@@ -14,6 +14,7 @@ import random
 import string
 from pyon.util.log import log
 from pyon.util.containers import DotDict
+from pyon.core.bootstrap import CFG as bootcfg
 
 
 class FileSystemError(Exception):
@@ -45,9 +46,26 @@ class FileSystem(object):
         if not cls._instance:
             cls._instance = super(FileSystem, cls).__new__(cls, *args, **kwargs)
         return cls._instance
+    
+    @classmethod 
+    def _clean(cls, config):
+        for k,v in FileSystem.FS_DIRECTORY.iteritems():
+            s = v.lower() # Lower case string
+            conf = config.get_safe('container.filesystem.%s' % s, None)
+            if conf:
+                FileSystem.FS_DIRECTORY[k] = conf
+            else:
+                FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
+            if os.path.exists(FS_DIRECTORY[k]):
+                log.info('Removing %s' , FS_DIRECTORY[k])
+                shutil.rmtree(FS_DIRECTORY[k])
+                cls.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
+
 
     def __init__(self, CFG):
         FileSystem._force_clean = CFG.get_safe('container.filesystem.force_clean',False)
+        if FileSystem._force_clean:
+            self._clean(CFG)
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
@@ -61,10 +79,6 @@ class FileSystem(object):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
             if not os.path.exists(FS_DIRECTORY[k]):
                 log.info('Making path: %s', FS_DIRECTORY[k])
-                self.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
-            elif os.path.exists(FS_DIRECTORY[k]) and FileSystem._force_clean:
-                log.info('Removing %s' , FS_DIRECTORY[k])
-                shutil.rmtree(FS_DIRECTORY[k])
                 self.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
 
     @classmethod
