@@ -222,6 +222,21 @@ class TestNodeB(PyonTestCase):
 
         self.assertEqual(chmock._destroy_queue.call_count, 20)
 
+    @patch('pyon.net.messaging.blocking_cb')
+    def test__new_transport(self, bcbmock):
+        self._node.client = Mock()
+        transport = self._node._new_transport()
+
+        bcbmock.assert_called_once_with(self._node.client.channel, 'on_open_callback', channel_number=None)
+
+    @patch('pyon.net.messaging.traceback', Mock())
+    @patch('pyon.net.messaging.blocking_cb', return_value=None)
+    @patch('pyon.container.cc.Container.instance')
+    def test__new_transport_fails(self, containermock, bcbmock):
+        self._node.client = Mock()
+        self.assertRaises(StandardError, self._node._new_transport)
+        containermock.fail_fast.assert_called_once_with("AMQCHAN IS NONE, messaging has failed", True)
+
 @attr('UNIT')
 class TestMessaging(PyonTestCase):
     def test_ioloop(self):

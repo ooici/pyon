@@ -20,6 +20,7 @@ from pyon.util.pool import IDPool
 from pyon.net.transport import LocalTransport, LocalRouter, AMQPTransport, ComposableTransport
 
 from collections import defaultdict
+import traceback
 
 class BaseNode(object):
     """
@@ -174,8 +175,10 @@ class NodeB(BaseNode):
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
         if amq_chan is None:
             log.error("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s", ch_number)
-            import traceback
             traceback.print_stack()
+            from pyon.container.cc import Container
+            if Container.instance is not None:
+                Container.instance.fail_fast("AMQCHAN IS NONE, messaging has failed", True)
             raise StandardError("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s" % ch_number)
 
         transport = AMQPTransport(amq_chan)
