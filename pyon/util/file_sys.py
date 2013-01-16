@@ -79,7 +79,6 @@ class FileSystem(object):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
             if not os.path.exists(FS_DIRECTORY[k]):
                 log.info('Making path: %s', FS_DIRECTORY[k])
-                self.__makedirs(FileSystem.FS_DIRECTORY[k]) # Catches race condition where concurrent container does the same thing
 
     @classmethod
     def __makedirs(cls,path):
