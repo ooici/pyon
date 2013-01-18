@@ -310,6 +310,7 @@ def main(opts, *args, **kwargs):
         import select
         import sys
         import os
+
         def stdin_ready():
             infds, outfds, erfds = select.select([sys.stdin], [], [], 0)
             if infds:
@@ -333,6 +334,7 @@ def main(opts, *args, **kwargs):
 
         # First import the embeddable shell class
         from IPython.frontend.terminal.embed import InteractiveShellEmbed
+        from mock import patch
 
         # Update namespace of interactive shell
         # TODO: Cleanup namespace even further
@@ -343,17 +345,18 @@ def main(opts, *args, **kwargs):
         # string with options exactly as you would type them if you were starting
         # IPython at the system command line. Any parameters you want to define for
         # configuration can thus be specified here.
-        ipshell = InteractiveShellEmbed(config=ipy_config,
-            banner1 =\
-            """          ____                                ________  _   __   ____________   ____  ___
-         / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
-        / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
-       / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
-      /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
-            /____/""",
-            exit_msg = 'Leaving ION shell, shutting down container.')
+        with patch("IPython.core.interactiveshell.InteractiveShell.init_virtualenv"):
+            ipshell = InteractiveShellEmbed(config=ipy_config,
+                banner1 =\
+                """              ____                                ________  _   __   ____________   ____  ___
+             / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
+            / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
+           / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
+          /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
+                /____/""",
+                exit_msg = 'Leaving ION shell, shutting down container.')
 
-        ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
+            ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
 
     def setup_ipython_embed(shell_api=None):
         from gevent_zeromq import monkey_patch
@@ -398,10 +401,12 @@ def main(opts, *args, **kwargs):
 
         # set specific manhole options
         import tempfile#, shutil
+        from mock import patch
         temp_dir = tempfile.mkdtemp()
         ipy_config.Application.ipython_dir = temp_dir
 
-        embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
+        with patch("IPython.core.interactiveshell.InteractiveShell.init_virtualenv"):
+            embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
 
         # @TODO: race condition here versus ipython, this will leave junk in tmp dir
         #try:
