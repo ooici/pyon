@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import sys
+import traceback
 """Events and Notifications"""
 
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
@@ -8,7 +10,7 @@ __license__ = 'Apache 2.0'
 from gevent import event as gevent_event
 
 from pyon.core import bootstrap
-from pyon.core.exception import BadRequest, IonException
+from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
@@ -323,3 +325,12 @@ class EventGate(EventSubscriber):
 
     def check_or_await(self):
         pass
+
+
+def handle_stream_exception(fn):
+    try:
+        fn()
+    except StreamException as e:
+        info = "".join(traceback.format_tb(sys.exc_info()[2]))
+        pub = EventPublisher(event_type="ExceptionEvent")        
+        pub.publish_event(origin="stream_exception", description="stream exception event", exception_type=str(type(e)), message=info)
