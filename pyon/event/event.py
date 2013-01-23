@@ -332,7 +332,7 @@ def _handle_stream_exception(fn):
     try:
         fn()
     except StreamException as e:
-        print e
+        #print e
         info = "".join(traceback.format_tb(sys.exc_info()[2]))
         pub = EventPublisher(event_type="ExceptionEvent")        
         pub.publish_event(origin="stream_exception", description="stream exception event", exception_type=str(type(e)), message=info)
