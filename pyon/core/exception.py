@@ -1,6 +1,8 @@
 import inspect
 import sys
+
 from ooi.exception import ApplicationException
+
 
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
@@ -29,6 +31,10 @@ class IonException(ApplicationException):
     def __str__(self):
         return str(self.get_status_code()) + " - " + str(self.get_error_message())
 
+class StreamException(IonException):
+    
+    def __init__(self, *a, **b):
+        super(StreamException, self).__init__(*a, **b)
 
 class BadRequest(IonException):
     '''
@@ -70,6 +76,21 @@ class Inconsistent(IonException):
     Client request failed due to internal error of the datastore
     '''
     status_code = 410
+
+class FilesystemError(StreamException):
+    """
+    """
+    status_code = 411
+
+class StreamingError(StreamException):
+    """
+    """
+    status_code = 412
+
+class CorruptionError(StreamException):
+    """
+    """
+    status_code = 413
 
 class ServerError(IonException):
     '''
@@ -202,3 +223,5 @@ class ExceptionFactory(object):
             for label, stack in stacks:
                 out.add_stack(label, stack)
         return out
+
+
