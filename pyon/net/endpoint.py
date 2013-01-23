@@ -506,17 +506,12 @@ class ListeningBaseEndpoint(BaseEndpoint):
         """
         Creates a channel and prepares it for use.
 
-        After this, the endpoint is inthe ready state.
+        After this, the endpoint is in the ready state.
         """
         binding = binding or self._binding or self._recv_name.binding
 
         self._ensure_node()
-        kwargs = {}
-        if isinstance(self._recv_name, BaseTransport):
-            kwargs.update({'transport': self._recv_name})
-        elif self._transport is not None:
-            kwargs.update({'transport': self._transport})
-        self._chan = self.node.channel(self.channel_type, **kwargs)
+        self._chan = self._create_channel()
 
         # @TODO this does not feel right
         if isinstance(self._recv_name, BaseTransport):
