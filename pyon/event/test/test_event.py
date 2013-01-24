@@ -261,21 +261,22 @@ class TestEvents(IonIntegrationTestCase):
         sub = EventSubscriber(event_type="ExceptionEvent", callback=cb, origin="stream_exception")
         self._listen(sub)
 
-        @handle_stream_exception
+        @handle_stream_exception()
         def _raise_filesystem_error():
             raise FilesystemError()
         _raise_filesystem_error()
         
-        @handle_stream_exception
+        @handle_stream_exception()
         def _raise_streaming_error():
             raise StreamingError()
         _raise_streaming_error()
         
-        @handle_stream_exception
+        @handle_stream_exception()
         def _raise_corruption_error():
             raise CorruptionError()
         _raise_corruption_error()
         
+
         ar.get(timeout=5)
         res = []
         for i in xrange(self.count):
@@ -285,8 +286,31 @@ class TestEvents(IonIntegrationTestCase):
         self.assertEquals(res[0].exception_type, "<class 'pyon.core.exception.FilesystemError'>")
         self.assertEquals(res[1].exception_type, "<class 'pyon.core.exception.StreamingError'>")
         self.assertEquals(res[2].exception_type, "<class 'pyon.core.exception.CorruptionError'>")
+        self.assertEquals(res[2].origin, "stream_exception")
         
+    
+    def test_pub_sub_exception_event_origin(self):
+        #test origin
+        ar = event.AsyncResult()
+        
+        self.count = 0
+        def cb(*args, **kwargs):
+            self.count = self.count + 1
+            ar.set(args[0])
 
+        sub = EventSubscriber(event_type="ExceptionEvent", callback=cb, origin="specific")
+        self._listen(sub)
+
+        @handle_stream_exception("specific")
+        def _test_origin():
+            raise CorruptionError()
+        _test_origin()
+        
+        exception_event = ar.get(timeout=5)
+        
+        self.assertEquals(self.count, 1)
+        self.assertEquals(exception_event.exception_type, "<class 'pyon.core.exception.CorruptionError'>")
+        self.assertEquals(exception_event.origin, "specific") 
 
 @attr('UNIT',group='datastore')
 class TestEventRepository(IonUnitTestCase):
