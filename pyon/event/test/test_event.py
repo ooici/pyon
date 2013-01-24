@@ -13,7 +13,7 @@ from gevent import event, queue
 from unittest import SkipTest
 
 from pyon.core import bootstrap
-from pyon.event.event import EventPublisher, EventSubscriber, EventRepository, _handle_stream_exception
+from pyon.event.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
 from pyon.util.async import spawn
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts, DotDict
@@ -261,17 +261,20 @@ class TestEvents(IonIntegrationTestCase):
         sub = EventSubscriber(event_type="ExceptionEvent", callback=cb, origin="stream_exception")
         self._listen(sub)
 
+        @handle_stream_exception
         def _raise_filesystem_error():
             raise FilesystemError()
-        _handle_stream_exception(_raise_filesystem_error)
+        _raise_filesystem_error()
         
+        @handle_stream_exception
         def _raise_streaming_error():
             raise StreamingError()
-        _handle_stream_exception(_raise_streaming_error)
+        _raise_streaming_error()
         
+        @handle_stream_exception
         def _raise_corruption_error():
             raise CorruptionError()
-        _handle_stream_exception(_raise_corruption_error)
+        _raise_corruption_error()
         
         ar.get(timeout=5)
         res = []
