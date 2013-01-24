@@ -5,6 +5,7 @@
 __author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
 
+import inspect
 import types
 import time
 
@@ -675,7 +676,6 @@ class ExtendedResourceContainer(object):
 
         try:
 
-
             #First look to see if this is a remote method
             if method_name.find('.') > 0:
 
@@ -692,22 +692,41 @@ class ExtendedResourceContainer(object):
 
                 methodToCall = getattr(service_client, operation)
                 param_list = [resource_id]
-                ret = methodToCall(*param_list, **kwargs )
+                param_dict = self._get_method_arguments(service_client, operation, **kwargs)
+                ret = methodToCall(*param_list, **param_dict )
                 return ret
 
             else:
                 #For local methods, first look for the method in the current class
                 func = getattr(self, method_name, None)
                 if func:
-                    return func(resource_id, **kwargs)
+                    param_dict = self._get_method_arguments(self,method_name, **kwargs)
+                    return func(resource_id, **param_dict)
                 else:
                     #Next look to see if the method exists in the service provider process
                     func = getattr(self.service_provider, method_name, None)
                     if func:
-                        return func(resource_id, **kwargs)
+                        param_dict = self._get_method_arguments(self.service_provider,method_name, **kwargs)
+                        return func(resource_id, **param_dict)
 
                 return None
 
         except Exception, e:
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
+
+    def _get_method_arguments(self, module, method_name, **kwargs):
+
+        param_dict = {}
+
+        try:
+            method_args = inspect.getargspec(getattr(module,method_name))
+            for arg in method_args[0]:
+                if kwargs.has_key(arg):
+                    param_dict[arg] = kwargs[arg]
+
+        except Exception, e:
+            #Log a warning and simply return an empty dict
+            log.warn('Cannot determine the arguments for method: %s in module: %s: %s',module, method_name, e.message )
+
+        return param_dict
