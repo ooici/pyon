@@ -153,6 +153,16 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(len(extended_res.owners),1)
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
+        self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
+
+        #Test adding extra paramaters to methods
+        extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123', resource_name='AltSystem_Resource')
+        self.assertEquals(extended_res.resource, instrument_device)
+        self.assertEquals(len(extended_res.owners),1)
+        self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
+        self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
+        self.assertEquals(extended_res.resource_object.name, 'AltSystem_Resource')
+
 
         #Test field exclusion
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123',ext_exclude=['owners'])
@@ -170,8 +180,8 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
 
-    def get_resource_object(self, resource_id):
+    def get_resource_object(self, my_resource_id, resource_name='TestSystem_Resource'):
         '''
         Method used for testing
         '''
-        return IonObject(RT.SystemResource, name='TestSystem_Resource')
+        return IonObject(RT.SystemResource, name=resource_name)
