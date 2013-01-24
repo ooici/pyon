@@ -88,6 +88,10 @@ class Negotiation(object):
 
         neg_obj = IonObject(RT.Negotiation, negotiation_type=neg_type)
 
+        #If there is a description in the initial proposal, then set the negotiation description with it.
+        if sap.description != '':
+            neg_obj.description = sap.description
+
         neg_id,_ = self.service_provider.clients.resource_registry.create(neg_obj)
 
         #Create associations between the parties
