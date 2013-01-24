@@ -329,17 +329,20 @@ class EventGate(EventSubscriber):
         pass
 
 
-def handle_stream_exception(fn):
+
+def handle_stream_exception(iorigin="stream_exception"):
     """
     decorator for stream exceptions
     """
-    functools.wraps(fn)
-    def wrapped(*args, **kwargs):
-        try:
-            fn(*args, **kwargs)
-        except StreamException as e:
-            info = "".join(traceback.format_tb(sys.exc_info()[2]))
-            pub = EventPublisher(event_type="ExceptionEvent")        
-            pub.publish_event(origin="stream_exception", description="stream exception event", exception_type=str(type(e)), message=info)
-    return wrapped
+    def real_decorator(fn):
+        @functools.wraps(fn)
+        def wrapped(*args, **kwargs):
+            try:
+                fn(*args, **kwargs)
+            except StreamException as e:
+                info = "".join(traceback.format_tb(sys.exc_info()[2]))
+                pub = EventPublisher(event_type="ExceptionEvent")        
+                pub.publish_event(origin=iorigin, description="stream exception event", exception_type=str(type(e)), message=info)
+        return wrapped
+    return real_decorator
 
