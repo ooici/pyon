@@ -16,6 +16,7 @@ from gevent import event, queue
 import time
 from pyon.util.containers import DotDict
 from pika.exceptions import NoFreeChannels
+from interface.services.icontainer_agent import ContainerAgentClient
 
 @attr('UNIT')
 class TestNodeB(PyonTestCase):
@@ -355,3 +356,37 @@ class TestPyonSelectConnection(PyonTestCase):
                 self.conn.mark_bad_channel(x)
 
         self.assertRaises(NoFreeChannels, self.conn._next_channel_number)
+
+@attr('INT')
+class TestNodeBInt(IonIntegrationTestCase):
+    def setUp(self):
+        self._start_container()
+        self.ccc = ContainerAgentClient(to_name=self.container.name)
+        self.node = self.container.node
+
+        patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_pool_health_check(self):
+
+        # make a request, thus making a bidir item
+        self.ccc.status()
+        self.assertEquals(1, len(self.node._bidir_pool))
+        curpoolchids = [o.get_channel_id() for o in self.node._bidir_pool.itervalues()]
+
+        # fake that this channel has been corrupted in pika
+        ch = self.node._bidir_pool.values()[0]
+        chnum = ch.get_channel_id()
+        del self.node.client.callbacks._callbacks[chnum]['_on_basic_deliver']
+
+        # make another request
+        self.ccc.status()
+
+        # should have killed our last channel, gotten a new one
+        self.assertEquals(1, len(self.node._bidir_pool))
+        self.assertNotEquals(curpoolchids, [o.get_channel_id() for o in self.node._bidir_pool.itervalues()])
+        self.assertNotIn(ch, self.node._bidir_pool.itervalues())
+        self.assertIn(ch, self.node._dead_pool)
+
+
