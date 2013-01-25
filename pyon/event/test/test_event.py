@@ -24,9 +24,21 @@ from interface.objects import Event, ResourceLifecycleEvent
 
 from pyon.core.exception import FilesystemError, StreamingError, CorruptionError
 
+@attr('UNIT',group='event')
+class TestEvents(IonUnitTestCase):
+    def test_event_subscriber_auto_delete(self):
+        mocknode = Mock()
+        ev = EventSubscriber(event_type="ProcessLifecycleEvent", callback=lambda *a,**kw: None, auto_delete=sentinel.auto_delete, node=mocknode)
+        self.assertEquals(ev._auto_delete, sentinel.auto_delete)
+
+        # we don't want to have to patch out everything here, so call initialize directly, which calls create_channel for us
+        ev._setup_listener = Mock()
+        ev.initialize(sentinel.binding)
+
+        self.assertEquals(ev._chan.queue_auto_delete, sentinel.auto_delete)
 
 @attr('INT',group='event')
-class TestEvents(IonIntegrationTestCase):
+class TestEventsInt(IonIntegrationTestCase):
 
     def setUp(self):
         self._listens = []
