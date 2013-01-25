@@ -164,6 +164,10 @@ class TestNodeB(PyonTestCase):
         ncm.return_value._queue_auto_delete = False
         ncm.return_value.get_channel_id.return_value = sentinel.chid
 
+        # mock out health check
+        cpchmock = Mock(return_value=True)
+        self._node._check_pooled_channel_health = cpchmock
+
         with patch('pyon.net.messaging.NodeB._new_channel', ncm):
             ch = self._node.channel(BidirClientChannel)
 
