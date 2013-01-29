@@ -5,11 +5,11 @@ __author__ = 'Stephen P. Henrie'
 __license__ = 'Apache 2.0'
 
 import types
-from pyon.core.bootstrap import CFG, get_service_registry
+from pyon.core.bootstrap import CFG, get_service_registry, IonObject
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.core.exception import BadRequest, Inconsistent
-from pyon.ion.resource import RT, PRED, LCS
+from pyon.ion.resource import RT, PRED, LCS, OT
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
@@ -293,22 +293,26 @@ class GovernanceController(object):
 
         return None
 
-    #Returns a tuple of commitment status between this resource/actor (hasSharedCommitment, hasExclusiveCommitment)
+    #Returns a ResourceCommitmentStatus object indicating the commitment status between this resource/actor
     #Can only have an exclusive commitment if actor already has a shared commitment.
     def has_resource_commitments(self, actor_id, resource_id):
 
+        ret_status = IonObject(OT.ResourceCommitmentStatus)
         commitments = self.get_resource_commitments(actor_id, resource_id)
         if commitments is None:
             #No commitments were found between this resource_id and actor_id
-            return (False, False)
+            return ret_status
+
+        ret_status.shared = True
 
         for com in commitments:
             if com.commitment.exclusive == True:
-                #Found an excusive commitment
-                return (True, True)
+                #Found an exclusive commitment
+                ret_status.exclusive = True
+                return ret_status
 
         #Only a shared commitment was found
-        return (True, False)
+        return ret_status
 
 
     #Manage all of the policies in the container
