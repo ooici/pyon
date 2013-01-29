@@ -269,7 +269,8 @@ class TestAMQPTransport(PyonTestCase):
 
     @patch('pyon.net.transport.log')
     def test__on_underlying_close(self, mocklog):
-        tp = AMQPTransport(Mock())
+        client = Mock()
+        tp = AMQPTransport(client)
         cb = Mock()
         tp.add_on_close_callback(cb)
 
@@ -278,6 +279,12 @@ class TestAMQPTransport(PyonTestCase):
         cb.assert_called_once_with(tp, 200, sentinel.text)
         self.assertEquals(mocklog.debug.call_count, 1)
         self.assertIn(sentinel.text, mocklog.debug.call_args[0])
+
+        self.assertEquals(client.callbacks.remove.call_count, 4)
+        self.assertEquals(client.callbacks.remove.call_args_list, [call(client.channel_number, 'Basic.GetEmpty'),
+                                                                   call(client.channel_number, 'Channel.Close'),
+                                                                   call(client.channel_number, '_on_basic_deliver'),
+                                                                   call(client.channel_number, '_on_basic_get')])
 
     @patch('pyon.net.transport.log')
     def test__on_underlying_close_error(self, mocklog):
@@ -312,12 +319,6 @@ class TestAMQPTransport(PyonTestCase):
         tp.close()
 
         client.close.assert_called_once_with()
-
-        self.assertEquals(client.callbacks.remove.call_count, 4)
-        self.assertEquals(client.callbacks.remove.call_args_list, [call(client.channel_number, 'Basic.GetEmpty'),
-                                                                   call(client.channel_number, 'Channel.Close'),
-                                                                   call(client.channel_number, '_on_basic_deliver'),
-                                                                   call(client.channel_number, '_on_basic_get')])
 
     def test_close_while_locked(self):
         tp = AMQPTransport(Mock())
