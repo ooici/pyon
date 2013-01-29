@@ -213,13 +213,13 @@ class ResourceAgent(BaseResourceAgent):
         return False
 
 
-    def _get_resource_commitments(self, user_id):
+    def _get_resource_commitments(self, actor_id):
 
         if not self.container.governance_controller.enabled:
             return None
 
         try:
-            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
+            return self.container.governance_controller.get_resource_commitments(actor_id, self.resource_id)
         except Exception, e:
             log.error(e.message)
             return None
