@@ -10,7 +10,7 @@ import couchdb
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
 from pyon.core.exception import BadRequest, Conflict, NotFound
-from pyon.util.containers import get_safe, SimpleLog, DictDiffer
+from pyon.util.containers import get_safe, DictDiffer
 
 from ooi.logging import log
 

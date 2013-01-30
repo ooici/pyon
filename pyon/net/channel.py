@@ -163,8 +163,8 @@ class BaseChannel(object):
 
         # is lock already acquired? spit out a notice
         if self._lock._is_owned():
-            print >>sys.stderr, "INTERLEAVE DETECTED:\n\nCURRENT STACK:\n%s\n\nSTACK THAT LOCKED: %s\n" \
-                    %  ("".join(traceback.format_stack()), "".join(self._lock_trace))
+            log.warn("INTERLEAVE DETECTED:\n\nCURRENT STACK:\n%s\n\nSTACK THAT LOCKED: %s\n",
+                    "".join(traceback.format_stack()), "".join(self._lock_trace))
 
         with self._lock:
             # we could wait and wait, and it gets closed, and unless we check again, we'd never know!
