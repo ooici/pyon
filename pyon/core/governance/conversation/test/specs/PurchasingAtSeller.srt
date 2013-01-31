@@ -1,0 +1,18 @@
+import Order;
+import CreditCheck;
+import CreditOk;
+import InsufficientCredit;
+import Confirmation;
+import OutOfStock;
+
+protocol PurchasingSeller at Seller {
+	rec Purchase
+	{
+	choice {
+			Order from Buyer;
+			Confirmation to Buyer;
+			Purchase;
+		}
+	Cancel from Buyer;
+	}
+}

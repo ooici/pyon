@@ -1,0 +1,8 @@
+protocol SimpleOrder at Buyer(role Seller, role Broker) {
+	Order to Broker;
+	Confirmation from Seller;
+	Confirmation from Seller;
+	Order to Broker;
+	Confirmation from Seller;
+	Confirmation from Seller;
+}

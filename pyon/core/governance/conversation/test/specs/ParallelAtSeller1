@@ -1,0 +1,14 @@
+import Order;
+import CreditCheck;
+import CreditOk;
+import Confirmation;
+import InsufficientCredit;
+import OrderRejected;
+import OutOfStock;
+protocol Purchasing at Seller(role Buyer) {
+	parallel {
+		Order from Buyer;
+	} and {
+		Confirmation to Buyer;
+	}
+}
