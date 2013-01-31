@@ -312,26 +312,12 @@ class GovernanceUnitTest(PyonTestCase):
 @attr('INT')
 class GovernanceIntTest(IonIntegrationTestCase):
 
+
     def setUp(self):
+
         self._start_container()
 
         self.rr = self.container.resource_registry
-
-        #Setup data
-        self.actor = IonObject(RT.ActorIdentity, name='actor1')
-
-        self.actor_id, _ = self.rr.create(self.actor)
-
-        self.ion_org = IonObject(RT.Org, name='ION')
-
-        self.ion_org_id, _ = self.rr.create(self.ion_org)
-        self.ion_org._id = self.ion_org_id
-
-        self.manager_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE, label='Org Manager', description='Org Manager')
-        self.manager_role_id = self.add_user_role(self.ion_org, self.manager_role)
-
-        self.member_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE, label='Org Member', description='Org Member')
-        self.member_role_id = self.add_user_role(self.ion_org, self.member_role)
 
     def add_user_role(self, org='', user_role=None):
         """Adds a UserRole to an Org. Will call Policy Management Service to actually
@@ -347,18 +333,33 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
     def test_get_actor_header(self):
 
-        actor_roles = self.container.governance_controller.find_roles_by_actor(self.actor_id)
+        #Setup data
+        actor = IonObject(RT.ActorIdentity, name='actor1')
+        actor_id, _ = self.rr.create(actor)
+
+        ion_org = IonObject(RT.Org, name='ION')
+        ion_org_id, _ = self.rr.create(ion_org)
+        ion_org._id = ion_org_id
+
+        manager_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE, label='Org Manager', description='Org Manager')
+        manager_role_id = self.add_user_role(ion_org, manager_role)
+
+        member_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE, label='Org Member', description='Org Member')
+
+
+        # all actors have a defaul org_member_role
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
         self.assertDictEqual(actor_roles, {'ION': [ORG_MEMBER_ROLE]})
 
-        actor_header = self.container.governance_controller.get_actor_header(self.actor_id)
-        self.assertDictEqual(actor_header, {'ion-actor-id': self.actor_id, 'ion-actor-roles': {'ION': [ORG_MEMBER_ROLE]}})
+        actor_header = self.container.governance_controller.get_actor_header(actor_id)
+        self.assertDictEqual(actor_header, {'ion-actor-id': actor_id, 'ion-actor-roles': {'ION': [ORG_MEMBER_ROLE]}})
 
         #Add Org Manager Role
-        aid = self.rr.create_association(self.actor_id, PRED.hasRole, self.manager_role_id)
+        self.rr.create_association(actor_id, PRED.hasRole, manager_role_id)
 
-        actor_roles = self.container.governance_controller.find_roles_by_actor(self.actor_id)
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
         role_header = self.container.governance_controller.get_role_message_headers\
-            ({'ION': [self.manager_role, self.member_role]})
+            ({'ION': [manager_role, member_role]})
         self.assertDictEqual(actor_roles, role_header)
 
         org2 = IonObject(RT.Org, name='Org2')
@@ -366,8 +367,6 @@ class GovernanceIntTest(IonIntegrationTestCase):
         org2_id, _ = self.rr.create(org2)
         org2._id = org2_id
 
-        manager2_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE, label='Org Manager', description='Org Manager')
-        manager2_role_id = self.add_user_role(org2, self.manager_role)
 
         member2_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE, label='Org Member', description='Org Member')
         member2_role_id = self.add_user_role(org2, member2_role)
@@ -376,56 +375,70 @@ class GovernanceIntTest(IonIntegrationTestCase):
                                    description='Instrument Operator')
         operator2_role_id = self.add_user_role(org2, operator2_role)
 
-        self.rr.create_association(self.actor_id, PRED.hasRole, member2_role_id)
+        self.rr.create_association(actor_id, PRED.hasRole, member2_role_id)
 
-        self.rr.create_association(self.actor_id, PRED.hasRole, operator2_role_id)
+        self.rr.create_association(actor_id, PRED.hasRole, operator2_role_id)
 
-        actor_roles = self.container.governance_controller.find_roles_by_actor(self.actor_id)
+        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
 
         role_header = self.container.governance_controller.get_role_message_headers\
-            ({'ION': [self.manager_role, self.member_role], 'Org2': [operator2_role, member2_role]})
-        self.assertDictEqual(actor_roles, role_header)
+            ({'ION': [manager_role, member_role], 'Org2': [operator2_role, member2_role]})
 
         self.assertEqual(len(actor_roles), 2)
+        self.assertEqual(len(role_header), 2)
         self.assertIn('Org2', actor_roles)
+        self.assertIn('Org2', role_header)
         self.assertEqual(len(actor_roles['Org2']), 2)
+        self.assertEqual(len(role_header['Org2']), 2)
         self.assertIn('INSTRUMENT_OPERATOR', actor_roles['Org2'])
+        self.assertIn('INSTRUMENT_OPERATOR', role_header['Org2'])
         self.assertIn(ORG_MEMBER_ROLE, actor_roles['Org2'])
+        self.assertIn(ORG_MEMBER_ROLE, role_header['Org2'])
         self.assertIn('ION', actor_roles)
+        self.assertIn('ION', role_header)
         self.assertIn(ORG_MANAGER_ROLE, actor_roles['ION'])
         self.assertIn(ORG_MEMBER_ROLE, actor_roles['ION'])
+        self.assertIn(ORG_MANAGER_ROLE, role_header['ION'])
+        self.assertIn(ORG_MEMBER_ROLE, role_header['ION'])
 
-        actor_header = self.container.governance_controller.get_actor_header(self.actor_id)
+        actor_header = self.container.governance_controller.get_actor_header(actor_id)
 
-        self.assertEqual(actor_header['ion-actor-id'], self.actor_id)
+        self.assertEqual(actor_header['ion-actor-id'], actor_id)
         self.assertEqual(actor_header['ion-actor-roles'], actor_roles)
 
     def test_get_sytsem_actor_header(self):
+        actor = IonObject(RT.ActorIdentity, name='ionsystem')
 
-        system_actor = self.container.governance_controller.get_system_actor()
-        system_actor_header = self.container.governance_controller.get_system_actor_header(system_actor)
-        self.assertDictEqual(system_actor_header,
-                             {'ion-actor-id': self.system_actor_id,
-                              'ion-actor-roles': {'ION': [ORG_MEMBER_ROLE]}})
+        actor_id, _ = self.rr.create(actor)
+
+        system_actor_header = self.container.governance_controller.get_system_actor_header()
+        self.assertDictEqual(system_actor_header['ion-actor-roles'],{'ION': [ORG_MEMBER_ROLE]})
 
     def test_get_resource_commitment(self):
         from pyon.util.containers import get_ion_ts
 
-        # create an expired commitment
+        # create ION org and an actor
+        ion_org = IonObject(RT.Org, name='ION')
+        ion_org_id, _ = self.rr.create(ion_org)
+        ion_org._id = ion_org_id
+        actor = IonObject(RT.ActorIdentity, name='actor1')
+        actor_id, _ = self.rr.create(actor)
+
+        # create an expired commitment in the org
         ts = int(get_ion_ts()) - 50000
-        com_obj = IonObject(RT.Commitment, provider=self.ion_org_id, consumer=self.actor_id, commitment=True, expiration=ts)
+        com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
-        id = self.rr.create_association(self.ion_org_id, PRED.hasCommitment, com_id)
-        c = self.container.governance_controller.get_resource_commitment(self.actor_id, self.ion_org_id)
+        id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
+        c = self.container.governance_controller.get_resource_commitments(actor_id, ion_org_id)
         #verify that the commitment is not returned
         self.assertIsNone(c)
 
         # create a commitment that has not expired yet
         ts = int(get_ion_ts()) + 50000
-        com_obj = IonObject(RT.Commitment, provider=self.ion_org_id, consumer=self.actor_id, commitment=True, expiration=ts)
+        com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
-        id = self.rr.create_association(self.ion_org_id, PRED.hasCommitment, com_id)
-        c = self.container.governance_controller.get_resource_commitment(self.actor_id, self.ion_org_id)
+        id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
+        c = self.container.governance_controller.get_resource_commitments(actor_id, ion_org_id)
 
         #verify that the commitment is returned
         self.assertIsNotNone(c)
