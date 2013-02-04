@@ -330,7 +330,7 @@ def shutdown_or_die(delay_sec=0):
 
     def diediedie(sig=None, frame=None):
         pid = os.getpid()
-        print 'Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).' % (pid)
+        log.warn('Container did not shutdown correctly. Forcibly terminating with SIGKILL (pid %d).', pid)
         os.kill(pid, signal.SIGKILL)
 
     def dontdie():
@@ -342,10 +342,9 @@ def shutdown_or_die(delay_sec=0):
             signal.alarm(int(delay_sec))
 
             if old:
-                print 'Warning: shutdown_or_die found a previously registered ALARM and overrode it.'
+                log.warn('shutdown_or_die found a previously registered ALARM and overrode it.')
         except ValueError, ex:
-            print 'Failed to set failsafe shutdown signal. This only works on UNIX platforms.'
-            pass
+            log.error('Failed to set failsafe shutdown signal. This only works on UNIX platforms.')
     else:
         diediedie()
 
