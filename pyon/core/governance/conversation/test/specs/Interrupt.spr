@@ -1,0 +1,19 @@
+import Order;
+import CreditCheck;
+import CreditOk;
+import InsufficientCredit;
+import Confirmation;
+import OutOfStock;
+
+protocol PurchasingBuyer at Buyer(role Seller) {
+do{	
+	Order to Seller;
+	Confirmation from Seller;
+	Order to Seller;
+	Confirmation from Seller;
+  }
+interrupt by Buyer
+{Help from Seller;
+ MoreHelp to Seller;}
+}
+
