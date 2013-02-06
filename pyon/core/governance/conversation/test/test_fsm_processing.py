@@ -1,10 +1,12 @@
 __author__ = 'rn710'
 import os, inspect
-from  pyon.core.governance.conversation.core.transition import TransitionFactory
+from pyon.core.governance.conversation.core.transition import TransitionFactory
 from pyon.core.governance.conversation.core.local_type import LocalType
 from pyon.core.governance.conversation.core.fsm import ExceptionFSM, ExceptionFailAssertion
 from pyon.core.governance.conversation.parsing.base_parser import ANTLRScribbleParser
 from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.log import log
+
 from nose.plugins.attrib import attr
 
 def purchasingAtBuyer_events():
@@ -94,10 +96,10 @@ class TestFSM(IonIntegrationTestCase):
             myparser = ANTLRScribbleParser()
             res = myparser.parse(self.path + lt_filename)
             builder = myparser.walk(res)
-            print builder.memory
-            print builder.main_fsm.fsm.memory
-            print builder.main_fsm.recursions_states
-            print builder.current_fsm.fsm.state_transitions
+            log.debug(builder.memory)
+            log.debug(builder.main_fsm.fsm.memory)
+            log.debug(builder.main_fsm.recursions_states)
+            log.debug(builder.current_fsm.fsm.state_transitions)
             builder.main_fsm.fsm.process_list(events)
         except ExceptionFSM: raise
 
@@ -106,11 +108,11 @@ class TestFSM(IonIntegrationTestCase):
             myparser = ANTLRScribbleParser()
             res = myparser.parse(self.path + lt_filename)
             builder = myparser.walk(res)
-            print builder.current_fsm.fsm.state_transitions
+            log.debug(builder.current_fsm.fsm.state_transitions)
             builder.main_fsm.fsm.set_assertion_check_on()
             builder.main_fsm.fsm.process_list(events, payloads)
-            print builder.main_fsm.fsm.interrupt_transition
-            print builder.main_fsm.fsm.interrupt_start_state
+            log.debug(builder.main_fsm.fsm.interrupt_transition)
+            log.debug(builder.main_fsm.fsm.interrupt_start_state)
         except ExceptionFSM:
             raise
 
