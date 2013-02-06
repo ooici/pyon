@@ -71,24 +71,8 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
         self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_REJECT)
 
         ##########
-        #
-        #           check a request from an agent is accepted  TEST 2
-        ##########
-
-        # make this an invocation from an agent
-        self.invocation.get_invocation_process_type.return_value = 'agent'
-
-        # set it up so that the request is accepted
-        governance_controller.policy_decision_point_manager.check_agent_request_policies.return_value = Decision.PERMIT
-
-        rval = policy_interceptor.incoming(self.invocation)
-        # check that the request is accepted
-        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_REJECT)
-
-
-        ##########
-        #
-        #           check that the validated request (one that has a policy token) from TEST2 passes through when sent to resource_registry  TEST 3
+        #           TEST 2
+        #           check that request (one that doesn't have a policy token) fails when sent to resource_registry
         ##########
 
         # simulate that the higher service is calling the resource registry with token set previously
@@ -101,9 +85,43 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
         # then skip checking policy yet again - should help with performance and to simplify policy
         # thus the invocation is simply returned back
         rval = policy_interceptor.incoming(self.invocation)
-        self.assertEquals(rval, self.invocation)
+        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_REJECT)
+
+
+
+        ##########
+        #           TEST 3
+        #           check a request from an agent is accepted
+        ##########
+
+        # make this an invocation from an agent
+        self.invocation.get_invocation_process_type.return_value = 'agent'
+
+        # set it up so that the request is accepted
+        governance_controller.policy_decision_point_manager.check_resource_request_policies.return_value = Decision.PERMIT
+        governance_controller.policy_decision_point_manager.check_agent_request_policies.return_value = Decision.PERMIT
+
+        rval = policy_interceptor.incoming(self.invocation)
+        # check that the request is accepted
+        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_COMPLETE)
+
+
         ##########
         #           TEST 4
+        #           check that the validated request (one that has a policy token) from TEST3 passes through when sent to resource_registry
+        ##########
+
+        # simulate that the higher service is calling the resource registry with token set previously
+        self.invocation.get_message_receiver.return_value = 'resource_registry'
+
+        # Since this is a sub RPC request to the RR (resource registry) from a higher level service that has already been validated and set a token
+        # then skip checking policy yet again - should help with performance and to simplify policy
+        # thus the invocation is simply returned back
+        rval = policy_interceptor.incoming(self.invocation)
+        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_COMPLETE)
+
+        ##########
+        #           TEST 5
         #           check a request from a service is accepted
         ##########
 
@@ -115,5 +133,5 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
 
         rval = policy_interceptor.incoming(self.invocation)
         # check that the request is accepted
-        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_REJECT)
+        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_COMPLETE)
 
