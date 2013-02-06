@@ -4,7 +4,7 @@ from  pyon.core.governance.conversation.core.transition import TransitionFactory
 from pyon.core.governance.conversation.core.local_type import LocalType
 from pyon.core.governance.conversation.core.fsm import ExceptionFSM, ExceptionFailAssertion
 from pyon.core.governance.conversation.parsing.base_parser import ANTLRScribbleParser
-from pyon.util.unit_test import PyonTestCase
+from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
 def purchasingAtBuyer_events():
@@ -12,7 +12,7 @@ def purchasingAtBuyer_events():
     events.append(TransitionFactory.create(LocalType.SEND, 'Order', 'Seller'))
     events.append(TransitionFactory.create(LocalType.RESV, 'Confirmation', 'Seller'))
     events.append(TransitionFactory.create(LocalType.SEND, 'Order', 'Seller'))
-    events.append(TransitionFactory.create(LocalType.RESV, 'Confirmation', 'Seller'))
+    events.append(TransitionFactory.create(LocalType.RESV, 'Confirmation', 'Seller'))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
     return events
 
 def locateChoiceAtBuyer_events():
@@ -84,7 +84,7 @@ def recAsRepeat_events():
     return events
 
 attr('INT')
-class TestFSM(PyonTestCase):
+class TestFSM(IonIntegrationTestCase):
     def setUp(self):
         cur_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         self.path = '%s/specs/'%cur_dir
