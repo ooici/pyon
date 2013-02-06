@@ -1,0 +1,14 @@
+import Order;
+import CreditCheck;
+import CreditOk;
+import InsufficientCredit;
+import Confirmation;
+import OutOfStock;
+
+protocol PurchasingBuyer at Buyer(role Seller) {
+	Order(a:int) to Seller;
+	Confirmation(b:string) from Seller @{b=="a"};
+	Order(c:int) to Seller;
+	Confirmation(d:int)  from Seller @{a + c > d};
+}
+

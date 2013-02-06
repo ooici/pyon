@@ -1,0 +1,9 @@
+import Order;
+import Invoice;
+protocol Purchasing at Buyer {
+	rec Transaction {
+		Order to Seller;
+		Invoice from Seller;
+		Transaction;
+	}
+}

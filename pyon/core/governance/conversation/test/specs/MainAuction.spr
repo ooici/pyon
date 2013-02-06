@@ -1,0 +1,15 @@
+import Order;
+import Invoice;
+protocol Purchasing at Buyer {
+	rec Transaction {
+	parallel{
+		Order to Seller;
+		Invoice from Seller;
+		
+	and{Order1 to Seller;
+		Invoice1 from Seller;
+		}
+	Transaction;}
+OK to Seller;
+
+}

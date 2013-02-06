@@ -1,0 +1,8 @@
+import Order;
+import Invoice;
+protocol Purchasing at Buyer {
+	repeat {
+		Order to Seller;
+		Invoice from Seller;
+	}
+}
