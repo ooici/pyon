@@ -249,6 +249,15 @@ def get_datetime_str(ts, show_millis=False, local_time=True):
 def parse_ion_ts(ts):
     return float(ts) / 1000.0
 
+
+def is_valid_ts(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})
     print dd.a.b.c, dd.a.b.d

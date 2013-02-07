@@ -12,9 +12,10 @@ from gevent import event as gevent_event
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
+from pyon.ion.identifier import create_unique_event_id
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, is_valid_ts
 from pyon.util.log import log
 
 from interface.objects import Event
@@ -27,6 +28,8 @@ EVENTS_XP_TYPE = "topic"
 
 PERSIST_ON_PUBLISH = False
 
+#The event will be ignored if older than this time period
+VALID_EVENT_TIME_PERIOD = 365 * 24 * 60 * 60 * 1000   # one year
 
 def get_events_exchange_point():
     return "%s.%s" % (bootstrap.get_sys_name(), EVENTS_XP)
@@ -59,6 +62,7 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, to_name=name, **kwargs)
 
+    #Deprecate this
     def _topic(self, event_type, origin, base_types=None, sub_type=None, origin_type=None):
         """
         Builds the topic that this event should be published to.
@@ -71,6 +75,19 @@ class EventPublisher(Publisher):
         routing_key = "%s.%s.%s.%s.%s" % (base_str, event_type, sub_type, origin_type, origin)
         return routing_key
 
+    def _topic(self, event_object):
+        """
+        Builds the topic that this event should be published to.
+        """
+        assert event_object
+        base_types = event_object.base_types or []
+        base_str = ".".join(reversed(base_types))
+        sub_type = event_object.sub_type or "_"
+        origin_type = event_object.origin_type or "_"
+        routing_key = "%s.%s.%s.%s.%s" % (base_str, event_object._get_type(), sub_type, origin_type, event_object.origin)
+        return routing_key
+
+    #Deprecate this
     def _create_event(self, event_type=None, ionobject=None, **kwargs):
         if ionobject is None:
             event_type = event_type or self.event_type
@@ -87,45 +104,83 @@ class EventPublisher(Publisher):
 
         return event_msg
 
+    #Deprecate this!
     def _publish_event(self, event_msg, origin, event_type=None):
-        event_type = event_type or self.event_type or event_msg._get_type()
-        assert origin and event_type
+        return self.publish_event_object(event_msg)
 
-        topic = self._topic(event_type, origin, base_types=event_msg.base_types,
-            sub_type=event_msg.sub_type, origin_type=event_msg.origin_type)
+    def publish_event_object(self, event_object):
+        """
+        Publishes an event of given type for the given origin. Event_type defaults to an
+        event_type set when initializing the EventPublisher. Other kwargs fill out the fields
+        of the event. This operation will log any errors occuring during event creation,
+        but will not fail with an exception.
+        @param event_object     the event object to be published
+        @retval  bool  indicating success of this operation
+        """
+        assert event_object
+
+        topic = self._topic(event_object)
         to_name = (self._send_name.exchange, topic)
         log.trace("Publishing event message to %s", to_name)
 
+        #Ensure valid created timestamp
+        event_object.ts_created = event_object.ts_created or get_ion_ts()
+        if not is_valid_ts(event_object.ts_created):
+            event_object.ts_created = get_ion_ts()
+
+        #Reject events that are older than specified time
+        if int(event_object.ts_created) > ( int(get_ion_ts()) + VALID_EVENT_TIME_PERIOD ):
+            log.exception("The event is being ignored for being too old '%s'" , (event_object))
+            return False
+
+        #Validate this object
+        event_object._validate()
+
+        #Ensure the event object has a unique id
+        if '_id' not in event_object:
+            event_object._id = create_unique_event_id()
+        else:
+            event_object._id = event_object._id or create_unique_event_id()
+
         try:
-            self.publish(event_msg, to_name=to_name)
+            self.publish(event_object, to_name=to_name)
         except Exception as ex:
-            log.exception("Failed to publish event '%s'" % (event_msg))
+            log.exception("Failed to publish event '%s'" , (event_object))
             return False
 
         try:
             # store published event but only if we specified an event_repo
             if PERSIST_ON_PUBLISH and self.event_repo:
-                self.event_repo.put_event(event_msg)
+                self.event_repo.put_event(event_object)
         except Exception as ex:
-            log.exception("Failed to store published event '%s'" % (event_msg))
+            log.exception("Failed to store published event '%s'" , (event_object))
             return False
 
         return True
 
-    def publish_event(self, origin=None, event_type=None, ionobject=None, **kwargs):
+
+    def publish_event(self, origin=None, event_type=None, **kwargs):
         """
         Publishes an event of given type for the given origin. Event_type defaults to an
         event_type set when initializing the EventPublisher. Other kwargs fill out the fields
         of the event. This operation will log any errors occuring during event creation,
         but will not fail with an exception.
         @param origin     the origin field value
-        @param event_type the event type (defaults to the EventPublisher's event_typeif set)
+        @param event_type the event type (defaults to the EventPublisher's event_type if set)
         @param kwargs     additional event fields
         @retval  bool  indicating success of this operation
         """
-        event_msg = self._create_event(origin=origin, event_type=event_type, ionobject=ionobject, **kwargs)
-        success = self._publish_event(event_msg, origin=origin)
+
+        event_type = event_type or self.event_type
+        assert event_type
+
+        event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
+        event_object.base_types = event_object._get_extends()
+        success = self.publish_event_object(event_object)
         return success
+
+
+
 
 
 class BaseEventSubscriberMixin(object):
@@ -272,7 +327,7 @@ class EventRepository(object):
             raise BadRequest("events must all be type Event")
 
         if events:
-            return self.event_store.create_mult(events)
+            return self.event_store.create_mult(events, allow_ids=True)
         else:
             return None
 
