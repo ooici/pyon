@@ -11,6 +11,7 @@ import simplejson
 import base64
 import uuid
 import os
+import re
 from copy import deepcopy
 
 class DotNotationGetItem(object):
@@ -210,7 +211,7 @@ def for_name(modpath, classname):
     return classobj()
 
 def current_time_millis():
-    return int(time.time() * 1000)
+    return int(round(time.time() * 1000))
 
 def get_ion_ts():
     """
@@ -251,11 +252,28 @@ def parse_ion_ts(ts):
 
 
 def is_valid_ts(s):
+
+    if not is_string(s):
+        return False
+
+    #Checking for only numeric characters and length of 13
+    #TODO - will need to change this length to 14 in the year 2286!!!  :)
+    if not re.match("^[0-9]*$", s) or len(s) < 13 or len(s) > 14:
+        return False
     try:
-        int(s)
+        val = int(s)
+        if val < 0:
+            return False
+
         return True
     except ValueError:
         return False
+
+def is_string(obj):
+    try:
+        return isinstance(obj, basestring)
+    except NameError:
+        return isinstance(obj, str)
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
 __author__ = 'Thomas R. Lennan'
 __license__ = 'Apache 2.0'
 
-from pyon.util.containers import DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID
+from pyon.util.containers import DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID, is_valid_ts, get_ion_ts
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
@@ -75,6 +75,28 @@ class Test_Containers(IonIntegrationTestCase):
         self.assertIn('abc123', id)
         id = create_unique_identifier()
         self.assertNotIn('abc123', id)
+
+
+    def test_is_valid_ts(self):
+
+        #Not a string
+        self.assertEqual(is_valid_ts(1332424), False)
+
+        #Too short
+        self.assertEqual(is_valid_ts('1332424'), False)
+
+        #Not numeric
+        self.assertEqual(is_valid_ts('bfd1332424'), False)
+
+        #Neither numeric or positive
+        self.assertEqual(is_valid_ts('-332424'), False)
+
+        #Too long
+        self.assertEqual(is_valid_ts('109392939394556'), False)
+
+        #Just right
+        ts = get_ion_ts()
+        self.assertEqual(is_valid_ts(ts), True)
 
 
 if __name__ == "__main__":

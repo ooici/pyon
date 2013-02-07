@@ -59,18 +59,50 @@ class TestEventsInt(IonIntegrationTestCase):
 
     def test_pub_and_sub(self):
         ar = event.AsyncResult()
+        gq = queue.Queue()
+        self.count = 0
+
         def cb(*args, **kwargs):
-            ar.set(args)
+            self.count += 1
+            gq.put(args[0])
+            if self.count == 2:
+                ar.set()
+
         sub = EventSubscriber(event_type="ResourceEvent", callback=cb, origin="specific")
         pub = EventPublisher(event_type="ResourceEvent")
 
         self._listen(sub)
-        pub.publish_event(origin="specific", description="hello")
+        self.assertEquals(pub.publish_event(origin="specific", description="hello"), True)
 
-        evmsg, evheaders = ar.get(timeout=5)
 
-        self.assertEquals(evmsg.description, "hello")
-        self.assertAlmostEquals(int(evmsg.ts_created), int(get_ion_ts()), delta=5000)
+        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
+        self.assertEquals(pub.publish_event_object(event_obj), True)
+
+        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='2423')
+        self.assertEquals(pub.publish_event_object(event_obj), False)
+
+        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='1000494978462')
+        self.assertEquals(pub.publish_event_object(event_obj), False)
+
+        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
+        event_obj._id = '343434'
+        self.assertEquals(pub.publish_event_object(event_obj), False)
+
+
+        ar.get(timeout=5)
+
+        res = []
+        for x in xrange(self.count):
+            res.append(gq.get(timeout=5))
+
+        self.assertEquals(len(res), self.count)
+        self.assertEquals(res[0].description, "hello")
+        self.assertAlmostEquals(int(res[0].ts_created), int(get_ion_ts()), delta=5000)
+
+        self.assertEquals(res[1].description, "more testing")
+        self.assertAlmostEquals(int(res[1].ts_created), int(get_ion_ts()), delta=5000)
+
+
 
     def Xtest_pub_with_event_repo(self):
         pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)

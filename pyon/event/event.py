@@ -62,19 +62,6 @@ class EventPublisher(Publisher):
 
         Publisher.__init__(self, to_name=name, **kwargs)
 
-    #Deprecate this
-    def _topic(self, event_type, origin, base_types=None, sub_type=None, origin_type=None):
-        """
-        Builds the topic that this event should be published to.
-        """
-        assert event_type and origin
-        base_types = base_types or []
-        base_str = ".".join(reversed(base_types))
-        sub_type = sub_type or "_"
-        origin_type = origin_type or "_"
-        routing_key = "%s.%s.%s.%s.%s" % (base_str, event_type, sub_type, origin_type, origin)
-        return routing_key
-
     def _topic(self, event_object):
         """
         Builds the topic that this event should be published to.
@@ -123,24 +110,38 @@ class EventPublisher(Publisher):
         to_name = (self._send_name.exchange, topic)
         log.trace("Publishing event message to %s", to_name)
 
-        #Ensure valid created timestamp
-        event_object.ts_created = event_object.ts_created or get_ion_ts()
-        if not is_valid_ts(event_object.ts_created):
-            event_object.ts_created = get_ion_ts()
+        current_time = int(get_ion_ts())
 
-        #Reject events that are older than specified time
-        if int(event_object.ts_created) > ( int(get_ion_ts()) + VALID_EVENT_TIME_PERIOD ):
-            log.exception("The event is being ignored for being too old '%s'" , (event_object))
-            return False
+        #Ensure valid created timestamp if supplied
+        if event_object.ts_created:
+
+            if not is_valid_ts(event_object.ts_created):
+                log.error("The ts_created value is not a valid timestamp: '%s'" , (event_object.ts_created))
+                return False
+
+            #Reject events that are older than specified time
+            if int(event_object.ts_created) > ( current_time + VALID_EVENT_TIME_PERIOD ):
+                log.error("This ts_created value is too far in the future:'%s'" , (event_object.ts_created))
+                return False
+
+            #Reject events that are older than specified time
+            if int(event_object.ts_created) < (current_time - VALID_EVENT_TIME_PERIOD) :
+                log.error("This ts_created value is too old:'%s'" , (event_object.ts_created))
+                return False
+
+        else:
+            event_object.ts_created = str(current_time)
 
         #Validate this object
         event_object._validate()
 
         #Ensure the event object has a unique id
-        if '_id' not in event_object:
-            event_object._id = create_unique_event_id()
-        else:
-            event_object._id = event_object._id or create_unique_event_id()
+        if '_id' in event_object:
+            log.error("The event object cannot contain a _id field '%s'" , (event_object))
+            return False
+
+        #Generate a unique ID for this event
+        event_object._id = create_unique_event_id()
 
         try:
             self.publish(event_object, to_name=to_name)
