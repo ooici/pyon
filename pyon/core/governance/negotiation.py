@@ -161,18 +161,18 @@ class Negotiation(object):
 
         event_type =   string.rstrip(sap.type_,'Proposal') + 'NegotiationStatusEvent'
 
-        #Thw negotiation id will be used for the orgin
+        #The negotiation id will be used for the orgin
         origin = negotiation._id
 
         event_data = dict()
         event_data['origin_type'] = RT.Negotiation
-        event_data['originator'] = sap.originator
+        event_data['originator'] = ProposalOriginatorEnum._str_map[sap.originator]
 
         if status is None:
-            event_data['sub_type'] = sap.proposal_status
+            event_data['sub_type'] = str(sap.proposal_status)
             event_data['description'] = ProposalStatusEnum._str_map[sap.proposal_status]
         else:
-            event_data['sub_type'] = status
+            event_data['sub_type'] = str(status)
             event_data['description'] = ProposalStatusEnum._str_map[status]
 
         #Look for other data that belongs in the event
@@ -182,7 +182,6 @@ class Negotiation(object):
                     event_data[field] = getattr(sap,field)
 
 
-        self.service_provider.event_pub.publish_event(event_type=event_type,
-            origin=origin, **event_data)
+        self.service_provider.event_pub.publish_event(event_type=event_type, origin=origin, **event_data)
 
 
