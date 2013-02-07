@@ -33,7 +33,8 @@ setup(  name = 'pyon',
                  'insulate=pyon.util.insulate:Insulate',
                  'insulateslave=pyon.util.insulate:InsulateSlave',
                  'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler',
-                 'greenletleak=pyon.util.greenlet_plugin:GreenletLeak'
+                 'greenletleak=pyon.util.greenlet_plugin:GreenletLeak',
+                 'processleak=pyon.util.processblame_plugin:ProcessLeak'
              ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
