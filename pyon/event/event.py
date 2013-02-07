@@ -74,22 +74,6 @@ class EventPublisher(Publisher):
         routing_key = "%s.%s.%s.%s.%s" % (base_str, event_object._get_type(), sub_type, origin_type, event_object.origin)
         return routing_key
 
-    #Deprecate this
-    def _create_event(self, event_type=None, ionobject=None, **kwargs):
-        if ionobject is None:
-            event_type = event_type or self.event_type
-            assert event_type
-
-            if 'ts_created' not in kwargs:
-                kwargs['ts_created'] = get_ion_ts()
-
-            event_msg = bootstrap.IonObject(event_type, **kwargs)
-        event_msg.base_types = event_msg._get_extends()
-
-        # Would like to validate here but blows up if an object is provided where a dict is declared
-        #event_msg._validate()
-
-        return event_msg
 
     #Deprecate this!
     def _publish_event(self, event_msg, origin, event_type=None):
@@ -99,10 +83,9 @@ class EventPublisher(Publisher):
         """
         Publishes an event of given type for the given origin. Event_type defaults to an
         event_type set when initializing the EventPublisher. Other kwargs fill out the fields
-        of the event. This operation will log any errors occuring during event creation,
-        but will not fail with an exception.
+        of the event. This operation will fail with an exception.
         @param event_object     the event object to be published
-        @retval  bool  indicating success of this operation
+        @retval event_object    the event object which was published
         """
         assert event_object
 
@@ -116,18 +99,15 @@ class EventPublisher(Publisher):
         if event_object.ts_created:
 
             if not is_valid_ts(event_object.ts_created):
-                log.error("The ts_created value is not a valid timestamp: '%s'" , (event_object.ts_created))
-                return False
+                raise BadRequest("The ts_created value is not a valid timestamp: '%s'" % (event_object.ts_created))
 
             #Reject events that are older than specified time
             if int(event_object.ts_created) > ( current_time + VALID_EVENT_TIME_PERIOD ):
-                log.error("This ts_created value is too far in the future:'%s'" , (event_object.ts_created))
-                return False
+                raise BadRequest("This ts_created value is too far in the future:'%s'" % (event_object.ts_created))
 
             #Reject events that are older than specified time
             if int(event_object.ts_created) < (current_time - VALID_EVENT_TIME_PERIOD) :
-                log.error("This ts_created value is too old:'%s'" , (event_object.ts_created))
-                return False
+                raise BadRequest("This ts_created value is too old:'%s'" % (event_object.ts_created))
 
         else:
             event_object.ts_created = str(current_time)
@@ -137,8 +117,7 @@ class EventPublisher(Publisher):
 
         #Ensure the event object has a unique id
         if '_id' in event_object:
-            log.error("The event object cannot contain a _id field '%s'" , (event_object))
-            return False
+            raise BadRequest("The event object cannot contain a _id field '%s'" % (event_object))
 
         #Generate a unique ID for this event
         event_object._id = create_unique_event_id()
@@ -146,30 +125,27 @@ class EventPublisher(Publisher):
         try:
             self.publish(event_object, to_name=to_name)
         except Exception as ex:
-            log.exception("Failed to publish event '%s'" , (event_object))
-            return False
+            raise BadRequest("Failed to publish event '%s'" % (event_object))
 
         try:
             # store published event but only if we specified an event_repo
             if PERSIST_ON_PUBLISH and self.event_repo:
                 self.event_repo.put_event(event_object)
         except Exception as ex:
-            log.exception("Failed to store published event '%s'" , (event_object))
-            return False
+            raise BadRequest("Failed to store published event '%s'" % (event_object))
 
-        return True
+        return event_object
 
 
     def publish_event(self, origin=None, event_type=None, **kwargs):
         """
         Publishes an event of given type for the given origin. Event_type defaults to an
         event_type set when initializing the EventPublisher. Other kwargs fill out the fields
-        of the event. This operation will log any errors occuring during event creation,
-        but will not fail with an exception.
+        of the event. This operation will fail with an exception.
         @param origin     the origin field value
         @param event_type the event type (defaults to the EventPublisher's event_type if set)
         @param kwargs     additional event fields
-        @retval  bool  indicating success of this operation
+        @retval event_object    the event object which was published
         """
 
         event_type = event_type or self.event_type
@@ -177,8 +153,8 @@ class EventPublisher(Publisher):
 
         event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
         event_object.base_types = event_object._get_extends()
-        success = self.publish_event_object(event_object)
-        return success
+        ret_val = self.publish_event_object(event_object)
+        return ret_val
 
 
 

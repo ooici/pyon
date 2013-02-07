@@ -13,6 +13,7 @@ from gevent import event, queue
 from unittest import SkipTest
 
 from pyon.core import bootstrap
+from pyon.core.exception import BadRequest
 from pyon.event.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
 from pyon.util.async import spawn
 from pyon.util.log import log
@@ -72,22 +73,26 @@ class TestEventsInt(IonIntegrationTestCase):
         pub = EventPublisher(event_type="ResourceEvent")
 
         self._listen(sub)
-        self.assertEquals(pub.publish_event(origin="specific", description="hello"), True)
-
-
-        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
-        self.assertEquals(pub.publish_event_object(event_obj), True)
-
-        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='2423')
-        self.assertEquals(pub.publish_event_object(event_obj), False)
-
-        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='1000494978462')
-        self.assertEquals(pub.publish_event_object(event_obj), False)
+        pub.publish_event(origin="specific", description="hello")
 
         event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
-        event_obj._id = '343434'
-        self.assertEquals(pub.publish_event_object(event_obj), False)
+        self.assertEqual(event_obj, pub.publish_event_object(event_obj))
 
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='2423')
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'The ts_created value is not a valid timestamp',cm.exception.message)
+
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='1000494978462')
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'This ts_created value is too old',cm.exception.message)
+
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
+            event_obj._id = '343434'
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'The event object cannot contain a _id field',cm.exception.message)
 
         ar.get(timeout=5)
 
