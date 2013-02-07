@@ -41,7 +41,7 @@ class ProcessLeak(Plugin):
         try:
            self.base_pids = [ proc.process_id for proc in self.pd_cli.list_processes(timeout=self.rpc_timeout) ]
         except Timeout:
-            pass
+           pass
 
     def afterTest(self, test):
         from pyon.core.exception import Timeout
