@@ -75,10 +75,6 @@ class EventPublisher(Publisher):
         return routing_key
 
 
-    #Deprecate this!
-    def _publish_event(self, event_msg, origin, event_type=None):
-        return self.publish_event_object(event_msg)
-
     def publish_event_object(self, event_object):
         """
         Publishes an event of given type for the given origin. Event_type defaults to an
