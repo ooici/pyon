@@ -8,7 +8,7 @@ from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerError
+from pyon.core.exception import ContainerError, BadRequest
 from pyon.core.governance.governance_controller import GovernanceController
 from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository, EventPublisher
@@ -330,10 +330,13 @@ class Container(BaseContainerAgent):
         log.info("=============== Container stopping... ===============")
 
         if self.event_pub is not None:
-            self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
-                                         origin=self.id, origin_type="CapabilityContainer",
-                                         sub_type="TERMINATE",
-                                         state=ContainerStateEnum.TERMINATE)
+            try:
+                self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                             origin=self.id, origin_type="CapabilityContainer",
+                                             sub_type="TERMINATE",
+                                             state=ContainerStateEnum.TERMINATE)
+            except BadRequest as ex:
+                log.error(ex.message)
 
         while self._capabilities:
             capability = self._capabilities.pop()
