@@ -104,21 +104,20 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
             cmd_res.result = str(ex)
 
         sub_type = "%s.%s" % (command.command, cmd_res.status)
-        post_event = self._event_publisher._create_event(event_type=self.COMMAND_EVENT_TYPE,
-                                origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
-                                sub_type=sub_type, command=command, result=cmd_res)
-        post_event = self._post_execute_event_hook(post_event)
-        success = self._event_publisher._publish_event(post_event, origin=post_event.origin)
+        event_data = self._post_execute_event_hook(event_type=self.COMMAND_EVENT_TYPE,
+            origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
+            sub_type=sub_type, command=command, result=cmd_res)
+        post_event = self._event_publisher.publish_event(**event_data)
 
         return cmd_res
 
-    def _post_execute_event_hook(self, event):
+    def _post_execute_event_hook(self, **kwargs):
         """
         Hook to add additional values to the event object to be published
         @param event  A filled out even object of type COMMAND_EVENT_TYPE
         @retval an event object
         """
-        return event
+        return kwargs
 
     def get_capabilities(self, resource_id="", capability_types=[]):
         capability_types = capability_types or ["CONV_TYPE", "AGT_CMD", "AGT_PAR", "RES_CMD", "RES_PAR"]
