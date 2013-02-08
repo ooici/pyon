@@ -109,7 +109,8 @@ class EventPublisher(Publisher):
             event_object.ts_created = str(current_time)
 
         #Validate this object
-        event_object._validate()
+        #TODO - enable this once the resource agent issue sending a dict is figured out
+        #event_object._validate()
 
         #Ensure the event object has a unique id
         if '_id' in event_object:
