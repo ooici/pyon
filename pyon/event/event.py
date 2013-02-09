@@ -122,14 +122,16 @@ class EventPublisher(Publisher):
         try:
             self.publish(event_object, to_name=to_name)
         except Exception as ex:
-            raise BadRequest("Failed to publish event '%s'" % (event_object))
+            log.exception("Failed to store published event (%s): '%s'" , (ex.message, event_object))
+            raise BadRequest("Failed to publish event (%s): '%s'" % (ex.message, event_object))
 
         try:
             # store published event but only if we specified an event_repo
             if PERSIST_ON_PUBLISH and self.event_repo:
                 self.event_repo.put_event(event_object)
         except Exception as ex:
-            raise BadRequest("Failed to store published event '%s'" % (event_object))
+            log.exception("Failed to store published event (%s): '%s'" , (ex.message, event_object))
+            raise BadRequest("Failed to store published event (%s): '%s'" % (ex.message, event_object))
 
         return event_object
 
