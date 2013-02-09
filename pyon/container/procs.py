@@ -853,6 +853,10 @@ class ProcManager(object):
                 # if it's already gone, it's already gone!
                 pass
 
+            except BadRequest:
+                # if the container is shutting down then the event publishing may not be functioning.
+                pass
+
         # Cleanup for specific process types
         if process_instance._proc_type == "service":
             # Check if this is the last process for this service and do auto delete service resources here
