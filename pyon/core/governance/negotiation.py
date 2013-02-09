@@ -34,7 +34,7 @@ class Negotiation(object):
 
         return counter_sap
 
-    def __init__(self,serv_prov, negotiation_rules=None):
+    def __init__(self,serv_prov, negotiation_rules=None, event_publisher=None):
 
         self.service_provider = serv_prov
 
@@ -43,6 +43,7 @@ class Negotiation(object):
         else:
             self.negotiation_rules = negotiation_rules
 
+        self.event_publisher = event_publisher
 
     def read_negotiation(self, sap=None):
 
@@ -154,7 +155,9 @@ class Negotiation(object):
         return None
 
     def _publish_status_event(self, negotiation, status=None):
-        #Sent request opened event
+
+        if self.event_publisher == None:
+            return
 
         #Get lastest proposal
         sap = negotiation.proposals[-1]
@@ -182,6 +185,6 @@ class Negotiation(object):
                     event_data[field] = getattr(sap,field)
 
 
-        self.service_provider.event_pub.publish_event(event_type=event_type, origin=origin, **event_data)
+        self.event_publisher.publish_event(event_type=event_type, origin=origin, **event_data)
 
 
