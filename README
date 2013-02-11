@@ -61,7 +61,7 @@ DEVELOPMENT TIME DEPENDENCIES
 PACKAGES:
 
 Use Buildout to install the python package dependencies with:
-    > python bootstrap.py
+    > python bootstrap.py -v 1.7
     > bin/buildout
 
 ** Add following to your .bashrc profile on Macs if buildout fails to
