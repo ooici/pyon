@@ -335,8 +335,8 @@ class Container(BaseContainerAgent):
                                              origin=self.id, origin_type="CapabilityContainer",
                                              sub_type="TERMINATE",
                                              state=ContainerStateEnum.TERMINATE)
-            except BadRequest as ex:
-                log.error(ex.message)
+            except Exception as ex:
+                log.exception(ex)
 
         while self._capabilities:
             capability = self._capabilities.pop()
