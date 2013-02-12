@@ -853,8 +853,8 @@ class ProcManager(object):
                 # if it's already gone, it's already gone!
                 pass
 
-            except BadRequest:
-                # if the container is shutting down then the event publishing may not be functioning.
+            except Exception, ex:
+                log.exception(ex)
                 pass
 
         # Cleanup for specific process types
@@ -873,6 +873,10 @@ class ProcManager(object):
                     self.container.resource_registry.delete(process_instance._proc_svc_id, del_associations=True)
                 except NotFound:
                     # if it's already gone, it's already gone!
+                    pass
+
+                except Exception, ex:
+                    log.exception(ex)
                     pass
 
         elif process_instance._proc_type == "agent":
