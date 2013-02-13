@@ -189,7 +189,7 @@ class ThreadManager(object):
         if len(gproc.exception.args) and isinstance(gproc.exception.args[-1], PyonThreadTraceback):
             extra = "\n" + str(gproc.exception.args[-1])
 
-        log.error("Child failed with an exception: %s%s", gproc.exception, extra)
+        log.error("Child failed with an exception: (%s) %s%s", gproc, gproc.exception, extra)
         if self._failure_notify_callback:
             self._failure_notify_callback(gproc)
 
