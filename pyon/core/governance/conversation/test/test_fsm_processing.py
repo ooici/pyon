@@ -85,7 +85,7 @@ def recAsRepeat_events():
     events.append(TransitionFactory.create(LocalType.SEND, 'OK', 'Seller'))
     return events
 
-attr('INT')
+@attr('INT')
 class TestFSM(IonIntegrationTestCase):
     def setUp(self):
         cur_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
