@@ -13,7 +13,7 @@ def dummy_action(fsm):
 def toDeque(alist):
     return [deque(l) for l in alist]
 
-attr('UNIT')
+@attr('UNIT')
 class TestFSM(PyonTestCase):
     def get_test_fsm(self):
         # build test data

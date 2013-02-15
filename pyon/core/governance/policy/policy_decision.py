@@ -237,26 +237,28 @@ class PolicyDecisionPointManager(object):
         if not process:
             raise NotFound('Cannot find process in message')
 
-        receiver = invocation.get_message_receiver()
+        decision = self._check_service_request_policies(invocation, 'agent')
 
-        decision = self._check_service_request_policies(invocation, receiver, 'agent')
-
-        #Return if agent service policies deny the operation
+        # todo: check if its OK to treat everything but Deny as Permit (Ex: NotApplicable)
+        # Return if agent service policies deny the operation
         if decision == Decision.DENY_STR:
             return decision
 
-        #Else check any policies that might be associated with the resource.
+        # Else check any policies that might be associated with the resource.
         decision = self.check_resource_request_policies(invocation, process.resource_id)
 
         return decision
 
     def check_service_request_policies(self, invocation):
-        receiver = invocation.get_message_receiver()
-
-        decision = self._check_service_request_policies(invocation, receiver, 'service')
+        decision = self._check_service_request_policies(invocation, 'service')
         return decision
 
-    def _check_service_request_policies(self, invocation, receiver, receiver_type):
+    def _check_service_request_policies(self, invocation, receiver_type):
+
+        receiver = invocation.get_message_receiver()
+
+        if not receiver:
+            raise NotFound('No receiver for this message')
 
         requestCtx = self._create_request_from_message(invocation, receiver, receiver_type)
 
