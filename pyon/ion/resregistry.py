@@ -59,7 +59,8 @@ class ResourceRegistry(object):
             raise BadRequest("Object is not a Resource")
 
         lcsm = get_restype_lcsm(object._get_type())
-        object.lcstate = lcsm.initial_state if lcsm else "DEPLOYED_AVAILABLE"
+        object.lcstate = lcsm.initial_state if lcsm else "DEPLOYED"
+        object.visibility = lcsm.initial_visibility if lcsm else "AVAILABLE"
         cur_time = get_ion_ts()
         object.ts_created = cur_time
         object.ts_updated = cur_time
@@ -85,7 +86,8 @@ class ResourceRegistry(object):
         cur_time = get_ion_ts()
         for resobj in res_list:
             lcsm = get_restype_lcsm(resobj._get_type())
-            resobj.lcstate = lcsm.initial_state if lcsm else "DEPLOYED_AVAILABLE"
+            resobj.lcstate = lcsm.initial_state if lcsm else "DEPLOYED"
+            resobj.visibility = lcsm.initial_visibility if lcsm else "AVAILABLE"
             resobj.ts_created = cur_time
             resobj.ts_updated = cur_time
 
@@ -121,11 +123,12 @@ class ResourceRegistry(object):
         res_obj = self.read(object._id)
 
         object.ts_updated = get_ion_ts()
-        if res_obj.lcstate != object.lcstate:
-            log.warn("Cannot modify %s life cycle state in update current=%s given=%s. " +
+        if res_obj.lcstate != object.lcstate or res_obj.visibility != object.visibility:
+            log.warn("Cannot modify %s life cycle state or visibility in update current=%s/%s given=%s/%s. " +
                      "DO NOT REUSE THE SAME OBJECT IN CREATE THEN UPDATE",
-                      type(res_obj).__name__, res_obj.lcstate, object.lcstate)
+                      type(res_obj).__name__, res_obj.lcstate, res_obj.visibility, object.lcstate, object.visibility)
             object.lcstate = res_obj.lcstate
+            object.visibility = res_obj.visibility
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=object._id, origin_type=object._get_type(),
@@ -174,7 +177,8 @@ class ResourceRegistry(object):
             raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
         old_state = res_obj.lcstate
-        new_state = restype_workflow.get_successor(old_state, transition_event)
+        old_visibility = res_obj.visibility
+        new_state, new_visibility = restype_workflow.get_successor(old_state, transition_event)
         if not new_state:
             raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
                 resource_id, restype, res_obj.lcstate, transition_event))

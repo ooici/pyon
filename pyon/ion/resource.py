@@ -30,19 +30,16 @@ Predicates = DotDict()
 PredicateType = DotDict()
 PRED = PredicateType
 
-# Association Types, don't confuse with predicate type!
-AssociationTypes = ['H2H', 'R2R', 'H2R', 'R2H']
-AssociationType = DotDict()
-AssociationType.update(zip(AssociationTypes, AssociationTypes))
-AT = AssociationType
-
 #Compound Associations
 CompoundAssociations = DotDict()
 
-# Life cycle states
+# Life cycle states and visibility states
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
 LCS_NONE = "NONE"
+
+VisibilityStates = DotDict()
+VIS = VisibilityStates
 
 # Life cycle events
 LCE = DotDict()
@@ -127,6 +124,11 @@ def load_definitions():
     allstates = list(CommonResourceLifeCycleSM.BASE_STATES) + CommonResourceLifeCycleSM.STATE_ALIASES.keys()
     LifeCycleStates.update(zip(allstates, allstates))
 
+    VisibilityStates.clear() # TODO
+    allstates = list(CommonResourceLifeCycleSM.BASE_STATES) + CommonResourceLifeCycleSM.STATE_ALIASES.keys()
+    VisibilityStates.update(zip(allstates, allstates))
+
+
     # Life cycle events
     LCE.clear()
     LCE.update(zip([e.upper() for e in CommonResourceLifeCycleSM.BASE_EVENTS], CommonResourceLifeCycleSM.BASE_EVENTS))
@@ -138,7 +140,7 @@ def get_restype_lcsm(restype):
 
 def get_maturity_visibility(lcstate):
     if lcstate == 'RETIRED':
-        return (None, None)
+        return ('RETIRED', None)
     return lcstate.split('_')
 
 
@@ -158,6 +160,7 @@ class ResourceLifeCycleSM(object):
     def __init__(self, **kwargs):
         self.transitions = {}
         self.initial_state = kwargs.get('initial_state', None)
+        self.initial_visibility = kwargs.get('initial_visibility', None)
         self._kwargs = kwargs
 
     @classmethod
