@@ -82,11 +82,24 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         context = self.get_context()
         log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
 
-        #Check for a field with the ResourceId decorator and if found, then set resource-id in the header with that field's value
-        if isinstance(raw_msg, IonObjectBase):
-            field = raw_msg.find_field_for_decorator('ResourceId')
-            if field is not None and hasattr(raw_msg,field):
-                header['resource-id'] = getattr(raw_msg,field)
+        #Check for a field with the ResourceId decorator and if found, then set resource-id
+        # in the header with that field's value or if the decorator specifies a field within an object,
+        #then use the object's field value ( ie. _id)
+        try:
+            if isinstance(raw_msg, IonObjectBase):
+                decorator = 'ResourceId'
+                field = raw_msg.find_field_for_decorator(decorator)
+                if field is not None and hasattr(raw_msg,field):
+                    deco_value = raw_msg.get_decorator_value(field, decorator)
+                    if deco_value:
+                        #Assume that if there is a value, then it is specifying a field in the object
+                        fld_value = getattr(raw_msg,field)
+                        header['resource-id'] = getattr(fld_value, deco_value)
+                    else:
+                        header['resource-id'] = getattr(raw_msg,field)
+
+        except Exception, ex:
+            log.exception(ex)
 
         # use context to set security attributes forward
         if isinstance(context, dict):
