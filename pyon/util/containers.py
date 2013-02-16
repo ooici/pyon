@@ -134,11 +134,11 @@ def dict_merge(base, upd, inplace=False):
     Uses a stack to avoid maximum recursion depth exceptions.
     @param base the dict to merge into
     @param upd the content to merge
-    @param inplace change base if True
-    @retval the merged dict (base of inplace else a merged copy)
+    @param inplace change base if True, otherwise deepcopy base
+    @retval the merged dict (base if inplace else a merged deepcopy)
     """
     assert quacks_like_dict(base), quacks_like_dict(upd)
-    dst = base if inplace else base.copy()
+    dst = base if inplace else deepcopy(base)
 
     stack = [(dst, upd)]
     while stack:
