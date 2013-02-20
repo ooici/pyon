@@ -299,8 +299,8 @@ class GovernanceUnitTest(PyonTestCase):
 
         self.governance_controller.service_policy_event_callback(service_policy_event)
 
-        # check that the service_policy_event_callback deleted all registered preconditions (func1) on operation test_op
-        self.assertEquals('test_op' in self.governance_controller.get_process_operation_dict(local_process.name), False)
+        # check that the service_policy_event_callback did not delete all registered preconditions (func1) on operation test_op
+        self.assertEquals('test_op' in self.governance_controller.get_process_operation_dict(local_process.name), True)
         # and updated with the active one (func2) on test_op2
         self.assertEquals('test_op_2' in self.governance_controller.get_process_operation_dict(local_process.name), True)
 
