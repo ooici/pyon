@@ -324,8 +324,9 @@ class GovernanceController(object):
         resource_id = resource_policy_event.resource_id
         resource_type = resource_policy_event.resource_type
         resource_name = resource_policy_event.resource_name
+        delete_policy = True if resource_policy_event.sub_type == 'DeletePolicy' else False
 
-        self.update_resource_access_policy(resource_id)
+        self.update_resource_access_policy(resource_id, delete_policy)
 
     def service_policy_event_callback(self, *args, **kwargs):
         service_policy_event = args[0]
@@ -334,12 +335,13 @@ class GovernanceController(object):
         policy_id = service_policy_event.origin
         service_name = service_policy_event.service_name
         service_op = service_policy_event.op
+        delete_policy = True if service_policy_event.sub_type == 'DeletePolicy' else False
 
         if service_name:
             if self.container.proc_manager.is_local_service_process(service_name):
-                self.update_service_access_policy(service_name, service_op)
+                self.update_service_access_policy(service_name, service_op, delete_policy)
             elif self.container.proc_manager.is_local_agent_process(service_name):
-                self.update_service_access_policy(service_name, service_op)
+                self.update_service_access_policy(service_name, service_op, delete_policy)
 
         else:
 
@@ -351,7 +353,7 @@ class GovernanceController(object):
                     #Reload all policies for existing services
                     for service_name in self.policy_decision_point_manager.get_list_service_policies():
                         if self.container.proc_manager.is_local_service_process(service_name):
-                            self.update_service_access_policy(service_name)
+                            self.update_service_access_policy(service_name, delete_policy)
 
                 except Exception, e:
                     #If the resource does not exist, just ignore it - but log a warning.
@@ -363,7 +365,7 @@ class GovernanceController(object):
         if self._is_policy_management_service_available():
             self.update_resource_access_policy(resource_id)
 
-    def update_resource_access_policy(self, resource_id):
+    def update_resource_access_policy(self, resource_id, delete_policy=False):
 
         if self.policy_decision_point_manager is not None:
 
@@ -381,7 +383,7 @@ class GovernanceController(object):
         if  self._is_policy_management_service_available():
             self.update_service_access_policy(service_name)
 
-    def update_service_access_policy(self, service_name, service_op=''):
+    def update_service_access_policy(self, service_name, service_op='', delete_policy=False):
 
         if self.policy_decision_point_manager is not None:
 
@@ -398,14 +400,16 @@ class GovernanceController(object):
             try:
                 proc = self.container.proc_manager.get_a_local_process(service_name)
                 if proc is not None:
-                    if service_op: #handles the delete policy case
-                        self.unregister_all_process_operation_precondition(proc,service_op)
                     op_preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
                     if op_preconditions:
                         for op in op_preconditions:
-                            self.unregister_all_process_operation_precondition(proc,op.op)
                             for pre in op.preconditions:
-                                self.register_process_operation_precondition(proc, op.op, pre )
+                                self.unregister_process_operation_precondition(proc,op.op, pre)
+                                if not delete_policy:
+                                    self.register_process_operation_precondition(proc, op.op, pre )
+                    else:
+                        #Unregister all...just in case
+                        self.unregister_all_process_operation_precondition(proc,service_op)
 
             except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
@@ -432,6 +436,19 @@ class GovernanceController(object):
 
 
     def register_process_operation_precondition(self, process, operation, precondition):
+        '''
+        This method is used to register service operation precondition functions with the governance controller. The endpoint
+        code will call check_process_operation_preconditions() below before calling the business logic operation and if any of
+        the precondition functions return False, then the request is denied as Unauthorized.
+
+        At some point, this should be refactored to by another interceptor, but at the operation level.
+
+        @param process:
+        @param operation:
+        @param precondition:
+        @param policy_object:
+        @return:
+        '''
 
         if not hasattr(process, operation):
             raise NotFound("The operation %s does not exist for the %s service" % (operation, process.name))
@@ -453,6 +470,15 @@ class GovernanceController(object):
             process_op_conditions[operation] = preconditions
 
     def unregister_all_process_operation_precondition(self, process, operation):
+        '''
+        This method removes all precondition functions registerd with an operation on a process. Care should be taken with this
+        call, as it can remove "hard wired" preconditions that are coded directly and not as part of policy objects, such as
+        with SA resource lifecycle preconditions.
+
+        @param process:
+        @param operation:
+        @return:
+        '''
         process_op_conditions = self.get_process_operation_dict(process.name)
         if process_op_conditions.has_key(operation):
             del process_op_conditions[operation]
@@ -488,7 +514,7 @@ class GovernanceController(object):
         process_op_conditions = self.get_process_operation_dict(process.name)
         if process_op_conditions.has_key(operation):
             preconditions = process_op_conditions[operation]
-            for precond in preconditions:
+            for precond in reversed(preconditions):
                 if type(precond) == types.MethodType or type(precond) == types.FunctionType:
                     #Handle precondition which are built-in functions
                     try:
