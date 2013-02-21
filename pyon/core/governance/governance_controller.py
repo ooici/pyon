@@ -16,7 +16,7 @@ from interface.services.coi.ipolicy_management_service import PolicyManagementSe
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from interface.services.coi.iorg_management_service import OrgManagementServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, get_safe
 
 #These constants are ubiquitous, so define in the container
 DEFAULT_ACTOR_ID = 'anonymous'
@@ -171,10 +171,13 @@ class GovernanceController(object):
 
     #Helper methods
 
-    #Iterate the Org(s) that the user belongs to and create a header that lists only the role names per Org assigned
-    #to the user; i.e. {'ION': ['Member', 'Operator'], 'Org2': ['Member']}
     def get_role_message_headers(self, org_roles):
-
+        '''
+        Iterate the Org(s) that the user belongs to and create a header that lists only the role names per Org assigned
+        to the user; i.e. {'ION': ['Member', 'Operator'], 'Org2': ['Member']}
+        @param org_roles:
+        @return:
+        '''
         role_header = dict()
         try:
             for org in org_roles:
@@ -187,14 +190,23 @@ class GovernanceController(object):
             log.error(e)
             return role_header
 
-    #Use this to build the message header used by governance to identify the actor and roles.
+
     def build_actor_header(self, actor_id=DEFAULT_ACTOR_ID, actor_roles=None):
+        '''
+        Use this to build the message header used by governance to identify the actor and roles.
+        @param actor_id:
+        @param actor_roles:
+        @return:
+        '''
         actor_roles = actor_roles or {}
         return {'ion-actor-id': actor_id, 'ion-actor-roles': actor_roles }
 
-    #Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
     def get_actor_header(self, actor_id):
-
+        '''
+        Returns the actor related message headers for a specific actorid - will return anonymous if the actor_id is not found.
+        @param actor_id:
+        @return:
+        '''
         actor_header = self.build_actor_header(DEFAULT_ACTOR_ID, {})
 
         if actor_id:
@@ -206,10 +218,37 @@ class GovernanceController(object):
 
         return actor_header
 
+    def has_org_role(self, role_header=None, org_name=None, role_name=None):
+        '''
+        Check the ion-actor-roles message header to see if this actor has the specified role in the specified Org.
+        Parameter role_name can be a string with the name of a user role or a list of user role names, which will
+        recursively call this same method for each role name in the list until one is found or the list is exhausted.
+        @param role_header:
+        @param org_name:
+        @param role_name:
+        @return:
+        '''
+        if role_header is None or org_name is None or role_name is None:
+            raise BadRequest("One of the parameters to this method are not set")
+
+        if isinstance(role_name, list):
+            for role in role_name:
+                if self.has_org_role(role_header, org_name, role):
+                    return True
+        else:
+            if role_header.has_key(org_name):
+                if role_name in role_header[org_name]:
+                    return True
+
+        return False
+
 
     def find_roles_by_actor(self, actor_id=None):
-        """Returns a dict of all User Roles roles by Org Name associated with the specified user
-        """
+        '''
+        Returns a dict of all User Roles roles by Org Name associated with the specified actor
+        @param actor_id:
+        @return:
+        '''
         if actor_id is None or not len(actor_id):
             raise BadRequest("The actor_id parameter is missing")
 
@@ -234,11 +273,13 @@ class GovernanceController(object):
         return role_dict
 
 
-    #Returns the ION System Actor defined in the Resource Registry
     def get_system_actor(self):
-
+        '''
+        Returns the ION System Actor defined in the Resource Registry
+        @return:
+        '''
         try:
-            system_actor, _ = self._rr.find_resources(RT.ActorIdentity,name=CFG.system.system_actor, id_only=False)
+            system_actor, _ = self._rr.find_resources(RT.ActorIdentity,name=get_safe(CFG, "system.system_actor", "ionsystem"), id_only=False)
             if not system_actor:
                 return None
 
@@ -248,9 +289,24 @@ class GovernanceController(object):
             log.error(e)
             return None
 
-    #Returns the actor related message headers for a the ION System Actor
-    def get_system_actor_header(self, system_actor=None):
+    def is_system_actor(self, actor_id):
+        '''
+        Is this the specified actor_id the system actor
+        @param actor_id:
+        @return:
+        '''
+        system_actor = self.get_system_actor()
+        if system_actor is not None and system_actor._id == actor_id:
+            return True
 
+        return False
+
+    def get_system_actor_header(self, system_actor=None):
+        '''
+        Returns the actor related message headers for a the ION System Actor
+        @param system_actor:
+        @return:
+        '''
         try:
             if system_actor is None:
                 system_actor = self.get_system_actor()
@@ -267,9 +323,46 @@ class GovernanceController(object):
             log.error(e)
             return self.get_actor_header(None)
 
-    #Returns the list of commitments for the specified user and resource
-    def get_resource_commitments(self, actor_id, resource_id):
 
+    def get_governance_resource_header_values(self, headers, resource_id_required=True):
+        '''
+        A helper function for retriving op, actor_id, actor_roles, resource_id from the message header
+        @param headers:
+        @return op, actor_id, actor_roles, resource_id:
+        '''
+
+        if headers.has_key('op'):
+            op = headers['op']
+        else:
+            op = "Unknown operation"
+
+        if headers.has_key('ion-actor-id'):
+            actor_id = headers['ion-actor-id']
+        else:
+            raise Inconsistent('%s(%s) has been denied since the ion-actor-id can not be found in the message headers'% (self.name, op))
+
+        if headers.has_key('ion-actor-roles'):
+            actor_roles = headers['ion-actor-roles']
+        else:
+            raise Inconsistent('%s(%s) has been denied since the ion-actor-roles can not be found in the message headers'% (self.name, op))
+
+        if headers.has_key('resource-id'):
+            resource_id = headers['resource-id']
+        else:
+            if resource_id_required:
+                raise Inconsistent('%s(%s) has been denied since the resource-id can not be found in the message headers'% (self.name, op))
+            resource_id = ''
+
+        return op, actor_id, actor_roles, resource_id
+
+
+    def get_resource_commitments(self, actor_id, resource_id):
+        '''
+        Returns the list of commitments for the specified user and resource
+        @param actor_id:
+        @param resource_id:
+        @return:
+        '''
         log.debug("Finding commitments for actor_id: %s and resource_id: %s" % (actor_id, resource_id))
 
         try:
@@ -293,10 +386,14 @@ class GovernanceController(object):
 
         return None
 
-    #Returns a ResourceCommitmentStatus object indicating the commitment status between this resource/actor
-    #Can only have an exclusive commitment if actor already has a shared commitment.
     def has_resource_commitments(self, actor_id, resource_id):
-
+        '''
+        Returns a ResourceCommitmentStatus object indicating the commitment status between this resource/actor
+        Can only have an exclusive commitment if actor already has a shared commitment.
+        @param actor_id:
+        @param resource_id:
+        @return:
+        '''
         ret_status = IonObject(OT.ResourceCommitmentStatus)
         commitments = self.get_resource_commitments(actor_id, resource_id)
         if commitments is None:
@@ -314,9 +411,60 @@ class GovernanceController(object):
         #Only a shared commitment was found
         return ret_status
 
+    def is_resource_owner(self, actor_id=None, resource_id=None):
+        '''
+        Returns True if the specified actor_id is an Owner of the specified resource id, otherwise False
+        @param actor_id:
+        @param resource_id:
+        @return:
+        '''
+        if actor_id is None or resource_id is None:
+            raise BadRequest('One or all of the method parameters are not set')
+
+        owners =  self._rr.find_objects(subject=resource_id, predicate=PRED.hasOwner, object_type=RT.ActorIdentity, id_only=True)
+
+        if actor_id not in owners[0]:
+            return False
+
+        return True
+
+    def has_shared_resource_commitment(self, actor_id=None, resource_id=None):
+        '''
+        This method returns True if the specified actor_id has acquired shared access for the specified resource id, otherwise False.
+        @param msg:
+        @param headers:
+        @return:
+        '''
+        if actor_id is None or resource_id is None:
+            raise BadRequest('One or all of the method parameters are not set')
+
+        commitment_status =  self.has_resource_commitments(actor_id, resource_id)
+
+        return commitment_status.shared
+
+
+    def has_exclusive_resource_commitment(self, actor_id=None, resource_id=None):
+        '''
+        This method returns True if the specified actor_id has acquired exclusive access for the specified resource id, otherwise False.
+        @param msg:
+        @param headers:
+        @return:
+        '''
+        if actor_id is None or resource_id is None:
+            raise BadRequest('One or all of the method parameters are not set')
+
+        commitment_status =  self.has_resource_commitments(actor_id, resource_id)
+
+        #If the resource has not been acquired for sharing, then it can't have been acquired exclusively
+        if not commitment_status.shared:
+            return False
+
+        return commitment_status.exclusive
 
     #Manage all of the policies in the container
+
     def resource_policy_event_callback(self, *args, **kwargs):
+
         resource_policy_event = args[0]
         log.debug('Resouce related policy event received: %s', str(resource_policy_event.__dict__))
 
