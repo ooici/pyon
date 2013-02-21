@@ -57,17 +57,18 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
     # Governance interfaces and helpers
     ##############################################################
 
-    def _get_resource_commitments(self, user_id):
+    def _get_process_org_name(self):
+        '''
+        Look for the org_name associated with this process, default to System root
+        '''
+        if hasattr(self,'org_name'):
+            org_name = self.org_name
+            log.debug("Getting org_name from process: " + org_name)
+        else:
+            org_name = self.container.governance_controller._system_root_org_name
+            log.debug("Getting org_name from container: " + org_name)
 
-        if not self.container.governance_controller.enabled:
-            return None
-
-        try:
-            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
-        except Exception, e:
-            log.error(e.message)
-            return None
-
+        return org_name
 
     def negotiate(self, resource_id="", sap_in=None):
         pass
