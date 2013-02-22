@@ -204,8 +204,8 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(len(res) == 6 + numcoredocs)
 
         # Create an Ion object with default values set (if any)
-        data_set = IonObject('DataSet')
-        self.assertTrue(isinstance(data_set, interface.objects.DataSet))
+        data_set = IonObject('Dataset')
+        self.assertTrue(isinstance(data_set, interface.objects.Dataset))
 
         # Assign values to object fields
         data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
@@ -215,7 +215,7 @@ class Test_DataStores(IonIntegrationTestCase):
         #        {"name":"water_height", "value":"ft"}
         #]
 
-        # Write DataSet object"
+        # Write Dataset object"
         write_tuple_1 = data_store.create(data_set)
         self.assertTrue(len(write_tuple_1) == 2)
 
@@ -225,21 +225,21 @@ class Test_DataStores(IonIntegrationTestCase):
         # Read back the HEAD version of the object and validate fields
         data_set_read_obj = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj._id == data_set_uuid)
-        self.assertTrue(isinstance(data_set_read_obj, interface.objects.DataSet))
+        self.assertTrue(isinstance(data_set_read_obj, interface.objects.Dataset))
         self.assertTrue(data_set_read_obj.description == "Real-time water data for Choptank River near Greensboro, MD")
         self.assertTrue('type_' in data_set_read_obj)
 
-        # Update DataSet's Description field and write
+        # Update Dataset's Description field and write
         data_set_read_obj.description = "Updated Description"
         write_tuple_2 = data_store.update(data_set_read_obj)
         self.assertTrue(len(write_tuple_2) == 2)
 
-        # Retrieve the updated DataSet
+        # Retrieve the updated Dataset
         data_set_read_obj_2 = data_store.read(data_set_uuid)
         self.assertTrue(data_set_read_obj_2._id == data_set_uuid)
         self.assertTrue(data_set_read_obj_2.description == "Updated Description")
 
-        # List all the revisions of DataSet in data store, should be two
+        # List all the revisions of Dataset in data store, should be two
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 2)
 
@@ -247,34 +247,34 @@ class Test_DataStores(IonIntegrationTestCase):
         data_set_read_obj_2.description = "USGS instantaneous value data for station 01491000"
         write_tuple_3 = data_store.update(data_set_read_obj_2)
 
-        # List revisions of DataSet in data store, should now be three
+        # List revisions of Dataset in data store, should now be three
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 3)
 
-        # Retrieve original version of DataSet
+        # Retrieve original version of Dataset
         obj1 = data_store.read(data_set_uuid, rev_id=write_tuple_1[1])
         self.assertTrue(obj1._id == data_set_uuid)
         self.assertTrue(obj1.description == "Real-time water data for Choptank River near Greensboro, MD")
 
-        # Retrieve second version of DataSet
+        # Retrieve second version of Dataset
         obj2 = data_store.read(data_set_uuid, rev_id=write_tuple_2[1])
         self.assertTrue(obj2._id == data_set_uuid)
         self.assertTrue(obj2.description == "Updated Description")
 
-        # Retrieve third version of DataSet
+        # Retrieve third version of Dataset
         obj3 = data_store.read(data_set_uuid, rev_id=write_tuple_3[1])
         self.assertTrue(obj3._id == data_set_uuid)
         self.assertTrue(obj3.description == "USGS instantaneous value data for station 01491000")
 
-        # Retrieve HEAD version of DataSet
+        # Retrieve HEAD version of Dataset
         head = data_store.read(data_set_uuid)
         self.assertTrue(head._id == data_set_uuid)
         self.assertTrue(head.description == "USGS instantaneous value data for station 01491000")
 
-        # Delete DataSet by object id
+        # Delete Dataset by object id
         data_store.delete(head)
 
-        # Try to re-delete DataSet by object id.  Should throw exception.
+        # Try to re-delete Dataset by object id.  Should throw exception.
         with self.assertRaises(NotFound):
             data_store.delete(head._id)
 
@@ -282,12 +282,12 @@ class Test_DataStores(IonIntegrationTestCase):
         res = data_store.list_objects()
         self.assertTrue(len(res) == 6 + numcoredocs)
 
-        # List revisions of now deleted DataSet, should be empty list
+        # List revisions of now deleted Dataset, should be empty list
         res = data_store.list_object_revisions(data_set_uuid)
         self.assertTrue(len(res) == 0)
 
-        o1 = IonObject("DataSet", name="One more")
-        o2 = IonObject("DataSet", name="Another one")
+        o1 = IonObject("Dataset", name="One more")
+        o2 = IonObject("Dataset", name="Another one")
         res = data_store.create_mult((o1, o2))
         self.assertTrue(all([success for success, oid, rev in res]))
 
@@ -306,13 +306,13 @@ class Test_DataStores(IonIntegrationTestCase):
         self.resources = {}
 
         # Create an Ion object with default values set (if any)
-        data_set = IonObject('DataSet')
-        self.assertTrue(isinstance(data_set, interface.objects.DataSet))
+        data_set = IonObject('Dataset')
+        self.assertTrue(isinstance(data_set, interface.objects.Dataset))
 
         # Assign values to object fields
         data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
 
-        # Write DataSet object"
+        # Write Dataset object"
         write_tuple_1 = data_store.create(data_set)
 
         # Save off the object UUID
@@ -321,7 +321,7 @@ class Test_DataStores(IonIntegrationTestCase):
         # Read back the HEAD version of the object
         data_set_read_obj = data_store.read(data_set_uuid)
 
-        # Update DataSet's Description field and write
+        # Update Dataset's Description field and write
         data_set_read_obj.description = "Updated Description"
         write_tuple_2 = data_store.update(data_set_read_obj)
 
@@ -471,9 +471,9 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # HACK: Both Predicates so that this test works
         from pyon.ion.resource import Predicates
-        Predicates[OWNER_OF] = dict(domain=[RT.ActorIdentity], range=[RT.InstrumentDevice, RT.DataSet])
+        Predicates[OWNER_OF] = dict(domain=[RT.ActorIdentity], range=[RT.InstrumentDevice, RT.Dataset])
         Predicates[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
-        Predicates[BASED_ON] = dict(domain=[RT.DataSet], range=[RT.DataSet])
+        Predicates[BASED_ON] = dict(domain=[RT.Dataset], range=[RT.Dataset])
 
         admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
 
@@ -489,9 +489,9 @@ class Test_DataStores(IonIntegrationTestCase):
 
         inst2_obj_id = self._create_resource(RT.InstrumentDevice, 'CTD2', description='Other Instrument')
 
-        ds1_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.DEPLOYED_AVAILABLE)
+        ds1_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.DEPLOYED_AVAILABLE)
 
-        ds2_obj_id = self._create_resource(RT.DataSet, 'DS_CTD_L1', description='My Dataset CTD L1')
+        ds2_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L1', description='My Dataset CTD L1')
 
         aid1, _ = data_store.create_association(admin_user_id, OWNER_OF, inst1_obj_id)
 
@@ -525,7 +525,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(obj_ids1a), 3)
         self.assertEquals(len(obj_assocs1a), 3)
         self.assertEquals(set([o._id for o in obj_ids1a]), set([inst1_obj_id, ds1_obj_id, admin_profile_id]))
-        self.assertEquals(set([type(o).__name__ for o in obj_ids1a]), set([RT.UserInfo, RT.InstrumentDevice, RT.DataSet]))
+        self.assertEquals(set([type(o).__name__ for o in obj_ids1a]), set([RT.UserInfo, RT.InstrumentDevice, RT.Dataset]))
 
         obj_ids1an, obj_assocs1an = data_store.find_objects("Non_Existent", id_only=False)
         self.assertEquals(len(obj_ids1an), 0)
@@ -603,7 +603,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
-        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.ActorIdentity, RT.DataSet]))
+        self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.ActorIdentity, RT.Dataset]))
 
         res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.DEPLOYED_AVAILABLE, RT.ActorIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
