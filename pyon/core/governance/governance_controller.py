@@ -24,8 +24,63 @@ ORG_MANAGER_ROLE = 'ORG_MANAGER'  # Can only act upon resource within the specif
 ORG_MEMBER_ROLE = 'ORG_MEMBER'    # Can only access resources within the specific Org
 ION_MANAGER = 'ION_MANAGER'   # Can act upon resources across all Orgs - like a Super User access
 
-class GovernanceController(object):
 
+class GovernanceHeaderValues(object):
+    '''
+    A helper class for containing governance values from a message header
+    '''
+
+    def __init__(self, headers, resource_id_required=True):
+        '''
+        A helper object for retrieving governance related values: op, actor_id, actor_roles, resource_id from the message header
+        @param headers:
+        @param resource_id_required: True if the message header must have a resource-id field and value.
+        @return op, actor_id, actor_roles, resource_id:
+        '''
+
+        if headers.has_key('op'):
+            self._op = headers['op']
+        else:
+            self._op = "Unknown operation"
+
+        if headers.has_key('ion-actor-id'):
+            self._actor_id = headers['ion-actor-id']
+        else:
+            raise Inconsistent('%s(%s) has been denied since the ion-actor-id can not be found in the message headers'% (self.name, op))
+
+        if headers.has_key('ion-actor-roles'):
+            self._actor_roles = headers['ion-actor-roles']
+        else:
+            raise Inconsistent('%s(%s) has been denied since the ion-actor-roles can not be found in the message headers'% (self.name, op))
+
+        if headers.has_key('resource-id'):
+            self._resource_id = headers['resource-id']
+        else:
+            if resource_id_required:
+                raise Inconsistent('%s(%s) has been denied since the resource-id can not be found in the message headers'% (self.name, op))
+            self._resource_id = ''
+
+    @property
+    def op(self):
+        return self._op
+
+    @property
+    def actor_id(self):
+        return self._actor_id
+
+    @property
+    def actor_roles(self):
+        return self._actor_roles
+
+    @property
+    def resource_id(self):
+        return self._resource_id
+
+
+class GovernanceController(object):
+    '''
+    This is a singleton object which handles governance functionality in the container.
+    '''
 
     def __init__(self,container):
         log.debug('GovernanceController.__init__()')
@@ -411,22 +466,6 @@ class GovernanceController(object):
         #Only a shared commitment was found
         return ret_status
 
-    def is_resource_owner(self, actor_id=None, resource_id=None):
-        '''
-        Returns True if the specified actor_id is an Owner of the specified resource id, otherwise False
-        @param actor_id:
-        @param resource_id:
-        @return:
-        '''
-        if actor_id is None or resource_id is None:
-            raise BadRequest('One or all of the method parameters are not set')
-
-        owners =  self._rr.find_objects(subject=resource_id, predicate=PRED.hasOwner, object_type=RT.ActorIdentity, id_only=True)
-
-        if actor_id not in owners[0]:
-            return False
-
-        return True
 
     def has_shared_resource_commitment(self, actor_id=None, resource_id=None):
         '''
@@ -460,6 +499,24 @@ class GovernanceController(object):
             return False
 
         return commitment_status.exclusive
+
+    def is_resource_owner(self, actor_id=None, resource_id=None):
+        '''
+        Returns True if the specified actor_id is an Owner of the specified resource id, otherwise False
+        @param actor_id:
+        @param resource_id:
+        @return:
+        '''
+        if actor_id is None or resource_id is None:
+            raise BadRequest('One or all of the method parameters are not set')
+
+        owners =  self._rr.find_objects(subject=resource_id, predicate=PRED.hasOwner, object_type=RT.ActorIdentity, id_only=True)
+
+        if actor_id not in owners[0]:
+            return False
+
+        return True
+
 
     #Manage all of the policies in the container
 
