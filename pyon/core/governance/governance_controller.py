@@ -379,38 +379,6 @@ class GovernanceController(object):
             return self.get_actor_header(None)
 
 
-    def get_governance_resource_header_values(self, headers, resource_id_required=True):
-        '''
-        A helper function for retriving op, actor_id, actor_roles, resource_id from the message header
-        @param headers:
-        @return op, actor_id, actor_roles, resource_id:
-        '''
-
-        if headers.has_key('op'):
-            op = headers['op']
-        else:
-            op = "Unknown operation"
-
-        if headers.has_key('ion-actor-id'):
-            actor_id = headers['ion-actor-id']
-        else:
-            raise Inconsistent('%s(%s) has been denied since the ion-actor-id can not be found in the message headers'% (self.name, op))
-
-        if headers.has_key('ion-actor-roles'):
-            actor_roles = headers['ion-actor-roles']
-        else:
-            raise Inconsistent('%s(%s) has been denied since the ion-actor-roles can not be found in the message headers'% (self.name, op))
-
-        if headers.has_key('resource-id'):
-            resource_id = headers['resource-id']
-        else:
-            if resource_id_required:
-                raise Inconsistent('%s(%s) has been denied since the resource-id can not be found in the message headers'% (self.name, op))
-            resource_id = ''
-
-        return op, actor_id, actor_roles, resource_id
-
-
     def get_resource_commitments(self, actor_id, resource_id):
         '''
         Returns the list of commitments for the specified user and resource
