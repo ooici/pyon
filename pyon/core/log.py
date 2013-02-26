@@ -37,4 +37,4 @@ def configure_logging(logging_conf_paths, logging_config_override=None):
 def is_logging_configured():
     """ allow caller to determine if logging has already been configured in this container """
     global logging_was_configured
-    return logging_was_configured
+    return logging_was_configured or config.get_configuration()
