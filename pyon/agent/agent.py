@@ -192,7 +192,7 @@ class ResourceAgent(BaseResourceAgent):
             org_name = self.org_name
             log.debug("Getting org_name from process: " + org_name)
         else:
-            org_name = self.container.governance_controller._system_root_org_name
+            org_name = self.container.governance_controller.system_root_org_name
             log.debug("Getting org_name from container: " + org_name)
 
         return org_name

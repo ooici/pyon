@@ -23,6 +23,8 @@ from ndg.xacml.core.context.pdp import PDP
 from ndg.xacml.core.context.result import Decision
 
 from pyon.core.exception import NotFound
+from pyon.core.governance import ION_MANAGER
+
 from pyon.util.log import log
 
 COMMON_SERVICE_POLICY_RULES = 'common_service_policy_rules'
@@ -196,11 +198,11 @@ class PolicyDecisionPointManager(object):
         if hasattr(endpoint_process,'org_name'):
             org_name = endpoint_process.org_name
         else:
-            org_name = self.governance_controller._system_root_org_name
+            org_name = self.governance_controller.system_root_org_name
 
         #If this process is not associated wiht the root Org, then iterate over the roles associated with the user only for
         #the Org that this process is associated with otherwise include all roles and create attributes for each
-        if org_name == self.governance_controller._system_root_org_name:
+        if org_name == self.governance_controller.system_root_org_name:
             log.debug("Including roles for all Orgs")
             #If the process Org name is the same for the System Root Org, then include all of them to be safe
             for org in actor_roles:
@@ -211,10 +213,10 @@ class PolicyDecisionPointManager(object):
                 self.create_org_role_attribute(actor_roles[org_name],subject)
 
             #Handle the special case for the ION system actor
-            if actor_roles.has_key(self.governance_controller._system_root_org_name):
-                if 'ION_MANAGER' in actor_roles[self.governance_controller._system_root_org_name]:
+            if actor_roles.has_key(self.governance_controller.system_root_org_name):
+                if ION_MANAGER in actor_roles[self.governance_controller.system_root_org_name]:
                     log.debug("Including ION_MANAGER role")
-                    self.create_org_role_attribute(['ION_MANAGER'],subject)
+                    self.create_org_role_attribute([ION_MANAGER],subject)
 
 
         request.subjects.append(subject)

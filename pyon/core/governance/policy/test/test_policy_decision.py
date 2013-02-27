@@ -7,10 +7,10 @@ from mock import Mock
 import unittest
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.core.exception import NotFound
-
+from pyon.util.unit_test import PyonTestCase
 
 @attr('UNIT')
-class PolicyDecisionUnitTest(unittest.TestCase):
+class PolicyDecisionUnitTest(PyonTestCase):
 
     permit_ION_MANAGER_rule = '''
         <Rule RuleId="%s:" Effect="Permit">
@@ -98,7 +98,7 @@ class PolicyDecisionUnitTest(unittest.TestCase):
         mock_args.side_effect = get_arg_value
         self.invocation.get_arg_value = mock_args
 
-        gc._system_root_org_name = 'sys_org_name'
+        gc.system_root_org_name = 'sys_org_name'
 
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "NotApplicable")
@@ -150,7 +150,7 @@ class PolicyDecisionUnitTest(unittest.TestCase):
         mock_args.side_effect = get_arg_value
         self.invocation.get_arg_value = mock_args
 
-        gc._system_root_org_name = 'sys_org_name'
+        gc.system_root_org_name = 'sys_org_name'
 
         response = pdpm.check_service_request_policies(self.invocation)
         self.assertEqual(response.value, "NotApplicable")
@@ -189,7 +189,7 @@ class PolicyDecisionUnitTest(unittest.TestCase):
             return self.invocation.args.get(key, default)
         mock_args.side_effect = get_arg_value
         self.invocation.get_arg_value = mock_args
-        gc._system_root_org_name = 'sys_org_name'
+        gc.system_root_org_name = 'sys_org_name'
 
         # check that service policies result in denying the request
         pdpm.load_service_policy_rules(service_key, self.deny_ION_MANAGER_rule)

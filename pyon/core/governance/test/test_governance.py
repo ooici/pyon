@@ -8,13 +8,13 @@ from pyon.util.unit_test import PyonTestCase
 from mock import Mock
 from nose.plugins.attrib import attr
 from pyon.core.governance.governance_controller import GovernanceController
-from pyon.core.exception import Unauthorized
+from pyon.core.exception import Unauthorized, BadRequest, Inconsistent
 from pyon.service.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.bootstrap import IonObject
 from pyon.ion.resource import PRED, RT
-from pyon.core.governance.governance_controller import ORG_MANAGER_ROLE, ORG_MEMBER_ROLE
-
+from pyon.core.governance import ORG_MANAGER_ROLE, ORG_MEMBER_ROLE, ION_MANAGER, GovernanceHeaderValues
+from pyon.core.governance import find_roles_by_actor, get_actor_header, get_system_actor_header, get_role_message_headers, get_resource_commitments
 
 class UnitTestService(BaseService):
     name = 'UnitTestService'
@@ -305,9 +305,63 @@ class GovernanceUnitTest(PyonTestCase):
         self.assertEquals('test_op_2' in self.governance_controller.get_process_operation_dict(local_process.name), True)
 
         # expect that policy rules are retrieved for resource
-        pc.get_active_service_access_policy_rules.assert_called_with(service_policy_event.service_name, self.governance_controller._container_org_name)
+        pc.get_active_service_access_policy_rules.assert_called_with(service_policy_event.service_name, self.governance_controller.container_org_name)
         pdp.load_service_policy_rules.assert_called_with(service_policy_event.service_name, policy_rules)
 
+
+    def test_governance_header_values(self):
+
+        process = Mock()
+        process.name = 'test_process'
+
+        headers = {'op': 'test_op', 'process': process, 'request': 'request', 'ion-actor-id': 'ionsystem', 'receiver': 'resource-registry',
+                                   'sender-type': 'sender-type', 'resource-id': '123xyz' ,'sender-service': 'sender-service',
+                                   'ion-actor-roles': {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]}}
+
+        gov_values = GovernanceHeaderValues(headers)
+        self.assertEqual(gov_values.op, 'test_op')
+        self.assertEqual(gov_values.process_name, 'test_process')
+        self.assertEqual(gov_values.actor_id, 'ionsystem')
+        self.assertEqual(gov_values.actor_roles, {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]})
+        self.assertEqual(gov_values.resource_id,'123xyz')
+
+        self.assertRaises(BadRequest, GovernanceHeaderValues, {})
+
+        headers = {'op': 'test_op', 'request': 'request', 'ion-actor-id': 'ionsystem', 'receiver': 'resource-registry',
+                   'sender-type': 'sender-type', 'resource-id': '123xyz' ,'sender-service': 'sender-service',
+                   'ion-actor-roles': {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]}}
+
+        gov_values = GovernanceHeaderValues(headers)
+        self.assertEqual(gov_values.op, 'test_op')
+        self.assertEqual(gov_values.process_name, 'Unknown-Process')
+        self.assertEqual(gov_values.actor_id, 'ionsystem')
+        self.assertEqual(gov_values.actor_roles, {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]})
+        self.assertEqual(gov_values.resource_id,'123xyz')
+
+        headers = {'op': 'test_op', 'request': 'request', 'receiver': 'resource-registry',
+                   'sender-type': 'sender-type', 'resource-id': '123xyz' ,'sender-service': 'sender-service',
+                   'ion-actor-roles': {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]}}
+
+        self.assertRaises(Inconsistent, GovernanceHeaderValues, headers)
+
+        headers = {'op': 'test_op', 'request': 'request', 'ion-actor-id': 'ionsystem', 'receiver': 'resource-registry',
+                   'sender-type': 'sender-type', 'resource-id': '123xyz' ,'sender-service': 'sender-service',
+                   'ion-actor-123-roles': {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]}}
+
+        self.assertRaises(Inconsistent, GovernanceHeaderValues, headers)
+
+        headers = {'op': 'test_op', 'request': 'request', 'ion-actor-id': 'ionsystem', 'receiver': 'resource-registry',
+                   'sender-type': 'sender-type','sender-service': 'sender-service',
+                   'ion-actor-roles': {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]}}
+
+        self.assertRaises(Inconsistent, GovernanceHeaderValues, headers)
+
+        gov_values = GovernanceHeaderValues(headers, False)
+        self.assertEqual(gov_values.op, 'test_op')
+        self.assertEqual(gov_values.process_name, 'Unknown-Process')
+        self.assertEqual(gov_values.actor_id, 'ionsystem')
+        self.assertEqual(gov_values.actor_roles, {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]})
+        self.assertEqual(gov_values.resource_id,'')
 
 @attr('INT')
 class GovernanceIntTest(IonIntegrationTestCase):
@@ -348,18 +402,17 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
 
         # all actors have a defaul org_member_role
-        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
+        actor_roles = find_roles_by_actor(actor_id)
         self.assertDictEqual(actor_roles, {'ION': [ORG_MEMBER_ROLE]})
 
-        actor_header = self.container.governance_controller.get_actor_header(actor_id)
+        actor_header = get_actor_header(actor_id)
         self.assertDictEqual(actor_header, {'ion-actor-id': actor_id, 'ion-actor-roles': {'ION': [ORG_MEMBER_ROLE]}})
 
         #Add Org Manager Role
         self.rr.create_association(actor_id, PRED.hasRole, manager_role_id)
 
-        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
-        role_header = self.container.governance_controller.get_role_message_headers\
-            ({'ION': [manager_role, member_role]})
+        actor_roles = find_roles_by_actor(actor_id)
+        role_header = get_role_message_headers({'ION': [manager_role, member_role]})
         self.assertDictEqual(actor_roles, role_header)
 
         org2 = IonObject(RT.Org, name='Org2')
@@ -379,10 +432,9 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
         self.rr.create_association(actor_id, PRED.hasRole, operator2_role_id)
 
-        actor_roles = self.container.governance_controller.find_roles_by_actor(actor_id)
+        actor_roles = find_roles_by_actor(actor_id)
 
-        role_header = self.container.governance_controller.get_role_message_headers\
-            ({'ION': [manager_role, member_role], 'Org2': [operator2_role, member2_role]})
+        role_header = get_role_message_headers({'ION': [manager_role, member_role], 'Org2': [operator2_role, member2_role]})
 
         self.assertEqual(len(actor_roles), 2)
         self.assertEqual(len(role_header), 2)
@@ -401,7 +453,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         self.assertIn(ORG_MANAGER_ROLE, role_header['ION'])
         self.assertIn(ORG_MEMBER_ROLE, role_header['ION'])
 
-        actor_header = self.container.governance_controller.get_actor_header(actor_id)
+        actor_header = get_actor_header(actor_id)
 
         self.assertEqual(actor_header['ion-actor-id'], actor_id)
         self.assertEqual(actor_header['ion-actor-roles'], actor_roles)
@@ -411,7 +463,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
         actor_id, _ = self.rr.create(actor)
 
-        system_actor_header = self.container.governance_controller.get_system_actor_header()
+        system_actor_header = get_system_actor_header()
         self.assertDictEqual(system_actor_header['ion-actor-roles'],{'ION': [ORG_MEMBER_ROLE]})
 
     def test_get_resource_commitment(self):
@@ -429,7 +481,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = self.container.governance_controller.get_resource_commitments(actor_id, ion_org_id)
+        c = get_resource_commitments(actor_id, ion_org_id)
         #verify that the commitment is not returned
         self.assertIsNone(c)
 
@@ -438,7 +490,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = self.container.governance_controller.get_resource_commitments(actor_id, ion_org_id)
+        c = get_resource_commitments(actor_id, ion_org_id)
 
         #verify that the commitment is returned
         self.assertIsNotNone(c)
