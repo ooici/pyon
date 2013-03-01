@@ -14,7 +14,7 @@ import random
 import string
 from pyon.util.log import log
 from pyon.util.containers import DotDict
-from pyon.core.bootstrap import CFG as bootcfg
+from pyon.core.bootstrap import CFG as bootcfg, get_sys_name
 
 
 class FileSystemError(Exception):
@@ -49,13 +49,14 @@ class FileSystem(object):
     
     @classmethod 
     def _clean(cls, config):
+        root = config.get_safe('container.filesystem.root', '/tmp')
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() 
             conf = config.get_safe('container.filesystem.%s' % s, None)
             if conf:
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
-                FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
+                FileSystem.FS_DIRECTORY[k] = os.path.join(os.path.join(root, get_sys_name()),s)
             if os.path.exists(FS_DIRECTORY[k]):
                 log.info('Removing %s' , FS_DIRECTORY[k])
                 shutil.rmtree(FS_DIRECTORY[k])
@@ -66,13 +67,15 @@ class FileSystem(object):
         if FileSystem._force_clean:
             self._clean(CFG)
 
+        root = CFG.get_safe('container.filesystem.root', '/tmp')
+
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
             conf = CFG.get_safe('container.filesystem.%s' % s, None)
             if conf:
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
-                FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
+                FileSystem.FS_DIRECTORY[k] = os.path.join(os.path.join(root, get_sys_name()),s)
             # Check to make sure you're within your rights to access this
             if not FileSystem._sandbox(FileSystem.FS_DIRECTORY[k]):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
