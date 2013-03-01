@@ -12,6 +12,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import bootstrap_pyon, CFG
 from pyon.core.interfaces.interfaces import InterfaceAdmin
 from pyon.util.log import log
+from pyon.util.file_sys import FileSystem
 
 
 def pre_initialize_ion():
@@ -142,6 +143,8 @@ class IonIntegrationTestCase(unittest.TestCase):
 
         finally:
             datastore.close()
+        FileSystem._clean(CFG)
+
 
     def patch_cfg(self, cfg_obj_or_str, *args, **kwargs):
         """
