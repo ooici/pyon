@@ -28,8 +28,8 @@ def pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonTestCase(unittest.TestCase):
-    def __init__(self):
-        unittest.TestCase.__init__(self)
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self, *args, **kwargs)
 
         self.addCleanup(self._file_sys_clean)
     # Call this function at the beginning of setUp if you need a mock ion
@@ -53,8 +53,7 @@ class PyonTestCase(unittest.TestCase):
         return thing
 
     def _file_sys_clean(self):
-        if CFG.get_safe('filesystem.force_clean',None):
-            FileSystem._clean(CFG)
+        FileSystem._clean(CFG)
 
 
 
