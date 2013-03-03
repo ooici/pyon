@@ -133,6 +133,8 @@ class IonObjectRegistry(object):
             clzz = model_classes[_def]
         elif _def in message_classes:
             clzz = message_classes[_def]
+        elif _def in enum_classes:
+            clzz = enum_classes[_def]
         else:
             raise NotFound("No matching class found for name %s" % _def)
 
