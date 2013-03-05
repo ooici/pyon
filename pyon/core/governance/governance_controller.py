@@ -48,8 +48,7 @@ class GovernanceController(object):
 
         log.info("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
-        self.resource_policy_event_subscriber = None
-        self.service_policy_event_subscriber = None
+        self.policy_event_subscriber = None
 
         #containers default to not Org Boundary and ION Root Org
         self._is_container_org_boundary = CFG.get_safe('container.org_boundary',False)
@@ -65,14 +64,8 @@ class GovernanceController(object):
 
             self.initialize_from_config(config)
 
-            self.resource_policy_event_subscriber = EventSubscriber(event_type=OT.ResourcePolicyEvent, callback=self.resource_policy_event_callback)
-            self.resource_policy_event_subscriber.start()
-
-            self.service_policy_event_subscriber = EventSubscriber(event_type=OT.ServicePolicyEvent, callback=self.service_policy_event_callback)
-            self.service_policy_event_subscriber.start()
-
-            self.policy_cache_reset_event_subscriber = EventSubscriber(event_type=OT.PolicyCacheResetEvent, callback=self.policy_cache_reset_event_callback)
-            self.policy_cache_reset_event_subscriber.start()
+            self.policy_event_subscriber = EventSubscriber(event_type=OT.PolicyEvent, callback=self.policy_event_callback)
+            self.policy_event_subscriber.start()
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
@@ -106,14 +99,8 @@ class GovernanceController(object):
     def stop(self):
         log.debug("GovernanceController stopping ...")
 
-        if self.resource_policy_event_subscriber is not None:
-            self.resource_policy_event_subscriber.stop()
-
-        if self.service_policy_event_subscriber is not None:
-            self.service_policy_event_subscriber.stop()
-
-        if self.policy_cache_reset_event_subscriber is not None:
-            self.policy_cache_reset_event_subscriber.stop()
+        if self.policy_event_subscriber is not None:
+            self.policy_event_subscriber.stop()
 
 
     @property
@@ -152,6 +139,10 @@ class GovernanceController(object):
 
 
     def get_container_org_boundary_id(self):
+        '''
+        Returns the permanent org identifier configured for this container
+        @return:
+        '''
 
         if not self._is_container_org_boundary:
             return None
@@ -165,16 +156,33 @@ class GovernanceController(object):
         return self._container_org_id
 
     def process_incoming_message(self,invocation):
-
+        '''
+        The GovernanceController hook into the incoming message interceptor stack
+        @param invocation:
+        @return:
+        '''
         self.process_message(invocation, self.interceptor_order,'incoming' )
         return self.governance_dispatcher.handle_incoming_message(invocation)
 
     def process_outgoing_message(self,invocation):
+        '''
+        The GovernanceController hook into the outgoing message interceptor stack
+        @param invocation:
+        @return:
+        '''
         self.process_message(invocation, reversed(self.interceptor_order),'outgoing')
         return self.governance_dispatcher.handle_outgoing_message(invocation)
 
     def process_message(self,invocation,interceptor_list, method):
-
+        '''
+        The GovernanceController hook to iterate over the interceptors to call each one and evaluate the annotations
+        to see what actions should be done.
+        @TODO - may want to make this more dynamic instead of hard coded for the moment.
+        @param invocation:
+        @param interceptor_list:
+        @param method:
+        @return:
+        '''
         for int_name in interceptor_list:
             class_inst = self.interceptor_by_name_dict[int_name]
             getattr(class_inst, method)(invocation)
@@ -190,10 +198,33 @@ class GovernanceController(object):
 
     #Manage all of the policies in the container
 
-    def resource_policy_event_callback(self, *args, **kwargs):
+    def policy_event_callback(self, *args, **kwargs):
+        '''
+        The generic policy event call back for dispatching policy related events
 
+        @param args:
+        @param kwargs:
+        @return:
+        '''
+        policy_event = args[0]
+        if policy_event.type_ == OT.ResourcePolicyEvent:
+            self.resource_policy_event_callback(*args, **kwargs)
+        elif policy_event.type_ == OT.ServicePolicyEvent:
+            self.service_policy_event_callback(*args, **kwargs)
+        elif policy_event.type_ == OT.PolicyCacheResetEvent:
+            self.policy_cache_reset_event_callback(*args, **kwargs)
+
+
+    def resource_policy_event_callback(self, *args, **kwargs):
+        '''
+        The ResourcePolicyEvent handler
+
+        @param args:
+        @param kwargs:
+        @return:
+        '''
         resource_policy_event = args[0]
-        log.debug('Resouce related policy event received: %s', str(resource_policy_event.__dict__))
+        log.debug('Resource related policy event received: %s', str(resource_policy_event.__dict__))
 
         policy_id = resource_policy_event.origin
         resource_id = resource_policy_event.resource_id
@@ -204,6 +235,13 @@ class GovernanceController(object):
         self.update_resource_access_policy(resource_id, delete_policy)
 
     def service_policy_event_callback(self, *args, **kwargs):
+        '''
+        The ServicePolicyEvent handler
+
+        @param args:
+        @param kwargs:
+        @return:
+        '''
         service_policy_event = args[0]
         log.debug('Service related policy event received: %s', str(service_policy_event.__dict__))
 
@@ -235,8 +273,12 @@ class GovernanceController(object):
                     log.warn("There was an error applying access policy: %s" % e.message)
 
 
-    def policy_cache_reset_event_callback(self):
+    def policy_cache_reset_event_callback(self, *args, **kwargs):
+        '''
+        The PolicyCacheResetEvent handler
 
+        @return:
+        '''
         #First remove all cached polices and precondition functions
         self.policy_decision_point_manager.clear_policy_cache()
         self._service_op_preconditions.clear()
