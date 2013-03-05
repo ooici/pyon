@@ -153,6 +153,11 @@ class PolicyDecisionPointManager(object):
         if self.service_policy_decision_point.has_key(service_name):
             del self.service_policy_decision_point[service_name]
 
+    #Remove all policies
+    def clear_policy_cache(self):
+        self.service_policy_decision_point.clear()
+
+
     def create_string_attribute(self, attrib_id, id):
         attribute = Attribute()
         attribute.attributeId = attrib_id

@@ -9,13 +9,13 @@ import types
 from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
-from pyon.ion.resource import RT
+from pyon.ion.resource import RT, OT
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized
-
+from pyon.container.procs import SERVICE_PROCESS_TYPE, AGENT_PROCESS_TYPE
 
 class GovernanceController(object):
     '''
@@ -65,11 +65,14 @@ class GovernanceController(object):
 
             self.initialize_from_config(config)
 
-            self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.resource_policy_event_callback)
+            self.resource_policy_event_subscriber = EventSubscriber(event_type=OT.ResourcePolicyEvent, callback=self.resource_policy_event_callback)
             self.resource_policy_event_subscriber.start()
 
-            self.service_policy_event_subscriber = EventSubscriber(event_type="ServicePolicyEvent", callback=self.service_policy_event_callback)
+            self.service_policy_event_subscriber = EventSubscriber(event_type=OT.ServicePolicyEvent, callback=self.service_policy_event_callback)
             self.service_policy_event_subscriber.start()
+
+            self.policy_cache_reset_event_subscriber = EventSubscriber(event_type=OT.PolicyCacheResetEvent, callback=self.policy_cache_reset_event_callback)
+            self.policy_cache_reset_event_subscriber.start()
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
@@ -108,6 +111,10 @@ class GovernanceController(object):
 
         if self.service_policy_event_subscriber is not None:
             self.service_policy_event_subscriber.stop()
+
+        if self.policy_cache_reset_event_subscriber is not None:
+            self.policy_cache_reset_event_subscriber.stop()
+
 
     @property
     def is_container_org_boundary(self):
@@ -226,6 +233,45 @@ class GovernanceController(object):
                 except Exception, e:
                     #If the resource does not exist, just ignore it - but log a warning.
                     log.warn("There was an error applying access policy: %s" % e.message)
+
+
+    def policy_cache_reset_event_callback(self):
+
+        #First remove all cached polices and precondition functions
+        self.policy_decision_point_manager.clear_policy_cache()
+        self._service_op_preconditions.clear()
+
+        #Now iterate over the processes running in the container and reload their policies
+        proc_list = self.container.proc_manager.list_local_processes
+        for proc in proc_list:
+            self.update_container_policies(proc)
+
+
+    def update_container_policies(self, process_instance):
+        '''
+        This must be called after registering a new process to load any applicable policies
+
+        @param process_instance:
+        @return:
+        '''
+
+
+        if process_instance._proc_type == SERVICE_PROCESS_TYPE:
+
+            # look to load any existing policies for this service
+            self.safe_update_service_access_policy(process_instance._proc_listen_name)
+
+        elif process_instance._proc_type == AGENT_PROCESS_TYPE:
+
+            # look to load any existing policies for this agent service
+            if process_instance.resource_type is None:
+                self.safe_update_service_access_policy(process_instance.name)
+            else:
+                self.safe_update_service_access_policy(process_instance.resource_type)
+
+            if process_instance.resource_id:
+                # look to load any existing policies for this resource
+                self.safe_update_resource_access_policy(process_instance.resource_id)
 
 
     def safe_update_resource_access_policy(self, resource_id):
