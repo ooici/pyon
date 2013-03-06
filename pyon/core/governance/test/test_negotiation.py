@@ -210,7 +210,7 @@ class NegotiationTest(PyonTestCase):
                 'accept_action': 'accept_actions.accept_method(sap.provider,sap.consumer)'
             }}
 
-        negotiation_handler = Negotiation(self, negotiation_rules)
+        negotiation_handler = Negotiation(self, negotiation_rules, self.event_pub)
 
         with self.assertRaises(Inconsistent) as cm:
             negotiation_handler.update_negotiation()

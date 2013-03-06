@@ -1,0 +1,13 @@
+
+protocol Order at Buyer {
+	choice {
+		OutOfStock from Seller;
+		OutOfStock from Seller;
+		OutOfStock from Seller;
+	} or 
+        {
+		Confirmation from Seller;
+		OK to Seller;
+	}
+	Finish to Seller;
+}

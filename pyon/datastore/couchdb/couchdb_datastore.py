@@ -21,7 +21,6 @@ from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.containers import get_ion_ts
 from pyon.util.stats import StatsCounter
-from pyon.util.lru_cache import LRUCache
 
 # Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
 # prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
@@ -84,14 +83,10 @@ class CouchDB_DataStore(DataStore):
         self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
         self._datastore_cache = {}
 
-        # Cache to keep resource_id to resource type mappings (for associations)
-        self._restype_cache = LRUCache(maxSize=10000, maxAgeMs=1800000.0, sizeElasticity=1000)
-
     def close(self):
         log.debug("Closing connection to CouchDB")
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
-        self._restype_cache.clear()
 
     def _get_datastore(self, datastore_name=None):
         datastore_name = datastore_name or self.datastore_name
@@ -208,8 +203,6 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Object with id %s already exist" % doc["_id"])
         log.debug('Create result: %s', str(res))
         obj_id, version = res
-        if "type_" in doc:
-            self._restype_cache.put(obj_id, doc["type_"])
         if attachments is not None:
             # Need to iterate through attachments because couchdb_python does not support binary
             # content in db.save()
@@ -252,9 +245,6 @@ class CouchDB_DataStore(DataStore):
                       % (len(res) - len(errors), "\n".join(errors)))
         else:
             log.debug('create_doc_mult result: %s', str(res))
-            for doc in docs:
-                if "type_" in doc:
-                    self._restype_cache.put(doc["_id"], doc["type_"])
 
         return res
 
@@ -297,8 +287,6 @@ class CouchDB_DataStore(DataStore):
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         log.debug('read doc contents: %s', doc)
         self._count(read=1)
-        if "type_" in doc:
-            self._restype_cache.put(doc["_id"], doc["type_"])
         return doc
 
     def read_mult(self, object_ids, datastore_name=""):
@@ -321,9 +309,6 @@ class CouchDB_DataStore(DataStore):
             raise NotFound("\n".join(notfound_list))
 
         doc_list = [row.doc.copy() for row in docs]
-        for doc in doc_list:
-            if "type_" in doc:
-                self._restype_cache.put(doc["_id"], doc["type_"])
         self._count(read_mult_call=1, read_mult_obj=len(doc_list))
         return doc_list
 
@@ -469,15 +454,14 @@ class CouchDB_DataStore(DataStore):
         Create an association between two IonObjects with a given predicate
         """
         #if assoc_type:
+        #if assoc_type:
         #    raise BadRequest("assoc_type deprecated")
         if not (subject and predicate and obj):
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
-            subject_type = self._restype_cache.get(subject_id, None)
-            if not subject_type:
-                subject = self.read(subject_id)
-                subject_type = subject._get_type()
+            subject = self.read(subject_id)
+            subject_type = subject._get_type()
         else:
             if "_id" not in subject or "_rev" not in subject:
                 raise BadRequest("Subject id or rev not available")
@@ -486,10 +470,8 @@ class CouchDB_DataStore(DataStore):
 
         if type(obj) is str:
             object_id = obj
-            object_type = self._restype_cache.get(object_id, None)
-            if not object_type:
-                obj = self.read(object_id)
-                object_type = obj._get_type()
+            obj = self.read(object_id)
+            object_type = obj._get_type()
         else:
             if "_id" not in obj or "_rev" not in obj:
                 raise BadRequest("Object id or rev not available")
@@ -662,10 +644,14 @@ class CouchDB_DataStore(DataStore):
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
         log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
+
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not subject:
             raise BadRequest("Must provide subject")
+        if object_type and not predicate:
+            raise BadRequest("Cannot provide object type without a predictate")
+
         ds, datastore_name = self._get_datastore()
 
         if type(subject) is str:
@@ -698,11 +684,16 @@ class CouchDB_DataStore(DataStore):
         return (obj_list, obj_assocs)
 
     def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, **kwargs):
+
         log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s", subject_type, predicate, obj, id_only)
+
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         if not obj:
             raise BadRequest("Must provide object")
+        if subject_type and not predicate:
+            raise BadRequest("Cannot provide subject type without a predicate")
+
         ds, datastore_name = self._get_datastore()
 
         if type(obj) is str:

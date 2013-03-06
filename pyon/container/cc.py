@@ -8,7 +8,7 @@ from pyon.container.apps import AppManager
 from pyon.container.procs import ProcManager
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
-from pyon.core.exception import ContainerError
+from pyon.core.exception import ContainerError, BadRequest
 from pyon.core.governance.governance_controller import GovernanceController
 from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository, EventPublisher
@@ -23,6 +23,7 @@ from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
 from pyon.util.sflow import SFlowManager
 from pyon.util.context import LocalContextMixin
+from pyon.util.greenlet_plugin import GreenletLeak
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
@@ -32,6 +33,8 @@ import msgpack
 import os
 import signal
 import traceback
+import sys
+import gevent
 from contextlib import contextmanager
 
 
@@ -140,6 +143,9 @@ class Container(BaseContainerAgent):
                 os.kill(os.getpid(), signal.SIGTERM)
         self._normal_signal = signal.signal(signal.SIGTERM, handl)
 
+        # set up greenlet debugging signal handler
+        gevent.signal(signal.SIGUSR2, self._handle_sigusr2)
+
         self.datastore_manager.start()
         self._capabilities.append("DATASTORE_MANAGER")
 
@@ -204,6 +210,41 @@ class Container(BaseContainerAgent):
         self._status        = "RUNNING"
 
         log.info("Container (%s) started, OK." , self.id)
+
+    def _handle_sigusr2(self):#, signum, frame):
+        """
+        Handles SIGUSR2, prints debugging greenlet information.
+        """
+        gls = GreenletLeak.get_greenlets()
+
+        allgls = []
+
+        for gl in gls:
+            status = GreenletLeak.format_greenlet(gl)
+
+            # build formatted output:
+            # Greenlet at 0xdeadbeef
+            #     self: <EndpointUnit at 0x1ffcceef>
+            #     func: bound, EndpointUnit.some_func
+
+            status[0].insert(0, "%s at %s:" % (gl.__class__.__name__, hex(id(gl))))
+            # indent anything in status a second time
+            prefmt = [s.replace("\t", "\t\t") for s in status[0]]
+            prefmt.append("traceback:")
+
+            for line in status[1]:
+                for subline in line.split("\n")[0:2]:
+                    prefmt.append(subline)
+
+            glstr = "\n\t".join(prefmt)
+
+            allgls.append(glstr)
+
+        # print it out!
+        print >>sys.stderr, "\n\n".join(allgls)
+        with open("gls-%s" % os.getpid(), "w") as f:
+            f.write("\n\n".join(allgls))
+
 
     @property
     def node(self):
@@ -289,10 +330,13 @@ class Container(BaseContainerAgent):
         log.info("=============== Container stopping... ===============")
 
         if self.event_pub is not None:
-            self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
-                                         origin=self.id, origin_type="CapabilityContainer",
-                                         sub_type="TERMINATE",
-                                         state=ContainerStateEnum.TERMINATE)
+            try:
+                self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                             origin=self.id, origin_type="CapabilityContainer",
+                                             sub_type="TERMINATE",
+                                             state=ContainerStateEnum.TERMINATE)
+            except Exception as ex:
+                log.exception(ex)
 
         while self._capabilities:
             capability = self._capabilities.pop()
@@ -376,12 +420,13 @@ class Container(BaseContainerAgent):
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
 
-    def fail_fast(self, err_msg=""):
+    def fail_fast(self, err_msg="", skip_stop=False):
         """
         Container needs to shut down and NOW.
         """
         log.error("Fail Fast: %s", err_msg)
-        self.stop()
+        if not skip_stop:
+            self.stop()
         log.error("Fail Fast: killing container")
 
         traceback.print_exc()

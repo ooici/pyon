@@ -187,6 +187,8 @@ class IonObjectBase(object):
         for key in other.__dict__:
             setattr(self, key, other.__dict__[key])
 
+    #Decorator methods
+
     def is_decorator(self, field, decorator):
         if self._schema[field]['decorators'].has_key(decorator):
             return True
@@ -196,6 +198,23 @@ class IonObjectBase(object):
     def get_decorator_value(self, field, decorator):
         if self._schema[field]['decorators'].has_key(decorator):
             return self._schema[field]['decorators'][decorator]
+
+        return None
+
+    def find_field_for_decorator(self, decorator='', decorator_value=None):
+        '''
+        This method will iterate the set of fields in te object and look for the first field
+        that has the specified decorator and decorator value, if supplied.
+        @param decorator: The decorator on the field to be searched for
+        @param decorator_value: An optional value to search on
+        @return fld: The name of the field that has the decorator
+        '''
+        for fld in self._schema:
+            if self.is_decorator(fld, decorator ):
+                if decorator_value is not None and self.get_decorator_value(fld, decorator) == decorator_value:
+                    return fld
+                else:
+                    return fld
 
         return None
 
@@ -259,7 +278,7 @@ class IonObjectBase(object):
             split_content_types = content_types.split(',')
         else:
             split_content_types.append(content_types)
-        print "split_content_types: " + str(split_content_types)
+        log.info("split_content_types: %s", split_content_types)
 
         for content_type in split_content_types:
             if type(value).__name__ == content_type.strip():

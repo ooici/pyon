@@ -104,7 +104,7 @@ def set_sys_name(sysname=None):
     global sys_name
     old_sys_name = sys_name
     sys_name = sysname
-    print >> sys.stderr, "pyon: sys_name changed from '%s' to '%s'" % (old_sys_name, sys_name)
+    log.info("pyon: sys_name changed from '%s' to '%s'", old_sys_name, sys_name)
 
 
 def get_sys_name():

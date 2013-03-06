@@ -103,9 +103,9 @@ class InstrumentFSM():
             if handler:
                 (next_state, result) = handler(*args, **kwargs)
             else:
-                raise FSMStateError('Command not handled in current state.')
+                raise FSMStateError('Command %s not handled in state %s' % (event, self.current_state))
         else:
-            raise FSMCommandUnknownError('Unknown command.')
+            raise FSMCommandUnknownError('Unknown command: %s' % event)
 
         #if next_state in self.states:
         if self.states.has(next_state):

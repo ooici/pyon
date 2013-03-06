@@ -5,6 +5,7 @@ __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 import time
+import sys
 
 from mock import Mock, sentinel, patch
 from nose.plugins.attrib import attr
@@ -12,7 +13,8 @@ from gevent import event, queue
 from unittest import SkipTest
 
 from pyon.core import bootstrap
-from pyon.event.event import EventPublisher, EventSubscriber, EventRepository
+from pyon.core.exception import BadRequest
+from pyon.event.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
 from pyon.util.async import spawn
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts, DotDict
@@ -21,9 +23,23 @@ from pyon.util.unit_test import IonUnitTestCase
 
 from interface.objects import Event, ResourceLifecycleEvent
 
+from pyon.core.exception import FilesystemError, StreamingError, CorruptionError
+
+@attr('UNIT',group='event')
+class TestEvents(IonUnitTestCase):
+    def test_event_subscriber_auto_delete(self):
+        mocknode = Mock()
+        ev = EventSubscriber(event_type="ProcessLifecycleEvent", callback=lambda *a,**kw: None, auto_delete=sentinel.auto_delete, node=mocknode)
+        self.assertEquals(ev._auto_delete, sentinel.auto_delete)
+
+        # we don't want to have to patch out everything here, so call initialize directly, which calls create_channel for us
+        ev._setup_listener = Mock()
+        ev.initialize(sentinel.binding)
+
+        self.assertEquals(ev._chan.queue_auto_delete, sentinel.auto_delete)
 
 @attr('INT',group='event')
-class TestEvents(IonIntegrationTestCase):
+class TestEventsInt(IonIntegrationTestCase):
 
     def setUp(self):
         self._listens = []
@@ -40,21 +56,58 @@ class TestEvents(IonIntegrationTestCase):
         sub.start()
         self._listens.append(sub)
         sub._ready_event.wait(timeout=5)
+        
 
     def test_pub_and_sub(self):
         ar = event.AsyncResult()
+        gq = queue.Queue()
+        self.count = 0
+
         def cb(*args, **kwargs):
-            ar.set(args)
+            self.count += 1
+            gq.put(args[0])
+            if self.count == 2:
+                ar.set()
+
         sub = EventSubscriber(event_type="ResourceEvent", callback=cb, origin="specific")
         pub = EventPublisher(event_type="ResourceEvent")
 
         self._listen(sub)
         pub.publish_event(origin="specific", description="hello")
 
-        evmsg, evheaders = ar.get(timeout=5)
+        event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
+        self.assertEqual(event_obj, pub.publish_event_object(event_obj))
 
-        self.assertEquals(evmsg.description, "hello")
-        self.assertAlmostEquals(int(evmsg.ts_created), int(get_ion_ts()), delta=5000)
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='2423')
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'The ts_created value is not a valid timestamp',cm.exception.message)
+
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing', ts_created='1000494978462')
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'This ts_created value is too old',cm.exception.message)
+
+        with self.assertRaises(BadRequest) as cm:
+            event_obj = bootstrap.IonObject('ResourceEvent', origin='specific', description='more testing')
+            event_obj._id = '343434'
+            pub.publish_event_object(event_obj)
+        self.assertIn( 'The event object cannot contain a _id field',cm.exception.message)
+
+        ar.get(timeout=5)
+
+        res = []
+        for x in xrange(self.count):
+            res.append(gq.get(timeout=5))
+
+        self.assertEquals(len(res), self.count)
+        self.assertEquals(res[0].description, "hello")
+        self.assertAlmostEquals(int(res[0].ts_created), int(get_ion_ts()), delta=5000)
+
+        self.assertEquals(res[1].description, "more testing")
+        self.assertAlmostEquals(int(res[1].ts_created), int(get_ion_ts()), delta=5000)
+
+
 
     def Xtest_pub_with_event_repo(self):
         pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)
@@ -239,6 +292,74 @@ class TestEvents(IonIntegrationTestCase):
         evmsg = ar.get(timeout=5)
         self.assertEquals(self.count, 1)
         self.assertEquals(evmsg.description, "3")
+    
+    
+    def test_pub_sub_exception_event(self):
+        ar = event.AsyncResult()
+        
+        gq = queue.Queue()
+        self.count = 0
+
+        def cb(*args, **kwargs):
+            self.count += 1
+            gq.put(args[0])
+            if self.count == 3:
+                ar.set()
+
+        #test file system error event
+        sub = EventSubscriber(event_type="ExceptionEvent", callback=cb, origin="stream_exception")
+        self._listen(sub)
+
+        @handle_stream_exception()
+        def _raise_filesystem_error():
+            raise FilesystemError()
+        _raise_filesystem_error()
+        
+        @handle_stream_exception()
+        def _raise_streaming_error():
+            raise StreamingError()
+        _raise_streaming_error()
+        
+        @handle_stream_exception()
+        def _raise_corruption_error():
+            raise CorruptionError()
+        _raise_corruption_error()
+        
+
+        ar.get(timeout=5)
+        res = []
+        for i in xrange(self.count):
+            exception_event = gq.get(timeout=5) 
+            res.append(exception_event)
+
+        self.assertEquals(res[0].exception_type, "<class 'pyon.core.exception.FilesystemError'>")
+        self.assertEquals(res[1].exception_type, "<class 'pyon.core.exception.StreamingError'>")
+        self.assertEquals(res[2].exception_type, "<class 'pyon.core.exception.CorruptionError'>")
+        self.assertEquals(res[2].origin, "stream_exception")
+        
+    
+    def test_pub_sub_exception_event_origin(self):
+        #test origin
+        ar = event.AsyncResult()
+        
+        self.count = 0
+        def cb(*args, **kwargs):
+            self.count = self.count + 1
+            ar.set(args[0])
+
+        sub = EventSubscriber(event_type="ExceptionEvent", callback=cb, origin="specific")
+        self._listen(sub)
+
+        @handle_stream_exception("specific")
+        def _test_origin():
+            raise CorruptionError()
+        _test_origin()
+        
+        exception_event = ar.get(timeout=5)
+        
+        self.assertEquals(self.count, 1)
+        self.assertEquals(exception_event.exception_type, "<class 'pyon.core.exception.CorruptionError'>")
+        self.assertEquals(exception_event.origin, "specific") 
 
 @attr('UNIT',group='datastore')
 class TestEventRepository(IonUnitTestCase):

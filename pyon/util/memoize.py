@@ -18,6 +18,7 @@ from itertools import ifilterfalse
 from heapq import nsmallest
 from operator import itemgetter
 from collections import deque
+from putil.hash import hash_any
 
 from heapq import heapify, heappush, heappop, heapreplace
 
@@ -27,7 +28,7 @@ class Counter(dict):
     def __missing__(self, key):
         return 0
 
-def memoize_lru(maxsize=100):
+def memoize_lru(maxsize=100, use_hash_any=False):
     '''Least-recently-used cache decorator.
 
     Arguments to the cached function must be hashable.
@@ -43,6 +44,9 @@ def memoize_lru(maxsize=100):
             key = args
             if kwds:
                 key += tuple(sorted(kwds.items()))
+
+            if use_hash_any:
+                key = hash_any(key)
             try:
                 result = cache.pop(key)
                 wrapper.hits += 1
@@ -59,7 +63,7 @@ def memoize_lru(maxsize=100):
 
 
 
-def memoize_lfu(maxsize=100):
+def memoize_lfu(maxsize=100, use_hash_any=False):
     '''Least-frequenty-used cache decorator.
 
     Arguments to the cached function must be hashable.
@@ -79,6 +83,8 @@ def memoize_lfu(maxsize=100):
             if kwargs:
                 key += (kwarg_mark,) + tuple(sorted(kwargs.items()))
 
+            if use_hash_any:
+                key = hash_any(key)
             # get cache entry or compute if not found
             try:
                 result = cache[key]

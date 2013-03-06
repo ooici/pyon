@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 
-__author__ = 'Thomas R. Lennan'
+__author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.util.containers import DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID
-from pyon.util.int_test import IonIntegrationTestCase
+import copy
 from nose.plugins.attrib import attr
 
-@attr('UNIT')
+from pyon.util.containers import DotDict, create_unique_identifier, make_json, is_valid_identifier, is_basic_identifier, NORMAL_VALID, is_valid_ts, get_ion_ts, dict_merge, DictDiffer
+from pyon.util.int_test import IonIntegrationTestCase
+
+
+@attr('UNIT', group='util')
 class Test_Containers(IonIntegrationTestCase):
 
     def test_dot_dict(self):
@@ -48,6 +51,57 @@ class Test_Containers(IonIntegrationTestCase):
         with self.assertRaises(AttributeError):
             base.another.chained.pop = 'again should not work'
 
+    def test_dict_merge(self):
+        # dict_merge(base, upd, inplace=False):
+        org_dict = {"a":"str_a", "d": {"d-x": 1, "d-y": None, "d-d": {"d-d-1": 1, "d-d-2": 2}}}
+
+        base_dict = copy.deepcopy(org_dict)
+        dd = DictDiffer(base_dict, org_dict)
+        self.assertTrue(len(base_dict), 2)
+        self.assertTrue(len(dd.unchanged()), len(base_dict))
+
+        # Case 1: Add new value
+        delta_dict = {"c" : "NEW_C"}
+        mod_dict = dict_merge(base_dict, delta_dict)
+        dd = DictDiffer(base_dict, org_dict)
+        self.assertTrue(len(base_dict), 2)
+        self.assertTrue(len(dd.unchanged()), len(base_dict))
+
+        dd = DictDiffer(mod_dict, org_dict)
+        self.assertTrue(len(mod_dict), 3)
+        self.assertTrue(len(dd.unchanged()), len(org_dict))
+        self.assertTrue(dd.added(), 1)
+
+        # Case 2: Change simple type value
+        delta_dict = {"a" : 5}
+        base_dict = copy.deepcopy(org_dict)
+        mod_dict = dict_merge(base_dict, delta_dict)
+
+        dd = DictDiffer(mod_dict, org_dict)
+        self.assertTrue(len(mod_dict), len(org_dict))
+        self.assertTrue(len(dd.unchanged()), len(org_dict)-1)
+        self.assertTrue(len(dd.changed()), 1)
+        self.assertTrue(mod_dict['a'], 5)
+
+        # Case 3: Add new value on lower level
+        delta_dict = {"d": {"new":"NEW_ENTRY"}}
+        base_dict = copy.deepcopy(org_dict)
+        mod_dict = dict_merge(base_dict, delta_dict)
+
+        dd = DictDiffer(mod_dict, org_dict)
+        self.assertTrue(len(mod_dict), len(org_dict))
+        self.assertTrue(len(mod_dict['d']), len(org_dict['d']) + 1)
+        self.assertTrue(mod_dict['d']['new'], "NEW_ENTRY")
+        dd = DictDiffer(mod_dict['d'], org_dict['d'])
+        self.assertTrue(len(dd.unchanged()), len(org_dict['d']))
+        self.assertTrue(dd.added(), 1)
+
+        #import pprint
+        #pprint.pprint(base_dict)
+        #pprint.pprint(mod_dict)
+        #print dd.added(), dd.removed(), dd.changed(), dd.unchanged()
+
+
     def test_is_basic_identifier(self):
 
         self.assertFalse(is_basic_identifier('abc 123'))
@@ -75,6 +129,28 @@ class Test_Containers(IonIntegrationTestCase):
         self.assertIn('abc123', id)
         id = create_unique_identifier()
         self.assertNotIn('abc123', id)
+
+
+    def test_is_valid_ts(self):
+
+        #Not a string
+        self.assertEqual(is_valid_ts(1332424), False)
+
+        #Too short
+        self.assertEqual(is_valid_ts('1332424'), False)
+
+        #Not numeric
+        self.assertEqual(is_valid_ts('bfd1332424'), False)
+
+        #Neither numeric or positive
+        self.assertEqual(is_valid_ts('-332424'), False)
+
+        #Too long
+        self.assertEqual(is_valid_ts('109392939394556'), False)
+
+        #Just right
+        ts = get_ion_ts()
+        self.assertEqual(is_valid_ts(ts), True)
 
 
 if __name__ == "__main__":

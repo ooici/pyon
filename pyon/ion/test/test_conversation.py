@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 
 __author__ = 'Stephen Henrie'
 __license__ = 'Apache 2.0'
@@ -11,8 +12,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.exception import Inconsistent
 from nose.plugins.attrib import attr
 from pyon.service.service import BaseService
-from pyon.net.endpoint import RPCClient
-from pyon.net.channel import BidirClientChannel
+from pyon.net.endpoint import RPCClient, BidirectionalEndpointUnit
 from pyon.util.context import LocalContextMixin
 
 @attr('UNIT')
@@ -123,32 +123,21 @@ class TestConversationInterceptor(IonIntegrationTestCase):
 
     def test_interceptor_fails_when_send_multiple_messages(self):
 
-        '''
-        # save off old send
-        old_message_send = RPCRequesterEndpointUnit._message_send
-
-        # make new send to patch on that duplicates send
-        def new_message_send(*args, **kwargs):
-            print 'In the patched new_message_send'
-
-            #Only duplicate the message send from the initial client
-            if args[0]._endpoint._process.name != 'conv_test':
-                old_message_send(*args, **kwargs)
-
-            return old_message_send(*args, **kwargs)
-
-        # patch it into place with auto-cleanup
-        patcher = patch('pyon.ion.conversation.RPCRequesterEndpointUnit._message_send', new_message_send)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        '''
 
         # save off old send
-        old_send = BidirClientChannel._send
+        old_send = BidirectionalEndpointUnit._send
+
+        class WrongMessageAssertion(Exception):
+            pass
+
+        def handle_outgoing_message(*args, **kwargs):
+            inv  = args[1]
+            if inv.message_annotations.has_key(GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION) and\
+               inv.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT:
+                    raise WrongMessageAssertion("Monitor detected an error")
 
         # make new send to patch on that duplicates send
         def new_send(*args, **kwargs):
-            print 'In the patched new_send'
 
             #Only duplicate the message send from the initial client call
             msg_headers = kwargs['headers']
@@ -159,45 +148,18 @@ class TestConversationInterceptor(IonIntegrationTestCase):
 
         # patch it into place with auto-cleanup to send a duplicate message at the channel layer which
         #is below the interceptors
-        patcher = patch('pyon.net.channel.BidirClientChannel._send', new_send)
+        patcher = patch('pyon.net.endpoint.BidirectionalEndpointUnit._send', new_send)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-
-
-
-        #Should throw an exception by intentionally forcing the message to be sent twice.
-        #This is not allowed.
-        ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
-
-        #Check to see if the text has been reversed.
-        self.assertEqual(ret,'dlrow olleh')
-
-    '''
-
-    def test_interceptor_fails_when_recv_multiple_messages(self):
-
-        # save off old send
-        old_message_send = RPCProviderEndpointUnit._message_send
-
-        # make new send to patch on that duplicates send
-        def new_message_send(*args, **kwargs):
-            print 'In the patched new_message_send'
-            old_message_send(*args, **kwargs)
-            return old_message_send(*args, **kwargs)
-
-        # patch it into place with auto-cleanup
-        patcher = patch('pyon.ion.conversation.RPCProviderEndpointUnit._message_send', new_message_send)
+        # patch to throw an exception to be caught by the test
+        patcher = patch('pyon.core.governance.governance_dispatcher.GovernanceDispatcher.handle_outgoing_message',
+                        handle_outgoing_message)
         patcher.start()
         self.addCleanup(patcher.stop)
 
-
-
-        #Should throw an exception by intentionally forcing the message to be sent twice.
+        #The above patch will intentionally forcing the message to be sent twice which will cause the conversation monitor
+        # to detect a duplicate message for the same conversation id and throw an exception.
         #This is not allowed.
-        ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )
-
-        #Check to see if the text has been reversed.
-        self.assertEqual(ret,'dlrow olleh')
-
-    '''
+        with self.assertRaises(WrongMessageAssertion) as cm:
+            ret = self.provider_client.request({'text': 'hello world'}, op='reverse_string' )

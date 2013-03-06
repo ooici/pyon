@@ -2,6 +2,7 @@ from collections import deque
 from pydoc import deque
 from pyon.core.governance.conversation.core.transition import DefaultTransition
 from transition import Transition, AssertionTransition
+from ooi.logging import log
 
 class ExceptionFSM(Exception):
     """This is the FSM Exception class."""
@@ -363,11 +364,11 @@ class FSM:
              for (value, type_sig), payload in zip(local_context, self.current_payload)]
             
     def execute_transition_action(self, assertion, context):
-        print 'context is' %(context)
+        log.debug('context is %s', context)
         result =  assertion.check(context)
         if not result: raise ExceptionFailAssertion('Assertion fail for input transition:%s , context: %s and assertion:%s' 
                                                     %(self.input_symbol, context, assertion.statement))
-        else: print 'Message %s is checked' %(self.input_symbol) 
+        else: log.debug('Message %s is checked', self.input_symbol)
             
     def __eq__(self, other) : 
         return self.__dict__ == other.__dict__

@@ -163,8 +163,8 @@ class BaseChannel(object):
 
         # is lock already acquired? spit out a notice
         if self._lock._is_owned():
-            print >>sys.stderr, "INTERLEAVE DETECTED:\n\nCURRENT STACK:\n%s\n\nSTACK THAT LOCKED: %s\n" \
-                    %  ("".join(traceback.format_stack()), "".join(self._lock_trace))
+            log.warn("INTERLEAVE DETECTED:\n\nCURRENT STACK:\n%s\n\nSTACK THAT LOCKED: %s\n",
+                    "".join(traceback.format_stack()), "".join(self._lock_trace))
 
         with self._lock:
             # we could wait and wait, and it gets closed, and unless we check again, we'd never know!
@@ -672,7 +672,7 @@ class RecvChannel(BaseChannel):
     def _declare_queue(self, queue):
 
         # prepend xp name in the queue for anti-clobbering
-        if queue and not self._recv_name.exchange in queue:
+        if queue and not queue.startswith(self._recv_name.exchange + "."):
             queue = ".".join([self._recv_name.exchange, queue])
             #log.debug('Auto-prepending exchange to queue name for anti-clobbering: %s', queue)
 

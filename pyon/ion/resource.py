@@ -5,6 +5,7 @@
 __author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
 
+import inspect
 import types
 import time
 
@@ -324,8 +325,8 @@ class ExtendedResourceContainer(object):
         self.ctx = None
 
     def create_extended_resource_container_list(self, extended_resource_type, resource_id_list,
-                                                computed_resource_type=None, origin_resource_type=None,
-                                                ext_associations=None, ext_exclude=None):
+                                                computed_resource_type=None,
+                                                ext_associations=None, ext_exclude=None, **kwargs):
         """
         Returns a list of extended resource containers for given list of resource_ids.
         """
@@ -341,7 +342,7 @@ class ExtendedResourceContainer(object):
         return ret
 
     def create_extended_resource_container(self, extended_resource_type, resource_id, computed_resource_type=None,
-                                           ext_associations=None, ext_exclude=None):
+                                           ext_associations=None, ext_exclude=None, **kwargs):
         """
         Returns an extended resource container for a given resource_id.
         """
@@ -388,10 +389,10 @@ class ExtendedResourceContainer(object):
         self.set_container_lcstate_info(res_container)
 
         # Fill resource container fields
-        self.set_container_field_values(res_container, ext_exclude)
+        self.set_container_field_values(res_container, ext_exclude, **kwargs)
 
         # Fill computed attributes
-        self.set_computed_attributes(res_container, computed_resource_type, ext_exclude)
+        self.set_computed_attributes(res_container, computed_resource_type, ext_exclude, **kwargs)
 
         # Fill additional associations
         self.set_extended_associations(res_container, ext_associations, ext_exclude)
@@ -417,13 +418,13 @@ class ExtendedResourceContainer(object):
         else:
             res_container.lcstate_transitions = {"retire": "RETIRED"}
 
-    def set_container_field_values(self, res_container, ext_exclude):
+    def set_container_field_values(self, res_container, ext_exclude, **kwargs):
         """
         Sets resource container fields that are not extended or computed.
         """
-        self.set_object_field_values(res_container, res_container.resource, ext_exclude)
+        self.set_object_field_values(res_container, res_container.resource, ext_exclude, **kwargs)
 
-    def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude):
+    def set_computed_attributes(self, res_container, computed_resource_type, ext_exclude, **kwargs):
         """
         Creates the specified ComputedAttributes object if given and iterate over the fields
         to set the computed values.
@@ -433,9 +434,9 @@ class ExtendedResourceContainer(object):
 
         res_container.computed = IonObject(computed_resource_type)
 
-        self.set_object_field_values(res_container.computed, res_container.resource, ext_exclude)
+        self.set_object_field_values(res_container.computed, res_container.resource, ext_exclude, **kwargs)
 
-    def set_object_field_values(self, obj, resource, ext_exclude):
+    def set_object_field_values(self, obj, resource, ext_exclude, **kwargs):
         """
         Iterate through all fields of the given object and set values according
         to the field type and decorator definition in the object type schema.
@@ -464,7 +465,7 @@ class ExtendedResourceContainer(object):
                         method_name = deco_value
                     else:
                         method_name = 'get_' + field
-                    ret_val = self.execute_method(resource._id, method_name)
+                    ret_val = self.execute_method(resource._id, method_name, **kwargs)
                     if ret_val is not None:
                         setattr(obj, field, ret_val)
 
@@ -671,9 +672,10 @@ class ExtendedResourceContainer(object):
 
     # This method will dynamically call the specified method. It will look for the method in the current class
     # and also in the class specified by the service_provider
-    def execute_method(self, resource_id, method_name):
+    def execute_method(self, resource_id, method_name, **kwargs):
 
         try:
+
             #First look to see if this is a remote method
             if method_name.find('.') > 0:
 
@@ -690,22 +692,41 @@ class ExtendedResourceContainer(object):
 
                 methodToCall = getattr(service_client, operation)
                 param_list = [resource_id]
-                ret = methodToCall(*param_list)
+                param_dict = self._get_method_arguments(service_client, operation, **kwargs)
+                ret = methodToCall(*param_list, **param_dict )
                 return ret
 
             else:
                 #For local methods, first look for the method in the current class
                 func = getattr(self, method_name, None)
                 if func:
-                    return func(resource_id)
+                    param_dict = self._get_method_arguments(self,method_name, **kwargs)
+                    return func(resource_id, **param_dict)
                 else:
                     #Next look to see if the method exists in the service provider process
                     func = getattr(self.service_provider, method_name, None)
                     if func:
-                        return func(resource_id)
+                        param_dict = self._get_method_arguments(self.service_provider,method_name, **kwargs)
+                        return func(resource_id, **param_dict)
 
                 return None
 
         except Exception, e:
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
+
+    def _get_method_arguments(self, module, method_name, **kwargs):
+
+        param_dict = {}
+
+        try:
+            method_args = inspect.getargspec(getattr(module,method_name))
+            for arg in method_args[0]:
+                if kwargs.has_key(arg):
+                    param_dict[arg] = kwargs[arg]
+
+        except Exception, e:
+            #Log a warning and simply return an empty dict
+            log.warn('Cannot determine the arguments for method: %s in module: %s: %s',module, method_name, e.message )
+
+        return param_dict

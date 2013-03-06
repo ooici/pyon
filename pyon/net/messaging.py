@@ -20,6 +20,7 @@ from pyon.util.pool import IDPool
 from pyon.net.transport import LocalTransport, LocalRouter, AMQPTransport, ComposableTransport
 
 from collections import defaultdict
+import traceback
 
 class BaseNode(object):
     """
@@ -143,6 +144,7 @@ class NodeB(BaseNode):
         self._pool = IDPool()
         self._bidir_pool = {}   # maps inactive/active our numbers (from self._pool) to channels
         self._pool_map = {}     # maps active pika channel numbers to our numbers (from self._pool)
+        self._dead_pool = []    # channels removed from pool for failing health test, for later forensics
 
         BaseNode.__init__(self)
 
@@ -174,12 +176,31 @@ class NodeB(BaseNode):
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
         if amq_chan is None:
             log.error("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s", ch_number)
-            import traceback
             traceback.print_stack()
+            from pyon.container.cc import Container
+            if Container.instance is not None:
+                Container.instance.fail_fast("AMQCHAN IS NONE, messaging has failed", True)
             raise StandardError("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s" % ch_number)
 
         transport = AMQPTransport(amq_chan)
         return transport
+
+    def _check_pooled_channel_health(self, ch):
+        """
+        Returns true if the channel has the proper callbacks in pika for delivery.
+
+        We're seeing an issue where channels are considered open and consuming by pika, RabbitMQ,
+        and our layer, but the "callbacks" mechanism in pika does not have any entries for
+        delivering messages to our layer, therefore messages are being dropped. Rabbit is happily
+        sending messages along, resulting in large numbers of UNACKED messages.
+
+        If this method returns false, the channel should be discarded and a new one created.
+        """
+        cbs = self.client.callbacks._callbacks
+        if "_on_basic_deliver" not in cbs[ch.get_channel_id()].iterkeys():
+            return False
+
+        return True
 
     def channel(self, ch_type, transport=None):
         """
@@ -191,18 +212,50 @@ class NodeB(BaseNode):
         with self._lock:
             # having _queue_auto_delete on is a pre-req to being able to pool.
             if ch_type == channel.BidirClientChannel and not ch_type._queue_auto_delete:
-                chid = self._pool.get_id()
-                if chid in self._bidir_pool:
-                    log.debug("BidirClientChannel requested, pulling from pool (%d)", chid)
-                    assert not chid in self._pool_map.values()
-                    ch = self._bidir_pool[chid]
-                    self._pool_map[ch.get_channel_id()] = chid
-                else:
-                    log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
-                    ch = self._new_channel(ch_type, transport=transport)
-                    ch.set_close_callback(self.on_channel_request_close)
-                    self._bidir_pool[chid] = ch
-                    self._pool_map[ch.get_channel_id()] = chid
+
+                # only attempt this 5 times - somewhat arbitrary but we can't have an infinite loop here
+                attempts = 5
+                while attempts > 0:
+                    attempts -= 1
+
+                    chid = self._pool.get_id()
+                    if chid in self._bidir_pool:
+                        log.debug("BidirClientChannel requested, pulling from pool (%d)", chid)
+                        assert not chid in self._pool_map.values()
+
+                        # we need to check the health of this bidir channel
+                        ch = self._bidir_pool[chid]
+                        if not self._check_pooled_channel_health(ch):
+                            log.warning("Channel (%d) failed health check, removing from pool", ch.get_channel_id())
+
+                            # return chid to the id pool
+                            self._pool.release_id(chid)
+
+                            # remove this channel from the pool, put into dead pool
+                            self._dead_pool.append(ch)
+                            del self._bidir_pool[chid]
+
+                            # now close the channel (must remove our close callback which returns it to the pool)
+                            assert ch._close_callback == self.on_channel_request_close
+                            ch._close_callback = None
+                            ch.close()
+
+                            # resume the loop to attempt to get one again
+                            continue
+
+                        self._pool_map[ch.get_channel_id()] = chid
+                    else:
+                        log.debug("BidirClientChannel requested, no pool items available, creating new (%d)", chid)
+                        ch = self._new_channel(ch_type, transport=transport)
+                        ch.set_close_callback(self.on_channel_request_close)
+                        self._bidir_pool[chid] = ch
+                        self._pool_map[ch.get_channel_id()] = chid
+
+                    # channel here is valid, exit out of attempts loop
+                    break
+                else:    # while loop didn't get a valid channel in X attempts
+                    raise StandardError("Could not get a valid channel")
+
             else:
                 ch = self._new_channel(ch_type, transport=transport)
             assert ch

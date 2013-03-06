@@ -11,6 +11,7 @@ import simplejson
 import base64
 import uuid
 import os
+import re
 from copy import deepcopy
 
 class DotNotationGetItem(object):
@@ -133,11 +134,11 @@ def dict_merge(base, upd, inplace=False):
     Uses a stack to avoid maximum recursion depth exceptions.
     @param base the dict to merge into
     @param upd the content to merge
-    @param inplace change base if True
-    @retval the merged dict (base of inplace else a merged copy)
+    @param inplace change base if True, otherwise deepcopy base
+    @retval the merged dict (base if inplace else a merged deepcopy)
     """
     assert quacks_like_dict(base), quacks_like_dict(upd)
-    dst = base if inplace else base.copy()
+    dst = base if inplace else deepcopy(base)
 
     stack = [(dst, upd)]
     while stack:
@@ -166,34 +167,6 @@ def get_safe(dict_instance, keypath, default=None):
         return obj
     except Exception, ex:
         return default
-
-class SimpleLog(object):
-    """
-    Simple log to STDOUT class for modules that don't want to depend on pyon logging
-    """
-    DEBUG, INFO, WARN, ERROR, CRITICAL = 1, 2, 3, 4, 5
-    def __init__(self, logname=None, loglevel=0):
-        self.logname = logname + ":" if logname else ""
-        self.loglevel = loglevel
-    def debug(self, message, *args):
-        if self.loglevel <= 1:
-            print self.logname, "DEBUG:", message % args
-    def info(self, message, *args):
-        if self.loglevel <= 2:
-            print self.logname, "INFO:", message % args
-    def warn(self, message, *args):
-        if self.loglevel <= 3:
-            print self.logname, "WARN:", message % args
-    def error(self, message, *args):
-        if self.loglevel <= 4:
-            print self.logname, "ERROR:", message % args
-    def critical(self, message, *args):
-        if self.loglevel <= 5:
-            print self.logname, "CRITICAL:", message % args
-    def exception(self, message, *args):
-        if self.loglevel <= 5:
-            # TODO: print exception
-            print self.logname, "EXCEPTION:", message % args
 
 def named_any(name):
     """
@@ -238,7 +211,7 @@ def for_name(modpath, classname):
     return classobj()
 
 def current_time_millis():
-    return int(time.time() * 1000)
+    return int(round(time.time() * 1000))
 
 def get_ion_ts():
     """
@@ -276,6 +249,32 @@ def get_datetime_str(ts, show_millis=False, local_time=True):
 
 def parse_ion_ts(ts):
     return float(ts) / 1000.0
+
+
+def is_valid_ts(s):
+
+    if not is_string(s):
+        return False
+
+    #Checking for only numeric characters and length of 13
+    #TODO - will need to change this length to 14 in the year 2286!!!  :)
+    if not re.match("^[0-9]*$", s) or len(s) < 13 or len(s) > 14:
+        return False
+    try:
+        val = int(s)
+        if val < 0:
+            return False
+
+        return True
+    except ValueError:
+        return False
+
+def is_string(obj):
+    try:
+        return isinstance(obj, basestring)
+    except NameError:
+        return isinstance(obj, str)
+
 
 if __name__ == '__main__':
     dd = DotDict({'a':{'b':{'c':1, 'd':2}}})

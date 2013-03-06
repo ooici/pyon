@@ -321,13 +321,14 @@ class MessageObjectGenerator:
 
         datadir = 'interface'
         messagemodelfile = os.path.join(datadir, 'messages.py')
-        try:
-            os.unlink(messagemodelfile)
-        except:
-            pass
-        print " Writing message interfaces to '" + messagemodelfile + "'"
-        with open(messagemodelfile, 'w') as f:
-            f.write(messageobject_output_text)
+        if not opts.dryrun:
+            try:
+                os.unlink(messagemodelfile)
+            except:
+                pass
+            print " Writing message interfaces to '" + messagemodelfile + "'"
+            with open(messagemodelfile, 'w') as f:
+                f.write(messageobject_output_text)
 
     def get_yaml_data(self):
         data = []

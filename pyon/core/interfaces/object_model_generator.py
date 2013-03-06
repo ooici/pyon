@@ -196,7 +196,9 @@ class ObjectModelGenerator:
         # Generate model object classes in the object.py file
         self.generate_objects(opts)
         # Write to the objects.py file
-        self.write_files(opts)
+        if not opts.dryrun:
+            self.write_files(opts)
+
         # Generate the HTML files related
         if opts.objectdoc:
             self.generate_object_specs()

@@ -14,5 +14,7 @@ omit =
     */util/lru_cache*
     */interceptor/sample*
     pyon/__init__*
+    */parsing/MonitorParser*
+    */parsing/MonitorLexer*
 [html]
 directory = coverage_results

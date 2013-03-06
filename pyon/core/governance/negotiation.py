@@ -34,7 +34,7 @@ class Negotiation(object):
 
         return counter_sap
 
-    def __init__(self,serv_prov, negotiation_rules=None):
+    def __init__(self,serv_prov, negotiation_rules=None, event_publisher=None):
 
         self.service_provider = serv_prov
 
@@ -43,6 +43,7 @@ class Negotiation(object):
         else:
             self.negotiation_rules = negotiation_rules
 
+        self.event_publisher = event_publisher
 
     def read_negotiation(self, sap=None):
 
@@ -87,6 +88,10 @@ class Negotiation(object):
             neg_type = NegotiationTypeEnum.BROKERED
 
         neg_obj = IonObject(RT.Negotiation, negotiation_type=neg_type)
+
+        #If there is a description in the initial proposal, then set the negotiation description with it.
+        if sap.description != '':
+            neg_obj.description = sap.description
 
         neg_id,_ = self.service_provider.clients.resource_registry.create(neg_obj)
 
@@ -150,25 +155,27 @@ class Negotiation(object):
         return None
 
     def _publish_status_event(self, negotiation, status=None):
-        #Sent request opened event
+
+        if self.event_publisher == None:
+            return
 
         #Get lastest proposal
         sap = negotiation.proposals[-1]
 
         event_type =   string.rstrip(sap.type_,'Proposal') + 'NegotiationStatusEvent'
 
-        #Thw negotiation id will be used for the orgin
+        #The negotiation id will be used for the orgin
         origin = negotiation._id
 
         event_data = dict()
         event_data['origin_type'] = RT.Negotiation
-        event_data['originator'] = sap.originator
+        event_data['originator'] = ProposalOriginatorEnum._str_map[sap.originator]
 
         if status is None:
-            event_data['sub_type'] = sap.proposal_status
+            event_data['sub_type'] = str(sap.proposal_status)
             event_data['description'] = ProposalStatusEnum._str_map[sap.proposal_status]
         else:
-            event_data['sub_type'] = status
+            event_data['sub_type'] = str(status)
             event_data['description'] = ProposalStatusEnum._str_map[status]
 
         #Look for other data that belongs in the event
@@ -178,7 +185,6 @@ class Negotiation(object):
                     event_data[field] = getattr(sap,field)
 
 
-        self.service_provider.event_pub.publish_event(event_type=event_type,
-            origin=origin, **event_data)
+        self.event_publisher.publish_event(event_type=event_type, origin=origin, **event_data)
 
 

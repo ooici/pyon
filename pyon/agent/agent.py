@@ -192,37 +192,10 @@ class ResourceAgent(BaseResourceAgent):
             org_name = self.org_name
             log.debug("Getting org_name from process: " + org_name)
         else:
-            org_name = self.container.governance_controller._system_root_org_name
+            org_name = self.container.governance_controller.system_root_org_name
             log.debug("Getting org_name from container: " + org_name)
 
         return org_name
-
-    def _is_org_role(self, actor_roles, role):
-
-        org_name = self._get_process_org_name()
-
-        #TODO - may back this out once process org_name relationships are properly created
-        if org_name == self.container.governance_controller._system_root_org_name:
-            for org in actor_roles:
-                if role in actor_roles[org]:
-                    return True
-
-        if actor_roles.has_key(org_name):
-            return ( role in actor_roles[org_name] )
-
-        return False
-
-
-    def _get_resource_commitments(self, user_id):
-
-        if not self.container.governance_controller.enabled:
-            return None
-
-        try:
-            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
-        except Exception, e:
-            log.error(e.message)
-            return None
 
 
     def negotiate(self, resource_id="", sap_in=None):

@@ -57,17 +57,18 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
     # Governance interfaces and helpers
     ##############################################################
 
-    def _get_resource_commitments(self, user_id):
+    def _get_process_org_name(self):
+        '''
+        Look for the org_name associated with this process, default to System root
+        '''
+        if hasattr(self,'org_name'):
+            org_name = self.org_name
+            log.debug("Getting org_name from process: " + org_name)
+        else:
+            org_name = self.container.governance_controller.system_root_org_name
+            log.debug("Getting org_name from container: " + org_name)
 
-        if not self.container.governance_controller.enabled:
-            return None
-
-        try:
-            return self.container.governance_controller.get_resource_commitment(user_id, self.resource_id)
-        except Exception, e:
-            log.error(e.message)
-            return None
-
+        return org_name
 
     def negotiate(self, resource_id="", sap_in=None):
         pass
@@ -104,21 +105,20 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
             cmd_res.result = str(ex)
 
         sub_type = "%s.%s" % (command.command, cmd_res.status)
-        post_event = self._event_publisher._create_event(event_type=self.COMMAND_EVENT_TYPE,
-                                origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
-                                sub_type=sub_type, command=command, result=cmd_res)
-        post_event = self._post_execute_event_hook(post_event)
-        success = self._event_publisher._publish_event(post_event, origin=post_event.origin)
+        event_data = self._post_execute_event_hook(event_type=self.COMMAND_EVENT_TYPE,
+            origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
+            sub_type=sub_type, command=command, result=cmd_res)
+        post_event = self._event_publisher.publish_event(**event_data)
 
         return cmd_res
 
-    def _post_execute_event_hook(self, event):
+    def _post_execute_event_hook(self, **kwargs):
         """
         Hook to add additional values to the event object to be published
         @param event  A filled out even object of type COMMAND_EVENT_TYPE
         @retval an event object
         """
-        return event
+        return kwargs
 
     def get_capabilities(self, resource_id="", capability_types=[]):
         capability_types = capability_types or ["CONV_TYPE", "AGT_CMD", "AGT_PAR", "RES_CMD", "RES_PAR"]

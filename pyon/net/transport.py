@@ -247,6 +247,21 @@ class AMQPTransport(BaseTransport):
             logmeth = log.error
         logmeth("AMQPTransport.underlying closed:\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.channel_number, code, text)
 
+        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
+        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
+        # up for Pika here so we don't goof up when reusing a channel number.
+
+        # this appears to be fixed in 3050d116899aced2392def2e3e66ca30c93334ac
+        # https://github.com/pika/pika/commit/e93c7ebae2c57b798977ba2992602310deb4758b
+        self._client.callbacks.remove(self._client.channel_number, 'Basic.GetEmpty')
+        self._client.callbacks.remove(self._client.channel_number, 'Channel.Close')
+        self._client.callbacks.remove(self._client.channel_number, '_on_basic_deliver')
+        self._client.callbacks.remove(self._client.channel_number, '_on_basic_get')
+
+        # uncomment these lines to see the full callback list that Pika maintains
+        #stro = pprint.pformat(callbacks._callbacks)
+        #log.error(str(stro))
+
         for cb in self._close_callbacks:
             cb(self, code, text)
 
@@ -264,21 +279,6 @@ class AMQPTransport(BaseTransport):
             return
 
         self._client.close()
-
-        # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
-        # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
-        # up for Pika here so we don't goof up when reusing a channel number.
-
-        # this appears to be fixed in 3050d116899aced2392def2e3e66ca30c93334ac
-        # https://github.com/pika/pika/commit/e93c7ebae2c57b798977ba2992602310deb4758b
-        self._client.callbacks.remove(self._client.channel_number, 'Basic.GetEmpty')
-        self._client.callbacks.remove(self._client.channel_number, 'Channel.Close')
-        self._client.callbacks.remove(self._client.channel_number, '_on_basic_deliver')
-        self._client.callbacks.remove(self._client.channel_number, '_on_basic_get')
-
-        # uncomment these lines to see the full callback list that Pika maintains
-        #stro = pprint.pformat(callbacks._callbacks)
-        #log.error(str(stro))
 
     @property
     def channel_number(self):
