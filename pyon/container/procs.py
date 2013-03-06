@@ -200,7 +200,7 @@ class ProcManager(object):
             else:
                 #Update local policies for the new process
                 if self.container.governance_controller:
-                    self.container.governance_controller.update_container_policies(process_instance)
+                    self.container.governance_controller.update_container_policies(process_instance, safe_mode=True)
 
 
             return process_instance.id

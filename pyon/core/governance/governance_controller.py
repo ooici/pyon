@@ -257,20 +257,8 @@ class GovernanceController(object):
                 self.update_service_access_policy(service_name, service_op, delete_policy)
 
         else:
+            self.update_common_service_access_policy()
 
-            if self.policy_decision_point_manager is not None:
-                try:
-                    rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
-                    self.policy_decision_point_manager.load_common_service_policy_rules(rules)
-
-                    #Reload all policies for existing services
-                    for service_name in self.policy_decision_point_manager.get_list_service_policies():
-                        if self.container.proc_manager.is_local_service_process(service_name):
-                            self.update_service_access_policy(service_name, delete_policy)
-
-                except Exception, e:
-                    #If the resource does not exist, just ignore it - but log a warning.
-                    log.warn("There was an error applying access policy: %s" % e.message)
 
 
     def policy_cache_reset_event_callback(self, *args, **kwargs):
@@ -279,17 +267,25 @@ class GovernanceController(object):
 
         @return:
         '''
+        policy_reset_event = args[0]
+        log.info('Policy cache reset event received: %s', str(policy_reset_event.__dict__))
+
         #First remove all cached polices and precondition functions
         self.policy_decision_point_manager.clear_policy_cache()
+
+        #@TODO - Fix this to not remove "hard-wired" precondition policies - like SA
         self._service_op_preconditions.clear()
 
+        self.update_common_service_access_policy()
+
         #Now iterate over the processes running in the container and reload their policies
-        proc_list = self.container.proc_manager.list_local_processes
+        proc_list = self.container.proc_manager.list_local_processes()
         for proc in proc_list:
             self.update_container_policies(proc)
 
 
-    def update_container_policies(self, process_instance):
+
+    def update_container_policies(self, process_instance, safe_mode=False):
         '''
         This must be called after registering a new process to load any applicable policies
 
@@ -297,29 +293,28 @@ class GovernanceController(object):
         @return:
         '''
 
+        #This method can be called before policy management service is available during system startup
+        if safe_mode and not self._is_policy_management_service_available():
+            return
 
         if process_instance._proc_type == SERVICE_PROCESS_TYPE:
 
             # look to load any existing policies for this service
-            self.safe_update_service_access_policy(process_instance._proc_listen_name)
+
+            self.update_service_access_policy(process_instance._proc_listen_name)
 
         elif process_instance._proc_type == AGENT_PROCESS_TYPE:
 
             # look to load any existing policies for this agent service
             if process_instance.resource_type is None:
-                self.safe_update_service_access_policy(process_instance.name)
+                self.update_service_access_policy(process_instance.name)
             else:
-                self.safe_update_service_access_policy(process_instance.resource_type)
+                self.update_service_access_policy(process_instance.resource_type)
 
             if process_instance.resource_id:
                 # look to load any existing policies for this resource
-                self.safe_update_resource_access_policy(process_instance.resource_id)
+                self.update_resource_access_policy(process_instance.resource_id)
 
-
-    def safe_update_resource_access_policy(self, resource_id):
-
-        if self._is_policy_management_service_available():
-            self.update_resource_access_policy(resource_id)
 
     def update_resource_access_policy(self, resource_id, delete_policy=False):
 
@@ -334,10 +329,22 @@ class GovernanceController(object):
                 log.warn("The resource %s is not found or there was an error applying access policy: %s" % ( resource_id, e.message))
 
 
-    def safe_update_service_access_policy(self, service_name, service_op=''):
+    def update_common_service_access_policy(self, delete_policy=False):
 
-        if  self._is_policy_management_service_available():
-            self.update_service_access_policy(service_name)
+        if self.policy_decision_point_manager is not None:
+            try:
+                rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
+                self.policy_decision_point_manager.load_common_service_policy_rules(rules)
+
+                #Reload all policies for existing services
+                for service_name in self.policy_decision_point_manager.get_list_service_policies():
+                    if self.container.proc_manager.is_local_service_process(service_name):
+                        self.update_service_access_policy(service_name, delete_policy)
+
+            except Exception, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.warn("There was an error applying access policy: %s" % e.message)
+
 
     def update_service_access_policy(self, service_name, service_op='', delete_policy=False):
 
