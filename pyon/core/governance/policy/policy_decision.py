@@ -107,7 +107,10 @@ class PolicyDecisionPointManager(object):
         #If a PDP does not exist for this resource key - then return common set of service policies
         return self.load_common_service_pdp
 
-    def get_list_service_policies(self):
+    def list_resource_policies(self):
+        return self.resource_policy_decision_point.keys()
+
+    def list_service_policies(self):
         return self.service_policy_decision_point.keys()
 
     def load_common_service_policy_rules(self, rules_text):
