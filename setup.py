@@ -48,7 +48,7 @@ setup(  name = 'pyon',
         dependency_links = [
             'http://sddevrepo.oceanobservatories.org/releases/',
             'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler',
-            'https://github.com/ooici/utilities/tarball/v2012.12.12#egg=utilities-2012.12.12',
+            'https://github.com/ooici/utilities/tarball/v2013.03.07#egg=utilities-2012.03.07',
         ],
         test_suite = 'pyon',
         package_data = {'': ['*.xml']},
