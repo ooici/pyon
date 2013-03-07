@@ -331,14 +331,14 @@ class ResourceRegistry(object):
                     subject_type, predicate, object, len(sub_list)))
             return sub_list[0] if id_only else self.read(sub_list[0])
 
-    def find_objects(self, subject="", predicate="", object_type="", id_only=False):
-        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only)
+    def find_objects(self, subject="", predicate="", object_type="", id_only=False, limit=None, skip=None, descending=None):
+        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only, limit=limit, skip=skip, descending=descending)
 
-    def find_subjects(self, subject_type="", predicate="", object="", id_only=False):
-        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only)
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False, limit=None, skip=None, descending=None):
+        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only, limit=limit, skip=skip, descending=descending)
 
-    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None):
-        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside)
+    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None, limit=None, skip=None, descending=None):
+        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside, limit=limit, skip=skip, descending=descending)
 
     def find_objects_mult(self, subjects=[], id_only=False):
         return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only)
