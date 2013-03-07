@@ -7,7 +7,7 @@ __license__ = 'Apache 2.0'
 
 from zope.interface import implementedBy
 
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, ServerError
 from pyon.util.log import log
 from pyon.util.containers import named_any, itersubclasses
 from pyon.util.context import LocalContextMixin
@@ -119,6 +119,36 @@ class BaseService(LocalContextMixin):
                         ",type=", proc_type,
                         ")"))
 
+    def add_endpoint(self, endpoint):
+        """
+        Adds a managed listening endpoint to this service/process.
+
+        The service/process must be running inside of an IonProcessThread, or this
+        method will raise an error.
+
+        A managed listening endpoint will report failures up to the process, then to
+        the container's process manager.
+        """
+        if self._process is None:
+            raise ServerError("No attached IonProcessThread")
+
+        self._process.add_endpoint(endpoint)
+
+    def remove_endpoint(self, endpoint):
+        """
+        Removes an endpoint from being managed by this service/process.
+
+        The service/process must be running inside of an IonProcessThread, or this
+        method will raise an error. It will also raise an error if the endpoint is
+        not currently managed.
+
+        Errors raised in the endpoint will no longer be reported to the process or
+        process manager.
+        """
+        if self._process is None:
+            raise ServerError("No attached IonProcessThread")
+
+        self._process.remove_endpoint(endpoint)
 
 # -----------------------------------------------------------------------------------------------
 # Service management infrastructure

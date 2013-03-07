@@ -1297,6 +1297,7 @@ class RPCServer(RequestResponseServer):
 
     def __init__(self, service=None, **kwargs):
         #log.debug("In RPCServer.__init__")
+        assert service
         self._service = service
         RequestResponseServer.__init__(self, **kwargs)
 

@@ -9,18 +9,18 @@ import types
 from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
-from pyon.ion.resource import RT
+from pyon.ion.resource import RT, OT
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.event.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized
-
+from pyon.container.procs import SERVICE_PROCESS_TYPE, AGENT_PROCESS_TYPE
 
 class GovernanceController(object):
-    '''
+    """
     This is a singleton object which handles governance functionality in the container.
-    '''
+    """
 
     def __init__(self,container):
         log.debug('GovernanceController.__init__()')
@@ -48,8 +48,7 @@ class GovernanceController(object):
 
         log.info("GovernanceInterceptor enabled: %s" % str(self.enabled))
 
-        self.resource_policy_event_subscriber = None
-        self.service_policy_event_subscriber = None
+        self.policy_event_subscriber = None
 
         #containers default to not Org Boundary and ION Root Org
         self._is_container_org_boundary = CFG.get_safe('container.org_boundary',False)
@@ -65,11 +64,8 @@ class GovernanceController(object):
 
             self.initialize_from_config(config)
 
-            self.resource_policy_event_subscriber = EventSubscriber(event_type="ResourcePolicyEvent", callback=self.resource_policy_event_callback)
-            self.resource_policy_event_subscriber.start()
-
-            self.service_policy_event_subscriber = EventSubscriber(event_type="ServicePolicyEvent", callback=self.service_policy_event_callback)
-            self.service_policy_event_subscriber.start()
+            self.policy_event_subscriber = EventSubscriber(event_type=OT.PolicyEvent, callback=self.policy_event_callback)
+            self.policy_event_subscriber.start()
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
@@ -103,11 +99,9 @@ class GovernanceController(object):
     def stop(self):
         log.debug("GovernanceController stopping ...")
 
-        if self.resource_policy_event_subscriber is not None:
-            self.resource_policy_event_subscriber.stop()
+        if self.policy_event_subscriber is not None:
+            self.policy_event_subscriber.stop()
 
-        if self.service_policy_event_subscriber is not None:
-            self.service_policy_event_subscriber.stop()
 
     @property
     def is_container_org_boundary(self):
@@ -145,6 +139,10 @@ class GovernanceController(object):
 
 
     def get_container_org_boundary_id(self):
+        """
+        Returns the permanent org identifier configured for this container
+        @return:
+        """
 
         if not self._is_container_org_boundary:
             return None
@@ -158,16 +156,33 @@ class GovernanceController(object):
         return self._container_org_id
 
     def process_incoming_message(self,invocation):
-
+        """
+        The GovernanceController hook into the incoming message interceptor stack
+        @param invocation:
+        @return:
+        """
         self.process_message(invocation, self.interceptor_order,'incoming' )
         return self.governance_dispatcher.handle_incoming_message(invocation)
 
     def process_outgoing_message(self,invocation):
+        """
+        The GovernanceController hook into the outgoing message interceptor stack
+        @param invocation:
+        @return:
+        """
         self.process_message(invocation, reversed(self.interceptor_order),'outgoing')
         return self.governance_dispatcher.handle_outgoing_message(invocation)
 
     def process_message(self,invocation,interceptor_list, method):
-
+        """
+        The GovernanceController hook to iterate over the interceptors to call each one and evaluate the annotations
+        to see what actions should be done.
+        @TODO - may want to make this more dynamic instead of hard coded for the moment.
+        @param invocation:
+        @param interceptor_list:
+        @param method:
+        @return:
+        """
         for int_name in interceptor_list:
             class_inst = self.interceptor_by_name_dict[int_name]
             getattr(class_inst, method)(invocation)
@@ -183,10 +198,33 @@ class GovernanceController(object):
 
     #Manage all of the policies in the container
 
-    def resource_policy_event_callback(self, *args, **kwargs):
+    def policy_event_callback(self, *args, **kwargs):
+        """
+        The generic policy event call back for dispatching policy related events
 
+        @param args:
+        @param kwargs:
+        @return:
+        """
+        policy_event = args[0]
+        if policy_event.type_ == OT.ResourcePolicyEvent:
+            self.resource_policy_event_callback(*args, **kwargs)
+        elif policy_event.type_ == OT.ServicePolicyEvent:
+            self.service_policy_event_callback(*args, **kwargs)
+        elif policy_event.type_ == OT.PolicyCacheResetEvent:
+            self.policy_cache_reset_event_callback(*args, **kwargs)
+
+
+    def resource_policy_event_callback(self, *args, **kwargs):
+        """
+        The ResourcePolicyEvent handler
+
+        @param args:
+        @param kwargs:
+        @return:
+        """
         resource_policy_event = args[0]
-        log.debug('Resouce related policy event received: %s', str(resource_policy_event.__dict__))
+        log.debug('Resource related policy event received: %s', str(resource_policy_event.__dict__))
 
         policy_id = resource_policy_event.origin
         resource_id = resource_policy_event.resource_id
@@ -197,6 +235,13 @@ class GovernanceController(object):
         self.update_resource_access_policy(resource_id, delete_policy)
 
     def service_policy_event_callback(self, *args, **kwargs):
+        """
+        The ServicePolicyEvent handler
+
+        @param args:
+        @param kwargs:
+        @return:
+        """
         service_policy_event = args[0]
         log.debug('Service related policy event received: %s', str(service_policy_event.__dict__))
 
@@ -212,26 +257,63 @@ class GovernanceController(object):
                 self.update_service_access_policy(service_name, service_op, delete_policy)
 
         else:
-
-            if self.policy_decision_point_manager is not None:
-                try:
-                    rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
-                    self.policy_decision_point_manager.load_common_service_policy_rules(rules)
-
-                    #Reload all policies for existing services
-                    for service_name in self.policy_decision_point_manager.get_list_service_policies():
-                        if self.container.proc_manager.is_local_service_process(service_name):
-                            self.update_service_access_policy(service_name, delete_policy)
-
-                except Exception, e:
-                    #If the resource does not exist, just ignore it - but log a warning.
-                    log.warn("There was an error applying access policy: %s" % e.message)
+            self.update_common_service_access_policy()
 
 
-    def safe_update_resource_access_policy(self, resource_id):
 
-        if self._is_policy_management_service_available():
-            self.update_resource_access_policy(resource_id)
+    def policy_cache_reset_event_callback(self, *args, **kwargs):
+        """
+        The PolicyCacheResetEvent handler
+
+        @return:
+        """
+        policy_reset_event = args[0]
+        log.info('Policy cache reset event received: %s', str(policy_reset_event.__dict__))
+
+        #First remove all cached polices and precondition functions that are not hard-wired
+        self.policy_decision_point_manager.clear_policy_cache()
+        self.unregister_all_process_policy_preconditions()
+
+        #Then load the common service access policies since they are shared across services
+        self.update_common_service_access_policy()
+
+        #Now iterate over the processes running in the container and reload their policies
+        proc_list = self.container.proc_manager.list_local_processes()
+        for proc in proc_list:
+            self.update_container_policies(proc)
+
+
+
+    def update_container_policies(self, process_instance, safe_mode=False):
+        """
+        This must be called after registering a new process to load any applicable policies
+
+        @param process_instance:
+        @return:
+        """
+
+        #This method can be called before policy management service is available during system startup
+        if safe_mode and not self._is_policy_management_service_available():
+            return
+
+        if process_instance._proc_type == SERVICE_PROCESS_TYPE:
+
+            # look to load any existing policies for this service
+
+            self.update_service_access_policy(process_instance._proc_listen_name)
+
+        elif process_instance._proc_type == AGENT_PROCESS_TYPE:
+
+            # look to load any existing policies for this agent service
+            if process_instance.resource_type is None:
+                self.update_service_access_policy(process_instance.name)
+            else:
+                self.update_service_access_policy(process_instance.resource_type)
+
+            if process_instance.resource_id:
+                # look to load any existing policies for this resource
+                self.update_resource_access_policy(process_instance.resource_id)
+
 
     def update_resource_access_policy(self, resource_id, delete_policy=False):
 
@@ -246,10 +328,22 @@ class GovernanceController(object):
                 log.warn("The resource %s is not found or there was an error applying access policy: %s" % ( resource_id, e.message))
 
 
-    def safe_update_service_access_policy(self, service_name, service_op=''):
+    def update_common_service_access_policy(self, delete_policy=False):
 
-        if  self._is_policy_management_service_available():
-            self.update_service_access_policy(service_name)
+        if self.policy_decision_point_manager is not None:
+            try:
+                rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
+                self.policy_decision_point_manager.load_common_service_policy_rules(rules)
+
+                #Reload all policies for existing services
+                for service_name in self.policy_decision_point_manager.list_service_policies():
+                    if self.container.proc_manager.is_local_service_process(service_name):
+                        self.update_service_access_policy(service_name, delete_policy)
+
+            except Exception, e:
+                #If the resource does not exist, just ignore it - but log a warning.
+                log.warn("There was an error applying access policy: %s" % e.message)
+
 
     def update_service_access_policy(self, service_name, service_op='', delete_policy=False):
 
@@ -284,6 +378,22 @@ class GovernanceController(object):
                 log.warn("The process %s is not found for op %s or there was an error applying access policy: %s" % ( service_name, service_op, e.message))
 
 
+    def get_active_policies(self):
+
+        container_policies = dict()
+        container_policies['service_access'] = dict()
+        container_policies['service_operation'] = dict()
+        container_policies['resource_access'] = dict()
+
+        container_policies['service_access'].update(self.policy_decision_point_manager.service_policy_decision_point)
+        container_policies['common_service_access'] = self.policy_decision_point_manager.load_common_service_pdp
+        container_policies['service_operation'].update(self._service_op_preconditions)
+        container_policies['resource_access'].update(self.policy_decision_point_manager.resource_policy_decision_point)
+
+        log.info(container_policies)
+
+        return container_policies
+
     def _is_policy_management_service_available(self):
         """
         Method to verify if the Policy Management Service is running in the system. If the container cannot connect to
@@ -295,16 +405,19 @@ class GovernanceController(object):
         return False
 
     # Methods for managing operation specific policy
-    def get_process_operation_dict(self, process_name):
+    def get_process_operation_dict(self, process_name, auto_add=True):
         if self._service_op_preconditions.has_key(process_name):
             return self._service_op_preconditions[process_name]
 
-        self._service_op_preconditions[process_name] = dict()
-        return self._service_op_preconditions[process_name]
+        if auto_add:
+            self._service_op_preconditions[process_name] = dict()
+            return self._service_op_preconditions[process_name]
 
+
+        return None
 
     def register_process_operation_precondition(self, process, operation, precondition):
-        '''
+        """
         This method is used to register service operation precondition functions with the governance controller. The endpoint
         code will call check_process_operation_preconditions() below before calling the business logic operation and if any of
         the precondition functions return False, then the request is denied as Unauthorized.
@@ -316,7 +429,7 @@ class GovernanceController(object):
         @param precondition:
         @param policy_object:
         @return:
-        '''
+        """
 
         if not hasattr(process, operation):
             raise NotFound("The operation %s does not exist for the %s service" % (operation, process.name))
@@ -338,7 +451,7 @@ class GovernanceController(object):
             process_op_conditions[operation] = preconditions
 
     def unregister_all_process_operation_precondition(self, process, operation):
-        '''
+        """
         This method removes all precondition functions registerd with an operation on a process. Care should be taken with this
         call, as it can remove "hard wired" preconditions that are coded directly and not as part of policy objects, such as
         with SA resource lifecycle preconditions.
@@ -346,13 +459,24 @@ class GovernanceController(object):
         @param process:
         @param operation:
         @return:
-        '''
-        process_op_conditions = self.get_process_operation_dict(process.name)
-        if process_op_conditions.has_key(operation):
+        """
+        process_op_conditions = self.get_process_operation_dict(process.name, auto_add=False)
+        if process_op_conditions is not None and process_op_conditions.has_key(operation):
             del process_op_conditions[operation]
 
-    def unregister_process_operation_precondition(self, process, operation, precondition):
 
+
+
+    def unregister_process_operation_precondition(self, process, operation, precondition):
+        """
+        This method removes a specific precondition function registerd with an operation on a process. Care should be taken with this
+        call, as it can remove "hard wired" preconditions that are coded directly and not as part of policy objects, such as
+        with SA resource lifecycle preconditions.
+        @param process:
+        @param operation:
+        @param precondition:
+        @return:
+        """
         #Just skip this if there operation is not passed in.
         if operation is None:
             return
@@ -366,21 +490,47 @@ class GovernanceController(object):
             if method:
                 precondition = method
 
-        process_op_conditions = self.get_process_operation_dict(process.name)
-        if process_op_conditions.has_key(operation):
+        process_op_conditions = self.get_process_operation_dict(process.name, auto_add=False)
+        if process_op_conditions is not None and process_op_conditions.has_key(operation):
             preconditions = process_op_conditions[operation]
             preconditions[:] = [pre for pre in preconditions if not pre == precondition]
             if not preconditions:
                 del process_op_conditions[operation]
 
 
+    def unregister_all_process_policy_preconditions(self):
+        """
+        This method removes all precondition functions registerd with an operation on a process. it will not remove
+        "hard wired" preconditions that are coded directly and not as part of policy objects, such as
+        with SA resource lifecycle preconditions.
+
+        @param process:
+        @param operation:
+        @return:
+        """
+        for proc in self._service_op_preconditions:
+            process_op_conditions = self.get_process_operation_dict(proc, auto_add=False)
+            if process_op_conditions is not None:
+                for op in process_op_conditions:
+                    preconditions = process_op_conditions[op]
+                    preconditions[:] = [pre for pre in preconditions if type(pre) == types.FunctionType]
+
+
     def check_process_operation_preconditions(self, process, msg, headers):
-        operation      = headers.get('op', None)
+        """
+        This method is called by the ion endpoint to execute any process operation preconditions functions before
+        allowing the operation to be called.
+        @param process:
+        @param msg:
+        @param headers:
+        @return:
+        """
+        operation = headers.get('op', None)
         if operation is None:
             return
 
-        process_op_conditions = self.get_process_operation_dict(process.name)
-        if process_op_conditions.has_key(operation):
+        process_op_conditions = self.get_process_operation_dict(process.name, auto_add=False)
+        if process_op_conditions is not None and process_op_conditions.has_key(operation):
             preconditions = process_op_conditions[operation]
             for precond in reversed(preconditions):
                 if type(precond) == types.MethodType or type(precond) == types.FunctionType:

@@ -288,6 +288,12 @@ class ProcessRPCServer(RPCServer):
         assert process
         self._process = process
         self._routing_call = routing_call
+
+        # don't make people set service and process when they're almost always the same
+        if not "service" in kwargs:
+            kwargs = kwargs.copy()
+            kwargs['service'] = process
+
         RPCServer.__init__(self, **kwargs)
 
     @property
