@@ -1,26 +1,30 @@
 """ WELCOME to the home of container management
 
     This is a framework for performing administrative actions on a pycc container or a full distributed system of containers.
-    The actions are some subclass of type AdminRequest and always include a container_selector attribute.
-    The container_selector decides which containers should perform this action on a distributed system,
-    and are some subclass of ContainerSelector.
 
-    ContainerManagementRequestEvent objects are used to pass requests throughout the system and
-    the ContainerManagementListener listens for and handles these events.
-    After performing the requested action, the container will emit a ContainerManagementEvent with the result.
+    A request is an event of type ContainerManagementRequest and contains a selector and an action.
+    The selector is used to determine which containers the action should be performed on
+    (or from the point of view of one container, if this action should be performed on this container).
+    The action describes the change requested, and may be performed by one or more handlers.
+    Handlers are registered with the system and can choose which actions they are able to perform.
 
-    AdminRequests are serializable as string values.
-    In particular, for any AdminRequest x, the implementation must guarantee that:
-        AdminRequest.from_string( str(x) ) == x
-    This serialization simplifies passing requests in URLs.
+    There is a peer relationship between IonObject subclasses ContainerManagementPredicate.
+    The normal python object can be created from the peer by calling ContainerSelector.from_object(ion_object)
+    and the Ion object can be created from the peer object by calling obj.get_peer()
+
+    To maintain this relationship:
+    1) the Ion object definition should include an (unused) peer attribute
+       with decorators module (string name of the module containing the peer class) and class (optional string name of the peer class).
+       If the class decorator is missing, the peer is assumed to have the same class name as the Ion object.
+    2) the peer object class should define get_peer_class() (string name of Ion object type)
+       and get_peer_args() (dictionary of attribute values for the Ion object)
 """
 
 import sys
-import logging
 from ooi.logging import log, config
 from pyon.event.event import EventPublisher, EventSubscriber
-from pyon.core.exception import BadRequest
-from interface.objects import ContainerManagementRequestEvent
+from pyon.core.bootstrap import IonObject
+from interface.objects import ContainerManagementRequest, ChangeLogLevel
 from threading import Lock
 
 # define selectors to determine if this message should be handled by this container.
@@ -28,135 +32,82 @@ from threading import Lock
 
 class ContainerSelector(object):
     """ base class for predicate classes to select which containers should handle messages
-
-        subclasses can be represented as string values so that for any ContainerSelector x:
-            x == ContainerSelector.from_string( str(x) )
-
-        to implement this, any subclass must define str(x) as classname,details[,more_details...]
-        and provide a constructor classname(*details)
-        or if no details are needed, str(x) should be classname and define a no-arg constructor (both are already defaults)
     """
+    def __init__(self, peer):
+        self.peer = peer
     def should_handle(self, container):
         raise Exception('subclass must override this method')
-    def _from_string(self, parts):
-        """ configure from string value """
-        pass # default action is do nothing
+    def get_peer(self):
+        return IonObject(self.get_peer_class(), **self.get_peer_args())
+    def get_peer_class(self):
+        return self.__class__.__name__
+    def get_peer_args(self):
+        return {}
     def __str__(self):
         return self.__class__.__name__
     @classmethod
-    def from_string(cls, value):
-        parts = value.split(',')
-        subclass = getattr(sys.modules[__name__], parts[0])
-        return subclass(persist=parts[1:]) if len(parts)>1 else subclass()
+    def from_object(cls, obj):
+        """ get peer type from Ion object """
+        mod = obj.get_decorator_value('peer', 'module')
+        clazz = obj.get_decorator_value('peer', 'class') or obj.__class__.__name__
+        subclass = getattr(sys.modules[mod], clazz)
+        return subclass(obj)
 
 class AllContainers(ContainerSelector):
     """ all containers should perform the action """
     def should_handle(self, container):
         return True
-    def __eq__(self, other):
-        return isinstance(other, AllContainers)
-
-ALL_CONTAINERS=AllContainers()
 
 # TODO: more selectors
 #class ContainersByName(ContainerSelector):
-#    """ specific list of containers """
-#    def __init__(self, name_list):
-#        self.names = name_list.split(',')
-#    def should_handle(self,container):
-#        name = container.get_name() ??
-#        return name in self.names
 #class ContainersByIP(ContainerSelector):
-#    pass
+#class ContainersRunningProcess(ContainerSelector):
+#class ContainersInExecutionEngine(ContainerSelector):
 
 
 
 # define types of messages that can be sent and handled
 
-class AdminRequest(object):
-    """ base class for messages
-
-        subclasses can be represented as string values so that for any ContainerSelector x:
-            x == ContainerSelector.from_string( str(x) )
-
-        to implement this, any subclass must define str(x) as classname:details[:more_details...]
-        and provide a constructor classname(persist=[details,...])
-        or if no details are needed, str(x) should be classname and define a no-arg constructor (both are already defaults)
-
-        representation as a string is needed so requests can be passed in a URL to the service gateway
-    """
-    def __init__(self, container_selector=ALL_CONTAINERS):
-        self.container_selector = container_selector
-    def perform_action(self, container):
-        raise Exception('subclass must override this method')
-    def should_handle(self, container):
-        return self.container_selector.should_handle(container)
+class EventHandler(object):
+    """ base class for event handler objects registered to handle a particular type of container management action """
+    def can_handle_request(self, action):
+        raise Exception('subclass must implement this method')
+    def handle_request(self, action):
+        raise Exception('subclass must implement this method')
     def __str__(self):
-        return "%s:%s" % (self.__class__.__name__, self.container_selector)
+        """ subclass should implement better name if behavior varies with args """
+        return self.__class__.__name__
 
-    @classmethod
-    def from_string(cls, value):
-        parts = value.split(':')
-        subclass = getattr(sys.modules[__name__], parts[0])
-        selector = ContainerSelector.from_string(parts[1])
-        return subclass(container_selector=selector, persist=parts[2:]) if len(parts)>2 else subclass(container_selector=selector)
-
-class LogAdmin(AdminRequest):
-    """ message to request a change in log levels """
-    def __init__(self, container_selector=None, logger=None, level=None, recursive=None, persist=None):
-        super(LogAdmin,self).__init__(container_selector)
-        if level:
-            # configure from individual args
-            self.logger = logger
-            self.recursive = recursive
-            self.level = level if isinstance(level, str) else logging.getLevelName(level)
-        else:
-            # configure from string
-            if len(persist)!=3:
-                raise BadRequest('expected exactly three string arguments: %r' % persist)
-            self.recursive = persist[2]=='True'
-            self.logger = persist[0]
-            self.level = persist[1]
-    def perform_action(self, container):
-        log.info('changing log level: %s: %s', self.logger, logging.getLevelName(self.level))
-        config.set_level(self.logger, self.level, self.recursive)
-        return "updated"
-    def __str__(self):
-        return "%s:%s:%s:%s" % (super(LogAdmin,self).__str__(), self.logger, self.level, self.recursive)
-    def __eq__(self, other):
-        return isinstance(other, LogAdmin) and self.level==other.level and self.logger==other.logger and self.recursive==other.recursive
+class LogLevelHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, ChangeLogLevel)
+    def handle_request(self, action):
+        config.set_level(action.logger, action.level, action.recursive)
 
 # TODO: other useful administrative actions
-#
-#class ThreadDump(AdminRequest):
 #    """ request that containers perform a thread dump """
-#    pass
-#
-#class LogTimingStats(AdminRequest):
 #    """ request that containers log timing stats """
-#    pass
-#
-#class ResetTimingStats(AdminRequest):
 #    """ request that containers clear all timing stats """
-#    pass
-
-
 
 
 # event listener to handle the messages
 
+SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
+DEFAULT_HANDLERS = [ LogLevelHandler() ]
+
 class ContainerManager(object):
-    def __init__(self, container):
+    def __init__(self, container, handlers=DEFAULT_HANDLERS):
         self.container = container
         self.running = False
         # make sure start() completes before an event is handled,
         # and any event is either handled before stop() begins,
         # or the handler begins after stop() completes and the event is dropped
         self.lock = Lock()
+        self.handlers = handlers[:]
     def start(self):
         ## create queue listener and publisher
-        self.sender = EventPublisher(event_type="ContainerManagementEvent")
-        self.receiver = EventSubscriber(event_type="ContainerManagementRequestEvent", callback=self.process_event)
+        self.sender = EventPublisher(event_type="ContainerManagementResult")
+        self.receiver = EventSubscriber(event_type="ContainerManagementRequest", callback=self._receive_event)
         with self.lock:
             self.running = True
             self.receiver.start()
@@ -168,25 +119,44 @@ class ContainerManager(object):
             self.sender.close()
             self.running = False
         log.debug('container management stopped')
-    def process_event(self, event, headers):
+    def add_handler(self, handler):
+        self.handlers.append(handler)
+    def _get_handlers(self, action):
+        out = []
+        for handler in self.handlers:
+            if handler.can_handle_request(action):
+                out.append(handler)
+        return out
+    def _receive_event(self, event, headers):
         with self.lock:
-            if not isinstance(event, ContainerManagementRequestEvent):
+            if not isinstance(event, ContainerManagementRequest):
                 log.trace('ignoring wrong type event: %r', event)
                 return
-            request = event.request if isinstance(event.request,AdminRequest) else AdminRequest.from_string(event.request)
             if not self.running:
-                log.warn('ignoring admin message received after shutdown: %s', request)
+                log.warn('ignoring admin message received after shutdown: %s', event.action)
                 return
-            if request.should_handle(self.container):
-                log.trace('handling admin message: %s', request)
-                self._perform_action(request)
+            predicate = ContainerSelector.from_object(event.predicate)
+            if predicate.should_handle(self.container):
+                log.trace('handling admin message: %s', event.action)
+                self._perform_action(event.action)
             else:
-                log.trace('ignoring admin request: %s', request)
-    def _perform_action(self, request):
-        try:
-            result = request.perform_action(self.container)
-        except Exception,e:
-            log.error("operation failed: %s", e, exc_info=True)
-            result = e
-        self.sender.publish_event(origin=self.container.id, request=str(request), outcome=str(result))
-        log.debug('performed request: %s, outcome: %s', request, result)
+                log.trace('ignoring admin action: %s', event.action)
+                if SEND_RESULT_IF_NOT_SELECTED:
+                    self.sender.publish_event(origin=self.container.id, action=event.action, outcome='not selected')
+                    log.debug('received action: %s, outcome: not selected', event.action)
+    def _perform_action(self, action):
+        handlers = self._get_handlers(action)
+        if not handlers:
+            log.info('action accepted but no handlers found: %s', action)
+            result = 'unhandled'
+            self.sender.publish_event(origin=self.container.id, action=action, outcome=str(result))
+            log.debug('received action: %s, outcome: %s', action, result)
+        else:
+            for handler in handlers:
+                try:
+                    result = handler.handle_request(action) or "completed"
+                except Exception,e:
+                    log.error("handler %r failed to perform action: %s", handler, action, exc_info=True)
+                    result = e
+                self.sender.publish_event(origin=self.container.id, action=action, outcome=str(result))
+                log.debug('performed action: %s, outcome: %s', action, result)

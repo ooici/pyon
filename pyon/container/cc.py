@@ -10,7 +10,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerError, BadRequest
 from pyon.core.governance.governance_controller import GovernanceController
-from pyon.core.management import ContainerManager
+from pyon.container.management import ContainerManager
 from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository, EventPublisher
 from pyon.ion.directory import Directory
