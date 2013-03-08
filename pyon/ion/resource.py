@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""ION Resource definitions and functions. Extended resource framework"""
+"""ION Resource definitions and functions. Life-cycle FSM. Extended resource framework"""
 
 __author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
@@ -25,21 +25,21 @@ OT = ObjectTypes
 ResourceTypes = DotDict()
 RT = ResourceTypes
 
-# Predicate Type4194304
+# Predicate Type
 Predicates = DotDict()
 PredicateType = DotDict()
 PRED = PredicateType
 
-#Compound Associations
+# Compound Associations
 CompoundAssociations = DotDict()
 
-# Life cycle states and visibility states
+# Life cycle states and availability (visibility) states
 LifeCycleStates = DotDict()
 LCS = LifeCycleStates
 LCS_NONE = "NONE"
 
-VisibilityStates = DotDict()
-VIS = VisibilityStates
+AvailabilityStates = DotDict()
+AS = AvailabilityStates
 
 # Life cycle events
 LCE = DotDict()
@@ -121,12 +121,12 @@ def load_definitions():
     # Life cycle states
     initialize_res_lcsms()
     LifeCycleStates.clear()
-    allstates = list(CommonResourceLifeCycleSM.BASE_STATES) + CommonResourceLifeCycleSM.STATE_ALIASES.keys()
-    LifeCycleStates.update(zip(allstates, allstates))
+    lcstates = list(CommonResourceLifeCycleSM.MATURITY)
+    LifeCycleStates.update(zip(lcstates, lcstates))
 
-    VisibilityStates.clear() # TODO
-    allstates = list(CommonResourceLifeCycleSM.BASE_STATES) + CommonResourceLifeCycleSM.STATE_ALIASES.keys()
-    VisibilityStates.update(zip(allstates, allstates))
+    AvailabilityStates.clear()
+    avstates = list(CommonResourceLifeCycleSM.AVAILABILITY)
+    AvailabilityStates.update(zip(avstates, avstates))
 
 
     # Life cycle events
@@ -138,14 +138,22 @@ def get_restype_lcsm(restype):
     return lcs_workflows.get(restype, None)
 
 
-def get_maturity_visibility(lcstate):
-    if lcstate == 'RETIRED':
-        return ('RETIRED', None)
-    return lcstate.split('_')
+# TODO: Remove references to this from coi-services
+# def get_maturity_visibility(lcstate):
 
 
 def is_resource(object):
     return issubtype(object._get_type(), "Resource")
+
+def lcstate(maturity, availability):
+    if not maturity and maturity not in LCS:
+        return BadRequest("lcstate maturity %s unknown" % maturity)
+    if not availability and availability not in AS:
+        return BadRequest("lcstate availability %s unknown" % availability)
+    return "%s_%s" % (maturity, availability)
+
+def lcsplit(lcstate):
+    return lcstate.split('_', 1)
 
 
 class ResourceLifeCycleSM(object):
@@ -160,7 +168,7 @@ class ResourceLifeCycleSM(object):
     def __init__(self, **kwargs):
         self.transitions = {}
         self.initial_state = kwargs.get('initial_state', None)
-        self.initial_visibility = kwargs.get('initial_visibility', None)
+        self.initial_availability = kwargs.get('initial_availability', None)
         self._kwargs = kwargs
 
     @classmethod
@@ -221,57 +229,46 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
     Supports hierarchical states.
     """
 
-    MATURITY = ['DRAFT', 'PLANNED', 'DEVELOPED', 'INTEGRATED', 'DEPLOYED']
-    VISIBILITY = ['PRIVATE', 'DISCOVERABLE', 'AVAILABLE']
+    MATURITY = ['DRAFT', 'PLANNED', 'DEVELOPED', 'INTEGRATED', 'DEPLOYED', 'RETIRED']
+    AVAILABILITY = ['PRIVATE', 'DISCOVERABLE', 'AVAILABLE']
 
-    BASE_STATES = ["%s_%s" % (m, v) for m in MATURITY for v in VISIBILITY]
-    BASE_STATES.append('RETIRED')
+    BASE_STATES = ["%s_%s" % (m, v) for m in MATURITY for v in AVAILABILITY]
 
-    STATE_ALIASES = {}
-
-    for i in list(MATURITY) + VISIBILITY:
-        matchstates = [s for s in BASE_STATES if i in s]
-        if matchstates:
-            STATE_ALIASES[i] = tuple(matchstates)
-
-    STATE_ALIASES['REGISTERED'] = tuple(["%s_%s" % (m, v) for m in MATURITY if m != 'DRAFT' for v in VISIBILITY])
-
-    # Names of transition events
+    # lcstate (maturity) transition events
     PLAN = "plan"
     DEVELOP = "develop"
     INTEGRATE = "integrate"
     DEPLOY = "deploy"
     RETIRE = "retire"
 
+    # Availability transition events
     ANNOUNCE = "announce"
     UNANNOUNCE = "unannounce"
     ENABLE = "enable"
     DISABLE = "disable"
 
     MAT_EVENTS = [PLAN, DEVELOP, INTEGRATE, DEPLOY, RETIRE]
-    VIS_EVENTS = [ANNOUNCE, UNANNOUNCE, ENABLE, DISABLE]
+    AVAIL_EVENTS = [ANNOUNCE, UNANNOUNCE, ENABLE, DISABLE]
 
-    BASE_EVENTS = [
-        PLAN, DEVELOP, INTEGRATE, DEPLOY,
-        ENABLE, DISABLE, ANNOUNCE, UNANNOUNCE,
-        RETIRE
-    ]
+    BASE_EVENTS = MAT_EVENTS + AVAIL_EVENTS
 
     BASE_TRANSITIONS = {}
 
+    # Transitions changing availability
     for m in MATURITY:
-        BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ANNOUNCE)] = "%s_%s" % (m, 'DISCOVERABLE')
-        BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
+        if m != 'RETIRED':
+            BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ANNOUNCE)] = "%s_%s" % (m, 'DISCOVERABLE')
+            BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
 
-        BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
-        BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), DISABLE)] = "%s_%s" % (m, 'DISCOVERABLE')
+            BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
+            BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), DISABLE)] = "%s_%s" % (m, 'DISCOVERABLE')
 
-        BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
-        BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
+            BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
+            BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
 
-    for v in VISIBILITY:
+    # Transitions changing maturity
+    for v in AVAILABILITY:
         BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), PLAN)] = "%s_%s" % ('PLANNED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), RETIRE)] = 'RETIRED'
 
         BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
         BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
@@ -288,19 +285,18 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
         BASE_TRANSITIONS[("%s_%s" % ('DEVELOPED', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
         BASE_TRANSITIONS[("%s_%s" % ('INTEGRATED', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
 
-    BASE_TRANSITIONS[('REGISTERED', RETIRE)] = 'RETIRED'
+        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+        BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+        BASE_TRANSITIONS[("%s_%s" % ('DEVELOPED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+        BASE_TRANSITIONS[("%s_%s" % ('INTEGRATED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+        BASE_TRANSITIONS[("%s_%s" % ('DEPLOYED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+
 
     def __init__(self, **kwargs):
         super(CommonResourceLifeCycleSM, self).__init__(**kwargs)
-        # Flatten transitions originating from hierarchical states
         for (s0, ev), s1 in self.BASE_TRANSITIONS.iteritems():
-            assert s1 not in self.STATE_ALIASES, "Transition target state cannot be hierarchical"
-            if s0 in self.STATE_ALIASES:
-                for state in self.STATE_ALIASES[s0]:
-                    self.transitions[(state, ev)] = s1
-            else:
-                self.transitions[(s0, ev)] = s1
-                #import pprint; pprint.pprint(self.transitions)
+            self.transitions[(s0, ev)] = s1
+            #import pprint; pprint.pprint(self.transitions)
 
     def _create_basic_transitions(self):
         pass
