@@ -1,0 +1,31 @@
+# base configuration for log levels
+#
+# To define local overrides, add a file "logging.local.yml"
+#
+version: 1
+
+formatters:
+  default:
+    format: '%(asctime)s %(levelname)s %(threadName)s %(name)s:%(lineno)d %(message)s'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: default
+    level: TRACE
+    stream: ext://sys.stdout
+
+root:
+  handlers: [console]
+  level: WARN
+
+# specific overrides for packages
+#
+# only needed if different than the root settings
+
+# example:
+#
+loggers:
+  pyon.container:
+    level: INFO
+#
