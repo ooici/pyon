@@ -205,16 +205,19 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(inst_obj1.lcstate, LCS.DRAFT)
         self.assertEquals(inst_obj1.availability, AS.PRIVATE)
 
-        self.rr.execute_lifecycle_transition(iid, LCE.PLAN)
+        lcres = self.rr.execute_lifecycle_transition(iid, LCE.PLAN)
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.PLANNED)
         self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+        self.assertEquals(lcres, lcstate(LCS.PLANNED,AS.PRIVATE))
 
         self.rr.execute_lifecycle_transition(iid, LCE.DEVELOP)
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
         self.assertEquals(inst_obj1.availability, AS.PRIVATE)
 
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, "!!NONE")
         with self.assertRaises(BadRequest):
             self.rr.execute_lifecycle_transition(iid, LCE.PLAN)
         with self.assertRaises(BadRequest):
