@@ -10,6 +10,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerError, BadRequest
 from pyon.core.governance.governance_controller import GovernanceController
+from pyon.container.management import ContainerManager
 from pyon.datastore.datastore import DataStore, DatastoreManager
 from pyon.event.event import EventRepository, EventPublisher
 from pyon.ion.directory import Directory
@@ -99,6 +100,8 @@ class Container(BaseContainerAgent):
 
         # sFlow manager - controls sFlow stat emission
         self.sflow_manager = SFlowManager(self)
+
+        self.cc_manager = ContainerManager(self)
 
         # Coordinates the container start
         self._status = "INIT"
@@ -190,6 +193,9 @@ class Container(BaseContainerAgent):
             self.sflow_manager.start()
             self._capabilities.append("SFLOW_MANAGER")
 
+        if CFG.get_safe('container.management.enabled', True):
+            self.cc_manager.start()
+            self._capabilities.append("CONTAINER_MANAGER")
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
@@ -416,6 +422,9 @@ class Container(BaseContainerAgent):
 
         elif capability == "SFLOW_MANAGER":
             self.sflow_manager.stop()
+
+        elif capability == "CONTAINER_MANAGER":
+            self.cc_manager.stop()
 
         else:
             raise ContainerError("Cannot stop capability: %s" % capability)
