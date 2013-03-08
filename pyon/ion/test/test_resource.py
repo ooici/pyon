@@ -17,7 +17,6 @@ from pyon.util.unit_test import IonUnitTestCase
 @attr('UNIT', group='resource')
 class TestResources(IonUnitTestCase):
 
-
     def test_resource_lcworkflow(self):
         default_workflow = lcs_workflows['InstrumentDevice']
 

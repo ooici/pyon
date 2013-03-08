@@ -179,7 +179,7 @@ class ResourceRegistry(object):
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
-        new_state, new_availability = restype_workflow.get_successor(old_lcs, transition_event)
+        new_state = restype_workflow.get_successor(old_lcs, transition_event)
         if not new_state:
             raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
                 resource_id, restype, old_lcs, transition_event))
@@ -189,6 +189,8 @@ class ResourceRegistry(object):
         res_obj.availability = lcav
         res_obj.ts_updated = get_ion_ts()
         self.rr_store.update(res_obj)
+        log.debug("execute_lifecycle_transition(res_id=%s, event=%s). Change %s_%s to %s_%s", resource_id, transition_event,
+                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
@@ -203,6 +205,7 @@ class ResourceRegistry(object):
             raise BadRequest("Bad life-cycle state %s" % target_lcstate)
 
         res_obj = self.read(resource_id)
+        old_target = target_lcstate
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
@@ -234,12 +237,14 @@ class ResourceRegistry(object):
             if not target_lcstate in restype_workflow.get_successors(old_lcs).values():
                 raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, old_lcs))
 
-            res_obj.lcstate = target_lcstate
+            res_obj.lcstate = target_lcmat
             res_obj.availability = target_lcav
 
         res_obj.ts_updated = get_ion_ts()
 
         updres = self.rr_store.update(res_obj)
+        log.debug("set_lifecycle_state(res_id=%s, target=%s). Change %s_%s to %s_%s", resource_id, old_target,
+                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
