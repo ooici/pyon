@@ -14,7 +14,7 @@ from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import LCS, PRED, AT, RT, get_restype_lcsm, is_resource, ExtendedResourceContainer
+from pyon.ion.resource import LCS, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -59,7 +59,8 @@ class ResourceRegistry(object):
             raise BadRequest("Object is not a Resource")
 
         lcsm = get_restype_lcsm(object._get_type())
-        object.lcstate = lcsm.initial_state if lcsm else "DEPLOYED_AVAILABLE"
+        object.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
+        object.availability = lcsm.initial_availability if lcsm else AS.AVAILABLE
         cur_time = get_ion_ts()
         object.ts_created = cur_time
         object.ts_updated = cur_time
@@ -85,7 +86,8 @@ class ResourceRegistry(object):
         cur_time = get_ion_ts()
         for resobj in res_list:
             lcsm = get_restype_lcsm(resobj._get_type())
-            resobj.lcstate = lcsm.initial_state if lcsm else "DEPLOYED_AVAILABLE"
+            resobj.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
+            resobj.availability = lcsm.initial_availability if lcsm else AS.AVAILABLE
             resobj.ts_created = cur_time
             resobj.ts_updated = cur_time
 
@@ -93,7 +95,7 @@ class ResourceRegistry(object):
         res = self.rr_store.create_mult(res_list, id_list)
         res_list = [(rid, rrv) for success, rid, rrv in res]
 
-        # TODO: Publish events (skipped, because this is inefficent one by one for a large list
+        # TODO: Publish events (skipped, because this is inefficient one by one for a large list
 #        for rid,rrv in res_list:
 #            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
 #                origin=res_id, origin_type=object._get_type(),
@@ -121,11 +123,12 @@ class ResourceRegistry(object):
         res_obj = self.read(object._id)
 
         object.ts_updated = get_ion_ts()
-        if res_obj.lcstate != object.lcstate:
-            log.warn("Cannot modify %s life cycle state in update current=%s given=%s. " +
+        if res_obj.lcstate != object.lcstate or res_obj.availability != object.availability:
+            log.warn("Cannot modify %s life cycle state or availability in update current=%s/%s given=%s/%s. " +
                      "DO NOT REUSE THE SAME OBJECT IN CREATE THEN UPDATE",
-                      type(res_obj).__name__, res_obj.lcstate, object.lcstate)
+                      type(res_obj).__name__, res_obj.lcstate, res_obj.availability, object.lcstate, object.availability)
             object.lcstate = res_obj.lcstate
+            object.availability = res_obj.availability
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=object._id, origin_type=object._get_type(),
@@ -174,39 +177,66 @@ class ResourceRegistry(object):
             raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
         old_state = res_obj.lcstate
-        new_state = restype_workflow.get_successor(old_state, transition_event)
+        old_availability = res_obj.availability
+        old_lcs = lcstate(old_state, old_availability)
+        new_state, new_availability = restype_workflow.get_successor(old_lcs, transition_event)
         if not new_state:
             raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
-                resource_id, restype, res_obj.lcstate, transition_event))
+                resource_id, restype, old_lcs, transition_event))
 
-        res_obj.lcstate = new_state
+        lcmat, lcav = lcsplit(new_state)
+        res_obj.lcstate = lcmat
+        res_obj.availability = lcav
         res_obj.ts_updated = get_ion_ts()
         self.rr_store.update(res_obj)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
                                      sub_type=new_state,
-                                     old_state=old_state, new_state=new_state, transition_event=transition_event)
+                                     old_state=old_lcs, new_state=new_state, transition_event=transition_event)
 
         return new_state
 
     def set_lifecycle_state(self, resource_id='', target_lcstate=''):
-        if not target_lcstate or target_lcstate not in LCS:
-            raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
+        """Sets the lifecycle state (if possible) to the target state. Supports compound states"""
+        if not target_lcstate:
+            raise BadRequest("Bad life-cycle state %s" % target_lcstate)
 
         res_obj = self.read(resource_id)
         old_state = res_obj.lcstate
-        if target_lcstate != LCS.RETIRED:
+        old_availability = res_obj.availability
+        old_lcs = lcstate(old_state, old_availability)
+        if 'RETIRED' in target_lcstate:
+            res_obj.lcstate = LCS.RETIRED
+            res_obj.availability = AS.PRIVATE
+        else:
             restype = res_obj._get_type()
             restype_workflow = get_restype_lcsm(restype)
             if not restype_workflow:
                 raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
-            # Check that target state is allowed
-            if not target_lcstate in restype_workflow.get_successors(res_obj.lcstate).values():
-                raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, res_obj.lcstate))
+            if '_' in target_lcstate:    # Support compound
+                target_lcmat, target_lcav = lcsplit(target_lcstate)
+                if target_lcmat not in LCS:
+                    raise BadRequest("Unknown life-cycle state %s" % target_lcmat)
+                if target_lcav and target_lcav not in AS:
+                    raise BadRequest("Unknown life-cycle availability %s" % target_lcav)
+            elif target_lcstate in LCS:
+                target_lcmat, target_lcav = target_lcstate, res_obj.availability
+                target_lcstate = lcstate(target_lcmat, target_lcav)
+            elif target_lcstate in AS:
+                target_lcmat, target_lcav = res_obj.lcstate, target_lcstate
+                target_lcstate = lcstate(target_lcmat, target_lcav)
+            else:
+                raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
 
-        res_obj.lcstate = target_lcstate
+            # Check that target state is allowed
+            if not target_lcstate in restype_workflow.get_successors(old_lcs).values():
+                raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, old_lcs))
+
+            res_obj.lcstate = target_lcstate
+            res_obj.availability = target_lcav
+
         res_obj.ts_updated = get_ion_ts()
 
         updres = self.rr_store.update(res_obj)
@@ -214,7 +244,7 @@ class ResourceRegistry(object):
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
                                      sub_type=target_lcstate,
-                                     old_state=old_state, new_state=target_lcstate)
+                                     old_state=old_lcs, new_state=lcstate(res_obj.lcstate, res_obj.availability))
 
     def create_attachment(self, resource_id='', attachment=None, actor_id=None):
         """
@@ -348,7 +378,7 @@ class ResourceRegistry(object):
     
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         if predicate:
-            assoc_type = assoc_type or AT.H2H
+            assoc_type = assoc_type or 'H2H'
         assoc = self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
         if not assoc:
             raise NotFound("Association for subject/predicate/object/type %s/%s/%s/%s not found" % (

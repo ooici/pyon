@@ -9,10 +9,9 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import RT, PRED, LCS
+from pyon.ion.resource import RT, PRED, LCS, AS, lcstate
 from nose.plugins.attrib import attr
 from unittest import SkipTest
-import socket
 
 import interface.objects
 
@@ -24,50 +23,43 @@ BASED_ON = "XBASED_ON"
 @attr('UNIT', group='datastore')
 class Test_DataStores(IonIntegrationTestCase):
 
-    def test_persistent(self):
-        import socket
-        try:
-            ds = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
-            self._do_test(ds)
+    def test_datastore_database(self):
+        ds = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
-            # CouchDB does not like upper case characters for database names
-            with self.assertRaises(BadRequest):
-                ds.create_datastore("BadDataStoreNamePerCouchDB")
+        # CouchDB does not like upper case characters for database names
+        with self.assertRaises(BadRequest):
+            ds.create_datastore("BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.delete_datastore("BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.delete_datastore("BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.info_datastore("BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.info_datastore("BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.list_objects("BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.list_objects("BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.list_object_revisions("badid", "BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.list_object_revisions("badid", "BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.create_doc({"foo": "bar"}, "", datastore_name="BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.create_doc({"foo": "bar"}, "", datastore_name="BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.read_doc("badid", "3", "BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.read_doc("badid", "3", "BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.read_doc_mult("badid", "BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.read_doc_mult("badid", "BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-               ds.update_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+           ds.update_doc({"foo": "bar"}, "BadDataStoreNamePerCouchDB")
 
-            with self.assertRaises(BadRequest):
-                ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
+        with self.assertRaises(BadRequest):
+            ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
 
-            self._do_test_views(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES), is_persistent=True)
-            self._do_test_attach(CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES))
+    def test_datastore_basic(self):
+        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
-        except socket.error:
-            raise SkipTest('Failed to connect to CouchDB')
-
-    def _do_test(self, data_store):
         self.data_store = data_store
         self.resources = {}
         # Just in case previous run failed without cleaning up,
@@ -209,11 +201,6 @@ class Test_DataStores(IonIntegrationTestCase):
 
         # Assign values to object fields
         data_set.description = "Real-time water data for Choptank River near Greensboro, MD"
-        #data_set.min_datetime = "2011-08-04T13:15:00Z"
-        #data_set.max_datetime = "2011-08-09T19:15:00Z"
-        #data_set.variables = [
-        #        {"name":"water_height", "value":"ft"}
-        #]
 
         # Write Dataset object"
         write_tuple_1 = data_store.create(data_set)
@@ -300,7 +287,8 @@ class Test_DataStores(IonIntegrationTestCase):
         # Assert data store is now gone
         self.assertNotIn('ion_test_ds', data_store.list_datastores())
 
-    def _do_test_attach(self, data_store):
+    def test_datastore_attach(self):
+        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
         self.data_store = data_store
         self.resources = {}
@@ -449,7 +437,9 @@ class Test_DataStores(IonIntegrationTestCase):
         with self.assertRaises(NotFound):
             data_store.delete_attachment(doc="incorrect_id", attachment_name='no_such_file')
 
-    def _do_test_views(self, data_store, is_persistent=False):
+    def test_datastore_views(self):
+        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+
         self.data_store = data_store
         self.resources = {}
         # Just in case previous run failed without cleaning up,
@@ -465,9 +455,8 @@ class Test_DataStores(IonIntegrationTestCase):
         res = data_store.list_objects()
         numcoredocs = len(res)
 
-        if is_persistent:
-            self.assertTrue(numcoredocs > 1)
-            data_store._update_views()
+        self.assertTrue(numcoredocs > 1)
+        data_store._update_views()
 
         # HACK: Both Predicates so that this test works
         from pyon.ion.resource import Predicates
@@ -475,7 +464,7 @@ class Test_DataStores(IonIntegrationTestCase):
         Predicates[HAS_A] = dict(domain=[RT.Resource], range=[RT.Resource])
         Predicates[BASED_ON] = dict(domain=[RT.Dataset], range=[RT.Dataset])
 
-        admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED_AVAILABLE)
+        admin_user_id = self._create_resource(RT.ActorIdentity, 'John Doe', description='Marine Operator', lcstate=LCS.DEPLOYED, availability=AS.AVAILABLE)
 
         admin_profile_id = self._create_resource(RT.UserInfo, 'J.D. Profile', description='Some User',
             contact=IonObject('ContactInformation', **{"individual_names_given": "John Doe",
@@ -489,7 +478,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         inst2_obj_id = self._create_resource(RT.InstrumentDevice, 'CTD2', description='Other Instrument')
 
-        ds1_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.DEPLOYED_AVAILABLE)
+        ds1_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L0', description='My Dataset CTD L0', lcstate=LCS.DEPLOYED, availability=AS.AVAILABLE)
 
         ds2_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L1', description='My Dataset CTD L1')
 
@@ -564,8 +553,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(sub_ids3), 1)
         self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
-        if is_persistent:
-            data_store._update_views()
+        data_store._update_views()
 
         # Find all resources
         res_ids1, res_assoc1 = data_store.find_res_by_type(None, None, id_only=True)
@@ -582,52 +570,27 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, other_user_id]))
-        self.assertEquals(set([o.lcstate for o in res_ids1a]), set([LCS.DRAFT_PRIVATE, LCS.DEPLOYED_AVAILABLE]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_type(RT.ActorIdentity, LCS.DEPLOYED_AVAILABLE, id_only=True)
-        self.assertEquals(len(res_ids2), 1)
-        self.assertEquals(len(res_assoc2), 1)
-        self.assertEquals(set(res_ids2), set([admin_user_id]))
-
-        res_ids2n, res_assoc2n = data_store.find_res_by_type("NONE##", LCS.DEPLOYED_AVAILABLE, id_only=True)
+        res_ids2n, res_assoc2n = data_store.find_res_by_type("NONE##", id_only=True)
         self.assertEquals(len(res_ids2n), 0)
         self.assertEquals(len(res_assoc2n), 0)
 
         # Find resources by lcstate
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.DEPLOYED_AVAILABLE, id_only=True)
+        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.DEPLOYED, id_only=True)
         self.assertEquals(len(res_ids1), 2)
         self.assertEquals(len(res_assoc1), 2)
         self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
 
-        res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(LCS.DEPLOYED_AVAILABLE, id_only=False)
+        res_ids1a, res_assoc1a = data_store.find_res_by_lcstate(lcstate(LCS.DEPLOYED, AS.AVAILABLE), id_only=False)
         self.assertEquals(len(res_ids1a), 2)
         self.assertEquals(len(res_assoc1a), 2)
         self.assertEquals(set([o._id for o in res_ids1a]), set([admin_user_id, ds1_obj_id]))
         self.assertEquals(set([type(o).__name__ for o in res_ids1a]), set([RT.ActorIdentity, RT.Dataset]))
 
-        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( LCS.DEPLOYED_AVAILABLE, RT.ActorIdentity, id_only=True)
+        res_ids2, res_assoc2 = data_store.find_res_by_lcstate( AS.AVAILABLE, RT.ActorIdentity, id_only=True)
         self.assertEquals(len(res_ids2), 1)
         self.assertEquals(len(res_assoc2), 1)
         self.assertEquals(set(res_ids2), set([admin_user_id]))
-
-        res_ids2n, res_assoc2n = data_store.find_res_by_type("NONE##", "XXXXX", id_only=True)
-        self.assertEquals(len(res_ids2n), 0)
-        self.assertEquals(len(res_assoc2n), 0)
-
-        # Find resources by lcstate - hierarchical
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.AVAILABLE, id_only=True)
-        self.assertEquals(len(res_ids1), 2)
-        self.assertEquals(len(res_assoc1), 2)
-        self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
-
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.REGISTERED, id_only=True)
-        self.assertEquals(len(res_ids1), 2)
-        self.assertEquals(len(res_assoc1), 2)
-        self.assertEquals(set(res_ids1), set([admin_user_id, ds1_obj_id]))
-
-        res_ids1, res_assoc1 = data_store.find_res_by_lcstate(LCS.PRIVATE, id_only=True)
-        self.assertEquals(len(res_ids1), 6)
-        self.assertEquals(len(res_assoc1), 6)
 
         # Find resources by name
         res_ids1, res_assoc1 = data_store.find_res_by_name('CTD1', id_only=True)
