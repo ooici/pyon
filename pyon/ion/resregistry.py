@@ -14,7 +14,7 @@ from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.event.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import LCS, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
+from pyon.ion.resource import LCS, LCE, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -171,33 +171,43 @@ class ResourceRegistry(object):
     def execute_lifecycle_transition(self, resource_id='', transition_event=''):
         res_obj = self.read(resource_id)
 
-        restype = res_obj._get_type()
-        restype_workflow = get_restype_lcsm(restype)
-        if not restype_workflow:
-            raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
-
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
-        new_state = restype_workflow.get_successor(old_lcs, transition_event)
-        if not new_state:
-            raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
-                resource_id, restype, old_lcs, transition_event))
 
-        lcmat, lcav = lcsplit(new_state)
-        res_obj.lcstate = lcmat
-        res_obj.availability = lcav
+        if transition_event == LCE.RETIRE:
+            res_obj.lcstate = LCS.RETIRED
+            res_obj.availability = AS.PRIVATE
+            if old_state == LCS.RETIRED:
+                raise BadRequest("Resource id=%s already retired" % (resource_id))
+        else:
+            restype = res_obj._get_type()
+            restype_workflow = get_restype_lcsm(restype)
+            if not restype_workflow:
+                raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+
+            new_state = restype_workflow.get_successor(old_lcs, transition_event)
+            if not new_state:
+                raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
+                    resource_id, restype, old_lcs, transition_event))
+
+            lcmat, lcav = lcsplit(new_state)
+            res_obj.lcstate = lcmat
+            res_obj.availability = lcav
+
         res_obj.ts_updated = get_ion_ts()
         self.rr_store.update(res_obj)
         log.debug("execute_lifecycle_transition(res_id=%s, event=%s). Change %s_%s to %s_%s", resource_id, transition_event,
                   old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
-                                     origin=res_obj._id, origin_type=res_obj._get_type(),
-                                     sub_type=new_state,
-                                     old_state=old_lcs, new_state=new_state, transition_event=transition_event)
+                                     origin=res_obj._id, origin_type=res_obj.type_,
+                                     sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
+                                     lcstate=res_obj.lcstate, availability=res_obj.availability,
+                                     lcstate_before=old_state, availability_before=old_availability,
+                                     transition_event=transition_event)
 
-        return new_state
+        return lcstate(res_obj.lcstate, res_obj.availability)
 
     def set_lifecycle_state(self, resource_id='', target_lcstate=''):
         """Sets the lifecycle state (if possible) to the target state. Supports compound states"""
@@ -209,7 +219,7 @@ class ResourceRegistry(object):
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
-        if 'RETIRED' in target_lcstate:
+        if target_lcstate.startswith('RETIRED'):
             res_obj.lcstate = LCS.RETIRED
             res_obj.availability = AS.PRIVATE
         else:
@@ -247,9 +257,10 @@ class ResourceRegistry(object):
                   old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
         self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
-                                     origin=res_obj._id, origin_type=res_obj._get_type(),
-                                     sub_type=target_lcstate,
-                                     old_state=old_lcs, new_state=lcstate(res_obj.lcstate, res_obj.availability))
+                                     origin=res_obj._id, origin_type=res_obj.type_,
+                                     sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
+                                     lcstate=res_obj.lcstate, availability=res_obj.availability,
+                                     lcstate_before=old_state, availability_before=old_availability)
 
     def create_attachment(self, resource_id='', attachment=None, actor_id=None):
         """
