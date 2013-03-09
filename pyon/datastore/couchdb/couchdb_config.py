@@ -170,7 +170,7 @@ function(doc) {
         'by_sub':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.p, doc.ot, doc.o], doc);
   }
 }""",
@@ -179,7 +179,7 @@ function(doc) {
         'by_obj':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.o, doc.p, doc.st, doc.s], doc);
   }
 }""",
@@ -188,7 +188,7 @@ function(doc) {
         'by_match':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.o, doc.p], doc);
   }
 }""",
@@ -197,7 +197,7 @@ function(doc) {
         'by_idpred':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.p], doc);
     emit([doc.o, doc.p], doc);
   }
@@ -207,7 +207,7 @@ function(doc) {
         'by_id':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit(doc.s, doc);
     emit(doc.o, doc);
   }
@@ -217,7 +217,7 @@ function(doc) {
         'by_pred':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.p, doc.s, doc.o], doc);
   }
 }""",
@@ -226,7 +226,7 @@ function(doc) {
         'by_bulk':{
             'map':"""
 function(doc) {
-  if(doc.type_ == "Association") {
+  if(doc.type_ == "Association" &&! doc.retired) {
     emit(doc.s, doc.o);
   }
 }""",
@@ -234,7 +234,7 @@ function(doc) {
         'by_subject_bulk':{
             'map':"""
 function(doc) {
-  if(doc.type_ == "Association") {
+  if(doc.type_ == "Association" &&! doc.retired) {
     emit(doc.o, doc.s);
   }
 }""",

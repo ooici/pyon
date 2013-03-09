@@ -372,6 +372,11 @@ class CouchDB_DataStore(DataStore):
         id, version = res
         return (id, version)
 
+    def update_mult(self, objects):
+        if any([not isinstance(obj, IonObjectBase) for obj in objects]):
+            raise BadRequest("Obj param is not instance of IonObjectBase")
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects], allow_ids=True)
+
     def update_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
         log.debug("updating attachment %s", attachment_name)
         self.create_attachment(doc=doc, attachment_name=attachment_name, data=data,

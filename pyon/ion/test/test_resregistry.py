@@ -255,6 +255,16 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
         self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 0)
+
+        model_obj = IonObject("InstrumentModel", name='model1')
+        mid, _ = self.rr.create(model_obj)
+        aid1 = self.rr.create_association(iid, PRED.hasModel, mid)
+
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 1)
+
         res_objs,_ = self.rr.find_resources("InstrumentDevice")
         self.assertEquals(len(res_objs), 1)
         res_objs,_ = self.rr.find_resources(name="instrument")
@@ -269,6 +279,8 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(len(res_objs), 0)
         res_objs,_ = self.rr.find_resources(name="instrument")
         self.assertEquals(len(res_objs), 0)
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 0)
 
         with self.assertRaises(BadRequest):
             self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)

@@ -137,12 +137,6 @@ class ResourceRegistry(object):
 
         return self.rr_store.update(object)
 
-    def retire(self, resource_id):
-        """
-        This is the official "delete" for resource objects: they are set to RETIRED lcstate
-        """
-        self.set_lifecycle_state(resource_id, LCS.RETIRED)
-
     def delete(self, object_id='', del_associations=False):
         res_obj = self.read(object_id)
         if not res_obj:
@@ -168,32 +162,62 @@ class ResourceRegistry(object):
         for aid in assocs:
             self.rr_store.delete_association(aid)
 
+    def retire(self, resource_id):
+        """
+        This is the official "delete" for resource objects: they are set to RETIRED lcstate.
+        All associations are set to retired as well.
+        """
+        res_obj = self.read(resource_id)
+        old_state = res_obj.lcstate
+        old_availability = res_obj.availability
+        if old_state == LCS.RETIRED:
+            raise BadRequest("Resource id=%s already RETIRED" % (resource_id))
+
+        res_obj.lcstate = LCS.RETIRED
+        res_obj.availability = AS.PRIVATE
+        res_obj.ts_updated = get_ion_ts()
+
+        updres = self.rr_store.update(res_obj)
+        log.debug("retire(res_id=%s). Change %s_%s to %s_%s", resource_id,
+                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
+
+        assocs = self.find_associations(anyside=resource_id, id_only=False)
+        for assoc in assocs:
+            assoc.retired = True
+        if assocs:
+            self.rr_store.update_mult(assocs)
+            log.debug("retire(res_id=%s). Retired %s associations", resource_id, len(assocs))
+
+        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+                                     origin=res_obj._id, origin_type=res_obj.type_,
+                                     sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
+                                     lcstate=res_obj.lcstate, availability=res_obj.availability,
+                                     lcstate_before=old_state, availability_before=old_availability)
+
+
     def execute_lifecycle_transition(self, resource_id='', transition_event=''):
+        if transition_event == LCE.RETIRE:
+            return self.retire(resource_id)
+
         res_obj = self.read(resource_id)
 
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
 
-        if transition_event == LCE.RETIRE:
-            res_obj.lcstate = LCS.RETIRED
-            res_obj.availability = AS.PRIVATE
-            if old_state == LCS.RETIRED:
-                raise BadRequest("Resource id=%s already retired" % (resource_id))
-        else:
-            restype = res_obj._get_type()
-            restype_workflow = get_restype_lcsm(restype)
-            if not restype_workflow:
-                raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+        restype = res_obj._get_type()
+        restype_workflow = get_restype_lcsm(restype)
+        if not restype_workflow:
+            raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
-            new_state = restype_workflow.get_successor(old_lcs, transition_event)
-            if not new_state:
-                raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
-                    resource_id, restype, old_lcs, transition_event))
+        new_state = restype_workflow.get_successor(old_lcs, transition_event)
+        if not new_state:
+            raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
+                resource_id, restype, old_lcs, transition_event))
 
-            lcmat, lcav = lcsplit(new_state)
-            res_obj.lcstate = lcmat
-            res_obj.availability = lcav
+        lcmat, lcav = lcsplit(new_state)
+        res_obj.lcstate = lcmat
+        res_obj.availability = lcav
 
         res_obj.ts_updated = get_ion_ts()
         self.rr_store.update(res_obj)
@@ -213,42 +237,40 @@ class ResourceRegistry(object):
         """Sets the lifecycle state (if possible) to the target state. Supports compound states"""
         if not target_lcstate:
             raise BadRequest("Bad life-cycle state %s" % target_lcstate)
+        if target_lcstate.startswith('RETIRED'):
+            return self.retire(resource_id)
 
         res_obj = self.read(resource_id)
         old_target = target_lcstate
         old_state = res_obj.lcstate
         old_availability = res_obj.availability
         old_lcs = lcstate(old_state, old_availability)
-        if target_lcstate.startswith('RETIRED'):
-            res_obj.lcstate = LCS.RETIRED
-            res_obj.availability = AS.PRIVATE
+        restype = res_obj._get_type()
+        restype_workflow = get_restype_lcsm(restype)
+        if not restype_workflow:
+            raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+
+        if '_' in target_lcstate:    # Support compound
+            target_lcmat, target_lcav = lcsplit(target_lcstate)
+            if target_lcmat not in LCS:
+                raise BadRequest("Unknown life-cycle state %s" % target_lcmat)
+            if target_lcav and target_lcav not in AS:
+                raise BadRequest("Unknown life-cycle availability %s" % target_lcav)
+        elif target_lcstate in LCS:
+            target_lcmat, target_lcav = target_lcstate, res_obj.availability
+            target_lcstate = lcstate(target_lcmat, target_lcav)
+        elif target_lcstate in AS:
+            target_lcmat, target_lcav = res_obj.lcstate, target_lcstate
+            target_lcstate = lcstate(target_lcmat, target_lcav)
         else:
-            restype = res_obj._get_type()
-            restype_workflow = get_restype_lcsm(restype)
-            if not restype_workflow:
-                raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+            raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
 
-            if '_' in target_lcstate:    # Support compound
-                target_lcmat, target_lcav = lcsplit(target_lcstate)
-                if target_lcmat not in LCS:
-                    raise BadRequest("Unknown life-cycle state %s" % target_lcmat)
-                if target_lcav and target_lcav not in AS:
-                    raise BadRequest("Unknown life-cycle availability %s" % target_lcav)
-            elif target_lcstate in LCS:
-                target_lcmat, target_lcav = target_lcstate, res_obj.availability
-                target_lcstate = lcstate(target_lcmat, target_lcav)
-            elif target_lcstate in AS:
-                target_lcmat, target_lcav = res_obj.lcstate, target_lcstate
-                target_lcstate = lcstate(target_lcmat, target_lcav)
-            else:
-                raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
+        # Check that target state is allowed
+        if not target_lcstate in restype_workflow.get_successors(old_lcs).values():
+            raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, old_lcs))
 
-            # Check that target state is allowed
-            if not target_lcstate in restype_workflow.get_successors(old_lcs).values():
-                raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, old_lcs))
-
-            res_obj.lcstate = target_lcmat
-            res_obj.availability = target_lcav
+        res_obj.lcstate = target_lcmat
+        res_obj.availability = target_lcav
 
         res_obj.ts_updated = get_ion_ts()
 
