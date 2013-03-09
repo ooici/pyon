@@ -255,10 +255,20 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
         self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
+        res_objs,_ = self.rr.find_resources("InstrumentDevice")
+        self.assertEquals(len(res_objs), 1)
+        res_objs,_ = self.rr.find_resources(name="instrument")
+        self.assertEquals(len(res_objs), 1)
+
         self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.RETIRED)
         self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        res_objs,_ = self.rr.find_resources("InstrumentDevice")
+        self.assertEquals(len(res_objs), 0)
+        res_objs,_ = self.rr.find_resources(name="instrument")
+        self.assertEquals(len(res_objs), 0)
 
         with self.assertRaises(BadRequest):
             self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
