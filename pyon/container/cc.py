@@ -67,13 +67,14 @@ class Container(BaseContainerAgent):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = kwargs
 
+        # Greenlet context-local storage
+        self.context = LocalContextMixin()
+
         # Load general capabilities file and augment with specific profile
         self._load_capabilities()
 
-        # Start the capabilities
 
-        init_order = list(self.cap_profile['init_order'])
-
+        # init_order = list(self.cap_profile['init_order'])
         # start_order = self.cap_profile['start_order']
         # for cap in start_order:
         #     if cap not in init_order:
@@ -82,6 +83,7 @@ class Container(BaseContainerAgent):
         #
         # for cap in init_order:
 
+        # Start the capabilities
         start_order = self.cap_profile['start_order']
         for cap in start_order:
             if cap not in self._cap_definitions:
@@ -100,9 +102,6 @@ class Container(BaseContainerAgent):
             except Exception as ex:
                 log.error("Container Capability %s init error: %s" % (cap, ex))
                 raise
-
-        # Greenlet context-local storage
-        self.context = LocalContextMixin()
 
         # Coordinates the container start
         self._status = "INIT"
