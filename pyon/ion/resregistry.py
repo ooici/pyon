@@ -27,14 +27,21 @@ class ResourceRegistry(object):
     """
     DEFAULT_ATTACHMENT_NAME = 'resource.attachment'
 
-    def __init__(self, datastore_manager=None):
+    def __init__(self, datastore_manager=None, container=None):
+        self.container = container or bootstrap.container_instance
 
         # Get an instance of datastore configured as resource registry.
         # May be persistent or mock, forced clean, with indexes
-        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
+        datastore_manager = datastore_manager or self.container.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
         self.event_pub = EventPublisher()
+
+    def start(self):
+        pass
+
+    def stop(self):
+        self.close()
 
     def close(self):
         """

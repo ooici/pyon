@@ -276,12 +276,19 @@ class EventRepository(object):
     Class that uses a data store to provide a persistent repository for ION events.
     """
 
-    def __init__(self, datastore_manager=None):
+    def __init__(self, datastore_manager=None, container=None):
+        self.container = container or bootstrap.container_instance
 
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
-        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
+        datastore_manager = datastore_manager or self.container.datastore_manager
         self.event_store = datastore_manager.get_datastore("events", DataStore.DS_PROFILE.EVENTS)
+
+    def start(self):
+        pass
+
+    def stop(self):
+        self.close()
 
     def close(self):
         """
