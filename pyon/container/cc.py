@@ -19,7 +19,7 @@ from pyon.ion.resregistry import ResourceRegistry
 from pyon.ion.state import StateRepository
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.net.transport import LocalRouter
-from pyon.util.containers import get_default_container_id
+from pyon.util.containers import get_default_container_id, DotDict
 from pyon.util.file_sys import FileSystem
 from pyon.util.log import log
 from pyon.util.sflow import SFlowManager
@@ -38,6 +38,23 @@ import sys
 import gevent
 from contextlib import contextmanager
 
+CONTAINER_CAPABILITY_LIST = [
+    "CONTAINER_AGENT",
+    "APP_MANAGER",
+    "PROC_MANAGER",
+    "EXCHANGE_MANAGER",
+    "LOCAL_ROUTER",
+    "EVENT_REPOSITORY",
+    "STATE_REPOSITORY",
+    "RESOURCE_REGISTRY",
+    "DIRECTORY",
+    "DATASTORE_MANAGER",
+    "GOVERNANCE_CONTROLLER",
+    "PID_FILE",
+    "STATS_MANAGER",
+    "CONTAINER_MANAGER"
+]
+CCAP = DotDict(zip(CONTAINER_CAPABILITY_LIST, CONTAINER_CAPABILITY_LIST))
 
 class Container(BaseContainerAgent):
     """
@@ -70,12 +87,8 @@ class Container(BaseContainerAgent):
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = kwargs
 
-        # DatastoreManager - controls access to Datastores (both mock and couch backed)
+        # DatastoreManager - controls access to Datastores (both couchdb and couchbase backends)
         self.datastore_manager = DatastoreManager()
-
-        # TODO: Do not start a capability here. Symmetric start/stop
-        self.datastore_manager.start()
-        self._capabilities.append("DATASTORE_MANAGER")
 
         # Instantiate Directory
         self.directory = Directory()
@@ -101,18 +114,19 @@ class Container(BaseContainerAgent):
         # sFlow manager - controls sFlow stat emission
         self.sflow_manager = SFlowManager(self)
 
+        # Container command executive
         self.cc_manager = ContainerManager(self)
 
         # Coordinates the container start
         self._status = "INIT"
 
-        # protection for when the container itself is used as a Process for clients
+        # Makes the container instance appear as a process for service clients
         self.container = self
 
-        # publisher, initialized in start()
+        # Event publisher
         self.event_pub = None
 
-        # context-local storage
+        # Greenlet context-local storage
         self.context = LocalContextMixin()
 
         log.debug("Container initialized, OK.")
@@ -150,52 +164,54 @@ class Container(BaseContainerAgent):
         gevent.signal(signal.SIGUSR2, self._handle_sigusr2)
 
         self.datastore_manager.start()
-        self._capabilities.append("DATASTORE_MANAGER")
+        self._capabilities.append(CCAP.DATASTORE_MANAGER)
 
-        self._capabilities.append("DIRECTORY")
+        self.directory.start()
+        self._capabilities.append(CCAP.DIRECTORY)
 
         # Event repository
         self.event_repository = EventRepository()
         self.event_pub = EventPublisher()
-        self._capabilities.append("EVENT_REPOSITORY")
+        self._capabilities.append(CCAP.EVENT_REPOSITORY)
 
         # Local resource registry
         self.resource_registry = ResourceRegistry()
-        self._capabilities.append("RESOURCE_REGISTRY")
+        self._capabilities.append(CCAP.RESOURCE_REGISTRY)
 
         # Persistent objects
         self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
 
         # State repository
         self.state_repository = StateRepository()
-        self._capabilities.append("STATE_REPOSITORY")
+        self._capabilities.append(CCAP.STATE_REPOSITORY)
 
         # internal router for local transports
         self.local_router = LocalRouter(bootstrap.get_sys_name())
         self.local_router.start()
         self.local_router.ready.wait(timeout=2)
-        self._capabilities.append("LOCAL_ROUTER")
+        self._capabilities.append(CCAP.LOCAL_ROUTER)
 
         # Start ExchangeManager, which starts the node (broker connection)
         self.ex_manager.start()
-        self._capabilities.append("EXCHANGE_MANAGER")
+        self._capabilities.append(CCAP.EXCHANGE_MANAGER)
 
         self.proc_manager.start()
-        self._capabilities.append("PROC_MANAGER")
+        self._capabilities.append(CCAP.PROC_MANAGER)
 
         self.app_manager.start()
-        self._capabilities.append("APP_MANAGER")
+        self._capabilities.append(CCAP.APP_MANAGER)
 
         self.governance_controller.start()
-        self._capabilities.append("GOVERNANCE_CONTROLLER")
+        self._capabilities.append(CCAP.GOVERNANCE_CONTROLLER)
 
         if CFG.get_safe('container.sflow.enabled', False):
             self.sflow_manager.start()
-            self._capabilities.append("SFLOW_MANAGER")
+            self._capabilities.append(CCAP.STATS_MANAGER)
 
         if CFG.get_safe('container.management.enabled', True):
             self.cc_manager.start()
-            self._capabilities.append("CONTAINER_MANAGER")
+            self._capabilities.append(CCAP.CONTAINER_MANAGER)
+
         # Start the CC-Agent API
         rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
 
@@ -205,7 +221,7 @@ class Container(BaseContainerAgent):
         proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self, cleanup_method=cleanup)
         self.proc_manager.proc_sup.ensure_ready(proc)
         proc.start_listeners()
-        self._capabilities.append("CONTAINER_AGENT")
+        self._capabilities.append(CCAP.CONTAINER_AGENT)
 
         self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
                                      origin=self.id, origin_type="CapabilityContainer",
@@ -216,6 +232,13 @@ class Container(BaseContainerAgent):
         self._status        = "RUNNING"
 
         log.info("Container (%s) started, OK." , self.id)
+
+    def has_capability(self, capability):
+        """
+        Returns True if the given capability is in the list of container capabilities,
+        i.e. available in this container.
+        """
+        return capability in self._capabilities
 
     def _handle_sigusr2(self):#, signum, frame):
         """
@@ -251,7 +274,6 @@ class Container(BaseContainerAgent):
         with open("gls-%s" % os.getpid(), "w") as f:
             f.write("\n\n".join(allgls))
 
-
     @property
     def node(self):
         """
@@ -259,7 +281,7 @@ class Container(BaseContainerAgent):
 
         Defers to exchange manager, but only if it has been started, otherwise returns None.
         """
-        if "EXCHANGE_MANAGER" in self._capabilities:
+        if self.has_capability(CCAP.EXCHANGE_MANAGER):
             return self.ex_manager.default_node
 
         return None
@@ -326,12 +348,6 @@ class Container(BaseContainerAgent):
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
 
-    def has_capability(self, capability):
-        """
-        Returns True if the given capability is in the list of container capabilities.
-        """
-        return capability in self._capabilities
-
     def stop(self):
         log.info("=============== Container stopping... ===============")
 
@@ -377,53 +393,53 @@ class Container(BaseContainerAgent):
             return self.app_manager.start_rel_from_url(rel_url=rel_url, config=config)
 
     def _stop_capability(self, capability):
-        if capability == "CONTAINER_AGENT":
+        if capability == CCAP.CONTAINER_AGENT:
             pass
 
-        elif capability == "APP_MANAGER":
+        elif capability == CCAP.APP_MANAGER:
             self.app_manager.stop()
 
-        elif capability == "PROC_MANAGER":
+        elif capability == CCAP.PROC_MANAGER:
             self.proc_manager.stop()
 
-        elif capability == "EXCHANGE_MANAGER":
+        elif capability == CCAP.EXCHANGE_MANAGER:
             self.ex_manager.stop()
 
-        elif capability == "LOCAL_ROUTER":
+        elif capability == CCAP.LOCAL_ROUTER:
             if self.local_router is not None:
                 self.local_router.stop()
 
-        elif capability == "EVENT_REPOSITORY":
+        elif capability == CCAP.EVENT_REPOSITORY:
             # close event repository (possible CouchDB connection)
             self.event_repository.close()
             self.event_pub.close()
 
-        elif capability == "STATE_REPOSITORY":
+        elif capability == CCAP.STATE_REPOSITORY:
             # close state repository (possible CouchDB connection)
             self.state_repository.close()
 
-        elif capability == "RESOURCE_REGISTRY":
+        elif capability == CCAP.RESOURCE_REGISTRY:
             # close state resource registry (possible CouchDB connection)
             self.resource_registry.close()
 
-        elif capability == "DIRECTORY":
+        elif capability == CCAP.DIRECTORY:
             # Close directory (possible CouchDB connection)
             self.directory.close()
 
-        elif capability == "DATASTORE_MANAGER":
+        elif capability == CCAP.DATASTORE_MANAGER:
             # close any open connections to datastores
             self.datastore_manager.stop()
 
-        elif capability == "GOVERNANCE_CONTROLLER":
+        elif capability == CCAP.GOVERNANCE_CONTROLLER:
             self.governance_controller.stop()
 
-        elif capability == "PID_FILE":
+        elif capability == CCAP.PID_FILE:
             self._cleanup_pid()
 
-        elif capability == "SFLOW_MANAGER":
+        elif capability == CCAP.STATS_MANAGER:
             self.sflow_manager.stop()
 
-        elif capability == "CONTAINER_MANAGER":
+        elif capability == CCAP.CONTAINER_MANAGER:
             self.cc_manager.stop()
 
         else:
