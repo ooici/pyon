@@ -61,6 +61,7 @@ class Container(BaseContainerAgent):
         bootstrap.container_instance = self
         Container.instance = self
         self.container = self  # Make self appear as process to service clients
+        self.CCAP = CCAP
 
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
 
@@ -72,16 +73,6 @@ class Container(BaseContainerAgent):
 
         # Load general capabilities file and augment with specific profile
         self._load_capabilities()
-
-
-        # init_order = list(self.cap_profile['init_order'])
-        # start_order = self.cap_profile['start_order']
-        # for cap in start_order:
-        #     if cap not in init_order:
-        #         init_order.append(cap)
-        # init_order = start_order
-        #
-        # for cap in init_order:
 
         # Start the capabilities
         start_order = self.cap_profile['start_order']
@@ -97,7 +88,7 @@ class Container(BaseContainerAgent):
                 log.debug("__init__(): Initializing '%s'" % cap)
                 cap_obj = named_any(cap_def['class'])(container=self)
                 self._cap_instances[cap] = cap_obj
-                if 'field' in cap_def:
+                if 'field' in cap_def and cap_def['field']:
                     setattr(self, cap_def['field'], cap_obj)
             except Exception as ex:
                 log.error("Container Capability %s init error: %s" % (cap, ex))
@@ -275,7 +266,7 @@ class Container(BaseContainerAgent):
     def stop(self):
         log.info("=============== Container stopping... ===============")
 
-        if self.event_pub is not None:
+        if self.has_capability(CCAP.EVENT_PUBLISHER) and self.event_pub is not None:
             try:
                 self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
                                              origin=self.id, origin_type="CapabilityContainer",
@@ -377,9 +368,13 @@ class EventPublisherCapability(ContainerCapability):
         self.container.event_pub.close()
 
 class ObjectsStoreCapability(ContainerCapability):
+    def __init__(self, container):
+        self.container = container
+        self.container.object_store = None
     def start(self):
-        # This registers this datastore in the DatastoreManager
-        self.container.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
+        self.container.object_store = self.container.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
+    def stop(self):
+        self.container.object_store.close()
 
 class LocalRouterCapability(ContainerCapability):
     def __init__(self, container):
