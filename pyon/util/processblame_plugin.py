@@ -27,14 +27,20 @@ class ProcessLeak(Plugin):
         from pyon.core import bootstrap
         from pyon.public import CFG
 
-        self.base_pids = []
         self.rpc_timeout = 2
+        self.base_pids = []
         self._procs_by_test = {}
         if not bootstrap.pyon_initialized:
             bootstrap.bootstrap_pyon()
         self.node, self.ioloop = make_node()
         self.node.setup_interceptors(CFG.interceptor)
         self.pd_cli =  ProcessDispatcherServiceClient(node=self.node)
+        # Set base_pids once
+        from pyon.core.exception import Timeout
+        try:
+           self.base_pids = [ proc.process_id for proc in self.pd_cli.list_processes(timeout=20) ]
+        except Timeout:
+           pass
 
     def beforeTest(self, test):
         from pyon.core.exception import Timeout

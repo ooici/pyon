@@ -174,7 +174,42 @@ class InterceptorTest(PyonTestCase):
 
         # Should work now that list content has been corrected
         validate_interceptor.incoming(invoke)
-        
+
+        #Validate with an ION object as content
+        decorator_obj = IonObject('Deco_Example', {"list1": [{"phone_number": "858.822.5141", "phone_type": "work", "type_": "Phone", "sms": False}], "list2": ["One element"], "dict1": {"key1": 1}, "dict2": {"key1": 1}, "an_important_value": "good value", "us_phone_number": "555-555-5555"})
+
+
+        invoke = Invocation()
+        invoke.message = decorator_obj
+        invoke.headers["validate"] = True
+
+        # Should work now that list content has been corrected
+        validate_interceptor.incoming(invoke)
+
+        #Validate with an ION object as content
+        decorator_obj = IonObject('Deco_Example', {"list1": [{"phone_number": "858.822.5141", "phone_type": "work", "type_": "ExtendedPhone", "sms": False}], "list2": ["One element"], "dict1": {"key1": 1}, "dict2": {"key1": 1}, "an_important_value": "good value", "us_phone_number": "555-555-5555"})
+
+
+        invoke = Invocation()
+        invoke.message = decorator_obj
+        invoke.headers["validate"] = True
+
+        # Should work now that list content has been corrected
+        validate_interceptor.incoming(invoke)
+
+        #Validate with an ION object as content
+        decorator_obj = IonObject('Deco_Example', {"list1": [{"phone_number": "858.822.5141", "phone_type": "work", "type_": "Bad_Phone", "sms": False}], "list2": ["One element"], "dict1": {"key1": 1}, "dict2": {"key1": 1}, "an_important_value": "good value", "us_phone_number": "555-555-5555"})
+
+
+        invoke = Invocation()
+        invoke.message = decorator_obj
+        invoke.headers["validate"] = True
+
+        # Should catch a bad ION object type
+        with self.assertRaises(BadRequest):
+            validate_interceptor.incoming(invoke)
+
+
         # Dict
         decorator_obj = IonObject('Deco_Example', {"list1": [1], "list2": ["One element"], "dict1": {"key1": "Should be a numeric type"}, "dict2": {"key1": 1}, "an_important_value": "good value", "us_phone_number": "555-555-5555"})
 
@@ -302,3 +337,13 @@ class InterceptorTest(PyonTestCase):
 
         # Should work
         validate_interceptor.incoming(invoke)
+
+        #Check to see if the class level decorators were set properly
+        deco_value = decorator_obj.get_class_decorator_value('SpecialObject')
+        self.assertEqual(deco_value,'')
+        deco_value = decorator_obj.get_class_decorator_value('OriginResourceType')
+        self.assertEqual(deco_value,'MyObject')
+        deco_value = decorator_obj.get_class_decorator_value('Unknown')
+        self.assertEqual(deco_value,None)
+
+

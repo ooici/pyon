@@ -41,46 +41,37 @@ COUCHDB_VIEWS = {
     # Resources all have a type, life cycle state and name
     # Note: adding additional entries to the index such as name leads to a sort by name but prevents range queries
     'resource':{
-        # Find resource by exact type
+        # Find resource by exact type, ordered by name (important for pagination)
         'by_type':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
-    emit([doc.type_, doc.lcstate, doc.name], doc);
+  if (doc.type_ && doc.lcstate != undefined && doc.lcstate != 'RETIRED' && doc.name != undefined) {
+    name = String(doc.name).substring(0,200);
+    emit([doc.type_, name], null);
   }
 }""",
         },
+        # Find resource by lcstate (maturity)
         # The following is a more sophisticated index. It does two things for each Resource object:
-        # 1: It emits an index value prefixed by 0 for the actual lcstate
-        # 2: It emits an index value prefixed by 1,parent_state for all parent states
-        # Thereby it is possible to search for resources by hierarchical state and still be able
-        # to return result sets that objects once only.
-        # Note: the order of the type_ in the key is important for case 2, so that range queries are possible
-        # with both type_ without.
+        # 1: It emits an index value prefixed by 0 for the lcstate maturity
+        # 2: It emits an index value prefixed by 0 for the lcstate availability
+        # The results are ordered by type_ first then name (important for pagination)
         'by_lcstate':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
-    emit([0, doc.lcstate, doc.type_, doc.name], null);
-    if (doc.lcstate != undefined && doc.lcstate != "") {
-      if (doc.lcstate.lastIndexOf("DRAFT",0)!=0 && doc.lcstate != "RETIRED") {
-        emit([1, "REGISTERED", doc.type_, doc.lcstate, doc.name], null);
-      }
-      comps = doc.lcstate.split("_")
-      if (comps.length == 2) {
-        emit([1, comps[0], doc.type_, doc.lcstate, doc.name], null);
-        emit([1, comps[1], doc.type_, doc.lcstate, doc.name], null);
-      }
-    }
+  if (doc.type_ && doc.lcstate != undefined && doc.availability != undefined && doc.name != undefined) {
+    name = String(doc.name).substring(0,200);
+    emit([0, doc.lcstate, doc.type_, name], null);
+    emit([1, doc.availability, doc.type_, name], null);
   }
 }""",
         },
-        # Find by name
+        # Find by name, ordered by type_ (important for pagination)
         'by_name':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.lcstate != undefined && doc.name != undefined) {
-    emit([doc.name, doc.type_, doc.lcstate], null);
+  if (doc.type_ && doc.lcstate != undefined && doc.lcstate != 'RETIRED' && doc.name != undefined) {
+    emit([doc.name, doc.type_], null);
   }
 }""",
         },
@@ -88,7 +79,7 @@ function(doc) {
         'by_altid':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.alt_ids) {
+  if (doc.type_ && doc.alt_ids && doc.lcstate != 'RETIRED') {
     for (var i = 0; i < doc.alt_ids.length; i++ ) {
       altid = doc.alt_ids[i];
       parts = altid.split(":");
@@ -98,7 +89,7 @@ function(doc) {
         emit([altid, "_"], null);
       }
     }
-  } else if (doc.type_ && doc.uirefid) {
+  } else if (doc.type_ && doc.uirefid && doc.lcstate != 'RETIRED') {
     emit([doc.uirefid, "UIREFID"], null);
   }
 }""",
@@ -107,7 +98,7 @@ function(doc) {
         'by_keyword':{
             'map':"""
 function(doc) {
-  if (doc.type_ && doc.keywords != undefined) {
+  if (doc.type_ && doc.lcstate != 'RETIRED' && doc.keywords != undefined) {
     for (var i = 0; i < doc.keywords.length; i++ ) {
       emit([doc.keywords[i], doc.type_], null);
     }
@@ -118,7 +109,7 @@ function(doc) {
         'by_nestedtype':{
             'map':"""
 function(doc) {
-  if (doc.type_) {
+  if (doc.type_ && doc.lcstate != 'RETIRED') {
     for (var attr in doc) {
       if (doc[attr] != undefined && doc[attr].type_) {
         emit([doc[attr].type_, doc.type_], null);
@@ -132,7 +123,7 @@ function(doc) {
         'by_attribute':{
             'map':"""
 function(doc) {
-  if (doc.type_) {
+  if (doc.type_ && doc.lcstate != 'RETIRED') {
     if (doc.type_ == "UserInfo" && doc.contact != undefined && doc.contact.email != undefined) {
       emit([doc.type_, "contact.email", doc.contact.email], null);
     }
@@ -179,7 +170,7 @@ function(doc) {
         'by_sub':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.p, doc.ot, doc.o], doc);
   }
 }""",
@@ -188,7 +179,7 @@ function(doc) {
         'by_obj':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.o, doc.p, doc.st, doc.s], doc);
   }
 }""",
@@ -197,7 +188,7 @@ function(doc) {
         'by_match':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.o, doc.p], doc);
   }
 }""",
@@ -206,7 +197,7 @@ function(doc) {
         'by_idpred':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.s, doc.p], doc);
     emit([doc.o, doc.p], doc);
   }
@@ -216,7 +207,7 @@ function(doc) {
         'by_id':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit(doc.s, doc);
     emit(doc.o, doc);
   }
@@ -226,7 +217,7 @@ function(doc) {
         'by_pred':{
             'map':"""
 function(doc) {
-  if (doc.type_ == "Association") {
+  if (doc.type_ == "Association" &&! doc.retired) {
     emit([doc.p, doc.s, doc.o], doc);
   }
 }""",
@@ -235,7 +226,7 @@ function(doc) {
         'by_bulk':{
             'map':"""
 function(doc) {
-  if(doc.type_ == "Association") {
+  if(doc.type_ == "Association" &&! doc.retired) {
     emit(doc.s, doc.o);
   }
 }""",
@@ -243,7 +234,7 @@ function(doc) {
         'by_subject_bulk':{
             'map':"""
 function(doc) {
-  if(doc.type_ == "Association") {
+  if(doc.type_ == "Association" &&! doc.retired) {
     emit(doc.o, doc.s);
   }
 }""",
@@ -287,7 +278,11 @@ function(doc) {
 function(doc) {
   if (doc.type_ == "DirEntry") {
     for (var attr in doc.attributes) {
-      emit([doc.org, attr, doc.attributes[attr], doc.parent], doc);
+      attval = doc.attributes[attr];
+      if (attval != undefined && attval.length > 0) {
+        attval = String(attval).substring(0,200);
+      }
+      emit([doc.org, attr, attval, doc.parent], doc);
     }
   }
 }""",

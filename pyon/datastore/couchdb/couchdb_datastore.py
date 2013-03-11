@@ -16,7 +16,7 @@ from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeseri
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
 from pyon.ion.identifier import create_unique_association_id
-from pyon.ion.resource import CommonResourceLifeCycleSM, AT
+from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.containers import get_ion_ts
@@ -371,6 +371,11 @@ class CouchDB_DataStore(DataStore):
         log.debug('Update result: %s', str(res))
         id, version = res
         return (id, version)
+
+    def update_mult(self, objects):
+        if any([not isinstance(obj, IonObjectBase) for obj in objects]):
+            raise BadRequest("Obj param is not instance of IonObjectBase")
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects], allow_ids=True)
 
     def update_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
         log.debug("updating attachment %s", attachment_name)
@@ -846,63 +851,56 @@ class CouchDB_DataStore(DataStore):
         elif not restype and not lcstate and not name:
             return self.find_res_by_type(None, None, id_only, filter=filter_kwargs)
 
+    def _prepare_find_return(self, rows, res_assocs=None, id_only=True, **kwargs):
+        if id_only:
+            res_ids = [row.id for row in rows]
+            return (res_ids, res_assocs)
+        else:
+            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
+            return (res_docs, res_assocs)
+
     def find_res_by_type(self, restype, lcstate=None, id_only=False, filter=None):
         log.debug("find_res_by_type(restype=%s, lcstate=%s)", restype, lcstate)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        if lcstate:
+            raise BadRequest('lcstate not supported anymore in find_res_by_type')
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
         view = ds.view(self._get_viewname("resource", "by_type"), include_docs=(not id_only), **filter)
         if restype:
             key = [restype]
-            if lcstate:
-                key.append(lcstate)
             endkey = self._get_endkey(key)
-            rows = view[key:endkey]
+            rows = view[key:endkey]   # Range query
         else:
+            # Returns ALL documents, only limited by filter
             rows = view
 
-        res_assocs = [dict(type=row['key'][0], lcstate=row['key'][1], name=row['key'][2], id=row.id) for row in rows]
+        res_assocs = [dict(type=row['key'][0], name=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_type() found %s objects", len(res_assocs))
         self._count(find_res_by_type_call=1, find_res_by_type_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_lcstate(self, lcstate, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_lcstate(lcstate=%s, restype=%s)", lcstate, restype)
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
+        if '_' in lcstate:
+            log.warn("Search for compound lcstate restricted to maturity: %s", lcstate)
+            lcstate,_ = lcstate.split("_", 1)
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
         view = ds.view(self._get_viewname("resource", "by_lcstate"), include_docs=(not id_only), **filter)
-        is_hierarchical = (lcstate in CommonResourceLifeCycleSM.STATE_ALIASES)
-        # lcstate is a hiearachical state and we need to treat the view differently
-        if is_hierarchical:
-            key = [1, lcstate]
-        else:
-            key = [0, lcstate]
+        key = [1, lcstate] if lcstate in CommonResourceLifeCycleSM.AVAILABILITY else [0, lcstate]
         if restype:
             key.append(restype)
         endkey = self._get_endkey(key)
-        rows = view[key:endkey]
+        rows = view[key:endkey]   # Range query
 
-        if is_hierarchical:
-            res_assocs = [dict(lcstate=row['key'][3], type=row['key'][2], name=row['key'][4], id=row.id) for row in rows]
-        else:
-            res_assocs = [dict(lcstate=row['key'][1], type=row['key'][2], name=row['key'][3], id=row.id) for row in rows]
-
+        res_assocs = [dict(lcstate=row['key'][1], type=row['key'][2], name=row['key'][3], id=row.id) for row in rows]
         log.debug("find_res_by_lcstate() found %s objects", len(res_assocs))
         self._count(find_res_by_lcstate_call=1, find_res_by_lcstate_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_name(self, name, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_name(name=%s, restype=%s)", name, restype)
@@ -915,17 +913,12 @@ class CouchDB_DataStore(DataStore):
         if restype:
             key.append(restype)
         endkey = self._get_endkey(key)
-        rows = view[key:endkey]
+        rows = view[key:endkey]   # Range query
 
-        res_assocs = [dict(name=row['key'][0], type=row['key'][1], lcstate=row['key'][2], id=row.id) for row in rows]
+        res_assocs = [dict(name=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_name() found %s objects", len(res_assocs))
         self._count(find_res_by_name_call=1, find_res_by_name_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_keyword(self, keyword, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_keyword(keyword=%s, restype=%s)", keyword, restype)
@@ -945,12 +938,7 @@ class CouchDB_DataStore(DataStore):
         res_assocs = [dict(keyword=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_keyword() found %s objects", len(res_assocs))
         self._count(find_res_by_kw_call=1, find_res_by_kw_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_nested_type(self, nested_type, restype=None, id_only=False, filter=None):
         log.debug("find_res_by_nested_type(nested_type=%s, restype=%s)", nested_type, restype)
@@ -970,12 +958,7 @@ class CouchDB_DataStore(DataStore):
         res_assocs = [dict(nested_type=row['key'][0], type=row['key'][1], id=row.id) for row in rows]
         log.debug("find_res_by_nested_type() found %s objects", len(res_assocs))
         self._count(find_res_by_nested_call=1, find_res_by_nested_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_attribute(self, restype, attr_name, attr_value=None, id_only=False, filter=None):
         log.debug("find_res_by_attribute(restype=%s, attr_name=%s, attr_value=%s)", restype, attr_name, attr_value)
@@ -995,12 +978,7 @@ class CouchDB_DataStore(DataStore):
         res_assocs = [dict(type=row['key'][0], attr_name=row['key'][1], attr_value=row['key'][2], id=row.id) for row in rows]
         log.debug("find_res_by_attribute() found %s objects", len(res_assocs))
         self._count(find_res_by_attribute_call=1, find_res_by_attribute_obj=len(res_assocs))
-        if id_only:
-            res_ids = [row.id for row in rows]
-            return (res_ids, res_assocs)
-        else:
-            res_docs = [self._persistence_dict_to_ion_object(row.doc) for row in rows]
-            return (res_docs, res_assocs)
+        return self._prepare_find_return(rows, res_assocs, id_only=id_only)
 
     def find_res_by_alternative_id(self, alt_id=None, alt_id_ns=None, id_only=False, filter=None):
         log.debug("find_res_by_alternative_id(restype=%s, alt_id_ns=%s)", alt_id, alt_id_ns)

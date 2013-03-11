@@ -12,6 +12,7 @@ import StringIO
 
 from pyon.util.log import log
 from pyon.core.exception import BadRequest
+
 try:
     import numpy as np
     _have_numpy = True
@@ -189,6 +190,14 @@ class IonObjectBase(object):
 
     #Decorator methods
 
+    def get_class_decorator_value(self, decorator):
+
+        if getattr(self, '_class_info'):
+            if self._class_info['decorators'].has_key(decorator):
+                return self._class_info['decorators'][decorator]
+
+        return None
+
     def is_decorator(self, field, decorator):
         if self._schema[field]['decorators'].has_key(decorator):
             return True
@@ -260,6 +269,13 @@ class IonObjectBase(object):
         for value in list_values:
             match_found = False
             for content_type in split_content_types:
+                #First check for valid ION types
+                from pyon.core.registry import issubtype
+                if isinstance(value, dict) and value.has_key('type_'):
+                    if value['type_'] == content_type.strip() or issubtype(value['type_'], content_type.strip()):
+                        match_found = True
+                        break
+
                 if type(value).__name__ == content_type.strip():
                     match_found = True
                     break

@@ -8,52 +8,49 @@ from mock import Mock
 from unittest import SkipTest
 from nose.plugins.attrib import attr
 
-from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT,PRED
+from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, Inconsistent
 from pyon.util.unit_test import IonUnitTestCase
 
 
 @attr('UNIT', group='resource')
 class TestResources(IonUnitTestCase):
 
-
     def test_resource_lcworkflow(self):
         default_workflow = lcs_workflows['InstrumentDevice']
 
-        self.assertEquals(len(CommonResourceLifeCycleSM.BASE_STATES), 16)
-        self.assertEquals(len(default_workflow.BASE_STATES), 16)
-        self.assertEquals(len(LCS), len(CommonResourceLifeCycleSM.BASE_STATES) + len(CommonResourceLifeCycleSM.STATE_ALIASES))
+        self.assertEquals(len(CommonResourceLifeCycleSM.BASE_STATES), 18)
+        self.assertEquals(len(default_workflow.BASE_STATES), 18)
 
-        self.assert_(LCS.DRAFT_PRIVATE in CommonResourceLifeCycleSM.BASE_STATES)
+        self.assert_(lcstate(LCS.DRAFT, AS.PRIVATE) in CommonResourceLifeCycleSM.BASE_STATES)
 
-        self.assert_(CommonResourceLifeCycleSM.is_in_state(LCS.DRAFT_PRIVATE, LCS.DRAFT_PRIVATE))
-        self.assert_(CommonResourceLifeCycleSM.is_in_state(LCS.DEVELOPED_PRIVATE, 'REGISTERED'))
+        self.assert_(CommonResourceLifeCycleSM.is_in_state(lcstate(LCS.DRAFT, AS.PRIVATE), lcstate(LCS.DRAFT, AS.PRIVATE)))
 
         events = set(ev for (s0,ev) in CommonResourceLifeCycleSM.BASE_TRANSITIONS)
         self.assertFalse(set(CommonResourceLifeCycleSM.BASE_STATES) & events)
 
         self.assertEquals(len(default_workflow.transitions), 84)
 
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_PRIVATE, LCE.PLAN), LCS.PLANNED_PRIVATE)
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.PLAN), lcstate(LCS.PLANNED,AS.PRIVATE))
 
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_PRIVATE, LCE.ANNOUNCE), LCS.DRAFT_DISCOVERABLE)
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_DISCOVERABLE, LCE.UNANNOUNCE), LCS.DRAFT_PRIVATE)
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_PRIVATE, LCE.ENABLE), LCS.DRAFT_AVAILABLE)
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_AVAILABLE, LCE.DISABLE), LCS.DRAFT_DISCOVERABLE)
-        self.assertEquals(default_workflow.get_successor(LCS.DRAFT_AVAILABLE, LCE.UNANNOUNCE), LCS.DRAFT_PRIVATE)
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.ANNOUNCE), lcstate(LCS.DRAFT,AS.DISCOVERABLE))
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.DISCOVERABLE), LCE.UNANNOUNCE), lcstate(LCS.DRAFT,AS.PRIVATE))
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.ENABLE), lcstate(LCS.DRAFT,AS.AVAILABLE))
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.AVAILABLE), LCE.DISABLE), lcstate(LCS.DRAFT,AS.DISCOVERABLE))
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.AVAILABLE), LCE.UNANNOUNCE), lcstate(LCS.DRAFT,AS.PRIVATE))
 
-        self.assertEquals(default_workflow.get_successor(LCS.PLANNED_PRIVATE, LCE.PLAN), None)
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.PLANNED,AS.PRIVATE), LCE.PLAN), None)
 
-        self.assertEquals(default_workflow.get_successor(LCS.PLANNED_PRIVATE, LCE.DEVELOP), LCS.DEVELOPED_PRIVATE)
-        self.assertEquals(default_workflow.get_successor(LCS.DEVELOPED_PRIVATE, LCE.RETIRE), LCS.RETIRED)
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.PLANNED,AS.PRIVATE), LCE.DEVELOP), lcstate(LCS.DEVELOPED,AS.PRIVATE))
+        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DEVELOPED,AS.PRIVATE), LCE.RETIRE), lcstate(LCS.RETIRED,AS.PRIVATE))
 
-        self.assertEquals(default_workflow.get_successors(LCS.PLANNED_PRIVATE), {LCE.DEVELOP: LCS.DEVELOPED_PRIVATE,
-                                                                                 LCE.INTEGRATE: LCS.INTEGRATED_PRIVATE,
-                                                                                 LCE.DEPLOY: LCS.DEPLOYED_PRIVATE,
-                                                                                 LCE.ANNOUNCE: LCS.PLANNED_DISCOVERABLE,
-                                                                                 LCE.ENABLE: LCS.PLANNED_AVAILABLE,
-                                                                                 LCE.RETIRE: LCS.RETIRED})
+        self.assertEquals(default_workflow.get_successors(lcstate(LCS.PLANNED,AS.PRIVATE)), {LCE.DEVELOP: lcstate(LCS.DEVELOPED,AS.PRIVATE),
+                                                                                 LCE.INTEGRATE: lcstate(LCS.INTEGRATED,AS.PRIVATE),
+                                                                                 LCE.DEPLOY: lcstate(LCS.DEPLOYED,AS.PRIVATE),
+                                                                                 LCE.ANNOUNCE: lcstate(LCS.PLANNED,AS.DISCOVERABLE),
+                                                                                 LCE.ENABLE: lcstate(LCS.PLANNED,AS.AVAILABLE),
+                                                                                 LCE.RETIRE: lcstate(LCS.RETIRED,AS.PRIVATE)})
 
 #        self.assertEquals(default_workflow.get_predecessors(LCS.DEVELOPED_PRIVATE), {LCS.PLANNED: LCE.DEVELOP})
 
@@ -154,6 +151,15 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
+
+
+        extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceDevice, '123')
+        self.assertEquals(extended_res.resource, instrument_device)
+        self.assertEquals(len(extended_res.owners),1)
+
+
+        with self.assertRaises(Inconsistent) as cm:
+            extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceBad, '123')
 
         #Test adding extra paramaters to methods
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123', resource_name='AltSystem_Resource')

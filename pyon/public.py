@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Entry point for importing common Pyon/ION packages. Most files should only need to import from here."""
+"""Entry point for importing common Pyon/ION packages. Higher level processes should only need to import from here."""
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
 __license__ = 'Apache 2.0'
@@ -45,9 +45,9 @@ from pyon.ion.stream import StreamPublisher, StreamSubscriber
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
             'ProcessSubscriber', 'ProcessPublisher']
 
-from pyon.ion.resource import ResourceTypes, RT, ObjectTypes, OT,PredicateType, PRED, AssociationType, AT, LifeCycleStates, LCS, LCE
-__all__ += ['RT', 'OT', 'PRED', 'AT', 'LCS', 'LCE']
-__all__ += ['ResourceTypes', 'ObjectTypes', 'PredicateType', 'AssociationType', 'LifeCycleStates']
+from pyon.ion.resource import ResourceTypes, RT, ObjectTypes, OT,PredicateType, PRED, LifeCycleStates, LCS, LCE, AS, AvailabilityStates
+__all__ += ['RT', 'OT', 'PRED', 'AT', 'LCS', 'LCE', 'AS']
+__all__ += ['ResourceTypes', 'ObjectTypes', 'PredicateType', 'AssociationType', 'LifeCycleStates', 'AvailabilityStates']
 
 from pyon.ion.streamproc import StreamProcess
 __all__ += ['StreamProcess']

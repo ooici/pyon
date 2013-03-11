@@ -5,8 +5,8 @@ __author__ = 'Michael Meisinger'
 import uuid
 
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import NotFound, Inconsistent
-from pyon.ion.resource import PRED, RT
+from pyon.core.exception import NotFound, Inconsistent, BadRequest
+from pyon.ion.resource import PRED, RT, LCS, AS, LCE, lcstate
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
@@ -157,8 +157,6 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(att_objs_without_content[0].content, '')
 
     def test_get_resource_extension(self):
-
-
         #Testing multiple instrument owners
         subject1 = "/DC=org/DC=cilogon/C=US/O=ProtectNetwork/CN=Roger Unwin A254"
 
@@ -190,3 +188,132 @@ class TestResourceRegistry(IonIntegrationTestCase):
 
         extended_resource_list = self.rr.get_resource_extension(str([user_info_id1,user_info_id2]), 'ExtendedInformationResource')
         self.assertEqual(len(extended_resource_list), 2)
+
+    def test_lifecycle(self):
+        svc_obj = IonObject("ServiceDefinition", name='abc')
+        sdid, _ = self.rr.create(svc_obj)
+
+        svc_obj1 = self.rr.read(sdid)
+        self.assertEquals(svc_obj1.lcstate, LCS.DEPLOYED)
+        self.assertEquals(svc_obj1.availability, AS.AVAILABLE)
+
+
+        inst_obj = IonObject("InstrumentDevice", name='instrument')
+        iid, _ = self.rr.create(inst_obj)
+
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DRAFT)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        lcres = self.rr.execute_lifecycle_transition(iid, LCE.PLAN)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.PLANNED)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+        self.assertEquals(lcres, lcstate(LCS.PLANNED,AS.PRIVATE))
+
+        self.rr.execute_lifecycle_transition(iid, LCE.DEVELOP)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, "!!NONE")
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.PLAN)
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.DEVELOP)
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.UNANNOUNCE)
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.DISABLE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.ANNOUNCE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.ANNOUNCE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.INTEGRATE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.INTEGRATED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.DEPLOY)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.INTEGRATE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.INTEGRATED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.DEVELOP)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEVELOPED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 0)
+
+        model_obj = IonObject("InstrumentModel", name='model1')
+        mid, _ = self.rr.create(model_obj)
+        aid1 = self.rr.create_association(iid, PRED.hasModel, mid)
+
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 1)
+
+        res_objs,_ = self.rr.find_resources("InstrumentDevice")
+        self.assertEquals(len(res_objs), 1)
+        res_objs,_ = self.rr.find_resources(name="instrument")
+        self.assertEquals(len(res_objs), 1)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.RETIRED)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        res_objs,_ = self.rr.find_resources("InstrumentDevice")
+        self.assertEquals(len(res_objs), 0)
+        res_objs,_ = self.rr.find_resources(name="instrument")
+        self.assertEquals(len(res_objs), 0)
+        aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
+        self.assertEquals(len(aids), 0)
+
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.ANNOUNCE)
+
+
+        inst_obj = IonObject("InstrumentDevice", name='instrument')
+        iid, _ = self.rr.create(inst_obj)
+
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DRAFT)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        self.rr.set_lifecycle_state(iid, LCS.PLANNED)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.PLANNED)
+        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+
+        self.rr.set_lifecycle_state(iid, AS.DISCOVERABLE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.PLANNED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        with self.assertRaises(BadRequest):
+            self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.AVAILABLE))
+
+        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.DISCOVERABLE))
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.AVAILABLE))
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
+        self.assertEquals(inst_obj1.availability, AS.AVAILABLE)
