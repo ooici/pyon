@@ -10,7 +10,7 @@ from nose.plugins.attrib import attr
 
 from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, Inconsistent
 from pyon.util.unit_test import IonUnitTestCase
 
 
@@ -151,6 +151,15 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
+
+
+        extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceDevice, '123')
+        self.assertEquals(extended_res.resource, instrument_device)
+        self.assertEquals(len(extended_res.owners),1)
+
+
+        with self.assertRaises(Inconsistent) as cm:
+            extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceBad, '123')
 
         #Test adding extra paramaters to methods
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123', resource_name='AltSystem_Resource')
