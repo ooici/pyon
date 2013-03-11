@@ -337,3 +337,13 @@ class InterceptorTest(PyonTestCase):
 
         # Should work
         validate_interceptor.incoming(invoke)
+
+        #Check to see if the class level decorators were set properly
+        deco_value = decorator_obj.get_class_decorator_value('SpecialObject')
+        self.assertEqual(deco_value,'')
+        deco_value = decorator_obj.get_class_decorator_value('OriginResourceType')
+        self.assertEqual(deco_value,'MyObject')
+        deco_value = decorator_obj.get_class_decorator_value('Unknown')
+        self.assertEqual(deco_value,None)
+
+

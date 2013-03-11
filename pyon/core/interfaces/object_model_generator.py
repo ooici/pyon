@@ -490,12 +490,12 @@ class ObjectModelGenerator:
                 else:
                     schema_extended = False
                     current_class_schema = "\n    _schema = {"
-                    line = line.replace(':', '(' + super_class + '')
+                    line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
                 class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
                 self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n"
 
-                self.dataobject_output_text += "    _class_info = {'name': '" + current_class + "', 'parent_class': '" + super_class + "', 'decorators': {" + class_decorators + "} }\n\n"
+                self.dataobject_output_text += "    _class_info = {'name': '" + "', 'decorators': {" + class_decorators + "} }\n\n"
                 self.dataobject_output_text += "    def __init__(self"
                 current_class_comment = class_comment
                 class_comment = ''
