@@ -190,6 +190,14 @@ class IonObjectBase(object):
 
     #Decorator methods
 
+    def get_class_decorator_value(self, decorator):
+
+        if getattr(self, '_class_info'):
+            if self._class_info['decorators'].has_key(decorator):
+                return self._class_info['decorators'][decorator]
+
+        return None
+
     def is_decorator(self, field, decorator):
         if self._schema[field]['decorators'].has_key(decorator):
             return True
