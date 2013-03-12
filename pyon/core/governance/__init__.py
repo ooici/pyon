@@ -190,9 +190,8 @@ def get_resource_commitments(actor_id, resource_id):
 
         cur_time = int(get_ion_ts())
         commitment_list = []
-        for com in commitments:  #TODO - update when Retired is removed from find_objects
-            if com.consumer == actor_id and com.lcstate != LCS.RETIRED and ( com.expiration == 0 or\
-                                                                             ( com.expiration > 0 and cur_time < com.expiration)):
+        for com in commitments:
+            if com.consumer == actor_id  and ( com.expiration == 0 or ( com.expiration > 0 and cur_time < com.expiration)):
                 commitment_list.append(com)
 
         if commitment_list:

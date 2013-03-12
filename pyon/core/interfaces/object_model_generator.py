@@ -348,6 +348,7 @@ class ObjectModelGenerator:
         init_lines = []
         first_time = True
         decorators = ''
+        class_decorators = ''
         description = ''
         csv_description = ''
         class_comment = ''
@@ -428,6 +429,20 @@ class ObjectModelGenerator:
             elif line and (line[0].isalpha() or line.startswith("#")):
                 if '!enum' in line:
                     continue
+
+                #Handle class level decorators
+                if line.startswith('#@'):
+                    dec = line.strip()[2:].split("=")
+                    key = dec[0]
+                    value = dec[1] if len(dec) == 2 else ""
+                    # Add it to the decorator list
+                    if not class_decorators:
+                        class_decorators = '"' + key + '":"' + value + '"'
+                    else:
+                        class_decorators = class_decorators + ', "' + key + '":"' + value + '"'
+                    continue
+
+                #Handle class level comments
                 if line.startswith('#'):
                     dsc = line[1:].strip()
                     if not class_comment:
@@ -435,6 +450,7 @@ class ObjectModelGenerator:
                     else:
                         class_comment = class_comment + ' ' + dsc
                     continue
+
                 if first_time:
                     first_time = False
                 else:
@@ -477,9 +493,13 @@ class ObjectModelGenerator:
                     line = line.replace(':', '(IonObjectBase')
                 init_lines.append("        self.type_ = '" + current_class + "'\n")
                 class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
-                self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n    def __init__(self"
+                self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n"
+
+                self.dataobject_output_text += "    _class_info = {'name': '" + "', 'decorators': {" + class_decorators + "} }\n\n"
+                self.dataobject_output_text += "    def __init__(self"
                 current_class_comment = class_comment
                 class_comment = ''
+                class_decorators = ''
         if len(args) > 0:
             for arg in args:
                 self.dataobject_output_text += arg
