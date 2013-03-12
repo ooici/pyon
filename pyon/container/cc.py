@@ -83,13 +83,18 @@ class Container(BaseContainerAgent):
                 raise ContainerError("CC capability %s already initialized" % cap)
             try:
                 cap_def = self._cap_definitions[cap]
-                if not cap_def.get("enable", True):
-                    continue
                 log.debug("__init__(): Initializing '%s'" % cap)
                 cap_obj = named_any(cap_def['class'])(container=self)
                 self._cap_instances[cap] = cap_obj
+                if 'depends_on' in cap_def and cap_def['depends_on']:
+                    dep_list = cap_def['depends_on'].split(',')
+                    for dep in dep_list:
+                        dep = dep.strip()
+                        if dep not in self._cap_initialized:
+                            raise ContainerError("CC capability %s dependent on non-existing capability %s" % (cap, dep))
                 if 'field' in cap_def and cap_def['field']:
                     setattr(self, cap_def['field'], cap_obj)
+                self._cap_initialized.append(cap)
             except Exception as ex:
                 log.error("Container Capability %s init error: %s" % (cap, ex))
                 raise
@@ -100,24 +105,32 @@ class Container(BaseContainerAgent):
         log.debug("Container initialized, OK.")
 
     def _load_capabilities(self):
-        self._capabilities = []   # List of capability constants active in container
-        self._cap_instances = {}  # Dict mapping capability->manager instance
+        self._cap_initialized = []  # List of capability constants initialized in container
+        self._capabilities = []     # List of capability constants active in container
+        self._cap_instances = {}    # Dict mapping capability->manager instance
 
         self._cap_definitions = Config(["res/config/container_capabilities.yml"]).data['capabilities']
 
-        profile_filename = CFG.container.capability.profile
+        profile_filename = CFG.container.profile
+        if not profile_filename.endswith(".yml"):
+            profile_filename = "res/profile/%s.yml" % profile_filename
+        log.info("Loading CC capability profile from file: %s", profile_filename)
         profile_cfg = Config([profile_filename]).data
         if not isinstance(profile_cfg, dict) or profile_cfg['type'] != "profile" or not "profile" in profile_cfg:
             raise ContainerError("Container capability profile invalid: %s" % profile_filename)
 
         self.cap_profile = profile_cfg['profile']
 
-        if "capabilities" in self.cap_profile:
+        if "capabilities" in self.cap_profile and self.cap_profile['capabilities']:
             dict_merge(self._cap_definitions, self.cap_profile['capabilities'], True)
 
         CCAP.clear()
         cap_list = self._cap_definitions.keys()
         CCAP.update(zip(cap_list, cap_list))
+
+        if "config" in self.cap_profile and self.cap_profile['config']:
+            # @TODO - Config override, but at this point it's to late to apply to CFG
+            pass
 
     def start(self):
         log.debug("Container starting...")
@@ -360,16 +373,16 @@ class SignalHandlerCapability(ContainerCapability):
 
 class EventPublisherCapability(ContainerCapability):
     def __init__(self, container):
-        self.container = container
+        ContainerCapability.__init__(self, container)
         self.container.event_pub = None
     def start(self):
         self.container.event_pub = EventPublisher()
     def stop(self):
         self.container.event_pub.close()
 
-class ObjectsStoreCapability(ContainerCapability):
+class ObjectStoreCapability(ContainerCapability):
     def __init__(self, container):
-        self.container = container
+        ContainerCapability.__init__(self, container)
         self.container.object_store = None
     def start(self):
         self.container.object_store = self.container.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
@@ -378,7 +391,7 @@ class ObjectsStoreCapability(ContainerCapability):
 
 class LocalRouterCapability(ContainerCapability):
     def __init__(self, container):
-        self.container = container
+        ContainerCapability.__init__(self, container)
         self.container.local_router = None
     def start(self):
         # internal router for local transports
@@ -404,5 +417,5 @@ class ContainerAgentCapability(ContainerCapability):
 
 class FileSystemCapability(ContainerCapability):
     def __init__(self, container):
-        self.container = container
+        ContainerCapability.__init__(self, container)
         self.container.file_system = FileSystem(CFG)
