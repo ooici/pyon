@@ -159,7 +159,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         return str(self._process.id)
 
     def _get_sflow_manager(self):
-        return self._process.container.sflow_manager
+        return getattr(self._process.container, "sflow_manager", None)
 
 
 class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpointUnit):
