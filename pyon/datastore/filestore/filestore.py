@@ -19,18 +19,31 @@ from pyon.ion.resource import LCS, LCE, PRED, RT, AS, get_restype_lcsm, is_resou
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
+from pyon.util.file_sys import FileSystem, FS
 
 from interface.objects import Attachment, AttachmentType, ResourceModificationType
 
 
 class FileDataStore(object):
-    def __init__(self, container):
+    def __init__(self, container, datastore_name=""):
         self.container = container
+        self.datastore_name = datastore_name
+
+        # Object serialization/deserialization
         self._io_serializer = IonObjectSerializer()
         self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
 
+    def start(self):
+        if self.container.has_capability(self.container.CCAP.FILE_SYSTEM):
+            self.datastore_dir = FileSystem.get_url(FS.FILESTORE, self.datastore_name)
+        else:
+            self.datastore_dir = "./tmp/%s" % self.datastore_name
+
+    def stop(self):
+        pass
+
     def _get_filename(self, object_id):
-        return "./tmp/resources/%s" % object_id
+        return "%s/%s" % (self.datastore_dir, object_id)
 
     def create(self, obj, object_id=None, attachments=None, datastore_name=""):
         """
