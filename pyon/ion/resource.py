@@ -458,13 +458,29 @@ class ExtendedResourceContainer(object):
                 # Field gets value from method or service call (local to current executing process)
                 if decorator == 'Method':
                     deco_value = obj.get_decorator_value(field, decorator)
-                    if deco_value:
-                        method_name = deco_value
-                    else:
-                        method_name = 'get_' + field
+                    method_name = deco_value if deco_value else 'get_' + field
+
                     ret_val = self.execute_method(resource._id, method_name, **kwargs)
                     if ret_val is not None:
                         setattr(obj, field, ret_val)
+
+                elif decorator == 'ServiceRequest':
+                    deco_value = obj.get_decorator_value(field, decorator)
+                    if obj._schema[field]['type'] != 'ServiceRequest':
+                        log.error('The field %s is an incorrect type for a ServiceRequest decorator.', field)
+                        continue
+
+                    method_name = deco_value if deco_value else 'get_' + field
+
+                    if method_name.find('.') == -1:
+                        raise Inconsistent('The field %s decorated as a ServiceRequest only supports remote operations.', field)
+
+                    service_client, operation = self._get_remote_info(method_name)
+                    rmi_call = method_name.split('.')
+                    query_string_params = { 'resource_id': resource._id }
+                    query_string_params.update(self._get_method_arguments(service_client, operation, **kwargs))
+                    ret_val = IonObject(OT.ServiceRequest,service_name=rmi_call[0], service_operation=operation, query_string_params=query_string_params )
+                    setattr(obj, field, ret_val)
 
                 # Fill field based on compound association chains. Results in nested lists of resource objects
                 elif self.is_compound_association(decorator):
@@ -676,16 +692,7 @@ class ExtendedResourceContainer(object):
             #First look to see if this is a remote method
             if method_name.find('.') > 0:
 
-                #This is a remote method.
-                rmi_call = method_name.split('.')
-                #Retrieve service definition
-                service_name = rmi_call[0]
-                operation = rmi_call[1]
-                if service_name == 'resource_registry':
-                    service_client = self._rr
-                else:
-                    target_service = get_service_registry().get_service_by_name(service_name)
-                    service_client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
+                service_client, operation = self._get_remote_info(method_name)
 
                 methodToCall = getattr(service_client, operation)
                 param_list = [resource_id]
@@ -712,8 +719,36 @@ class ExtendedResourceContainer(object):
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
 
-    def _get_method_arguments(self, module, method_name, **kwargs):
 
+    def _get_remote_info(self, method_name):
+        """
+        Returns the service client and operation name
+
+        @param method_name:
+        @return:
+        """
+        #This is a remote method.
+        rmi_call = method_name.split('.')
+        #Retrieve service definition
+        service_name = rmi_call[0]
+        operation = rmi_call[1]
+        if service_name == 'resource_registry':
+            service_client = self._rr
+        else:
+            target_service = get_service_registry().get_service_by_name(service_name)
+            service_client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
+
+        return service_client, operation
+
+
+    def _get_method_arguments(self, module, method_name, **kwargs):
+        """
+        Returns a dict of the allowable method parameters
+        @param module:
+        @param method_name:
+        @param kwargs:
+        @return:
+        """
         param_dict = {}
 
         try:
