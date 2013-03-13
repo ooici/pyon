@@ -32,7 +32,7 @@ from interface.objects import CapabilityType
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 #Agent imports
-from pyon.agent.instrument_fsm import InstrumentFSM
+from pyon.agent.instrument_fsm import InstrumentFSM, ThreadSafeFSM
 from pyon.agent.instrument_fsm import FSMStateError
 from pyon.agent.instrument_fsm import FSMCommandUnknownError
 from pyon.agent.common import BaseEnum
@@ -810,7 +810,7 @@ class ResourceAgent(BaseResourceAgent):
         """
 
         # Instrument agent state machine.
-        self._fsm = InstrumentFSM(ResourceAgentState, ResourceAgentEvent,
+        self._fsm = ThreadSafeFSM(ResourceAgentState, ResourceAgentEvent,
                             ResourceAgentEvent.ENTER, ResourceAgentEvent.EXIT)
 
         self._fsm.add_handler(ResourceAgentState.UNINITIALIZED, ResourceAgentEvent.ENTER, self._handler_uninitialized_enter)
