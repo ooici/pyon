@@ -29,6 +29,16 @@ def apply_local_configuration(system_cfg, local_conf_paths=None):
         local_cfg = read_local_configuration(local_conf_paths)
         apply_configuration(system_cfg, local_cfg)
 
+def apply_profile_configuration(system_cfg, bootstrap_config):
+    profile_filename = bootstrap_config.get_safe("container.profile", None)
+    if profile_filename and not profile_filename.endswith(".yml"):
+        profile_filename = "res/profile/%s.yml" % profile_filename
+    from pyon.util.config import Config
+    profile_cfg = Config([profile_filename]).data
+    config_override = profile_cfg.get_safe("profile.config")
+    if config_override and isinstance(config_override, dict):
+        from pyon.util.containers import dict_merge
+        dict_merge(system_cfg, config_override, inplace=True)
 
 def read_standard_configuration():
     pyon_cfg = read_local_configuration(pyon.DEFAULT_CONFIG_PATHS)

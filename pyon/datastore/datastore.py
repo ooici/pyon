@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Management of datastores in the container"""
+
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
@@ -32,193 +34,27 @@ class DataStore(object):
         DS_STATE: DS_PROFILE.STATE,
     }
 
-    def close(self):
-        """
-        Close any connections required for this datastore.
-        """
-        pass
-
-    def create_datastore(self, datastore_name="", create_indexes=True):
-        """
-        Create a data store with the given name.  This is
-        equivalent to creating a database on a database server.
-        """
-        pass
-
-    def delete_datastore(self, datastore_name=""):
-        """
-        Delete the data store with the given name.  This is
-        equivalent to deleting a database from a database server.
-        """
-        pass
-
-    def list_datastores(self):
-        """
-        List all data stores within this data store server. This is
-        equivalent to listing all databases hosted on a database server.
-        """
-        pass
-
-    def info_datastore(self, datastore_name=""):
-        """
-        List information about a data store.  Content may vary based
-        on data store type.
-        """
-        pass
-
-    def datastore_exists(self, datastore_name=""):
-        """
-        Indicates whether named data store currently exists.
-        """
-        pass
-
-    def list_objects(self, datastore_name=""):
-        """
-        List all object types existing in the data store instance.
-        """
-        pass
-
-    def list_object_revisions(self, object_id, datastore_name=""):
-        """
-        Method for itemizing all the versions of a particular object
-        known to the data store.
-        """
-        pass
-
-    def create(self, obj, object_id=None, datastore_name=""):
-        """"
-        Persist a new Ion object in the data store. An '_id' and initial
-        '_rev' value will be added to the doc.
-        """
-        pass
-
-    def create_doc(self, obj, object_id=None, datastore_name=""):
-        """"
-        Persist a new raw doc in the data store. An '_id' and initial
-        '_rev' value will be added to the doc.
-        """
-        pass
-
-    def create_mult(self, objects, object_ids=None):
-        """
-        Create more than one ION object.
-        """
-        pass
-
-    def create_doc_mult(self, docs, object_ids=None):
-        """
-        Create multiple raw docs.
-        Returns list of (Success, Oid, rev)
-        """
-        pass
-
-    def read(self, object_id, rev_id="", datastore_name=""):
-        """"
-        Fetch an Ion object instance.  If rev_id is specified, an attempt
-        will be made to return that specific object version.  Otherwise,
-        the HEAD version is returned.
-        """
-        pass
-
-    def read_doc(self, object_id, rev_id="", datastore_name=""):
-        """"
-        Fetch a raw doc instance.  If rev_id is specified, an attempt
-        will be made to return that specific doc version.  Otherwise,
-        the HEAD version is returned.
-        """
-        pass
-
-    def read_mult(self, object_ids, datastore_name=""):
-        """"
-        Fetch multiple Ion object instances, HEAD rev.
-        """
-        pass
-
-    def read_doc_mult(self, object_ids, datastore_name=""):
-        """"
-        Fetch a raw doc instances, HEAD rev.
-        """
-        pass
-
-    def update(self, obj, datastore_name=""):
-        """
-        Update an existing Ion object in the data store.  The '_rev' value
-        must exist in the object and must be the most recent known object
-        version. If not, a Conflict exception is thrown.
-        """
-        pass
-
-    def update_doc(self, obj, datastore_name=""):
-        """
-        Update an existing raw doc in the data store.  The '_rev' value
-        must exist in the doc and must be the most recent known doc
-        version. If not, a Conflict exception is thrown.
-        """
-        pass
-
-    def delete(self, obj, datastore_name=""):
-        """
-        Remove all versions of specified Ion object from the data store.
-        This method will check the '_rev' value to ensure that the object
-        provided is the most recent known object version.  If not, a
-        Conflict exception is thrown.
-        If object id (str) is given instead of an object, deletes the
-        object with the given id.
-        """
-        pass
-
-    def delete_doc(self, obj, datastore_name=""):
-        """
-        Remove all versions of specified raw doc from the data store.
-        This method will check the '_rev' value to ensure that the doc
-        provided is the most recent known doc version.  If not, a
-        Conflict exception is thrown.
-        If object id (str) is given instead of an object, deletes the
-        object with the given id.
-        """
-        pass
-
-    def find_objects(self, subject, predicate="", object_type="", id_only=False):
-        """
-        Find objects (or object ids) by association from a given subject or subject id (if str).
-        Returns a tuple (list_of_objects, list_of_associations) if id_only == False, or
-        (list_of_object_ids, list_of_associations) if id_only == True.
-        Predicate and object_type are optional to narrow the search down. Object_type can only
-        be set if predicate is set as well.
-        """
-        pass
-
-    def find_subjects(self, subject_type="", predicate="", obj="", id_only=False):
-        """
-        Find subjects (or subject ids) by association from a given object or object id (if str).
-        Returns a tuple (list_of_subjects, list_of_associations) if id_only == False, or
-        (list_of_subject_ids, list_of_associations) if id_only == True.
-        Predicate and subject_type are optional to narrow the search down. Subject_type can only
-        be set if predicate is set as well.
-        """
-        pass
-
-    def find_associations(self, subject="", predicate="", obj="", assoc_type='H2H', id_only=True):
-        """
-        Find associations by subject, predicate, object. Either subject and predicate have
-        to be provided or predicate only. Returns either a list of associations or
-        a list of association ids.
-        """
-        pass
-
-    def _preload_create_doc(self, doc):
-        """
-        Stealth method used to force pre-defined objects into the data store
-        """
-        pass
-
 
 class DatastoreManager(object):
     """
     Container manager for datastore instances.
     @TODO: Remove caching. This is harmful and no good
     """
-    def __init__(self):
+    def __init__(self, container=None):
+        self._datastores = {}
+        self.container = container
+
+    def start(self):
+        pass
+
+    def stop(self):
+        log.debug("DatastoreManager.stop() [%d datastores]", len(self._datastores))
+        for x in self._datastores.itervalues():
+            try:
+                x.close()
+            except Exception as ex:
+                log.exception("Error closing datastore")
+
         self._datastores = {}
 
     @classmethod
@@ -278,15 +114,3 @@ class DatastoreManager(object):
         generic_ds = cls.get_datastore_instance("")
         return generic_ds.datastore_exists(ds_name)
 
-    def start(self):
-        pass
-
-    def stop(self):
-        log.debug("DatastoreManager.stop() [%d datastores]", len(self._datastores))
-        for x in self._datastores.itervalues():
-            try:
-                x.close()
-            except Exception as ex:
-                log.exception("Error closing datastore")
-
-        self._datastores = {}

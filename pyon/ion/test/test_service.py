@@ -4,7 +4,7 @@ __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
 import pyon
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 
 class TestService(BaseService):
@@ -15,6 +15,3 @@ class ServiceTest(IonIntegrationTestCase):
         # TODO: Make an equivalent of R1's ServiceProcess
         srv = TestService()
         #srv.serve_forever()
-
-if __name__ == '__main__':
-    unittest.main()

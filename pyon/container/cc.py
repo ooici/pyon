@@ -4,27 +4,20 @@
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 
-from pyon.container.apps import AppManager
-from pyon.container.procs import ProcManager
+from pyon.container import ContainerCapability
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerError, BadRequest
-from pyon.core.governance.governance_controller import GovernanceController
-from pyon.container.management import ContainerManager
-from pyon.datastore.datastore import DataStore, DatastoreManager
-from pyon.event.event import EventRepository, EventPublisher
-from pyon.ion.directory import Directory
-from pyon.ion.exchange import ExchangeManager
-from pyon.ion.resregistry import ResourceRegistry
-from pyon.ion.state import StateRepository
+from pyon.datastore.datastore import DataStore
+from pyon.event.event import EventPublisher
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.net.transport import LocalRouter
-from pyon.util.containers import get_default_container_id
-from pyon.util.file_sys import FileSystem
+from pyon.util.config import Config
+from pyon.util.containers import get_default_container_id, DotDict, named_any, dict_merge
 from pyon.util.log import log
-from pyon.util.sflow import SFlowManager
 from pyon.util.context import LocalContextMixin
 from pyon.util.greenlet_plugin import GreenletLeak
+from pyon.util.file_sys import FileSystem
 
 from interface.objects import ContainerStateEnum
 from interface.services.icontainer_agent import BaseContainerAgent
@@ -37,6 +30,10 @@ import traceback
 import sys
 import gevent
 from contextlib import contextmanager
+
+# Capability constants for use in:
+# if self.container.has_capability(CCAP.RESOURCE_REGISTRY):
+CCAP = DotDict()
 
 
 class Container(BaseContainerAgent):
@@ -60,162 +57,116 @@ class Container(BaseContainerAgent):
         # set container id and cc_agent name (as they are set in base class call)
         self.id = get_default_container_id()
         self.name = "cc_agent_%s" % self.id
-        self._capabilities = []
 
         bootstrap.container_instance = self
         Container.instance = self
+        self.container = self  # Make self appear as process to service clients
+        self.CCAP = CCAP
 
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
 
         # Keep track of the overrides from the command-line, so they can trump app/rel file data
         self.spawn_args = kwargs
 
-        # DatastoreManager - controls access to Datastores (both mock and couch backed)
-        self.datastore_manager = DatastoreManager()
+        # Greenlet context-local storage
+        self.context = LocalContextMixin()
 
-        # TODO: Do not start a capability here. Symmetric start/stop
-        self.datastore_manager.start()
-        self._capabilities.append("DATASTORE_MANAGER")
+        # Load general capabilities file and augment with specific profile
+        self._load_capabilities()
 
-        # Instantiate Directory
-        self.directory = Directory()
-
-        # internal router
-        self.local_router = None
-
-        # Create this Container's specific ExchangeManager instance
-        self.ex_manager = ExchangeManager(self)
-
-        # Create this Container's specific ProcManager instance
-        self.proc_manager = ProcManager(self)
-
-        # Create this Container's specific AppManager instance
-        self.app_manager = AppManager(self)
-
-        # File System - Interface to the OS File System, using correct path names and setups
-        self.file_system = FileSystem(CFG)
-
-        # Governance Controller - manages the governance related interceptors
-        self.governance_controller = GovernanceController(self)
-
-        # sFlow manager - controls sFlow stat emission
-        self.sflow_manager = SFlowManager(self)
-
-        self.cc_manager = ContainerManager(self)
+        # Start the capabilities
+        start_order = self.cap_profile['start_order']
+        for cap in start_order:
+            if cap not in self._cap_definitions:
+                raise ContainerError("CC capability %s not defined in profile" % cap)
+            if cap in self._capabilities or cap in self._cap_instances:
+                raise ContainerError("CC capability %s already initialized" % cap)
+            try:
+                cap_def = self._cap_definitions[cap]
+                log.debug("__init__(): Initializing '%s'" % cap)
+                cap_obj = named_any(cap_def['class'])(container=self)
+                self._cap_instances[cap] = cap_obj
+                if 'depends_on' in cap_def and cap_def['depends_on']:
+                    dep_list = cap_def['depends_on'].split(',')
+                    for dep in dep_list:
+                        dep = dep.strip()
+                        if dep not in self._cap_initialized:
+                            raise ContainerError("CC capability %s dependent on non-existing capability %s" % (cap, dep))
+                if 'field' in cap_def and cap_def['field']:
+                    setattr(self, cap_def['field'], cap_obj)
+                self._cap_initialized.append(cap)
+            except Exception as ex:
+                log.error("Container Capability %s init error: %s" % (cap, ex))
+                raise
 
         # Coordinates the container start
         self._status = "INIT"
 
-        # protection for when the container itself is used as a Process for clients
-        self.container = self
-
-        # publisher, initialized in start()
-        self.event_pub = None
-
-        # context-local storage
-        self.context = LocalContextMixin()
-
         log.debug("Container initialized, OK.")
+
+    def _load_capabilities(self):
+        self._cap_initialized = []  # List of capability constants initialized in container
+        self._capabilities = []     # List of capability constants active in container
+        self._cap_instances = {}    # Dict mapping capability->manager instance
+
+        self._cap_definitions = Config(["res/config/container_capabilities.yml"]).data['capabilities']
+
+        profile_filename = CFG.get_safe("container.profile", "development")
+        if not profile_filename.endswith(".yml"):
+            profile_filename = "res/profile/%s.yml" % profile_filename
+        log.info("Loading CC capability profile from file: %s", profile_filename)
+        profile_cfg = Config([profile_filename]).data
+        if not isinstance(profile_cfg, dict) or profile_cfg['type'] != "profile" or not "profile" in profile_cfg:
+            raise ContainerError("Container capability profile invalid: %s" % profile_filename)
+
+        self.cap_profile = profile_cfg['profile']
+
+        if "capabilities" in self.cap_profile and self.cap_profile['capabilities']:
+            dict_merge(self._cap_definitions, self.cap_profile['capabilities'], True)
+
+        CCAP.clear()
+        cap_list = self._cap_definitions.keys()
+        CCAP.update(zip(cap_list, cap_list))
+
+        if "config" in self.cap_profile and self.cap_profile['config']:
+            # @TODO - Config override, but at this point it's to late to apply to CFG
+            pass
 
     def start(self):
         log.debug("Container starting...")
         if self._is_started:
             raise ContainerError("Container already started")
 
-        # Check if this UNIX process already runs a Container.
-        self.pidfile = "cc-pid-%d" % os.getpid()
-        if os.path.exists(self.pidfile):
-            raise ContainerError("Container.on_start(): Container is a singleton per UNIX process. Existing pid file found: %s" % self.pidfile)
-
-        # write out a PID file containing our agent messaging name
-        with open(self.pidfile, 'w') as f:
-            pid_contents = {'messaging': dict(CFG.server.amqp),
-                            'container-agent': self.name,
-                            'container-xp': bootstrap.get_sys_name()}
-            f.write(msgpack.dumps(pid_contents))
-            atexit.register(self._cleanup_pid)
-            self._capabilities.append("PID_FILE")
-
-        # set up abnormal termination handler for this container
-        def handl(signum, frame):
+        start_order = self.cap_profile['start_order']
+        for cap in start_order:
+            if cap not in self._cap_instances:
+                continue
+            log.debug("start(): Starting '%s'" % cap)
             try:
-                self._cleanup_pid()     # cleanup the pidfile first
-                self.quit()             # now try to quit - will not error on second cleanup pidfile call
-            finally:
-                signal.signal(signal.SIGTERM, self._normal_signal)
-                os.kill(os.getpid(), signal.SIGTERM)
-        self._normal_signal = signal.signal(signal.SIGTERM, handl)
+                cap_obj = self._cap_instances[cap]
+                cap_obj.start()
+                self._capabilities.append(cap)
+            except Exception as ex:
+                log.error("Container Capability %s start error: %s" % (cap, ex))
+                raise
 
-        # set up greenlet debugging signal handler
-        gevent.signal(signal.SIGUSR2, self._handle_sigusr2)
-
-        self.datastore_manager.start()
-        self._capabilities.append("DATASTORE_MANAGER")
-
-        self._capabilities.append("DIRECTORY")
-
-        # Event repository
-        self.event_repository = EventRepository()
-        self.event_pub = EventPublisher()
-        self._capabilities.append("EVENT_REPOSITORY")
-
-        # Local resource registry
-        self.resource_registry = ResourceRegistry()
-        self._capabilities.append("RESOURCE_REGISTRY")
-
-        # Persistent objects
-        self.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
-
-        # State repository
-        self.state_repository = StateRepository()
-        self._capabilities.append("STATE_REPOSITORY")
-
-        # internal router for local transports
-        self.local_router = LocalRouter(bootstrap.get_sys_name())
-        self.local_router.start()
-        self.local_router.ready.wait(timeout=2)
-        self._capabilities.append("LOCAL_ROUTER")
-
-        # Start ExchangeManager, which starts the node (broker connection)
-        self.ex_manager.start()
-        self._capabilities.append("EXCHANGE_MANAGER")
-
-        self.proc_manager.start()
-        self._capabilities.append("PROC_MANAGER")
-
-        self.app_manager.start()
-        self._capabilities.append("APP_MANAGER")
-
-        self.governance_controller.start()
-        self._capabilities.append("GOVERNANCE_CONTROLLER")
-
-        if CFG.get_safe('container.sflow.enabled', False):
-            self.sflow_manager.start()
-            self._capabilities.append("SFLOW_MANAGER")
-
-        if CFG.get_safe('container.management.enabled', True):
-            self.cc_manager.start()
-            self._capabilities.append("CONTAINER_MANAGER")
-        # Start the CC-Agent API
-        rsvc = ProcessRPCServer(node=self.node, from_name=self.name, service=self, process=self)
-
-        cleanup = lambda _: self.proc_manager._cleanup_method(self.name, rsvc)
-
-        # Start an ION process with the right kind of endpoint factory
-        proc = self.proc_manager.proc_sup.spawn(name=self.name, listeners=[rsvc], service=self, cleanup_method=cleanup)
-        self.proc_manager.proc_sup.ensure_ready(proc)
-        proc.start_listeners()
-        self._capabilities.append("CONTAINER_AGENT")
-
-        self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
-                                     origin=self.id, origin_type="CapabilityContainer",
-                                     sub_type="START",
-                                     state=ContainerStateEnum.START)
+        if self.has_capability(CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
+                                         origin=self.id, origin_type="CapabilityContainer",
+                                         sub_type="START",
+                                         state=ContainerStateEnum.START)
 
         self._is_started    = True
         self._status        = "RUNNING"
 
         log.info("Container (%s) started, OK." , self.id)
+
+    def has_capability(self, capability):
+        """
+        Returns True if the given capability is in the list of container capabilities,
+        i.e. available in this container.
+        """
+        return capability in self._capabilities
 
     def _handle_sigusr2(self):#, signum, frame):
         """
@@ -251,7 +202,6 @@ class Container(BaseContainerAgent):
         with open("gls-%s" % os.getpid(), "w") as f:
             f.write("\n\n".join(allgls))
 
-
     @property
     def node(self):
         """
@@ -259,7 +209,7 @@ class Container(BaseContainerAgent):
 
         Defers to exchange manager, but only if it has been started, otherwise returns None.
         """
-        if "EXCHANGE_MANAGER" in self._capabilities:
+        if self.has_capability(CCAP.EXCHANGE_MANAGER):
             return self.ex_manager.default_node
 
         return None
@@ -326,16 +276,10 @@ class Container(BaseContainerAgent):
                 log.warn("Pidfile could not be deleted: %s" % str(e))
             self.pidfile = None
 
-    def has_capability(self, capability):
-        """
-        Returns True if the given capability is in the list of container capabilities.
-        """
-        return capability in self._capabilities
-
     def stop(self):
         log.info("=============== Container stopping... ===============")
 
-        if self.event_pub is not None:
+        if self.has_capability(CCAP.EVENT_PUBLISHER) and self.event_pub is not None:
             try:
                 self.event_pub.publish_event(event_type="ContainerLifecycleEvent",
                                              origin=self.id, origin_type="CapabilityContainer",
@@ -348,7 +292,9 @@ class Container(BaseContainerAgent):
             capability = self._capabilities.pop()
             log.debug("stop(): Stopping '%s'" % capability)
             try:
-                self._stop_capability(capability)
+                cap_obj = self._cap_instances[capability]
+                cap_obj.stop()
+                del self._cap_instances[capability]
             except Exception as ex:
                 log.exception("Container stop(): Error stop %s" % capability)
 
@@ -376,58 +322,6 @@ class Container(BaseContainerAgent):
         with self._push_status("START_REL_FROM_URL"):
             return self.app_manager.start_rel_from_url(rel_url=rel_url, config=config)
 
-    def _stop_capability(self, capability):
-        if capability == "CONTAINER_AGENT":
-            pass
-
-        elif capability == "APP_MANAGER":
-            self.app_manager.stop()
-
-        elif capability == "PROC_MANAGER":
-            self.proc_manager.stop()
-
-        elif capability == "EXCHANGE_MANAGER":
-            self.ex_manager.stop()
-
-        elif capability == "LOCAL_ROUTER":
-            if self.local_router is not None:
-                self.local_router.stop()
-
-        elif capability == "EVENT_REPOSITORY":
-            # close event repository (possible CouchDB connection)
-            self.event_repository.close()
-            self.event_pub.close()
-
-        elif capability == "STATE_REPOSITORY":
-            # close state repository (possible CouchDB connection)
-            self.state_repository.close()
-
-        elif capability == "RESOURCE_REGISTRY":
-            # close state resource registry (possible CouchDB connection)
-            self.resource_registry.close()
-
-        elif capability == "DIRECTORY":
-            # Close directory (possible CouchDB connection)
-            self.directory.close()
-
-        elif capability == "DATASTORE_MANAGER":
-            # close any open connections to datastores
-            self.datastore_manager.stop()
-
-        elif capability == "GOVERNANCE_CONTROLLER":
-            self.governance_controller.stop()
-
-        elif capability == "PID_FILE":
-            self._cleanup_pid()
-
-        elif capability == "SFLOW_MANAGER":
-            self.sflow_manager.stop()
-
-        elif capability == "CONTAINER_MANAGER":
-            self.cc_manager.stop()
-
-        else:
-            raise ContainerError("Cannot stop capability: %s" % capability)
 
     def fail_fast(self, err_msg="", skip_stop=False):
         """
@@ -442,3 +336,86 @@ class Container(BaseContainerAgent):
 
         # The exit code of the terminated process is set to non-zero
         os.kill(os.getpid(), signal.SIGTERM)
+
+
+class PidfileCapability(ContainerCapability):
+    def start(self):
+        # Check if this UNIX process already runs a Container.
+        self.container.pidfile = "cc-pid-%d" % os.getpid()
+        if os.path.exists(self.container.pidfile):
+            raise ContainerError("Container.on_start(): Container is a singleton per UNIX process. Existing pid file found: %s" % self.container.pidfile)
+
+        # write out a PID file containing our agent messaging name
+        with open(self.container.pidfile, 'w') as f:
+            pid_contents = {'messaging': dict(CFG.server.amqp),
+                            'container-agent': self.container.name,
+                            'container-xp': bootstrap.get_sys_name()}
+            f.write(msgpack.dumps(pid_contents))
+            atexit.register(self.container._cleanup_pid)
+
+    def stop(self):
+        self.container._cleanup_pid()
+
+class SignalHandlerCapability(ContainerCapability):
+    def start(self):
+        # set up abnormal termination handler for this container
+        def handl(signum, frame):
+            try:
+                self.container._cleanup_pid()     # cleanup the pidfile first
+                self.container.quit()             # now try to quit - will not error on second cleanup pidfile call
+            finally:
+                signal.signal(signal.SIGTERM, self._normal_signal)
+                os.kill(os.getpid(), signal.SIGTERM)
+        self._normal_signal = signal.signal(signal.SIGTERM, handl)
+
+        # set up greenlet debugging signal handler
+        gevent.signal(signal.SIGUSR2, self.container._handle_sigusr2)
+
+class EventPublisherCapability(ContainerCapability):
+    def __init__(self, container):
+        ContainerCapability.__init__(self, container)
+        self.container.event_pub = None
+    def start(self):
+        self.container.event_pub = EventPublisher()
+    def stop(self):
+        self.container.event_pub.close()
+
+class ObjectStoreCapability(ContainerCapability):
+    def __init__(self, container):
+        ContainerCapability.__init__(self, container)
+        self.container.object_store = None
+    def start(self):
+        self.container.object_store = self.container.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
+    def stop(self):
+        self.container.object_store.close()
+
+class LocalRouterCapability(ContainerCapability):
+    def __init__(self, container):
+        ContainerCapability.__init__(self, container)
+        self.container.local_router = None
+    def start(self):
+        # internal router for local transports
+        self.container.local_router = LocalRouter(bootstrap.get_sys_name())
+        self.container.local_router.start()
+        self.container.local_router.ready.wait(timeout=2)
+    def stop(self):
+        self.container.local_router.stop()
+
+class ContainerAgentCapability(ContainerCapability):
+    def start(self):
+        # Start the CC-Agent API
+        rsvc = ProcessRPCServer(node=self.container.node, from_name=self.container.name, service=self.container, process=self.container)
+
+        cleanup = lambda _: self.container.proc_manager._cleanup_method(self.container.name, rsvc)
+
+        # Start an ION process with the right kind of endpoint factory
+        proc = self.container.proc_manager.proc_sup.spawn(name=self.container.name, listeners=[rsvc], service=self.container, cleanup_method=cleanup)
+        self.container.proc_manager.proc_sup.ensure_ready(proc)
+        proc.start_listeners()
+    def stop(self):
+        pass
+
+class FileSystemCapability(ContainerCapability):
+    def __init__(self, container):
+        ContainerCapability.__init__(self, container)
+        self.container.file_system = FileSystem(CFG)
