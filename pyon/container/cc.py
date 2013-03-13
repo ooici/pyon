@@ -129,8 +129,8 @@ class Container(BaseContainerAgent):
         CCAP.update(zip(cap_list, cap_list))
 
         if "config" in self.cap_profile and self.cap_profile['config']:
-            # @TODO - Config override, but at this point it's to late to apply to CFG
-            pass
+            log.info("Container CFG was changed based on profile: %s", profile_filename)
+            # Note: The config update actually happens in pycc.py early on
 
     def start(self):
         log.debug("Container starting...")
