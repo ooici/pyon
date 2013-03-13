@@ -26,8 +26,6 @@ from interface.objects import Event
 EVENTS_XP = "pyon.events"
 EVENTS_XP_TYPE = "topic"
 
-PERSIST_ON_PUBLISH = False
-
 #The event will be ignored if older than this time period
 VALID_EVENT_TIME_PERIOD = 365 * 24 * 60 * 60 * 1000   # one year
 
@@ -123,14 +121,6 @@ class EventPublisher(Publisher):
             self.publish(event_object, to_name=to_name)
         except Exception as ex:
             log.exception("Failed to publish event (%s): '%s'" % (ex.message, event_object))
-            raise
-
-        try:
-            # store published event but only if we specified an event_repo
-            if PERSIST_ON_PUBLISH and self.event_repo:
-                self.event_repo.put_event(event_object)
-        except Exception as ex:
-            log.exception("Failed to store published event (%s): '%s'" % (ex.message, event_object))
             raise
 
         return event_object
