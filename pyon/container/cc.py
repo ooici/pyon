@@ -111,7 +111,7 @@ class Container(BaseContainerAgent):
 
         self._cap_definitions = Config(["res/config/container_capabilities.yml"]).data['capabilities']
 
-        profile_filename = CFG.container.profile
+        profile_filename = CFG.get_safe("container.profile", "development")
         if not profile_filename.endswith(".yml"):
             profile_filename = "res/profile/%s.yml" % profile_filename
         log.info("Loading CC capability profile from file: %s", profile_filename)
