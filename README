@@ -16,7 +16,7 @@ Install the following if not yet present:
 
 * OS Packages and package management:
 For Mac, use homebrew
-    > /usr/bin/ruby -e "$(/usr/bin/curl -fksSL https://raw.github.com/mxcl/homebrew/master/Library/Contributions/install_homebrew.rb)"
+    > /usr/bin/ruby <(curl -fsSkL raw.github.com/mxcl/homebrew/go)
 - python 2.7.2
     Download and use installer on a Mac.
     If you need to build from source (like on some linux distributions), enable the following in the build:
