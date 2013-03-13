@@ -11,7 +11,7 @@ from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.ion.resource import RT, OT
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
-from pyon.event.event import EventSubscriber
+from pyon.ion.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized

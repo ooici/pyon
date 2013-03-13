@@ -26,7 +26,7 @@ import sys
 from threading import Lock
 
 from ooi.logging import log, config
-from pyon.event.event import EventPublisher, EventSubscriber
+from pyon.ion.event import EventPublisher, EventSubscriber
 from pyon.core.bootstrap import IonObject
 
 from interface.objects import ContainerManagementRequest, ChangeLogLevel

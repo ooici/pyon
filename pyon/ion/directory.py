@@ -9,7 +9,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import Inconsistent, BadRequest
 from pyon.datastore.datastore import DataStore
-from pyon.event.event import EventPublisher, EventSubscriber
+from pyon.ion.event import EventPublisher, EventSubscriber
 from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts

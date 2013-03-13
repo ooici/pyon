@@ -5,7 +5,7 @@ __license__ = 'Apache 2.0'
 
 from pyon.util.log import log
 from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback, PyonHeartbeatError
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from gevent.event import Event, waitall, AsyncResult
 from gevent.queue import Queue
 from gevent import greenlet, Timeout

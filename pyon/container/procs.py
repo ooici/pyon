@@ -18,7 +18,7 @@ from pyon.ion.conversation import ConversationRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager, IonProcessError
 from pyon.net.messaging import IDPool
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED

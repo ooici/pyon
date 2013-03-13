@@ -16,7 +16,7 @@ from pyon.ion.process import IonProcessError
 from pyon.ion.conversation import ConversationRPCServer
 from pyon.net.transport import NameTrio, TransportError
 from pyon.public import PRED, CCAP
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
 

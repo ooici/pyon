@@ -13,7 +13,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import get_obj_registry, CFG
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
-from pyon.event.event import EventPublisher
+from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
 from pyon.ion.resource import LCS, LCE, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
 from pyon.util.containers import get_ion_ts

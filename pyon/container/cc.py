@@ -9,7 +9,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import ContainerError, BadRequest
 from pyon.datastore.datastore import DataStore
-from pyon.event.event import EventPublisher
+from pyon.ion.event import EventPublisher
 from pyon.ion.endpoint import ProcessRPCServer
 from pyon.net.transport import LocalRouter
 from pyon.util.config import Config
