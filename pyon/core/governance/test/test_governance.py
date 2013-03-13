@@ -9,7 +9,7 @@ from mock import Mock
 from nose.plugins.attrib import attr
 from pyon.core.governance.governance_controller import GovernanceController
 from pyon.core.exception import Unauthorized, BadRequest, Inconsistent
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.bootstrap import IonObject
 from pyon.ion.resource import PRED, RT

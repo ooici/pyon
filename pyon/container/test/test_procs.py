@@ -4,28 +4,32 @@ __author__ = 'Michael Meisinger'
 
 from unittest import SkipTest
 from mock import Mock, patch, ANY, sentinel, call
+from nose.plugins.attrib import attr
+from couchdb.http import ResourceNotFound
+from gevent.event import AsyncResult
 
 from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.container.procs import ProcManager
-from pyon.service.service import BaseService
+from pyon.core.exception import BadRequest, NotFound
+from pyon.ion.endpoint import ProcessRPCServer
+from pyon.ion.process import IonProcessError
+from pyon.ion.conversation import ConversationRPCServer
+from pyon.net.transport import NameTrio, TransportError
+from pyon.public import PRED, CCAP
+from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
-from nose.plugins.attrib import attr
+
 from interface.objects import ProcessStateEnum
-from pyon.ion.endpoint import ProcessRPCServer
-from pyon.core.exception import BadRequest, NotFound
-from couchdb.http import ResourceNotFound
-from pyon.public import PRED
-from gevent.event import AsyncResult
-from pyon.ion.process import IonProcessError
-from pyon.net.transport import NameTrio, TransportError
-from pyon.ion.conversation import ConversationRPCServer
 
 class FakeContainer(object):
     def __init__(self):
         self.id = "containerid"
         self.node = None
         self.name = "containername"
+        self.CCAP = CCAP
+    def has_capability(self, cap):
+        return True
 
 class SampleProcess(BaseService):
     name = 'sample'
@@ -399,7 +403,7 @@ class TestProcManagerInt(IonIntegrationTestCase):
         pm = self.container.proc_manager
         pid = pm.spawn_process('badprocess', 'pyon.container.test.test_procs', 'BadProcess', {'process':{'type':'service'}})
 
-        with patch('pyon.service.service.log') as m:
+        with patch('pyon.ion.service.log') as m:
             pm.stop()
             self.assertEquals(len(pm.procs), 0)
             self.assertEquals(m.exception.call_count, 1)

@@ -14,7 +14,7 @@ from unittest import SkipTest
 
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest
-from pyon.event.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
+from pyon.ion.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
 from pyon.util.async import spawn
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts, DotDict

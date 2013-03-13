@@ -464,7 +464,8 @@ class TestExchangeObjects(PyonTestCase):
 @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
+                                                              'exchange':{'auto_register': False},
                                                               'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
         self._start_container()
 
@@ -611,12 +612,13 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 @unittest.skipIf(os.getenv('CEI_LAUNCH_TEST', False),'Test reaches into container, doesn\'t work with CEI')
 class TestExchangeObjectsIntWithLocal(TestExchangeObjectsInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False},
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
+                                                              'exchange':{'auto_register': False},
                                                               'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
         self._start_container()
 
 @attr('INT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False}}})
+@patch.dict('pyon.ion.exchange.CFG', {'container':{'capability':{'profile':"res/profile/development.yml"},'exchange':{'auto_register': False}}})
 class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
     """
     Tests creation and deletion of things on the broker.

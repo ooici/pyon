@@ -9,7 +9,7 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG
 from pyon.core.exception import Inconsistent, BadRequest
 from pyon.datastore.datastore import DataStore
-from pyon.event.event import EventPublisher, EventSubscriber
+from pyon.ion.event import EventPublisher, EventSubscriber
 from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
@@ -18,7 +18,7 @@ from interface.objects import DirEntry
 
 class Directory(object):
     """
-    Class that uses a datastore to provide a directory lookup mechanism.
+    Frontent to a directory functionality backed by the resource registry to provide a directory lookup mechanism.
     Terms:
       directory: instance of a Directory, representing entries within one Org. A tree of entries.
       path: parent+key (= qualified name of an entry). All paths start with '/'
@@ -26,9 +26,10 @@ class Directory(object):
       key: local name of an entry
     """
 
-    def __init__(self, orgname=None, datastore_manager=None, events_enabled=False):
+    def __init__(self, orgname=None, datastore_manager=None, events_enabled=False, container=None):
+        self.container = container or bootstrap.container_instance
         # Get an instance of datastore configured as directory.
-        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
+        datastore_manager = datastore_manager or self.container.datastore_manager
         self.dir_store = datastore_manager.get_datastore(DataStore.DS_DIRECTORY)
 
         self.orgname = orgname or CFG.system.root_org
@@ -38,6 +39,8 @@ class Directory(object):
         self.event_pub = None
         self.event_sub = None
 
+
+    def start(self):
         # Create directory root entry (for current org) if not existing
         if CFG.system.auto_bootstrap:
             root_de = self.register("/", "DIR", sys_name=bootstrap.get_sys_name())
@@ -51,8 +54,11 @@ class Directory(object):
 
             # Register to receive directory changes
             self.event_sub = EventSubscriber(event_type="ContainerConfigModifiedEvent",
-                origin="Directory",
-                callback=self.receive_directory_change_event)
+                                             origin="Directory",
+                                             callback=self.receive_directory_change_event)
+
+    def stop(self):
+        self.close()
 
     def close(self):
         """

@@ -177,7 +177,7 @@ def bootstrap_pyon(logging_config_override=None, pyon_cfg=None):
 
     # SERVICES. Service definitions
     # TODO: change the following to read service definitions from directory and import selectively
-    from pyon.service.service import IonServiceRegistry
+    from pyon.ion.service import IonServiceRegistry
     global _service_registry
     _service_registry = IonServiceRegistry()
     _service_registry.load_service_mods('interface/services')

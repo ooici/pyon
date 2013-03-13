@@ -12,7 +12,7 @@ from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
-from pyon.event.event import EventPublisher
+from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
 from pyon.ion.resource import LCS, LCE, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
 from pyon.util.containers import get_ion_ts
@@ -27,14 +27,21 @@ class ResourceRegistry(object):
     """
     DEFAULT_ATTACHMENT_NAME = 'resource.attachment'
 
-    def __init__(self, datastore_manager=None):
+    def __init__(self, datastore_manager=None, container=None):
+        self.container = container or bootstrap.container_instance
 
         # Get an instance of datastore configured as resource registry.
         # May be persistent or mock, forced clean, with indexes
-        datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
+        datastore_manager = datastore_manager or self.container.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
 
         self.event_pub = EventPublisher()
+
+    def start(self):
+        pass
+
+    def stop(self):
+        self.close()
 
     def close(self):
         """
@@ -75,7 +82,8 @@ class ResourceRegistry(object):
             log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
-        self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+        if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_id, origin_type=object._get_type(),
                                      sub_type="CREATE",
                                      mod_type=ResourceModificationType.CREATE)
@@ -149,7 +157,8 @@ class ResourceRegistry(object):
         self.rr_store.update(res_obj)
         res = self.rr_store.delete(object_id, del_associations=del_associations)
 
-        self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+        if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
                                      origin=res_obj._id, origin_type=res_obj._get_type(),
                                      sub_type="DELETE",
                                      mod_type=ResourceModificationType.DELETE)
@@ -188,7 +197,8 @@ class ResourceRegistry(object):
             self.rr_store.update_mult(assocs)
             log.debug("retire(res_id=%s). Retired %s associations", resource_id, len(assocs))
 
-        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+        if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
@@ -224,7 +234,8 @@ class ResourceRegistry(object):
         log.debug("execute_lifecycle_transition(res_id=%s, event=%s). Change %s_%s to %s_%s", resource_id, transition_event,
                   old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
-        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+        if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
@@ -278,7 +289,8 @@ class ResourceRegistry(object):
         log.debug("set_lifecycle_state(res_id=%s, target=%s). Change %s_%s to %s_%s", resource_id, old_target,
                   old_state, old_availability, res_obj.lcstate, res_obj.availability)
 
-        self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
+        if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
+            self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,

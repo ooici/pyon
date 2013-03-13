@@ -11,7 +11,7 @@ from pyon.util.unit_test import PyonTestCase
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.exception import Inconsistent
 from nose.plugins.attrib import attr
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.net.endpoint import RPCClient, BidirectionalEndpointUnit
 from pyon.util.context import LocalContextMixin
 

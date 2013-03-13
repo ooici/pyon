@@ -4,7 +4,7 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 
 
 class StreamProcess(BaseService):

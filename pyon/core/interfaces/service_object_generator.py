@@ -20,7 +20,7 @@ from collections import OrderedDict
 
 from pyon.core.path import list_files_recursive
 from pyon.core.interfaces.interface_util import get_object_definition_from_datastore, get_service_definition_from_datastore
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.core.bootstrap import CFG, set_config
 from pyon.util import yaml_ordered_dict; yaml_ordered_dict.apply_yaml_patch()
 from pyon.ion.directory_standalone import DirectoryStandalone
@@ -39,7 +39,7 @@ from collections import OrderedDict, defaultdict
 import interface.objects
 from pyon.core.bootstrap import IonObject
 from pyon.ion.resregistry import ResourceRegistryServiceWrapper
-from pyon.service.service import BaseService, BaseClients
+from pyon.ion.service import BaseService, BaseClients
 from pyon.net.endpoint import RPCClient
 from pyon.ion.endpoint import ProcessRPCClient
 from pyon.ion.conversation import ConversationRPCClient

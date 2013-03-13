@@ -189,6 +189,9 @@ def main(opts, *args, **kwargs):
         if opts.config_from_directory:
             config.apply_remote_config(bootstrap_cfg=bootstrap_config, system_cfg=pyon_config)
             config.apply_local_configuration(pyon_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)     # apply pyon.local.yml again over top
+        # - Apply container profile specific config
+        config.apply_profile_configuration(pyon_config, bootstrap_config)
+        # - TBD: Reapply pyon.local.yml here again for good measure?
         # - Last apply any separate command line config overrides
         config.apply_configuration(pyon_config, config_override)
         config.apply_configuration(pyon_config, command_line_config)

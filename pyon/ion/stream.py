@@ -13,7 +13,7 @@ from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.arg_check import validate_is_instance
 from interface.services.dm.ipubsub_management_service import PubsubManagementServiceProcessClient
 from pyon.util.log import log
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from interface.objects import StreamRoute
 
 
