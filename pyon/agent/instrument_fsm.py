@@ -24,7 +24,7 @@ class FSMCommandUnknownError(FSMError):
     pass
 
 
-class InstrumentFSM():
+class InstrumentFSM(object):
     """
     Simple state mahcine for driver and agent classes.
     """
