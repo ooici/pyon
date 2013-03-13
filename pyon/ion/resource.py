@@ -477,9 +477,9 @@ class ExtendedResourceContainer(object):
 
                     service_client, operation = self._get_remote_info(method_name)
                     rmi_call = method_name.split('.')
-                    query_string_params = { 'resource_id': resource._id }
-                    query_string_params.update(self._get_method_arguments(service_client, operation, **kwargs))
-                    ret_val = IonObject(OT.ServiceRequest,service_name=rmi_call[0], service_operation=operation, query_string_params=query_string_params )
+                    parms = { 'resource_id': resource._id }
+                    parms.update(self._get_method_arguments(service_client, operation, **kwargs))
+                    ret_val = IonObject(OT.ServiceRequest, service_name=rmi_call[0], service_operation=operation, request_parameters=parms )
                     setattr(obj, field, ret_val)
 
                 # Fill field based on compound association chains. Results in nested lists of resource objects
