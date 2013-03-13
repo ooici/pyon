@@ -9,7 +9,7 @@ from nose.plugins.attrib import attr
 from pyon.datastore.datastore import DatastoreManager
 
 
-@attr('UNIT',group='datastored')
+@attr('UNIT',group='datastore')
 class TestDirectory(IonUnitTestCase):
 
     def test_directory(self):
@@ -19,6 +19,7 @@ class TestDirectory(IonUnitTestCase):
         ds.create_datastore()
 
         directory = Directory(datastore_manager=dsm)
+        directory.start()
 
         #self.addCleanup(directory.dir_store.delete_datastore)
 
@@ -103,4 +104,4 @@ class TestDirectory(IonUnitTestCase):
         res_list = directory.find_by_key("X", parent="/BranchB")
         self.assertEquals(len(res_list), 1)
 
-        directory.close()
+        directory.stop()

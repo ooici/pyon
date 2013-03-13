@@ -16,7 +16,7 @@ from pyon.util.async import spawn
 from mock import sentinel, Mock, MagicMock, ANY, patch
 from nose.plugins.attrib import attr
 from pyon.net.endpoint import RPCClient
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from interface.objects import ProcessStateEnum
 import time
 import os

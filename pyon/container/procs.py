@@ -18,7 +18,7 @@ from pyon.ion.conversation import ConversationRPCServer
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 from pyon.ion.process import IonProcessThreadManager, IonProcessError
 from pyon.net.messaging import IDPool
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.containers import DotDict, for_name, named_any, dict_merge, get_safe, is_valid_identifier
 from pyon.util.log import log
 from pyon.ion.resource import RT, PRED
@@ -70,15 +70,16 @@ class ProcManager(object):
         log.debug("ProcManager starting ...")
         self.proc_sup.start()
 
-        # Register container as resource object
-        cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
-        self.cc_id, _ = self.container.resource_registry.create(cc_obj)
+        if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+            # Register container as resource object
+            cc_obj = CapabilityContainer(name=self.container.id, cc_agent=self.container.name)
+            self.cc_id, _ = self.container.resource_registry.create(cc_obj)
 
-        #Create an association to an Org object if not the rot ION org and only if found
-        if CFG.container.org_name and CFG.container.org_name != CFG.system.root_org:
-            org, _ = self.container.resource_registry.find_resources(restype=RT.Org, name=CFG.container.org_name, id_only=True)
-            if org:
-                self.container.resource_registry.create_association(org[0], PRED.hasResource, self.cc_id)  # TODO - replace with proper association
+            #Create an association to an Org object if not the rot ION org and only if found
+            if CFG.container.org_name and CFG.container.org_name != CFG.system.root_org:
+                org, _ = self.container.resource_registry.find_resources(restype=RT.Org, name=CFG.container.org_name, id_only=True)
+                if org:
+                    self.container.resource_registry.create_association(org[0], PRED.hasResource, self.cc_id)  # TODO - replace with proper association
 
         log.debug("ProcManager started, OK.")
 
@@ -109,12 +110,13 @@ class ProcManager(object):
             log.warn("ProcManager procs_by_name not empty: %s", self.procs_by_name)
 
         # Remove Resource registration
-        try:
-            self.container.resource_registry.delete(self.cc_id, del_associations=True)
-        except NotFound:
-            # already gone, this is ok
-            pass
-        # TODO: Check associations to processes
+        if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+            try:
+                self.container.resource_registry.delete(self.cc_id, del_associations=True)
+            except NotFound:
+                # already gone, this is ok
+                pass
+            # TODO: Check associations to processes
 
         stats2 = CouchDB_DataStore._stats.get_stats()
 
@@ -199,9 +201,8 @@ class ProcManager(object):
 
             else:
                 #Update local policies for the new process
-                if self.container.governance_controller:
+                if self.container.has_capability(self.container.CCAP.GOVERNANCE_CONTROLLER):
                     self.container.governance_controller.update_container_policies(process_instance, safe_mode=True)
-
 
             return process_instance.id
 
@@ -218,9 +219,6 @@ class ProcManager(object):
             self._call_proc_state_changed(process_instance, ProcessStateEnum.FAILED)
 
             raise
-
-
-
 
     def list_local_processes(self, process_type=''):
         """
@@ -244,7 +242,6 @@ class ProcManager(object):
                 return p
 
         return None
-
 
     def is_local_service_process(self, service_name):
         local_services = self.list_local_processes(SERVICE_PROCESS_TYPE)
@@ -764,49 +761,52 @@ class ProcManager(object):
         process_instance.errcause = "registering"
 
         if process_instance._proc_type != IMMEDIATE_PROCESS_TYPE:
-            proc_obj = Process(name=process_instance.id, label=name, proctype=process_instance._proc_type)
-            proc_id, _ = self.container.resource_registry.create(proc_obj)
-            process_instance._proc_res_id = proc_id
+            if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+                proc_obj = Process(name=process_instance.id, label=name, proctype=process_instance._proc_type)
+                proc_id, _ = self.container.resource_registry.create(proc_obj)
+                process_instance._proc_res_id = proc_id
 
-            # Associate process with container resource
-            self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
+                # Associate process with container resource
+                self.container.resource_registry.create_association(self.cc_id, "hasProcess", proc_id)
         else:
             process_instance._proc_res_id = None
 
         # Process type specific registration
         # TODO: Factor out into type specific handler functions
         if process_instance._proc_type == SERVICE_PROCESS_TYPE:
-            # Registration of SERVICE process: in resource registry
-            service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=process_instance.name)
-            if service_list:
-                process_instance._proc_svc_id = service_list[0]._id
-            else:
-                # We are starting the first process of a service instance
-                # TODO: This should be created by the HA Service agent in the future
-                svc_obj = Service(name=process_instance.name, exchange_name=process_instance._proc_listen_name, state=ServiceStateEnum.READY)
-                process_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
-
-                # Create association to service definition resource
-                svcdef_list, _ = self.container.resource_registry.find_resources(restype="ServiceDefinition",
-                    name=process_instance.name)
-                if svcdef_list:
-                    self.container.resource_registry.create_association(process_instance._proc_svc_id,
-                        "hasServiceDefinition", svcdef_list[0]._id)
+            if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+                # Registration of SERVICE process: in resource registry
+                service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=process_instance.name)
+                if service_list:
+                    process_instance._proc_svc_id = service_list[0]._id
                 else:
-                    log.error("Cannot find ServiceDefinition resource for %s", process_instance.name)
+                    # We are starting the first process of a service instance
+                    # TODO: This should be created by the HA Service agent in the future
+                    svc_obj = Service(name=process_instance.name, exchange_name=process_instance._proc_listen_name, state=ServiceStateEnum.READY)
+                    process_instance._proc_svc_id, _ = self.container.resource_registry.create(svc_obj)
 
-            self.container.resource_registry.create_association(process_instance._proc_svc_id, "hasProcess", proc_id)
+                    # Create association to service definition resource
+                    svcdef_list, _ = self.container.resource_registry.find_resources(restype="ServiceDefinition",
+                        name=process_instance.name)
+                    if svcdef_list:
+                        self.container.resource_registry.create_association(process_instance._proc_svc_id,
+                            "hasServiceDefinition", svcdef_list[0]._id)
+                    else:
+                        log.error("Cannot find ServiceDefinition resource for %s", process_instance.name)
+
+                self.container.resource_registry.create_association(process_instance._proc_svc_id, "hasProcess", proc_id)
 
         elif process_instance._proc_type == AGENT_PROCESS_TYPE:
-            # Registration of AGENT process: in Directory
-            caps = process_instance.get_capabilities()
-            self.container.directory.register("/Agents", process_instance.id,
-                **dict(name=process_instance._proc_name,
-                    container=process_instance.container.id,
-                    resource_id=process_instance.resource_id,
-                    agent_id=process_instance.agent_id,
-                    def_id=process_instance.agent_def_id,
-                    capabilities=caps))
+            if self.container.has_capability(self.container.CCAP.DIRECTORY):
+                # Registration of AGENT process: in Directory
+                caps = process_instance.get_capabilities()
+                self.container.directory.register("/Agents", process_instance.id,
+                    **dict(name=process_instance._proc_name,
+                        container=process_instance.container.id,
+                        resource_id=process_instance.resource_id,
+                        agent_id=process_instance.agent_id,
+                        def_id=process_instance.agent_def_id,
+                        capabilities=caps))
 
         self._call_proc_state_changed(process_instance, ProcessStateEnum.RUNNING)
 
@@ -839,40 +839,42 @@ class ProcManager(object):
     def _unregister_process(self, process_id, process_instance):
         # Remove process registration in resource registry
         if process_instance._proc_res_id:
-            try:
-                self.container.resource_registry.delete(process_instance._proc_res_id, del_associations=True)
-            except NotFound: #, HTTPException):
-                # if it's already gone, it's already gone!
-                pass
-
-            except Exception, ex:
-                log.exception(ex)
-                pass
-
-        # Cleanup for specific process types
-        if process_instance._proc_type == SERVICE_PROCESS_TYPE:
-            # Check if this is the last process for this service and do auto delete service resources here
-            svcproc_list = []
-            try:
-                svcproc_list, _ = self.container.resource_registry.find_objects(process_instance._proc_svc_id,
-                    "hasProcess", "Process", id_only=True)
-            except ResourceNotFound:
-                # if it's already gone, it's already gone!
-                pass
-
-            if not svcproc_list:
+            if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
                 try:
-                    self.container.resource_registry.delete(process_instance._proc_svc_id, del_associations=True)
-                except NotFound:
+                    self.container.resource_registry.delete(process_instance._proc_res_id, del_associations=True)
+                except NotFound: #, HTTPException):
                     # if it's already gone, it's already gone!
                     pass
-
                 except Exception, ex:
                     log.exception(ex)
                     pass
 
+        # Cleanup for specific process types
+        if process_instance._proc_type == SERVICE_PROCESS_TYPE:
+            if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+                # Check if this is the last process for this service and do auto delete service resources here
+                svcproc_list = []
+                try:
+                    svcproc_list, _ = self.container.resource_registry.find_objects(process_instance._proc_svc_id,
+                        "hasProcess", "Process", id_only=True)
+                except ResourceNotFound:
+                    # if it's already gone, it's already gone!
+                    pass
+
+                if not svcproc_list:
+                    try:
+                        self.container.resource_registry.delete(process_instance._proc_svc_id, del_associations=True)
+                    except NotFound:
+                        # if it's already gone, it's already gone!
+                        pass
+
+                    except Exception, ex:
+                        log.exception(ex)
+                        pass
+
         elif process_instance._proc_type == AGENT_PROCESS_TYPE:
-            self.container.directory.unregister_safe("/Agents", process_instance.id)
+            if self.container.has_capability(self.container.CCAP.DIRECTORY):
+                self.container.directory.unregister_safe("/Agents", process_instance.id)
 
         # Remove internal registration in container
         del self.procs[process_id]

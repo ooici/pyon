@@ -6,7 +6,7 @@ from unittest import SkipTest
 
 from pyon.container.apps import AppManager
 from pyon.core.path import resolve
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ WELCOME to the home of container management
 
     This is a framework for performing administrative actions on a pycc container or a full distributed system of containers.
@@ -21,11 +23,14 @@
 """
 
 import sys
-from ooi.logging import log, config
-from pyon.event.event import EventPublisher, EventSubscriber
-from pyon.core.bootstrap import IonObject
-from interface.objects import ContainerManagementRequest, ChangeLogLevel
 from threading import Lock
+
+from ooi.logging import log, config
+from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.core.bootstrap import IonObject
+
+from interface.objects import ContainerManagementRequest, ChangeLogLevel
+
 
 # define selectors to determine if this message should be handled by this container.
 # used by the message, manager should not interact with this directly
@@ -45,6 +50,7 @@ class ContainerSelector(object):
         return {}
     def __str__(self):
         return self.__class__.__name__
+
     @classmethod
     def from_object(cls, obj):
         """ get peer type from Ion object """
@@ -104,6 +110,7 @@ class ContainerManager(object):
         # or the handler begins after stop() completes and the event is dropped
         self.lock = Lock()
         self.handlers = handlers[:]
+
     def start(self):
         ## create queue listener and publisher
         self.sender = EventPublisher(event_type="ContainerManagementResult")
@@ -112,6 +119,7 @@ class ContainerManager(object):
             self.running = True
             self.receiver.start()
         log.info('ready for container management requests')
+
     def stop(self):
         log.debug('container management stopping')
         with self.lock:
@@ -119,14 +127,17 @@ class ContainerManager(object):
             self.sender.close()
             self.running = False
         log.debug('container management stopped')
+
     def add_handler(self, handler):
         self.handlers.append(handler)
+
     def _get_handlers(self, action):
         out = []
         for handler in self.handlers:
             if handler.can_handle_request(action):
                 out.append(handler)
         return out
+
     def _receive_event(self, event, headers):
         with self.lock:
             if not isinstance(event, ContainerManagementRequest):
@@ -144,6 +155,7 @@ class ContainerManager(object):
                 if SEND_RESULT_IF_NOT_SELECTED:
                     self.sender.publish_event(origin=self.container.id, action=event.action, outcome='not selected')
                     log.debug('received action: %s, outcome: not selected', event.action)
+
     def _perform_action(self, action):
         handlers = self._get_handlers(action)
         if not handlers:

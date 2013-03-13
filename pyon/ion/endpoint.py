@@ -6,7 +6,7 @@ __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.c
 __license__ = 'Apache 2.0'
 
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
-from pyon.event.event import BaseEventSubscriberMixin
+from pyon.ion.event import BaseEventSubscriberMixin
 from pyon.util.log import log
 from pyon.core.object import IonObjectBase
 from pyon.core.exception import Timeout as IonTimeout
@@ -159,7 +159,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
         return str(self._process.id)
 
     def _get_sflow_manager(self):
-        return self._process.container.sflow_manager
+        return getattr(self._process.container, "sflow_manager", None)
 
 
 class ProcessRPCRequestEndpointUnit(ProcessEndpointUnitMixin, RPCRequestEndpointUnit):

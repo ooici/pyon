@@ -24,6 +24,7 @@ class TestState(IonUnitTestCase):
     def test_state(self):
         dsm = DatastoreManager()
         state_repo = StateRepository(dsm)
+        state_repo.start()
         state_repo1 = StateRepository(dsm)
 
         state1 = {'key':'value1'}

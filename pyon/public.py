@@ -34,20 +34,23 @@ __all__ += ['messaging', 'channel', 'endpoint']
 from pyon.ion.process import IonProcessThreadManager, SimpleProcess, StandaloneProcess, ImmediateProcess
 __all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
 
-from pyon.container.cc import Container
-__all__ += ['Container']
+from pyon.container.cc import Container, CCAP
+__all__ += ['Container', 'CCAP']
 
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 __all__ += ['BaseService']
 
 from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher
-from pyon.ion.stream import StreamPublisher, StreamSubscriber
-__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'StreamPublisher', 'StreamSubscriber',
-            'ProcessSubscriber', 'ProcessPublisher']
+__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'ProcessSubscriber', 'ProcessPublisher']
 
-from pyon.ion.resource import ResourceTypes, RT, ObjectTypes, OT,PredicateType, PRED, LifeCycleStates, LCS, LCE, AS, AvailabilityStates
-__all__ += ['RT', 'OT', 'PRED', 'AT', 'LCS', 'LCE', 'AS']
-__all__ += ['ResourceTypes', 'ObjectTypes', 'PredicateType', 'AssociationType', 'LifeCycleStates', 'AvailabilityStates']
+from pyon.ion.stream import StreamPublisher, StreamSubscriber
+__all__ += ['StreamPublisher', 'StreamSubscriber']
+
+from pyon.ion.resource import RT, OT, PRED, LCS, LCE, AS
+__all__ += ['RT', 'OT', 'PRED', 'LCS', 'LCE', 'AS']
+
+from pyon.ion.event import EventPublisher, EventSubscriber
+__all__ += ['StreamProcess', 'EventPublisher', 'EventSubscriber']
 
 from pyon.ion.streamproc import StreamProcess
 __all__ += ['StreamProcess']

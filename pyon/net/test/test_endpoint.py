@@ -11,7 +11,7 @@ from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, Subsc
 from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
 from gevent import event, spawn
 from pyon.net.messaging import NodeB
-from pyon.service.service import BaseService
+from pyon.ion.service import BaseService
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
 from mock import Mock, sentinel, patch, ANY, call, MagicMock
