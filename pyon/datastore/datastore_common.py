@@ -4,3 +4,9 @@
 
 __author__ = 'Michael Meisinger'
 
+
+class DatastoreFactory(object):
+
+    @classmethod
+    def get_datastore(cls, config):
+        pass
