@@ -148,10 +148,11 @@ class GovernanceController(object):
             return None
 
         if self._container_org_id is None:
-            org, _ = self.rr.find_resources(restype=RT.Org,name=self._container_org_name)
-
-            if org:
-                self._container_org_id = org[0]._id
+            orgs, _ = self.rr.find_resources(restype=RT.Org)
+            for org in orgs:
+                if org.org_governance_name == self._container_org_name:
+                    self._container_org_id = org._id
+                    break
 
         return self._container_org_id
 

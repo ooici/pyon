@@ -203,22 +203,22 @@ class PolicyDecisionPointManager(object):
 
         #Get the Org name associated with the endpoint process
         endpoint_process = invocation.get_arg_value('process', invocation)
-        if hasattr(endpoint_process,'org_name'):
-            org_name = endpoint_process.org_name
+        if hasattr(endpoint_process,'org_governance_name'):
+            org_governance_name = endpoint_process.org_governance_name
         else:
-            org_name = self.governance_controller.system_root_org_name
+            org_governance_name = self.governance_controller.system_root_org_name
 
         #If this process is not associated wiht the root Org, then iterate over the roles associated with the user only for
         #the Org that this process is associated with otherwise include all roles and create attributes for each
-        if org_name == self.governance_controller.system_root_org_name:
+        if org_governance_name == self.governance_controller.system_root_org_name:
             log.debug("Including roles for all Orgs")
             #If the process Org name is the same for the System Root Org, then include all of them to be safe
             for org in actor_roles:
                 self.create_org_role_attribute(actor_roles[org],subject)
         else:
-            if actor_roles.has_key(org_name):
-                log.debug("Org Roles (%s): %s" , org_name, ' '.join(actor_roles[org_name]))
-                self.create_org_role_attribute(actor_roles[org_name],subject)
+            if actor_roles.has_key(org_governance_name):
+                log.debug("Org Roles (%s): %s" , org_governance_name, ' '.join(actor_roles[org_governance_name]))
+                self.create_org_role_attribute(actor_roles[org_governance_name],subject)
 
             #Handle the special case for the ION system actor
             if actor_roles.has_key(self.governance_controller.system_root_org_name):
