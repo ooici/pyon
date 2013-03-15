@@ -30,7 +30,7 @@ def get_role_message_headers(org_roles):
         for org in org_roles:
             role_header[org] = []
             for role in org_roles[org]:
-                role_header[org].append(role.name)
+                role_header[org].append(role.governance_name)
         return role_header
 
     except Exception, e:
@@ -109,7 +109,7 @@ def find_roles_by_actor(actor_id=None):
         if not role_dict.has_key(role.org_governance_name):
             role_dict[role.org_governance_name] = list()
 
-        role_dict[role.org_governance_name].append(role.name)
+        role_dict[role.org_governance_name].append(role.governance_name)
 
     #Membership in ION Org is implied
     if not role_dict.has_key(gov_controller.system_root_org_name):
