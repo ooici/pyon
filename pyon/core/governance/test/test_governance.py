@@ -378,7 +378,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         create the role object that is passed in, if the role by the specified
         name does not exist. Throws exception if either id does not exist.
         """
-        user_role.org_name = org.name
+        user_role.org_governance_name = org.org_governance_name
         user_role_id, _ = self.rr.create(user_role)
 
         aid = self.rr.create_association(org._id, PRED.hasRole, user_role_id)
@@ -391,7 +391,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         actor = IonObject(RT.ActorIdentity, name='actor1')
         actor_id, _ = self.rr.create(actor)
 
-        ion_org = IonObject(RT.Org, name='ION')
+        ion_org = IonObject(RT.Org, name='ION', org_governance_name='ION')
         ion_org_id, _ = self.rr.create(ion_org)
         ion_org._id = ion_org_id
 
@@ -415,7 +415,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         role_header = get_role_message_headers({'ION': [manager_role, member_role]})
         self.assertDictEqual(actor_roles, role_header)
 
-        org2 = IonObject(RT.Org, name='Org2')
+        org2 = IonObject(RT.Org, name='Org 2', org_governance_name='Second_Org')
 
         org2_id, _ = self.rr.create(org2)
         org2._id = org2_id
@@ -434,18 +434,18 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
         actor_roles = find_roles_by_actor(actor_id)
 
-        role_header = get_role_message_headers({'ION': [manager_role, member_role], 'Org2': [operator2_role, member2_role]})
+        role_header = get_role_message_headers({'ION': [manager_role, member_role], 'Second_Org': [operator2_role, member2_role]})
 
         self.assertEqual(len(actor_roles), 2)
         self.assertEqual(len(role_header), 2)
-        self.assertIn('Org2', actor_roles)
-        self.assertIn('Org2', role_header)
-        self.assertEqual(len(actor_roles['Org2']), 2)
-        self.assertEqual(len(role_header['Org2']), 2)
-        self.assertIn('INSTRUMENT_OPERATOR', actor_roles['Org2'])
-        self.assertIn('INSTRUMENT_OPERATOR', role_header['Org2'])
-        self.assertIn(ORG_MEMBER_ROLE, actor_roles['Org2'])
-        self.assertIn(ORG_MEMBER_ROLE, role_header['Org2'])
+        self.assertIn('Second_Org', actor_roles)
+        self.assertIn('Second_Org', role_header)
+        self.assertEqual(len(actor_roles['Second_Org']), 2)
+        self.assertEqual(len(role_header['Second_Org']), 2)
+        self.assertIn('INSTRUMENT_OPERATOR', actor_roles['Second_Org'])
+        self.assertIn('INSTRUMENT_OPERATOR', role_header['Second_Org'])
+        self.assertIn(ORG_MEMBER_ROLE, actor_roles['Second_Org'])
+        self.assertIn(ORG_MEMBER_ROLE, role_header['Second_Org'])
         self.assertIn('ION', actor_roles)
         self.assertIn('ION', role_header)
         self.assertIn(ORG_MANAGER_ROLE, actor_roles['ION'])
@@ -457,6 +457,36 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
         self.assertEqual(actor_header['ion-actor-id'], actor_id)
         self.assertEqual(actor_header['ion-actor-roles'], actor_roles)
+
+        #Now make sure we can change the name of the Org and not affect the headers
+        org2 = self.rr.read(org2_id)
+        org2.name = 'Updated Org 2'
+        org2_id, _ = self.rr.update(org2)
+
+        actor_roles = find_roles_by_actor(actor_id)
+
+        self.assertEqual(len(actor_roles), 2)
+        self.assertEqual(len(role_header), 2)
+        self.assertIn('Second_Org', actor_roles)
+        self.assertIn('Second_Org', role_header)
+        self.assertEqual(len(actor_roles['Second_Org']), 2)
+        self.assertEqual(len(role_header['Second_Org']), 2)
+        self.assertIn('INSTRUMENT_OPERATOR', actor_roles['Second_Org'])
+        self.assertIn('INSTRUMENT_OPERATOR', role_header['Second_Org'])
+        self.assertIn(ORG_MEMBER_ROLE, actor_roles['Second_Org'])
+        self.assertIn(ORG_MEMBER_ROLE, role_header['Second_Org'])
+        self.assertIn('ION', actor_roles)
+        self.assertIn('ION', role_header)
+        self.assertIn(ORG_MANAGER_ROLE, actor_roles['ION'])
+        self.assertIn(ORG_MEMBER_ROLE, actor_roles['ION'])
+        self.assertIn(ORG_MANAGER_ROLE, role_header['ION'])
+        self.assertIn(ORG_MEMBER_ROLE, role_header['ION'])
+
+        actor_header = get_actor_header(actor_id)
+
+        self.assertEqual(actor_header['ion-actor-id'], actor_id)
+        self.assertEqual(actor_header['ion-actor-roles'], actor_roles)
+
 
     def test_get_sytsem_actor_header(self):
         actor = IonObject(RT.ActorIdentity, name='ionsystem')

@@ -644,10 +644,10 @@ class ProcManager(object):
         process_instance._proc_start_time = time.time()
 
         #Unless the process has been started as part of another Org, default to the container Org or the ION Org
-        if config.has_key('org_name'):
-            process_instance.org_name = config['org_name']
+        if config.has_key('org_governance_name'):
+            process_instance.org_governance_name = config['org_governance_name']
         else:
-            process_instance.org_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
+            process_instance.org_governance_name = CFG.get_safe('container.org_name', CFG.get_safe('system.root_org', 'ION'))
 
 
         # Add stateful process operations
