@@ -9,6 +9,7 @@ from uuid import uuid4
 import couchdb
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
+from pyon.datastore.couchdb.couch_common import AbstractCouchDataStore
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.util.containers import get_safe, DictDiffer
 
@@ -27,30 +28,28 @@ class CouchDataStore(object):
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
-    def __init__(self, datastore_name=None, host=None, port=None, username=None, password=None,
-                 config=None, newlog=None, scope=None, **kwargs):
+    def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, **kwargs):
         """
         @param datastore_name  Name of datastore within server. Should be scoped by caller with sysname
         @param config  A standard config dict with connection params
         @param scope  Identifier to prefix the datastore name (e.g. sysname)
         """
+        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=newlog)
+
         global log
         if newlog:
             log = newlog
 
         # Connection
-        self.host = host or get_safe(config, 'server.couchdb.host') or 'localhost'
-        self.port = port or get_safe(config, 'server.couchdb.port') or 5984
-        self.username = username or get_safe(config, 'server.couchdb.username')
-        self.password = password or get_safe(config, 'server.couchdb.password')
         if self.username and self.password:
             connection_str = "http://%s:%s@%s:%s" % (self.username, self.password, self.host, self.port)
+            log_connection_str = "http://%s:%s@%s:%s" % ("username", "password", self.host, self.port)
             log.debug("Using username:password authentication to connect to datastore")
         else:
             connection_str = "http://%s:%s" % (self.host, self.port)
+            log_connection_str = connection_str
 
-        # TODO: Potential security risk to emit password into log.
-        log.info('Connecting to CouchDB server: %s' % connection_str)
+        log.info("Connecting to CouchDB server: %s", log_connection_str)
         self.server = couchdb.Server(connection_str)
 
         self._datastore_cache = {}
@@ -356,7 +355,7 @@ class CouchDataStore(object):
         return ds.compact(design)
 
     def define_profile_views(self, profile, datastore_name=None):
-        from pyon.datastore.couchdb.couchdb_config import get_couchdb_views
+        from pyon.datastore.couchdb.views import get_couchdb_views
         ds_views = get_couchdb_views(profile)
         for design, viewdef in ds_views.iteritems():
             self.define_views(design, viewdef, datastore_name=datastore_name)

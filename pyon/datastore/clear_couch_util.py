@@ -12,7 +12,7 @@
 import sys
 from optparse import OptionParser
 
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.datastore.couchdb.base_store import CouchDataStore
 
 
 def main():

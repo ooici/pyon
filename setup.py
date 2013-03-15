@@ -66,6 +66,7 @@ setup(  name = 'pyon',
             'gevent_zeromq==0.2.5',
             'zope.interface',
             'couchdb==0.8',
+            'couchbase==0.8.2',
             # 'lockfile==0.9.1',
             'python-daemon==1.6',
             'M2Crypto==0.21.1-pl1',
@@ -79,7 +80,8 @@ setup(  name = 'pyon',
             'ndg-xacml==0.5.1',
             'python-gevent-profiler',
             'lxml==2.3.4', # Fails to compile on Linux ??!??
-            'requests==0.13.5',
+            #'requests==0.13.5',
+            'requests==1.1.0',
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',

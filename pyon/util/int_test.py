@@ -130,7 +130,7 @@ class IonIntegrationTestCase(unittest.TestCase):
     @classmethod
     def _force_clean(cls, recreate=False):
         from pyon.core.bootstrap import get_sys_name, CFG
-        from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+        from pyon.datastore.couchdb.base_store import CouchDataStore
         datastore = CouchDataStore(config=CFG)
         dbs = datastore.list_datastores()
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name().lower()), dbs)

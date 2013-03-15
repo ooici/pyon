@@ -10,7 +10,7 @@ import ast
 import pyon
 from pyon.core import bootstrap, config
 from pyon.core.interfaces.interfaces import InterfaceAdmin
-from script_util import parse_args
+from putil.script_util import parse_args
 
 def main():
     '''

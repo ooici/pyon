@@ -6,7 +6,7 @@ __license__ = 'Apache 2.0'
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
-from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
+from pyon.datastore.couchdb.datastore import CouchDataStore
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.ion.identifier import create_unique_resource_id
 from pyon.ion.resource import RT, PRED, LCS, AS, lcstate
@@ -24,7 +24,7 @@ BASED_ON = "XBASED_ON"
 class Test_DataStores(IonIntegrationTestCase):
 
     def test_datastore_database(self):
-        ds = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+        ds = CouchDataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
         # CouchDB does not like upper case characters for database names
         with self.assertRaises(BadRequest):
@@ -58,7 +58,7 @@ class Test_DataStores(IonIntegrationTestCase):
             ds.delete_doc("badid", "BadDataStoreNamePerCouchDB")
 
     def test_datastore_basic(self):
-        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+        data_store = CouchDataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
         self.data_store = data_store
         self.resources = {}
@@ -288,7 +288,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertNotIn('ion_test_ds', data_store.list_datastores())
 
     def test_datastore_attach(self):
-        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+        data_store = CouchDataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
         self.data_store = data_store
         self.resources = {}
@@ -438,7 +438,7 @@ class Test_DataStores(IonIntegrationTestCase):
             data_store.delete_attachment(doc="incorrect_id", attachment_name='no_such_file')
 
     def test_datastore_views(self):
-        data_store = CouchDB_DataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
+        data_store = CouchDataStore(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES)
 
         self.data_store = data_store
         self.resources = {}

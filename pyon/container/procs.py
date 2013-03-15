@@ -86,8 +86,8 @@ class ProcManager(object):
     def stop(self):
         log.debug("ProcManager stopping ...")
 
-        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-        stats1 = CouchDB_DataStore._stats.get_stats()
+        from pyon.datastore.couchdb.datastore import CouchDataStore
+        stats1 = CouchDataStore._stats.get_stats()
 
         # Call quit on procs to give them ability to clean up
         # @TODO terminate_process is not gl-safe
@@ -118,9 +118,9 @@ class ProcManager(object):
                 pass
             # TODO: Check associations to processes
 
-        stats2 = CouchDB_DataStore._stats.get_stats()
+        stats2 = CouchDataStore._stats.get_stats()
 
-        stats3 = CouchDB_DataStore._stats.diff_stats(stats2, stats1)
+        stats3 = CouchDataStore._stats.diff_stats(stats2, stats1)
         log.debug("Datastore stats difference during stop(): %s", stats3)
 
         log.debug("ProcManager stopped, OK.")

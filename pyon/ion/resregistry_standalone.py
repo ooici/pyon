@@ -3,7 +3,7 @@
 __author__ = 'Michael Meisinger'
 
 from pyon.core.exception import NotFound
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.datastore.couchdb.base_store import CouchDataStore
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 

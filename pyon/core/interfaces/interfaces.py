@@ -9,7 +9,7 @@ import os
 from collections import OrderedDict
 
 from pyon.core.path import list_files_recursive
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.datastore.couchdb.base_store import CouchDataStore
 from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
 

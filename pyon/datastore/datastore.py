@@ -5,7 +5,8 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import get_sys_name
+from pyon.core.bootstrap import get_sys_name, CFG
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.util.containers import DotDict
 from pyon.util.log import log
 from pyon.util.arg_check import validate_true
@@ -101,9 +102,8 @@ class DatastoreManager(object):
     def get_datastore_instance(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC):
         scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
-        # Use inline import to prevent circular import dependency
-        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-        new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
+        new_ds = DatastoreFactory.get_datastore(datastore_name=scoped_name, profile=profile,
+                                                config=CFG, variant=DatastoreFactory.DS_FULL)
 
         return new_ds
 
