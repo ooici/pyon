@@ -395,10 +395,10 @@ class GovernanceIntTest(IonIntegrationTestCase):
         ion_org_id, _ = self.rr.create(ion_org)
         ion_org._id = ion_org_id
 
-        manager_role = IonObject(RT.UserRole, name=ORG_MANAGER_ROLE, label='Org Manager', description='Org Manager')
+        manager_role = IonObject(RT.UserRole, name='Org Manager', governance_name=ORG_MANAGER_ROLE, description='Org Manager')
         manager_role_id = self.add_user_role(ion_org, manager_role)
 
-        member_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE, label='Org Member', description='Org Member')
+        member_role = IonObject(RT.UserRole, name='Org Member', governance_name=ORG_MEMBER_ROLE, description='Org Member')
 
 
         # all actors have a defaul org_member_role
@@ -421,10 +421,10 @@ class GovernanceIntTest(IonIntegrationTestCase):
         org2._id = org2_id
 
 
-        member2_role = IonObject(RT.UserRole, name=ORG_MEMBER_ROLE, label='Org Member', description='Org Member')
+        member2_role = IonObject(RT.UserRole, governance_name=ORG_MEMBER_ROLE, name='Org Member', description='Org Member')
         member2_role_id = self.add_user_role(org2, member2_role)
 
-        operator2_role = IonObject(RT.UserRole, name='INSTRUMENT_OPERATOR', label='Instrument Operator',
+        operator2_role = IonObject(RT.UserRole, governance_name='INSTRUMENT_OPERATOR', name='Instrument Operator',
                                    description='Instrument Operator')
         operator2_role_id = self.add_user_role(org2, operator2_role)
 
