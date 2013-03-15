@@ -65,7 +65,7 @@ def get_actor_header(actor_id):
 
     return actor_header
 
-def has_org_role(role_header=None, org_name=None, role_name=None):
+def has_org_role(role_header=None, org_governance_name=None, role_name=None):
     '''
     Check the ion-actor-roles message header to see if this actor has the specified role in the specified Org.
     Parameter role_name can be a string with the name of a user role or a list of user role names, which will
@@ -75,16 +75,16 @@ def has_org_role(role_header=None, org_name=None, role_name=None):
     @param role_name:
     @return:
     '''
-    if role_header is None or org_name is None or role_name is None:
+    if role_header is None or org_governance_name is None or role_name is None:
         raise BadRequest("One of the parameters to this method are not set")
 
     if isinstance(role_name, list):
         for role in role_name:
-            if has_org_role(role_header, org_name, role):
+            if has_org_role(role_header, org_governance_name, role):
                 return True
     else:
-        if role_header.has_key(org_name):
-            if role_name in role_header[org_name]:
+        if role_header.has_key(org_governance_name):
+            if role_name in role_header[org_governance_name]:
                 return True
 
     return False
@@ -106,10 +106,10 @@ def find_roles_by_actor(actor_id=None):
 
     for role in role_list:
 
-        if not role_dict.has_key(role.org_name):
-            role_dict[role.org_name] = list()
+        if not role_dict.has_key(role.org_governance_name):
+            role_dict[role.org_governance_name] = list()
 
-        role_dict[role.org_name].append(role.name)
+        role_dict[role.org_governance_name].append(role.name)
 
     #Membership in ION Org is implied
     if not role_dict.has_key(gov_controller.system_root_org_name):
@@ -120,6 +120,22 @@ def find_roles_by_actor(actor_id=None):
 
     return role_dict
 
+def get_web_authentication_actor():
+    '''
+    Returns the ION System Actor defined in the Resource Registry
+    @return:
+    '''
+    try:
+        gov_controller = bootstrap.container_instance.governance_controller
+        web_actor, _ = gov_controller.rr.find_resources(RT.ActorIdentity,name=get_safe(gov_controller.CFG, "system.web_authentication_actor", "web_authentication"), id_only=False)
+        if not web_actor:
+            return None
+
+        return web_actor[0]
+
+    except Exception, e:
+        log.error(e)
+        return None
 
 def get_system_actor():
     '''
