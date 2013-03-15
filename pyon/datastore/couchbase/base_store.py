@@ -31,7 +31,7 @@ couchbase.rest_client.json = json
 #END_MARKER = "\x7f\x7f\x7f\x7f"
 END_MARKER = "ZZZZZZ"
 
-class CouchDataStore(object):
+class CouchbaseDataStore(object):
     """
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
@@ -387,8 +387,8 @@ class CouchDataStore(object):
         #return ds.compact(design)
 
     def define_profile_views(self, profile, datastore_name=None):
-        from pyon.datastore.couchdb.views import get_couchdb_views
-        ds_views = get_couchdb_views(profile)
+        from pyon.datastore.couchdb.views import get_couchdb_view_designs
+        ds_views = get_couchdb_view_designs(profile)
         for design, viewdef in ds_views.iteritems():
             self.define_views(design, viewdef, datastore_name=datastore_name)
 

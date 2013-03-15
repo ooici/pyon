@@ -72,7 +72,7 @@ class DatastoreAdmin(object):
             objs = ds.find_docs_by_view("_all_docs", None, id_only=False)
             numwrites = 0
             if compact:
-                compact_obj = [obj for obj_id, obj_key, obj in objs]
+                compact_obj = [obj for obj_id, obj_key, value, obj in objs]
                 compact_obj.insert(0, "COMPACTDUMP")
                 with open("%s/%s_compact.yml" % (outpath, ds_name), 'w') as f:
                     yaml.dump(compact_obj, f, default_flow_style=False)
@@ -192,7 +192,7 @@ class DatastoreAdmin(object):
             except BadRequest:
                 continue
             objs = []
-            for obj_id, obj_key, obj in ret_objs:
+            for obj_id, obj_key, value, obj in ret_objs:
                 if "blame_" in obj:
                     objs.append(obj)
             blame_objs[ds_name] = objs

@@ -11,7 +11,7 @@ from couchbase.client import Couchbase, Bucket
 from couchbase.rest_client import RestHelper
 from couchbase.exception import BucketCreationException, BucketUnavailableException, MemcachedTimeoutException
 import requests
-from pyon.datastore.couchdb.views import get_couchdb_views
+from pyon.datastore.couchdb.views import get_couchdb_view_designs
 
 from couchdb.client import ViewResults, Row
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
@@ -48,24 +48,7 @@ couchbase.rest_client.json = json
 END_MARKER = "ZZZZZZ"
 
 
-def sha1hex(doc):
-    """
-    Compare the content of the doc without its id or revision...
-    """
-    doc_id = doc.pop('_id', None)
-    doc_rev = doc.get('_rev', None)
-    doc_string = str(doc)
-
-    if doc_id is not None:
-        doc['_id'] = doc_id
-
-    if doc_rev is not None:
-        doc['_rev'] = doc_rev
-
-    return hashlib.sha1(doc_string).hexdigest().upper()
-
-
-class CouchDataStore(DataStore):
+class CouchbasePyonDataStore(DataStore):
     """
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
@@ -787,7 +770,7 @@ class CouchDataStore(DataStore):
         profile = profile or self.profile
         log.debug('Define views datastore: %s profile: %s' %(datastore_name,profile))
 
-        ds_views = get_couchdb_views(profile)
+        ds_views = get_couchdb_view_designs(profile)
         for design, viewdef in ds_views.iteritems():
             self._define_view(design, viewdef, datastore_name=datastore_name, keepviews=keepviews)
 
@@ -818,7 +801,7 @@ class CouchDataStore(DataStore):
         ds, datastore_name = self._get_datastore(datastore_name)
 
         profile = profile or self.profile
-        ds_views = get_couchdb_views(profile)
+        ds_views = get_couchdb_view_designs(profile)
 
         for design, viewdef in ds_views.iteritems():
             for viewname in viewdef:
@@ -834,7 +817,7 @@ class CouchDataStore(DataStore):
         ds, datastore_name = self._get_datastore(datastore_name)
 
         profile = profile or self.profile
-        ds_views = get_couchdb_views(profile)
+        ds_views = get_couchdb_view_designs(profile)
 
         for design, viewdef in ds_views.iteritems():
             try:

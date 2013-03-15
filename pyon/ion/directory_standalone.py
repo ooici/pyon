@@ -58,11 +58,10 @@ class DirectoryStandalone(object):
         find_key = [orgname, key, parent]
         view_res = self.datastore.find_docs_by_view('directory', 'by_key', key=find_key, id_only=True)
 
-        match = [doc for docid, index, doc in view_res]
-        if len(match) > 1:
+        if len(view_res) > 1:
             raise Inconsistent("More than one directory entry found for key %s" % path)
-        elif match:
-            return match[0]
+        elif view_res:
+            return view_res[0][2]  # First value
         return None
 
     def lookup(self, parent, key=None, return_entry=False):
@@ -166,5 +165,5 @@ class DirectoryStandalone(object):
             res = self.datastore.find_docs_by_view('directory', 'by_path',
                 start_key=start_key, end_key=end_key, id_only=True, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        match = [value for docid, indexkey, value, doc in res]
         return match

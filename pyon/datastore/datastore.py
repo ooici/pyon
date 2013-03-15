@@ -24,7 +24,7 @@ class DataStore(object):
     DS_STATE = "state"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'EXAMPLES', 'SCIDATA', 'FILESYSTEM', 'BASIC']
+    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     # Maps common datastore logical names to index profiles
@@ -88,7 +88,7 @@ class DatastoreManager(object):
         else:
             # NOTE: This may be expensive if called more than once per container
             # If views exist and are dropped and recreated
-            new_ds._define_views(profile=profile, keepviews=True)
+            new_ds.define_profile_views(profile=profile, keepviews=True)
 
         # Set a few standard datastore instance fields
         new_ds.local_name = ds_name

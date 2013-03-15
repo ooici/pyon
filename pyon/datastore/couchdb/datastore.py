@@ -3,150 +3,55 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from uuid import uuid4
-import hashlib
 
 import couchdb
 from couchdb.client import ViewResults, Row
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
+from uuid import uuid4
+
+from pyon.datastore.couchdb.couch_common import END_MARKER
+from pyon.datastore.couchdb.base_store import CouchDataStore
 
 from pyon.core.bootstrap import get_obj_registry, CFG
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
-from pyon.datastore.couchdb.views import get_couchdb_views
+from pyon.datastore.couchdb.views import get_couchdb_view_designs
 from pyon.ion.identifier import create_unique_association_id
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.containers import get_ion_ts
-from pyon.util.stats import StatsCounter
-
-# Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
-# prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
-# or "somestr" <= keys < "somestr"+END_MARKER for string prefix checking
-# Note: Use highest ASCII characters here, not 8bit
-#END_MARKER = "\x7f\x7f\x7f\x7f"
-END_MARKER = "ZZZZZZ"
 
 
-class CouchDataStore(DataStore):
+class CouchPyonDataStore(CouchDataStore):
     """
-    Data store implementation utilizing CouchDB to persist documents.
-    For API info, see: http://packages.python.org/CouchDB/client.html
+    Pyon specialization of CouchDB datastore.
     """
-    _stats = StatsCounter()
-
     def __init__(self, datastore_name=None, profile=None, config=None):
         log.debug('__init__(datastore_name=%s, profile=%s, config=%s)', datastore_name, profile, config)
         if not config:
             config = CFG.get_safe("server.couchdb")
 
-        # Connection
-        self.host = config.get('host', 'localhost')
-        self.port = config.get('port', 5984)
-        self.username = config.get('username', None)
-        self.password = config.get('password', None)
-        if self.username and self.password:
-            connection_str = "http://%s:%s@%s:%s" % (self.username, self.password, self.host, self.port)
-            log_connection_str = "http://%s:%s@%s:%s" % ("username", "password", self.host, self.port)
-            log.debug("Using username:password authentication to connect to datastore")
-        else:
-            connection_str = "http://%s:%s" % (self.host, self.port)
-            log_connection_str = connection_str
-
-        log.info("Connecting to CouchDB server: %s", log_connection_str)
-        self.server = couchdb.Server(connection_str)
-
-        # The scoped name of the datastore
-        self.datastore_name = datastore_name
+        super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=log)
 
         # Datastore specialization (views)
         self.profile = profile or DataStore.DS_PROFILE.BASIC
 
-        # serializers
+        # IonObject Serializers
         self._io_serializer = IonObjectSerializer()
         self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
 
-        self._datastore_cache = {}
-
-    def close(self):
-        log.debug("Closing connection to CouchDB")
-        map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
-        self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
-
-    def _get_datastore(self, datastore_name=None):
-        datastore_name = datastore_name or self.datastore_name
-
-        if datastore_name in self._datastore_cache:
-            return (self._datastore_cache[datastore_name], datastore_name)
-
-        try:
-            ds = self.server[datastore_name]   # http lookup
-            self._datastore_cache[datastore_name] = ds
-            return ds, datastore_name
-        except ResourceNotFound:
-            raise BadRequest("Datastore '%s' does not exist" % datastore_name)
-        except ValueError:
-            raise BadRequest("Datastore name '%s' invalid" % datastore_name)
-
     def create_datastore(self, datastore_name="", create_indexes=True, profile=None):
-        datastore_name = datastore_name or self.datastore_name
-        profile = profile or self.profile
-        log.info('Creating data store %s with profile=%s' % (datastore_name, profile))
-        if self.datastore_exists(datastore_name):
-            raise BadRequest("Data store with name %s already exists" % datastore_name)
-        try:
-            self.server.create(datastore_name)
-        except PreconditionFailed:
-            raise BadRequest("Data store with name %s already exists" % datastore_name)
-        except ValueError:
-            raise BadRequest("Data store name %s invalid" % datastore_name)
+        super(CouchPyonDataStore, self).create_datastore(datastore_name=datastore_name)
+
         if create_indexes:
+            profile = profile or self.profile
+            log.info('Creating indexes for datastore %s with profile=%s' % (datastore_name, profile))
             self._define_views(datastore_name, profile)
 
-    def delete_datastore(self, datastore_name=""):
-        datastore_name = datastore_name or self.datastore_name
-        log.info('Deleting data store %s' % datastore_name)
-        try:
-            self.server.delete(datastore_name)
-        except ResourceNotFound:
-            log.debug('Data store %s does not exist' % datastore_name)
-        except ValueError:
-            raise BadRequest("Data store name %s invalid" % datastore_name)
-
-    def list_datastores(self):
-        dbs = [db for db in self.server]
-        log.debug('Data stores: %s', str(dbs))
-        return dbs
-
-    def info_datastore(self, datastore_name=""):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        log.debug('Listing information about data store %s', datastore_name)
-        info = ds.info()
-        log.debug('Data store info: %s', str(info))
-        return info
-
-    def datastore_exists(self, datastore_name=""):
-        for db in self.server:
-            if db == datastore_name:
-                return True
-        return False
-
-    def list_objects(self, datastore_name=""):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        log.warning('Listing all objects in data store %s' % datastore_name)
-        objs = [obj for obj in ds]
-        log.debug('Objects: %s', str(objs))
-        return objs
-
-    def list_object_revisions(self, object_id, datastore_name=""):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        log.debug('Listing all versions of object %s/%s', datastore_name, object_id)
-        gen = ds.revisions(object_id)
-        res = [ent["_rev"] for ent in gen]
-        log.debug('Object versions: %s', str(res))
-        return res
+    # -------------------------------------------------------------------------
+    # Couch document operations
 
     def create(self, obj, object_id=None, attachments=None, datastore_name=""):
         """
@@ -157,222 +62,48 @@ class CouchDataStore(DataStore):
         if not isinstance(obj, IonObjectBase):
             raise BadRequest("Obj param is not instance of IonObjectBase")
 
-
         return self.create_doc(self._ion_object_to_persistence_dict(obj),
                                object_id=object_id, datastore_name=datastore_name,
                                attachments=attachments)
 
-    def create_doc(self, doc, object_id=None, attachments=None, datastore_name=""):
-        """
-        Persists the document using the optionally suggested doc_id, and creates attachments to it.
-        Returns the identifier and version number of the document
-        """
-        ds, datastore_name = self._get_datastore(datastore_name)
-        if '_id' in doc:
-            raise BadRequest("Doc must not have '_id'")
-        if '_rev' in doc:
-            raise BadRequest("Doc must not have '_rev'")
-
-        # Assign an id to doc (recommended in CouchDB documentation)
-        doc["_id"] = object_id or uuid4().hex
-        log.debug('Creating new object %s/%s' % (datastore_name, doc["_id"]))
-        log.debug('create doc contents: %s', doc)
-
-        # Add the attachments if indicated
-        if attachments is not None:
-            pass   # Does not work with binary attachments
-#            if isinstance(attachments, dict):
-#                doc['_attachments'] = attachments
-#            else:
-#                raise BadRequest('Improper attachment given')
-        try:
-            res = ds.save(doc)
-            self._count(create=1)
-        except ResourceConflict:
-            raise BadRequest("Object with id %s already exist" % doc["_id"])
-        log.debug('Create result: %s', str(res))
-        obj_id, version = res
-        if attachments is not None:
-            # Need to iterate through attachments because couchdb_python does not support binary
-            # content in db.save()
-            for att_name, att_value in attachments.iteritems():
-                self.create_attachment(obj_id, att_name, att_value['data'],
-                    content_type=att_value.get('content_type', ''), datastore_name=datastore_name)
-        return obj_id, version
-
-    def create_mult(self, objects, object_ids=None, allow_ids=False):
+    def create_mult(self, objects, object_ids=None):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
                 raise BadRequest("Obj param is not instance of IonObjectBase")
-        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects],
-                                    object_ids, allow_ids=allow_ids)
 
-    def create_doc_mult(self, docs, object_ids=None, allow_ids=False):
-        if not allow_ids:
-            if any(["_id" in doc for doc in docs]):
-                raise BadRequest("Docs must not have '_id'")
-            if any(["_rev" in doc for doc in docs]):
-                raise BadRequest("Docs must not have '_rev'")
-        if object_ids and len(object_ids) != len(docs):
-            raise BadRequest("Invalid object_ids")
-        if type(docs) is not list:
-            raise BadRequest("Invalid type for docs:%s" % type(docs))
+        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects], object_ids)
 
-        if object_ids:
-            for doc, oid in zip(docs, object_ids):
-                doc["_id"] = oid
-        else:
-            for doc in docs:
-                doc["_id"] = doc.get("_id", None) or uuid4().hex
-
-        # Update docs.  CouchDB will assign versions to docs.
-        db, _ = self._get_datastore()
-        res = db.update(docs)
-        self._count(create_mult_call=1, create_mult_obj=len(docs))
-        if not all([success for success, oid, rev in res]):
-            errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
-            log.error('create_doc_mult had errors. Successful: %s, Errors: %s'
-                      % (len(res) - len(errors), "\n".join(errors)))
-        else:
-            log.debug('create_doc_mult result: %s', str(res))
-
-        return res
-
-    def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
-        """
-        Assumes that the document already exists and creates attachment to it.
-        @param doc can be either id or a document
-        """
-        if not isinstance(attachment_name, str):
-            raise BadRequest("attachment name is not string")
-        if not isinstance(data, str) and not isinstance(data, file):
-            raise BadRequest("data to create attachment is not a str or file")
-        if isinstance(doc, str):
-            doc = self.read_doc(doc_id=doc)
-        ds, _ = self._get_datastore(datastore_name)
-        ds.put_attachment(doc=doc, content=data, filename=attachment_name, content_type=content_type)
-        self._count(create_attachment=1)
-
-    def read(self, object_id, rev_id="", datastore_name=""):
-        if not isinstance(object_id, str):
-            raise BadRequest("Object id param is not string")
-        doc = self.read_doc(object_id, rev_id, datastore_name)
-
-        # Convert doc into Ion object
-        obj = self._persistence_dict_to_ion_object(doc)
-        log.debug('Ion object: %s', str(obj))
-        return obj
-
-    def read_doc(self, doc_id, rev_id="", datastore_name=""):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        if not rev_id:
-            log.debug('Reading head version of object %s/%s', datastore_name, doc_id)
-            doc = ds.get(doc_id)
-            if doc is None:
-                raise NotFound('Object with id %s does not exist.' % str(doc_id))
-        else:
-            log.debug('Reading version %s of object %s/%s', rev_id, datastore_name, doc_id)
-            doc = ds.get(doc_id, rev=rev_id)
-            if doc is None:
-                raise NotFound('Object with id %s does not exist.' % str(doc_id))
-        log.debug('read doc contents: %s', doc)
-        self._count(read=1)
-        return doc
-
-    def read_mult(self, object_ids, datastore_name=""):
-        if any([not isinstance(object_id, str) for object_id in object_ids]):
-            raise BadRequest("Object ids are not string: %s" % str(object_ids))
-        docs = self.read_doc_mult(object_ids, datastore_name)
-        # Convert docs into Ion objects
-        obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
-        return obj_list
-
-    def read_doc_mult(self, object_ids, datastore_name=""):
-        if not object_ids: return []
-        ds, datastore_name = self._get_datastore(datastore_name)
-        log.debug('Reading head version of objects %s/%s' % (datastore_name, object_ids))
-        docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
-        # Check for docs not found
-        notfound_list = ['Object with id %s does not exist.' % str(row.key)
-                         for row in docs if row.doc is None]
-        if notfound_list:
-            raise NotFound("\n".join(notfound_list))
-
-        doc_list = [row.doc.copy() for row in docs]
-        self._count(read_mult_call=1, read_mult_obj=len(doc_list))
-        return doc_list
-
-    def read_attachment(self, doc, attachment_name, datastore_name=""):
-        if not isinstance(attachment_name, str):
-            raise BadRequest("Attachment_name param is not str")
-
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        log.debug('Fetching attachment %s of document %s/%s', attachment_name, datastore_name, doc)
-        attachment = ds.get_attachment(doc, attachment_name)
-
-        if attachment is None:
-            raise NotFound('Attachment %s does not exist in document %s.%s.',
-                attachment_name, datastore_name, doc)
-        else:
-            log.debug('Reading attachment content: %s', attachment)
-            attachment = attachment.read()
-
-        if not isinstance(attachment, str):
-            raise NotFound('Attachment read is not a string')
-
-        log.debug('Read content of attachment: %s of document %s/%s', attachment_name, datastore_name, doc)
-
-        self._count(read_attachment=1)
-        return attachment
-
-    def list_attachments(self, doc):
-        """
-        Returns the a list of attachments for the document, as a dict of dicts, key'ed by name with
-        nested keys 'data' for the content and 'content-type'.
-        @param doc  accepts either str (meaning an id) or dict (meaning a full document).
-        """
-        if isinstance(doc, dict) and '_attachments' not in doc:
-            # Need to reread again, because it did not contain the _attachments
-            doc = self.read_doc(doc_id=doc["_id"])
-        elif isinstance(doc, str):
-            doc = self.read_doc(doc_id=doc)
-
-        return doc.get("_attachments", None)
 
     def update(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase):
             raise BadRequest("Obj param is not instance of IonObjectBase")
+
         return self.update_doc(self._ion_object_to_persistence_dict(obj))
-
-    def update_doc(self, doc, datastore_name=""):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        if '_id' not in doc:
-            raise BadRequest("Doc must have '_id'")
-        if '_rev' not in doc:
-            raise BadRequest("Doc must have '_rev'")
-
-        log.debug('update doc contents: %s', doc)
-        try:
-            res = ds.save(doc)
-            self._count(update=1)
-        except ResourceConflict:
-            raise Conflict('Object not based on most current version')
-        log.debug('Update result: %s', str(res))
-        id, version = res
-        return (id, version)
 
     def update_mult(self, objects):
         if any([not isinstance(obj, IonObjectBase) for obj in objects]):
             raise BadRequest("Obj param is not instance of IonObjectBase")
-        return self.create_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects], allow_ids=True)
 
-    def update_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
-        log.debug("updating attachment %s", attachment_name)
-        self.create_attachment(doc=doc, attachment_name=attachment_name, data=data,
-            content_type=content_type,
-            datastore_name=datastore_name)
-        log.debug("updated attachment %s", attachment_name)
-        self._count(update_attachment=1)
+        return self.update_doc_mult([self._ion_object_to_persistence_dict(obj) for obj in objects])
+
+
+    def read(self, object_id, rev_id="", datastore_name=""):
+        if not isinstance(object_id, str):
+            raise BadRequest("Object id param is not string")
+
+        doc = self.read_doc(object_id, rev_id, datastore_name)
+        obj = self._persistence_dict_to_ion_object(doc)
+
+        return obj
+
+    def read_mult(self, object_ids, datastore_name=""):
+        if any([not isinstance(object_id, str) for object_id in object_ids]):
+            raise BadRequest("Object ids are not string: %s" % str(object_ids))
+
+        docs = self.read_doc_mult(object_ids, datastore_name)
+        obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
+
+        return obj_list
+
 
     def delete(self, obj, datastore_name="", del_associations=False):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
@@ -384,64 +115,27 @@ class CouchDataStore(DataStore):
                 raise BadRequest("Doc must have '_id'")
             if '_rev' not in obj:
                 raise BadRequest("Doc must have '_rev'")
-            self.delete_doc(self._ion_object_to_persistence_dict(obj), datastore_name=datastore_name, del_associations=del_associations)
+            self.delete_doc(self._ion_object_to_persistence_dict(obj),
+                            datastore_name=datastore_name, del_associations=del_associations)
 
     def delete_doc(self, doc, datastore_name="", del_associations=False):
-        ds, datastore_name = self._get_datastore(datastore_name)
         doc_id = doc if type(doc) is str else doc["_id"]
-        log.debug('Deleting object %s/%s', datastore_name, doc_id)
-
         if del_associations:
             assoc_ids = self.find_associations(anyside=doc_id, id_only=True)
             self.delete_doc_mult(assoc_ids)
-#            for aid in assoc_ids:
-#                self.delete(aid, datastore_name=datastore_name)
-#            log.info("Deleted %n associations for object %s", len(assoc_ids), doc_id)
+            log.debug("Deleted %n associations for object %s", len(assoc_ids), doc_id)
 
         elif self._is_in_association(doc_id, datastore_name):
-            bad_doc = self.read(doc_id)
-            if doc:
-                log.warn("XXXXXXX Attempt to delete %s object %s that still has associations" % (bad_doc.type_, doc_id))
-            else:
-                log.warn("XXXXXXX Attempt to delete object %s that still has associations" % doc_id)
-#           raise BadRequest("Object cannot be deleted until associations are broken")
+            log.warn("Deleting object %s that still has associations" % doc_id)
 
-        try:
-            if type(doc) is str:
-                del ds[doc_id]
-            else:
-                ds.delete(doc)
-            self._count(delete=1)
-        except ResourceNotFound:
-            raise NotFound('Object with id %s does not exist.' % doc_id)
+        super(CouchPyonDataStore, self).delete_doc(doc, datastore_name=datastore_name)
 
     def delete_mult(self, object_ids, datastore_name=None):
         return self.delete_doc_mult(object_ids, datastore_name)
 
-    def delete_doc_mult(self, object_ids, datastore_name=None):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        obj_list = self.read_doc_mult(object_ids, datastore_name=datastore_name)
-        for obj in obj_list:
-            obj['_deleted'] = True
-        self.create_doc_mult(obj_list, allow_ids=True)
-        self._count(delete_mult_call=1, delete_mult_obj=len(obj_list))
 
-    def delete_attachment(self, doc, attachment_name, datastore_name=""):
-        """
-        Deletes an attachment from a document.
-        """
-        if not isinstance(attachment_name, str):
-            raise BadRequest("attachment_name is not a string")
-
-        if isinstance(doc, str):
-            doc = self.read_doc(doc_id=doc)
-
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        log.debug('Deleting attachment of document %s/%s', datastore_name, doc["_id"])
-        ds.delete_attachment(doc, attachment_name)
-        log.debug('Deleted attachment: %s', attachment_name)
-        self._count(delete_attachment=1)
+    # -------------------------------------------------------------------------
+    # Association operations
 
     def create_association(self, subject=None, predicate=None, obj=None, assoc_type=None):
         """
@@ -530,66 +224,9 @@ class CouchDataStore(DataStore):
             self._count(_delete_assoc=1)
             return self.delete(association)
 
-    def _get_viewname(self, design, name):
-        return "_design/%s/_view/%s" % (design, name)
 
-    def _define_views(self, datastore_name=None, profile=None, keepviews=False):
-        datastore_name = datastore_name or self.datastore_name
-        profile = profile or self.profile
-
-        ds_views = get_couchdb_views(profile)
-        for design, viewdef in ds_views.iteritems():
-            self._define_view(design, viewdef, datastore_name=datastore_name, keepviews=keepviews)
-
-    def _define_view(self, design, viewdef, datastore_name=None, keepviews=False):
-        ds, datastore_name = self._get_datastore(datastore_name)
-        viewname = "_design/%s" % design
-        if keepviews and viewname in ds:
-            return
-        try:
-            del ds[viewname]
-        except ResourceNotFound:
-            pass
-        ds[viewname] = dict(views=viewdef)
-
-    def _update_views(self, datastore_name="", profile=None):
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        profile = profile or self.profile
-        ds_views = get_couchdb_views(profile)
-
-        for design, viewdef in ds_views.iteritems():
-            for viewname in viewdef:
-                try:
-                    rows = ds.view("_design/%s/_view/%s" % (design, viewname))
-                    log.debug("View %s/_design/%s/_view/%s: %s rows", datastore_name, design, viewname, len(rows))
-                except Exception, ex:
-                    log.exception("Problem with view %s/_design/%s/_view/%s", datastore_name, design, viewname)
-
-    _refresh_views = _update_views
-
-    def _delete_views(self, datastore_name="", profile=None):
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        profile = profile or self.profile
-        ds_views = get_couchdb_views(profile)
-
-        for design, viewdef in ds_views.iteritems():
-            try:
-                del ds["_design/%s" % design]
-            except ResourceNotFound:
-                pass
-
-    def _get_view_args(self, all_args):
-        """
-        @brief From given all_args dict, extract all entries that are valid CouchDB view options.
-        @see http://wiki.apache.org/couchdb/HTTP_view_API
-        """
-        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq') and v is not None)
-        limit = int(all_args.get('limit', 0)) if all_args.get('limit', None) is not None else 0
-        if limit > 0:
-            view_args['limit'] = limit
-        return view_args
+    # -------------------------------------------------------------------------
+    # View operations
 
     def _is_in_association(self, obj_id, datastore_name=""):
         log.debug("_is_in_association(%s)", obj_id)
@@ -611,7 +248,7 @@ class CouchDataStore(DataStore):
         ds, datastore_name = self._get_datastore()
         validate_is_instance(subjects, list, 'subjects is not a list of resource_ids')
         view_args = dict(keys=subjects, include_docs=True)
-        results = self.query_view(self._get_viewname("association", "by_bulk"), view_args)
+        results = self.query_view(self._get_view_name("association", "by_bulk"), view_args)
         ids = [i['value'] for i in results]
         assocs = [i['doc'] for i in results]
         self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
@@ -627,7 +264,7 @@ class CouchDataStore(DataStore):
         ds, datastore_name = self._get_datastore()
         validate_is_instance(objects, list, 'objects is not a list of resource_ids')
         view_args = dict(keys=objects, include_docs=True)
-        results = self.query_view(self._get_viewname("association", "by_subject_bulk"), view_args)
+        results = self.query_view(self._get_view_name("association", "by_subject_bulk"), view_args)
         ids = [i['value'] for i in results]
         assocs = [i['doc'] for i in results]
         self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
@@ -657,7 +294,7 @@ class CouchDataStore(DataStore):
                 subject_id = subject._id
 
         view_args = self._get_view_args(kwargs)
-        view = ds.view(self._get_viewname("association", "by_sub"), **view_args)
+        view = ds.view(self._get_view_name("association", "by_sub"), **view_args)
         key = [subject_id]
         if predicate:
             key.append(predicate)
@@ -699,7 +336,7 @@ class CouchDataStore(DataStore):
                 object_id = obj._id
 
         view_args = self._get_view_args(kwargs)
-        view = ds.view(self._get_viewname("association", "by_obj"), **view_args)
+        view = ds.view(self._get_view_name("association", "by_obj"), **view_args)
         key = [object_id]
         if predicate:
             key.append(predicate)
@@ -765,21 +402,21 @@ class CouchDataStore(DataStore):
         view_args = self._get_view_args(kwargs)
 
         if subject and obj:
-            view = ds.view(self._get_viewname("association", "by_match"), **view_args)
+            view = ds.view(self._get_view_name("association", "by_match"), **view_args)
             key = [subject_id, object_id]
             if predicate:
                 key.append(predicate)
             endkey = self._get_endkey(key)
             rows = view[key:endkey]
         elif subject:
-            view = ds.view(self._get_viewname("association", "by_sub"), **view_args)
+            view = ds.view(self._get_view_name("association", "by_sub"), **view_args)
             key = [subject_id]
             if predicate:
                 key.append(predicate)
             endkey = self._get_endkey(key)
             rows = view[key:endkey]
         elif obj:
-            view = ds.view(self._get_viewname("association", "by_obj"), **view_args)
+            view = ds.view(self._get_view_name("association", "by_obj"), **view_args)
             key = [object_id]
             if predicate:
                 key.append(predicate)
@@ -787,16 +424,16 @@ class CouchDataStore(DataStore):
             rows = view[key:endkey]
         elif anyside:
             if predicate:
-                view = ds.view(self._get_viewname("association", "by_idpred"), **view_args)
+                view = ds.view(self._get_view_name("association", "by_idpred"), **view_args)
                 key = [anyside, predicate]
                 endkey = self._get_endkey(key)
                 rows = view[key:endkey]
             elif type(anyside_ids[0]) is str:
-                rows = ds.view(self._get_viewname("association", "by_id"), keys=anyside_ids, **view_args)
+                rows = ds.view(self._get_view_name("association", "by_id"), keys=anyside_ids, **view_args)
             else:
-                rows = ds.view(self._get_viewname("association", "by_idpred"), keys=anyside_ids, **view_args)
+                rows = ds.view(self._get_view_name("association", "by_idpred"), keys=anyside_ids, **view_args)
         elif predicate:
-            view = ds.view(self._get_viewname("association", "by_pred"), **view_args)
+            view = ds.view(self._get_view_name("association", "by_pred"), **view_args)
             key = [predicate]
             endkey = self._get_endkey(key)
             rows = view[key:endkey]
@@ -856,7 +493,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('lcstate not supported anymore in find_res_by_type')
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_type"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_type"), include_docs=(not id_only), **filter)
         if restype:
             key = [restype]
             endkey = self._get_endkey(key)
@@ -879,7 +516,7 @@ class CouchDataStore(DataStore):
             lcstate,_ = lcstate.split("_", 1)
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_lcstate"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_lcstate"), include_docs=(not id_only), **filter)
         key = [1, lcstate] if lcstate in CommonResourceLifeCycleSM.AVAILABILITY else [0, lcstate]
         if restype:
             key.append(restype)
@@ -897,7 +534,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_name"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_name"), include_docs=(not id_only), **filter)
         key = [name]
         if restype:
             key.append(restype)
@@ -917,7 +554,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_keyword"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_keyword"), include_docs=(not id_only), **filter)
         key = [keyword]
         if restype:
             key.append(restype)
@@ -937,7 +574,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_nestedtype"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_nestedtype"), include_docs=(not id_only), **filter)
         key = [nested_type]
         if restype:
             key.append(restype)
@@ -957,7 +594,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_attribute"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_attribute"), include_docs=(not id_only), **filter)
         key = [restype, attr_name]
         if attr_value:
             key.append(attr_value)
@@ -979,7 +616,7 @@ class CouchDataStore(DataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        view = ds.view(self._get_viewname("resource", "by_altid"), include_docs=(not id_only), **filter)
+        view = ds.view(self._get_view_name("resource", "by_altid"), include_docs=(not id_only), **filter)
         key = []
         if alt_id:
             key.append(alt_id)
@@ -1011,61 +648,31 @@ class CouchDataStore(DataStore):
         pass
 
     def find_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
-                           id_only=True, convert_doc=True, **kwargs):
+                           id_only=True, convert_doc=True, convert_value=True, **kwargs):
         """
-        @brief Generic find function using an defined index
-        @retval Returns a list of triples: (object _id, index key, Document/object or None)
+        Generic find function using a defined index
+        @param design_name  design document
+        @param view_name  view name
+        @param key  specific key to find
+        @param keys  list of keys to find
+        @param start_key  find range start value
+        @param end_key  find range end value
+        @param id_only  if True, the 4th element of each triple is the document
+        @param convert_doc  if True, make IonObject out of doc
+        @param convert_value  if True, make IonObject out of value
+        @retval Returns a list of 4-tuples: (document id, index key, index value, document)
         """
-        if type(id_only) is not bool:
-            raise BadRequest('id_only must be type bool, not %s' % type(id_only))
-        ds, datastore_name = self._get_datastore()
+        res_rows = self.find_docs_by_view(design_name=design_name, view_name=view_name, key=key, keys=keys,
+                                          start_key=start_key, end_key=end_key, id_only=id_only, **kwargs)
 
-        view_args = self._get_view_args(kwargs)
-        view_args['include_docs'] = (not id_only)
-        view_doc = design_name if design_name == "_all_docs" else self._get_viewname(design_name, view_name)
-        if keys:
-            view_args['keys'] = keys
-        view = ds.view(view_doc, **view_args)
-        if key is not None:
-            rows = view[key]
-            log.info("find_by_view(%s): key=%s", view_doc, key)
-        elif keys:
-            rows = view
-            log.info("find_by_view(%s): keys=%s", view_doc, str(keys))
-        elif start_key and end_key:
-            startkey = start_key or []
-            endkey = list(end_key) or []
-            endkey.append(END_MARKER)
-            log.info("find_by_view(%s): start_key=%s to end_key=%s", view_doc, startkey, endkey)
-            if view_args.get('descending', False):
-                rows = view[endkey:startkey]
-            else:
-                rows = view[startkey:endkey]
-        else:
-            rows = view
+        res_rows = [(rid, key,
+                     self._persistence_dict_to_ion_object(value) if convert_value and isinstance(value, dict) else value,
+                     self._persistence_dict_to_ion_object(doc) if convert_doc and isinstance(doc, dict) else doc)
+                    for rid,key,value,doc in res_rows]
 
-        if id_only:
-            if convert_doc:
-                res_rows = [(row['id'], row['key'], self._persistence_dict_to_ion_object(row['value'])) for row in rows]
-            else:
-                res_rows = [(row['id'], row['key'], row['value']) for row in rows]
-        else:
-            if convert_doc:
-                res_rows = [(row['id'], row['key'], self._persistence_dict_to_ion_object(row['doc'])) for row in rows]
-            else:
-                res_rows = [(row['id'], row['key'], row['doc']) for row in rows]
-
-        self._count(find_by_view_call=1, find_by_view_obj=len(res_rows))
-
-        log.info("find_by_view() found %s objects" % (len(res_rows)))
+        log.debug("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
 
-    def _get_endkey(self, startkey):
-        if startkey is None or type(startkey) is not list:
-            raise BadRequest("Cannot create endkey for type %s" % type(startkey))
-        endkey = list(startkey)
-        endkey.append(END_MARKER)
-        return endkey
 
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None: return None

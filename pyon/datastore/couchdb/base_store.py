@@ -9,36 +9,28 @@ from uuid import uuid4
 import couchdb
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
-from pyon.datastore.couchdb.couch_common import AbstractCouchDataStore
+from pyon.datastore.couchdb.couch_common import AbstractCouchDataStore, END_MARKER
+from pyon.datastore.couchdb.views import get_couchdb_view_designs
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.util.containers import get_safe, DictDiffer
 
 from ooi.logging import log
 
-# Token for a most likely non-inclusive key range upper bound (end_key), for queries such as
-# prefix <= keys < upper bound: e.g. ['some','value'] <= keys < ['some','value', END_MARKER]
-# or "somestr" <= keys < "somestr"+END_MARKER for string prefix checking
-# Note: Use highest ASCII characters here, not 8bit
-#END_MARKER = "\x7f\x7f\x7f\x7f"
-END_MARKER = "ZZZZZZ"
 
-
-class CouchDataStore(object):
+class CouchDataStore(AbstractCouchDataStore):
     """
     Data store implementation utilizing CouchDB to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
     def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, **kwargs):
-        """
-        @param datastore_name  Name of datastore within server. Should be scoped by caller with sysname
-        @param config  A standard config dict with connection params
-        @param scope  Identifier to prefix the datastore name (e.g. sysname)
-        """
-        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=newlog)
+        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, newlog=newlog)
 
         global log
         if newlog:
             log = newlog
+
+        if self.config.get("type", None) and self.config['type'] != "couchdb":
+            raise BadRequest("Datastore server config is not couchdb: %s" % self.config)
 
         # Connection
         if self.username and self.password:
@@ -52,14 +44,9 @@ class CouchDataStore(object):
         log.info("Connecting to CouchDB server: %s", log_connection_str)
         self.server = couchdb.Server(connection_str)
 
-        self._datastore_cache = {}
+        self._id_factory = None   # TODO
 
-        # Datastore (couch database) handling. Scope with given scope (sysname) and make all lowercase
-        self.scope = scope
-        if self.scope:
-            self.datastore_name = ("%s_%s" % (self.scope, datastore_name)).lower() if datastore_name else None
-        else:
-            self.datastore_name = datastore_name.lower() if datastore_name else None
+        self._datastore_cache = {}
 
         # Just to test existence of the datastore
         if self.datastore_name:
@@ -77,24 +64,9 @@ class CouchDataStore(object):
         map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
         self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
 
+
     # -------------------------------------------------------------------------
     # Couch database operations
-
-    def _get_datastore_name(self, datastore_name=None):
-        """
-        Computes a name for the datastore to work on. If name is given, uses the lower case
-        version of this name. If this instance was initialized with a scope, the name is additionally
-        scoped. If no name was given, the instance defaults will be returned.
-        """
-        if datastore_name and self.scope:
-            datastore_name = ("%s_%s" % (self.scope, datastore_name)).lower()
-        elif datastore_name:
-            datastore_name = datastore_name.lower()
-        elif self.datastore_name:
-            datastore_name = self.datastore_name
-        else:
-            raise BadRequest("No data store name provided")
-        return datastore_name
 
     def _get_datastore(self, datastore_name=None):
         """
@@ -123,6 +95,7 @@ class CouchDataStore(object):
         @param datastore_name  Datastore to work on. Will be scoped if scope was provided.
         """
         datastore_name = self._get_datastore_name(datastore_name)
+        log.info('Creating data store %s' % (datastore_name))
         try:
             self.server.create(datastore_name)
         except PreconditionFailed:
@@ -136,6 +109,7 @@ class CouchDataStore(object):
         equivalent to deleting a database from a database server.
         """
         datastore_name = self._get_datastore_name(datastore_name)
+        log.info('Deleting data store %s' % datastore_name)
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
@@ -175,6 +149,9 @@ class CouchDataStore(object):
         except ResourceNotFound:
             return False
 
+    datastore_exists = exists_datastore  # Alias
+
+
     # -------------------------------------------------------------------------
     # Couch document operations
 
@@ -195,6 +172,7 @@ class CouchDataStore(object):
         res = [ent["_rev"] for ent in gen]
         return res
 
+
     def save_doc(self, doc, object_id=None, datastore_name=None):
         """
         Create or update document
@@ -203,9 +181,16 @@ class CouchDataStore(object):
         """
         ds, datastore_name = self._get_datastore(datastore_name)
 
-        # Assign an id to doc (recommended in CouchDB documentation)
+        create = False
+        # Assign an id to doc
         if "_id" not in doc:
+            create = True
             doc["_id"] = object_id or uuid4().hex
+
+        if create:
+            log.debug('Create document id=%s', doc['_id'])
+        else:
+            log.debug('Update document id=%s', doc['_id'])
 
         try:
             obj_id, version = ds.save(doc)
@@ -217,16 +202,98 @@ class CouchDataStore(object):
 
         return obj_id, version
 
-    def create_doc(self, doc, object_id=None, datastore_name=None):
+    def save_doc_mult(self, docs, object_ids=None, datastore_name=None):
+        if type(docs) is not list:
+            raise BadRequest("Invalid type for docs:%s" % type(docs))
+        if not docs:
+            return []
+
+        if object_ids:
+            for doc, oid in zip(docs, object_ids):
+                doc["_id"] = oid
+        else:
+            for doc in docs:
+                doc["_id"] = doc.get("_id", None) or uuid4().hex
+
+        ds, datastore_name = self._get_datastore(datastore_name)
+        res = ds.update(docs)
+
+        self._count(create_mult_call=1, create_mult_obj=len(docs))
+        if not all([success for success, oid, rev in res]):
+            errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
+            log.error('create_doc_mult had errors. Successful: %s, Errors: %s'
+                      % (len(res) - len(errors), "\n".join(errors)))
+        else:
+            log.debug('create_doc_mult successfully created %s documents', len(res))
+
+        return res
+
+
+    def create_doc(self, doc, object_id=None, attachments=None, datastore_name=None):
         """"
-        Persist a new raw doc in the data store. An '_id' and initial
-        '_rev' value will be added to the doc.
+        Persists a document using the optionally provided object_id.
+        Optionally creates attachments to the new document.
+        Returns a tuple of identifier and revision number of the document
         """
         if object_id and '_id' in doc:
             raise BadRequest("Doc must not have '_id'")
         if '_rev' in doc:
             raise BadRequest("Doc must not have '_rev'")
-        return self.save_doc(doc, object_id, datastore_name=datastore_name)
+
+        # Add the attachments if indicated
+        if attachments is not None:
+            pass   # Does not work with binary attachments
+            # if isinstance(attachments, dict):
+            #     doc['_attachments'] = attachments
+            # else:
+            #     raise BadRequest('Improper attachment given')
+
+        obj_id, version = self.save_doc(doc, object_id, datastore_name=datastore_name)
+        self._count(create=1)
+
+        if attachments is not None:
+            # Need to iterate through attachments because couchdb_python does not support binary
+            # content in db.save()
+            for att_name, att_value in attachments.iteritems():
+                self.create_attachment(obj_id, att_name, att_value['data'],
+                                       content_type=att_value.get('content_type', ''), datastore_name=datastore_name)
+
+        return obj_id, version
+
+    def create_doc_mult(self, docs, object_ids=None, datastore_name=None):
+        """
+        Create multiple raw docs.
+        Returns list of (Success True/False, document_id, rev)
+        """
+        if type(docs) is not list:
+            raise BadRequest("Invalid type for docs:%s" % type(docs))
+        if object_ids and len(object_ids) != len(docs):
+            raise BadRequest("Invalid object_ids")
+        if any(["_id" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_id'")
+        if any(["_rev" in doc for doc in docs]):
+            raise BadRequest("Docs must not have '_rev'")
+
+        res = self.save_doc_mult(docs, object_ids, datastore_name=datastore_name)
+        self._count(create_mult_call=1, create_mult_obj=len(docs))
+
+        return res
+
+    def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
+        """
+        Assumes that the document already exists and creates attachment to it.
+        @param doc can be either id or a document
+        """
+        if not isinstance(attachment_name, str):
+            raise BadRequest("attachment name is not string")
+        if not isinstance(data, str) and not isinstance(data, file):
+            raise BadRequest("data to create attachment is not a str or file")
+        if isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc)
+        ds, _ = self._get_datastore(datastore_name)
+        ds.put_attachment(doc=doc, content=data, filename=attachment_name, content_type=content_type)
+        self._count(create_attachment=1)
+
 
     def update_doc(self, doc, datastore_name=None):
         """
@@ -238,49 +305,35 @@ class CouchDataStore(object):
             raise BadRequest("Doc must have '_id'")
         if '_rev' not in doc:
             raise BadRequest("Doc must have '_rev'")
-        return self.save_doc(doc, datastore_name=datastore_name)
 
-    def save_doc_mult(self, docs, object_ids=None, datastore_name=None):
-        if type(docs) is not list:
-            raise BadRequest("Invalid type for docs:%s" % type(docs))
+        obj_id, version = self.save_doc(doc, datastore_name=datastore_name)
+        self._count(update=1)
 
-        if object_ids:
-            for doc, oid in zip(docs, object_ids):
-                doc["_id"] = oid
-        else:
-            for doc in docs:
-                if "_id" not in doc:
-                    doc["_id"] = uuid4().hex
-
-        ds, datastore_name = self._get_datastore(datastore_name)
-        res = ds.update(docs)
-
-        if not all([success for success, oid, rev in res]):
-            errors = ["%s:%s" % (oid, rev) for success, oid, rev in res if not success]
-            log.error('create_doc_mult had errors. Successful: %s, errors: %s' % (len(res) - len(errors), "\n".join(errors)))
-        return res
-
-    def create_doc_mult(self, docs, object_ids=None, datastore_name=None):
-        """
-        Create multiple raw docs.
-        Returns list of (Success, Oid, rev)
-        """
-        if object_ids and any(["_id" in doc for doc in docs]):
-            raise BadRequest("Docs must not have '_id'")
-        if any(["_rev" in doc for doc in docs]):
-            raise BadRequest("Docs must not have '_rev'")
-        if object_ids and len(object_ids) != len(docs):
-            raise BadRequest("Invalid object_ids length")
-
-        return self.save_doc_mult(docs, object_ids, datastore_name=datastore_name)
+        return obj_id, version
 
     def update_doc_mult(self, docs, datastore_name=None):
+        """
+        Update multiple raw docs.
+        Returns list of (Success True/False, document_id, rev)
+        """
+        if type(docs) is not list:
+            raise BadRequest("Invalid type for docs:%s" % type(docs))
         if not all(["_id" in doc for doc in docs]):
             raise BadRequest("Docs must have '_id'")
         if not all(["_rev" in doc for doc in docs]):
             raise BadRequest("Docs must have '_rev'")
 
-        return self.save_doc_mult(docs, datastore_name=datastore_name)
+        res = self.save_doc_mult(docs, datastore_name=datastore_name)
+        self._count(update_mult_call=1, update_mult_obj=len(docs))
+
+        return res
+
+    def update_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
+        self.create_attachment(doc=doc, attachment_name=attachment_name, data=data,
+                               content_type=content_type,
+                               datastore_name=datastore_name)
+        self._count(update_attachment=1)
+
 
     def read_doc(self, doc_id, rev_id=None, datastore_name=None):
         """"
@@ -297,21 +350,65 @@ class CouchDataStore(object):
             doc = ds.get(doc_id, rev=rev_id)
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % doc_id)
+        self._count(read=1)
+
         return doc
 
     def read_doc_mult(self, object_ids, datastore_name=None):
         """"
-        Fetch a raw doc instances, HEAD rev.
+        Fetch a number of raw doc instances, HEAD rev.
         """
+        if not object_ids:
+            return []
         ds, datastore_name = self._get_datastore(datastore_name)
-        docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
+        rows = ds.view("_all_docs", keys=object_ids, include_docs=True)
+
         # Check for docs not found
-        notfound_list = ['Object with id %s does not exist.' % str(row.key) for row in docs if row.doc is None]
+        notfound_list = ['Object with id %s does not exist.' % str(row.key)
+                         for row in rows if row.doc is None]
         if notfound_list:
             raise NotFound("\n".join(notfound_list))
 
-        doc_list = [row.doc.copy() for row in docs]
+        doc_list = [row.doc.copy() for row in rows]   # TODO: Is copy() necessary?
+        self._count(read_mult_call=1, read_mult_obj=len(doc_list))
+
         return doc_list
+
+    def read_attachment(self, doc, attachment_name, datastore_name=""):
+        if not isinstance(attachment_name, str):
+            raise BadRequest("Attachment_name param is not str")
+
+        ds, datastore_name = self._get_datastore(datastore_name)
+
+        attachment = ds.get_attachment(doc, attachment_name)
+
+        if attachment is None:
+            raise NotFound('Attachment %s does not exist in document %s.%s.',
+                           attachment_name, datastore_name, doc)
+
+        attachment_content = attachment.read()
+        if not isinstance(attachment_content, str):
+            raise NotFound('Attachment read is not a string')
+
+        self._count(read_attachment=1)
+
+        return attachment_content
+
+    def list_attachments(self, doc):
+        """
+        Returns the a list of attachments for the document, as a dict of dicts, key'ed by name with
+        nested keys 'data' for the content and 'content-type'.
+        @param doc  accepts either str (meaning an id) or dict (a full document).
+        """
+        if isinstance(doc, dict) and '_attachments' not in doc:
+            # Need to reread again, because it did not contain the _attachments
+            doc = self.read_doc(doc_id=doc["_id"])
+        elif isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc)
+
+        attachment_list = doc.get("_attachments", None)
+        return attachment_list
+
 
     def delete_doc(self, doc, datastore_name=None, **kwargs):
         """
@@ -324,6 +421,7 @@ class CouchDataStore(object):
         """
         ds, datastore_name = self._get_datastore(datastore_name)
         doc_id = doc if type(doc) is str else doc["_id"]
+        log.debug('Deleting object %s/%s', datastore_name, doc_id)
         try:
             if type(doc) is str:
                 del ds[doc_id]
@@ -339,51 +437,75 @@ class CouchDataStore(object):
         obj_list = self.read_doc_mult(object_ids, datastore_name=datastore_name)
         for obj in obj_list:
             obj['_deleted'] = True
-        self.save_doc_mult(obj_list, datastore_name=datastore_name)
+        self.update_doc_mult(obj_list)
+        self._count(delete_mult_call=1, delete_mult_obj=len(obj_list))
+
+    def delete_attachment(self, doc, attachment_name, datastore_name=""):
+        """
+        Deletes an attachment from a document.
+        """
+        if not isinstance(attachment_name, str):
+            raise BadRequest("attachment_name is not a string")
+
+        if isinstance(doc, str):
+            doc = self.read_doc(doc_id=doc, datastore_name=datastore_name)
+
+        ds, datastore_name = self._get_datastore(datastore_name)
+
+        log.debug('Delete attachment %s of document %s', attachment_name, doc["_id"])
+        ds.delete_attachment(doc, attachment_name)
+        self._count(delete_attachment=1)
+
 
     # -------------------------------------------------------------------------
-    # Couch view operations
-
-    def _get_design_name(self, design):
-        return "_design/%s" % design
-
-    def _get_view_name(self, design, name):
-        return "_design/%s/_view/%s" % (design, name)
+    # View operations
 
     def compact_views(self, design, datastore_name=None):
         ds, datastore_name = self._get_datastore(datastore_name)
         return ds.compact(design)
 
-    def define_profile_views(self, profile, datastore_name=None):
-        from pyon.datastore.couchdb.views import get_couchdb_views
-        ds_views = get_couchdb_views(profile)
-        for design, viewdef in ds_views.iteritems():
-            self.define_views(design, viewdef, datastore_name=datastore_name)
+    def define_profile_views(self, datastore_name=None, profile=None, keepviews=False):
+        ds_views = get_couchdb_view_designs(profile)
+        for design_name, design_doc in ds_views.iteritems():
+            self.define_viewset(design_name, design_doc, datastore_name=datastore_name, keepviews=keepviews)
 
-    def define_views(self, design, viewdef, datastore_name=None):
+    def define_viewset(self, design_name, design_doc, datastore_name=None, keepviews=False):
         """
-        Create or update a design document (set of views).
+        Create or update a design document (i.e. a set of views).
         If design exists, only updates if view definitions are different to prevent rebuild of indexes.
         """
         ds, datastore_name = self._get_datastore(datastore_name)
-        doc_name = self._get_design_name(design)
+        doc_name = self._get_design_name(design_name)
         try:
-            ds[doc_name] = dict(views=viewdef)
+            ds[doc_name] = dict(views=design_doc)
         except ResourceConflict:
             # View exists
             old_design = ds[doc_name]
-            ddiff = DictDiffer(old_design.get("views", {}), viewdef)
-            if ddiff.changed():
-                old_design["views"] = viewdef
-                ds.save(old_design)
+            if not keepviews:
+                del ds[doc_name]
+                ds[doc_name] = dict(views=design_doc)
+            else:
+                ddiff = DictDiffer(old_design.get("views", {}), design_doc)
+                if ddiff.changed():
+                    old_design["views"] = design_doc
+                    ds.save(old_design)
 
-    def refresh_views(self, design, datastore_name=None):
+    def refresh_views(self, datastore_name="", profile=None):
+        """
+        Triggers a refresh of all views (all designs) for this datastore's profile
+        """
+        profile = profile or self.profile
+        ds_views = get_couchdb_view_designs(profile)
+        for design_name, design_doc in ds_views.iteritems():
+            self.refresh_viewset(design_name, datastore_name=datastore_name)
+
+
+    def refresh_viewset(self, design, datastore_name=None):
         """
         Triggers the rebuild of a design document (set of views).
         """
         ds, datastore_name = self._get_datastore(datastore_name)
         doc_id = self._get_design_name(design)
-
         try:
             design_doc = ds[doc_id]
             view_name = design_doc["views"].keys()[0]
@@ -403,8 +525,8 @@ class CouchDataStore(object):
         @brief From given all_args dict, extract all entries that are valid CouchDB view options.
         @see http://wiki.apache.org/couchdb/HTTP_view_API
         """
-        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq'))
-        limit = int(all_args.get('limit', 0))
+        view_args = dict((k, v) for k, v in all_args.iteritems() if k in ('descending', 'stale', 'skip', 'inclusive_end', 'update_seq') and v is not None)
+        limit = int(all_args.get('limit', 0)) if all_args.get('limit', None) is not None else 0
         if limit > 0:
             view_args['limit'] = limit
         return view_args
@@ -416,8 +538,15 @@ class CouchDataStore(object):
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                           id_only=True, **kwargs):
         """
-        @brief Generic find function using an defined index
-        @retval Returns a list of triples: (att_id, index_row, Attachment object or none)
+        Generic find function using a defined index
+        @param design_name  design document
+        @param view_name  view name
+        @param key  specific key to find
+        @param keys  list of keys to find
+        @param start_key  find range start value
+        @param end_key  find range end value
+        @param id_only  if True, the 4th element of each triple is the document
+        @retval Returns a list of 4-tuples: (document id, index key, index value, document)
         """
         #log.debug("find_docs_by_view(%s/%s)",design_name, view_name)
         if type(id_only) is not bool:
@@ -438,8 +567,11 @@ class CouchDataStore(object):
             #log.info("find_docs_by_view(): keys=%s" % keys)
         elif start_key and end_key:
             startkey = start_key or []
-            endkey = list(end_key) or []
-            endkey.append(END_MARKER)
+            if end_key is None:
+                end_key = []
+            elif not isinstance(end_key, list):
+                end_key = list(end_key)
+            endkey = self._get_endkey(end_key)
             #log.info("find_docs_by_view(): start_key=%s to end_key=%s" % (startkey, endkey))
             if view_args.get('descending', False):
                 rows = view[endkey:startkey]
@@ -449,9 +581,11 @@ class CouchDataStore(object):
             rows = view
 
         if id_only:
-            res_rows = [(row['id'], row['key'], row.get('value', None)) for row in rows]
+            res_rows = [(row['id'], row['key'], row.get('value', None), None) for row in rows]
         else:
-            res_rows = [(row['id'], row['key'], row['doc']) for row in rows]
+            res_rows = [(row['id'], row['key'], row.get('value', None), row['doc']) for row in rows]
 
-        #log.info("find_docs_by_view() found %s objects" % (len(res_rows)))
+        self._count(find_by_view_call=1, find_by_view_obj=len(res_rows))
+
         return res_rows
+

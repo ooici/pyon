@@ -117,7 +117,7 @@ class ResourceRegistryStandalone(object):
             start_key=start_key, end_key=end_key, id_only=id_only, **kwargs)
 
         if id_only:
-            match = [docid for docid, indexkey, doc in res]
+            match = [docid for docid, indexkey, value, doc in res]
         else:
-            match = [doc for docid, indexkey, doc in res]
+            match = [doc for docid, indexkey, value, doc in res]
         return match
