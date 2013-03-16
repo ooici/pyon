@@ -28,15 +28,15 @@ class CouchPyonDataStore(CouchDataStore):
     """
     Pyon specialization of CouchDB datastore.
     """
-    def __init__(self, datastore_name=None, profile=None, config=None):
+    def __init__(self, datastore_name=None, profile=None, config=None, **kwargs):
         log.debug('__init__(datastore_name=%s, profile=%s, config=%s)', datastore_name, profile, config)
         if not config:
             config = CFG.get_safe("server.couchdb")
 
-        super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=log)
-
         # Datastore specialization (views)
         self.profile = profile or DataStore.DS_PROFILE.BASIC
+
+        super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=log)
 
         # IonObject Serializers
         self._io_serializer = IonObjectSerializer()
@@ -48,7 +48,7 @@ class CouchPyonDataStore(CouchDataStore):
         if create_indexes:
             profile = profile or self.profile
             log.info('Creating indexes for datastore %s with profile=%s' % (datastore_name, profile))
-            self._define_views(datastore_name, profile)
+            self.define_profile_views(profile=profile, datastore_name=datastore_name)
 
     # -------------------------------------------------------------------------
     # Couch document operations
@@ -123,7 +123,7 @@ class CouchPyonDataStore(CouchDataStore):
         if del_associations:
             assoc_ids = self.find_associations(anyside=doc_id, id_only=True)
             self.delete_doc_mult(assoc_ids)
-            log.debug("Deleted %n associations for object %s", len(assoc_ids), doc_id)
+            log.debug("Deleted %s associations for object %s", len(assoc_ids), doc_id)
 
         elif self._is_in_association(doc_id, datastore_name):
             log.warn("Deleting object %s that still has associations" % doc_id)

@@ -456,7 +456,7 @@ class Test_DataStores(IonIntegrationTestCase):
         numcoredocs = len(res)
 
         self.assertTrue(numcoredocs > 1)
-        data_store._update_views()
+        data_store.refresh_views()
 
         # HACK: Both Predicates so that this test works
         from pyon.ion.resource import Predicates
@@ -553,7 +553,7 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertEquals(len(sub_ids3), 1)
         self.assertEquals(set(sub_ids3), set([admin_user_id]))
 
-        data_store._update_views()
+        data_store.refresh_views()
 
         # Find all resources
         res_ids1, res_assoc1 = data_store.find_res_by_type(None, None, id_only=True)

@@ -64,13 +64,14 @@ class AbstractCouchDataStore(object):
         scoped. If no name was given, the instance defaults will be returned.
         """
         if datastore_name and self.scope:
-            datastore_name = ("%s_%s" % (self.scope, datastore_name)).lower()
+            datastore_name = "%s_%s" % (self.scope, datastore_name)
         elif datastore_name:
-            datastore_name = datastore_name.lower()
+            #datastore_name = datastore_name.lower()
+            pass
         elif self.datastore_name:
             datastore_name = self.datastore_name
         else:
-            raise BadRequest("No data store name provided")
+            raise BadRequest("No datastore name provided")
         return datastore_name
 
     def _get_design_name(self, design):

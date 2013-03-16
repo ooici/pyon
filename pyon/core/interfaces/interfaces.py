@@ -9,7 +9,7 @@ import os
 from collections import OrderedDict
 
 from pyon.core.path import list_files_recursive
-from pyon.datastore.couchdb.base_store import CouchDataStore
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.ion.directory_standalone import DirectoryStandalone
 from pyon.ion.resregistry_standalone import ResourceRegistryStandalone
 
@@ -25,8 +25,8 @@ class InterfaceAdmin:
     def __init__(self, sysname, config=None):
         self.sysname = sysname
         self.config = config
-        self.dir = DirectoryStandalone(sysname=self.sysname, config=config)
-        self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=config)
+        self.dir = DirectoryStandalone(sysname=self.sysname, config=self.config)
+        self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=self.config)
         self._closed = False
 
     def close(self):
@@ -44,11 +44,11 @@ class InterfaceAdmin:
         """
         Main entry point into creating core datastores
         """
-        ds = CouchDataStore(config=self.config, scope=self.sysname)
+        ds = DatastoreFactory.get_datastore(config=self.config, scope=self.sysname, variant=DatastoreFactory.DS_BASE)
         datastores = ['resources','events']
         count = 0
         for local_dsn in datastores:
-            if not ds.exists_datastore(local_dsn):
+            if not ds.datastore_exists(local_dsn):
                 ds.create_datastore(local_dsn)
                 count += 1
                 # NOTE: Views and other datastores are created by containers' DatastoreManager

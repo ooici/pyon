@@ -31,6 +31,10 @@ class CouchDataStore(AbstractCouchDataStore):
 
         if self.config.get("type", None) and self.config['type'] != "couchdb":
             raise BadRequest("Datastore server config is not couchdb: %s" % self.config)
+        if self.datastore_name and self.datastore_name != self.datastore_name.lower():
+            raise BadRequest("Invalid CouchDB datastore name: '%s'" % self.datastore_name)
+        if self.scope and self.scope != self.scope.lower():
+            raise BadRequest("Invalid CouchDB scope name: '%s'" % self.scope)
 
         # Connection
         if self.username and self.password:
@@ -138,7 +142,7 @@ class CouchDataStore(AbstractCouchDataStore):
         ds, datastore_name = self._get_datastore(datastore_name)
         return ds.compact()
 
-    def exists_datastore(self, datastore_name=None):
+    def datastore_exists(self, datastore_name=None):
         """
         Indicates whether named data store currently exists.
         """
@@ -148,8 +152,6 @@ class CouchDataStore(AbstractCouchDataStore):
             return True
         except ResourceNotFound:
             return False
-
-    datastore_exists = exists_datastore  # Alias
 
 
     # -------------------------------------------------------------------------
@@ -269,8 +271,6 @@ class CouchDataStore(AbstractCouchDataStore):
             raise BadRequest("Invalid type for docs:%s" % type(docs))
         if object_ids and len(object_ids) != len(docs):
             raise BadRequest("Invalid object_ids")
-        if any(["_id" in doc for doc in docs]):
-            raise BadRequest("Docs must not have '_id'")
         if any(["_rev" in doc for doc in docs]):
             raise BadRequest("Docs must not have '_rev'")
 
@@ -464,7 +464,7 @@ class CouchDataStore(AbstractCouchDataStore):
         ds, datastore_name = self._get_datastore(datastore_name)
         return ds.compact(design)
 
-    def define_profile_views(self, datastore_name=None, profile=None, keepviews=False):
+    def define_profile_views(self, profile=None, datastore_name=None, keepviews=False):
         ds_views = get_couchdb_view_designs(profile)
         for design_name, design_doc in ds_views.iteritems():
             self.define_viewset(design_name, design_doc, datastore_name=datastore_name, keepviews=keepviews)

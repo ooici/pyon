@@ -3,7 +3,7 @@
 __author__ = 'Seman Said, Michael Meisinger'
 
 from pyon.core.exception import NotFound, BadRequest, Inconsistent
-from pyon.datastore.couchdb.base_store import CouchDataStore
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
@@ -17,7 +17,8 @@ class DirectoryStandalone(object):
         self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
         self.datastore_name = "resources"
-        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
+        self.datastore = DatastoreFactory.get_datastore(datastore_name=self.datastore_name, config=config,
+                                                        scope=sysname, variant=DatastoreFactory.DS_BASE)
         try:
             self.datastore.read_doc("_design/directory")
         except NotFound:

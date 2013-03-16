@@ -72,7 +72,7 @@ class TestProcManager(PyonTestCase):
 
         self.container.resource_registry.create_association.assert_called_once_with(sentinel.oid, PRED.hasResource, sentinel.rid)
 
-    @patch('pyon.datastore.couchdb.datastore.CouchDataStore._stats')
+    @patch('pyon.datastore.couchdb.datastore.CouchPyonDataStore._stats')
     def test_stop(self, statsmock):
         self.pm.start()
 
@@ -102,7 +102,7 @@ class TestProcManager(PyonTestCase):
 
         self.assertEquals(mocklog.warn.call_count, 1)
 
-    @patch('pyon.datastore.couchdb.datastore.CouchDataStore._stats', Mock())
+    @patch('pyon.datastore.couchdb.datastore.CouchPyonDataStore._stats', Mock())
     @patch('pyon.container.procs.log')
     def test_stop_with_error(self, mocklog):
         self.pm.start()

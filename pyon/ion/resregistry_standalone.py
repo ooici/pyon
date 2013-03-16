@@ -2,8 +2,8 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.core.exception import NotFound
-from pyon.datastore.couchdb.base_store import CouchDataStore
+from pyon.core.exception import NotFound, BadRequest
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
@@ -17,7 +17,8 @@ class ResourceRegistryStandalone(object):
         self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
         self.datastore_name = "resources"
-        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
+        self.datastore = DatastoreFactory.get_datastore(datastore_name=self.datastore_name, config=config,
+                                                        scope=sysname, variant=DatastoreFactory.DS_BASE)
         try:
             self.datastore.read_doc("_design/directory")
         except NotFound:
@@ -42,7 +43,7 @@ class ResourceRegistryStandalone(object):
         if actor_id and actor_id != 'anonymous':
             self.create_association(res_id, "hasOwner", actor_id)
 
-        return res
+        return res_id, rev
 
     def create_mult(self, res_list, lcstate=None):
         cur_time = get_ion_ts()

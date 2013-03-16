@@ -12,7 +12,7 @@
 import sys
 from optparse import OptionParser
 
-from pyon.datastore.couchdb.base_store import CouchDataStore
+from pyon.datastore.datastore_common import DatastoreFactory
 
 
 def main():
@@ -68,25 +68,24 @@ def main():
             parser.print_help()
             sys.exit()
 
-        _clear_couch(options.couch_host, options.couch_port, options.couch_uname, options.couch_pword, prefix=prefix, verbose=bool(options.verbose))
+        config = create_config(options.couch_host, options.couch_port, options.couch_uname, options.couch_pword)
+        _clear_couch(config, prefix=prefix, verbose=bool(options.verbose))
 
 def create_config(host, port, username, password):
-    config = dict(server=dict(couchdb=dict(host=host, port=port, username=username, password=password)))
+    config = dict(host=host, port=port, username=username, password=password)
     return config
 
 def clear_couch(config, prefix):
+    config = DatastoreFactory.get_server_config(config)
     _clear_couch(
-        config.server.couchdb.host,
-        config.server.couchdb.port,
-        config.server.couchdb.username,
-        config.server.couchdb.password,
+        config=config,
         prefix=prefix)
 
-def _clear_couch(host, port, username, password, prefix, verbose=False):
-    db_server = CouchDataStore(host=host, port=str(port), username=username, password=password)
+def _clear_couch(config, prefix, verbose=False):
+    db_server = DatastoreFactory.get_datastore(config=config)
 
     if verbose:
-        print "clear_couch: Connected to couch server http://%s:%d" % (host, port)
+        print "clear_couch: Connected to couch server with config %s" % (config)
 
     db_list = db_server.list_datastores()
 
@@ -105,7 +104,6 @@ def _clear_couch(host, port, username, password, prefix, verbose=False):
     print 'clear_couch: Ignored %s existing databases' % ignored_num
 
     db_server.close()
-
 
 
 if __name__ == '__main__':
