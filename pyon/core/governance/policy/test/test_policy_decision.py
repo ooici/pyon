@@ -90,7 +90,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.get_header_value = mock_header
         mock_args = Mock()
         process = Mock()
-        process.org_name = 'org_name'
+        process.org_governance_name = 'org_name'
         self.invocation.args = {'process': process}
 
         def get_arg_value(key, default):
@@ -142,7 +142,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.get_header_value = mock_header
         mock_args = Mock()
         process = Mock()
-        process.org_name = 'org_name'
+        process.org_governance_name = 'org_name'
         self.invocation.args = {'process': process}
 
         def get_arg_value(key, default):
@@ -181,7 +181,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.get_header_value = mock_header
         mock_args = Mock()
         process = Mock()
-        process.org_name = 'org_name'
+        process.org_governance_name = 'org_name'
         process.resource_id = 'resource_id'
         self.invocation.args = {'process': process}
 

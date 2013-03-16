@@ -31,7 +31,9 @@ def apply_local_configuration(system_cfg, local_conf_paths=None):
 
 def apply_profile_configuration(system_cfg, bootstrap_config):
     profile_filename = bootstrap_config.get_safe("container.profile", None)
-    if profile_filename and not profile_filename.endswith(".yml"):
+    if not profile_filename:
+        return
+    if not profile_filename.endswith(".yml"):
         profile_filename = "res/profile/%s.yml" % profile_filename
     from pyon.util.config import Config
     profile_cfg = Config([profile_filename]).data

@@ -40,7 +40,7 @@ class BaseService(LocalContextMixin):
         self._proc_res_id     = None
         self._proc_start_time = None
         self.errcause         = None
-        self.org_name         = None
+        self.org_governance_name = None
         self.container        = None
         self.CFG              = None
         self._process         = None      # reference to IonProcess, internal
