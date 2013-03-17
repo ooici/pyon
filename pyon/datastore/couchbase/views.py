@@ -519,7 +519,7 @@ function(doc) {
         }
 }
 
-def get_couchdb_views(config):
+def get_couch_view_designs(config):
     store_config = COUCHDB_CONFIGS[config]
     views = store_config['views']
     res_views = {}

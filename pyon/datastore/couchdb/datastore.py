@@ -6,12 +6,11 @@ import couchdb
 from couchdb.client import ViewResults, Row
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
 
-from pyon.datastore.couchdb.base_store import CouchDataStore
-
 from pyon.core.bootstrap import get_obj_registry, CFG
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
+from pyon.datastore.couchdb.base_store import CouchDataStore
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
@@ -150,7 +149,7 @@ class CouchPyonDataStore(CouchDataStore):
         if not subject:
             raise BadRequest("Must provide subject")
         if object_type and not predicate:
-            raise BadRequest("Cannot provide object type without a predictate")
+            raise BadRequest("Cannot provide object type without a predicate")
 
         ds, datastore_name = self._get_datastore()
 
@@ -542,37 +541,6 @@ class CouchPyonDataStore(CouchDataStore):
         log.debug("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
 
-    def query_view(self, view_name='', opts={}, datastore_name=''):
-        '''
-        query_view is a straight through method for querying a view in CouchDB. query_view provides us the interface
-        to the view structure in couch, in lieu of implementing a method for every type of query we could want, we
-        now have the capability for clients to make queries to couch in a straight-through manner.
-        '''
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        # Actually obtain the results and place them in rows
-        rows = ds.view(view_name, **opts)
-
-        # Parse the results and convert the results into ionobjects and python types.
-        result = self._parse_results(rows)
-
-        return result
-
-    def custom_query(self, map_fun, reduce_fun=None, datastore_name='', **options):
-        '''
-        custom_query sets up a temporary view in couchdb, the map_fun is a string consisting
-        of the javascript map function
-
-        Warning: Please note that temporary views are not suitable for use in production,
-        as they are really slow for any database with more than a few dozen documents.
-        You can use a temporary view to experiment with view functions, but switch to a
-        permanent view before using them in an application.
-        '''
-        ds, datastore_name = self._get_datastore(datastore_name)
-        res = ds.query(map_fun, reduce_fun, **options)
-
-        return self._parse_results(res)
-
     def _parse_results(self, doc):
         ''' Parses a complex object and organizes it into basic types
         '''
@@ -614,7 +582,7 @@ class CouchPyonDataStore(CouchDataStore):
             for element in doc:
                 ret.append(self._parse_results(element))
             return ret
-        #-------------------------------
+            #-------------------------------
         # Handle a dic
         #-------------------------------
         # \_ Check to make sure it's not an IonObject
@@ -632,7 +600,6 @@ class CouchPyonDataStore(CouchDataStore):
         # Primitive type
         #-------------------------------
         return doc
-
 
     def _ion_object_to_persistence_dict(self, ion_object):
         if ion_object is None:
