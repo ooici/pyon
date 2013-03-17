@@ -3,7 +3,6 @@
 """Resource Registry implementation"""
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
@@ -34,6 +33,9 @@ class ResourceRegistry(object):
 
         # Get an instance of datastore configured as resource registry.
         datastore_manager = datastore_manager or self.container.datastore_manager
+#        self.rr_store_backend = datastore_manager.get_datastore(DataStore.DS_RESOURCES, DataStore.DS_PROFILE.RESOURCES)
+#        self.rr_store = IonCouchDataStore(self.rr_store_backend, self.container)
+
         self.rr_store = datastore_manager.get_datastore(DataStore.DS_RESOURCES, DataStore.DS_PROFILE.RESOURCES)
 
         self.event_pub = EventPublisher()

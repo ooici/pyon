@@ -536,3 +536,6 @@ class CouchbaseDataStore(AbstractCouchDataStore):
         if "state" not in view_args:
             view_args["stale"] = "false"
         return view_args
+
+    def _get_row_doc(self, row):
+        return row['doc']['json']

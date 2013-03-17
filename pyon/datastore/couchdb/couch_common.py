@@ -129,7 +129,6 @@ class AbstractCouchDataStore(object):
         datastore_name = self._get_datastore_name(datastore_name)
         log.info('Deleting datastore %s' % datastore_name)
 
-        self._delete_datastore(datastore_name)
         self.server.delete(datastore_name)
         if datastore_name in self._datastore_cache:
             del self._datastore_cache[datastore_name]
@@ -341,16 +340,16 @@ class AbstractCouchDataStore(object):
                 end_key = list(end_key)
             endkey = self._get_endkey(end_key)
             if view_args.get('descending', False):
-                rows = ds.view(view_doc,  start_key=endkey, end_key=startkey, **view_args)
+                rows = ds.view(view_doc, start_key=endkey, end_key=startkey, **view_args)
             else:
-                rows = ds.view(view_doc,  start_key=key, end_key=endkey, **view_args)
+                rows = ds.view(view_doc, start_key=startkey, end_key=endkey, **view_args)
         else:
             rows = ds.view(view_doc, **view_args)
 
         if id_only:
             res_rows = [(row['id'], row['key'], row.get('value', None), None) for row in rows]
         else:
-            res_rows = [(row['id'], row['key'], row.get('value', None), row['doc']) for row in rows]
+            res_rows = [(row['id'], row['key'], row.get('value', None), self._get_row_doc(row)) for row in rows]
 
         self._count(find_by_view_call=1, find_by_view_obj=len(res_rows))
 
@@ -392,6 +391,8 @@ class AbstractCouchDataStore(object):
     def _parse_results(self, doc):
         raise NotImplementedError()
 
+    def _get_row_doc(self, row):
+        return row['doc']
 
     def _count(self, datastore=None, **kwargs):
         datastore = datastore or self.datastore_name
