@@ -34,7 +34,8 @@ class ResourceRegistryStandalone(object):
         if not "type_" in object:
             raise BadRequest("Object is not an IonObject")
         cur_time = get_ion_ts()
-        object['lcstate'] =  lcstate or "DEPLOYED_AVAILABLE"
+        object['lcstate'] =  lcstate or "DEPLOYED"
+        object['availability'] =  lcstate or "AVAILABLE"
         object['ts_created'] = cur_time
         object['ts_updated'] = cur_time
         new_res_id = create_unique_resource_id()
@@ -48,7 +49,8 @@ class ResourceRegistryStandalone(object):
     def create_mult(self, res_list, lcstate=None):
         cur_time = get_ion_ts()
         for resobj in res_list:
-            resobj['lcstate'] = lcstate or "DEPLOYED_AVAILABLE"
+            resobj['lcstate'] = lcstate or "DEPLOYED"
+            resobj['availability'] = lcstate or "AVAILABLE"
             resobj['ts_created'] = cur_time
             resobj['ts_updated'] = cur_time
 

@@ -474,7 +474,7 @@ class ResourceRegistry(object):
                 success = success and self.delete(aid)
             return success
         else:
-            return self.delete(association)
+            return self.rr_store.delete(association)
 
     def _is_in_association(self, obj_id):
         if not obj_id:
