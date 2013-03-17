@@ -20,10 +20,11 @@ from ooi.logging import log
 class CouchDataStore(AbstractCouchDataStore):
     """
     Data store implementation utilizing CouchDB to persist documents.
-    For API info, see: http://packages.python.org/CouchDB/client.html
+    For API info, see: http://packages.python.org/CouchDB/client.html.
+    A base datastore knows how to manage datastores, CRUD documents (dict) and access generic indexes.
     """
-    def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, **kwargs):
-        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, newlog=newlog)
+    def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, profile=None, **kwargs):
+        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, profile=profile, newlog=newlog)
 
         global log
         if newlog:
@@ -92,38 +93,45 @@ class CouchDataStore(AbstractCouchDataStore):
         except ValueError:
             raise BadRequest("Data store name '%s' invalid" % datastore_name)
 
-    def create_datastore(self, datastore_name=None, **kwargs):
+    def create_datastore(self, datastore_name=None, create_indexes=True, profile=None):
         """
-        Create a data store with the given name.  This is
+        Create a datastore with the given name.  This is
         equivalent to creating a database on a database server.
         @param datastore_name  Datastore to work on. Will be scoped if scope was provided.
+        @param create_indexes  If True create indexes according to profile
+        @param profile  The profile used to determine indexes
         """
         datastore_name = self._get_datastore_name(datastore_name)
-        log.info('Creating data store %s' % (datastore_name))
+        profile = profile or self.profile
+        log.info('Creating datastore %s (create_indexes=%s, profile=%s)' % (datastore_name, create_indexes, profile))
         try:
             self.server.create(datastore_name)
         except PreconditionFailed:
-            raise BadRequest("Data store with name %s already exists" % datastore_name)
+            raise BadRequest("Datastore with name %s already exists" % datastore_name)
         except ValueError:
-            raise BadRequest("Data store name %s invalid" % datastore_name)
+            raise BadRequest("Datastore name %s invalid" % datastore_name)
+
+        if create_indexes and profile:
+            log.info('Creating indexes for datastore %s with profile=%s' % (datastore_name, profile))
+            self.define_profile_views(profile=profile, datastore_name=datastore_name)
 
     def delete_datastore(self, datastore_name=None):
         """
-        Delete the data store with the given name.  This is
+        Delete the datastore with the given name.  This is
         equivalent to deleting a database from a database server.
         """
         datastore_name = self._get_datastore_name(datastore_name)
-        log.info('Deleting data store %s' % datastore_name)
+        log.info('Deleting datastore %s' % datastore_name)
         try:
             self.server.delete(datastore_name)
         except ResourceNotFound:
-            raise NotFound('Data store %s does not exist' % datastore_name)
+            raise NotFound('Datastore %s does not exist' % datastore_name)
         except ValueError:
-            raise BadRequest("Data store name %s invalid" % datastore_name)
+            raise BadRequest("Datastore name %s invalid" % datastore_name)
 
     def list_datastores(self):
         """
-        List all data stores within this data store server. This is
+        List all datastores within this datastore server. This is
         equivalent to listing all databases hosted on a database server.
         Returns scoped names.
         """
@@ -131,8 +139,8 @@ class CouchDataStore(AbstractCouchDataStore):
 
     def info_datastore(self, datastore_name=None):
         """
-        List information about a data store.  Content may vary based
-        on data store type.
+        List information about a datastore.  Content may vary based
+        on datastore type.
         """
         ds, datastore_name = self._get_datastore(datastore_name)
         info = ds.info()
@@ -144,7 +152,7 @@ class CouchDataStore(AbstractCouchDataStore):
 
     def datastore_exists(self, datastore_name=None):
         """
-        Indicates whether named data store currently exists.
+        Indicates whether named datastore currently exists.
         """
         datastore_name = self._get_datastore_name(datastore_name)
         try:
@@ -159,7 +167,7 @@ class CouchDataStore(AbstractCouchDataStore):
 
     def list_objects(self, datastore_name=None):
         """
-        List all object types existing in the data store instance.
+        List all object types existing in the datastore instance.
         """
         ds, datastore_name = self._get_datastore(datastore_name)
         return list(ds)
@@ -167,7 +175,7 @@ class CouchDataStore(AbstractCouchDataStore):
     def list_object_revisions(self, object_id, datastore_name=None):
         """
         Method for itemizing all the versions of a particular object
-        known to the data store.
+        known to the datastore.
         """
         ds, datastore_name = self._get_datastore(datastore_name)
         gen = ds.revisions(object_id)
@@ -297,7 +305,7 @@ class CouchDataStore(AbstractCouchDataStore):
 
     def update_doc(self, doc, datastore_name=None):
         """
-        Update an existing raw doc in the data store.  The '_rev' value
+        Update an existing raw doc in the datastore.  The '_rev' value
         must exist in the doc and must be the most recent known doc
         version. If not, a Conflict exception is thrown.
         """
@@ -412,7 +420,7 @@ class CouchDataStore(AbstractCouchDataStore):
 
     def delete_doc(self, doc, datastore_name=None, **kwargs):
         """
-        Remove all versions of specified raw doc from the data store.
+        Remove all versions of specified raw doc from the datastore.
         This method will check the '_rev' value to ensure that the doc
         provided is the most recent known doc version.  If not, a
         Conflict exception is thrown.
@@ -465,6 +473,7 @@ class CouchDataStore(AbstractCouchDataStore):
         return ds.compact(design)
 
     def define_profile_views(self, profile=None, datastore_name=None, keepviews=False):
+        profile = profile or self.profile
         ds_views = get_couchdb_view_designs(profile)
         for design_name, design_doc in ds_views.iteritems():
             self.define_viewset(design_name, design_doc, datastore_name=datastore_name, keepviews=keepviews)

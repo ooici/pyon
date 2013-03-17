@@ -7,8 +7,9 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.datastore import CouchPyonDataStore
+from pyon.util.containers import get_ion_ts
 from pyon.util.int_test import IonIntegrationTestCase
-from pyon.ion.identifier import create_unique_resource_id
+from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.ion.resource import RT, PRED, LCS, AS, lcstate
 from nose.plugins.attrib import attr
 from unittest import SkipTest
@@ -482,23 +483,19 @@ class Test_DataStores(IonIntegrationTestCase):
 
         ds2_obj_id = self._create_resource(RT.Dataset, 'DS_CTD_L1', description='My Dataset CTD L1')
 
-        aid1, _ = data_store.create_association(admin_user_id, OWNER_OF, inst1_obj_id)
+        aid1, _ = self._create_association(admin_user_id, OWNER_OF, inst1_obj_id)
 
-        data_store.create_association(admin_user_id, HAS_A, admin_profile_id)
+        self._create_association(admin_user_id, HAS_A, admin_profile_id)
 
-        data_store.create_association(admin_user_id, OWNER_OF, ds1_obj_id)
+        self._create_association(admin_user_id, OWNER_OF, ds1_obj_id)
 
-        data_store.create_association(other_user_id, OWNER_OF, inst2_obj_id)
+        self._create_association(other_user_id, OWNER_OF, inst2_obj_id)
 
-        data_store.create_association(plat1_obj_id, HAS_A, inst1_obj_id)
+        self._create_association(plat1_obj_id, HAS_A, inst1_obj_id)
 
-        data_store.create_association(inst1_obj_id, HAS_A, ds1_obj_id)
+        self._create_association(inst1_obj_id, HAS_A, ds1_obj_id)
 
-        data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
-
-        with self.assertRaises(BadRequest) as cm:
-            data_store.create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
-        self.assertTrue(cm.exception.message.startswith("Association between"))
+        self._create_association(ds1_obj_id, BASED_ON, ds1_obj_id)
 
         # Subject -> Object direction
         obj_ids1, obj_assocs1 = data_store.find_objects(admin_user_id, id_only=True)
@@ -655,7 +652,7 @@ class Test_DataStores(IonIntegrationTestCase):
 
         iag1_obj_id = self._create_resource(RT.InstrumentAgentInstance, 'ia1', description='')
 
-        data_store.create_association(idev1_obj_id, PRED.hasAgentInstance, iag1_obj_id)
+        self._create_association(idev1_obj_id, PRED.hasAgentInstance, iag1_obj_id)
 
         att1 = self._create_resource(RT.Attachment, 'att1', keywords=[])
         att2 = self._create_resource(RT.Attachment, 'att2', keywords=['FOO'])
@@ -735,6 +732,12 @@ class Test_DataStores(IonIntegrationTestCase):
         self.resources[name] = res_obj
         return res_obj_res[0]
 
+    def _create_association(self, subject_id, predicate, obj_id):
+        subject = self.data_store.read(subject_id)
+        obj = self.data_store.read(obj_id)
+        ass_obj = IonObject("Association", s=subject._id, st=subject.type_, p=predicate, o=obj._id, ot=obj.type_, ts=get_ion_ts())
+        res = self.data_store.create(ass_obj, create_unique_association_id())
+        return res
 
 if __name__ == "__main__":
     unittest.main()

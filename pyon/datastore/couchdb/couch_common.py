@@ -27,7 +27,7 @@ class AbstractCouchDataStore(object):
     """
     _stats = StatsCounter()
 
-    def __init__(self, datastore_name=None, config=None, scope=None, newlog=None):
+    def __init__(self, datastore_name=None, config=None, scope=None, profile=None, newlog=None):
         """
         @param datastore_name  Name of datastore within server. May be scoped to sysname
         @param config  A server config dict with connection params
@@ -48,6 +48,7 @@ class AbstractCouchDataStore(object):
         self.username = self.config.get('username', None)
         self.password = self.config.get('password', None)
 
+        self.profile = profile
         self.datastore_name = datastore_name
 
         # Datastore (couch database) handling. Scope with given scope (sysname) and make all lowercase

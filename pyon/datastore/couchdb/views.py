@@ -21,6 +21,9 @@ COUCHDB_PROFILES = {
     "BASIC":{
         'views': []
     },
+    "FILESYSTEM": {
+        'views': ['catalog']
+    },
 }
 
 # Defines all the available CouchDB views and their map/reduce functions.
@@ -320,6 +323,23 @@ function(doc) {
 }""",
         },
     },
+
+    # -------------------------------------------------------------------------
+    # Catalog is used by current preservation_management_service (which in turn is not used)
+    'catalog': {
+        'file_by_name': {
+            "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"
+        },
+        "file_by_created_date": {
+            "map": "function(doc) {\n  emit(doc.created_date, doc._id);\n}"
+        },
+        "file_by_modified_date": {
+            "map": "function(doc) {\n  emit(doc.modified_date, doc._id);\n}"
+        },
+        "file_by_owner": {
+            "map": "function(doc) {\n  emit([doc.owner_id, doc.group_id, doc.name], doc._id);\n}"
+        },
+    }
 }
 
 def get_couchdb_view_designs(profile):

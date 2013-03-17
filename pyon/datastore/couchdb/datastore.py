@@ -1,54 +1,39 @@
 #!/usr/bin/env python
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
-__license__ = 'Apache 2.0'
-
 
 import couchdb
 from couchdb.client import ViewResults, Row
 from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
-from uuid import uuid4
 
-from pyon.datastore.couchdb.couch_common import END_MARKER
 from pyon.datastore.couchdb.base_store import CouchDataStore
 
 from pyon.core.bootstrap import get_obj_registry, CFG
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.datastore import DataStore
-from pyon.datastore.couchdb.views import get_couchdb_view_designs
-from pyon.ion.identifier import create_unique_association_id
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.log import log
 from pyon.util.arg_check import validate_is_instance
-from pyon.util.containers import get_ion_ts
 
 
 class CouchPyonDataStore(CouchDataStore):
     """
     Pyon specialization of CouchDB datastore.
+    This class adds IonObject handling to the underlying base datastore.
     """
     def __init__(self, datastore_name=None, profile=None, config=None, **kwargs):
         log.debug('__init__(datastore_name=%s, profile=%s, config=%s)', datastore_name, profile, config)
-        if not config:
-            config = CFG.get_safe("server.couchdb")
 
-        # Datastore specialization (views)
-        self.profile = profile or DataStore.DS_PROFILE.BASIC
-
-        super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name, config=config, newlog=log)
+        super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name,
+                                                 config=config or CFG.get_safe("server.couchdb"),
+                                                 profile=profile or DataStore.DS_PROFILE.BASIC,
+                                                 newlog=log)
 
         # IonObject Serializers
         self._io_serializer = IonObjectSerializer()
         self._io_deserializer = IonObjectDeserializer(obj_registry=get_obj_registry())
 
-    def create_datastore(self, datastore_name="", create_indexes=True, profile=None):
-        super(CouchPyonDataStore, self).create_datastore(datastore_name=datastore_name)
-
-        if create_indexes:
-            profile = profile or self.profile
-            log.info('Creating indexes for datastore %s with profile=%s' % (datastore_name, profile))
-            self.define_profile_views(profile=profile, datastore_name=datastore_name)
 
     # -------------------------------------------------------------------------
     # Couch document operations
@@ -105,141 +90,25 @@ class CouchPyonDataStore(CouchDataStore):
         return obj_list
 
 
-    def delete(self, obj, datastore_name="", del_associations=False):
+    def delete(self, obj, datastore_name=""):
         if not isinstance(obj, IonObjectBase) and not isinstance(obj, str):
             raise BadRequest("Obj param is not instance of IonObjectBase or string id")
         if type(obj) is str:
-            self.delete_doc(obj, datastore_name=datastore_name, del_associations=del_associations)
+            self.delete_doc(obj, datastore_name=datastore_name)
         else:
             if '_id' not in obj:
                 raise BadRequest("Doc must have '_id'")
             if '_rev' not in obj:
                 raise BadRequest("Doc must have '_rev'")
             self.delete_doc(self._ion_object_to_persistence_dict(obj),
-                            datastore_name=datastore_name, del_associations=del_associations)
-
-    def delete_doc(self, doc, datastore_name="", del_associations=False):
-        doc_id = doc if type(doc) is str else doc["_id"]
-        if del_associations:
-            assoc_ids = self.find_associations(anyside=doc_id, id_only=True)
-            self.delete_doc_mult(assoc_ids)
-            log.debug("Deleted %s associations for object %s", len(assoc_ids), doc_id)
-
-        elif self._is_in_association(doc_id, datastore_name):
-            log.warn("Deleting object %s that still has associations" % doc_id)
-
-        super(CouchPyonDataStore, self).delete_doc(doc, datastore_name=datastore_name)
+                            datastore_name=datastore_name)
 
     def delete_mult(self, object_ids, datastore_name=None):
         return self.delete_doc_mult(object_ids, datastore_name)
 
 
     # -------------------------------------------------------------------------
-    # Association operations
-
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type=None):
-        """
-        Create an association between two IonObjects with a given predicate
-        """
-        #if assoc_type:
-        #if assoc_type:
-        #    raise BadRequest("assoc_type deprecated")
-        if not (subject and predicate and obj):
-            raise BadRequest("Association must have all elements set")
-        if type(subject) is str:
-            subject_id = subject
-            subject = self.read(subject_id)
-            subject_type = subject._get_type()
-        else:
-            if "_id" not in subject or "_rev" not in subject:
-                raise BadRequest("Subject id or rev not available")
-            subject_id = subject._id
-            subject_type = subject._get_type()
-
-        if type(obj) is str:
-            object_id = obj
-            obj = self.read(object_id)
-            object_type = obj._get_type()
-        else:
-            if "_id" not in obj or "_rev" not in obj:
-                raise BadRequest("Object id or rev not available")
-            object_id = obj._id
-            object_type = obj._get_type()
-
-        # Check that subject and object type are permitted by association definition
-        # Note: Need import here, so that import orders are not screwed up
-        from pyon.core.registry import getextends
-        from pyon.ion.resource import Predicates
-        from pyon.core.bootstrap import IonObject
-
-        try:
-            pt = Predicates.get(predicate)
-        except AttributeError:
-            raise BadRequest("Predicate unknown %s" % predicate)
-        if not subject_type in pt['domain']:
-            found_st = False
-            for domt in pt['domain']:
-                if subject_type in getextends(domt):
-                    found_st = True
-                    break
-            if not found_st:
-                raise BadRequest("Illegal subject type %s for predicate %s" % (subject_type, predicate))
-        if not object_type in pt['range']:
-            found_ot = False
-            for rant in pt['range']:
-                if object_type in getextends(rant):
-                    found_ot = True
-                    break
-            if not found_ot:
-                raise BadRequest("Illegal object type %s for predicate %s" % (object_type, predicate))
-
-        # Finally, ensure this isn't a duplicate
-        assoc_list = self.find_associations(subject, predicate, obj, id_only=False)
-        if len(assoc_list) != 0:
-            assoc = assoc_list[0]
-            raise BadRequest("Association between %s and %s with predicate %s already exists" % (subject, obj, predicate))
-
-        assoc = IonObject("Association",
-            s=subject_id, st=subject_type,
-            p=predicate,
-            o=object_id, ot=object_type,
-            ts=get_ion_ts())
-        self._count(_create_assoc=1)
-        return self.create(assoc, create_unique_association_id())
-
-    def delete_association(self, association=''):
-        """
-        Delete an association between two IonObjects
-        @param association  Association object, association id or 3-list of [subject, predicate, object]
-        """
-        if type(association) in (list, tuple) and len(association) == 3:
-            subject, predicate, obj = association
-            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, obj=obj, id_only=True)
-            success = True
-            for aid in assoc_id_list:
-                success = success and self.delete(aid)
-            self._count(_delete_assoc=1)
-            return success
-        else:
-            self._count(_delete_assoc=1)
-            return self.delete(association)
-
-
-    # -------------------------------------------------------------------------
     # View operations
-
-    def _is_in_association(self, obj_id, datastore_name=""):
-        log.debug("_is_in_association(%s)", obj_id)
-        if not obj_id:
-            raise BadRequest("Must provide object id")
-        ds, datastore_name = self._get_datastore(datastore_name)
-
-        assoc_ids = self.find_associations(anyside=obj_id, id_only=True, limit=1)
-        if assoc_ids:
-            log.debug("Object found as object in associations: %s", assoc_ids)
-            return True
-
-        return False
 
     def find_objects_mult(self, subjects, id_only=False):
         """
@@ -673,19 +542,6 @@ class CouchPyonDataStore(CouchDataStore):
         log.debug("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
 
-
-    def _ion_object_to_persistence_dict(self, ion_object):
-        if ion_object is None: return None
-
-        obj_dict = self._io_serializer.serialize(ion_object)
-        return obj_dict
-
-    def _persistence_dict_to_ion_object(self, obj_dict):
-        if obj_dict is None: return None
-
-        ion_object = self._io_deserializer.deserialize(obj_dict)
-        return ion_object
-
     def query_view(self, view_name='', opts={}, datastore_name=''):
         '''
         query_view is a straight through method for querying a view in CouchDB. query_view provides us the interface
@@ -777,6 +633,18 @@ class CouchPyonDataStore(CouchDataStore):
         #-------------------------------
         return doc
 
-    def _count(self, datastore=None, **kwargs):
-        datastore = datastore or self.datastore_name
-        self._stats.count(namespace=datastore, **kwargs)
+
+    def _ion_object_to_persistence_dict(self, ion_object):
+        if ion_object is None:
+            return None
+
+        obj_dict = self._io_serializer.serialize(ion_object)
+        return obj_dict
+
+    def _persistence_dict_to_ion_object(self, obj_dict):
+        if obj_dict is None:
+            return None
+
+        ion_object = self._io_deserializer.deserialize(obj_dict)
+        return ion_object
+

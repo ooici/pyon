@@ -14,7 +14,7 @@ from pyon.util.arg_check import validate_true
 
 class DataStore(object):
     """
-    Common utilities for datastores
+    Common definitions for data stores
     """
     # Constants for common datastore names
     DS_RESOURCES = "resources"
@@ -24,7 +24,7 @@ class DataStore(object):
     DS_STATE = "state"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'BASIC']
+    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'FILESYSTEM', 'BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     # Maps common datastore logical names to index profiles
