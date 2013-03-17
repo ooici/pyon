@@ -409,22 +409,22 @@ class ResourceRegistry(object):
         if type(subject) is str:
             subject_id = subject
             subject = self.read(subject_id)
-            subject_type = subject._get_type()
+            subject_type = subject.type_
         else:
             if "_id" not in subject:
                 raise BadRequest("Subject id not available")
             subject_id = subject._id
-            subject_type = subject._get_type()
+            subject_type = subject.type_
 
         if type(obj) is str:
             object_id = obj
             obj = self.read(object_id)
-            object_type = obj._get_type()
+            object_type = obj.type_
         else:
             if "_id" not in obj:
                 raise BadRequest("Object id not available")
             object_id = obj._id
-            object_type = obj._get_type()
+            object_type = obj.type_
 
         # Check that subject and object type are permitted by association definition
         try:
@@ -476,15 +476,13 @@ class ResourceRegistry(object):
         else:
             return self.delete(association)
 
-    def _is_in_association(self, obj_id, datastore_name=""):
-        log.debug("_is_in_association(%s)", obj_id)
+    def _is_in_association(self, obj_id):
         if not obj_id:
             raise BadRequest("Must provide object id")
-        ds, datastore_name = self._get_datastore(datastore_name)
 
         assoc_ids = self.find_associations(anyside=obj_id, id_only=True, limit=1)
         if assoc_ids:
-            log.debug("Object found as object in associations: %s", assoc_ids)
+            log.debug("_is_in_association(%s): Object has associations: %s", obj_id, assoc_ids)
             return True
 
         return False
@@ -537,15 +535,13 @@ class ResourceRegistry(object):
         return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only)
     
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
-        if predicate:
-            assoc_type = assoc_type or 'H2H'
-        assoc = self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
+        assoc = self.rr_store.find_associations(subject, predicate, object, id_only=id_only)
         if not assoc:
-            raise NotFound("Association for subject/predicate/object/type %s/%s/%s/%s not found" % (
-                str(subject), str(predicate), str(object), str(assoc_type)))
+            raise NotFound("Association for subject/predicate/object/type %s/%s/%s not found" % (
+                subject, predicate, object))
         elif len(assoc) > 1:
-            raise Inconsistent("Duplicate associations found for subject/predicate/object/type %s/%s/%s/%s" % (
-                str(subject), str(predicate), str(object), str(assoc_type)))
+            raise Inconsistent("Duplicate associations found for subject/predicate/object/type %s/%s/%s" % (
+                subject, predicate, object))
         return assoc[0]
 
     def find_resources(self, restype="", lcstate="", name="", id_only=False):
