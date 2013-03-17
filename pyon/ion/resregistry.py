@@ -399,12 +399,12 @@ class ResourceRegistry(object):
     # -------------------------------------------------------------------------
     # Association operations
 
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type=None):
+    def create_association(self, subject=None, predicate=None, object=None, assoc_type=None):
         """
         Create an association between two IonObjects with a given predicate
         @param assoc_type  DEPRECATED
         """
-        if not (subject and predicate and obj):
+        if not (subject and predicate and object):
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
@@ -416,15 +416,15 @@ class ResourceRegistry(object):
             subject_id = subject._id
             subject_type = subject.type_
 
-        if type(obj) is str:
-            object_id = obj
-            obj = self.read(object_id)
-            object_type = obj.type_
+        if type(object) is str:
+            object_id = object
+            object = self.read(object_id)
+            object_type = object.type_
         else:
-            if "_id" not in obj:
+            if "_id" not in object:
                 raise BadRequest("Object id not available")
-            object_id = obj._id
-            object_type = obj.type_
+            object_id = object._id
+            object_type = object.type_
 
         # Check that subject and object type are permitted by association definition
         try:
@@ -449,10 +449,10 @@ class ResourceRegistry(object):
                 raise BadRequest("Illegal object type %s for predicate %s" % (object_type, predicate))
 
         # Finally, ensure this isn't a duplicate
-        assoc_list = self.find_associations(subject, predicate, obj, id_only=False)
+        assoc_list = self.find_associations(subject, predicate, object, id_only=False)
         if len(assoc_list) != 0:
             assoc = assoc_list[0]
-            raise BadRequest("Association between %s and %s with predicate %s already exists" % (subject, obj, predicate))
+            raise BadRequest("Association between %s and %s with predicate %s already exists" % (subject, object, predicate))
 
         assoc = IonObject("Association",
                           s=subject_id, st=subject_type,

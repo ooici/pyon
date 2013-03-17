@@ -69,11 +69,11 @@ class ResourceRegistryStandalone(object):
             raise BadRequest("The object_ids parameter is empty")
         return self.datastore.read_doc_mult(object_ids)
 
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type=None):
+    def create_association(self, subject=None, predicate=None, object=None, assoc_type=None):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if not subject or not predicate or not obj:
+        if not subject or not predicate or not object:
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
@@ -84,14 +84,14 @@ class ResourceRegistryStandalone(object):
             subject_id = subject._id
         st = subject.type_
 
-        if type(obj) is str:
-            object_id = obj
-            obj = self.read(object_id)
+        if type(object) is str:
+            object_id = object
+            object = self.read(object_id)
         else:
-            if "_id" not in obj:
+            if "_id" not in object:
                 raise BadRequest("Object id not available")
-            object_id = obj._id
-        ot = obj.type_
+            object_id = object._id
+        ot = object.type_
 
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
