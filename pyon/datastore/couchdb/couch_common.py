@@ -27,17 +27,12 @@ class AbstractCouchDataStore(object):
     """
     _stats = StatsCounter()
 
-    def __init__(self, datastore_name=None, config=None, scope=None, profile=None, newlog=None):
+    def __init__(self, datastore_name=None, config=None, scope=None, profile=None):
         """
         @param datastore_name  Name of datastore within server. May be scoped to sysname
         @param config  A server config dict with connection params
         @param scope  Prefix for the datastore name (e.g. sysname) to separate multiple systems
-        @param newlog  Override for the logging system
         """
-        global log
-        if newlog:
-            log = newlog
-
         self.config = config
         if not self.config:
             self.config = {}
@@ -82,23 +77,6 @@ class AbstractCouchDataStore(object):
             raise BadRequest("No datastore name provided")
         return datastore_name
 
-    def _get_datastore(self, datastore_name=None):
-        """
-        Returns the couch datastore instance and datastore name.
-        This caches the datastore instance to avoid an explicit lookup to save on http request.
-        The consequence is that if another process deletes the datastore in the meantime, we will fail later.
-        """
-        datastore_name = self._get_datastore_name(datastore_name)
-
-        if datastore_name in self._datastore_cache:
-            return self._datastore_cache[datastore_name], datastore_name
-
-        try:
-            ds = self.server[datastore_name]   # Note: causes http lookup
-            self._datastore_cache[datastore_name] = ds
-            return ds, datastore_name
-        except ValueError:
-            raise BadRequest("Datastore name '%s' invalid" % datastore_name)
 
     def create_datastore(self, datastore_name=None, create_indexes=True, profile=None):
         """
@@ -108,15 +86,15 @@ class AbstractCouchDataStore(object):
         @param create_indexes  If True create indexes according to profile
         @param profile  The profile used to determine indexes
         """
-        datastore_name = self._get_datastore_name(datastore_name)
+        ds_name = self._get_datastore_name(datastore_name)
         profile = profile or self.profile
-        log.info('Creating datastore %s (create_indexes=%s, profile=%s)' % (datastore_name, create_indexes, profile))
+        log.info('Creating datastore %s (create_indexes=%s, profile=%s)' % (ds_name, create_indexes, profile))
 
-        self._create_datastore(datastore_name)
+        self._create_datastore(ds_name)
 
         if create_indexes and profile:
-            log.info('Creating indexes for datastore %s with profile=%s' % (datastore_name, profile))
-            self.define_profile_views(profile=profile, datastore_name=datastore_name)
+            log.info('Creating indexes for datastore %s with profile=%s' % (ds_name, profile))
+            self.define_profile_views(profile=profile, datastore_name=datastore_name, keepviews=True)
 
     def _create_datastore(self, datastore_name):
         raise NotImplementedError()
@@ -199,6 +177,8 @@ class AbstractCouchDataStore(object):
         """
         if object_id and '_id' in doc:
             raise BadRequest("Doc must not have '_id'")
+        if '_rev' in doc:
+            raise BadRequest("Doc must not have '_rev'")
 
         # Add the attachments if indicated
         if attachments is not None:

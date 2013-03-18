@@ -20,8 +20,7 @@ class CouchPyonDataStore(CouchDataStore, PyonCouchDataStoreMixin):
 
         super(CouchPyonDataStore, self).__init__(datastore_name=datastore_name,
                                                  config=config or CFG.get_safe("server.couchdb"),
-                                                 profile=profile or DataStore.DS_PROFILE.BASIC,
-                                                 newlog=log)
+                                                 profile=profile or DataStore.DS_PROFILE.BASIC)
 
         # IonObject Serializers
         self._io_serializer = IonObjectSerializer()

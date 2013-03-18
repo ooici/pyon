@@ -454,7 +454,7 @@ def main(opts, *args, **kwargs):
     except Exception as ex:
         stop_container(container)
         print "pycc: ===== CONTAINER PROCESS START ERROR -- ABORTING ====="
-        print ex
+        traceback.print_exc()
         sys.exit(1)
 
     # Assumption: stop is so robust, it does not fail even if it was only partially started

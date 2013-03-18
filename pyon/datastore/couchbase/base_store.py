@@ -33,12 +33,8 @@ class CouchbaseDataStore(AbstractCouchDataStore):
     Data store implementation utilizing Couchbase to persist documents.
     For API info, see: http://packages.python.org/CouchDB/client.html
     """
-    def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, profile=None, **kwargs):
-        super(CouchbaseDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, profile=profile, newlog=newlog)
-
-        global log
-        if newlog:
-            log = newlog
+    def __init__(self, datastore_name=None, config=None, scope=None, profile=None, **kwargs):
+        super(CouchbaseDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, profile=profile)
 
         if self.config.get("type", None) and self.config['type'] != "couchbase":
             raise BadRequest("Datastore server config is not couchbase: %s" % self.config)
@@ -48,41 +44,63 @@ class CouchbaseDataStore(AbstractCouchDataStore):
             raise BadRequest("Invalid Couchbase scope name: '%s'" % self.scope)
 
         # Connection
-        connection_str = '%s:%s' % (self.host, self.port)
-        log.info("Connecting to Couchbase server: %s", connection_str)
+        self.username = self.username or ""
+        self.password = self.password or ""
+        if self.port == 5984:
+            self.port = 8091
+        self.api_port = get_safe(self.config, "api_port", "8092")
 
+        connection_str = '%s:%s' % (self.host, self.port)
+        log.info("Connecting to Couchbase server: %s (datastore_name=%s)", connection_str, self.datastore_name)
         self.server = Couchbase(connection_str, username=self.username, password=self.password)
 
         # Just to test existence of the datastore
         if self.datastore_name:
             try:
-                ds, _ = self._get_datastore()
+                ds, dsn = self._get_datastore()
             except NotFound:
                 self.create_datastore()
                 ds, _ = self._get_datastore()
 
     def close(self):
         log.debug("Closing connection to Couchbase")
-        '''
-        ds, _ = self._get_datastore()
-        del ds
-        del self.server
-        ##TODO:  is there a way to close connection
-        '''
+        ##TODO:  is there a way to close the connection?
 
 
     # -------------------------------------------------------------------------
     # Couchbase database operations
 
+    def _get_datastore(self, datastore_name=None):
+        """
+        Returns the couch datastore instance and datastore name.
+        This caches the datastore instance to avoid an explicit lookup to save on http request.
+        The consequence is that if another process deletes the datastore in the meantime, we will fail later.
+        """
+        ds_name = self._get_datastore_name(datastore_name)
+
+        if ds_name in self._datastore_cache:
+            return self._datastore_cache[ds_name], ds_name
+
+        try:
+            if not self.datastore_exists(datastore_name):
+                raise NotFound("Datastore '%s' does not exist" % ds_name)
+
+            ds = self.server[ds_name]   # Note: causes http lookup
+            self._datastore_cache[ds_name] = ds
+            return ds, ds_name
+        except ValueError:
+            raise BadRequest("Datastore name '%s' invalid" % ds_name)
+
     def _create_datastore(self, datastore_name):
-        bucket_password = get_safe(self.config, 'bucket_password')
-        ram_quota_mb = get_safe(self.config, 'bucket_ram_quota_samll_mb')
-        if not self.datastore_exists(datastore_name):
-            self._create_bucket(name=datastore_name, sasl_password=bucket_password, ram_quota_mb=ram_quota_mb)
+        if self.datastore_exists(datastore_name):
+            raise BadRequest("Datastore with name %s already exists" % datastore_name)
+        bucket_password = get_safe(self.config, "bucket_password", "")
+        ram_quota_mb = get_safe(self.config, "bucket_ram_quota_small_mb", "50")
+        self._create_bucket(name=datastore_name, sasl_password=bucket_password, ram_quota_mb=ram_quota_mb)
 
     def _create_bucket(self, name, auth_type='sasl', bucket_type='couchbase',
-                       parallel_db_and_view_compaction='false',
-                       ram_quota_mb="128", replica_index='0', replica_number='1',
+                       parallel_db_and_view_compaction=False,
+                       ram_quota_mb="128", replica_index='0', replica_number='0',
                        sasl_password=None, flush_enabled=False, proxy_port=11211):
         """
         If you set authType to "None", then you must specify a proxyPort number.
@@ -105,12 +123,23 @@ class CouchbaseDataStore(AbstractCouchDataStore):
             payload['replicaNumber'] = replica_number
         if sasl_password:
             payload['saslPassword'] = sasl_password
-        response = requests.post('http://%s:%s/pools/default/buckets' %(self.host, self.port), auth=(self.username, self.password), data=payload)
+
+        response = requests.post('http://%s:%s/pools/default/buckets' % (self.host, self.port), auth=(self.username, self.password), data=payload)
         if response.status_code != 202:
             log.error('Unable to create bucket %s on %s' % (name, self.host))
-            raise BadRequest ('Couchbase returned error - status code:%d - error_string from Couchbase: %s' %(response.status_code, response.content))
+            raise BadRequest ('Couchbase error %d: %s' %(response.status_code, response.content))
 
         gevent.sleep(2)
+
+        # Wait until datastore exists
+        # retries = 0
+        # ds_exists = self.datastore_exists(name)
+        # while not ds_exists and retries < 20:
+        #     gevent.sleep(0.1)
+        #     ds_exists = self.datastore_exists(name)
+        #     retries += 1
+        # if not ds_exists:
+        #     raise BadRequest("Could not create datastore %s in time" % name)
 
     def delete_datastore(self, datastore_name=None):
         try:
@@ -129,7 +158,9 @@ class CouchbaseDataStore(AbstractCouchDataStore):
         equivalent to listing all databases hosted on a database server.
         Returns scoped names.
         """
-        ds_list = [str(db.name) for db in self.server]
+        rest = self.server._rest()
+        buckets = rest.get_buckets()
+        ds_list = [str(b.name) for b in buckets]
         return ds_list
 
     def info_datastore(self, datastore_name=None):
@@ -149,6 +180,7 @@ class CouchbaseDataStore(AbstractCouchDataStore):
         """
         Indicates whether named datastore currently exists.
         """
+        datastore_name = self._get_datastore_name(datastore_name)
         rest = RestHelper(self.server._rest())
         return rest.bucket_exists(datastore_name)
 
@@ -170,18 +202,31 @@ class CouchbaseDataStore(AbstractCouchDataStore):
 
 
     def _save_doc(self, ds, doc):
+        doc_id = doc["_id"]
         try:
             if isinstance(doc, dict):
                 doc = json.dumps(doc)
-            opaque, cas, msg = ds.set(doc["_id"], 0, 0, doc)
-        except MemcachedError as e:
-            raise NotFound('Object could not be created. Id: %s - Exception: %s' % (doc["_id"], e))
-        version = cas
-        return doc["_id"], version
+            opaque, cas, msg = ds.set(doc_id, 0, 0, doc)
+        except MemcachedError as ex:
+            raise NotFound('Object %s could not be created: %s' % (doc_id, ex))
+        return doc_id, cas
 
     def _save_doc_mult(self, ds, docs):
         res = [(True, id, cas) for opaque, cas, msg, id in [(ds.set(doc['_id'],0,0,doc) + (doc['_id'],)) for doc in docs]]
         return res
+
+    # def _save_doc_mult(self, ds, docs):
+    #     doc_list = [dict(meta=dict(id=doc["_id"], expiration=0, flags=0), json=doc) for doc in docs]
+    #     payload = dict(docs=doc_list)
+    #     payload = json.dumps(payload)
+    #     api = 'http://%s:%s/%s/_bulk_docs' % (self.host, self.api_port, self.datastore_name)
+    #     headers = {'Content-Type': 'application/json', 'Accept': '*/*'}
+    #     response = requests.post(api, auth=(self.username, self.password), data=payload, headers=headers)
+    #     if response.status_code != 202:
+    #         raise BadRequest ('Couchbase error %d: %s' %(response.status_code, response.content))
+    #
+    #     res = [(True, doc["_id"], "") for doc in docs]
+    #     return res
 
     def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
         """
@@ -285,43 +330,25 @@ class CouchbaseDataStore(AbstractCouchDataStore):
             raise NotImplementedError()
         return doc
 
-    def read_doc_mult(self, object_ids, datastore_name=""):
-        ## TODO: find other way to do bulk read
+    def read_doc_mult(self, object_ids, datastore_name=None):
+        """"
+        Fetch a number of raw doc instances, HEAD rev.
+        """
         if not object_ids:
             return []
-        data, not_found_list = self._read_doc_mult(object_ids,datastore_name)
-        if not_found_list:
-            raise NotFound("\n".join(not_found_list))
+        ds, datastore_name = self._get_datastore(datastore_name)
+        rows = ds.view("_all_docs", keys=object_ids, include_docs=True)
 
-        return data
+        # Check for docs not found
+        notfound_list = ['Object with id %s does not exist.' % str(row.key)
+                         for row in rows if row.doc is None]
+        if notfound_list:
+            raise NotFound("\n".join(notfound_list))
 
-    def _read_doc_mult(self, object_ids, datastore_name=""):
-        datastore_name = datastore_name or self.datastore_name
-        data = json.dumps({"keys": object_ids})
-        #todo remove port number
-        response = requests.post('http://%s:%s/%s/_all_docs?include_docs=true&stale=false' %(self.host, '8092', datastore_name), auth=(self.username, self.password), data=data)
-        obj = []
-        notfound_list = []
-        if response.status_code == 404:
-            uri = 'http://%s:%s/%s/_all_docs?include_docs=true' % (self.host, self.port, datastore_name)
-            data = str(data)
-            print ("Couchbase server returned an error. \n Returned code: %d \n Returned content:%s \n URI: %s \n Data:%s " %(response.status_code, response.content, uri, data))
-            log.error("Couchbase server returned an error. \n Returned code: %d \n Returned content:%s \n URI: %s \n Data:%s " %(response.status_code, response.content, uri, data))
-            notfound_list.append('Object id does not exist.')
-        elif response.status_code == 200:
-            rows = json.loads(response.content)
-            for row in rows['rows']:
-                if 'doc' in row and 'json' in row['doc']:
-                    obj.append(self._persistence_dict_to_ion_object(row['doc']['json']))
-                elif 'error' in row:
-                    obj.append(None)
-                    notfound_list.append('Object with id %s does not exist.' % row['key'])
-        else:
-            uri = 'http://%s:%s/%s/_all_docs?include_docs=true' % (self.host, self.port, datastore_name)
-            data = str(data)
-            raise ServerError("Couchbase server returned an error. \n Returned code: %d \n Returned content:%s \n URI: %s \n Data:%s " %(response.status_code, response.content, uri, data))
+        doc_list = [row['doc']['json'] for row in rows]
+        self._count(read_mult_call=1, read_mult_obj=len(doc_list))
 
-        return obj, notfound_list
+        return doc_list
 
     def read_attachment(self, doc, attachment_name, datastore_name=""):
         if not isinstance(attachment_name, str):
@@ -490,14 +517,17 @@ class CouchbaseDataStore(AbstractCouchDataStore):
         ds, datastore_name = self._get_datastore(datastore_name)
         doc_name = self._get_design_name(design_name)
 
-        if keepviews and doc_name in ds.design_docs():
+        if keepviews and design_name in ds.design_docs():
             return
+        rest = self.server._rest()
         try:
-            rest = self.server._rest()
-            rest.delete_design_doc(bucket=datastore_name, design_doc=doc_name)
+            rest.delete_design_doc(bucket=datastore_name, design_doc=design_name)
         except Exception:
             pass
-        ds[doc_name] = dict(views=design_doc)
+        design_doc_json = json.dumps(dict(views=design_doc))
+        rest.create_design_doc(bucket=datastore_name, design_doc=design_name, function=design_doc_json)
+        #ds[doc_name] = design_doc_json
+        log.debug("Added design %s to datastore %s", doc_name, datastore_name)
 
     def refresh_views(self, datastore_name="", profile=None):
         """

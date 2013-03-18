@@ -23,12 +23,8 @@ class CouchDataStore(AbstractCouchDataStore):
     For API info, see: http://packages.python.org/CouchDB/client.html.
     A base datastore knows how to manage datastores, CRUD documents (dict) and access generic indexes.
     """
-    def __init__(self, datastore_name=None, config=None, newlog=None, scope=None, profile=None, **kwargs):
-        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, profile=profile, newlog=newlog)
-
-        global log
-        if newlog:
-            log = newlog
+    def __init__(self, datastore_name=None, config=None, scope=None, profile=None, **kwargs):
+        super(CouchDataStore, self).__init__(datastore_name=datastore_name, config=config, scope=scope, profile=profile)
 
         if self.config.get("type", None) and self.config['type'] != "couchdb":
             raise BadRequest("Datastore server config is not couchdb: %s" % self.config)
@@ -72,10 +68,24 @@ class CouchDataStore(AbstractCouchDataStore):
     # Couch database operations
 
     def _get_datastore(self, datastore_name=None):
+        """
+        Returns the couch datastore instance and datastore name.
+        This caches the datastore instance to avoid an explicit lookup to save on http request.
+        The consequence is that if another process deletes the datastore in the meantime, we will fail later.
+        """
+        datastore_name = self._get_datastore_name(datastore_name)
+
+        if datastore_name in self._datastore_cache:
+            return self._datastore_cache[datastore_name], datastore_name
+
         try:
-            return super(CouchDataStore, self)._get_datastore(datastore_name)
+            ds = self.server[datastore_name]   # Note: causes http lookup
+            self._datastore_cache[datastore_name] = ds
+            return ds, datastore_name
         except ResourceNotFound:
             raise NotFound("Datastore '%s' does not exist" % datastore_name)
+        except ValueError:
+            raise BadRequest("Datastore name '%s' invalid" % datastore_name)
 
     def _create_datastore(self, datastore_name):
         try:

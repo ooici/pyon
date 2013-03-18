@@ -23,11 +23,11 @@ class InterfaceAdmin:
     DIR_CONFIG_PATH = "/Config"
 
     def __init__(self, sysname, config=None):
+        self._closed = False
         self.sysname = sysname
         self.config = config
         self.dir = DirectoryStandalone(sysname=self.sysname, config=self.config)
         self.rr = ResourceRegistryStandalone(sysname=self.sysname, config=self.config)
-        self._closed = False
 
     def close(self):
         self.dir.close()
@@ -51,7 +51,6 @@ class InterfaceAdmin:
             if not ds.datastore_exists(local_dsn):
                 ds.create_datastore(local_dsn)
                 count += 1
-                # NOTE: Views and other datastores are created by containers' DatastoreManager
         print "store_interfaces: Created %s datastores..." % count
 
 
