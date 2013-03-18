@@ -70,6 +70,11 @@ class ResourceRegistry(object):
             raise BadRequest("Object is not an IonObject")
         if not is_resource(object):
             raise BadRequest("Object is not a Resource")
+        if "_id" in object:
+            raise BadRequest("Object must not contain _id")
+        if "_rev" in object:
+            raise BadRequest("Object must not contain _rev")
+
 
         lcsm = get_restype_lcsm(object._get_type())
         object.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
@@ -96,7 +101,7 @@ class ResourceRegistry(object):
 
         return res
 
-    def _create_mult(self, res_list):
+    def create_mult(self, res_list):
         cur_time = get_ion_ts()
         for resobj in res_list:
             lcsm = get_restype_lcsm(resobj._get_type())
@@ -116,17 +121,6 @@ class ResourceRegistry(object):
 #                mod_type=ResourceModificationType.CREATE)
 
         return res_list
-
-    def read(self, object_id='', rev_id=''):
-        if not object_id:
-            raise BadRequest("The object_id parameter is an empty string")
-
-        return self.rr_store.read(object_id, rev_id)
-
-    def read_mult(self, object_ids=None):
-        if object_ids is None:
-            raise BadRequest("The object_ids parameter is empty")
-        return self.rr_store.read_mult(object_ids)
 
     def update(self, object):
         if object is None:
@@ -150,6 +144,17 @@ class ResourceRegistry(object):
                                      mod_type=ResourceModificationType.UPDATE)
 
         return self.rr_store.update(object)
+
+    def read(self, object_id='', rev_id=''):
+        if not object_id:
+            raise BadRequest("The object_id parameter is an empty string")
+
+        return self.rr_store.read(object_id, rev_id)
+
+    def read_mult(self, object_ids=None):
+        if object_ids is None:
+            raise BadRequest("The object_ids parameter is empty")
+        return self.rr_store.read_mult(object_ids)
 
     def delete(self, object_id='', del_associations=False):
         res_obj = self.read(object_id)

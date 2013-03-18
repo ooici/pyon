@@ -8,6 +8,7 @@ import simplejson as json
 from pyon.core.bootstrap import get_obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
+from pyon.datastore.couchdb.couch_common import AbstractCouchDataStore
 from pyon.ion.resource import CommonResourceLifeCycleSM
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.log import log
@@ -24,7 +25,7 @@ except Exception:
         pass
 
 
-class PyonCouchDataStoreMixin(object):
+class PyonCouchDataStoreMixin(AbstractCouchDataStore):
     """
     Mixin class for common couch style datastore code
     """
