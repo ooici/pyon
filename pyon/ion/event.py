@@ -300,7 +300,7 @@ class EventRepository(object):
             raise BadRequest("events must all be type Event")
 
         if events:
-            return self.event_store.create_mult(events, allow_ids=True)
+            return self.event_store.create_mult(events)
         else:
             return None
 
@@ -347,7 +347,7 @@ class EventRepository(object):
 
         events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
                                                id_only=False, **kwargs)
-
+        events = [(docid, indexkey, doc) for docid, indexkey, value, doc in events]
         return events
 
 

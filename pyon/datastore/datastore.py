@@ -5,7 +5,8 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
-from pyon.core.bootstrap import get_sys_name
+from pyon.core.bootstrap import get_sys_name, CFG
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.util.containers import DotDict
 from pyon.util.log import log
 from pyon.util.arg_check import validate_true
@@ -13,7 +14,7 @@ from pyon.util.arg_check import validate_true
 
 class DataStore(object):
     """
-    Common utilities for datastores
+    Common definitions for data stores
     """
     # Constants for common datastore names
     DS_RESOURCES = "resources"
@@ -23,7 +24,7 @@ class DataStore(object):
     DS_STATE = "state"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'EXAMPLES', 'SCIDATA', 'FILESYSTEM', 'BASIC']
+    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'FILESYSTEM', 'BASIC']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
 
     # Maps common datastore logical names to index profiles
@@ -87,7 +88,7 @@ class DatastoreManager(object):
         else:
             # NOTE: This may be expensive if called more than once per container
             # If views exist and are dropped and recreated
-            new_ds._define_views(profile=profile, keepviews=True)
+            new_ds.define_profile_views(profile=profile, keepviews=True)
 
         # Set a few standard datastore instance fields
         new_ds.local_name = ds_name
@@ -101,9 +102,8 @@ class DatastoreManager(object):
     def get_datastore_instance(cls, ds_name, profile=DataStore.DS_PROFILE.BASIC):
         scoped_name = DatastoreManager.get_scoped_name(ds_name)
 
-        # Use inline import to prevent circular import dependency
-        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-        new_ds = CouchDB_DataStore(datastore_name=scoped_name, profile=profile)
+        new_ds = DatastoreFactory.get_datastore(datastore_name=scoped_name, profile=profile,
+                                                config=CFG, variant=DatastoreFactory.DS_FULL)
 
         return new_ds
 

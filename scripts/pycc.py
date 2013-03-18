@@ -12,7 +12,7 @@ import sys
 import traceback
 from uuid import uuid4
 
-from script_util import parse_args
+from putil.script_util import parse_args
 from pyon.core import log as logutil
 #
 # WARNING - DO NOT IMPORT GEVENT OR PYON HERE. IMPORTS **MUST** BE DONE IN THE MAIN()
@@ -21,7 +21,7 @@ from pyon.core import log as logutil
 # SEE: http://groups.google.com/group/gevent/browse_thread/thread/6223805ffcd5be22?pli=1
 #
 
-version = "2.0"     # TODO: extract this from the code once versioning is automated again
+version = "2.0"     # TODO: extract version info from the code (tag/commit)
 description = '''
 pyon (ION capability container) v%s
 ''' % (version)
@@ -83,7 +83,7 @@ def main(opts, *args, **kwargs):
     Processes arguments and starts the capability container.
     """
     def prepare_logging():
-    # Load logging override config if provided. Supports variants literal and path.
+        # Load logging override config if provided. Supports variants literal and path.
         logging_config_override = None
         if opts.logcfg:
             if '{' in opts.logcfg:
@@ -112,7 +112,8 @@ def main(opts, *args, **kwargs):
 
         from pyon.core import bootstrap, config
 
-        # Set global testing flag to False. We are running as capability container. This is NO TEST.
+        # Set global testing flag to False. We are running as capability container, because
+        # we started through the pycc program.
         bootstrap.testing = False
 
         # Set sysname if provided in startup argument
@@ -188,10 +189,10 @@ def main(opts, *args, **kwargs):
         # - Optionally load config from directory
         if opts.config_from_directory:
             config.apply_remote_config(bootstrap_cfg=bootstrap_config, system_cfg=pyon_config)
-            config.apply_local_configuration(pyon_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)     # apply pyon.local.yml again over top
         # - Apply container profile specific config
         config.apply_profile_configuration(pyon_config, bootstrap_config)
-        # - TBD: Reapply pyon.local.yml here again for good measure?
+        # - Reapply pyon.local.yml here again for good measure
+        config.apply_local_configuration(pyon_config, pyon.DEFAULT_LOCAL_CONFIG_PATHS)
         # - Last apply any separate command line config overrides
         config.apply_configuration(pyon_config, config_override)
         config.apply_configuration(pyon_config, command_line_config)
@@ -453,7 +454,7 @@ def main(opts, *args, **kwargs):
     except Exception as ex:
         stop_container(container)
         print "pycc: ===== CONTAINER PROCESS START ERROR -- ABORTING ====="
-        print ex
+        traceback.print_exc()
         sys.exit(1)
 
     # Assumption: stop is so robust, it does not fail even if it was only partially started
