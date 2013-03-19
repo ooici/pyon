@@ -68,6 +68,8 @@ class TestResources(IonUnitTestCase):
         instrument_device._id = '123'
         instrument_device.name = "MyInstrument"
         instrument_device.type_ = RT.InstrumentDevice
+        instrument_device.lcstate = LCS.DRAFT
+        instrument_device.availability = AS.PRIVATE
 
         instrument_device2 = Mock()
         instrument_device2._id = '456'
@@ -79,7 +81,6 @@ class TestResources(IonUnitTestCase):
         actor_identity._id = '111'
         actor_identity.name = "Foo"
         actor_identity.type_ = RT.ActorIdentity
-
 
 
         user_info = Mock()
@@ -151,6 +152,8 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
+        self.assertEquals(len(extended_res.lcstate_transitions), 7)
+        self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['enable', 'develop', 'deploy', 'retire', 'plan', 'integrate', 'announce']))
 
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceDevice, '123')
