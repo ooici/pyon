@@ -5,7 +5,7 @@ __author__ = 'Dave Foster <dfoster@asascience.com>'
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
-from pyon.container.cc import Container
+from pyon.container.cc import Container, CCAP
 import signal
 from gevent.event import Event
 from mock import Mock, patch, ANY
@@ -76,3 +76,37 @@ class TestCCIntProcs(IonIntegrationTestCase):
     def tearDown(self):
         pass
 
+@attr('INT')
+class TestContainerCapabilities(IonIntegrationTestCase):
+
+    def test_development(self):
+        from pyon.container.cc import CFG
+        old_profile = CFG.container.profile
+        CFG.container.profile = "development"
+        try:
+            self._start_container()
+            self.assertIn(CCAP.RESOURCE_REGISTRY, self.container._capabilities)
+            self.assertEquals(self.container._cap_instances[CCAP.RESOURCE_REGISTRY] .__class__.__name__, "ResourceRegistry")
+            self.assertIn(CCAP.EVENT_REPOSITORY, self.container._capabilities)
+            self.assertIn(CCAP.GOVERNANCE_CONTROLLER, self.container._capabilities)
+            self.assertGreater(len(self.container._capabilities), 15)
+            self.assertEqual(CFG.get_safe("container.messaging.server.primary"), "amqp")
+        finally:
+            CFG.container.profile = old_profile
+
+    def test_gumstix(self):
+        from pyon.container.cc import CFG
+        old_profile = CFG.container.profile
+        CFG.container.profile = "gumstix"
+        try:
+            self._start_container()
+            self.assertIn(CCAP.RESOURCE_REGISTRY, self.container._capabilities)
+            self.assertEquals(self.container._cap_instances[CCAP.RESOURCE_REGISTRY] .__class__.__name__, "EmbeddedResourceRegistryCapability")
+            self.assertNotIn(CCAP.EVENT_REPOSITORY, self.container._capabilities)
+            self.assertNotIn(CCAP.GOVERNANCE_CONTROLLER, self.container._capabilities)
+            self.assertLess(len(self.container._capabilities), 15)
+            # This checks the config override
+            # @TODO cannot check this here because container was not started with pycc.py
+            #self.assertEqual(CFG.get_safe("container.messaging.server.primary"), "localrouter")
+        finally:
+            CFG.container.profile = old_profile
