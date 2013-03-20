@@ -143,7 +143,7 @@ def get_restype_lcsm(restype):
 
 
 def is_resource(object):
-    return issubtype(object._get_type(), "Resource")
+    return issubtype(object.type_, "Resource")
 
 def lcstate(maturity, availability):
     if not maturity and maturity not in LCS:
@@ -409,9 +409,9 @@ class ExtendedResourceContainer(object):
         Set lcstate related fields in resource container, such as available lcstate transitions.
         This is true for all resources, independent of the type.
         """
-        restype_workflow = get_restype_lcsm(res_container.resource._get_type())
+        restype_workflow = get_restype_lcsm(res_container.resource.type_)
         if restype_workflow:
-            res_container.lcstate_transitions = restype_workflow.get_successors(res_container.resource.lcstate)
+            res_container.lcstate_transitions = restype_workflow.get_successors(lcstate(res_container.resource.lcstate, res_container.resource.availability))
         else:
             res_container.lcstate_transitions = {"retire": "RETIRED"}
 

@@ -110,7 +110,7 @@ class LRUCache (object):
         if self.maxSize == 0:
             pass
         elif self.size()> (self.maxSize + self.elasticity):
-            print 'size [%d] is greater than [%d]. pruning...' % (self.size(), self.maxSize + self.elasticity)
+            #print 'size [%d] is greater than [%d]. pruning...' % (self.size(), self.maxSize + self.elasticity)
             toDel = self.size() - self.maxSize
             timeStamps = sorted(self.keyTable.keys())
             timeStamps = timeStamps[0:toDel]

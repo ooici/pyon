@@ -141,14 +141,23 @@ class Container(BaseContainerAgent):
         for cap in start_order:
             if cap not in self._cap_instances:
                 continue
-            log.debug("start(): Starting '%s'" % cap)
-            try:
-                cap_obj = self._cap_instances[cap]
-                cap_obj.start()
-                self._capabilities.append(cap)
-            except Exception as ex:
-                log.error("Container Capability %s start error: %s" % (cap, ex))
-                raise
+            # First find the default enabled value if no CFG key exists
+            enabled_default = self._cap_definitions.get_safe("%s.enabled_default" % cap, True)
+            # Then find CFG key where enabled flag is (default or override)
+            enabled_config = self._cap_definitions.get_safe("%s.enabled_config" % cap, "container.%s.enabled" % cap)
+            # Then determine the enabled value
+            enabled = CFG.get_safe(enabled_config, enabled_default)
+            if enabled:
+                log.debug("start(): Starting '%s'" % cap)
+                try:
+                    cap_obj = self._cap_instances[cap]
+                    cap_obj.start()
+                    self._capabilities.append(cap)
+                except Exception as ex:
+                    log.error("Container Capability %s start error: %s" % (cap, ex))
+                    raise
+            else:
+                log.debug("start(): Capability '%s' disabled by config '%s'", cap, enabled_config)
 
         if self.has_capability(CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ContainerLifecycleEvent",

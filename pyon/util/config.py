@@ -15,12 +15,13 @@ class Config(object):
     """
 
     def __init__(self, paths=(), dict_class=DotDict, ignore_not_found=False):
-        self.paths = list(paths)
+        self.paths = [path for path in paths if path] if paths is not None else []
         self.paths_loaded = set()
         self.dict_class = dict_class
         self.data = self.dict_class()
 
-        if paths: self.load(ignore_not_found)
+        if paths:
+            self.load(ignore_not_found)
 
     def add_path(self, path, ignore_not_found=False):
         """ Add this path at the end of the list and load/merge its contents. """
@@ -49,4 +50,3 @@ class Config(object):
     def reload(self):
         self.paths_loaded.clear()
         self.load()
-

@@ -248,6 +248,9 @@ class CouchDB_DataStore(DataStore):
 
         return res
 
+    def update_doc_mult(self, docs):
+        return self.create_doc_mult(docs, allow_ids=True)
+
     def create_attachment(self, doc, attachment_name, data, content_type=None, datastore_name=""):
         """
         Assumes that the document already exists and creates attachment to it.
