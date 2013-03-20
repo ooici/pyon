@@ -187,18 +187,18 @@ class ResourceAgent(BaseResourceAgent):
     # Governance interfaces and helpers
     ##############################################################
 
-    def _get_process_org_name(self):
+    def _get_process_org_governance_name(self):
         '''
         Look for the org_name associated with this process, default to System root
         '''
-        if hasattr(self,'org_name'):
-            org_name = self.org_name
-            log.debug("Getting org_name from process: " + org_name)
+        if hasattr(self,'org_governance_name'):
+            org_governance_name = self.org_governance_name
+            log.debug("Getting org_governance_name from process: " + org_governance_name)
         else:
-            org_name = self.container.governance_controller.system_root_org_name
-            log.debug("Getting org_name from container: " + org_name)
+            org_governance_name = self.container.governance_controller.system_root_org_name
+            log.debug("Getting org_governance_name from container: " + org_governance_name)
 
-        return org_name
+        return org_governance_name
 
 
     def negotiate(self, resource_id="", sap_in=None):
@@ -280,11 +280,24 @@ class ResourceAgent(BaseResourceAgent):
         for x in params:
             try:
                 key = 'aparam_' + x
-                val = getattr(self, key)
-                result[x] = val
-
+                getattr(self, key)
             except (TypeError, AttributeError):
-                raise BadRequest('Bad agent parameter: %s.', str(x))
+                raise BadRequest('Bad agent parameter: %s', str(x))
+
+        for x in params:
+            key = 'aparam_' + x
+            get_key = 'aparam_get_' + x
+            
+            try:
+                get_func = getattr(self, get_key)
+            except (TypeError, AttributeError):
+                get_func = None
+                
+            if get_func and callable(get_func):
+                result[x] = get_func()
+            
+            else:
+                result[x] = getattr(self, key)
 
         return result
 
