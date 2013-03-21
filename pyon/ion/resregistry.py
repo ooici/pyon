@@ -452,7 +452,7 @@ class ResourceRegistry(object):
             id_only=id_only)
 
 
-    def get_resource_extension(self, resource_id='', resource_extension='', ext_associations=None, ext_exclude=None):
+    def get_resource_extension(self, resource_id='', resource_extension='', ext_associations=None, ext_exclude=None, **kwargs ):
         """Returns any ExtendedResource object containing additional related information derived from associations
 
         @param resource_id    str
@@ -474,14 +474,21 @@ class ResourceRegistry(object):
         #Handle differently if the resource_id parameter is a list of ids
         if resource_id.find('[') > -1:
             res_input = eval(resource_id)
-            extended_resource_list = extended_resource_handler.create_extended_resource_container_list(resource_extension,
-                res_input, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude)
+            extended_resource_list = extended_resource_handler.create_extended_resource_container_list(extended_resource_type=resource_extension,
+                resource_id_list=res_input, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
             return extended_resource_list
 
-        extended_resource = extended_resource_handler.create_extended_resource_container(resource_extension,
-            resource_id, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude)
+        extended_resource = extended_resource_handler.create_extended_resource_container(extended_resource_type=resource_extension,
+            resource_id=resource_id, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
 
         return extended_resource
+
+
+    #This is a method used for testing - do not remove
+    def get_user_id_test(self, resource_id, user_id=None):
+        print 'here:' + resource_id + " " + user_id
+        return user_id
+
 
 class ResourceRegistryServiceWrapper(object):
     """
