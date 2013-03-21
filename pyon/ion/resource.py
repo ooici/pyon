@@ -559,10 +559,19 @@ class ExtendedResourceContainer(object):
                     elif obj._schema[field]['type'] == 'int':
                         setattr(obj, field, len(obj_list))
                     else:
-                        if len(obj_list) != 1:
+                        #Find the one and only object that matches
+                        result_obj_list = []
+                        for ol_nested in obj_list:
+                            if ol_nested:
+                                #Only get the object types which match the field return type
+                                result_obj_list.extend([target_obj for target_obj in obj_list[0] if target_obj.type_ == obj._schema[field]['type'] ])
+
+                        if len(result_obj_list) != 1:
                             # WARNING: Swallow random further objects here!
-                            log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(obj_list))
-                        setattr(obj, field, obj_list[0])
+                            log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(result_obj_list))
+
+                        setattr(obj, field, result_obj_list[0]);
+
 
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         """
