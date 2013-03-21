@@ -467,7 +467,7 @@ class ResourceRegistry(object):
             raise BadRequest("The resource_id parameter is empty")
 
         if not resource_extension:
-            raise BadRequest("The extended_resource parameter not set")
+            raise BadRequest("The resource_extension parameter is not set")
 
         extended_resource_handler = ExtendedResourceContainer(self, self)
 
