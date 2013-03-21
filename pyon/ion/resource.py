@@ -553,18 +553,20 @@ class ExtendedResourceContainer(object):
                     assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
                     obj_list.append([res_objs[target_id1] for target_id1, assoc1 in assoc_list1])
 
-                if obj_list:
+
+                #Filter thelist to remove objects that might match the current resource type
+                result_obj_list = []
+                for ol_nested in obj_list:
+                    if ol_nested:
+                        #Only get the object types which don't match the current resource type
+                        result_obj_list.extend([target_obj for target_obj in obj_list[0] if target_obj.type_ != resource.type_ ])
+
+                if result_obj_list:
                     if obj._schema[field]['type'] == 'list':
-                        setattr(obj, field, obj_list)
+                        setattr(obj, field, result_obj_list)
                     elif obj._schema[field]['type'] == 'int':
-                        setattr(obj, field, len(obj_list))
+                        setattr(obj, field, len(result_obj_list))
                     else:
-                        #Find the one and only object that matches
-                        result_obj_list = []
-                        for ol_nested in obj_list:
-                            if ol_nested:
-                                #Only get the object types which match the field return type
-                                result_obj_list.extend([target_obj for target_obj in obj_list[0] if target_obj.type_ == obj._schema[field]['type'] ])
 
                         if len(result_obj_list) != 1:
                             # WARNING: Swallow random further objects here!

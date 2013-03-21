@@ -83,6 +83,11 @@ class TestResources(IonUnitTestCase):
         actor_identity.type_ = RT.ActorIdentity
 
 
+        actor_identity = Mock()
+        actor_identity._id = '1112'
+        actor_identity.name = "Foo2"
+        actor_identity.type_ = RT.ActorIdentity
+
         user_info = Mock()
         user_info._id = '444'
         user_info.name = "John Doe"
@@ -110,7 +115,7 @@ class TestResources(IonUnitTestCase):
         # ActorIdentity to UserInfo association
         actor_identity_to_info_association2 = Mock()
         actor_identity_to_info_association2._id = '556'
-        actor_identity_to_info_association2.s = "111"
+        actor_identity_to_info_association2.s = "1112"
         actor_identity_to_info_association2.st = RT.ActorIdentity
         actor_identity_to_info_association2.p = PRED.hasInfo
         actor_identity_to_info_association2.o = "445"
@@ -148,17 +153,19 @@ class TestResources(IonUnitTestCase):
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123')
         self.assertEquals(extended_res.resource, instrument_device)
-        self.assertEquals(len(extended_res.owners),1)
+        self.assertEquals(len(extended_res.owners),2)
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
+        self.assertEquals(extended_res.owner_count, 2)
+        self.assertEquals(extended_res.single_owner.name, user_info.name)
         self.assertEquals(len(extended_res.lcstate_transitions), 7)
         self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['enable', 'develop', 'deploy', 'retire', 'plan', 'integrate', 'announce']))
 
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceDevice, '123')
         self.assertEquals(extended_res.resource, instrument_device)
-        self.assertEquals(len(extended_res.owners),1)
+        self.assertEquals(len(extended_res.owners),2)
 
 
         with self.assertRaises(Inconsistent) as cm:
@@ -167,7 +174,7 @@ class TestResources(IonUnitTestCase):
         #Test adding extra paramaters to methods
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResource, '123', resource_name='AltSystem_Resource')
         self.assertEquals(extended_res.resource, instrument_device)
-        self.assertEquals(len(extended_res.owners),1)
+        self.assertEquals(len(extended_res.owners),2)
         self.assertEquals(extended_res.resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
         self.assertEquals(extended_res.resource_object.name, 'AltSystem_Resource')
@@ -184,7 +191,7 @@ class TestResources(IonUnitTestCase):
         extended_res_list = extended_resource_handler.create_extended_resource_container_list(OT.TestExtendedResource, ['123','456'])
         self.assertEqual(len(extended_res_list), 2)
         self.assertEquals(extended_res_list[0].resource, instrument_device)
-        self.assertEquals(len(extended_res_list[0].owners),1)
+        self.assertEquals(len(extended_res_list[0].owners),2)
         self.assertEquals(extended_res_list[0].resource_object.type_, RT.SystemResource)
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
