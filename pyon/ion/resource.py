@@ -559,7 +559,7 @@ class ExtendedResourceContainer(object):
                 for ol_nested in obj_list:
                     if ol_nested:
                         #Only get the object types which don't match the current resource type
-                        result_obj_list.extend([target_obj for target_obj in obj_list[0] if target_obj.type_ != resource.type_ ])
+                        result_obj_list.extend([target_obj for target_obj in ol_nested if target_obj.type_ != resource.type_ ])
 
                 if result_obj_list:
                     if obj._schema[field]['type'] == 'list':
