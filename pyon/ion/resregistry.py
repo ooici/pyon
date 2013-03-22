@@ -486,7 +486,6 @@ class ResourceRegistry(object):
 
     #This is a method used for testing - do not remove
     def get_user_id_test(self, resource_id, user_id=None):
-        print 'here:' + resource_id + " " + user_id
         return user_id
 
 
