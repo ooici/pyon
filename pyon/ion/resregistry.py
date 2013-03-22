@@ -34,6 +34,8 @@ class ResourceRegistry(object):
         # May be persistent or mock, forced clean, with indexes
         datastore_manager = datastore_manager or self.container.datastore_manager
         self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
+        self.name = 'container_resource_registry'
+        self.id = 'container_resource_registry'
 
         self.event_pub = EventPublisher()
 
@@ -452,7 +454,7 @@ class ResourceRegistry(object):
             id_only=id_only)
 
 
-    def get_resource_extension(self, resource_id='', resource_extension='', ext_associations=None, ext_exclude=None, **kwargs ):
+    def get_resource_extension(self, resource_id='', resource_extension='', computed_resource_type=None, ext_associations=None, ext_exclude=None, **kwargs ):
         """Returns any ExtendedResource object containing additional related information derived from associations
 
         @param resource_id    str
@@ -475,11 +477,11 @@ class ResourceRegistry(object):
         if resource_id.find('[') > -1:
             res_input = eval(resource_id)
             extended_resource_list = extended_resource_handler.create_extended_resource_container_list(extended_resource_type=resource_extension,
-                resource_id_list=res_input, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
+                resource_id_list=res_input, computed_resource_type=computed_resource_type, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
             return extended_resource_list
 
         extended_resource = extended_resource_handler.create_extended_resource_container(extended_resource_type=resource_extension,
-            resource_id=resource_id, computed_resource_type=None, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
+            resource_id=resource_id, computed_resource_type=computed_resource_type, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
 
         return extended_resource
 
