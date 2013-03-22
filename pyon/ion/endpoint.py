@@ -32,7 +32,10 @@ class ProcessEndpointUnitMixin(EndpointUnit):
 
         This method may be overridden for advanced purposes.
         """
-        return self._process.get_context()
+        if hasattr(self._process, 'get_context'):
+            return self._process.get_context()
+        else:
+            return None
 
     def _build_invocation(self, **kwargs):
         newkwargs = kwargs.copy()
