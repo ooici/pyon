@@ -443,6 +443,7 @@ class ExtendedResourceContainer(object):
         field_needs = []         # Fields that need to be set in a subsequent step
         resource_needs = set()   # Resources to read by id based on needs
         assoc_needs = set()      # Compound associations to follow
+        final_target_types = {}  # Keeps track of what resource type filter is desired
 
         for field in obj._schema:
 
@@ -484,7 +485,12 @@ class ExtendedResourceContainer(object):
 
                 # Fill field based on compound association chains. Results in nested lists of resource objects
                 elif self.is_compound_association(decorator):
+
                     target_type = obj.get_decorator_value(field, decorator)
+                    if target_type.find(',') > 0: #Can specify multiple type filters, only handles two levels for now
+                        target_type, final_target_type = target_type.split(',')
+                        final_target_types[field] = final_target_type # Keep track for later
+
                     predicates = self.get_compound_association_predicates(decorator)
                     assoc_list = self._find_associated_resources(resource, predicates[0], target_type)
                     field_needs.append((field, "A", (assoc_list, predicates)))
@@ -518,7 +524,7 @@ class ExtendedResourceContainer(object):
             return
 
         # Step 2: Read second level of compound associations as needed
-        # @TODO Can only do 2 level compounds for now. Make recursive
+        # @TODO Can only do 2 level compounds for now. Make recursive someday
         if assoc_needs:
             assocs = self._rr.find_associations(anyside=list(assoc_needs), id_only=False)
             self._add_associations(assocs)
@@ -558,8 +564,11 @@ class ExtendedResourceContainer(object):
                 result_obj_list = []
                 for ol_nested in obj_list:
                     if ol_nested:
-                        #Only get the object types which don't match the current resource type
-                        result_obj_list.extend([target_obj for target_obj in ol_nested if target_obj.type_ != resource.type_ ])
+                        #Only get the object types which don't match the current resource type and may match a final type
+                        if final_target_types.has_key(field):
+                            result_obj_list.extend([target_obj for target_obj in ol_nested if ( target_obj.type_ != resource.type_ and target_obj.type_ == final_target_types[field] ) ])
+                        else:
+                            result_obj_list.extend([target_obj for target_obj in ol_nested if ( target_obj.type_ != resource.type_  ) ])
 
                 if result_obj_list:
                     if obj._schema[field]['type'] == 'list':
