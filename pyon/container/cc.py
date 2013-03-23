@@ -35,6 +35,11 @@ from contextlib import contextmanager
 # if self.container.has_capability(CCAP.RESOURCE_REGISTRY):
 CCAP = DotDict()
 
+#Container status
+INIT = "INIT"
+RUNNING = "RUNNING"
+TERMINATING = "TERMINATING"
+TERMINATED = "TERMINATED"
 
 class Container(BaseContainerAgent):
     """
@@ -52,6 +57,9 @@ class Container(BaseContainerAgent):
 
     def __init__(self, *args, **kwargs):
         BaseContainerAgent.__init__(self, *args, **kwargs)
+
+        # Coordinates the container start
+        self._status = INIT
 
         self._is_started = False
         # set container id and cc_agent name (as they are set in base class call)
@@ -99,8 +107,7 @@ class Container(BaseContainerAgent):
                 log.error("Container Capability %s init error: %s" % (cap, ex))
                 raise
 
-        # Coordinates the container start
-        self._status = "INIT"
+
 
         log.debug("Container initialized, OK.")
 
@@ -166,7 +173,7 @@ class Container(BaseContainerAgent):
                                          state=ContainerStateEnum.START)
 
         self._is_started    = True
-        self._status        = "RUNNING"
+        self._status        = RUNNING
 
         log.info("Container (%s) started, OK." , self.id)
 
@@ -276,6 +283,23 @@ class Container(BaseContainerAgent):
         """
         return self._status
 
+    def is_running(self):
+        """
+        Is the container in the process of shutting down or stopped.
+        """
+        if self._status == RUNNING:
+            return True
+        return False
+
+    def is_terminating(self):
+        """
+        Is the container in the process of shutting down or stopped.
+        """
+        if self._status == TERMINATING or self._status == TERMINATED:
+            return True
+        return False
+
+
     def _cleanup_pid(self):
         if self.pidfile:
             log.debug("Cleanup pidfile: %s", self.pidfile)
@@ -287,6 +311,8 @@ class Container(BaseContainerAgent):
 
     def stop(self):
         log.info("=============== Container stopping... ===============")
+
+        self._status = TERMINATING
 
         if self.has_capability(CCAP.EVENT_PUBLISHER) and self.event_pub is not None:
             try:
@@ -312,6 +338,8 @@ class Container(BaseContainerAgent):
         bootstrap.container_instance = None
 
         self._is_started = False
+
+        self._status = TERMINATED
 
         log.debug("Container stopped, OK.")
 
