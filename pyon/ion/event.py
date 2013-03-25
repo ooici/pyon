@@ -290,7 +290,8 @@ class EventRepository(object):
         log.trace("Store event persistently %s", event)
         if not isinstance(event, Event):
             raise BadRequest("event must be type Event, not %s" % type(event))
-        return self.event_store.create(event)
+        event_id = event.__dict__.pop("_id", None)
+        return self.event_store.create(event, event_id)
 
     def put_events(self, events):
         log.debug("Store %s events persistently", len(events))

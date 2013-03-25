@@ -13,6 +13,7 @@ from gevent import event, queue
 from unittest import SkipTest
 
 from pyon.core import bootstrap
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest
 from pyon.ion.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
 from pyon.util.async import spawn
@@ -365,7 +366,7 @@ class TestEventsInt(IonIntegrationTestCase):
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
         dsm = DatastoreManager()
-        ds = dsm.get_datastore("events")
+        ds = dsm.get_datastore("events", "EVENTS")
         ds.delete_datastore()
         ds.create_datastore()
 
@@ -406,9 +407,77 @@ class TestEventRepository(IonUnitTestCase):
         events_r = event_repo.find_events(start_ts=str(ts+3), end_ts=str(ts+4))
         self.assertEquals(len(events_r), 2)
 
-
         event3 = ResourceLifecycleEvent(origin="resource3")
         event_id, _ = event_repo.put_event(event3)
 
         events_r = event_repo.find_events(event_type="ResourceLifecycleEvent")
         self.assertEquals(len(events_r), 1)
+
+
+    def test_event_persist(self):
+        events = [{'_id': '778dcc0811bd4b518ffd1ef873f3f457',
+                   'base_types': ['Event'],
+                   'description': 'Event to deliver the status of instrument.',
+                   'origin': 'instrument_1',
+                   'origin_type': 'PlatformDevice',
+                   'state': 1,
+                   'sub_type': 'input_voltage',
+                   'time_stamps': [2.0, 2.0],
+                   'ts_created': '1364121284585',
+                   'type_': 'DeviceStatusEvent',
+                   'valid_values': [-100, 100],
+                   'values': [110.0, 111.0]},
+                  {'_id': 'b40731684e41418082e1727f3cf61026',
+                   'base_types': ['Event'],
+                   'description': 'Event to deliver the status of instrument.',
+                   'origin': 'instrument_1',
+                   'origin_type': 'PlatformDevice',
+                   'state': 1,
+                   'sub_type': 'input_voltage',
+                   'time_stamps': [2.0, 2.0],
+                   'ts_created': '1364121284609',
+                   'type_': 'DeviceStatusEvent',
+                   'valid_values': [-100, 100],
+                   'values': [110.0, 111.0]}]
+
+        dsm = DatastoreManager()
+        ds = dsm.get_datastore("events", "EVENTS")
+        ds.delete_datastore()
+        ds.create_datastore()
+
+        event_repo = EventRepository(dsm)
+
+        event1_dict = events[0].copy()
+        event1_dict.pop("_id")
+        event1_type = event1_dict.pop("type_")
+        event1 = IonObject(event1_type, **event1_dict)
+        event_repo.put_event(event1)
+
+        events_r = event_repo.find_events(origin=event1_dict["origin"])
+        self.assertEquals(len(events_r), 1)
+        event1_read = events_r[0][2]
+        self.assertEquals(event1_read.time_stamps, event1_dict["time_stamps"])
+
+        event2_dict = events[1].copy()
+        event2_id = event2_dict.pop("_id")
+        event2_type = event2_dict.pop("type_")
+        event2_obj = IonObject(event2_type, **event2_dict)
+        event2_obj._id = event2_id
+        event_repo.put_event(event2_obj)
+
+        event1_dict = events[0].copy()
+        event1_id = event1_dict.pop("_id")
+        event1_type = event1_dict.pop("type_")
+        event1_obj = IonObject(event1_type, **event1_dict)
+        event1_obj._id = event1_id
+
+        event2_dict = events[1].copy()
+        event2_id = event2_dict.pop("_id")
+        event2_type = event2_dict.pop("type_")
+        event2_obj = IonObject(event2_type, **event2_dict)
+        event2_obj._id = event2_id
+
+        event_repo.put_events([event1_obj, event2_obj])
+        events_r = event_repo.find_events(event_type='DeviceStatusEvent')
+        self.assertEquals(len(events_r), 3)
+
