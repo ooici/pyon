@@ -148,6 +148,22 @@ class IonObjectRegistry(object):
 
                 if isinstance(value, unicode):
                     self.__dict__[name] = str(value.encode('utf8'))
+                elif isinstance(value, dict):
+                    for k, v in value.iteritems():
+                        if isinstance(k, unicode):
+                            del value[k]
+                            k = str(k.encode('utf8'))
+                            value[k] = v
+                        if isinstance(v, unicode):
+                            value[k] = str(v.encode('utf8'))
+                    self.__dict__[name] = value
+                elif isinstance(value, list):
+                    counter = 0
+                    for v in value:
+                        if isinstance(v, unicode):
+                            value[counter] = str(v.encode('utf8'))
+                        counter = counter + 1
+                    self.__dict__[name] = value
                 else:
                     self.__dict__[name] = value
 
@@ -172,4 +188,3 @@ class IonObjectRegistry(object):
             obj = clzz(**kwargs)
 
         return obj
-
