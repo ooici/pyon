@@ -558,30 +558,38 @@ class ExchangeManager(object):
 
         return raw_exchanges
 
-    def list_queues(self, name=None):
+    def list_queues(self, name=None, return_columns=None):
         """
         Rabbit HTTP management API call to list names of queues on the broker.
 
-        Returns a list of queue names. If you want the full properties for each,
-        use _list_queues.
+        Returns a list of queue names.  Can specify an optional list of
+        column names to filter the data returned from the API query.  If you want
+        the full properties for each, use _list_queues.
 
         @param  name    If set, filters the list by only including queues with name in them.
         """
-        raw_queues = self._list_queues()
+        raw_queues = self._list_queues(return_columns)
 
         nl = lambda x: (name is None) or (name is not None and name in x)
 
-        queues = [x['name'] for x in raw_queues if nl(x['name'])]
+        if return_columns is None:
+            queues = [x['name'] for x in raw_queues if nl(x['name'])]
+        else:
+            queues = [x for x in raw_queues if nl(x['name'])]
 
         return queues
 
-    def _list_queues(self):
+    def _list_queues(self, return_columns=None):
         """
-        Rabbit HTTP management API call to list queues with full properties.
+        Rabbit HTTP management API call to list queues with full properties. Can specify an optional list of
+        column names to filter the data returned from the API query.
 
         This is used by list_queues to get a list of names, but does not filter anything.
         """
-        url = self._get_management_url("queues", "%2f")
+        feats = "%2f"
+        if isinstance(return_columns, list):
+            feats += "?columns=" + ','.join(return_columns)
+        url = self._get_management_url("queues", feats)
         raw_queues = self._call_management(url)
 
         return raw_queues
