@@ -17,6 +17,7 @@ from pyon.event.event import EventPublisher
 from pyon.util.log import log
 from pyon.util.containers import get_ion_ts
 from pyon.ion.resource import RT, PRED, OT, LCS
+from pyon.ion.state import StatefulProcessMixin
 
 # Pyon exceptions.
 from pyon.core.exception import IonException
@@ -96,7 +97,7 @@ class ResourceAgentStreamStatus(BaseEnum):
     WARNING = 'RESOURCE_AGENT_STREAM_STATUS_WARNING'
     ALARM = 'RESOURCE_AGENT_STREAM_STATUS_ALARM'
 
-class ResourceAgent(BaseResourceAgent):
+class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
     """
     A resource agent is an ION process of type "agent" that exposes the standard
     resource agent service interface. This base class captures the mechanisms
