@@ -411,9 +411,18 @@ class ExtendedResourceContainer(object):
         """
         restype_workflow = get_restype_lcsm(res_container.resource.type_)
         if restype_workflow:
-            res_container.lcstate_transitions = restype_workflow.get_successors(lcstate(res_container.resource.lcstate, res_container.resource.availability))
+            successors = restype_workflow.get_successors(lcstate(res_container.resource.lcstate, res_container.resource.availability))
+            res_container.lcstate_transitions = {}
+            res_container.availability_transitions = {}
+            for event, target in successors.iteritems():
+                target_lcstate, target_availability = lcsplit(target)
+                if not target_lcstate == res_container.resource.lcstate:
+                    res_container.lcstate_transitions[event] = target_lcstate
+                if not target_availability == res_container.resource.availability:
+                    res_container.availability_transitions[event] = target_availability
         else:
             res_container.lcstate_transitions = {"retire": "RETIRED"}
+            res_container.availability_transitions = {}
 
     def set_container_field_values(self, res_container, ext_exclude, **kwargs):
         """

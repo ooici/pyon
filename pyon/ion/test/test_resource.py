@@ -159,9 +159,10 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
         self.assertEquals(extended_res.owner_count, 2)
         self.assertEquals(extended_res.single_owner.name, user_info.name)
-        self.assertEquals(len(extended_res.lcstate_transitions), 7)
-        self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['enable', 'develop', 'deploy', 'retire', 'plan', 'integrate', 'announce']))
-
+        self.assertEquals(len(extended_res.lcstate_transitions), 5)
+        self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['develop', 'deploy', 'retire', 'plan', 'integrate']))
+        self.assertEquals(len(extended_res.availability_transitions), 2)
+        self.assertEquals(set(extended_res.availability_transitions.keys()), set(['enable', 'announce']))
 
         extended_res = extended_resource_handler.create_extended_resource_container(OT.TestExtendedResourceDevice, '123')
         self.assertEquals(extended_res.resource, instrument_device)
