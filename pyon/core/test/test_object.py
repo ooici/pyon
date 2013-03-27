@@ -145,18 +145,19 @@ class ObjectTest(IonIntegrationTestCase):
         a_dict = {'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
                   3:{'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
                      4:[u"♣ Temporal Domain ♥", {1:u'one', u'2Ĕ':u"A test data product Ĕ ∆"}]}}
-        typeUnicode = type(a_dict[3][4][1][1])
+        type_unicode = type(a_dict[3][4][1][1])
         obj.a_dict = a_dict
-        typeStr = type(a_dict[3][4][1][1])
+        type_str = type(a_dict[3][4][1][1])
 
         # check that the type of the innermost element changed
-        self.assertNotEqual(typeUnicode, typeStr)
-        # check that the type of the innermost element isn't unicode anymore
-        self.assertNotEqual(type(a_dict[3][4][1][1]), unicode)
+        self.assertNotEqual(type_unicode, type_str)
+        # check that the type of the innermost element is now type str
+        self.assertEqual(type(a_dict[3][4][1][1]), type_str)
 
 
 
-    def test_bootstrap(self):
+
+def test_bootstrap(self):
         """ Use the factory and singleton from bootstrap.py/public.py """
         obj = IonObject('SampleObject')
         self.assertEqual(obj.name, '')

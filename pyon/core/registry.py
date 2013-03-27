@@ -146,30 +146,30 @@ class IonObjectRegistry(object):
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
 
-                def recursiveEncoding(value):
+                def recursive_encoding(value):
                     if isinstance(value, unicode):
                         value = str(value.encode('utf8'))
                     elif hasattr(value, '__iter__'):
                         if isinstance(value, dict):
-                            removeKey = []
-                            addKeyValue = {}
+                            remove_key = []
+                            add_key_value = {}
                             for k, v in value.iteritems():
                                 if isinstance(k, unicode):
-                                    removeKey.append(k)
+                                    remove_key.append(k)
                                     k = str(k.encode('utf8'))
-                                    addKeyValue[k] = v
+                                    add_key_value[k] = v
                                 if isinstance(v, unicode):
-                                    addKeyValue[k] = str(v.encode('utf8'))
+                                    add_key_value[k] = str(v.encode('utf8'))
                                 elif hasattr(v, '__iter__'):
-                                    addKeyValue[k] = recursiveEncoding(v)
-                            for k in removeKey:
+                                    add_key_value[k] = recursive_encoding(v)
+                            for k in remove_key:
                                 del value[k]
-                            for k, v in addKeyValue.iteritems():
+                            for k, v in add_key_value.iteritems():
                                 value[k] = v
                         else:
-                            value = map(recursiveEncoding, value)
+                            value = map(recursive_encoding, value)
                     return value
-                self.__dict__[name] = recursiveEncoding(value)
+                self.__dict__[name] = recursive_encoding(value)
 
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)
