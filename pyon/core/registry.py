@@ -146,32 +146,30 @@ class IonObjectRegistry(object):
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
 
-                if isinstance(value, unicode):
-                    self.__dict__[name] = str(value.encode('utf8'))
-                elif isinstance(value, dict):
-                    removeKey =[]
-                    addKeyValue={}
-                    for k, v in value.iteritems():
-                        if isinstance(k, unicode):
-                            removeKey.append(k)
-                            k = str(k.encode('utf8'))
-                            addKeyValue[k]=v
-                        if isinstance(v, unicode):
-                            addKeyValue[k] = str(v.encode('utf8'))
-                    for k in removeKey:
-                        del value[k]
-                    for k, v in addKeyValue.iteritems():
-                        value[k]=v
-                    self.__dict__[name] = value
-                elif isinstance(value, list):
-                    counter = 0
-                    for v in value:
-                        if isinstance(v, unicode):
-                            value[counter] = str(v.encode('utf8'))
-                        counter = counter + 1
-                    self.__dict__[name] = value
-                else:
-                    self.__dict__[name] = value
+                def recursiveEncoding(value):
+                    if isinstance(value, unicode):
+                        value = str(value.encode('utf8'))
+                    elif hasattr(value, '__iter__'):
+                        if isinstance(value, dict):
+                            removeKey =[]
+                            addKeyValue={}
+                            for k, v in value.iteritems():
+                                if isinstance(k, unicode):
+                                    removeKey.append(k)
+                                    k = str(k.encode('utf8'))
+                                    addKeyValue[k]=v
+                                if isinstance(v, unicode):
+                                    addKeyValue[k] = str(v.encode('utf8'))
+                                elif hasattr(v, '__iter__'):
+                                    addKeyValue[k] = recursiveEncoding(v)
+                            for k in removeKey:
+                                del value[k]
+                            for k, v in addKeyValue.iteritems():
+                                value[k]=v
+                        else:
+                            value = map(recursiveEncoding, value)
+                    return value
+                self.__dict__[name] = recursiveEncoding(value)
 
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)
