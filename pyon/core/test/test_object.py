@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+## coding: utf-8
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
@@ -19,7 +19,7 @@ class ObjectTest(IonIntegrationTestCase):
 
     def test_new(self):
         obj = self.registry.new('SampleObject')
-        
+
         self.assertEqual(obj.name, '')
         self.assertEqual(obj.time, "1341269890404")
 
@@ -139,6 +139,22 @@ class ObjectTest(IonIntegrationTestCase):
 
         # Should work
         obj._validate
+
+    def test_recursive_encoding(self):
+        obj = self.registry.new('SampleObject')
+        a_dict = {'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
+                  3:{'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
+                     4:[u"♣ Temporal Domain ♥", {1:u'one', u'2Ĕ':u"A test data product Ĕ ∆"}]}}
+        typeUnicode = type(a_dict[3][4][1][1])
+        obj.a_dict = a_dict
+        typeStr = type(a_dict[3][4][1][1])
+
+        # check that the type of the innermost element changed
+        self.assertNotEqual(typeUnicode, typeStr)
+        # check that the type of the innermost element isn't unicode anymore
+        self.assertNotEqual(type(a_dict[3][4][1][1]), unicode)
+
+
 
     def test_bootstrap(self):
         """ Use the factory and singleton from bootstrap.py/public.py """

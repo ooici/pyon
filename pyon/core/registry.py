@@ -151,13 +151,13 @@ class IonObjectRegistry(object):
                         value = str(value.encode('utf8'))
                     elif hasattr(value, '__iter__'):
                         if isinstance(value, dict):
-                            removeKey =[]
-                            addKeyValue={}
+                            removeKey = []
+                            addKeyValue = {}
                             for k, v in value.iteritems():
                                 if isinstance(k, unicode):
                                     removeKey.append(k)
                                     k = str(k.encode('utf8'))
-                                    addKeyValue[k]=v
+                                    addKeyValue[k] = v
                                 if isinstance(v, unicode):
                                     addKeyValue[k] = str(v.encode('utf8'))
                                 elif hasattr(v, '__iter__'):
@@ -165,7 +165,7 @@ class IonObjectRegistry(object):
                             for k in removeKey:
                                 del value[k]
                             for k, v in addKeyValue.iteritems():
-                                value[k]=v
+                                value[k] = v
                         else:
                             value = map(recursiveEncoding, value)
                     return value
