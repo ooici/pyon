@@ -142,22 +142,50 @@ class ObjectTest(IonIntegrationTestCase):
 
     def test_recursive_encoding(self):
         obj = self.registry.new('SampleObject')
-        a_dict = {'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
+        a_dict = {'1':u"♣ Temporal Domain ♥",
+                  u'2Ĕ':u"A test data product Ĕ ∆",
                   3:{'1':u"♣ Temporal Domain ♥", u'2Ĕ':u"A test data product Ĕ ∆",
-                     4:[u"♣ Temporal Domain ♥", {1:u'one', u'2Ĕ':u"A test data product Ĕ ∆"}]}}
-        type_unicode = type(a_dict[3][4][1][1])
+                        4:[u"♣ Temporal Domain ♥", {u'2Ĕ':u'one', 1:u"A test data product Ĕ ∆"}]},
+                  'Four': u'४',
+                  u'४': 'Four',
+                  6:{u'1':'Temporal Domain', u'2Ĕ':u"A test data product Ĕ ∆",
+                        4:[u"♣ Temporal Domain ♥", {u'४':'one', 1:'A test data product'}]}}
+
+        type_str = type('a string')
+        type_inner_element = type(a_dict[3][4][1][1])
+        type_another_element = type(a_dict[6][4][1][1])
+        top_level_element = a_dict['Four']
+        type_top_level_element = type(top_level_element)
+
+
+        # check that the type of the innermost element is not string originally
+        self.assertNotEqual(type_inner_element, type_str)
+        # check that the type of the innermost element is originally str
+        self.assertEqual(type('a string'), type_another_element)
+        # check that the type of the innermost element is not string originally
+        self.assertNotEqual(type_top_level_element, type_str)
+        # check that a unicode element isn't utf-8 encoded
+        self.assertNotEqual(top_level_element,'\xe0\xa5\xaa')
+
+        # apply recursive encoding
         obj.a_dict = a_dict
-        type_str = type(a_dict[3][4][1][1])
 
-        # check that the type of the innermost element changed
-        self.assertNotEqual(type_unicode, type_str)
-        # check that the type of the innermost element is now type str
-        self.assertEqual(type(a_dict[3][4][1][1]), type_str)
+        # check types of the innermost elements
+        type_inner_element = type(a_dict[3][4][1][1])
+        type_remains_str = type(a_dict[6][4][1][1])
+
+        # check that the type of the first innermost element is now type str
+        self.assertEqual(type_inner_element, type_str)
+        # check that the type of the other innermost element remains str
+        self.assertEqual(type_another_element, type_remains_str)
+
+        # check that a unicode element did get utf-8 encoded
+        self.assertEqual(a_dict['Four'],'\xe0\xa5\xaa')
 
 
 
 
-def test_bootstrap(self):
+    def test_bootstrap(self):
         """ Use the factory and singleton from bootstrap.py/public.py """
         obj = IonObject('SampleObject')
         self.assertEqual(obj.name, '')
