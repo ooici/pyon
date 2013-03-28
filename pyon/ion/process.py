@@ -86,7 +86,7 @@ class IonProcessThread(PyonThread):
 
         Should only be called after the process has been started.
         Checks the following:
-            - All attached endpoints are alive + listening
+            - All attached endpoints are alive + listening (this means ready)
             - The control flow greenlet is alive + listening or processing
 
         @return 3-tuple indicating (listeners ok, ctrl thread ok, heartbeat status). Use all on it for a
@@ -94,7 +94,7 @@ class IonProcessThread(PyonThread):
         """
         listeners_ok = True
         for l in self.listeners:
-            if not (l in self._listener_map and not self._listener_map[l].proc.dead):
+            if not (l in self._listener_map and not self._listener_map[l].proc.dead and l.get_ready_event().is_set()):
                 listeners_ok = False
 
         ctrl_thread_ok = self._ctrl_thread.running
