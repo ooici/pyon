@@ -27,9 +27,9 @@ from threading import Lock
 
 from ooi.logging import log, config
 from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
-
-from interface.objects import ContainerManagementRequest, ChangeLogLevel
+from interface.objects import ContainerManagementRequest, ChangeLogLevel, ResetPolicyCache
 
 
 # define selectors to determine if this message should be handled by this container.
@@ -90,6 +90,13 @@ class LogLevelHandler(EventHandler):
     def handle_request(self, action):
         config.set_level(action.logger, action.level, action.recursive)
 
+class PolicyCacheHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, ResetPolicyCache)
+    def handle_request(self, action):
+        if bootstrap.container_instance.has_capability(bootstrap.container_instance.CCAP.GOVERNANCE_CONTROLLER):
+            bootstrap.container_instance.governance_controller.reset_policy_cache()
+
 # TODO: other useful administrative actions
 #    """ request that containers perform a thread dump """
 #    """ request that containers log timing stats """
@@ -99,7 +106,7 @@ class LogLevelHandler(EventHandler):
 # event listener to handle the messages
 
 SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
-DEFAULT_HANDLERS = [ LogLevelHandler() ]
+DEFAULT_HANDLERS = [ LogLevelHandler(), PolicyCacheHandler() ]
 
 class ContainerManager(object):
     def __init__(self, container, handlers=DEFAULT_HANDLERS):
