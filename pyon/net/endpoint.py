@@ -877,7 +877,11 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
         if t:
             # record elapsed time in RPC stats
-            stepid = 'client.%s.%s=%s' % (headers.get('receiver', '?'), headers.get('op', '?'), res_headers["status_code"])
+            receiver = headers.get('receiver', '?')  # header field is generally: systemname,service_name
+            parts = receiver.split(',')
+            if len(parts)==2:
+                receiver = parts[1]                  # want to log just the service_name for consistancy
+            stepid = 'client.%s.%s=%s' % (receiver, headers.get('op', '?'), res_headers["status_code"])
             t.complete_step(stepid)
             stats.add(t)
         log_message("MESSAGE RECV >>> RPC-reply", res, res_headers, is_send=False)
