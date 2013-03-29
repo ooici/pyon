@@ -23,14 +23,16 @@
 """
 
 import sys
+import gc
 from threading import Lock
 
 from ooi.logging import log, config
 from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from ooi.timer import get_accumulators
 
-from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics
+from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, ResetPolicyCache, TriggerGarbageCollection
 
 
 # define selectors to determine if this message should be handled by this container.
@@ -102,6 +104,20 @@ class StatisticsHandler(EventHandler):
             for a in get_accumulators().values():
                 a.clear()
 
+class PolicyCacheHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, ResetPolicyCache)
+    def handle_request(self, action):
+        if bootstrap.container_instance.has_capability(bootstrap.container_instance.CCAP.GOVERNANCE_CONTROLLER):
+            bootstrap.container_instance.governance_controller.reset_policy_cache()
+
+class GarbageCollectionHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, TriggerGarbageCollection)
+    def handle_request(self, action):
+        gc.collect()
+
+
 # TODO: other useful administrative actions
 #    """ request that containers perform a thread dump """
 #    """ request that containers log timing stats """
@@ -111,7 +127,8 @@ class StatisticsHandler(EventHandler):
 # event listener to handle the messages
 
 SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
-DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler() ]
+
+DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler(), PolicyCacheHandler(), GarbageCollectionHandler() ]
 
 class ContainerManager(object):
     def __init__(self, container, handlers=DEFAULT_HANDLERS):
