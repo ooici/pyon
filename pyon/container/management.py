@@ -23,13 +23,14 @@
 """
 
 import sys
+import gc
 from threading import Lock
 
 from ooi.logging import log, config
 from pyon.ion.event import EventPublisher, EventSubscriber
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
-from interface.objects import ContainerManagementRequest, ChangeLogLevel, ResetPolicyCache
+from interface.objects import ContainerManagementRequest, ChangeLogLevel, ResetPolicyCache, TriggerGarbageCollection
 
 
 # define selectors to determine if this message should be handled by this container.
@@ -97,6 +98,12 @@ class PolicyCacheHandler(EventHandler):
         if bootstrap.container_instance.has_capability(bootstrap.container_instance.CCAP.GOVERNANCE_CONTROLLER):
             bootstrap.container_instance.governance_controller.reset_policy_cache()
 
+class GarbageCollectionHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, TriggerGarbageCollection)
+    def handle_request(self, action):
+        gc.collect()
+
 # TODO: other useful administrative actions
 #    """ request that containers perform a thread dump """
 #    """ request that containers log timing stats """
@@ -106,7 +113,7 @@ class PolicyCacheHandler(EventHandler):
 # event listener to handle the messages
 
 SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
-DEFAULT_HANDLERS = [ LogLevelHandler(), PolicyCacheHandler() ]
+DEFAULT_HANDLERS = [ LogLevelHandler(), PolicyCacheHandler(), GarbageCollectionHandler() ]
 
 class ContainerManager(object):
     def __init__(self, container, handlers=DEFAULT_HANDLERS):
