@@ -272,8 +272,7 @@ class GovernanceController(object):
         log.info('Policy cache reset event received: %s', str(policy_reset_event.__dict__))
 
         #First remove all cached polices and precondition functions that are not hard-wired
-        self.policy_decision_point_manager.clear_policy_cache()
-        self.unregister_all_process_policy_preconditions()
+        self._reset_container_policy_caches()
 
         #Then load the common service access policies since they are shared across services
         self.update_common_service_access_policy()
@@ -283,6 +282,10 @@ class GovernanceController(object):
         for proc in proc_list:
             self.update_container_policies(proc)
 
+
+    def _reset_container_policy_caches(self):
+        self.policy_decision_point_manager.clear_policy_cache()
+        self.unregister_all_process_policy_preconditions()
 
 
     def update_container_policies(self, process_instance, safe_mode=False):

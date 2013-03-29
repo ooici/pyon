@@ -158,7 +158,9 @@ class PolicyDecisionPointManager(object):
 
     #Remove all policies
     def clear_policy_cache(self):
+        self.resource_policy_decision_point.clear()
         self.service_policy_decision_point.clear()
+        self.load_common_service_policy_rules('')
 
 
     def create_string_attribute(self, attrib_id, id):
