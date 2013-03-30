@@ -30,7 +30,9 @@ from ooi.logging import log, config
 from pyon.ion.event import EventPublisher, EventSubscriber
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
-from interface.objects import ContainerManagementRequest, ChangeLogLevel, ResetPolicyCache, TriggerGarbageCollection
+from ooi.timer import get_accumulators
+
+from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, ResetPolicyCache, TriggerGarbageCollection
 
 
 # define selectors to determine if this message should be handled by this container.
@@ -91,6 +93,17 @@ class LogLevelHandler(EventHandler):
     def handle_request(self, action):
         config.set_level(action.logger, action.level, action.recursive)
 
+class StatisticsHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, ReportStatistics) or isinstance(action, ClearStatistics)
+    def handle_request(self, action):
+        if isinstance(action, ReportStatistics):
+            for a in get_accumulators().values():
+                a.log()
+        else:
+            for a in get_accumulators().values():
+                a.clear()
+
 class PolicyCacheHandler(EventHandler):
     def can_handle_request(self, action):
         return isinstance(action, ResetPolicyCache)
@@ -104,6 +117,7 @@ class GarbageCollectionHandler(EventHandler):
     def handle_request(self, action):
         gc.collect()
 
+
 # TODO: other useful administrative actions
 #    """ request that containers perform a thread dump """
 #    """ request that containers log timing stats """
@@ -113,7 +127,8 @@ class GarbageCollectionHandler(EventHandler):
 # event listener to handle the messages
 
 SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
-DEFAULT_HANDLERS = [ LogLevelHandler(), PolicyCacheHandler(), GarbageCollectionHandler() ]
+
+DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler(), PolicyCacheHandler(), GarbageCollectionHandler() ]
 
 class ContainerManager(object):
     def __init__(self, container, handlers=DEFAULT_HANDLERS):

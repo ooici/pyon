@@ -27,6 +27,10 @@ import threading
 import logging
 rpclog = logging.getLogger('rpc')
 
+# create global accumulator for RPC times
+from ooi.timer import Timer, Accumulator
+stats = Accumulator(keys='!total', persist=True)
+
 class EndpointError(StandardError):
     pass
 
@@ -868,9 +872,18 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
 
     def _send(self, msg, headers=None, **kwargs):
         log_message("MESSAGE SEND >>> RPC-request", msg, headers, is_send=True)
-
+        global stats
+        t = Timer(logger=None) if stats.is_log_enabled() else None
         res, res_headers = RequestEndpointUnit._send(self, msg, headers=headers, **kwargs)
-
+        if t:
+            # record elapsed time in RPC stats
+            receiver = headers.get('receiver', '?')  # header field is generally: systemname,service_name
+            parts = receiver.split(',')
+            if len(parts)==2:
+                receiver = parts[1]                  # want to log just the service_name for consistancy
+            stepid = 'client.%s.%s=%s' % (receiver, headers.get('op', '?'), res_headers["status_code"])
+            t.complete_step(stepid)
+            stats.add(t)
         log_message("MESSAGE RECV >>> RPC-reply", res, res_headers, is_send=False)
 
         # Check response header
@@ -1068,10 +1081,11 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         ts = get_ion_ts()
         response_headers['msg-rcvd'] = ts
 
+        global stats
+        t = Timer(logger=None) if stats.is_log_enabled() else None
         try:
             result, new_response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
             response_headers.update(new_response_headers)       # don't clobber our msg-rcvd header
-
         except IonException as ex:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             tb_list = traceback.extract_tb(sys.exc_info()[2])
@@ -1081,14 +1095,24 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
                 tb_output += elt
             log.debug("server exception being passed to client", exc_info=True)
             result = ex.get_stacks()
-
             response_headers.update(self._create_error_response(ex))
-
         finally:
             # REPLIES: propogate protocol, conv-id, conv-seq
             response_headers['protocol']    = headers.get('protocol', '')
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
+
+        if t:
+            # record elapsed time in RPC stats
+            op=headers.get('op', '')
+            if op:
+                stepid = 'server.%s.%s=%s' % (headers.get('receiver', '?'), headers.get('op', '?'), response_headers["status_code"])
+            else:
+                parts = headers.get('routing_key','unknown').split('.')
+                stepid = 'server.' + '.'.join( [ parts[i] for i in xrange(min(3,len(parts))) ] )
+            t.complete_step(stepid)
+            stats.add(t)
+
         # sample (possibly) before we do any sending
         self._sample_request(response_headers['status_code'], response_headers['error_message'], msg, headers, result, response_headers)
 
