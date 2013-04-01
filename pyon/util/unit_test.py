@@ -35,6 +35,17 @@ class PyonTestCase(unittest.TestCase):
     def shortDescription(self):
         return None
 
+    # override __str__ and __repr__ behavior to show a copy-pastable nosetest name for ion tests
+    #  ion.module:TestClassName.test_function_name
+    def __repr__(self):
+        name = self.id()
+        name = name.split('.')
+        if name[0] not in ["ion", "pyon"]:
+            return "%s (%s)" % (name[-1], '.'.join(name[:-1]))
+        else:
+            return "%s ( %s )" % (name[-1], '.'.join(name[:-2]) + ":" + '.'.join(name[-2:]))
+    __str__ = __repr__
+
     def _create_IonObject_mock(self, name):
         mock_ionobj = Mock(name='IonObject')
         def side_effect(_def, _dict=None, **kwargs):
