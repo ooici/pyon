@@ -335,7 +335,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         for (x, val) in params.iteritems():
             try:
-                
                 key = 'aparam_' + x
                 getattr(self, key)
 
@@ -355,13 +354,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 set_func = None
             
             if set_func and callable(set_func):
-                new_aparams[key] = set_func(val)                        
-                
-            else:
-                new_aparams[key] = val
+                set_func(val)                        
 
-        for (key, val) in new_aparams.iteritems():
-            setattr(self, key, val)
+            else:
+                setattr(self, key, val)
+
             if self.CFG.get('enable_persistence', None):
                 self._set_state(key, dumps(val))
 
@@ -643,9 +640,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             self._fsm.add_handler(state, ResourceAgentEvent.EXIT, self._common_state_exit)
 
     def _proc_state_changed(self, *args, **kwargs):
-        print '############ proc state changed called:'
-        print 'args ' + str(args)
-        print 'kwargs ' + str(kwargs)
+        # Determine what this is for.
+        pass
 
 class ResourceAgentClient(ResourceAgentProcessClient):
     """
