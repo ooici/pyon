@@ -558,7 +558,7 @@ class ExchangeManager(object):
 
         return raw_exchanges
 
-    def list_queues(self, name=None, return_columns=None):
+    def list_queues(self, name=None, return_columns=None, use_ems=True):
         """
         Rabbit HTTP management API call to list names of queues on the broker.
 
@@ -568,7 +568,7 @@ class ExchangeManager(object):
 
         @param  name    If set, filters the list by only including queues with name in them.
         """
-        raw_queues = self._list_queues(return_columns)
+        raw_queues = self._list_queues(return_columns=return_columns, use_ems=use_ems)
 
         nl = lambda x: (name is None) or (name is not None and name in x)
 
@@ -579,7 +579,7 @@ class ExchangeManager(object):
 
         return queues
 
-    def _list_queues(self, return_columns=None):
+    def _list_queues(self, return_columns=None, use_ems=True):
         """
         Rabbit HTTP management API call to list queues with full properties. Can specify an optional list of
         column names to filter the data returned from the API query.
@@ -590,7 +590,7 @@ class ExchangeManager(object):
         if isinstance(return_columns, list):
             feats += "?columns=" + ','.join(return_columns)
         url = self._get_management_url("queues", feats)
-        raw_queues = self._call_management(url)
+        raw_queues = self._call_management(url, use_ems=use_ems)
 
         return raw_queues
 
@@ -745,7 +745,7 @@ class ExchangeManager(object):
 
         return url
 
-    def _call_management(self, url):
+    def _call_management(self, url, use_ems=True):
         """
         Makes a GET HTTP request to the Rabbit HTTP management API.
 
@@ -753,9 +753,9 @@ class ExchangeManager(object):
 
         @param  url     A URL to be used, build one with _get_management_url.
         """
-        return self._make_management_call(url)
+        return self._make_management_call(url, use_ems=use_ems)
 
-    def _call_management_delete(self, url):
+    def _call_management_delete(self, url, use_ems=True):
         """
         Makes an HTTP DELETE request to the Rabbit HTTP management API.
 
@@ -763,7 +763,7 @@ class ExchangeManager(object):
 
         @param  url     A URL to be used, build one with _get_management_url.
         """
-        return self._make_management_call(url, method="delete")
+        return self._make_management_call(url, use_ems=use_ems, method="delete")
 
     def _make_management_call(self, url, use_ems=True, method="get", data=None):
         """
