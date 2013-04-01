@@ -362,7 +362,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
         for (key, val) in new_aparams.iteritems():
             setattr(self, key, val)
-            self._set_state(key, dumps(val))
+            if self.CFG.get('enable_persistence', None):
+                self._set_state(key, dumps(val))
 
     def get_agent_state(self, resource_id=''):
         """
@@ -522,7 +523,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s publsihed state change: %s, time: %s result: %s',
                  self.id, state, get_ion_ts(), str(result))
 
-        self._set_state('agent_state', state)
+        if self.CFG.get('enable_persistence', None):
+            self._set_state('agent_state', state)
 
     def _common_state_exit(self, *args, **kwargs):
         """
@@ -625,7 +627,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         pass
 
-    def _construct_fsm(self, states, events):
+    def _construct_fsm(self, states=ResourceAgentState, events=ResourceAgentEvent):
         """
         Construct the state machine and register default handlers.
         Override in subclass to add handlers for resouce-dependent behaviors
@@ -636,9 +638,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._fsm = ThreadSafeFSM(states, events, ResourceAgentEvent.ENTER,
                                   ResourceAgentEvent.EXIT)
 
-        for state in states:
+        for state in states.list():
             self._fsm.add_handler(state, ResourceAgentEvent.ENTER, self._common_state_enter)
             self._fsm.add_handler(state, ResourceAgentEvent.EXIT, self._common_state_exit)
+
+    def _proc_state_changed(self, *args, **kwargs):
+        print '############ proc state changed called:'
+        print 'args ' + str(args)
+        print 'kwargs ' + str(kwargs)
 
 class ResourceAgentClient(ResourceAgentProcessClient):
     """
