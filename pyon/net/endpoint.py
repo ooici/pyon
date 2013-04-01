@@ -881,7 +881,7 @@ class RPCRequestEndpointUnit(RequestEndpointUnit):
             parts = receiver.split(',')
             if len(parts)==2:
                 receiver = parts[1]                  # want to log just the service_name for consistancy
-            stepid = 'client.%s.%s=%s' % (receiver, headers.get('op', '?'), res_headers["status_code"])
+            stepid = 'rpc-client.%s.%s=%s' % (receiver, headers.get('op', '?'), res_headers["status_code"])
             t.complete_step(stepid)
             stats.add(t)
         log_message("MESSAGE RECV >>> RPC-reply", res, res_headers, is_send=False)
@@ -1102,11 +1102,23 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             response_headers['conv-id']     = headers.get('conv-id', '')
             response_headers['conv-seq']    = headers.get('conv-seq', 1) + 1
 
+#            # record elapsed time in RPC stats
+#            receiver = headers.get('receiver', '?')  # header field is generally: systemname,service_name
+#            parts = receiver.split(',')
+#            if len(parts)==2:
+#                receiver = parts[1]                  # want to log just the service_name for consistancy
+#            stepid = 'client.%s.%s=%s' % (receiver, headers.get('op', '?'), res_headers["status_code"])
+#            t.complete_step(stepid)
+
         if t:
             # record elapsed time in RPC stats
             op=headers.get('op', '')
             if op:
-                stepid = 'server.%s.%s=%s' % (headers.get('receiver', '?'), headers.get('op', '?'), response_headers["status_code"])
+                receiver = headers.get('receiver', '?')  # header field is generally: systemname,service_name
+                parts = receiver.split(',')
+                if len(parts)==2:
+                    receiver = parts[1]                  # want to log just the service_name for consistancy
+                stepid = 'rpc-server.%s.%s=%s' % (receiver, headers.get('op', '?'), response_headers["status_code"])
             else:
                 parts = headers.get('routing_key','unknown').split('.')
                 stepid = 'server.' + '.'.join( [ parts[i] for i in xrange(min(3,len(parts))) ] )
