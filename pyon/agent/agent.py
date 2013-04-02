@@ -179,11 +179,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._fsm.start(self._initial_state)
 
         # If configured, wipe out the prior agent memory.
-        if self.CFG.get('forget_past', None):
+        if self.CFG.get('forget_past', True):
             self._get_state_vector().clear()
             
         # If configured, restore any persisted aparams.
-        if self.CFG.get('enable_persistence', None):
+        if self.CFG.get('enable_persistence', False):
             (restored_aparams, unrestored_aparams) = self._restore_aparams()
         else:
             unrestored_aparams = self.get_agent_parameters()
@@ -192,7 +192,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._configure_aparams(unrestored_aparams)
 
         # If configured, restore the state and resource parameters.
-        if self.CFG.get('enable_persistence', None):
+        if self.CFG.get('enable_persistence', False):
             self._restore_resource()
 
     def _on_quit(self):
@@ -359,7 +359,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             else:
                 setattr(self, key, val)
 
-            if self.CFG.get('enable_persistence', None):
+            if self.CFG.get('enable_persistence', False):
                 self._set_state(key, dumps(val))
 
     def get_agent_state(self, resource_id=''):
@@ -520,7 +520,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s publsihed state change: %s, time: %s result: %s',
                  self.id, state, get_ion_ts(), str(result))
 
-        if self.CFG.get('enable_persistence', None):
+        if self.CFG.get('enable_persistence', False):
             self._set_state('agent_state', state)
 
     def _common_state_exit(self, *args, **kwargs):
