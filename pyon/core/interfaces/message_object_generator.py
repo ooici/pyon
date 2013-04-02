@@ -58,8 +58,22 @@ class MessageObjectGenerator:
             if index >= len(lines):
                 continue
 
-            # Find op name
+
+            current_class_decorators = ''
+
+            # Find method/op name
             while index < len(lines):
+                # Find method decorators
+                if lines[index].startswith('  #@') and lines[index][4].isalpha():
+                    dec = lines[index].strip()[2:].split("=")
+                    key = dec[0]
+                    value = dec[1] if len(dec) == 2 else ""
+                    # Add it to the decorator list
+                    if not current_class_decorators:
+                        current_class_decorators = '"' + key + '":"' + value + '"'
+                    else:
+                        current_class_decorators = current_class_decorators + ', "' + key + '":"' + value + '"'
+
                 if lines[index].startswith('  ') and lines[index][2].isalpha():
                     break
                 index += 1
@@ -79,9 +93,11 @@ class MessageObjectGenerator:
                 args = []
                 init_lines = []
                 current_op_name = lines[index].strip(' :')
-                messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_in(IonMessageObjectBase):\n"
+                current_class_name = current_service_name + "_" + current_op_name + "_in"
+                messageobject_output_text += '\nclass ' + current_class_name + "(IonMessageObjectBase):\n"
                 messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
                 messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
+                messageobject_output_text += "    _class_info = {'name': '" + current_class_name + "', 'decorators': {" + current_class_decorators + "} }\n\n"
                 index += 1
 
                 # Find in
@@ -203,9 +219,12 @@ class MessageObjectGenerator:
                 if index < len(lines) and lines[index].startswith('    out:'):
                     args = []
                     init_lines = []
-                    messageobject_output_text += '\nclass ' + current_service_name + "_" + current_op_name + "_out(IonMessageObjectBase):\n"
+                    current_class_name = current_service_name + "_" + current_op_name + "_out"
+                    messageobject_output_text += '\nclass ' + current_class_name + "(IonMessageObjectBase):\n"
                     messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
-                    messageobject_output_text += "    _op_name = '" + current_op_name + "'\n\n"
+                    messageobject_output_text += "    _op_name = '" + current_op_name + "'\n"
+                    messageobject_output_text += "    _class_info = {'name': '" + current_class_name + "', 'decorators': {" + current_class_decorators + "} }\n\n"
+
                     messageobject_output_text += '    def __init__(self'
                     current_class_schema = "\n    _schema = {"
                     index += 1
@@ -239,10 +258,14 @@ class MessageObjectGenerator:
                         if line.startswith('  #'):
                             # Check for decorators
                             if len(line) > 4 and line.startswith('  #@'):
+                                dec = line.strip()[2:].split("=")
+                                key = dec[0]
+                                value = dec[1] if len(dec) == 2 else ""
+                                # Add it to the decorator list
                                 if not decorators:
-                                    decorators = '"' + line.strip()[2:] + '"'
+                                    decorators = '"' + key + '":"' + value + '"'
                                 else:
-                                    decorators = decorators + ', "' + line.strip()[2:] + '"'
+                                    decorators = decorators + ', "' + key + '":"' + value + '"'
                             else:
                                 init_lines.append('  ' + line + '\n')
                                 if not description:
@@ -304,7 +327,7 @@ class MessageObjectGenerator:
                         args.append(", ")
                         args.append(field + "=" + value)
                         init_lines.append('        self.' + field + " = " + field + "\n")
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': [" + decorators + "]" + ", 'description': '" + re.escape(description) + "' },"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + default + ", 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "' },"
                         index += 1
                         decorators = ''
 
