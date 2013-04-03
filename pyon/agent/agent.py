@@ -212,6 +212,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         #if self._enable_persistence:
         #    self._restore_resource()
 
+
     def _on_quit(self):
         """
         ION on_quit called prior to terminating the process.
