@@ -325,6 +325,11 @@ class ResourceRegistry(object):
             attachment_content = attachment.content
         elif attachment.attachment_type == AttachmentType.OBJECT:
             raise BadRequest("AttachmentType.OBJECT is not supported currently")
+        elif attachment.attachment_type == AttachmentType.REFERENCE:
+            if not isinstance(attachment.content, basestring):
+                raise BadRequest("Attachment content must be binary string")
+            attachment.attachment_size = len(attachment.content)
+            attachment_content = attachment.content
         else:
             raise BadRequest("Unknown attachment-type: %s" % attachment.attachment_type)
 
