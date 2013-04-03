@@ -170,6 +170,9 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         # state and event parameters.
         self._construct_fsm()
         
+        self._proc_state = {}
+        self._proc_state_changed = False
+        
     def _on_init(self):
         """
         ION on_init initializer called once the process exists.
@@ -188,11 +191,15 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._forget_past = self.CFG.get('forget_past', True)        
         self._enable_persistence = self.CFG.get('enable_persistence', False)
 
+        self._load_state()
+
         # If configured, wipe out the prior agent memory.
         if self._forget_past:
-            self._get_state_vector().clear()
-            
+            self._get_state_vector().clear()        
+        
         # If configured, restore any persisted aparams.
+        restored_aparams = []
+        unrestored_aparams = []
         if self._enable_persistence:
             (restored_aparams, unrestored_aparams) = self._restore_aparams()
         else:
@@ -202,8 +209,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._configure_aparams(unrestored_aparams)
 
         # If configured, restore the state and resource parameters.
-        if self._enable_persistence:
-            self._restore_resource()
+        #if self._enable_persistence:
+        #    self._restore_resource()
 
     def _on_quit(self):
         """
@@ -352,7 +359,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 ex = BadRequest('Bad agent parameter: %s', str(x))
                 self._on_command_error('set_agent', None, [params], None, ex)
 
-        new_aparams = {}
         for (x, val) in params.iteritems():
                 
             key = 'aparam_' + x
@@ -367,9 +373,10 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 set_func(val)                        
 
             else:
-                setattr(self, key, val)
+                setattr(self, key, val)                
 
             if self._enable_persistence:
+                val = getattr(self, key)
                 self._set_state(key, dumps(val))
 
     def get_agent_state(self, resource_id=''):
@@ -610,14 +617,12 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         restored = []
         unrestored = []
         for key in aparams:
-            val = self._get_state(key)
+            val = self._get_state('aparam_' + key)
             if val:
-                val = loads(val)
-                setattr(self, key, val)
+                setattr(self, 'aparam_' + key, loads(val))
                 restored.append(key)
             else:
                 unrestored.append(key)
-        
         return (restored, unrestored)
         
     def _configure_aparams(self, aparams=[]):
@@ -648,10 +653,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         for state in states.list():
             self._fsm.add_handler(state, ResourceAgentEvent.ENTER, self._common_state_enter)
             self._fsm.add_handler(state, ResourceAgentEvent.EXIT, self._common_state_exit)
-
-    def _proc_state_changed(self, *args, **kwargs):
-        # Determine what this is for.
-        pass
 
 class ResourceAgentClient(ResourceAgentProcessClient):
     """
