@@ -26,6 +26,7 @@ setup(  name = 'pyon',
         packages = find_packages(),
         entry_points = {
              'nose.plugins.0.10': [
+                 'stats_plugin=pyon.util.container_stats_plugin:TestStats',
                  'pycc_plugin=pyon.util.pycc_plugin:PYCC',
                  'timer_plugin=pyon.util.timer_plugin:TestTimer',
                  'queueblame=pyon.util.queueblame_plugin:QueueBlame',
