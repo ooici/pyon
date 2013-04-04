@@ -21,9 +21,10 @@ from ndg.xacml.core.context.resource import Resource
 from ndg.xacml.core.context.action import Action
 from ndg.xacml.core.context.pdp import PDP
 from ndg.xacml.core.context.result import Decision
-
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.core.governance import ION_MANAGER
+from pyon.core.registry import is_ion_object
 
 from pyon.util.log import log
 
@@ -36,6 +37,7 @@ XACML_EMPTY_POLICY_FILENAME = 'empty_policy_set.xml'
 ROLE_ATTRIBUTE_ID = XACML_1_0_PREFIX + 'subject:subject-role-id'
 SENDER_ID = XACML_1_0_PREFIX + 'subject:subject-sender-id'
 RECEIVER_TYPE = XACML_1_0_PREFIX + 'resource:receiver-type'
+ACTION_TYPE = XACML_1_0_PREFIX + 'action:action-verb'
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
@@ -195,6 +197,7 @@ class PolicyDecisionPointManager(object):
         op = invocation.get_header_value('op', 'Unknown')
         ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
         actor_roles = invocation.get_header_value('ion-actor-roles', {})
+        message_format = invocation.get_header_value('format', '')
 
         log.debug("Using XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
 
@@ -239,6 +242,16 @@ class PolicyDecisionPointManager(object):
         request.action = Action()
         request.action.attributes.append(self.create_string_attribute(Identifiers.Action.ACTION_ID, op))
 
+        #Check to see if there is a OperationVerb decorator specifying a Verb used with policy
+        if is_ion_object(message_format):
+            try:
+                msg_class = IonObject(message_format)
+                operation_verb = msg_class.get_class_decorator_value('OperationVerb')
+                if operation_verb is not None:
+                    request.action.attributes.append(self.create_string_attribute(ACTION_TYPE, operation_verb))
+
+            except NotFound:
+                pass
 
         return request
 

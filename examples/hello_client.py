@@ -5,6 +5,7 @@ __author__ = 'sphenrie'
 from pyon.public import Container, ImmediateProcess
 #from pyon.ion.endpoint import ProcessRPCClient
 from pyon.util.context import LocalContextMixin
+from pyon.core.governance import get_actor_header
 
 from interface.services.examples.hello.ihello_service  import HelloServiceProcessClient
 from interface.services.icontainer_agent import ContainerAgentProcessClient
@@ -41,23 +42,27 @@ def hello_client(container, actor_id='anonymous', text='mytext 123'):
     try:
         client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
-        actor_headers = container.governance_controller.build_actor_header(actor_id)
-        ret = client.hello(text)
+        actor_headers = get_actor_header(actor_id)
+        ret = client.hello(text, headers=actor_headers)
         print "Returned: " + str(ret)
 
-        ret = client.hello('second message text')
+        ret = client.hello('second message text', headers=actor_headers)
         print "Returned: " + str(ret)
+
+        ret = client.noop(text='third message text', headers=actor_headers)
+        print "Returned"
 
     except Exception, e:
         print "client.hello() failed: " + e.message
 
-def hello_noop(container, actor_id='anonymous', org_id='no-ooi', text='mytext 123'):
+def hello_noop(container, actor_id='anonymous', text='mytext 123'):
 
 
     try:
         client = HelloServiceProcessClient(node=container.node, process=FakeProcess())
 
-        ret = client.noop(text, headers={'ion-actor-id': actor_id, 'ion-org-id': org_id})
+        actor_headers = get_actor_header(actor_id)
+        ret = client.noop(text, headers=actor_headers)
 
     except Exception ,e:
         print "client.hello() failed: " + e.message
