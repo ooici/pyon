@@ -377,8 +377,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 setattr(self, key, val)                
 
             if self._enable_persistence:
-                val = getattr(self, key)
-                self._set_state(key, dumps(val))
+                get_key = 'aparam_get_' + key
+                get_func = getattr(get_key, None)
+                val = None
+                if get_func and callable(get_func):
+                    val = get_func()
+                else:
+                    val = getattr(self, key)
+                self._set_state(key, val)
 
     def get_agent_state(self, resource_id=''):
         """
@@ -549,7 +555,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s leaving state: %s, time: %s',
                  self.id, state, get_ion_ts())
 
-        self._set_state('prev_agent_state', state)
+        if self._enable_persistence:
+            self._set_state('prev_agent_state', state)
 
     def _on_command(self, cmd, execute_cmd, args, kwargs, result):
         """
@@ -620,7 +627,12 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         for key in aparams:
             val = self._get_state('aparam_' + key)
             if val:
-                setattr(self, 'aparam_' + key, loads(val))
+                set_key = 'aparam_set_' + key
+                set_func = getattr(self, set_key, None)
+                if set_func and callable(set_func):
+                    set_func(val)
+                else:
+                    setattr(self, 'aparam_' + key, val)
                 restored.append(key)
             else:
                 unrestored.append(key)
