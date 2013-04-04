@@ -216,9 +216,12 @@ class MessageObjectGenerator:
                     messageobject_output_text += '        pass\n'
                 messageobject_output_text += current_class_schema + "\n              }\n"
 
+
                 if index < len(lines) and lines[index].startswith('    out:'):
                     args = []
                     init_lines = []
+                    current_class_decorators = ''
+
                     current_class_name = current_service_name + "_" + current_op_name + "_out"
                     messageobject_output_text += '\nclass ' + current_class_name + "(IonMessageObjectBase):\n"
                     messageobject_output_text += "    _svc_name = '" + current_service_name + "'\n"
@@ -240,6 +243,16 @@ class MessageObjectGenerator:
                         if not line.startswith('  '):
                             index += 1
                             continue
+
+                        if lines[index].startswith('  #@') and lines[index][4].isalpha():
+                            dec = lines[index].strip()[2:].split("=")
+                            key = dec[0]
+                            value = dec[1] if len(dec) == 2 else ""
+                            # Add it to the decorator list
+                            if not current_class_decorators:
+                                current_class_decorators = '"' + key + '":"' + value + '"'
+                            else:
+                                current_class_decorators = current_class_decorators + ', "' + key + '":"' + value + '"'
 
                         # Found next op
                         if line.startswith('  ') and line[2].isalpha():
