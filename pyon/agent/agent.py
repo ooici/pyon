@@ -747,7 +747,8 @@ class ResourceAgentClient(ResourceAgentProcessClient):
 
     ##############################################################
     # Helpers.
-    ###########################################################
+    ##############################################################
+    
     @classmethod
     def _get_agent_process_id(cls, resource_id):
         """
