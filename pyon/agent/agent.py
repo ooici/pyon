@@ -212,7 +212,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         #if self._enable_persistence:
         #    self._restore_resource()
 
-
     def _on_quit(self):
         """
         ION on_quit called prior to terminating the process.
@@ -377,8 +376,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 setattr(self, key, val)                
 
             if self._enable_persistence:
-                get_key = 'aparam_get_' + key
-                get_func = getattr(get_key, None)
+                get_key = 'aparam_get_' + x
+                get_func = getattr(self, get_key, None)
                 val = None
                 if get_func and callable(get_func):
                     val = get_func()
