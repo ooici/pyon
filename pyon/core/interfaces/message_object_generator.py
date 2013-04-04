@@ -82,9 +82,21 @@ class MessageObjectGenerator:
                 continue
 
             while index < len(lines):
+
                 if len(lines[index]) == 0 or lines[index].isspace():
                     index += 1
                     continue
+
+                if lines[index].startswith('  #@') and lines[index][4].isalpha():
+                    dec = lines[index].strip()[2:].split("=")
+                    key = dec[0]
+                    value = dec[1] if len(dec) == 2 else ""
+                    # Add it to the decorator list
+                    if not current_class_decorators:
+                        current_class_decorators = '"' + key + '":"' + value + '"'
+                    else:
+                        current_class_decorators = current_class_decorators + ', "' + key + '":"' + value + '"'
+
 
                 if not (lines[index].startswith('  ') and lines[index][2].isalpha()):
                     index += 1
@@ -119,6 +131,7 @@ class MessageObjectGenerator:
                 description = ''
 
                 while index < len(lines) and not lines[index].startswith('    out:'):
+
                     if lines[index].isspace():
                         index += 1
                         continue
@@ -265,6 +278,7 @@ class MessageObjectGenerator:
                                     break
                                 index += 1
                             break
+
                         line = line.replace('    ', '', 1)
 
                         # Add comments and decorators
