@@ -9,7 +9,7 @@ import inspect
 import types
 import time
 
-from pyon.core.registry import getextends, issubtype
+from pyon.core.registry import getextends, issubtype, is_ion_object, isenum
 from pyon.core.bootstrap import IonObject, get_service_registry
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
@@ -155,6 +155,61 @@ def lcstate(maturity, availability):
 def lcsplit(lcstate):
     return lcstate.split('_', 1)
 
+
+def get_object_schema(resource_type):
+    """
+    This function returns the schema for a given resource_type
+    @param resource_type:
+    @return:
+    """
+
+    schema_info = dict()
+
+    #Prepare the dict entry for schema information including all of the internal object types
+    schema_info['schemas'] = dict()
+
+    #ION Objects are not registered as UNICODE names
+    ion_object_name = str(resource_type)
+    ret_obj = IonObject(ion_object_name, {})
+
+    # If it's an op input param or response message object.
+    # Walk param list instantiating any params that were marked None as default.
+    if hasattr(ret_obj, "_svc_name"):
+        schema = ret_obj._schema
+        for field in ret_obj._schema:
+            if schema[field]["default"] is None:
+                try:
+                    value = IonObject(schema[field]["type"], {})
+                except NotFound:
+                    # TODO
+                    # Some other non-IonObject type.  Just use None as default for now.
+                    value = None
+                setattr(ret_obj, field, value)
+
+    #Add schema information for sub object types
+    schema_info['schemas'][ion_object_name] = ret_obj._schema
+    for field in ret_obj._schema:
+        obj_type = ret_obj._schema[field]['type']
+
+        #First look for ION objects
+        if is_ion_object(obj_type):
+
+            try:
+                value = IonObject(obj_type, {})
+                schema_info['schemas'][obj_type] = value._schema
+
+            except NotFound:
+                pass
+
+        #Next look for ION Enums
+        elif ret_obj._schema[field].has_key('enum_type'):
+            if isenum(ret_obj._schema[field]['enum_type']):
+                value = IonObject(ret_obj._schema[field]['enum_type'], {})
+                schema_info['schemas'][ret_obj._schema[field]['enum_type']] = value._str_map
+
+
+    schema_info['object'] = ret_obj
+    return schema_info
 
 class ResourceLifeCycleSM(object):
     """
