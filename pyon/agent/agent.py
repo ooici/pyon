@@ -173,7 +173,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._proc_state = {}
         self._proc_state_changed = False
         
-    def _on_init(self):
+    def on_init(self):
         """
         ION on_init initializer called once the process exists.
         """
@@ -209,10 +209,10 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._configure_aparams(unrestored_aparams)
 
         # If configured, restore the state and resource parameters.
-        #if self._enable_persistence:
-        #    self._restore_resource()
+        if self._enable_persistence:
+            self._restore_resource()
 
-    def _on_quit(self):
+    def on_quit(self):
         """
         ION on_quit called prior to terminating the process.
         """
