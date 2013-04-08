@@ -332,15 +332,16 @@ def walk(o, cb):
 
     @TODO move to a general utils area?
     """
+    if _have_numpy and isinstance(o, np.ndarray):
+        return o
     newo = cb(o)
 
     # is now or is still an iterable? iterate it.
-    if _have_numpy:
-        if isinstance(newo, np.ndarray):
-            return newo
     if hasattr(newo, '__iter__'):
         if isinstance(newo, dict):
-            return dict(((k, walk(v, cb)) for k, v in newo.iteritems()))
+            return {k:walk(v,cb) for k,v in newo.iteritems()}
+        elif _have_numpy and isinstance(newo, np.ndarray):
+            return newo
         else:
             return [walk(x, cb) for x in newo]
 
