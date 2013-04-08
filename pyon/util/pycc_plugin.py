@@ -137,6 +137,8 @@ class PYCC(Plugin):
             # Clean again to make sure the first nosetest starts on a clean
             # slate
             self.datastore_admin.clear_datastore(prefix=self.sysname)
+            # Set PYCC env var in case CEI needs to skip tests in pycc mode
+            os.environ['PYCC_MODE'] = '1'
             # Enable CEI mode for the tests
             os.environ['CEI_LAUNCH_TEST'] = '1'
 
