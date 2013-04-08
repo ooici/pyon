@@ -37,12 +37,16 @@ XACML_EMPTY_POLICY_FILENAME = 'empty_policy_set.xml'
 ROLE_ATTRIBUTE_ID = XACML_1_0_PREFIX + 'subject:subject-role-id'
 SENDER_ID = XACML_1_0_PREFIX + 'subject:subject-sender-id'
 RECEIVER_TYPE = XACML_1_0_PREFIX + 'resource:receiver-type'
-ACTION_TYPE = XACML_1_0_PREFIX + 'action:action-verb'
+ACTION_VERB = XACML_1_0_PREFIX + 'action:action-verb'
+ACTION_MESSAGE_ARGUMENT = XACML_1_0_PREFIX + 'action:message-'
+
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
-AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
+IntAttributeValue = attributeValueFactory(AttributeValue.INTEGER_TYPE_URI)
+DoubleAttributeValue = attributeValueFactory(AttributeValue.DOUBLE_TYPE_URI)
+BooleanAttributeValue = attributeValueFactory(AttributeValue.BOOLEAN_TYPE_URI)
 
 
 class PolicyDecisionPointManager(object):
@@ -55,6 +59,7 @@ class PolicyDecisionPointManager(object):
         self.load_common_service_policy_rules('')
 
         self.governance_controller = governance_controller
+
 
         #No longer need this cause these were added to the XACML engine library, but left here for historical purposes.
         #from pyon.core.governance.policy.xacml.not_function import Not
@@ -165,13 +170,26 @@ class PolicyDecisionPointManager(object):
         self.load_common_service_policy_rules('')
 
 
-    def create_string_attribute(self, attrib_id, id):
+    def create_attribute(self, attrib_class, attrib_id, id):
         attribute = Attribute()
         attribute.attributeId = attrib_id
-        attribute.dataType = StringAttributeValue.IDENTIFIER
-        attribute.attributeValues.append(StringAttributeValue())
+        attribute.dataType = attrib_class.IDENTIFIER
+        attribute.attributeValues.append(attrib_class())
         attribute.attributeValues[-1].value = id
         return attribute
+
+
+    def create_string_attribute(self, attrib_id, id):
+        return self.create_attribute(StringAttributeValue, attrib_id, id)
+
+    def create_int_attribute(self, attrib_id, id):
+        return self.create_attribute(IntAttributeValue, attrib_id, id)
+
+    def create_double_attribute(self, attrib_id, id):
+        return self.create_attribute(DoubleAttributeValue, attrib_id, id)
+
+    def create_boolean_attribute(self, attrib_id, id):
+        return self.create_attribute(BooleanAttributeValue, attrib_id, id)
 
     def create_org_role_attribute(self, actor_roles, subject):
         attribute = None
@@ -248,10 +266,20 @@ class PolicyDecisionPointManager(object):
                 msg_class = IonObject(message_format)
                 operation_verb = msg_class.get_class_decorator_value('OperationVerb')
                 if operation_verb is not None:
-                    request.action.attributes.append(self.create_string_attribute(ACTION_TYPE, operation_verb))
+                    request.action.attributes.append(self.create_string_attribute(ACTION_VERB, operation_verb))
 
             except NotFound:
+
                 pass
+
+        #Create generic attributes for each of the message parameters
+        if isinstance(invocation.message, dict):
+            for arg_name, arg_value in invocation.message.iteritems():
+                attrib_id = ACTION_MESSAGE_ARGUMENT + arg_name
+
+                #This XACML implementation seems to only work with strings
+                request.action.attributes.append(self.create_string_attribute(attrib_id, str(arg_value)))
+
 
         return request
 
