@@ -272,13 +272,14 @@ class PolicyDecisionPointManager(object):
 
                 pass
 
-        #Create generic attributes for each of the message parameters
+        #Create generic attributes for each of the primitive message parameter types to be available in XACML rules
         if isinstance(invocation.message, dict):
             for arg_name, arg_value in invocation.message.iteritems():
                 attrib_id = ACTION_MESSAGE_ARGUMENT + arg_name
 
                 #This XACML implementation seems to only work with strings
-                request.action.attributes.append(self.create_string_attribute(attrib_id, str(arg_value)))
+                if isinstance(arg_value, str) or isinstance(arg_value, int) or isinstance(arg_value, float) or isinstance(arg_value, bool):
+                    request.action.attributes.append(self.create_string_attribute(attrib_id, str(arg_value)))
 
 
         return request
