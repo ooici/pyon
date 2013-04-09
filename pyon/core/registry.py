@@ -7,6 +7,7 @@ import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
+from pyon.core.object import walk
 
 import interface.objects
 import interface.messages
@@ -146,28 +147,11 @@ class IonObjectRegistry(object):
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
 
-                def recursive_encoding(value):
+                def utf8fix(value):
                     if isinstance(value, unicode):
-                        value = str(value.encode('utf8'))
-                    elif hasattr(value, '__iter__'):
-                        if isinstance(value, dict):
-                            remove_key = []
-                            add_key_value = {}
-                            for k, v in value.iteritems():
-                                if isinstance(k, unicode):
-                                    remove_key.append(k)
-                                    k = str(k.encode('utf8'))
-                                    add_key_value[k] = v
-                                if isinstance(v, unicode):
-                                    add_key_value[k] = str(v.encode('utf8'))
-                                elif hasattr(v, '__iter__'):
-                                    add_key_value[k] = recursive_encoding(v)
-                            for k in remove_key:
-                                del value[k]
-                            for k, v in add_key_value.iteritems():
-                                value[k] = v
-                        else:
-                            value = map(recursive_encoding, value)
+                        return str(value.encode('utf8'))
+                def recursive_encoding(value):
+                    walk(value,utf8fix)
                     return value
                 self.__dict__[name] = recursive_encoding(value)
 
