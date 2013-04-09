@@ -15,6 +15,11 @@ enum_classes = {}
 model_classes = {}
 message_classes = {}
 
+try:
+    import numpy as np
+    _have_numpy = True
+except ImportError:
+    _have_numpy = False
 
 def getextends(type):
     """
@@ -147,6 +152,8 @@ class IonObjectRegistry(object):
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
 
                 def recursive_encoding(value):
+                    if _have_numpy and isinstance(value, np.ndarray):
+                        return value
                     if isinstance(value, unicode):
                         value = str(value.encode('utf8'))
                     elif hasattr(value, '__iter__'):
