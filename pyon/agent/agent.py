@@ -546,6 +546,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         if self._enable_persistence:
             self._set_state('agent_state', state)
 
+        self._on_state_enter(state)
+
+    def _on_state_enter(self, state):
+        """
+        Used by derived classes to extend common state enter.
+        """
+        pass
+    
     def _common_state_exit(self, *args, **kwargs):
         """
         Common work upon every state exit.
@@ -556,6 +564,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
         if self._enable_persistence:
             self._set_state('prev_agent_state', state)
+
+        self._on_state_exit(state)
+
+    def _on_state_exit(self, state):
+        """
+        Used by derived classes to extend common state exit.
+        """
+        pass
 
     def _on_command(self, cmd, execute_cmd, args, kwargs, result):
         """
