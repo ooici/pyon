@@ -55,6 +55,20 @@ class TestResources(IonUnitTestCase):
 #        self.assertEquals(default_workflow.get_predecessors(LCS.DEVELOPED_PRIVATE), {LCS.PLANNED: LCE.DEVELOP})
 
 
+        restrictions = dict(
+            initial_state=LCS.DRAFT,
+            initial_availability=AS.PRIVATE,
+            illegal_states=[LCS.DEVELOPED, LCS.INTEGRATED],
+            illegal_transitions=[],
+            )
+
+        restricted_wf = default_workflow._clone_with_restrictions(restrictions)
+
+        for (a_state, a_transition), a_newstate in restricted_wf.transitions.iteritems():
+            if LCS.DEVELOPED in a_state or LCS.DEVELOPED in a_newstate:
+                self.fail("Workflow contains illegal state")
+
+
     def test_create_extended_resource_container(self):
 
         mock_clients = self._create_service_mock('resource_registry')

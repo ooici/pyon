@@ -75,7 +75,6 @@ def initialize_res_lcsms():
     lcs_workflow_defs.clear()
     lcsm_defs = res_lifecycle["LifecycleWorkflowDefinitions"]
     for wf in lcsm_defs:
-        #print "****** FOUND RES WORKFLOW %s" % (wf)
         wfname = wf['name']
         clsname = wf.get('lcsm_class', None)
         if clsname:
@@ -241,7 +240,11 @@ class ResourceLifeCycleSM(object):
         if self.illegal_states:
             trans_new = self.transitions.copy()
             for (a_state, a_transition), a_newstate in self.transitions.iteritems():
-                if a_state in self.illegal_states or a_newstate in self.illegal_states:
+                ost_lcs, ost_av = lcsplit(a_state)
+                nst_lcs, nst_av = lcsplit(a_newstate)
+                if a_state in self.illegal_states or a_newstate in self.illegal_states or \
+                                ost_lcs in self.illegal_states or ost_av in self.illegal_states or \
+                                nst_lcs in self.illegal_states or nst_av in self.illegal_states:
                     del trans_new[(a_state, a_transition)]
             self.transitions = trans_new
 
