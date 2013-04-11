@@ -550,7 +550,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
     def _on_state_enter(self, state):
         """
-        Used by derived classes to extend common state enter.
+        Used by derived classes to extend common state enter. Xx.
         """
         pass
     
