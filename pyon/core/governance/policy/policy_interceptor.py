@@ -58,8 +58,8 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
         log.debug("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
 
-        #If missing default to request just to be safe
-        msg_performative = invocation.get_header_value('performative', 'request')
+        #If missing the performative header, consider it as a failure message.
+        msg_performative = invocation.get_header_value('performative', 'failure')
 
         #TODO - This should be removed once better process security is implemented
         #THis fix infers that all messages that do not specify an actor id are TRUSTED wihtin the system
@@ -69,8 +69,8 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         else:
             actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
 
-        #No need to check policy for response or failure messages  - TODO - remove the last check at some point
-        if msg_performative != 'inform-result' and msg_performative != 'failure' and actor_id is not None:
+        #Only check messages marked as the initial rpc request - TODO - remove the last check at some point
+        if msg_performative == 'request' and actor_id is not None:
 
             #checking policy - if needed
             receiver = invocation.get_message_receiver()
