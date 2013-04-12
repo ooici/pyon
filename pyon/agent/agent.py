@@ -177,8 +177,16 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         ION on_init initializer called once the process exists.
         """
-        log.debug("Resource Agent initializing. name=%s, resource_id=%s"
-                  % (self._proc_name, self.resource_id))
+        
+        # The registrar to create publishers.
+        agent_info = self.CFG.get('agent', None)
+        if not agent_info:
+            log.error('No agent config found.')
+        else:
+            self.resource_id = agent_info.get('resource_id', '')
+        
+        log.info("Resource Agent on_init. name=%s, resource_id=%s",
+                 self._proc_name, self.resource_id)
 
         # Create event publisher.
         self._event_publisher = EventPublisher()
@@ -577,10 +585,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         Common action after a successful agent command.
         """
-        log.info('Resource agent %s publishing command event: \
-                 cmd=%s, execute_cmd=%s, args=%s kwargs=%s time=%s',
-                 self.id, str(cmd), str(execute_cmd), str(args), str(kwargs),
-                 get_ion_ts())
         event_data = {
             'command': cmd,
             'execute_command': execute_cmd,
@@ -588,6 +592,9 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             'kwargs': kwargs,
             'result': result
         }
+        msg = 'Resource agent %s publishing command event %s:' % \
+            (self.id, event_data)
+        log.info(msg)
         self._event_publisher.publish_event(event_type='ResourceAgentCommandEvent',
                                             origin_type=self.ORIGIN_TYPE,
                                             origin=self.resource_id,
