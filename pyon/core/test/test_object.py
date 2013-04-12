@@ -171,8 +171,8 @@ class ObjectTest(IonIntegrationTestCase):
         obj.a_dict = a_dict
 
         # check types of the innermost elements
-        type_inner_element = type(a_dict[3][4][1][1])
-        type_remains_str = type(a_dict[6][4][1][1])
+        type_inner_element = type(obj.a_dict[3][4][1][1])
+        type_remains_str = type(obj.a_dict[6][4][1][1])
 
         # check that the type of the first innermost element is now type str
         self.assertEqual(type_inner_element, type_str)
@@ -180,8 +180,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEqual(type_another_element, type_remains_str)
 
         # check that a unicode element did get utf-8 encoded
-        self.assertEqual(a_dict['Four'],'\xe0\xa5\xaa')
-
+        self.assertEqual(obj.a_dict['Four'],'\xe0\xa5\xaa')
 
 
 
