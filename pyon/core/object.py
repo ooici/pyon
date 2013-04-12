@@ -13,11 +13,6 @@ import StringIO
 from pyon.util.log import log
 from pyon.core.exception import BadRequest
 
-try:
-    import numpy as np
-    _have_numpy = True
-except ImportError as e:
-    _have_numpy = False
 
 built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
 
@@ -322,28 +317,30 @@ class IonObjectBase(object):
 class IonMessageObjectBase(IonObjectBase):
     pass
 
-def walk(o, cb):
+def walk(o, cb, modify_key_value = 'value'):
     """
     Utility method to do recursive walking of a possible iterable (inc dicts) and do inline transformations.
     You supply a callback which receives an object. That object may be an iterable (which will then be walked
     after you return it, as long as it remains an iterable), or it may be another object inside of that.
 
-    If a dict is discovered, your callback will receive the dict as a whole and the contents of values only. Keys are left untouched.
+    If a dict is discovered and
+        if modify_key_value = 'key', callback will modify only keys
+        if modify_key_value = 'key_value', callback will modify both keys and values
+        else callback will modify only values
 
     @TODO move to a general utils area?
     """
     newo = cb(o)
 
-    # is now or is still an iterable? iterate it.
-    if _have_numpy:
-        if isinstance(newo, np.ndarray):
-            return newo
-    if hasattr(newo, '__iter__'):
-        if isinstance(newo, dict):
-            return dict(((k, walk(v, cb)) for k, v in newo.iteritems()))
+    if isinstance(newo, dict):
+        if modify_key_value == 'key':
+            return dict(((cb(k), v) for k, v in newo.iteritems()))
+        elif modify_key_value == 'key_value':
+            return dict(((cb(k), walk(v, cb, 'key_value')) for k, v in newo.iteritems()))
         else:
-            return [walk(x, cb) for x in newo]
-
+            return dict(((k, walk(v, cb)) for k, v in newo.iteritems()))
+    elif isinstance(newo, (list, tuple)):
+        return [walk(x, cb, modify_key_value) for x in newo]
     elif isinstance(newo, IonObjectBase):
         # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
         # @TODO consolidate with _validate method in IonObjectBase
@@ -351,12 +348,10 @@ def walk(o, cb):
 
         for fieldname in set_fields:
             fieldval = getattr(newo, fieldname)
-            newfo = walk(fieldval, cb)
+            newfo = walk(fieldval, cb, modify_key_value)
             if newfo != fieldval:
                 setattr(newo, fieldname, newfo)
-
         return newo
-
     else:
         return newo
 

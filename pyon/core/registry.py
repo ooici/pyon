@@ -11,15 +11,11 @@ from pyon.core.exception import NotFound
 import interface.objects
 import interface.messages
 
+from pyon.core.object import walk
+
 enum_classes = {}
 model_classes = {}
 message_classes = {}
-
-try:
-    import numpy as np
-    _have_numpy = True
-except ImportError:
-    _have_numpy = False
 
 def getextends(type):
     """
@@ -150,31 +146,12 @@ class IonObjectRegistry(object):
                 from pyon.core.object import built_in_attrs
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
-
-                def recursive_encoding(value):
-                    if _have_numpy and isinstance(value, np.ndarray):
-                        return value
+                def unicode_to_utf8(value):
                     if isinstance(value, unicode):
                         value = str(value.encode('utf8'))
-                    elif hasattr(value, '__iter__'):
-                        if isinstance(value, dict):
-                            remove_key = []
-                            add_key_value = {}
-                            for k, v in value.iteritems():
-                                if isinstance(k, unicode):
-                                    remove_key.append(k)
-                                    k = str(k.encode('utf8'))
-                                    add_key_value[k] = v
-                                if isinstance(v, unicode):
-                                    add_key_value[k] = str(v.encode('utf8'))
-                                elif hasattr(v, '__iter__'):
-                                    add_key_value[k] = recursive_encoding(v)
-                            for k in remove_key:
-                                del value[k]
-                            for k, v in add_key_value.iteritems():
-                                value[k] = v
-                        else:
-                            value = map(recursive_encoding, value)
+                    return value
+                def recursive_encoding(value):
+                    value = walk(value, unicode_to_utf8, 'key_value')
                     return value
                 self.__dict__[name] = recursive_encoding(value)
 
