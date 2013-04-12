@@ -44,7 +44,6 @@ from pyon.agent.common import BaseEnum
 class UserAgent():
     pass
 
-
 class ResourceAgentState(BaseEnum):
     """
     Resource agent common states.
