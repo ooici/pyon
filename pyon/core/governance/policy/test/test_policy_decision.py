@@ -75,9 +75,41 @@ class PolicyDecisionUnitTest(PyonTestCase):
                         <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">op</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:evaluate-code">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">def policy_func(process, message, headers):
+                            arg = message['argument1']
+                            if arg > 3:
+                                return True
+                            return False
+                        </AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:param-dict" DataType="http://www.w3.org/2001/XMLSchema#dict"/>
+                    </ActionMatch>
+
+                </Action>
+            </Actions>
+        </Target>
+
+
+        </Rule>
+        '''
+
+    deny_message_parameter_function_rule = '''
+        <Rule RuleId="789:" Effect="Deny">
+            <Description>
+                %s
+            </Description>
+
+
+        <Target>
+            <Actions>
+                <Action>
                     <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">5</AttributeValue>
-                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:message-argument1" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">op</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:evaluate-function">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">check_test_value</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:param-dict" DataType="http://www.w3.org/2001/XMLSchema#dict"/>
                     </ActionMatch>
 
                 </Action>
@@ -106,26 +138,36 @@ class PolicyDecisionUnitTest(PyonTestCase):
             pdpm.check_resource_request_policies(self.invocation, None)
         self.assertIn(chk_res.exception.message, 'The resource_id is not set')
 
-        # check that, because actor does not have ION_MANAGER role, policy evaluates to a denial
         # (really Not Applicable, because of the inelegant hack of a policy we are setting up our pdp with)
         mock_header = Mock()
-        self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
-                                   'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
 
         def get_header_value(key, default):
             return self.invocation.headers.get(key, default)
         mock_header.side_effect = get_header_value
         self.invocation.get_header_value = mock_header
         mock_args = Mock()
-        process = Mock()
-        process.org_governance_name = 'org_name'
-        self.invocation.args = {'process': process}
+
+        class MockProcess(Mock):
+            def check_test_value(self, process, message, headers):
+                if message['argument1'] > 3:
+                    return False
+                return True
+
+        mock_process = MockProcess()
+        mock_process.org_governance_name = 'org_name'
+        self.invocation.args = {'process': mock_process}
 
         def get_arg_value(key, default):
             return self.invocation.args.get(key, default)
         mock_args.side_effect = get_arg_value
         self.invocation.get_arg_value = mock_args
+
+        # check that, because actor does not have ION_MANAGER role, policy evaluates to a denial
+
+        self.invocation.message = {'argument1': 0}
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+                                   'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
+
 
         gc.system_root_org_name = 'sys_org_name'
 
@@ -133,7 +175,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.assertEqual(response.value, "NotApplicable")
 
         # check that policy evaluates to Permit because actor has ION_MANAGER role
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "Permit")
@@ -142,16 +184,33 @@ class PolicyDecisionUnitTest(PyonTestCase):
         pdpm.load_resource_policy_rules(resource_id, self.deny_message_parameter_rule)
 
         self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "NotApplicable")
 
         self.invocation.message = {'argument1': 5}
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "Deny")
+
+
+        pdpm.load_resource_policy_rules(resource_id, self.deny_message_parameter_function_rule)
+
+        self.invocation.message = {'argument1': 0}
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+                                   'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
+        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        self.assertEqual(response.value, "Deny")
+
+        self.invocation.message = {'argument1': 5}
+        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+                                   'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
+        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        self.assertEqual(response.value, "NotApplicable")
+
+
 
     def test_service_policies(self):
         gc = Mock()
@@ -205,6 +264,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_service_request_policies(self.invocation)
         self.assertEqual(response.value, "Permit")
+
 
     def test_agent_policies(self):
 

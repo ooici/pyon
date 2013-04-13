@@ -15,10 +15,12 @@ from ndg.xacml.core import Identifiers, XACML_1_0_PREFIX
 from ndg.xacml.core.attribute import Attribute
 from ndg.xacml.core.attributevalue import (AttributeValue,
                                            AttributeValueClassFactory)
+from ndg.xacml.core.functions import functionMap
 from ndg.xacml.core.context.request import Request
 from ndg.xacml.core.context.subject import Subject
 from ndg.xacml.core.context.resource import Resource
 from ndg.xacml.core.context.action import Action
+from ndg.xacml.core.context.environment import Environment
 from ndg.xacml.core.context.pdp import PDP
 from ndg.xacml.core.context.result import Decision
 from pyon.core.bootstrap import IonObject
@@ -38,8 +40,10 @@ ROLE_ATTRIBUTE_ID = XACML_1_0_PREFIX + 'subject:subject-role-id'
 SENDER_ID = XACML_1_0_PREFIX + 'subject:subject-sender-id'
 RECEIVER_TYPE = XACML_1_0_PREFIX + 'resource:receiver-type'
 ACTION_VERB = XACML_1_0_PREFIX + 'action:action-verb'
-ACTION_MESSAGE_ARGUMENT = XACML_1_0_PREFIX + 'action:message-'
+ACTION_PARAMETERS = XACML_1_0_PREFIX + 'action:param-dict'
 
+DICT_TYPE_URI = AttributeValue.IDENTIFIER_PREFIX + 'dict'
+OBJECT_TYPE_URI = AttributeValue.IDENTIFIER_PREFIX + 'object'
 
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
@@ -47,7 +51,6 @@ StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
 IntAttributeValue = attributeValueFactory(AttributeValue.INTEGER_TYPE_URI)
 DoubleAttributeValue = attributeValueFactory(AttributeValue.DOUBLE_TYPE_URI)
 BooleanAttributeValue = attributeValueFactory(AttributeValue.BOOLEAN_TYPE_URI)
-
 
 class PolicyDecisionPointManager(object):
 
@@ -61,11 +64,30 @@ class PolicyDecisionPointManager(object):
         self.governance_controller = governance_controller
 
 
-        #No longer need this cause these were added to the XACML engine library, but left here for historical purposes.
-        #from pyon.core.governance.policy.xacml.not_function import Not
-        #from pyon.core.governance.policy.xacml.and_function import And
-        #functionMap['urn:oasis:names:tc:xacml:ooi:function:not'] = Not
-        #functionMap['urn:oasis:names:tc:xacml:ooi:function:and'] = And
+        #Create and register an Attribute Value derived class to handle a dict type used for the messages
+        _className = 'Dict' + AttributeValue.CLASS_NAME_SUFFIX
+        _classVars = {'TYPE': dict, 'IDENTIFIER': DICT_TYPE_URI}
+        _attributeValueClass = type(_className, (AttributeValue, ), _classVars)
+        AttributeValue.register(_attributeValueClass)
+        attributeValueFactory.addClass(DICT_TYPE_URI, _attributeValueClass)
+
+        self.DictAttributeValue = attributeValueFactory(DICT_TYPE_URI)
+
+
+        #Create and register an Attribute Value derived class to handle any object
+        _className = 'Object' + AttributeValue.CLASS_NAME_SUFFIX
+        _classVars = {'TYPE': object, 'IDENTIFIER': OBJECT_TYPE_URI}
+        _attributeValueClass = type(_className, (AttributeValue, ), _classVars)
+        AttributeValue.register(_attributeValueClass)
+        attributeValueFactory.addClass(OBJECT_TYPE_URI, _attributeValueClass)
+
+        self.ObjectAttributeValue = attributeValueFactory(OBJECT_TYPE_URI)
+
+        #Create and add new function for evaluating functions that take the message as a dict
+        from pyon.core.governance.policy.evaluate import EvaluateCode, EvaluateFunction
+        functionMap['urn:oasis:names:tc:xacml:1.0:function:evaluate-code'] = EvaluateCode
+        functionMap['urn:oasis:names:tc:xacml:1.0:function:evaluate-function'] = EvaluateFunction
+
 
     def _get_policy_template(self):
 
@@ -191,6 +213,13 @@ class PolicyDecisionPointManager(object):
     def create_boolean_attribute(self, attrib_id, id):
         return self.create_attribute(BooleanAttributeValue, attrib_id, id)
 
+    def create_dict_attribute(self, attrib_id, id):
+        return self.create_attribute(self.DictAttributeValue, attrib_id, id)
+
+    def create_object_attribute(self, attrib_id, id):
+        return self.create_attribute(self.ObjectAttributeValue, attrib_id, id)
+
+
     def create_org_role_attribute(self, actor_roles, subject):
         attribute = None
         for role in actor_roles:
@@ -225,8 +254,8 @@ class PolicyDecisionPointManager(object):
         subject.attributes.append(self.create_string_attribute(Identifiers.Subject.SUBJECT_ID, ion_actor_id))
 
         #Get the Org name associated with the endpoint process
-        endpoint_process = invocation.get_arg_value('process', invocation)
-        if hasattr(endpoint_process,'org_governance_name'):
+        endpoint_process = invocation.get_arg_value('process', None)
+        if endpoint_process is not None and hasattr(endpoint_process,'org_governance_name'):
             org_governance_name = endpoint_process.org_governance_name
         else:
             org_governance_name = self.governance_controller.system_root_org_name
@@ -255,6 +284,7 @@ class PolicyDecisionPointManager(object):
         resource = Resource()
         resource.attributes.append(self.create_string_attribute(Identifiers.Resource.RESOURCE_ID, receiver))
         resource.attributes.append(self.create_string_attribute(RECEIVER_TYPE, receiver_type))
+
         request.resources.append(resource)
 
         request.action = Action()
@@ -273,14 +303,12 @@ class PolicyDecisionPointManager(object):
                 pass
 
         #Create generic attributes for each of the primitive message parameter types to be available in XACML rules
-        if isinstance(invocation.message, dict):
-            for arg_name, arg_value in invocation.message.iteritems():
-                attrib_id = ACTION_MESSAGE_ARGUMENT + arg_name
 
-                #This XACML implementation seems to only work with strings
-                if isinstance(arg_value, str) or isinstance(arg_value, int) or isinstance(arg_value, float) or isinstance(arg_value, bool):
-                    request.action.attributes.append(self.create_string_attribute(attrib_id, str(arg_value)))
+        parameter_dict = {'message': invocation.message, 'headers': invocation.headers }
+        if endpoint_process is not None:
+            parameter_dict['process'] = endpoint_process
 
+        request.action.attributes.append(self.create_dict_attribute(ACTION_PARAMETERS, parameter_dict))
 
         return request
 
