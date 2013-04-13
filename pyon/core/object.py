@@ -339,7 +339,7 @@ def walk(o, cb, modify_key_value = 'value'):
             return dict(((cb(k), walk(v, cb, 'key_value')) for k, v in newo.iteritems()))
         else:
             return dict(((k, walk(v, cb)) for k, v in newo.iteritems()))
-    elif isinstance(newo, (list, tuple)):
+    elif isinstance(newo, (list, tuple, set)):
         return [walk(x, cb, modify_key_value) for x in newo]
     elif isinstance(newo, IonObjectBase):
         # IOs are not iterable and are a huge pain to make them look iterable, special casing is fine then
