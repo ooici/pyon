@@ -44,7 +44,7 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
 
         # mock up invocation header values
         mock_header = Mock()
-        self.invocation.headers = {'op':'not_start_from_rel', 'process':'process','request':'request','ion-actor-id':'ion-actor-id','receiver':'resource-registry'}
+        self.invocation.headers = {'op':'not_start_from_rel', 'process':'process','performative':'request','ion-actor-id':'ion-actor-id','receiver':'resource-registry'}
 
         def get_header_value(key, default):
             return self.invocation.headers.get(key, default)
