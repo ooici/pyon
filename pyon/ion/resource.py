@@ -10,10 +10,11 @@ import types
 import time
 
 from pyon.core.registry import getextends, issubtype, is_ion_object, isenum
-from pyon.core.bootstrap import IonObject, get_service_registry
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
+from pyon.util.execute import get_method_arguments, get_remote_info, execute_method
 from pyon.util.log import log
 
 
@@ -528,7 +529,7 @@ class ExtendedResourceContainer(object):
                     deco_value = obj.get_decorator_value(field, decorator)
                     method_name = deco_value if deco_value else 'get_' + field
 
-                    ret_val = self.execute_method(resource._id, method_name, **kwargs)
+                    ret_val = self.execute_method_with_resource(resource._id, method_name, **kwargs)
                     if ret_val is not None:
                         setattr(obj, field, ret_val)
 
@@ -543,10 +544,10 @@ class ExtendedResourceContainer(object):
                     if method_name.find('.') == -1:
                         raise Inconsistent('The field %s decorated as a ServiceRequest only supports remote operations.', field)
 
-                    service_client, operation = self._get_remote_info(method_name)
+                    service_client, operation = get_remote_info(self, method_name)
                     rmi_call = method_name.split('.')
                     parms = { 'resource_id': resource._id }
-                    parms.update(self._get_method_arguments(service_client, operation, **kwargs))
+                    parms.update(get_method_arguments(service_client, operation, **kwargs))
                     ret_val = IonObject(OT.ServiceRequest, service_name=rmi_call[0], service_operation=operation, request_parameters=parms )
                     setattr(obj, field, ret_val)
 
@@ -770,82 +771,13 @@ class ExtendedResourceContainer(object):
             assoc_list.extend([(assoc.o, assoc) for assoc in by_subject if not target_type or assoc.ot == target_type])
         return assoc_list
 
-    # This method will dynamically call the specified method. It will look for the method in the current class
-    # and also in the class specified by the service_provider
-    def execute_method(self, resource_id, method_name, **kwargs):
+
+    def execute_method_with_resource(self, resource_id, method_name, **kwargs):
 
         try:
-
-            #First look to see if this is a remote method
-            if method_name.find('.') > 0:
-
-                service_client, operation = self._get_remote_info(method_name)
-
-                methodToCall = getattr(service_client, operation)
-                param_list = [resource_id]
-                param_dict = self._get_method_arguments(service_client, operation, **kwargs)
-                ret = methodToCall(*param_list, **param_dict )
-                return ret
-
-            else:
-                #For local methods, first look for the method in the current class
-                func = getattr(self, method_name, None)
-                if func:
-                    param_dict = self._get_method_arguments(self,method_name, **kwargs)
-                    return func(resource_id, **param_dict)
-                else:
-                    #Next look to see if the method exists in the service provider process
-                    func = getattr(self.service_provider, method_name, None)
-                    if func:
-                        param_dict = self._get_method_arguments(self.service_provider,method_name, **kwargs)
-                        return func(resource_id, **param_dict)
-
-                return None
+            args = [resource_id]
+            return execute_method(self, method_name, *args, **kwargs)
 
         except Exception, e:
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
-
-
-    def _get_remote_info(self, method_name):
-        """
-        Returns the service client and operation name
-
-        @param method_name:
-        @return:
-        """
-        #This is a remote method.
-        rmi_call = method_name.split('.')
-        #Retrieve service definition
-        service_name = rmi_call[0]
-        operation = rmi_call[1]
-        if service_name == 'resource_registry':
-            service_client = self._rr
-        else:
-            target_service = get_service_registry().get_service_by_name(service_name)
-            service_client = target_service.client(node=self.service_provider.container.instance.node, process=self.service_provider)
-
-        return service_client, operation
-
-
-    def _get_method_arguments(self, module, method_name, **kwargs):
-        """
-        Returns a dict of the allowable method parameters
-        @param module:
-        @param method_name:
-        @param kwargs:
-        @return:
-        """
-        param_dict = {}
-
-        try:
-            method_args = inspect.getargspec(getattr(module,method_name))
-            for arg in method_args[0]:
-                if kwargs.has_key(arg):
-                    param_dict[arg] = kwargs[arg]
-
-        except Exception, e:
-            #Log a warning and simply return an empty dict
-            log.warn('Cannot determine the arguments for method: %s in module: %s: %s',module, method_name, e.message )
-
-        return param_dict
