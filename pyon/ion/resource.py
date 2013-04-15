@@ -364,6 +364,8 @@ class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
         pass
 
 
+
+
 class ExtendedResourceContainer(object):
     """
     Class to support creating and filling extended resource containers.
@@ -781,3 +783,69 @@ class ExtendedResourceContainer(object):
         except Exception, e:
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
             return None
+
+
+
+    def create_prepare_update_resource(self, resource_id, resource_type):
+
+        if not isinstance(resource_id, types.StringType):
+            raise Inconsistent("The parameter resource_id is not a single resource id string")
+
+        if not self.service_provider or not self._rr:
+            raise Inconsistent("This class is not initialized properly")
+
+        if resource_type not in getextends(OT.ResourcePrepareUpdate):
+            raise BadRequest('The requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourcePrepareUpdate))
+
+        resource_object = self._rr.read(resource_id)
+
+        if not resource_object:
+            raise NotFound("The Resource %s does not exist" % resource_id)
+
+        resource_data = IonObject(resource_type)
+
+        # Check to make sure the extended resource decorator raise OriginResourceType matches the type of the resource type
+        origin_resource_type =  resource_data.get_class_decorator_value('OriginResourceType')
+        if origin_resource_type is None:
+            raise NotFound('OriginResourceType decorator not found in object specification %s', resource_type)
+
+        elif origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, origin_resource_type):
+            raise Inconsistent('The OriginResourceType decorator of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (
+                resource_type, origin_resource_type, resource_object.type_))
+
+        resource_data._id = resource_object._id
+        resource_data.resource = resource_object
+        resource_data.resource_schema = get_object_schema(origin_resource_type)
+
+        for field in resource_data._schema:
+
+            deco_value = resource_data.get_decorator_value(field, 'ResourceType')
+            if deco_value is not None:
+                res_list,_ = self._rr.find_resources(restype=deco_value, id_only=False)
+                setattr(resource_data, field, res_list)
+                continue
+
+            deco_value = resource_data.get_decorator_value(field, 'Association')
+            if deco_value is not None:
+
+
+                resource_subject = resource_id if resource_data.is_decorator(field, 'ResourceSubject') else None
+                resource_object = resource_id if resource_data.is_decorator(field, 'ResourceObject') else None
+                assoc_list = self._rr.find_associations(subject=resource_subject, predicate=deco_value, object=resource_object,
+                    id_only=False)
+
+                subject_type = resource_data.get_decorator_value(field, 'SubjectType')
+                if subject_type is not None:
+                    assoc_list = [assoc for assoc in assoc_list if ( assoc.st == subject_type )]
+
+                object_type = resource_data.get_decorator_value(field, 'ObjectType')
+                if object_type is not None:
+                    assoc_list = [assoc for assoc in assoc_list if ( assoc.ot == object_type )]
+
+
+                setattr(resource_data, field, assoc_list)
+                continue
+
+
+
+        return resource_data
