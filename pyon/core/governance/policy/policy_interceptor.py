@@ -100,6 +100,11 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                     elif process_type == 'service':
                         ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
+                """
+                if invocation.headers.has_key('op'):
+                    if invocation.headers['op'] == 'execute_resource':
+                        print "eval execute_resource>>" + str(ret)
+                """
 
             log.debug("Policy Decision: " + str(ret))
 
