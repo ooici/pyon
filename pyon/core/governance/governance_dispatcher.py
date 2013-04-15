@@ -16,6 +16,7 @@ class GovernanceDispatcher(object):
     CONVERSATION__STATUS_ANNOTATION = 'CONVERSATION_STATUS'
     CONVERSATION__STATUS_REASON_ANNOTATION = 'CONVERSATION_STATUS_REASON'
     POLICY__STATUS_ANNOTATION = 'POLICY_STATUS'
+    POLICY__STATUS_REASON_ANNOTATION = 'POLICY_STATUS_REASON'
 
     # The interceptor was skipped for some reason
     STATUS_SKIPPED = 'skipped'
@@ -57,6 +58,10 @@ class GovernanceDispatcher(object):
         #Raise Unauthorized exception if policy denies access.
         if invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_ANNOTATION) and \
            invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_REJECT:
+
+            if invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION):
+                raise Unauthorized(invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION])
+
             raise Unauthorized("The request from user %s for operation %s(%s) has been denied" % (actor_id,receiver, op) )
 
         return invocation

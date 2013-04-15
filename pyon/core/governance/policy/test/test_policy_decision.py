@@ -62,7 +62,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
 
 
     deny_message_parameter_rule = '''
-        <Rule RuleId="789:" Effect="Deny">
+        <Rule RuleId="789:" Effect="Permit">
             <Description>
                 %s
             </Description>
@@ -79,8 +79,8 @@ class PolicyDecisionUnitTest(PyonTestCase):
                         <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">def policy_func(process, message, headers):
                             arg = message['argument1']
                             if arg > 3:
-                                return True
-                            return False
+                                return True, ''
+                            return False, 'The value of argument1 is less than or equal to 3'
                         </AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:param-dict" DataType="http://www.w3.org/2001/XMLSchema#dict"/>
                     </ActionMatch>
@@ -94,7 +94,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         '''
 
     deny_message_parameter_function_rule = '''
-        <Rule RuleId="789:" Effect="Deny">
+        <Rule RuleId="789:" Effect="Permit">
             <Description>
                 %s
             </Description>
@@ -150,8 +150,8 @@ class PolicyDecisionUnitTest(PyonTestCase):
         class MockProcess(Mock):
             def check_test_value(self, process, message, headers):
                 if message['argument1'] > 3:
-                    return False
-                return True
+                    return False, 'The value of argument1 is larger than 3'
+                return True, ''
 
         mock_process = MockProcess()
         mock_process.org_governance_name = 'org_name'
@@ -188,12 +188,14 @@ class PolicyDecisionUnitTest(PyonTestCase):
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "NotApplicable")
+        self.assertEqual(pdpm.get_error_message(),'The value of argument1 is less than or equal to 3')
 
         self.invocation.message = {'argument1': 5}
         self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
-        self.assertEqual(response.value, "Deny")
+        self.assertEqual(response.value, "Permit")
+        self.assertEqual(pdpm.get_error_message(),None)
 
 
         pdpm.load_resource_policy_rules(resource_id, self.deny_message_parameter_function_rule)
@@ -202,13 +204,15 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
-        self.assertEqual(response.value, "Deny")
+        self.assertEqual(response.value, "Permit")
+        self.assertEqual(pdpm.get_error_message(),None)
 
         self.invocation.message = {'argument1': 5}
         self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
         self.assertEqual(response.value, "NotApplicable")
+        self.assertEqual(pdpm.get_error_message(),'The value of argument1 is larger than 3')
 
 
 

@@ -10,6 +10,7 @@ from ndg.xacml.core.functions import (AbstractFunction, FunctionClassFactoryInte
 from ndg.xacml.core.attributevalue import (AttributeValue,
                                            AttributeValueClassFactory)
 
+from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.util.execute import execute_method
 from pyon.util.log import log
 class EvaluateCode(AbstractFunction):
@@ -33,6 +34,7 @@ class EvaluateCode(AbstractFunction):
         @return: True if code evaluates to True, False otherwise
         @rtype: bool
         """
+        error_msg = ''
         eval_code = inputs[0]
         if not isinstance(eval_code, AttributeValue) and not isinstance(eval_code.elementType, self.__class__.ATTRIB1_TYPE):
             raise XacmlContextTypeError('Expecting %r derived type for '
@@ -50,11 +52,14 @@ class EvaluateCode(AbstractFunction):
         try:
             exec eval_code.value
             pref = locals()["policy_func"]
-            ret_val = pref(**parameter_dict.value)
+            ret_val, error_msg = pref(**parameter_dict.value)
 
         except Exception, e:
             log.exception(e)
             ret_val = False
+
+        if not ret_val:
+            PolicyDecisionPointManager.pdp_error_message = error_msg
 
         return ret_val
 
@@ -81,6 +86,7 @@ class EvaluateFunction(AbstractFunction):
         @return: True if code evaluates to True, False otherwise
         @rtype: bool
         """
+        error_msg = ''
         function_name = inputs[0]
         if not isinstance(function_name, AttributeValue) and not isinstance(function_name.elementType, self.__class__.ATTRIB1_TYPE):
             raise XacmlContextTypeError('Expecting %r derived type for '
@@ -96,11 +102,14 @@ class EvaluateFunction(AbstractFunction):
                                          type(parameter_dict)))
 
         try:
-            ret_val = execute_method(execution_object=parameter_dict.value['process'], method_name=function_name.value, **parameter_dict.value)
+            ret_val, error_msg = execute_method(execution_object=parameter_dict.value['process'], method_name=function_name.value, **parameter_dict.value)
 
         except Exception, e:
             log.exception(e)
             ret_val = False
+
+        if not ret_val:
+            PolicyDecisionPointManager.pdp_error_message = error_msg
 
         return ret_val
 
