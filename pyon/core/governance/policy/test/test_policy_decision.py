@@ -187,7 +187,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
-        self.assertEqual(response.value, "NotApplicable")
+        self.assertEqual(response.value, "Deny")
         self.assertEqual(pdpm.get_error_message(),'The value of argument1 is less than or equal to 3')
 
         self.invocation.message = {'argument1': 5}
@@ -211,7 +211,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
         response = pdpm.check_resource_request_policies(self.invocation, resource_id)
-        self.assertEqual(response.value, "NotApplicable")
+        self.assertEqual(response.value, "Deny")
         self.assertEqual(pdpm.get_error_message(),'The value of argument1 is larger than 3')
 
 

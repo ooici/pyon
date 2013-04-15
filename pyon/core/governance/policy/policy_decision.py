@@ -339,7 +339,7 @@ class PolicyDecisionPointManager(object):
 
         # todo: check if its OK to treat everything but Deny as Permit (Ex: NotApplicable)
         # Return if agent service policies deny the operation
-        if decision == Decision.DENY_STR:
+        if decision == Decision.DENY:
             return decision
 
         # Else check any policies that might be associated with the resource.
@@ -363,7 +363,7 @@ class PolicyDecisionPointManager(object):
         pdp = self.get_service_pdp(receiver)
 
         if pdp is None:
-            return Decision.NOT_APPLICABLE_STR
+            return Decision.NOT_APPLICABLE
 
         return self._evaluate_pdp(pdp, requestCtx)
 
@@ -377,7 +377,7 @@ class PolicyDecisionPointManager(object):
         pdp = self.get_resource_pdp(resource_id)
 
         if pdp is None:
-            return Decision.NOT_APPLICABLE_STR
+            return Decision.NOT_APPLICABLE
 
         return self._evaluate_pdp(pdp, requestCtx)
 
@@ -388,14 +388,17 @@ class PolicyDecisionPointManager(object):
             response = pdp.evaluate(requestCtx)
         except Exception, e:
             log.error("Error evaluating policies: %s" % e.message)
-            return Decision.NOT_APPLICABLE_STR
+            return Decision.NOT_APPLICABLE
 
         if response is None:
             log.debug('response from PDP contains nothing, so not authorized')
-            return Decision.DENY_STR
+            return Decision.DENY
+
+        if self.get_error_message() is not None:
+            return Decision.DENY
 
         for result in response.results:
-            if result.decision == Decision.DENY_STR:
+            if result.decision == Decision.DENY:
                 break
 
         return result.decision
