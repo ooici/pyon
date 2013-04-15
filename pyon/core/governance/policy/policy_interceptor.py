@@ -118,6 +118,10 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #TODO - Fix this to use the proper annotation reference and figure out special cases
         if invocation.headers.has_key('op') and invocation.headers['op'] != 'start_rel_from_url':
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_REJECT
+            error_msg = self.governance_controller.get_policy_decision_error_message()
+            if self.governance_controller is not None and error_msg is not None:
+                invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
+
 
     def permit_registry_calls_token(self, invocation):
         actor_tokens = invocation.get_header_value('ion-actor-tokens', None)

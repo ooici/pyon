@@ -283,6 +283,16 @@ class GovernanceController(object):
         self.policy_decision_point_manager.clear_policy_cache()
         self.unregister_all_process_policy_preconditions()
 
+    def get_policy_decision_error_message(self):
+        return self.policy_decision_point_manager.get_error_message()
+
+    def set_policy_decision_error_message(self, message):
+        """
+        This function is a total hack to allow for XACML based optional error messages from evaluating functions
+        @param message:
+        @return:
+        """
+        self.policy_decision_point_manager.set_error_message(message)
 
     def update_container_policies(self, process_instance, safe_mode=False):
         """
