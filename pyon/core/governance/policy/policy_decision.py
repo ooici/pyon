@@ -52,7 +52,12 @@ IntAttributeValue = attributeValueFactory(AttributeValue.INTEGER_TYPE_URI)
 DoubleAttributeValue = attributeValueFactory(AttributeValue.DOUBLE_TYPE_URI)
 BooleanAttributeValue = attributeValueFactory(AttributeValue.BOOLEAN_TYPE_URI)
 
+
 class PolicyDecisionPointManager(object):
+
+    # THis is a total HACK to allow the XACML to return an optional error message when evaluating functions
+    pdp_error_message = None
+
 
     def __init__(self, governance_controller):
         self.resource_policy_decision_point = dict()
@@ -110,6 +115,17 @@ class PolicyDecisionPointManager(object):
         </Policy>'''
 
         return policy_template
+
+    def get_error_message(self):
+        return PolicyDecisionPointManager.pdp_error_message
+
+    def set_error_message(self, message):
+        """
+        This function is a total hack to allow for XACML based optional error messages from evaluating functions
+        @param message:
+        @return:
+        """
+        PolicyDecisionPointManager.pdp_error_message = message
 
     def create_policy_from_rules(self, policy_identifier, rules):
         policy = self._get_policy_template()
@@ -368,6 +384,7 @@ class PolicyDecisionPointManager(object):
     def _evaluate_pdp(self, pdp, requestCtx):
 
         try:
+            self.set_error_message(None)
             response = pdp.evaluate(requestCtx)
         except Exception, e:
             log.error("Error evaluating policies: %s" % e.message)
