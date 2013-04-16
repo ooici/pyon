@@ -303,7 +303,7 @@ class GovernanceHeaderValues(object):
     A helper class for containing governance values from a message header
     '''
 
-    def __init__(self, headers, resource_id_required=True):
+    def __init__(self, headers, process=None, resource_id_required=True):
         '''
         A helper object for retrieving governance related values: op, actor_id, actor_roles, resource_id from the message header
         @param headers:
@@ -319,13 +319,16 @@ class GovernanceHeaderValues(object):
         else:
             self._op = "Unknown-Operation"
 
-        if headers.has_key('process'):
-            if getattr(headers['process'],'name'):
-                self._process_name = headers['process'].name
+        if process is not None and hasattr(process, 'name'):
+            self._process_name = process.name
+        else:
+            if headers.has_key('process'):
+                if getattr(headers['process'],'name'):
+                    self._process_name = headers['process'].name
+                else:
+                    self._process_name = "Unknown-Process"
             else:
                 self._process_name = "Unknown-Process"
-        else:
-            self._process_name = "Unknown-Process"
 
 
         #The self.name references below should be provided by the running ION process ( service, agent, etc ) which will be using this class.

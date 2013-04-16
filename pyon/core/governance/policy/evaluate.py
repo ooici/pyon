@@ -9,8 +9,9 @@ from ndg.xacml.core.context.exceptions import XacmlContextTypeError
 from ndg.xacml.core.functions import (AbstractFunction, FunctionClassFactoryInterface)
 from ndg.xacml.core.attributevalue import (AttributeValue,
                                            AttributeValueClassFactory)
+from ndg.xacml.utils import TypedList as Bag
 
-from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
+from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.execute import execute_method
 from pyon.util.log import log
 class EvaluateCode(AbstractFunction):
@@ -42,7 +43,11 @@ class EvaluateCode(AbstractFunction):
                                         (self.__class__.ATTRIB1_TYPE,
                                          type(eval_code)))
 
-        parameter_dict = inputs[1]
+        if isinstance(inputs[1], Bag):
+            parameter_dict = inputs[1][0]
+        else:
+            parameter_dict = inputs[1]
+
         if not isinstance(parameter_dict, AttributeValue) and not isinstance(parameter_dict.elementType, self.__class__.ATTRIB2_TYPE):
             raise XacmlContextTypeError('Expecting %r derived type for '
                                         '"attribute2"; got %r' %
@@ -52,14 +57,14 @@ class EvaluateCode(AbstractFunction):
         try:
             exec eval_code.value
             pref = locals()["policy_func"]
-            ret_val, error_msg = pref(**parameter_dict.value)
+            ret_val, error_msg = pref(process=parameter_dict.value['process'], message=parameter_dict.value['message'], headers=parameter_dict.value['headers'])
 
         except Exception, e:
             log.exception(e)
             ret_val = False
 
         if not ret_val:
-            PolicyDecisionPointManager.pdp_error_message = error_msg
+            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
 
         return ret_val
 
@@ -94,7 +99,10 @@ class EvaluateFunction(AbstractFunction):
                                         (self.__class__.ATTRIB1_TYPE,
                                          type(function_name)))
 
-        parameter_dict = inputs[1]
+        if isinstance(inputs[1], Bag):
+            parameter_dict = inputs[1][0]
+        else:
+            parameter_dict = inputs[1]
         if not isinstance(parameter_dict, AttributeValue) and not isinstance(parameter_dict.elementType, self.__class__.ATTRIB2_TYPE):
             raise XacmlContextTypeError('Expecting %r derived type for '
                                         '"attribute2"; got %r' %
@@ -103,13 +111,12 @@ class EvaluateFunction(AbstractFunction):
 
         try:
             ret_val, error_msg = execute_method(execution_object=parameter_dict.value['process'], method_name=function_name.value, **parameter_dict.value)
-
         except Exception, e:
             log.exception(e)
             ret_val = False
 
         if not ret_val:
-            PolicyDecisionPointManager.pdp_error_message = error_msg
+            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
 
         return ret_val
 
