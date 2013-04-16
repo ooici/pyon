@@ -13,7 +13,7 @@ from pyon.util.log import log
 
 from ndg.xacml.core.context.result import Decision
 
-ALLOW_RESOURCE_REGISTRY_SUB_CALLS = 'ALLOW_RESOURCE_REGISTRY_SUB_CALLS'
+PERMIT_SUB_CALLS = 'PERMIT_SUB_CALLS'
 
 #TODO - will need to iterate on this
 
@@ -60,6 +60,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
         #If missing the performative header, consider it as a failure message.
         msg_performative = invocation.get_header_value('performative', 'failure')
+        op = invocation.get_header_value('op', 'unknown')
 
         #TODO - This should be removed once better process security is implemented
         #THis fix infers that all messages that do not specify an actor id are TRUSTED wihtin the system
@@ -69,42 +70,50 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         else:
             actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
 
-        #Only check messages marked as the initial rpc request - TODO - remove the last check at some point
+        #Only check messages marked as the initial rpc request - TODO - remove the actor_id is not None when headless process have actor_ids
         if msg_performative == 'request' and actor_id is not None:
+
+            #Can's check policy if the controller is not initialized
+            if self.governance_controller is None:
+                invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
+                return invocation
+
+            #No need to check for requests from the system actor - should increase performance during startup
+            if actor_id == self.governance_controller.system_actor_id:
+                invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
+                return invocation
 
             #checking policy - if needed
             receiver = invocation.get_message_receiver()
 
-            #If this is a sub RPC request to the RR service from a higher level service that has already been validated and set a token
+            #If this is a sub RPC request from a higher level service that has already been validated and set a token
             #then skip checking policy yet again - should help with performance and to simplify policy
-            if receiver == 'resource_registry' and self.has_valid_token(invocation, ALLOW_RESOURCE_REGISTRY_SUB_CALLS):
+            if self.has_valid_token(invocation, PERMIT_SUB_CALLS):
+                #print "skipping call to " + receiver + " " + op + " from " + actor_id
+                invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
+
+            #print "checking call to " + receiver + " " + op + " from " + actor_id
 
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
             ret = None
-            if self.governance_controller is not None:
 
-                #First check for Org boundary policies if the container is configured as such
-                org_id = self.governance_controller.get_container_org_boundary_id()
-                if org_id is not None:
-                    ret = self.governance_controller.policy_decision_point_manager.check_resource_request_policies(invocation, org_id)
+            #First check for Org boundary policies if the container is configured as such
+            org_id = self.governance_controller.get_container_org_boundary_id()
+            if org_id is not None:
+                ret = self.governance_controller.policy_decision_point_manager.check_resource_request_policies(invocation, org_id)
 
-                if str(ret) != Decision.DENY_STR:
-                    #Next check endpoint process specific policies
-                    process_type = invocation.get_invocation_process_type()
-                    if process_type == 'agent':
-                        ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
+            if str(ret) != Decision.DENY_STR:
+                #Next check endpoint process specific policies
+                process_type = invocation.get_invocation_process_type()
+                if process_type == 'agent':
+                    ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
 
-                    elif process_type == 'service':
-                        ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
+                elif process_type == 'service':
+                    ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
-                """
-                if invocation.headers.has_key('op'):
-                    if invocation.headers['op'] == 'execute_resource':
-                        print "eval execute_resource>>" + str(ret)
-                """
 
             log.debug("Policy Decision: " + str(ret))
 
@@ -115,7 +124,10 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 if str(ret) == Decision.DENY_STR:
                     self.annotate_denied_message(invocation)
                 elif str(ret) == Decision.PERMIT:
-                    self.permit_registry_calls_token(invocation)
+                    self.permit_sub_rpc_calls_token(invocation)
+
+        else:
+            invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
 
         return invocation
 
@@ -123,12 +135,8 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #TODO - Fix this to use the proper annotation reference and figure out special cases
         if invocation.headers.has_key('op') and invocation.headers['op'] != 'start_rel_from_url':
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_REJECT
-            error_msg = self.governance_controller.get_policy_decision_error_message()
-            if self.governance_controller is not None and error_msg is not None:
-                invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
 
-
-    def permit_registry_calls_token(self, invocation):
+    def permit_sub_rpc_calls_token(self, invocation):
         actor_tokens = invocation.get_header_value('ion-actor-tokens', None)
         if actor_tokens is None:
             actor_tokens = list()
@@ -137,7 +145,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #See if this token exists already
         for tok in actor_tokens:
             pol_tok = pickle.loads(tok)
-            if pol_tok.is_token(ALLOW_RESOURCE_REGISTRY_SUB_CALLS):
+            if pol_tok.is_token(PERMIT_SUB_CALLS):
                 return
 
         #Not found, so create a new one
@@ -148,7 +156,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #TODO - investigate adding information about parent conversation when available
 
         #Create a token that subsequent resource_registry calls are allowed
-        token = create_policy_token(container_id, actor_id, requesting_message, ALLOW_RESOURCE_REGISTRY_SUB_CALLS)
+        token = create_policy_token(container_id, actor_id, requesting_message, PERMIT_SUB_CALLS)
         actor_tokens.append(token)
 
     def has_valid_token(self, invocation, token):

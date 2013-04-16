@@ -3,7 +3,7 @@
 __author__ = 'Prashant Kediyal, Stephen Henrie'
 
 from nose.plugins.attrib import attr
-from mock import Mock
+from mock import Mock, MagicMock
 import unittest
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.core.exception import NotFound
@@ -133,18 +133,19 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.assertNotEqual(pdpm.get_resource_pdp(resource_id), pdpm.empty_pdp)
 
         # check request without a resource_id raises NotFound error
-        self.invocation = Mock()
+        invocation = MagicMock()
+        invocation.message_annotations = {}
         with self.assertRaises(NotFound) as chk_res:
-            pdpm.check_resource_request_policies(self.invocation, None)
+            pdpm.check_resource_request_policies(invocation, None)
         self.assertIn(chk_res.exception.message, 'The resource_id is not set')
 
         # (really Not Applicable, because of the inelegant hack of a policy we are setting up our pdp with)
         mock_header = Mock()
 
         def get_header_value(key, default):
-            return self.invocation.headers.get(key, default)
+            return invocation.headers.get(key, default)
         mock_header.side_effect = get_header_value
-        self.invocation.get_header_value = mock_header
+        invocation.get_header_value = mock_header
         mock_args = Mock()
 
         class MockProcess(Mock):
@@ -155,64 +156,71 @@ class PolicyDecisionUnitTest(PyonTestCase):
 
         mock_process = MockProcess()
         mock_process.org_governance_name = 'org_name'
-        self.invocation.args = {'process': mock_process}
+        invocation.args = {'process': mock_process}
 
         def get_arg_value(key, default):
-            return self.invocation.args.get(key, default)
+            return invocation.args.get(key, default)
         mock_args.side_effect = get_arg_value
-        self.invocation.get_arg_value = mock_args
+        invocation.get_arg_value = mock_args
 
         # check that, because actor does not have ION_MANAGER role, policy evaluates to a denial
 
-        self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message_annotations = {}
+        invocation.message = {'argument1': 0}
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
 
 
         gc.system_root_org_name = 'sys_org_name'
 
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
         self.assertEqual(response.value, "NotApplicable")
 
         # check that policy evaluates to Permit because actor has ION_MANAGER role
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        invocation.message_annotations = {}
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
         self.assertEqual(response.value, "Permit")
 
 
         pdpm.load_resource_policy_rules(resource_id, self.deny_message_parameter_rule)
 
-        self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message = {'argument1': 0}
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        invocation.message_annotations = {}
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
         self.assertEqual(response.value, "Deny")
-        self.assertEqual(pdpm.get_error_message(),'The value of argument1 is less than or equal to 3')
+        self.assertEqual(invocation.message_annotations.has_key('POLICY_STATUS_REASON'), True)
+        self.assertEqual(invocation.message_annotations['POLICY_STATUS_REASON'],'The value of argument1 is less than or equal to 3')
 
-        self.invocation.message = {'argument1': 5}
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message = {'argument1': 5}
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        invocation.message_annotations = {}
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
         self.assertEqual(response.value, "Permit")
-        self.assertEqual(pdpm.get_error_message(),None)
+        self.assertEqual(invocation.message_annotations.has_key('POLICY_STATUS_REASON'), False)
 
 
         pdpm.load_resource_policy_rules(resource_id, self.deny_message_parameter_function_rule)
 
-        self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message = {'argument1': 0}
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
+        invocation.message_annotations = {}
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
         self.assertEqual(response.value, "Permit")
-        self.assertEqual(pdpm.get_error_message(),None)
+        self.assertEqual(invocation.message_annotations.has_key('POLICY_STATUS_REASON'), False)
 
-        self.invocation.message = {'argument1': 5}
-        self.invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message = {'argument1': 5}
+        invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_resource_request_policies(self.invocation, resource_id)
-        self.assertEqual(response.value, "Deny")
-        self.assertEqual(pdpm.get_error_message(),'The value of argument1 is larger than 3')
+        invocation.message_annotations = {}
+        response = pdpm.check_resource_request_policies(invocation, resource_id)
+        self.assertEqual(invocation.message_annotations.has_key('POLICY_STATUS_REASON'), True)
+        self.assertEqual(invocation.message_annotations['POLICY_STATUS_REASON'],'The value of argument1 is larger than 3')
 
 
 
@@ -229,44 +237,48 @@ class PolicyDecisionUnitTest(PyonTestCase):
         self.assertNotEqual(pdpm.get_service_pdp(service_key), pdpm.load_common_service_pdp)
 
         # check request without a service_key raises NotFound error
-        self.invocation = Mock()
-        self.invocation.get_message_receiver.return_value = None
+        invocation = Mock()
+        invocation.message_annotations = {}
+
+        invocation.get_message_receiver.return_value = None
         with self.assertRaises(NotFound) as chk_res:
-            pdpm.check_service_request_policies(self.invocation)
+            pdpm.check_service_request_policies(invocation)
         self.assertIn(chk_res.exception.message, 'No receiver for this message')
 
         # check that, because actor does not have ION_MANAGER role, policy evaluates to a denial
         # (really Not Applicable, because of the inelegant hack of a policy we are setting up our pdp with)
         mock_header = Mock()
-        self.invocation.message = {'argument1': 0}
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message_annotations = {}
+        invocation.message = {'argument1': 0}
+        invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'Unknown', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
-        self.invocation.get_message_receiver.return_value = 'service_key'
-        self.invocation.get_service_name.return_value = 'Unknown'
+        invocation.get_message_receiver.return_value = 'service_key'
+        invocation.get_service_name.return_value = 'Unknown'
 
         def get_header_value(key, default):
-            return self.invocation.headers.get(key, default)
+            return invocation.headers.get(key, default)
         mock_header.side_effect = get_header_value
-        self.invocation.get_header_value = mock_header
+        invocation.get_header_value = mock_header
         mock_args = Mock()
         process = Mock()
         process.org_governance_name = 'org_name'
-        self.invocation.args = {'process': process}
+        invocation.args = {'process': process}
 
         def get_arg_value(key, default):
-            return self.invocation.args.get(key, default)
+            return invocation.args.get(key, default)
         mock_args.side_effect = get_arg_value
-        self.invocation.get_arg_value = mock_args
+        invocation.get_arg_value = mock_args
 
         gc.system_root_org_name = 'sys_org_name'
 
-        response = pdpm.check_service_request_policies(self.invocation)
+        response = pdpm.check_service_request_policies(invocation)
         self.assertEqual(response.value, "NotApplicable")
 
         # check that policy evaluates to Permit because actor has ION_MANAGER role
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message_annotations = {}
+        invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'sys_org_name': ['ION_MANAGER']}}
-        response = pdpm.check_service_request_policies(self.invocation)
+        response = pdpm.check_service_request_policies(invocation)
         self.assertEqual(response.value, "Permit")
 
 
@@ -277,44 +289,45 @@ class PolicyDecisionUnitTest(PyonTestCase):
         service_key = 'service_key'
         resource_id = 'resource_id'
         pdpm = PolicyDecisionPointManager(gc)
-        self.invocation = Mock()
+        invocation = Mock()
         mock_header = Mock()
-        self.invocation.message = {'argument1': 0 }
-        self.invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
+        invocation.message_annotations = {}
+        invocation.message = {'argument1': 0 }
+        invocation.headers = {'op': 'op', 'process': 'process', 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'Unknown', 'ion-actor-roles': {'org_name':  ['ION_MANAGER']}}
-        self.invocation.get_message_receiver.return_value = 'service_key'
-        self.invocation.get_service_name.return_value = 'Unknown'
+        invocation.get_message_receiver.return_value = 'service_key'
+        invocation.get_service_name.return_value = 'Unknown'
 
         def get_header_value(key, default):
-            return self.invocation.headers.get(key, default)
+            return invocation.headers.get(key, default)
         mock_header.side_effect = get_header_value
-        self.invocation.get_header_value = mock_header
+        invocation.get_header_value = mock_header
         mock_args = Mock()
         process = Mock()
         process.org_governance_name = 'org_name'
         process.resource_id = 'resource_id'
-        self.invocation.args = {'process': process}
+        invocation.args = {'process': process}
 
         def get_arg_value(key, default='Unknown'):
-            return self.invocation.args.get(key, default)
+            return invocation.args.get(key, default)
         mock_args.side_effect = get_arg_value
-        self.invocation.get_arg_value = mock_args
+        invocation.get_arg_value = mock_args
         gc.system_root_org_name = 'sys_org_name'
 
         # check that service policies result in denying the request
         pdpm.load_service_policy_rules(service_key, self.deny_ION_MANAGER_rule)
         pdpm.load_resource_policy_rules(resource_id, self.permit_ION_MANAGER_rule)
-        response = pdpm.check_agent_request_policies(self.invocation)
+        response = pdpm.check_agent_request_policies(invocation)
         self.assertEqual(response.value, "Deny")
 
         # check that resource policies result in denying the request
         pdpm.load_service_policy_rules(service_key, self.permit_ION_MANAGER_rule)
         pdpm.load_resource_policy_rules(resource_id, self.deny_ION_MANAGER_rule)
-        response = pdpm.check_agent_request_policies(self.invocation)
+        response = pdpm.check_agent_request_policies(invocation)
         self.assertEqual(response.value, "Deny")
 
         # check that both service and resource policies need to allow a request
         pdpm.load_service_policy_rules(service_key, self.permit_ION_MANAGER_rule)
         pdpm.load_resource_policy_rules(resource_id, self.permit_ION_MANAGER_rule)
-        response = pdpm.check_agent_request_policies(self.invocation)
+        response = pdpm.check_agent_request_policies(invocation)
         self.assertEqual(response.value, "Permit")
