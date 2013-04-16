@@ -301,8 +301,9 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         Return the set of agent parameter keys.
         """            
-        params = [x[7:] for x in vars(self).keys() if x.startswith('aparam_') \
-                  and not x.startswith('aparam_set_')]
+        params = [x[7:] for x in vars(self).keys() if x.startswith('aparam_') 
+                  and not x.startswith('aparam_set_')
+                  and not x.startswith('aparam_get_')]
         return params
     
     def _filter_capabilities(self, events):
