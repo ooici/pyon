@@ -27,6 +27,7 @@ from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.core.governance import ION_MANAGER
 from pyon.core.registry import is_ion_object
+from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 
 from pyon.util.log import log
 
@@ -54,10 +55,6 @@ BooleanAttributeValue = attributeValueFactory(AttributeValue.BOOLEAN_TYPE_URI)
 
 
 class PolicyDecisionPointManager(object):
-
-    # THis is a total HACK to allow the XACML to return an optional error message when evaluating functions
-    pdp_error_message = None
-
 
     def __init__(self, governance_controller):
         self.resource_policy_decision_point = dict()
@@ -115,17 +112,6 @@ class PolicyDecisionPointManager(object):
         </Policy>'''
 
         return policy_template
-
-    def get_error_message(self):
-        return PolicyDecisionPointManager.pdp_error_message
-
-    def set_error_message(self, message):
-        """
-        This function is a total hack to allow for XACML based optional error messages from evaluating functions
-        @param message:
-        @return:
-        """
-        PolicyDecisionPointManager.pdp_error_message = message
 
     def create_policy_from_rules(self, policy_identifier, rules):
         policy = self._get_policy_template()
@@ -208,32 +194,32 @@ class PolicyDecisionPointManager(object):
         self.load_common_service_policy_rules('')
 
 
-    def create_attribute(self, attrib_class, attrib_id, id):
+    def create_attribute(self, attrib_class, attrib_id, val):
         attribute = Attribute()
         attribute.attributeId = attrib_id
         attribute.dataType = attrib_class.IDENTIFIER
         attribute.attributeValues.append(attrib_class())
-        attribute.attributeValues[-1].value = id
+        attribute.attributeValues[-1].value = val
         return attribute
 
 
-    def create_string_attribute(self, attrib_id, id):
-        return self.create_attribute(StringAttributeValue, attrib_id, id)
+    def create_string_attribute(self, attrib_id, val):
+        return self.create_attribute(StringAttributeValue, attrib_id, val)
 
-    def create_int_attribute(self, attrib_id, id):
-        return self.create_attribute(IntAttributeValue, attrib_id, id)
+    def create_int_attribute(self, attrib_id, val):
+        return self.create_attribute(IntAttributeValue, attrib_id, val)
 
-    def create_double_attribute(self, attrib_id, id):
-        return self.create_attribute(DoubleAttributeValue, attrib_id, id)
+    def create_double_attribute(self, attrib_id, val):
+        return self.create_attribute(DoubleAttributeValue, attrib_id, val)
 
-    def create_boolean_attribute(self, attrib_id, id):
-        return self.create_attribute(BooleanAttributeValue, attrib_id, id)
+    def create_boolean_attribute(self, attrib_id, val):
+        return self.create_attribute(BooleanAttributeValue, attrib_id, val)
 
-    def create_dict_attribute(self, attrib_id, id):
-        return self.create_attribute(self.DictAttributeValue, attrib_id, id)
+    def create_dict_attribute(self, attrib_id, val):
+        return self.create_attribute(self.DictAttributeValue, attrib_id, val)
 
-    def create_object_attribute(self, attrib_id, id):
-        return self.create_attribute(self.ObjectAttributeValue, attrib_id, id)
+    def create_object_attribute(self, attrib_id, val):
+        return self.create_attribute(self.ObjectAttributeValue, attrib_id, val)
 
 
     def create_org_role_attribute(self, actor_roles, subject):
@@ -320,7 +306,7 @@ class PolicyDecisionPointManager(object):
 
         #Create generic attributes for each of the primitive message parameter types to be available in XACML rules
 
-        parameter_dict = {'message': invocation.message, 'headers': invocation.headers }
+        parameter_dict = {'message': invocation.message, 'headers': invocation.headers, 'annotations': invocation.message_annotations }
         if endpoint_process is not None:
             parameter_dict['process'] = endpoint_process
 
@@ -365,7 +351,7 @@ class PolicyDecisionPointManager(object):
         if pdp is None:
             return Decision.NOT_APPLICABLE
 
-        return self._evaluate_pdp(pdp, requestCtx)
+        return self._evaluate_pdp(invocation, pdp, requestCtx)
 
     def check_resource_request_policies(self, invocation, resource_id):
 
@@ -379,12 +365,11 @@ class PolicyDecisionPointManager(object):
         if pdp is None:
             return Decision.NOT_APPLICABLE
 
-        return self._evaluate_pdp(pdp, requestCtx)
+        return self._evaluate_pdp(invocation, pdp, requestCtx)
 
-    def _evaluate_pdp(self, pdp, requestCtx):
+    def _evaluate_pdp(self, invocation, pdp, requestCtx):
 
         try:
-            self.set_error_message(None)
             response = pdp.evaluate(requestCtx)
         except Exception, e:
             log.error("Error evaluating policies: %s" % e.message)
@@ -394,7 +379,7 @@ class PolicyDecisionPointManager(object):
             log.debug('response from PDP contains nothing, so not authorized')
             return Decision.DENY
 
-        if self.get_error_message() is not None:
+        if invocation.message_annotations.has_key(GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION):
             return Decision.DENY
 
         for result in response.results:

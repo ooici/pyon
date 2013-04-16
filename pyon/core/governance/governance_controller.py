@@ -10,6 +10,7 @@ from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.ion.resource import RT, OT
+from pyon.core.governance import get_system_actor_header, get_system_actor
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.ion.event import EventSubscriber
 from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
@@ -57,6 +58,9 @@ class GovernanceController(object):
         self._system_root_org_name = CFG.get_safe('system.root_org', 'ION')
 
         self._is_root_org_container = (self._container_org_name == self._system_root_org_name)
+
+        self.system_actor_id = None
+        self.system_actor_user_header = None
 
         if self.enabled:
 
@@ -207,6 +211,13 @@ class GovernanceController(object):
         @param kwargs:
         @return:
         """
+        #Need to check to set here to set after the system actor is created
+        if self.system_actor_id is None:
+            system_actor = get_system_actor()
+            if system_actor is not None:
+                self.system_actor_id = system_actor._id
+                self.system_actor_user_header = get_system_actor_header()
+
         policy_event = args[0]
         if policy_event.type_ == OT.ResourcePolicyEvent:
             self.resource_policy_event_callback(*args, **kwargs)
@@ -283,17 +294,6 @@ class GovernanceController(object):
         self.policy_decision_point_manager.clear_policy_cache()
         self.unregister_all_process_policy_preconditions()
 
-    def get_policy_decision_error_message(self):
-        return self.policy_decision_point_manager.get_error_message()
-
-    def set_policy_decision_error_message(self, message):
-        """
-        This function is a total hack to allow for XACML based optional error messages from evaluating functions
-        @param message:
-        @return:
-        """
-        self.policy_decision_point_manager.set_error_message(message)
-
     def update_container_policies(self, process_instance, safe_mode=False):
         """
         This must be called after registering a new process to load any applicable policies
@@ -305,6 +305,13 @@ class GovernanceController(object):
         #This method can be called before policy management service is available during system startup
         if safe_mode and not self._is_policy_management_service_available():
             return
+
+        #Need to check to set here to set after the system actor is created
+        if self.system_actor_id is None:
+            system_actor = get_system_actor()
+            if system_actor is not None:
+                self.system_actor_id = system_actor._id
+                self.system_actor_user_header = get_system_actor_header()
 
         if process_instance._proc_type == SERVICE_PROCESS_TYPE:
 
@@ -330,7 +337,7 @@ class GovernanceController(object):
         if self.policy_decision_point_manager is not None:
 
             try:
-                policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id)
+                policy_rules = self.policy_client.get_active_resource_access_policy_rules(resource_id, headers=self.system_actor_user_header)
                 self.policy_decision_point_manager.load_resource_policy_rules(resource_id, policy_rules)
 
             except Exception, e:
@@ -342,7 +349,7 @@ class GovernanceController(object):
 
         if self.policy_decision_point_manager is not None:
             try:
-                rules = self.policy_client.get_active_service_access_policy_rules('', self._container_org_name)
+                rules = self.policy_client.get_active_service_access_policy_rules(service_name='', org_name=self._container_org_name, headers=self.system_actor_user_header)
                 self.policy_decision_point_manager.load_common_service_policy_rules(rules)
 
                 #Reload all policies for existing services
@@ -361,7 +368,7 @@ class GovernanceController(object):
 
             try:
                 #First update any access policy rules
-                rules = self.policy_client.get_active_service_access_policy_rules(service_name, self._container_org_name)
+                rules = self.policy_client.get_active_service_access_policy_rules(service_name=service_name, org_name=self._container_org_name, headers=self.system_actor_user_header)
                 self.policy_decision_point_manager.load_service_policy_rules(service_name, rules)
 
             except Exception, e:
@@ -372,7 +379,7 @@ class GovernanceController(object):
             try:
                 proc = self.container.proc_manager.get_a_local_process(service_name)
                 if proc is not None:
-                    op_preconditions = self.policy_client.get_active_process_operation_preconditions(service_name, service_op, self._container_org_name)
+                    op_preconditions = self.policy_client.get_active_process_operation_preconditions(process_name=service_name, op=service_op, org_name=self._container_org_name, headers=self.system_actor_user_header)
                     if op_preconditions:
                         for op in op_preconditions:
                             for pre in op.preconditions:

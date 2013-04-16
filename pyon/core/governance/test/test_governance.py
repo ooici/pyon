@@ -232,7 +232,7 @@ class GovernanceUnitTest(PyonTestCase):
         pc = Mock()
         pc.get_active_resource_access_policy_rules.return_value = policy_rules
         self.governance_controller.policy_client = pc
-
+        self.governance_controller.system_actor_user_header = {}
         # call resource_policy_event_callback without a PDP
         self.governance_controller.resource_policy_event_callback(event_data)
         # expect that nothing happened since there was no PDP to update
@@ -245,7 +245,7 @@ class GovernanceUnitTest(PyonTestCase):
         self.governance_controller.resource_policy_event_callback(event_data)
 
         # expect that policy rules are retrieved for resource
-        pc.get_active_resource_access_policy_rules.assert_called_with(event_data.resource_id)
+        pc.get_active_resource_access_policy_rules.assert_called_with(event_data.resource_id, headers={})
 
         # expect that pdp is called with new rules
         pdp.load_resource_policy_rules.assert_called_with(event_data.resource_id, policy_rules)
@@ -282,6 +282,7 @@ class GovernanceUnitTest(PyonTestCase):
         policy_rules = 'policy_rules'
         pc = Mock()
         self.governance_controller.policy_client = pc
+        self.governance_controller.system_actor_user_header = {}
         pc.get_active_service_access_policy_rules.return_value = policy_rules
 
         # set local process
@@ -305,7 +306,7 @@ class GovernanceUnitTest(PyonTestCase):
         self.assertEquals('test_op_2' in self.governance_controller.get_process_operation_dict(local_process.name), True)
 
         # expect that policy rules are retrieved for resource
-        pc.get_active_service_access_policy_rules.assert_called_with(service_policy_event.service_name, self.governance_controller.container_org_name)
+        pc.get_active_service_access_policy_rules.assert_called_with(service_name=service_policy_event.service_name, org_name=self.governance_controller.container_org_name, headers={})
         pdp.load_service_policy_rules.assert_called_with(service_policy_event.service_name, policy_rules)
 
 
@@ -356,7 +357,7 @@ class GovernanceUnitTest(PyonTestCase):
 
         self.assertRaises(Inconsistent, GovernanceHeaderValues, headers)
 
-        gov_values = GovernanceHeaderValues(headers, False)
+        gov_values = GovernanceHeaderValues(headers, resource_id_required=False)
         self.assertEqual(gov_values.op, 'test_op')
         self.assertEqual(gov_values.process_name, 'Unknown-Process')
         self.assertEqual(gov_values.actor_id, 'ionsystem')
