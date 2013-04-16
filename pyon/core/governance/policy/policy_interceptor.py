@@ -114,7 +114,6 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 elif process_type == 'service':
                     ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
-
             log.debug("Policy Decision: " + str(ret))
 
             #Annonate the message has completed policy checking
@@ -123,7 +122,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             if ret is not None:
                 if str(ret) == Decision.DENY_STR:
                     self.annotate_denied_message(invocation)
-                elif str(ret) == Decision.PERMIT:
+                else:
                     self.permit_sub_rpc_calls_token(invocation)
 
         else:
