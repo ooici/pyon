@@ -58,7 +58,7 @@ setup(  name = 'pyon',
             'greenlet==0.4.0',
             # Don't put == version on gevent
             'gevent',
-            'simplejson==2.1.6',
+            'simplejson',
             'msgpack-python==0.1.13',
             'setproctitle==1.1.2',
             'pika==0.9.5',
