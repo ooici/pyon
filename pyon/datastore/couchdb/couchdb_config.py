@@ -126,6 +126,8 @@ function(doc) {
   if (doc.type_ && doc.lcstate != 'RETIRED') {
     if (doc.type_ == "UserInfo" && doc.contact != undefined && doc.contact.email != undefined) {
       emit([doc.type_, "contact.email", doc.contact.email], null);
+    } else if (doc.type_ == "DataProduct" && doc.ooi_product_name) {
+      emit([doc.type_, "ooi_product_name", doc.ooi_product_name], null);
     }
   }
 }""",
