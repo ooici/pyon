@@ -786,21 +786,17 @@ class ExtendedResourceContainer(object):
 
 
 
-    def create_prepare_update_resource(self, resource_id, resource_type):
+    def create_prepare_resource_support(self, resource_id=None, resource_type=None):
 
-        if not isinstance(resource_id, types.StringType):
+        if resource_id is None or not isinstance(resource_id, types.StringType):
             raise Inconsistent("The parameter resource_id is not a single resource id string")
 
         if not self.service_provider or not self._rr:
             raise Inconsistent("This class is not initialized properly")
 
-        if resource_type not in getextends(OT.ResourcePrepareUpdate):
-            raise BadRequest('The requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourcePrepareUpdate))
+        if resource_type is not None and resource_type not in getextends(OT.ResourcePrepareSupport):
+            raise BadRequest('The requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourcePrepareSupport))
 
-        resource_object = self._rr.read(resource_id)
-
-        if not resource_object:
-            raise NotFound("The Resource %s does not exist" % resource_id)
 
         resource_data = IonObject(resource_type)
 
@@ -809,11 +805,18 @@ class ExtendedResourceContainer(object):
         if origin_resource_type is None:
             raise NotFound('OriginResourceType decorator not found in object specification %s', resource_type)
 
-        elif origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, origin_resource_type):
-            raise Inconsistent('The OriginResourceType decorator of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (
-                resource_type, origin_resource_type, resource_object.type_))
+        resource_object = None
+        if resource_id is not None:
+            resource_object = self._rr.read(resource_id)
 
-        resource_data._id = resource_object._id
+            if origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, origin_resource_type):
+                raise Inconsistent('The OriginResourceType decorator of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (
+                    resource_type, origin_resource_type, resource_object.type_))
+
+            resource_data._id = resource_object._id
+        else:
+            resource_object = IonObject(origin_resource_type)
+
         resource_data.resource = resource_object
         resource_data.resource_schema = get_object_schema(origin_resource_type)
 
@@ -828,10 +831,9 @@ class ExtendedResourceContainer(object):
             deco_value = resource_data.get_decorator_value(field, 'Association')
             if deco_value is not None:
 
-
-                resource_subject = resource_id if resource_data.is_decorator(field, 'ResourceSubject') else None
-                resource_object = resource_id if resource_data.is_decorator(field, 'ResourceObject') else None
-                assoc_list = self._rr.find_associations(subject=resource_subject, predicate=deco_value, object=resource_object,
+                resource_sub = resource_id if resource_id is not None and resource_data.is_decorator(field, 'ResourceSubject') else None
+                resource_obj = resource_id if resource_id is not None and resource_data.is_decorator(field, 'ResourceObject') else None
+                assoc_list = self._rr.find_associations(subject=resource_subj, predicate=deco_value, object=resource_obj,
                     id_only=False)
 
                 subject_type = resource_data.get_decorator_value(field, 'SubjectType')
