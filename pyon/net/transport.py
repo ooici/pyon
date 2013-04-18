@@ -470,7 +470,8 @@ class AMQPTransport(BaseTransport):
         """
         Publishes a message on an exchange.
         """
-        log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
+        #log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
+        log.debug("AMQPTransport.publish(%s): ex %s key %s, size %d", self._client.channel_number, exchange, routing_key, len(repr(body))+len(repr(properties)))
 
         if durable_msg:
             delivery_mode = 2
