@@ -118,7 +118,7 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
         # then skip checking policy yet again - should help with performance and to simplify policy
         # thus the invocation is simply returned back
         rval = policy_interceptor.incoming(self.invocation)
-        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_SKIPPED)
+        self.assertEquals(rval.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION], GovernanceDispatcher.STATUS_COMPLETE)
 
         ##########
         #           TEST 5
