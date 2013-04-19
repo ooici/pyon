@@ -61,6 +61,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #If missing the performative header, consider it as a failure message.
         msg_performative = invocation.get_header_value('performative', 'failure')
         op = invocation.get_header_value('op', 'unknown')
+        process_type = invocation.get_invocation_process_type()
 
         #TODO - This should be removed once better process security is implemented
         #THis fix infers that all messages that do not specify an actor id are TRUSTED wihtin the system
@@ -86,14 +87,14 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             #checking policy - if needed
             receiver = invocation.get_message_receiver()
 
-            #If this is a sub RPC request from a higher level service that has already been validated and set a token
+            #For services only - if this is a sub RPC request from a higher level service that has already been validated and set a token
             #then skip checking policy yet again - should help with performance and to simplify policy
-            if self.has_valid_token(invocation, PERMIT_SUB_CALLS):
-                #print "skipping call to " + receiver + " " + op + " from " + actor_id
+            if process_type == 'service' and self.has_valid_token(invocation, PERMIT_SUB_CALLS):
+                #print "skipping call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
 
-            #print "checking call to " + receiver + " " + op + " from " + actor_id
+            #print "checking call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
 
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
@@ -107,7 +108,6 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
             if str(ret) != Decision.DENY_STR:
                 #Next check endpoint process specific policies
-                process_type = invocation.get_invocation_process_type()
                 if process_type == 'agent':
                     ret = self.governance_controller.policy_decision_point_manager.check_agent_request_policies(invocation)
 
