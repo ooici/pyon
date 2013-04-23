@@ -397,7 +397,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
             """
             try:
                 self.body, self.headers = self.endpoint.intercept_in(self.raw_body, self.raw_headers)
-            except IonException as ex:
+            except Exception as ex:
                 log.info("MessageObject.make_body raised an error: \n%s", traceback.format_exc(ex))
                 self.error = ex
 
