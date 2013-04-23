@@ -1048,15 +1048,12 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         try:
             new_msg, new_headers = ResponseEndpointUnit.intercept_in(self, msg, headers)
             return new_msg, new_headers
-        except IonException as ex:
-            (exc_type, exc_value, exc_traceback) = sys.exc_info()
-            tb_list = traceback.extract_tb(sys.exc_info()[2])
-            tb_list = traceback.format_list(tb_list)
-            tb_output = ""
-            for elt in tb_list:
-                tb_output += elt
+        except Exception as ex:
             log.debug("server exception being passed to client", exc_info=True)
-            result = ex.get_stacks()
+            result = ""
+            if isinstance(ex, IonException):
+                result = ex.get_stacks()
+
             response_headers = self._create_error_response(ex)
 
             response_headers['protocol']    = headers.get('protocol', '')
@@ -1086,16 +1083,13 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         try:
             result, new_response_headers = ResponseEndpointUnit._message_received(self, msg, headers)       # execute interceptor stack, calls into our message_received
             response_headers.update(new_response_headers)       # don't clobber our msg-rcvd header
-        except IonException as ex:
-            (exc_type, exc_value, exc_traceback) = sys.exc_info()
-            tb_list = traceback.extract_tb(sys.exc_info()[2])
-            tb_list = traceback.format_list(tb_list)
-            tb_output = ""
-            for elt in tb_list:
-                tb_output += elt
+        except Exception as ex:
             log.debug("server exception being passed to client", exc_info=True)
-            result = ex.get_stacks()
-            response_headers.update(self._create_error_response(ex))
+            result = ""
+            if isinstance(ex, IonException):
+                result = ex.get_stacks()
+
+            response_headers = self._create_error_response(ex)
         finally:
             # REPLIES: propogate protocol, conv-id, conv-seq
             response_headers['protocol']    = headers.get('protocol', '')
@@ -1169,7 +1163,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
             if ro_meth_args[2] is None:
                 for arg_name in cmd_arg_obj:
                     if not arg_name in ro_meth_args[0]:
-                        return None, self._create_error_response(BadRequest("Argument %s not present in op signature" % arg_name))
+                        return None, self._create_error_response(code=400, msg="Argument %s not present in op signature" % arg_name)
 
         result = None
         response_headers = {}
@@ -1203,10 +1197,17 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         return to_val
 
-    def _create_error_response(self, ex):
-        # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
-        return {'status_code': ex.get_status_code(),
-                'error_message': str(ex.get_error_message()),
+    def _create_error_response(self, ex=None, code=500, msg=None):
+        if ex is not None:
+            if isinstance(ex, IonException):
+                code = ex.get_status_code()
+                # have seen exceptions where the "message" is really a tuple, and pika is not a fan: make sure it is str()'d
+                msg = str(ex.get_error_message())
+            else:
+                msg = "%s (%s)" % (str(ex.message), type(ex))
+
+        return {'status_code': code,
+                'error_message': msg,
                 'performative': 'failure'}
 
     def _make_routing_call(self, call, timeout, *op_args, **op_kwargs):
