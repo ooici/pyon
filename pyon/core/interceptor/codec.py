@@ -2,6 +2,7 @@ from pyon.core.interceptor.interceptor import Interceptor
 from pyon.core.bootstrap import get_obj_registry
 from pyon.core.object import IonObjectDeserializer, IonObjectSerializer, IonObjectBlameDeserializer, IonObjectBlameSerializer
 from pyon.util.log import log
+from pyon.core.exception import BadRequest
 
 
 class CodecInterceptor(Interceptor):
@@ -28,7 +29,11 @@ class CodecInterceptor(Interceptor):
         payload = invocation.message
         log.debug("Payload, pre-transform: %s", payload)
 
-        invocation.message = self._io_deserializer.deserialize(payload)
+        try:
+            invocation.message = self._io_deserializer.deserialize(payload)
+        except Exception as e:
+            raise BadRequest("Could not deserialize: %s" % e.message)
+
         log.debug("Payload, post-transform: %s", invocation.message)
 
         return invocation
