@@ -58,13 +58,13 @@ class EvaluateCode(AbstractFunction):
             exec eval_code.value
             pref = locals()["policy_func"]
             ret_val, error_msg = pref(process=parameter_dict.value['process'], message=parameter_dict.value['message'], headers=parameter_dict.value['headers'])
+            if not ret_val:
+                parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
 
         except Exception, e:
             log.exception(e)
             ret_val = False
-
-        if not ret_val:
-            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
+            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = e.message
 
         return ret_val
 
@@ -111,12 +111,12 @@ class EvaluateFunction(AbstractFunction):
 
         try:
             ret_val, error_msg = execute_method(execution_object=parameter_dict.value['process'], method_name=function_name.value, **parameter_dict.value)
+            if not ret_val:
+                parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
         except Exception, e:
             log.exception(e)
             ret_val = False
-
-        if not ret_val:
-            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = error_msg
+            parameter_dict.value['annotations'][GovernanceDispatcher.POLICY__STATUS_REASON_ANNOTATION] = e.message
 
         return ret_val
 
