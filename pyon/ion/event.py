@@ -106,9 +106,13 @@ class EventPublisher(Publisher):
         else:
             event_object.ts_created = str(current_time)
 
-        #Validate this object
-        #TODO - enable this once the resource agent issue sending a dict is figured out
-        #event_object._validate()
+        #Validate this object - ideally the validator should pass on problems, but for now just log
+        #any errors and keep going, since seeing invalid situations are better than skipping validation.
+        try:
+            event_object._validate()
+        except Exception, e:
+            log.exception(e)
+
 
         #Ensure the event object has a unique id
         if '_id' in event_object:

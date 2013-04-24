@@ -49,9 +49,16 @@ class ValidateInterceptor(Interceptor):
 
             # IonObject _validate will throw AttributeError on validation failure.
             # Raise corresponding BadRequest exception into message stack.
+            # Ideally the validator should pass on problems, but for now just log
+            # any errors and keep going, since logging and seeing invalid situations are better
+            # than skipping validation altogether.
+
             def validate_ionobj(obj):
                 if isinstance(obj, IonObjectBase):
-                    obj._validate()
+                    try:
+                        obj._validate()
+                    except Exception, e:
+                        log.exception(e)
                 return obj
 
             try:
