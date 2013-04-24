@@ -55,10 +55,7 @@ class ValidateInterceptor(Interceptor):
 
             def validate_ionobj(obj):
                 if isinstance(obj, IonObjectBase):
-                    try:
-                        obj._validate()
-                    except Exception, e:
-                        log.exception(e)
+                    obj._validate()
                 return obj
 
             try:
@@ -74,6 +71,9 @@ class ValidateInterceptor(Interceptor):
                     tb_output += elt
                 log.debug("Object validation failed. %s" % e.message)
                 log.debug("Traceback: %s" % str(tb_output))
-                raise BadRequest(e.message)
+                if invocation.headers.has_key("raise-exception") and invocation.headers['raise-exception']:
+                    raise BadRequest(e.message)
+                else:
+                    log.exception(e)
 
         return invocation
