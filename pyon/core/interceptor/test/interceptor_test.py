@@ -137,6 +137,7 @@ class InterceptorTest(PyonTestCase):
 
         invoke = Invocation()
         invoke.message = decorator_obj
+        invoke.headers["raise-exception"] = True
         invoke.headers["validate"] = True
 
         # Should fail because required field not set
@@ -148,6 +149,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work now that we have set a value for the required field
         validate_interceptor.incoming(invoke)
@@ -161,6 +163,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail because list contains non-numeric value
         with self.assertRaises(BadRequest):
@@ -171,6 +174,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work now that list content has been corrected
         validate_interceptor.incoming(invoke)
@@ -182,6 +186,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work now that list content has been corrected
         validate_interceptor.incoming(invoke)
@@ -193,6 +198,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work now that list content has been corrected
         validate_interceptor.incoming(invoke)
@@ -204,6 +210,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should catch a bad ION object type
         with self.assertRaises(BadRequest):
@@ -216,6 +223,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail because dict value contains non-numeric value
         with self.assertRaises(BadRequest):
@@ -226,6 +234,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work now that dict value content has been corrected
         validate_interceptor.incoming(invoke)
@@ -239,6 +248,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail since list has zero length
         with self.assertRaises(BadRequest):
@@ -249,6 +259,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work new that item length of list has been corrected
         validate_interceptor.incoming(invoke)
@@ -259,6 +270,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail since dict has zero length
         with self.assertRaises(BadRequest):
@@ -269,6 +281,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work new that item length of dict has been corrected
         validate_interceptor.incoming(invoke)
@@ -282,6 +295,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail
         with self.assertRaises(BadRequest):
@@ -292,6 +306,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work
         validate_interceptor.incoming(invoke)
@@ -302,6 +317,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail
         with self.assertRaises(BadRequest):
@@ -312,6 +328,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work
         validate_interceptor.incoming(invoke)
@@ -324,6 +341,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should fail
         with self.assertRaises(BadRequest):
@@ -334,6 +352,7 @@ class InterceptorTest(PyonTestCase):
         invoke = Invocation()
         invoke.message = decorator_obj
         invoke.headers["validate"] = True
+        invoke.headers["raise-exception"] = True
 
         # Should work
         validate_interceptor.incoming(invoke)
