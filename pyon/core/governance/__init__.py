@@ -189,14 +189,18 @@ def get_system_actor_header(system_actor=None):
         return get_actor_header(None)
 
 
-def get_resource_commitments(actor_id, resource_id):
+def get_resource_commitments(resource_id=None, actor_id=None):
     '''
-    Returns the list of commitments for the specified user and resource
-    @param actor_id:
+    Returns the list of valid commitments for the specified resource.
+    If optional actor_id is supplied, then filtered by actor_id
     @param resource_id:
+    @param actor_id:
     @return:
     '''
-    log.debug("Finding commitments for actor_id: %s and resource_id: %s" % (actor_id, resource_id))
+    log.debug("Finding commitments for resource_id: %s and actor_id: %s" % (resource_id, actor_id))
+
+    if resource_id is None:
+        return None
 
     try:
         gov_controller = bootstrap.container_instance.governance_controller
@@ -207,7 +211,7 @@ def get_resource_commitments(actor_id, resource_id):
         cur_time = int(get_ion_ts())
         commitment_list = []
         for com in commitments:
-            if com.consumer == actor_id  and ( com.expiration == 0 or ( com.expiration > 0 and cur_time < com.expiration)):
+            if ( actor_id == None or com.consumer == actor_id )  and ( com.expiration == 0 or ( com.expiration > 0 and cur_time < com.expiration)):
                 commitment_list.append(com)
 
         if commitment_list:
@@ -227,9 +231,10 @@ def has_resource_commitments(actor_id, resource_id):
     @return:
     '''
     ret_status = IonObject(OT.ResourceCommitmentStatus)
-    commitments = get_resource_commitments(actor_id, resource_id)
+    commitments = get_resource_commitments(resource_id, actor_id)
     if commitments is None:
-        #No commitments were found between this resource_id and actor_id
+        #No commitments were found between this resource_id and actor_id - so return default object with
+        #fields set to False
         return ret_status
 
     ret_status.shared = True
