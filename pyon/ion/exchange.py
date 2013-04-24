@@ -16,7 +16,7 @@ from pyon.ion.endpoint import ProcessEndpointUnitMixin
 
 import gevent
 import requests
-import json
+import simplejson
 import time
 import socket
 
@@ -786,7 +786,7 @@ class ExchangeManager(object):
                 r.raise_for_status()
 
                 if not r.content == "":
-                    content = json.loads(r.content)
+                    content = simplejson.loads(r.content)
                 else:
                     content = None
 
