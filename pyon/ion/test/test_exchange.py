@@ -25,7 +25,7 @@ import os
 import time
 from gevent.timeout import Timeout
 from uuid import uuid4
-import json
+import simplejson as json
 
 def _make_server_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
