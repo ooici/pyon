@@ -512,7 +512,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = get_resource_commitments(actor_id, ion_org_id)
+        c = get_resource_commitments(ion_org_id, actor_id)
         #verify that the commitment is not returned
         self.assertIsNone(c)
 
@@ -521,7 +521,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = get_resource_commitments(actor_id, ion_org_id)
+        c = get_resource_commitments(ion_org_id, actor_id)
 
         #verify that the commitment is returned
         self.assertIsNotNone(c)
