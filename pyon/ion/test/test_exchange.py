@@ -731,16 +731,22 @@ class TestExchangeObjectsDurableFlag(IonIntegrationTestCase):
         pub.publish('test')
         pub.close()
 
-        url = self.container.ex_manager._get_management_url("queues", "%2f", xq.queue, "get")
-        res = self.container.ex_manager._make_management_call(url,
-                                                              use_ems=False,
-                                                              method='post',
-                                                              data=json.dumps({'count':1, 'requeue':True,'encoding':'auto'}))
 
-        self.assertEquals(len(res), 1)
-        self.assertIn('properties', res[0])
-        self.assertIn('delivery_mode', res[0]['properties'])
-        self.assertEquals(2, res[0]['properties']['delivery_mode'])
+        try:
+            url = self.container.ex_manager._get_management_url("queues", "%2f", xq.queue, "get")
+            res = self.container.ex_manager._make_management_call(url,
+                                                                  use_ems=False,
+                                                                  method='post',
+                                                                  data=json.dumps({'count':1, 'requeue':True,'encoding':'auto'}))
+
+            self.assertEquals(len(res), 1)
+            self.assertIn('properties', res[0])
+            self.assertIn('delivery_mode', res[0]['properties'])
+            self.assertEquals(2, res[0]['properties']['delivery_mode'])
+
+        except Exception, e:
+            # Rabbit 3.x does not support this command anymore apparently.
+            self.assertIn('Method Not Allowed', e.message)
 
     def test_xn_service_is_not_durable_with_cfg_on(self):
         xns = self.container.ex_manager.create_xn_service('fake_service')
