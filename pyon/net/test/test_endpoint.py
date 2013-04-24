@@ -663,7 +663,6 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
                                                        'encoding':'msgpack',
                                                        'format':'list',
                                                        'receiver': ',',
-                                                       'msg-rcvd':ANY,
                                                        'ts': sentinel.ts})
 
     @patch('pyon.net.endpoint.get_ion_ts', Mock(return_value=sentinel.ts))
@@ -706,7 +705,6 @@ class TestRPCResponseEndpoint(PyonTestCase, RecvMockMixin):
             assert_called_once_with_header(self, e.send, {'status_code': -1,
                                                           'error_message':'',
                                                           'conv-id': '',
-                                                          'msg-rcvd':ANY,
                                                           'conv-seq': 2,
                                                           'protocol':'',
                                                           'performative': 'failure'})
@@ -736,7 +734,6 @@ Routing method for next test, raises an IonException.
         assert_called_once_with_header(self, e.send, {'status_code': 401,
                                                       'error_message': str(sentinel.unauth),
                                                       'conv-id': sentinel.conv_id,
-                                                      'msg-rcvd':ANY,
                                                       'conv-seq': 2,
                                                       'protocol':'',
                                                       'performative':'failure'})
