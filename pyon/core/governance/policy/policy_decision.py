@@ -155,7 +155,7 @@ class PolicyDecisionPointManager(object):
         if not rules_text and not self.service_policy_decision_point.has_key(service_name):
             return
 
-        log.info("Loading policies for service: %s" % service_name)
+        log.debug("Loading policies for service: %s" % service_name)
 
         self.clear_service_policy(service_name)
         service_rule_set = self.common_service_rules + rules_text
@@ -169,7 +169,7 @@ class PolicyDecisionPointManager(object):
         if not rules_text and not self.resource_policy_decision_point.has_key(resource_key):
             return
 
-        log.info("Loading policies for resource: %s" % resource_key)
+        log.debug("Loading policies for resource: %s" % resource_key)
 
         self.clear_resource_policy(resource_key)
 
@@ -248,7 +248,7 @@ class PolicyDecisionPointManager(object):
         actor_roles = invocation.get_header_value('ion-actor-roles', {})
         message_format = invocation.get_header_value('format', '')
 
-        log.debug("Using XACML Request: sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s" % (sender, receiver, op, ion_actor_id, str(actor_roles)))
+        log.debug("Checking XACML Request: receiver_type: %s, sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s", receiver_type, sender, receiver, op, ion_actor_id, actor_roles)
 
         request = Request()
         subject = Subject()
@@ -321,7 +321,9 @@ class PolicyDecisionPointManager(object):
         if not process:
             raise NotFound('Cannot find process in message')
 
-        decision = self._check_service_request_policies(invocation, 'agent')
+        decision = self.check_resource_request_policies(invocation, process.resource_id)
+
+        log.debug("Resource policy Decision: %s", decision)
 
         # todo: check if its OK to treat everything but Deny as Permit (Ex: NotApplicable)
         # Return if agent service policies deny the operation
@@ -329,7 +331,7 @@ class PolicyDecisionPointManager(object):
             return decision
 
         # Else check any policies that might be associated with the resource.
-        decision = self.check_resource_request_policies(invocation, process.resource_id)
+        decision = self._check_service_request_policies(invocation, 'agent')
 
         return decision
 
