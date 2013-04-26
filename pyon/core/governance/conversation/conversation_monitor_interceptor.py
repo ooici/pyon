@@ -41,12 +41,11 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
 
     def outgoing(self, invocation):
-        log.debug('I am in outgoing conversation interceptor!!!')
 
         if invocation.args.has_key('process'):
-            log.debug("ConversationMonitorInterceptor.outgoing: %s" % invocation.get_arg_value('process',invocation).name)
+            log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation.get_arg_value('process',invocation).name)
         else:
-            log.debug("ConversationMonitorInterceptor.outgoing: %s" % invocation)
+            log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation)
 
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
@@ -66,11 +65,11 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         return invocation
 
     def incoming(self, invocation):
-        log.debug('I am in incoming conversation interceptor!!!')
+
         if invocation.args.has_key('process'):
-            log.debug("ConversationMonitorInterceptor.incoming: %s" % invocation.get_arg_value('process',invocation).name)
+            log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation.get_arg_value('process',invocation).name)
         else:
-            log.debug("ConversationMonitorInterceptor.incoming: %s" % invocation)
+            log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation)
 
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 

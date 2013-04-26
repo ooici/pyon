@@ -50,13 +50,16 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        log.debug("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
+        log.trace("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
 
         return invocation
 
     def incoming(self, invocation):
 
-        log.debug("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
+        log.trace("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
+
+        #print "========"
+        #print invocation.headers
 
         #If missing the performative header, consider it as a failure message.
         msg_performative = invocation.get_header_value('performative', 'failure')
@@ -74,27 +77,30 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
         #Only check messages marked as the initial rpc request - TODO - remove the actor_id is not None when headless process have actor_ids
         if msg_performative == 'request' and actor_id is not None:
 
+            receiver = invocation.get_message_receiver()
+
             #Can's check policy if the controller is not initialized
             if self.governance_controller is None:
+                log.debug("Skipping policy check for %s(%s) since governance_controller is None", receiver, op)
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
 
             #No need to check for requests from the system actor - should increase performance during startup
             if actor_id == self.governance_controller.system_actor_id:
+                log.debug("Skipping policy check for %s(%s) for the system actor", receiver, op)
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
 
-            #checking policy - if needed
-            receiver = invocation.get_message_receiver()
 
             #For services only - if this is a sub RPC request from a higher level service that has already been validated and set a token
             #then skip checking policy yet again - should help with performance and to simplify policy
             if process_type == 'service' and self.has_valid_token(invocation, PERMIT_SUB_CALLS):
+                log.debug("Skipping policy check for service call %s %s since token is valid", receiver, op)
                 #print "skipping call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
 
-            #print "checking call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
+            log.debug("Checking request for %s: %s(%s) from %s  ", process_type, receiver, op, actor_id)
 
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
@@ -114,7 +120,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 elif process_type == 'service':
                     ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
-            log.debug("Policy Decision: " + str(ret))
+            log.debug("Policy Decision: %s", ret)
 
             #Annonate the message has completed policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE
