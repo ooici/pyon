@@ -102,6 +102,14 @@ def is_ion_object_dict(obj):
     return False
 
 
+def get_class_decorator_value(class_obj, decorator):
+
+    if getattr(class_obj, '_class_info'):
+        if class_obj._class_info['decorators'].has_key(decorator):
+            return class_obj._class_info['decorators'][decorator]
+
+    return None
+
 class IonObjectRegistry(object):
     """
     A simple key-value store that stores by name and by definition hash for versioning.
