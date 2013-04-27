@@ -26,7 +26,7 @@ from ndg.xacml.core.context.result import Decision
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound
 from pyon.core.governance import ION_MANAGER
-from pyon.core.registry import is_ion_object
+from pyon.core.registry import is_ion_object, message_classes, get_class_decorator_value
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 
 from pyon.util.log import log
@@ -295,8 +295,8 @@ class PolicyDecisionPointManager(object):
         #Check to see if there is a OperationVerb decorator specifying a Verb used with policy
         if is_ion_object(message_format):
             try:
-                msg_class = IonObject(message_format)
-                operation_verb = msg_class.get_class_decorator_value('OperationVerb')
+                msg_class = message_classes[message_format]
+                operation_verb = get_class_decorator_value(msg_class,'OperationVerb')
                 if operation_verb is not None:
                     request.action.attributes.append(self.create_string_attribute(ACTION_VERB, operation_verb))
 

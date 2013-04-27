@@ -261,9 +261,9 @@ class GovernanceController(object):
 
         if service_name:
             if self.container.proc_manager.is_local_service_process(service_name):
-                self.update_service_access_policy(service_name, service_op, delete_policy)
+                self.update_service_access_policy(service_name, service_op, delete_policy=delete_policy)
             elif self.container.proc_manager.is_local_agent_process(service_name):
-                self.update_service_access_policy(service_name, service_op, delete_policy)
+                self.update_service_access_policy(service_name, service_op, delete_policy=delete_policy)
 
         else:
             self.update_common_service_access_policy()
@@ -355,7 +355,7 @@ class GovernanceController(object):
                 #Reload all policies for existing services
                 for service_name in self.policy_decision_point_manager.list_service_policies():
                     if self.container.proc_manager.is_local_service_process(service_name):
-                        self.update_service_access_policy(service_name, delete_policy)
+                        self.update_service_access_policy(service_name, delete_policy=delete_policy)
 
             except Exception, e:
                 #If the resource does not exist, just ignore it - but log a warning.
