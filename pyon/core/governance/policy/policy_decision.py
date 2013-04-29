@@ -91,7 +91,7 @@ class PolicyDecisionPointManager(object):
         functionMap['urn:oasis:names:tc:xacml:1.0:function:evaluate-function'] = EvaluateFunction
 
 
-    def _get_policy_template(self):
+    def _get_default_policy_template(self):
 
         #TODO - Put in resource registry as object and load in preload
 
@@ -113,8 +113,39 @@ class PolicyDecisionPointManager(object):
 
         return policy_template
 
+    def _get_resource_policy_template(self):
+
+        #TODO - Put in resource registry as object and load in preload
+
+        policy_template = '''<?xml version="1.0" encoding="UTF-8"?>
+        <Policy xmlns="urn:oasis:names:tc:xacml:2.0:policy:schema:os"
+            xmlns:xacml-context="urn:oasis:names:tc:xacml:2.0:context:schema:os"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="urn:oasis:names:tc:xacml:2.0:policy:schema:os http://docs.oasis-open.org/xacml/access_control-xacml-2.0-policy-schema-os.xsd"
+            xmlns:xf="http://www.w3.org/TR/2002/WD-xquery-operators-20020816/#"
+            xmlns:md="http:www.med.example.com/schemas/record.xsd"
+            PolicyId="%s"
+            RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:first-applicable">
+            <PolicyDefaults>
+                <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
+            </PolicyDefaults>
+
+            %s
+        </Policy>'''
+
+        return policy_template
+
+
+
+
+
     def create_policy_from_rules(self, policy_identifier, rules):
-        policy = self._get_policy_template()
+        policy = self._get_default_policy_template()
+        policy_rules = policy % (policy_identifier, rules)
+        return policy_rules
+
+    def create_resource_policy_from_rules(self, policy_identifier, rules):
+        policy = self._get_resource_policy_template()
         policy_rules = policy % (policy_identifier, rules)
         return policy_rules
 
@@ -170,11 +201,12 @@ class PolicyDecisionPointManager(object):
             return
 
         log.debug("Loading policies for resource: %s" % resource_key)
+        #print rules_text
 
         self.clear_resource_policy(resource_key)
 
         #Simply create a new PDP object for the service
-        input_source = StringIO(self.create_policy_from_rules(resource_key, rules_text))
+        input_source = StringIO(self.create_resource_policy_from_rules(resource_key, rules_text))
         self.resource_policy_decision_point[resource_key] = PDP.fromPolicySource(input_source, ReaderFactory)
 
     #Remove any policy indexed by the resource_key
