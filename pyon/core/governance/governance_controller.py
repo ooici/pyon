@@ -221,6 +221,8 @@ class GovernanceController(object):
         policy_event = args[0]
         if policy_event.type_ == OT.ResourcePolicyEvent:
             self.resource_policy_event_callback(*args, **kwargs)
+        elif policy_event.type_ == OT.RelatedResourcePolicyEvent:
+            self.resource_policy_event_callback(*args, **kwargs)
         elif policy_event.type_ == OT.ServicePolicyEvent:
             self.service_policy_event_callback(*args, **kwargs)
 
@@ -233,12 +235,10 @@ class GovernanceController(object):
         @return:
         """
         resource_policy_event = args[0]
-        log.debug('Resource related policy event received: %s', str(resource_policy_event.__dict__))
+        log.debug('Resource policy event received: %s', str(resource_policy_event.__dict__))
 
         policy_id = resource_policy_event.origin
         resource_id = resource_policy_event.resource_id
-        resource_type = resource_policy_event.resource_type
-        resource_name = resource_policy_event.resource_name
         delete_policy = True if resource_policy_event.sub_type == 'DeletePolicy' else False
 
         self.update_resource_access_policy(resource_id, delete_policy)
@@ -252,7 +252,7 @@ class GovernanceController(object):
         @return:
         """
         service_policy_event = args[0]
-        log.debug('Service related policy event received: %s', str(service_policy_event.__dict__))
+        log.debug('Service policy event received: %s', str(service_policy_event.__dict__))
 
         policy_id = service_policy_event.origin
         service_name = service_policy_event.service_name
