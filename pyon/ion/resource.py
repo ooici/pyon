@@ -822,11 +822,51 @@ class ExtendedResourceContainer(object):
 
         for field in resource_data._schema:
 
+            deco_value = resource_data.get_decorator_value(field, 'AssociatedResources')
+            assoc_dict = {}
+            if deco_value is not None:
+                if deco_value.find(',') == -1:
+                    associated_resources = [deco_value]
+                else:
+                    associated_resources = deco_value.split(',')
+
+                for res in associated_resources:
+                    assoc = self.get_associated_resource_info(resource_id, res)
+                    assoc_dict[assoc.resource_type] = assoc
+
+                setattr(resource_data, field, assoc_dict)
+                continue
+
+
+        return resource_data
+
+
+    def get_associated_resource_info(self, resource_id="", resource_type=None):
+
+        if not isinstance(resource_id, types.StringType):
+            raise Inconsistent("The parameter resource_id is not a single resource id string")
+
+        if not self.service_provider or not self._rr:
+            raise Inconsistent("This class is not initialized properly")
+
+        if resource_type is not None and resource_type not in getextends(OT.AssociatedResources):
+            raise BadRequest('The requested resource %s is not extended from %s' % (resource_type, OT.AssociatedResources))
+
+
+        resource_data = IonObject(resource_type)
+
+        for field in resource_data._schema:
+
             deco_value = resource_data.get_decorator_value(field, 'ResourceType')
             if deco_value is not None:
+
+                #Set the type of the associated resource to be used as the key in dict of associations
+                setattr(resource_data, 'resource_type', deco_value)
+
                 res_list,_ = self._rr.find_resources(restype=deco_value, id_only=False)
                 setattr(resource_data, field, res_list)
                 continue
+
 
             deco_value = resource_data.get_decorator_value(field, 'Association')
             if deco_value is not None:
@@ -855,3 +895,16 @@ class ExtendedResourceContainer(object):
 
 
         return resource_data
+
+    def set_service_requests(self, service_request=None, service_name='', service_operation='', request_parameters=None):
+
+        assert(service_request)
+        assert(service_name)
+        assert(service_operation)
+        assert(request_parameters)
+
+        service_request.service_name = service_name
+        service_request.service_operation = service_operation
+        service_request.request_parameters = request_parameters if request_parameters is not None else {}
+
+        return
