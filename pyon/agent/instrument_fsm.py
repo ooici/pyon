@@ -154,31 +154,9 @@ class InstrumentFSM(object):
         return events
 
 class ThreadSafeFSM(InstrumentFSM):
-    """
-    """
-    
     def __init__(self, states, events, enter_event, exit_event):
-        super(ThreadSafeFSM, self).__init__(states, events, enter_event,
-                                            exit_event)
         self._lock = RLock()
-    
+        super(ThreadSafeFSM, self).__init__(states, events, enter_event, exit_event)
     def on_event(self, event, *args, **kwargs):
-        """
-        """
-        
-        self._lock.acquire(True)
-        ex = None
-        
-        try:
-            result = super(ThreadSafeFSM, self).on_event(event, *args, **kwargs)
-        
-        except Exception as ex:
-            pass
-        
-        finally:
-            self._lock.release()
-        
-        if ex:
-            raise ex
-        
-        return result
+        with self._lock:
+            return super(ThreadSafeFSM, self).on_event(event, *args, **kwargs)
