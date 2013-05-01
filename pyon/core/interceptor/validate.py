@@ -21,16 +21,7 @@ class ValidateInterceptor(Interceptor):
         # Set validate flag in header if IonObject(s) found in message
         log.debug("ValidateInterceptor.outgoing: %s", invocation)
 
-        if self.enabled:
-            payload = invocation.message
-            log.debug("Payload, pre-validate: %s", payload)
-
-            def validate_ionobj(obj):
-                if isinstance(obj, IonObjectBase):
-                    invocation.headers["validate"] = True
-                return obj
-
-            walk(payload, validate_ionobj)
+        #Nothing to validate on the outbound side
         return invocation
 
     def incoming(self, invocation):
