@@ -85,7 +85,7 @@ class EventPublisher(Publisher):
 
         topic = self._topic(event_object)
         to_name = (self._send_name.exchange, topic)
-        log.trace("Publishing event message to %s", to_name)
+        log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
 
         current_time = int(get_ion_ts())
 
@@ -242,7 +242,7 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread = gl
         if not self._ready_event.wait(timeout=5):
             log.warning('EventSubscriber start timed out.')
-        log.info("EventSubscriber started. Event pattern=%s" % self.binding)
+        log.debug("EventSubscriber started. Event pattern=%s", self.binding)
         return gl
 
     def stop(self):
@@ -250,7 +250,7 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread.join(timeout=5)
         self._cbthread.kill()
         self._cbthread = None
-        log.info("EventSubscriber stopped. Event pattern=%s" % self.binding)
+        log.debug("EventSubscriber stopped. Event pattern=%s", self.binding)
 
     def __str__(self):
         return "EventSubscriber at %s:\n\trecv_name: %s\n\tcb: %s" % (hex(id(self)), str(self._recv_name), str(self._callback))
