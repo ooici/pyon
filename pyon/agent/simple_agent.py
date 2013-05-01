@@ -108,7 +108,8 @@ class SimpleResourceAgent(BaseSimpleResourceAgent):
         sub_type = "%s.%s" % (command.command, cmd_res.status)
         event_data = self._post_execute_event_hook(event_type=self.COMMAND_EVENT_TYPE,
             origin=self.resource_id, origin_type=self.ORIGIN_TYPE,
-            sub_type=sub_type, command=command, result=cmd_res)
+            sub_type=sub_type, command=str(command.command),
+            result=str(cmd_res.result))
         post_event = self._event_publisher.publish_event(**event_data)
 
         return cmd_res

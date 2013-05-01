@@ -585,6 +585,12 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         Common action after a successful agent command.
         """
+
+        cmd = cmd or ''
+        execute_cmd = execute_cmd or ''
+        args = args or []
+        kwargs = kwargs or {}                
+        
         event_data = {
             'command': cmd,
             'execute_command': execute_cmd,
@@ -621,6 +627,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             (str(cmd), str(execute_cmd), str(args), str(kwargs))
         errstr += 'error=%s' % str(iex)
         log.error(errstr)
+
+        cmd = cmd or ''
+        execute_cmd = execute_cmd or ''
+        args = args or []
+        kwargs = kwargs or {}        
 
         event_data = {
             'command': cmd,
