@@ -61,6 +61,7 @@ class ValidateInterceptor(Interceptor):
                 for elt in tb_list:
                     tb_output += elt
                 log.debug("Object validation failed. %s" % e.message)
+                log.debug(payload)
                 log.debug("Traceback: %s" % str(tb_output))
                 if invocation.headers.has_key("raise-exception") and invocation.headers['raise-exception']:
                     raise BadRequest(e.message)
