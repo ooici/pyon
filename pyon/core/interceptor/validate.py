@@ -61,11 +61,12 @@ class ValidateInterceptor(Interceptor):
                 for elt in tb_list:
                     tb_output += elt
                 log.debug("Object validation failed. %s" % e.message)
-                log.debug(payload)
                 log.debug("Traceback: %s" % str(tb_output))
                 if invocation.headers.has_key("raise-exception") and invocation.headers['raise-exception']:
                     raise BadRequest(e.message)
                 else:
-                    log.exception(e)
+                    log.error(e.message)
+                    log.error("message headers:%s", str(invocation.headers)) #The str is needed here to display the content of ION objects
+                    log.error("message payload:%s", str(payload)) #The str is needed here to display the content of ION objects
 
         return invocation
