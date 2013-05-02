@@ -189,7 +189,7 @@ def get_system_actor_header(system_actor=None):
         return get_actor_header(None)
 
 
-def get_resource_commitments(resource_id=None, actor_id=None):
+def get_valid_resource_commitments(resource_id=None, actor_id=None):
     '''
     Returns the list of valid commitments for the specified resource.
     If optional actor_id is supplied, then filtered by actor_id
@@ -222,7 +222,7 @@ def get_resource_commitments(resource_id=None, actor_id=None):
 
     return None
 
-def has_resource_commitments(actor_id, resource_id):
+def has_valid_resource_commitments(actor_id, resource_id):
     '''
     Returns a ResourceCommitmentStatus object indicating the commitment status between this resource/actor
     Can only have an exclusive commitment if actor already has a shared commitment.
@@ -231,7 +231,7 @@ def has_resource_commitments(actor_id, resource_id):
     @return:
     '''
     ret_status = IonObject(OT.ResourceCommitmentStatus)
-    commitments = get_resource_commitments(resource_id, actor_id)
+    commitments = get_valid_resource_commitments(resource_id, actor_id)
     if commitments is None:
         #No commitments were found between this resource_id and actor_id - so return default object with
         #fields set to False
@@ -249,7 +249,7 @@ def has_resource_commitments(actor_id, resource_id):
     return ret_status
 
 
-def has_shared_resource_commitment(actor_id=None, resource_id=None):
+def has_valid_shared_resource_commitment(actor_id=None, resource_id=None):
     '''
     This method returns True if the specified actor_id has acquired shared access for the specified resource id, otherwise False.
     @param msg:
@@ -259,12 +259,12 @@ def has_shared_resource_commitment(actor_id=None, resource_id=None):
     if actor_id is None or resource_id is None:
         raise BadRequest('One or all of the method parameters are not set')
 
-    commitment_status =  has_resource_commitments(actor_id, resource_id)
+    commitment_status =  has_valid_resource_commitments(actor_id, resource_id)
 
     return commitment_status.shared
 
 
-def has_exclusive_resource_commitment(actor_id=None, resource_id=None):
+def has_valid_exclusive_resource_commitment(actor_id=None, resource_id=None):
     '''
     This method returns True if the specified actor_id has acquired exclusive access for the specified resource id, otherwise False.
     @param msg:
@@ -274,7 +274,7 @@ def has_exclusive_resource_commitment(actor_id=None, resource_id=None):
     if actor_id is None or resource_id is None:
         raise BadRequest('One or all of the method parameters are not set')
 
-    commitment_status =  has_resource_commitments(actor_id, resource_id)
+    commitment_status =  has_valid_resource_commitments(actor_id, resource_id)
 
     #If the resource has not been acquired for sharing, then it can't have been acquired exclusively
     if not commitment_status.shared:
