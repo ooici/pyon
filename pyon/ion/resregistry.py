@@ -14,7 +14,7 @@ from pyon.core.object import IonObjectBase
 from pyon.datastore.datastore import DataStore
 from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import LCS, LCE, PRED, RT, AS, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
+from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -466,7 +466,7 @@ class ResourceRegistry(object):
         @param resource_extension    str
         @param ext_associations    dict
         @param ext_exclude    list
-        @retval actor_identity    ExtendedResource
+        @retval extended_resource    ExtendedResource
         @throws BadRequest    A parameter is missing
         @throws NotFound    An object with the specified resource_id does not exist
         """
@@ -489,6 +489,33 @@ class ResourceRegistry(object):
             resource_id=resource_id, computed_resource_type=computed_resource_type, ext_associations=ext_associations, ext_exclude=ext_exclude, **kwargs)
 
         return extended_resource
+
+    def prepare_resource_support(self, resource_type='', resource_id=''):
+        """Returns a structured dict with information to help create/update a resource
+
+        @param resource_type    str
+        @param resource_id    str
+        @retval resource_data    GenericPrepareSupport
+        @throws BadRequest    A parameter is missing
+        @throws NotFound    An object with the specified resource_id does not exist
+        """
+
+        if not resource_type:
+            raise BadRequest("The resource_type parameter is required")
+
+        extended_resource_handler = ExtendedResourceContainer(self, self)
+
+        resource_data = extended_resource_handler.create_prepare_resource_support(resource_id=resource_id, prepare_resource_type=OT.GenericPrepareSupport, origin_resource_type=resource_type)
+
+        #Fill out service request information for creating a instrument device
+        extended_resource_handler.set_service_requests(resource_data.create_request, 'resource_registry',
+            'create', { "object":  "$(object)" })
+
+        #Fill out service request information for creating a instrument device
+        extended_resource_handler.set_service_requests(resource_data.update_request, 'resource_registry',
+            'update', { "object":  "$(object)" })
+
+        return resource_data
 
 
     #This is a method used for testing - do not remove

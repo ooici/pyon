@@ -189,6 +189,10 @@ class TestResourceRegistry(IonIntegrationTestCase):
         extended_resource_list = self.rr.get_resource_extension(str([user_info_id1,user_info_id2]), 'ExtendedInformationResource')
         self.assertEqual(len(extended_resource_list), 2)
 
+        prepare_resource = self.rr.prepare_resource_support(resource_type='UserInfo', resource_id=user_info_id2)
+        self.assertEqual(prepare_resource._id, user_info_id2)
+        self.assertEqual(prepare_resource.resource.name, user_info_obj2.name)
+
     def test_lifecycle(self):
         svc_obj = IonObject("ServiceDefinition", name='abc')
         sdid, _ = self.rr.create(svc_obj)

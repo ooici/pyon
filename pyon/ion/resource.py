@@ -786,7 +786,7 @@ class ExtendedResourceContainer(object):
 
 
 
-    def create_prepare_resource_support(self, resource_id="", resource_type=None):
+    def create_prepare_resource_support(self, resource_id="", prepare_resource_type=None, origin_resource_type=None):
 
         if not isinstance(resource_id, types.StringType):
             raise Inconsistent("The parameter resource_id is not a single resource id string")
@@ -794,16 +794,21 @@ class ExtendedResourceContainer(object):
         if not self.service_provider or not self._rr:
             raise Inconsistent("This class is not initialized properly")
 
-        if resource_type is not None and resource_type not in getextends(OT.ResourcePrepareSupport):
-            raise BadRequest('The requested resource %s is not extended from %s' % (resource_type, OT.ResourcePrepareSupport))
+        if prepare_resource_type is not None and prepare_resource_type not in getextends(OT.ResourcePrepareSupport):
+            raise BadRequest('The requested resource %s is not extended from %s' % (prepare_resource_type, OT.ResourcePrepareSupport))
 
 
-        resource_data = IonObject(resource_type)
+        resource_data = IonObject(prepare_resource_type)
 
         # Check to make sure the extended resource decorator raise OriginResourceType matches the type of the resource type
-        origin_resource_type =  resource_data.get_class_decorator_value('OriginResourceType')
+        origin_resource_decorator =  resource_data.get_class_decorator_value('OriginResourceType')
+        if origin_resource_decorator is None and origin_resource_type is None:
+            raise NotFound('OriginResourceType decorator not found in object specification %s', prepare_resource_type)
+
+        origin_resource_type = origin_resource_type if origin_resource_type is not None else origin_resource_decorator
         if origin_resource_type is None:
-            raise NotFound('OriginResourceType decorator not found in object specification %s', resource_type)
+            raise NotFound('OriginResourceType decorator not found in object specification %s', prepare_resource_type)
+
 
         resource_object = None
         if resource_id:
@@ -811,7 +816,7 @@ class ExtendedResourceContainer(object):
 
             if origin_resource_type != resource_object.type_ and not issubtype(resource_object.type_, origin_resource_type):
                 raise Inconsistent('The OriginResourceType decorator of the requested resource %s(%s) does not match the type of the specified resource id(%s).' % (
-                    resource_type, origin_resource_type, resource_object.type_))
+                    prepare_resource_type, origin_resource_type, resource_object.type_))
 
             resource_data._id = resource_object._id
         else:
