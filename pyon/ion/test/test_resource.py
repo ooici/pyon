@@ -211,11 +211,11 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.remote_resource_object.type_, RT.InstrumentDevice)
 
         #Test create_prepare_update_resource
-        prepare_create = extended_resource_handler.create_prepare_resource_support(resource_type=OT.TestPrepareUpdateResource)
+        prepare_create = extended_resource_handler.create_prepare_resource_support(prepare_resource_type=OT.TestPrepareUpdateResource)
         self.assertEqual(prepare_create.type_, OT.TestPrepareUpdateResource)
         self.assertEqual(prepare_create._id, '')
 
-        prepare_update = extended_resource_handler.create_prepare_resource_support(resource_id='123',resource_type=OT.TestPrepareUpdateResource)
+        prepare_update = extended_resource_handler.create_prepare_resource_support(resource_id='123',prepare_resource_type=OT.TestPrepareUpdateResource)
         self.assertEqual(prepare_update.type_, OT.TestPrepareUpdateResource)
         self.assertEqual(prepare_update._id, '123')
 
