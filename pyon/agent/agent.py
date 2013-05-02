@@ -553,7 +553,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
         if self._enable_persistence:
             self._set_state('agent_state', state)
-
+            self._flush_state()
+            
         self._on_state_enter(state)
 
     def _on_state_enter(self, state):
