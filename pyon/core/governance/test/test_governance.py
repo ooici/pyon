@@ -14,7 +14,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.bootstrap import IonObject
 from pyon.ion.resource import PRED, RT
 from pyon.core.governance import ORG_MANAGER_ROLE, ORG_MEMBER_ROLE, ION_MANAGER, GovernanceHeaderValues
-from pyon.core.governance import find_roles_by_actor, get_actor_header, get_system_actor_header, get_role_message_headers, get_resource_commitments
+from pyon.core.governance import find_roles_by_actor, get_actor_header, get_system_actor_header, get_role_message_headers, get_valid_resource_commitments
 
 class UnitTestService(BaseService):
     name = 'UnitTestService'
@@ -497,7 +497,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         system_actor_header = get_system_actor_header()
         self.assertDictEqual(system_actor_header['ion-actor-roles'],{'ION': [ORG_MEMBER_ROLE]})
 
-    def test_get_resource_commitment(self):
+    def test_get_valid_resource_commitment(self):
         from pyon.util.containers import get_ion_ts
 
         # create ION org and an actor
@@ -512,7 +512,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = get_resource_commitments(ion_org_id, actor_id)
+        c = get_valid_resource_commitments(ion_org_id, actor_id)
         #verify that the commitment is not returned
         self.assertIsNone(c)
 
@@ -521,7 +521,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
-        c = get_resource_commitments(ion_org_id, actor_id)
+        c = get_valid_resource_commitments(ion_org_id, actor_id)
 
         #verify that the commitment is returned
         self.assertIsNotNone(c)
