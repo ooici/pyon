@@ -52,21 +52,9 @@ class ValidateInterceptor(Interceptor):
             try:
                 walk(payload, validate_ionobj)
             except AttributeError as e:
-                import traceback
-                import sys
-                (exc_type, exc_value, exc_traceback) = sys.exc_info()
-                tb_list = traceback.extract_tb(sys.exc_info()[2])
-                tb_list = traceback.format_list(tb_list)
-                tb_output = ""
-                for elt in tb_list:
-                    tb_output += elt
-                log.debug("Object validation failed. %s" % e.message)
-                log.debug("Traceback: %s" % str(tb_output))
                 if invocation.headers.has_key("raise-exception") and invocation.headers['raise-exception']:
+                    log.warn('message failed validation\nheaders %s\npayload %s', e.message, invocation.headers, payload, exc_info=True)
                     raise BadRequest(e.message)
                 else:
-                    log.error(e.message)
-                    log.error("message headers:%s", str(invocation.headers)) #The str is needed here to display the content of ION objects
-                    log.error("message payload:%s", str(payload)) #The str is needed here to display the content of ION objects
-
+                    log.warn('message failed validation, but allowing it anyway\nheaders %s\npayload %s', e.message, invocation.headers, payload, exc_info=True)
         return invocation

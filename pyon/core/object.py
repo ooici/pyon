@@ -289,7 +289,7 @@ class IonObjectBase(object):
             split_content_types = content_types.split(',')
         else:
             split_content_types.append(content_types)
-        log.info("split_content_types: %s", split_content_types)
+        log.trace("split_content_types: %s", split_content_types)
 
         for content_type in split_content_types:
             if type(value).__name__ == content_type.strip():
