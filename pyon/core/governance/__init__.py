@@ -211,7 +211,7 @@ def get_valid_resource_commitments(resource_id=None, actor_id=None):
         cur_time = int(get_ion_ts())
         commitment_list = []
         for com in commitments:
-            if ( actor_id == None or com.consumer == actor_id )  and ( com.expiration == 0 or ( com.expiration > 0 and cur_time < com.expiration)):
+            if ( actor_id == None or com.consumer == actor_id )  and ( int(com.expiration) == 0 or ( int(com.expiration) > 0 and cur_time < int(com.expiration))):
                 commitment_list.append(com)
 
         if commitment_list:
