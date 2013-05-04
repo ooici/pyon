@@ -53,8 +53,8 @@ class ValidateInterceptor(Interceptor):
                 walk(payload, validate_ionobj)
             except AttributeError as e:
                 if invocation.headers.has_key("raise-exception") and invocation.headers['raise-exception']:
-                    log.warn('message failed validation\nheaders %s\npayload %s', e.message, invocation.headers, payload, exc_info=True)
+                    log.warn('message failed validation: %s\nheaders %s\npayload %s', e.message, invocation.headers, payload)
                     raise BadRequest(e.message)
                 else:
-                    log.warn('message failed validation, but allowing it anyway\nheaders %s\npayload %s', e.message, invocation.headers, payload, exc_info=True)
+                    log.warn('message failed validation, but allowing it anyway: %s\nheaders %s\npayload %s', e.message, invocation.headers, payload)
         return invocation
