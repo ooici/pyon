@@ -6,7 +6,7 @@ __author__ = 'Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
-from pyon.core.exception import NotFound, BadRequest
+from pyon.core.exception import NotFound, BadRequest, Conflict
 from pyon.datastore.datastore import DataStore
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
@@ -39,23 +39,54 @@ class StateRepository(object):
         """
         self.state_store.close()
 
-    def put_state(self, key, state):
-        log.debug("Store persistent state for key=%s" % key)
+    def put_state(self, key, state, state_obj=None):
+        """
+        Persist a private process state using the given key (typically a process id).
+        The state vector is an object (e.g. a dict) that may contain any python type that
+        is JSON-able. This means no custom objects are allowed in here.
+        WARNING: If multiple threads/greenlets persist state concurrently, e.g. based
+        on message processing and time, the calls to this method need to be protected
+        by an exclusive lock (semaphore).
+        @retval the ProcessState object as written
+        """
+        log.debug("Store persistent state for key=%s", key)
         if not isinstance(state, dict):
             raise BadRequest("state must be type dict, not %s" % type(state))
+        if state_obj is not None:
+            if not isinstance(state_obj, ProcessState):
+                raise BadRequest("Argument state_obj is not ProcessState object")
+            state_obj.state = state
+            state_obj.ts = get_ion_ts()
+            try:
+                id, rev = self.state_store.update(state_obj)
+                state_obj._rev = rev
+                return state_obj
+            except Conflict as ce:
+                log.info("Process %s state update conflict - retry.")
+
         try:
             state_obj = self.state_store.read(key)
             state_obj.state = state
             state_obj.ts = get_ion_ts()
-            self.state_store.update(state_obj)
+            id, rev = self.state_store.update(state_obj)
+            state_obj._rev = rev
         except NotFound as nf:
             state_obj = ProcessState(state=state, ts=get_ion_ts())
-            self.state_store.create(state_obj, object_id=key)
+            id, rev = self.state_store.create(state_obj, object_id=key)
+            state_obj._id = id
+            state_obj._rev = rev
+        return state_obj
 
     def get_state(self, key):
-        log.debug("Retrieving persistent state for key=%s" % key)
+        """
+        Returns the state vector for given key (typically a process id).
+        The state vector is a previously persisted object (e.g. a dict).
+        In case no state was found, NotFound is raised.
+        @retval a tuple with state vector and ProcessState object
+        """
+        log.debug("Retrieving persistent state for key=%s", key)
         state_obj = self.state_store.read(key)
-        return state_obj.state
+        return state_obj.state, state_obj
 
 
 class StatefulProcessMixin(object):

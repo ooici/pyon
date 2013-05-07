@@ -273,8 +273,7 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         if hasattr(self._process, "_proc_state"):
             if self._process._proc_state_changed:
                 log.debug("Process %s state changed. State=%s", self._process.id, self._process._proc_state)
-                self._process.container.state_repository.put_state(self._process.id, self._process._proc_state)
-                self._process._proc_state_changed = False
+                self._process._flush_state()
         return res
 
     def _get_process_saturation(self):
