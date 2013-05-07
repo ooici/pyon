@@ -61,6 +61,12 @@ class StateRepository(object):
             self.state_store.create(state_obj, object_id=key)
 
     def get_state(self, key):
+        """
+        Returns the state vector for given key (typically a process id).
+        The state vector is a previously persisted object (e.g. a dict).
+        In case no state was found, NotFound is raised.
+        @TODO: The actual state object around the state is lost (with _rev and ts).
+        """
         log.debug("Retrieving persistent state for key=%s", key)
         state_obj = self.state_store.read(key)
         return state_obj.state

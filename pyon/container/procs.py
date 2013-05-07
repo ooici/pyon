@@ -647,7 +647,8 @@ class ProcManager(object):
                     process_instance._proc_state = {}
                     process_instance._proc_state_changed = False
                     return
-                with process_instance._update_lock:
+                # TODO: Saving the old object's _rev could save the need for read before update
+                with process_instance._state_lock:
                     process_instance.container.state_repository.put_state(process_instance.id, process_instance._proc_state)
                     process_instance._proc_state_changed = False
 
@@ -659,16 +660,18 @@ class ProcManager(object):
                     process_instance._proc_state.clear()
                     process_instance._proc_state.update(new_state)
                     process_instance._proc_state_changed = False
+                except NotFound as nf:
+                    log.debug("No persisted state available for process %s", process_instance.id)
                 except Exception as ex:
                     log.warn("Process %s load state failed: %s", process_instance.id, str(ex))
             process_instance._flush_state = _flush_state
             process_instance._load_state = _load_state
-            process_instance._update_lock = RLock()
+            process_instance._state_lock = RLock()
 
-        process_start_mode = get_safe(config, "process.start_mode")
-        if process_start_mode == "RESTART":
-            if hasattr(process_instance, "_load_state"):
-                process_instance._load_state()
+            # PROCESS RESTART: Need to check whether this process had persisted state.
+            # Note: This could happen anytime during a system run, not just on RESTART boot
+            log.debug("Loading persisted state for process %s", process_id)
+            process_instance._load_state()
 
         # start service dependencies (RPC clients)
         self._start_process_dependencies(process_instance)

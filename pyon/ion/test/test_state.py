@@ -53,7 +53,7 @@ class TestStatefulProcess(IonIntegrationTestCase):
 
         # Send it a message to do stuff and change state
         proc_client = SampleServiceClient(to_name=pid)
-        result = proc_client.sample_other_op("state1")
+        result = proc_client.sample_other_op("state1", name="setstate")
         self.assertEquals(result, "")
 
         # Try the force state store and load
@@ -62,9 +62,14 @@ class TestStatefulProcess(IonIntegrationTestCase):
         # Check state
         # Kill process (not terminate)
         self.container.terminate_process(pid)
+
         # Restart process with prior id
-        # Send it a message
-        # Check that state reflects
+        newpid = self.container.spawn_process("testproc", "pyon.ion.test.test_state", "StatefulTestProcess", process_id=pid)
+        self.assertEquals(pid, newpid)
+
+        # Send it a message to get current "preserved" state and check it's the preserved one.
+        result1 = proc_client.sample_other_op(name="getstate")
+        self.assertEquals(result1, "state1")
 
     def test_process_state_concurrent(self):
         pid = "testproc_%s" % uuid.uuid4().hex
@@ -83,7 +88,8 @@ class StatefulTestProcess(StandaloneProcess, StatefulProcessMixin):
         log.info("StatefulTestProcess START")
 
     def sample_other_op(self, foo='bar', num=84, name=''):
-        if name == "":
+        """We overload this YML service operation to do what we need to do"""
+        if name == "setstate":
             log.info("StatefulTestProcess OP, state=%s", foo)
             newstate = foo
             oldstate = self._get_state("statevalue") or ""
@@ -110,6 +116,10 @@ class StatefulTestProcess(StandaloneProcess, StatefulProcessMixin):
             if self.error:
                 raise Exception("Error in greenlets")
             return "GOOD"
+        elif name == "getstate":
+            return self._get_state("statevalue")
+        else:
+            raise Exception("Unknown mode: %s" % name)
 
     def sample_ping(self, name='name', time='2011-07-27T02:59:43.1Z', an_int=0, a_float=0.0, a_str='',
                     none=None, a_dict=None, a_list=None):
