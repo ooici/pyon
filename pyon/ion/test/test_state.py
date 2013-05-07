@@ -44,11 +44,16 @@ class TestState(IonUnitTestCase):
         state4, state_obj4 = state_repo.get_state("id1")
         self.assertEquals(state3, state4)
 
+        # Test persisting with a prior state object to save a read
         state5 = {'key':'value5', 'key2': {}}
         state_repo.put_state("id1", state5, state_obj=state_obj4)
 
         state6, state_obj6 = state_repo.get_state("id1")
         self.assertEquals(state5, state6)
+
+        # Test that using an old state object will not screw up
+        state7 = {'key':'value7', 'key2': {}}
+        state_repo.put_state("id1", state7, state_obj=state_obj4)
 
 
 @attr('INT', group='state')

@@ -642,24 +642,23 @@ class ProcManager(object):
         # Add stateful process operations
         if hasattr(process_instance, "_flush_state"):
             def _flush_state():
-                if not hasattr(process_instance, "_proc_state"):
-                    # The first time this is called state members may not be there. Create them.
-                    process_instance._proc_state = {}
-                    process_instance._proc_state_changed = False
-                    return
-                # TODO: Saving the old object's _rev could save the need for read before update
                 with process_instance._state_lock:
-                    process_instance.container.state_repository.put_state(process_instance.id, process_instance._proc_state)
+                    state_obj = process_instance.container.state_repository.put_state(process_instance.id, process_instance._proc_state,
+                                                                                      state_obj=process_instance._proc_state_obj)
+                    state_obj.state = None   # Make sure memory footprint is low for larger states
+                    process_instance._proc_state_obj = state_obj
                     process_instance._proc_state_changed = False
 
             def _load_state():
                 if not hasattr(process_instance, "_proc_state"):
                     process_instance._proc_state = {}
                 try:
-                    new_state, _ = process_instance.container.state_repository.get_state(process_instance.id)
-                    process_instance._proc_state.clear()
-                    process_instance._proc_state.update(new_state)
-                    process_instance._proc_state_changed = False
+                    with process_instance._state_lock:
+                        new_state, state_obj = process_instance.container.state_repository.get_state(process_instance.id)
+                        process_instance._proc_state.clear()
+                        process_instance._proc_state.update(new_state)
+                        process_instance._proc_state_obj = state_obj
+                        process_instance._proc_state_changed = False
                 except NotFound as nf:
                     log.debug("No persisted state available for process %s", process_instance.id)
                 except Exception as ex:
@@ -667,6 +666,9 @@ class ProcManager(object):
             process_instance._flush_state = _flush_state
             process_instance._load_state = _load_state
             process_instance._state_lock = RLock()
+            process_instance._proc_state = {}
+            process_instance._proc_state_obj = None
+            process_instance._proc_state_changed = False
 
             # PROCESS RESTART: Need to check whether this process had persisted state.
             # Note: This could happen anytime during a system run, not just on RESTART boot
