@@ -6,6 +6,7 @@ __license__ = 'Apache 2.0'
 from unittest import SkipTest
 from nose.plugins.attrib import attr
 import uuid
+import gevent
 
 from pyon.datastore.datastore import DatastoreManager
 from pyon.ion.state import StateRepository, StatefulProcessMixin
@@ -65,6 +66,16 @@ class TestStatefulProcess(IonIntegrationTestCase):
         # Send it a message
         # Check that state reflects
 
+    def test_process_state_concurrent(self):
+        pid = "testproc_%s" % uuid.uuid4().hex
+        self.container.spawn_process("testproc", "pyon.ion.test.test_state", "StatefulTestProcess", process_id=pid)
+
+        # Send it a message to do stuff and change state
+        proc_client = SampleServiceClient(to_name=pid)
+
+        result = proc_client.sample_other_op("state1", name="concurrent")
+        self.container.terminate_process(pid)
+
 class StatefulTestProcess(StandaloneProcess, StatefulProcessMixin):
     name = "sample_service"
 
@@ -72,12 +83,33 @@ class StatefulTestProcess(StandaloneProcess, StatefulProcessMixin):
         log.info("StatefulTestProcess START")
 
     def sample_other_op(self, foo='bar', num=84, name=''):
-        log.info("StatefulTestProcess OP, state=%s", foo)
-        newstate = foo
-        oldstate = self._get_state("statevalue") or ""
-        self._set_state("statevalue", newstate)
-        self._set_state("statets", get_ion_ts())
-        return oldstate
+        if name == "":
+            log.info("StatefulTestProcess OP, state=%s", foo)
+            newstate = foo
+            oldstate = self._get_state("statevalue") or ""
+            self._set_state("statevalue", newstate)
+            self._set_state("statets", get_ion_ts())
+            return oldstate
+        elif name == "concurrent":
+            self.error = False
+            def worker(num):
+                try:
+                    for i in xrange(10):
+                        value = uuid.uuid4().hex
+                        self._set_state("state"+str(num), value)
+                        log.debug("Flushing state %s of greenlet %s", i, num)
+                        self._flush_state()
+                        gevent.sleep(0.1)
+                except Exception as ex:
+                    log.exception("Error in worker")
+                    self.error = True
+
+            greenlets = [gevent.spawn(worker, i) for i in xrange(3)]
+            gevent.joinall(greenlets)
+
+            if self.error:
+                raise Exception("Error in greenlets")
+            return "GOOD"
 
     def sample_ping(self, name='name', time='2011-07-27T02:59:43.1Z', an_int=0, a_float=0.0, a_str='',
                     none=None, a_dict=None, a_list=None):

@@ -6,7 +6,9 @@ __author__ = 'Michael Meisinger'
 
 from copy import deepcopy
 import time
-from zope.interface import implementedBy
+
+from couchdb.http import ResourceNotFound
+from gevent.coros import RLock
 
 from pyon.agent.agent import ResourceAgent
 from pyon.agent.simple_agent import SimpleResourceAgent
@@ -27,9 +29,6 @@ from pyon.net.transport import NameTrio, TransportError
 
 from interface.objects import ProcessStateEnum, CapabilityContainer, Service, Process, ServiceStateEnum
 
-from couchdb.http import ResourceNotFound
-
-
 #Various process types
 SERVICE_PROCESS_TYPE = 'service'
 STREAM_PROCESS_TYPE = 'stream_process'
@@ -37,7 +36,6 @@ AGENT_PROCESS_TYPE = 'agent'
 STANDALONE_PROCESS_TYPE = 'standalone'
 IMMEDIATE_PROCESS_TYPE = 'immediate'
 SIMPLE_PROCESS_TYPE = 'simple'
-
 
 
 class ProcManager(object):
@@ -86,9 +84,6 @@ class ProcManager(object):
     def stop(self):
         log.debug("ProcManager stopping ...")
 
-#        from pyon.datastore.couchdb.couchdb_datastore import CouchDB_DataStore
-#        stats1 = CouchDB_DataStore._stats.get_stats()
-
         # Call quit on procs to give them ability to clean up
         # @TODO terminate_process is not gl-safe
 #        gls = map(lambda k: spawn(self.terminate_process, k), self.procs.keys())
@@ -118,18 +113,12 @@ class ProcManager(object):
                 pass
             # TODO: Check associations to processes
 
-#        stats2 = CouchDB_DataStore._stats.get_stats()
-#
-#        stats3 = CouchDB_DataStore._stats.diff_stats(stats2, stats1)
-#        log.debug("Datastore stats difference during stop(): %s", stats3)
-
         log.debug("ProcManager stopped, OK.")
 
     def spawn_process(self, name=None, module=None, cls=None, config=None, process_id=None):
         """
         Spawn a process within the container. Processes can be of different type.
         """
-
         if process_id and not is_valid_identifier(process_id, ws_sub='_'):
             raise BadRequest("Given process_id %s is not a valid identifier" % process_id)
 
@@ -654,11 +643,13 @@ class ProcManager(object):
         if hasattr(process_instance, "_flush_state"):
             def _flush_state():
                 if not hasattr(process_instance, "_proc_state"):
+                    # The first time this is called state members may not be there. Create them.
                     process_instance._proc_state = {}
                     process_instance._proc_state_changed = False
                     return
-                process_instance.container.state_repository.put_state(process_instance.id, process_instance._proc_state)
-                process_instance._proc_state_changed = False
+                with process_instance._update_lock:
+                    process_instance.container.state_repository.put_state(process_instance.id, process_instance._proc_state)
+                    process_instance._proc_state_changed = False
 
             def _load_state():
                 if not hasattr(process_instance, "_proc_state"):
@@ -672,6 +663,7 @@ class ProcManager(object):
                     log.warn("Process %s load state failed: %s", process_instance.id, str(ex))
             process_instance._flush_state = _flush_state
             process_instance._load_state = _load_state
+            process_instance._update_lock = RLock()
 
         process_start_mode = get_safe(config, "process.start_mode")
         if process_start_mode == "RESTART":

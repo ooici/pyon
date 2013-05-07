@@ -40,7 +40,15 @@ class StateRepository(object):
         self.state_store.close()
 
     def put_state(self, key, state):
-        log.debug("Store persistent state for key=%s" % key)
+        """
+        Persist a private process state using the given key (typically a process id).
+        The state vector is an object (e.g. a dict) that may contain any python type that
+        is JSON-able. This means no custom objects are allowed in here.
+        WARNING: If multiple threads/greenlets persist state concurrently, e.g. based
+        on message processing and time, the calls to this method need to be protected
+        by an exclusive lock (semaphore).
+        """
+        log.debug("Store persistent state for key=%s", key)
         if not isinstance(state, dict):
             raise BadRequest("state must be type dict, not %s" % type(state))
         try:
@@ -53,7 +61,7 @@ class StateRepository(object):
             self.state_store.create(state_obj, object_id=key)
 
     def get_state(self, key):
-        log.debug("Retrieving persistent state for key=%s" % key)
+        log.debug("Retrieving persistent state for key=%s", key)
         state_obj = self.state_store.read(key)
         return state_obj.state
 
