@@ -656,7 +656,7 @@ class ProcManager(object):
                 if not hasattr(process_instance, "_proc_state"):
                     process_instance._proc_state = {}
                 try:
-                    new_state = process_instance.container.state_repository.get_state(process_instance.id)
+                    new_state, _ = process_instance.container.state_repository.get_state(process_instance.id)
                     process_instance._proc_state.clear()
                     process_instance._proc_state.update(new_state)
                     process_instance._proc_state_changed = False

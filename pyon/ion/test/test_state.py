@@ -31,14 +31,25 @@ class TestState(IonUnitTestCase):
         state1 = {'key':'value1'}
         state_repo.put_state("id1", state1)
 
-        state2 = state_repo.get_state("id1")
+        state2, state_obj2 = state_repo.get_state("id1")
         self.assertEquals(state1, state2)
+        self.assertEquals(state_obj2.state, state2)
+        self.assertTrue(state_obj2.ts)
+        self.assertTrue(state_obj2._rev)
+        self.assertEquals(state_obj2._id, "id1")
 
         state3 = {'key':'value2', 'key2': {}}
         state_repo.put_state("id1", state3)
 
-        state4 = state_repo.get_state("id1")
+        state4, state_obj4 = state_repo.get_state("id1")
         self.assertEquals(state3, state4)
+
+        state5 = {'key':'value5', 'key2': {}}
+        state_repo.put_state("id1", state5, state_obj=state_obj4)
+
+        state6, state_obj6 = state_repo.get_state("id1")
+        self.assertEquals(state5, state6)
+
 
 @attr('INT', group='state')
 class TestStatefulProcess(IonIntegrationTestCase):
