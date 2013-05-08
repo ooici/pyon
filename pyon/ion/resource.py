@@ -212,8 +212,8 @@ def get_object_schema(resource_type):
         schema_info['object'] = ret_obj
 
     elif isenum(resource_type):
-        schema_info[resource_type] = {}
-        schema_info[resource_type] = ret_obj._str_map
+        schema_info['schemas'][resource_type] = {}
+        schema_info['schemas'][resource_type] = ret_obj._str_map
 
     else:
         raise ('%s is not an ION Object', resource_type)
