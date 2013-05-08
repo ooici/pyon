@@ -187,28 +187,37 @@ def get_object_schema(resource_type):
                 setattr(ret_obj, field, value)
 
     #Add schema information for sub object types
-    schema_info['schemas'][ion_object_name] = ret_obj._schema
-    for field in ret_obj._schema:
-        obj_type = ret_obj._schema[field]['type']
+    if hasattr(ret_obj,'_schema'):
+        schema_info['schemas'][ion_object_name] = ret_obj._schema
+        for field in ret_obj._schema:
+            obj_type = ret_obj._schema[field]['type']
 
-        #First look for ION objects
-        if is_ion_object(obj_type):
+            #First look for ION objects
+            if is_ion_object(obj_type):
 
-            try:
-                value = IonObject(obj_type, {})
-                schema_info['schemas'][obj_type] = value._schema
+                try:
+                    value = IonObject(obj_type, {})
+                    schema_info['schemas'][obj_type] = value._schema
 
-            except NotFound:
-                pass
+                except NotFound:
+                    pass
 
-        #Next look for ION Enums
-        elif ret_obj._schema[field].has_key('enum_type'):
-            if isenum(ret_obj._schema[field]['enum_type']):
-                value = IonObject(ret_obj._schema[field]['enum_type'], {})
-                schema_info['schemas'][ret_obj._schema[field]['enum_type']] = value._str_map
+            #Next look for ION Enums
+            elif ret_obj._schema[field].has_key('enum_type'):
+                if isenum(ret_obj._schema[field]['enum_type']):
+                    value = IonObject(ret_obj._schema[field]['enum_type'], {})
+                    schema_info['schemas'][ret_obj._schema[field]['enum_type']] = value._str_map
 
 
-    schema_info['object'] = ret_obj
+        schema_info['object'] = ret_obj
+
+    elif isenum(resource_type):
+        schema_info[resource_type] = {}
+        schema_info[resource_type] = ret_obj._str_map
+
+    else:
+        raise ('%s is not an ION Object', resource_type)
+
     return schema_info
 
 class ResourceLifeCycleSM(object):
