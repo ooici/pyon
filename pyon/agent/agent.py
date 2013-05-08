@@ -89,7 +89,7 @@ class ResourceAgentEvent(BaseEnum):
     PING_RESOURCE = 'RESOURCE_AGENT_PING_RESOURCE'
     LOST_CONNECTION = 'RESOURCE_AGENT_EVENT_LOST_CONNECTION'
     AUTORECONNECT = 'RESOURCE_AGENT_EVENT_AUTORECONNECT'
-    GET_SCHEMA = 'RESOURCE_AGENT_EVENT_GET_SCHEMA'
+    GET_RESOURCE_SCHEMA = 'RESOURCE_AGENT_EVENT_GET_RESOURCE_SCHEMA'
 
 class ResourceAgentStreamStatus(BaseEnum):
     """
@@ -267,10 +267,13 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         try:
             [res_cmds, res_params] = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_CAPABILITIES, current_state)
 
-        except FSMStateError:
+        except FSMStateError, FSMCommandUnknownError:
             res_cmds = []
             res_params = []
 
+        except Exception as ex:            
+            self._on_command_error('get_capabilities', None, None, None, ex)
+  
         res_iface_cmds = self._get_resource_interface(current_state)
         #res_cmds.extend(res_iface_cmds)
         
@@ -327,7 +330,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         try:
             resource_schema = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_SCHEMA)
         
-        except FSMStateError:
+        except FSMStateError, FSMCommandUnknownError:
             resource_schema = ''
 
         except Exception as ex:            
@@ -335,12 +338,17 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         
         agent_schema = self._get_agent_schema()
         
-        return None
+        # Construct a command result object.
+        schema = IonObject("AgentSchema",
+                               agent_schema=agent_schema,
+                               resource_schema=resource_schema)
+        
+        return schema
 
     def _get_agent_schema(self):
         """
         """
-        return ''
+        return 'I am an agent schema!'
 
     ##############################################################
     # Agent interface.
