@@ -89,6 +89,7 @@ class ResourceAgentEvent(BaseEnum):
     PING_RESOURCE = 'RESOURCE_AGENT_PING_RESOURCE'
     LOST_CONNECTION = 'RESOURCE_AGENT_EVENT_LOST_CONNECTION'
     AUTORECONNECT = 'RESOURCE_AGENT_EVENT_AUTORECONNECT'
+    GET_SCHEMA = 'RESOURCE_AGENT_EVENT_GET_SCHEMA'
 
 class ResourceAgentStreamStatus(BaseEnum):
     """
@@ -319,6 +320,27 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         Override in derived classes.
         """
         return []
+
+    def get_schema(self, resource_id=""):
+        """
+        """
+        try:
+            resource_schema = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_SCHEMA)
+        
+        except FSMStateError:
+            resource_schema = ''
+
+        except Exception as ex:            
+            self._on_command_error('get_schema', None, None, None, ex)
+        
+        agent_schema = self._get_agent_schema()
+        
+        return None
+
+    def _get_agent_schema(self):
+        """
+        """
+        return ''
 
     ##############################################################
     # Agent interface.
