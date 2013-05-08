@@ -8,7 +8,7 @@ from mock import Mock
 from unittest import SkipTest
 from nose.plugins.attrib import attr
 
-from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate
+from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate, get_object_schema
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Inconsistent
 from pyon.util.unit_test import IonUnitTestCase
@@ -224,3 +224,17 @@ class TestResources(IonUnitTestCase):
         Method used for testing
         '''
         return IonObject(RT.SystemResource, name=resource_name)
+
+    @attr('SCHEMA')
+    def test_get_object_schema(self):
+
+        schema = get_object_schema('InstrumentSite')
+        self.assertEqual(len(schema['schemas']), 5)
+        self.assertItemsEqual([k for k,v in schema['schemas'].iteritems()], ['InstrumentSite', 'PlatformPort', 'GeospatialCoordinateReferenceSystem', 'GeospatialIndex', 'SiteEnvironmentType'])
+
+        #Loop through all of the schemas and get them too.
+        for k, v in schema['schemas'].iteritems():
+            sub_schema = get_object_schema(k)
+
+
+
