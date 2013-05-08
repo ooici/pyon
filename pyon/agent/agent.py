@@ -621,6 +621,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         execute_cmd = execute_cmd or ''
         args = args or []
         kwargs = kwargs or {}                
+        result = result or {}
+        
+        if not isinstance(result, dict):
+            log.error('Agent command result not a dict: cmd=%s, execute_cmd=%s, result=%s',
+                      cmd, execute_cmd, str(result))
         
         event_data = {
             'command': cmd,
