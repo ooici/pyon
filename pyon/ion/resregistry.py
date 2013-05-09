@@ -81,7 +81,7 @@ class ResourceRegistry(object):
         res_id, rev = res
 
         if actor_id and actor_id != 'anonymous':
-            log.debug("Associate resource_id=%s with owner=%s" % (res_id, actor_id))
+            log.debug("Associate resource_id=%s with owner=%s", res_id, actor_id)
             self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
