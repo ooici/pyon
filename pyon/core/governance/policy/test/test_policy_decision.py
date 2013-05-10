@@ -170,6 +170,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
         invocation.headers = {'op': 'op', 'process': mock_process, 'request': 'request', 'ion-actor-id': 'ion-actor-id', 'receiver': 'resource-registry',
                                    'sender-type': 'sender-type', 'sender-service': 'sender-service', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
 
+        invocation.get_message_sender.return_value = ['Unknown','Unknown']
 
         gc.system_root_org_name = 'sys_org_name'
 
@@ -254,6 +255,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
                                    'sender-type': 'sender-type', 'sender-service': 'Unknown', 'ion-actor-roles': {'org_name': ['ion-actor-roles']}}
         invocation.get_message_receiver.return_value = 'service_key'
         invocation.get_service_name.return_value = 'Unknown'
+        invocation.get_message_sender.return_value = ['Unknown','Unknown']
 
         def get_header_value(key, default):
             return invocation.headers.get(key, default)
@@ -297,6 +299,7 @@ class PolicyDecisionUnitTest(PyonTestCase):
                                    'sender-type': 'sender-type', 'sender-service': 'Unknown', 'ion-actor-roles': {'org_name':  ['ION_MANAGER']}}
         invocation.get_message_receiver.return_value = 'service_key'
         invocation.get_service_name.return_value = 'Unknown'
+        invocation.get_message_sender.return_value = ['Unknown','Unknown']
 
         def get_header_value(key, default):
             return invocation.headers.get(key, default)

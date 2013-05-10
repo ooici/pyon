@@ -32,6 +32,26 @@ class Invocation(object):
 
         return getattr(process, 'process_type', 'simple')
 
+    def get_message_sender(self):
+
+        sender_type = self.get_header_value('sender-type', 'Unknown')
+        if sender_type == 'service':
+            sender_header = self.get_header_value('sender-service', 'Unknown')
+            sender = self.get_service_name(sender_header)
+        else:
+            sender = self.get_header_value('sender', 'Unknown')
+
+        return sender, sender_type
+
+    def get_message_sender_queue(self):
+        sender_queue = self.get_header_value('reply-to', 'todo')
+        if (sender_queue == 'todo'):
+            return None
+
+        index = sender_queue.find('amq')
+        if (index != -1): sender_queue = sender_queue[index:]
+        return sender_queue
+
     def get_message_receiver(self):
 
         process = self.get_arg_value('process')
