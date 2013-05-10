@@ -55,7 +55,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         op_type = LocalType.SEND;
 
         if conv_msg_type and self_principal and target_principal:
-        #    target_principal = self._get_receiver(invocation)
+        #    target_principal = invocation.get_message_receiver()
         #    op_type = LocalType.SEND;
             self._check(invocation, op_type, self_principal, target_principal)
             if invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] == GovernanceDispatcher.STATUS_STARTED:
@@ -80,8 +80,8 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         op_type = LocalType.RESV
         if conv_msg_type and self_principal and target_principal:
         #if self_principal:
-        #    target_principal = self._get_sender(invocation)
-        #    target_principal_queue = self._get_sender_queue(invocation)
+        #    target_principal, sender_type = invocation.get_message_sender()
+        #    target_principal_queue = invocation.get_message_sender_queue()
         #    op_type = LocalType.RESV;
         #
         #    if target_principal=='Unknown':
@@ -198,7 +198,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
     def _report_error(self, invocation, dispatcher_status, error):
         cur_label = invocation.get_header_value('op', None)
         if not cur_label: invocation.get_header_value('conv-id', 'Unknown')
-        msg_from = self._get_sender(invocation)
+        msg_from, sender_type = invocation.get_message_sender()
 
         err_msg = 'Conversation interceptor error for message %s from %s: %s' %(cur_label, msg_from, error)
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = dispatcher_status
@@ -224,26 +224,3 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
     def _get_protocol_spec(self, role, operation ):
          return self.conversations_for_monitoring[role]
 
-    def _get_sender_queue(self, invocation):
-        sender_queue = invocation.get_header_value('reply-to', 'todo')
-        if (sender_queue == 'todo'):
-            return None
-        else:
-            index = sender_queue.find('amq')
-            if (index != -1): sender_queue = sender_queue[index:]
-            return sender_queue
-
-    def _get_sender(self, invocation):
-        sender_type = invocation.get_header_value('sender-type', 'Unknown')
-
-        if sender_type == 'service':
-            sender_header = invocation.get_header_value('sender-service', 'Unknown')
-            sender = invocation.get_service_name(sender_header)
-        else:
-            sender = invocation.get_header_value('sender', 'Unknown')
-        return sender
-
-    def _get_receiver(self, invocation):
-        receiver_header = invocation.get_header_value('receiver', 'Unknown')
-        receiver = invocation.get_service_name(receiver_header)
-        return receiver

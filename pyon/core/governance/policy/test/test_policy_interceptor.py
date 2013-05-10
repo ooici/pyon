@@ -22,6 +22,8 @@ class PolicyInterceptorIntTest(IonIntegrationTestCase):
         #set up the invocation parameter which is passed to the outgoing and incoming methods
         self.invocation = Mock()
         self.invocation.get_arg_value.return_value = 'invocation.get_arg_value(''process'', invocation)'
+        self.invocation.get_message_sender.return_value = ['Unknown','Unknown']
+
 
     def test_outgoing(self):
         policy_interceptor = self.policy_interceptor
