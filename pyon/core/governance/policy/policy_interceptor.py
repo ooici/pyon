@@ -8,6 +8,7 @@ import pickle
 from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_interceptor import BaseInternalGovernanceInterceptor
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
+from pyon.core.object import IonObjectBase
 from pyon.util.containers import current_time_millis
 from pyon.util.log import log
 
@@ -51,6 +52,27 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
     def outgoing(self, invocation):
 
         log.trace("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
+
+
+        #Check for a field with the ResourceId decorator and if found, then set resource-id
+        # in the header with that field's value or if the decorator specifies a field within an object,
+        #then use the object's field value ( ie. _id)
+        try:
+            if isinstance(invocation.message, IonObjectBase):
+                decorator = 'ResourceId'
+                field = invocation.message.find_field_for_decorator(decorator)
+                if field is not None and hasattr(invocation.message,field):
+                    deco_value = invocation.message.get_decorator_value(field, decorator)
+                    if deco_value:
+                        #Assume that if there is a value, then it is specifying a field in the object
+                        fld_value = getattr(invocation.message,field)
+                        invocation.headers['resource-id'] = getattr(fld_value, deco_value)
+                    else:
+                        invocation.headers['resource-id'] = getattr(invocation.message,field)
+
+        except Exception, ex:
+            log.exception(ex)
+
 
         return invocation
 
