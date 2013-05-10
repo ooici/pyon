@@ -11,7 +11,7 @@ import time
 
 from pyon.core.registry import getextends, issubtype, is_ion_object, isenum
 from pyon.core.bootstrap import IonObject
-from pyon.core.exception import BadRequest, NotFound, Inconsistent
+from pyon.core.exception import BadRequest, NotFound, Inconsistent, Unauthorized
 from pyon.util.config import Config
 from pyon.util.containers import DotDict, named_any, get_ion_ts
 from pyon.util.execute import get_method_arguments, get_remote_info, execute_method
@@ -789,9 +789,14 @@ class ExtendedResourceContainer(object):
             args = [resource_id]
             return execute_method(self, method_name, *args, **kwargs)
 
+        except Unauthorized:
+            #No need to do anything if the user was unauthorized. This is NOT an error, just means the user does not have the proper rights.
+            pass
+
         except Exception, e:
             log.error('Error executing method %s for resource id %s: %s' % (method_name, resource_id, str(e)))
-            return None
+
+        return None
 
 
 

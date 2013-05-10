@@ -102,6 +102,12 @@ def is_ion_object_dict(obj):
     return False
 
 
+def has_class_decorator(class_obj, decorator):
+    if getattr(class_obj, '_class_info'):
+        if class_obj._class_info['decorators'].has_key(decorator):
+            return True
+    return False
+
 def get_class_decorator_value(class_obj, decorator):
 
     if getattr(class_obj, '_class_info'):
