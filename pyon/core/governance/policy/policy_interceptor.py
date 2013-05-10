@@ -9,6 +9,7 @@ from pyon.core.bootstrap import CFG
 from pyon.core.governance.governance_interceptor import BaseInternalGovernanceInterceptor
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.core.object import IonObjectBase
+from pyon.core.registry import is_ion_object, message_classes, has_class_decorator
 from pyon.util.containers import current_time_millis
 from pyon.util.log import log
 
@@ -85,6 +86,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
         #If missing the performative header, consider it as a failure message.
         msg_performative = invocation.get_header_value('performative', 'failure')
+        message_format = invocation.get_header_value('format', '')
         op = invocation.get_header_value('op', 'unknown')
         process_type = invocation.get_invocation_process_type()
 
@@ -114,9 +116,18 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 return invocation
 
 
+            #Check to see if there is a AlwaysVerifyPolicy decorator
+            always_verify_policy = False
+            if is_ion_object(message_format):
+                try:
+                    msg_class = message_classes[message_format]
+                    always_verify_policy = has_class_decorator(msg_class,'AlwaysVerifyPolicy')
+                except Exception:
+                    pass
+
             #For services only - if this is a sub RPC request from a higher level service that has already been validated and set a token
             #then skip checking policy yet again - should help with performance and to simplify policy
-            if process_type == 'service' and self.has_valid_token(invocation, PERMIT_SUB_CALLS):
+            if not always_verify_policy and process_type == 'service' and self.has_valid_token(invocation, PERMIT_SUB_CALLS):
                 log.debug("Skipping policy check for service call %s %s since token is valid", receiver, op)
                 #print "skipping call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
