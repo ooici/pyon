@@ -268,13 +268,7 @@ class PolicyDecisionPointManager(object):
 
     def _create_request_from_message(self, invocation, receiver, receiver_type='service'):
 
-        sender_type = invocation.get_header_value('sender-type', 'Unknown')
-        if sender_type == 'service':
-            sender_header = invocation.get_header_value('sender-service', 'Unknown')
-            sender = invocation.get_service_name(sender_header)
-        else:
-            sender = invocation.get_header_value('sender', 'Unknown')
-
+        sender, sender_type = invocation.get_message_sender()
         op = invocation.get_header_value('op', 'Unknown')
         ion_actor_id = invocation.get_header_value('ion-actor-id', 'anonymous')
         actor_roles = invocation.get_header_value('ion-actor-roles', {})
