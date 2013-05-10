@@ -16,5 +16,8 @@ omit =
     pyon/__init__*
     */parsing/MonitorParser*
     */parsing/MonitorLexer*
+    */shell_api*
+    */datastore_admin*
+    */breakpoint*
 [html]
 directory = coverage_results
