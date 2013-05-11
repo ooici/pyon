@@ -67,9 +67,11 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                     if deco_value:
                         #Assume that if there is a value, then it is specifying a field in the object
                         fld_value = getattr(invocation.message,field)
-                        invocation.headers['resource-id'] = getattr(fld_value, deco_value)
+                        if getattr(fld_value, deco_value) is not None:
+                            invocation.headers['resource-id'] = getattr(fld_value, deco_value)
                     else:
-                        invocation.headers['resource-id'] = getattr(invocation.message,field)
+                        if getattr(invocation.message,field) is not None:
+                            invocation.headers['resource-id'] = getattr(invocation.message,field)
 
         except Exception, ex:
             log.exception(ex)
