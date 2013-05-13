@@ -46,7 +46,8 @@ def breakpoint(scope=None):
         from pyon.container.shell_api import get_shell_api
         from pyon.container.cc import Container
         locals().update(scope)
-        locals().update(get_shell_api(Container.instance))
+        if Container.instance:
+            locals().update(get_shell_api(Container.instance))
 
     # Update namespace of interactive shell
     # TODO: Cleanup namespace even further
