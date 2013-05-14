@@ -324,27 +324,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         return []
 
-    def get_schema(self, resource_id=""):
-        """
-        """
-        try:
-            resource_schema = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_SCHEMA)
-        
-        except FSMStateError, FSMCommandUnknownError:
-            resource_schema = ''
-
-        except Exception as ex:            
-            self._on_command_error('get_schema', None, None, None, ex)
-        
-        agent_schema = self._get_agent_schema()
-        
-        # Construct a command result object.
-        schema = IonObject("AgentSchema",
-                               agent_schema=agent_schema,
-                               resource_schema=resource_schema)
-        
-        return schema
-
     def _get_agent_schema(self):
         """
         """
