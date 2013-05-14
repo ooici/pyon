@@ -20,6 +20,7 @@ from pyon.ion.resource import RT, PRED, OT, LCS
 from pyon.ion.state import StatefulProcessMixin
 
 from pickle import dumps, loads
+import json
 
 # Pyon exceptions.
 from pyon.core.exception import IonException
@@ -173,6 +174,12 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._proc_state = {}
         self._proc_state_changed = False
         
+        # Resource schema.
+        self._resource_schema = {}
+        
+        # Agent schema.
+        self._agent_schema = {}
+        
     def on_init(self):
         """
         ION on_init initializer called once the process exists.
@@ -275,29 +282,62 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             self._on_command_error('get_capabilities', None, None, None, ex)
   
         res_iface_cmds = self._get_resource_interface(current_state)
-        #res_cmds.extend(res_iface_cmds)
-        
+
         caps = []
         for item in agent_cmds:
+            schema = self._agent_schema.get('commands',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.AGT_CMD)
+                            cap_type=CapabilityType.AGT_CMD,
+                            schema=schema)
             caps.append(cap)
+
         for item in agent_params:
+            schema = self._agent_schema.get('parameters',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.AGT_PAR)
+                            cap_type=CapabilityType.AGT_PAR,
+                            schema=schema)
             caps.append(cap)
+
         for item in res_cmds:
+            schema = self._resource_schema.get('commands',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_CMD)
             caps.append(cap)
+
         for item in res_iface_cmds:
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_IFACE)
             caps.append(cap)
+
         for item in res_params:
+            schema = self._resource_schema.get('parameters',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_PAR)
             caps.append(cap)
+
+        schema = self._agent_schema.get('states',{})
+        cap = IonObject('AgentCapability', name='agent_states',
+                            cap_type=CapabilityType.AGT_STATES,
+                            schema=schema)
+        caps.append(cap)
+        
+        schema = self._agent_schema.get('alert_defs',{})
+        cap = IonObject('AgentCapability', name='alert_defs',
+                            cap_type=CapabilityType.ALERT_DEFS,
+                            schema=schema)
+        caps.append(cap)
+        
+        schema = self._agent_schema.get('command_args',{})
+        cap = IonObject('AgentCapability', name='command_args',
+                            cap_type=CapabilityType.AGT_CMD_ARGS,
+                            schema=schema)
+        caps.append(cap)
+
+        schema = self._agent_schema.get('streams',{})
+        cap = IonObject('AgentCapability', name='streams',
+                            cap_type=CapabilityType.AGT_STREAMS,
+                            schema=schema)
+        caps.append(cap)
 
         return caps
 
