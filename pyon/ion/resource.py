@@ -850,7 +850,7 @@ class ExtendedResourceContainer(object):
                     associated_resources = deco_value.split(',')
 
                 for res in associated_resources:
-                    assoc = self.get_associated_resource_info(resource_id, res)
+                    assoc = self.get_associated_resource_info(origin_resource_type, resource_id, res)
                     assoc_dict[assoc.resource_type] = assoc
 
                 setattr(resource_data, field, assoc_dict)
@@ -860,7 +860,10 @@ class ExtendedResourceContainer(object):
         return resource_data
 
 
-    def get_associated_resource_info(self, resource_id="", resource_type=None):
+    def get_associated_resource_info(self, origin_resource_type="", resource_id="", assoc_resource_type=None):
+
+        if not origin_resource_type:
+            raise Inconsistent("The parameter origin_resource_type is not set")
 
         if not isinstance(resource_id, types.StringType):
             raise Inconsistent("The parameter resource_id is not a single resource id string")
@@ -868,11 +871,11 @@ class ExtendedResourceContainer(object):
         if not self.service_provider or not self._rr:
             raise Inconsistent("This class is not initialized properly")
 
-        if resource_type is not None and resource_type not in getextends(OT.AssociatedResources):
-            raise BadRequest('The requested resource %s is not extended from %s' % (resource_type, OT.AssociatedResources))
+        if assoc_resource_type is not None and assoc_resource_type not in getextends(OT.AssociatedResources):
+            raise BadRequest('The requested resource %s is not extended from %s' % (assoc_resource_type, OT.AssociatedResources))
 
 
-        resource_data = IonObject(resource_type)
+        resource_data = IonObject(assoc_resource_type)
 
         for field in resource_data._schema:
 
@@ -883,7 +886,54 @@ class ExtendedResourceContainer(object):
                 setattr(resource_data, 'resource_type', deco_value)
 
                 res_list,_ = self._rr.find_resources(restype=deco_value, id_only=False)
-                setattr(resource_data, field, res_list)
+
+                exclude_lcs_filter_value = resource_data.get_decorator_value(field, 'ExcludeLifecycleStates')
+                if exclude_lcs_filter_value is not None and exclude_lcs_filter_value.find(',') > -1:
+                    exclude_filter = exclude_lcs_filter_value.split(',')
+                    res_list = [res for res in res_list if res.lcstate not in exclude_filter ]
+
+                #Look for ResourceSPOFilter filter and filter above results to exclude other resources already assigned
+                #This filter MUST be a comma separated value of Subject, Predicate, Object
+                res_filter_value = resource_data.get_decorator_value(field, 'ResourceSPOFilter')
+                if res_filter_value is not None and res_filter_value.find(',') > -1:
+                    assoc_filter = res_filter_value.split(',')
+
+                    res_associations = self._rr.find_associations(predicate=assoc_filter[1], id_only=False)
+                    assoc_list = [a for a in res_associations if a.st==assoc_filter[0] and a.ot==assoc_filter[2]]
+
+                    def resource_available(res):
+                        for assoc in assoc_list:
+                            if assoc.st == origin_resource_type:
+                                if assoc.o == res._id:
+                                    if not resource_id:
+                                        return False
+
+                                    if assoc.s == resource_id:
+                                        return True
+                                    else:
+                                        return False
+
+                            else:
+                                if assoc.s == res._id:
+                                    if not resource_id:
+                                        return False
+
+                                    if assoc.o == resource_id:
+                                        return True
+                                    else:
+                                        return False
+
+                        return True
+
+
+                    #Iterate over the list and remove any object which are assigned to other resources and not the target resource
+                    final_list = []
+                    final_list.extend( [res for res in res_list if resource_available(res)])
+                    setattr(resource_data, field, final_list)
+
+                else:
+                    setattr(resource_data, field, res_list)
+
                 continue
 
 
