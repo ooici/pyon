@@ -183,6 +183,11 @@ class NodeB(BaseNode):
             raise StandardError("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s" % ch_number)
 
         transport = AMQPTransport(amq_chan)
+
+        # by default, everything should have a prefetch count of 1 (configurable)
+        # this can be overridden by the channel get_n related methods
+        transport.qos_impl(prefetch_count=CFG.get_safe('container.messaging.endpoint.prefetch_count', 1))
+
         return transport
 
     def _check_pooled_channel_health(self, ch):
