@@ -77,7 +77,8 @@ class TestNodeB(PyonTestCase):
         self.assertNotIn(ourchid, self._node._bidir_pool)
 
     @patch('pyon.net.messaging.blocking_cb')
-    def test__new_channel(self, bcbmock):
+    @patch('pyon.net.transport.AsyncResult')
+    def test__new_channel(self, armock, bcbmock):
         self._node.client = Mock()
         ch = self._node._new_channel(BaseChannel)
 
@@ -228,7 +229,8 @@ class TestNodeB(PyonTestCase):
         self.assertEqual(chmock._destroy_queue.call_count, 20)
 
     @patch('pyon.net.messaging.blocking_cb')
-    def test__new_transport(self, bcbmock):
+    @patch('pyon.net.transport.AsyncResult')
+    def test__new_transport(self, armock, bcbmock):
         self._node.client = Mock()
         transport = self._node._new_transport()
 
