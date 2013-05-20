@@ -301,7 +301,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         for item in res_cmds:
             schema = self._resource_schema.get('commands',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.RES_CMD)
+                            cap_type=CapabilityType.RES_CMD,
+                            schema=schema)
             caps.append(cap)
 
         for item in res_iface_cmds:
@@ -312,7 +313,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         for item in res_params:
             schema = self._resource_schema.get('parameters',{}).get(item,{})
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.RES_PAR)
+                            cap_type=CapabilityType.RES_PAR,
+                            schema=schema)
             caps.append(cap)
 
         schema = self._agent_schema.get('states',{})
