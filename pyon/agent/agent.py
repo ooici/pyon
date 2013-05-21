@@ -299,7 +299,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             caps.append(cap)
 
         for item in res_cmds:
-            schema = self._resource_schema.get('commands',{}).get(item,{})
+            try:
+                schema = self._resource_schema.get('commands',{}).get(item,{})
+            except:
+                log.error('Bad resource schema.')
+                schema = {}
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_CMD,
                             schema=schema)
@@ -311,7 +315,11 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             caps.append(cap)
 
         for item in res_params:
-            schema = self._resource_schema.get('parameters',{}).get(item,{})
+            try:
+                schema = self._resource_schema.get('parameters',{}).get(item,{})
+            except:
+                log.error('Bad resource schema.')
+                schema = {}
             cap = IonObject('AgentCapability', name=item,
                             cap_type=CapabilityType.RES_PAR,
                             schema=schema)
