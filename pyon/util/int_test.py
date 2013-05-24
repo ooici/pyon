@@ -76,16 +76,20 @@ class IonIntegrationTestCase(unittest.TestCase):
             from pyon.datastore.datastore_admin import DatastoreAdmin
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
+            # Turn off file system cleaning
+            # The child container should NOT clean out the parent's filesystem, 
+            # they should share like good containers sometimes do
+            CFG.container.file_system.force_clean = False
         else:
             # We cannot live without pre-initialized datastores and resource objects
             pre_initialize_ion()
 
-        # hack to force_clean on filesystem
-        try:
-            CFG['container']['filesystem']['force_clean'] = True
-        except KeyError:
-            CFG['container']['filesystem'] = {}
-            CFG['container']['filesystem']['force_clean'] = True
+            # hack to force_clean on filesystem
+            try:
+                CFG['container']['filesystem']['force_clean'] = True
+            except KeyError:
+                CFG['container']['filesystem'] = {}
+                CFG['container']['filesystem']['force_clean'] = True
 
         self.container = None
         self.addCleanup(self._stop_container)
