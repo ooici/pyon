@@ -159,13 +159,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         # Override in derived class to set initial state of set in
         # config.
         self._initial_state = None
-
-        # Wipe out the persisted state launch.
-        self._forget_past = True
         
-        # Store state while running.
-        self._enable_persistence = False
-
         # Construct the default state machine.
         # This is overridden in derived classes and calls base class with
         # state and event parameters.
@@ -199,33 +193,28 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         self._event_publisher = EventPublisher()
 
         # Start state machine.
+        state = self._get_state('agent_state')
+        prev_state = self._get_state('agent_state')
+        
         self._initial_state = self.CFG.get('initial_state', None) or self._initial_state
         self._fsm.start(self._initial_state)
 
-        # State persistence flags.
-        self._forget_past = self.CFG.get('forget_past', True)        
-        self._enable_persistence = self.CFG.get('enable_persistence', False)
-
+        bootmode = self.CFG.get_safe('bootmode')
         self._load_state()
 
         # If configured, wipe out the prior agent memory.
-        if self._forget_past:
-            self._get_state_vector().clear()        
-        
-        # If configured, restore any persisted aparams.
         restored_aparams = []
         unrestored_aparams = []
-        if self._enable_persistence:
+        if bootmode == 'restart':
             (restored_aparams, unrestored_aparams) = self._restore_aparams()
+            self._restore_resource(state, prev_state)            
         else:
             unrestored_aparams = self.get_agent_parameters()
-
-        # Configure any aparams not restored by persistence.
+            self._get_state_vector().clear()        
+        
         self._configure_aparams(unrestored_aparams)
 
-        # If configured, restore the state and resource parameters.
-        if self._enable_persistence:
-            self._restore_resource()
+            
 
     def on_quit(self):
         """
@@ -299,9 +288,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             caps.append(cap)
 
         for item in res_cmds:
-            schema = self._resource_schema.get('commands',{}).get(item,{})
+            try:
+                schema = self._resource_schema.get('commands',{}).get(item,{})
+            except:
+                log.error('Bad resource schema.')
+                schema = {}
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.RES_CMD)
+                            cap_type=CapabilityType.RES_CMD,
+                            schema=schema)
             caps.append(cap)
 
         for item in res_iface_cmds:
@@ -310,9 +304,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             caps.append(cap)
 
         for item in res_params:
-            schema = self._resource_schema.get('parameters',{}).get(item,{})
+            try:
+                schema = self._resource_schema.get('parameters',{}).get(item,{})
+            except:
+                log.error('Bad resource schema.')
+                schema = {}
             cap = IonObject('AgentCapability', name=item,
-                            cap_type=CapabilityType.RES_PAR)
+                            cap_type=CapabilityType.RES_PAR,
+                            schema=schema)
             caps.append(cap)
 
         schema = self._agent_schema.get('states',{})
@@ -432,15 +431,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             else:
                 setattr(self, key, val)                
 
-            if self._enable_persistence:
-                get_key = 'aparam_get_' + x
-                get_func = getattr(self, get_key, None)
-                val = None
-                if get_func and callable(get_func):
-                    val = get_func()
-                else:
-                    val = getattr(self, key)
-                self._set_state(key, val)
+            get_key = 'aparam_get_' + x
+            get_func = getattr(self, get_key, None)
+            val = None
+            if get_func and callable(get_func):
+                val = get_func()
+            else:
+                val = getattr(self, key)
+            self._set_state(key, val)
 
     def get_agent_state(self, resource_id=''):
         """
@@ -600,9 +598,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s publsihed state change: %s, time: %s result: %s',
                  self.id, state, get_ion_ts(), str(result))
 
-        if self._enable_persistence:
-            self._set_state('agent_state', state)
-            self._flush_state()
+        self._set_state('agent_state', state)
+        self._flush_state()
             
         self._on_state_enter(state)
 
@@ -620,9 +617,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s leaving state: %s, time: %s',
                  self.id, state, get_ion_ts())
 
-        if self._enable_persistence:
-            self._set_state('prev_agent_state', state)
-
+        self._set_state('prev_agent_state', state)
         self._on_state_exit(state)
 
     def _on_state_exit(self, state):
@@ -733,7 +728,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         """
         pass
 
-    def _restore_resource(self):
+    def _restore_resource(self, state, prev_state):
         """
         Override in derived class to restore agent state and
         resource parameters.

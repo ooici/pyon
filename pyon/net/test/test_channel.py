@@ -907,6 +907,11 @@ class TestChannelInt(IonIntegrationTestCase):
         ch._recv_name = NameTrio(bootstrap.get_sys_name(), 'test_queue')
         ch._queue_auto_delete = False
 
+        # #########
+        # THIS TEST EXPECTS OLD BEHAVIOR OF NO QOS, SO SET A HIGH BAR
+        # #########
+        ch._transport.qos_impl(prefetch_count=9999)
+
         def cleanup_channel(thech):
             thech._destroy_queue()
             thech.close()
