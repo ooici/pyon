@@ -85,6 +85,7 @@ def get_method_arguments(module, method_name, **kwargs):
 
     if hasattr(module,method_name):
         try:
+            #This will fail running unit tests with mock objects - BOO!  
             method_args = inspect.getargspec(getattr(module,method_name))
             for arg in method_args[0]:
                 if kwargs.has_key(arg):

@@ -453,11 +453,6 @@ class GovernanceController(object):
 
         if type(precondition) == types.MethodType and precondition.im_self != process:
             raise NotFound("The method %s does not exist for the %s service." % (str(precondition), process.name))
-        elif type(precondition) == types.StringType:
-            #Convert string to instancemethod if it exists..if not store as potential precondition to execute
-            method = getattr(process, precondition, None)
-            if method:
-                precondition = method
 
         process_op_conditions = self.get_process_operation_dict(process.name)
         if process_op_conditions.has_key(operation):
@@ -500,12 +495,6 @@ class GovernanceController(object):
 
         if not hasattr(process, operation):
             raise NotFound("The operation %s does not exist for the %s service" % (operation, process.name))
-
-        if type(precondition) == types.StringType:
-            #Convert string to instancemethod
-            method = getattr(process, precondition, None)
-            if method:
-                precondition = method
 
         process_op_conditions = self.get_process_operation_dict(process.name, auto_add=False)
         if process_op_conditions is not None and process_op_conditions.has_key(operation):
@@ -566,9 +555,15 @@ class GovernanceController(object):
                 elif type(precond) == types.StringType:
 
                     try:
-                        exec precond
-                        pref = locals()["precondition_func"]
-                        ret_val, ret_message = pref(process, msg, headers)
+                        #See if this is method within the endpoint process, if so call it
+                        method = getattr(process, precond, None)
+                        if method:
+                            ret_val, ret_message = method(msg, headers)
+                        else:
+                            #It is not a method in the process, so try to execute as a simple python function
+                            exec precond
+                            pref = locals()["precondition_func"]
+                            ret_val, ret_message = pref(process, msg, headers)
 
                     except Exception, e:
                         #TODD - Catching all exceptions and logging as errors, don't want to stop processing for this right now
