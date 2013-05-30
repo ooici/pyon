@@ -479,9 +479,7 @@ class ProcManager(object):
         def agent_cleanup(x):
             self._cleanup_method(process_instance.id, rsvc)
             if resource_id:
-                pass
-                #self._cleanup_method(resource_id, alistener)
-                # disabled, it's probably not architecturally correct to delete this queue
+                self._cleanup_method(resource_id, alistener)
 
         proc = self.proc_sup.spawn(name=process_instance.id,
                                    service=process_instance,
