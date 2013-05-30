@@ -28,6 +28,11 @@ class QueueBlame(Plugin):
         self._queues_declared = []          # ordered list of queues declared
         self._queues = defaultdict(list)    # queue name -> list of accesses
 
+        # Make sure we initialize pyon before anything in this plugin executes
+        from pyon.core import bootstrap
+        if not bootstrap.pyon_initialized:
+            bootstrap.bootstrap_pyon()
+
         from pyon.ion.exchange import ExchangeManager
         from pyon.util.containers import DotDict
         from pyon.core.bootstrap import CFG
