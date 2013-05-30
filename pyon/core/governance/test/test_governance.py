@@ -15,6 +15,8 @@ from pyon.core.bootstrap import IonObject
 from pyon.ion.resource import PRED, RT
 from pyon.core.governance import ORG_MANAGER_ROLE, ORG_MEMBER_ROLE, ION_MANAGER, GovernanceHeaderValues
 from pyon.core.governance import find_roles_by_actor, get_actor_header, get_system_actor_header, get_role_message_headers, get_valid_resource_commitments
+from interface.services.examples.hello.ihello_service  import HelloServiceProcessClient
+from pyon.util.context import LocalContextMixin
 
 class UnitTestService(BaseService):
     name = 'UnitTestService'
@@ -144,9 +146,9 @@ class GovernanceUnitTest(PyonTestCase):
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 2)
 
         self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', 'func1')
-        self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 1)
+        self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 2)
 
-        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', 'func1')
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', bs.func1)
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 1)
 
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', self.pre_func1)
@@ -155,7 +157,7 @@ class GovernanceUnitTest(PyonTestCase):
         self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', self.pre_func1)
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)['test_op']), 1)
 
-        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op',  bs.func2)
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op',  'func2')
         self.assertEqual(len(self.governance_controller.get_process_operation_dict(bs.name)), 0)
 
     def test_check_process_operation_preconditions(self):
@@ -170,7 +172,7 @@ class GovernanceUnitTest(PyonTestCase):
             self.governance_controller.check_process_operation_preconditions(bs, {}, {'op': 'test_op'})
         self.assertIn('No reason', cm.exception.message)
 
-        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', bs.func2)
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', 'func2')
         self.governance_controller.check_process_operation_preconditions(bs, {}, {'op': 'test_op'})
 
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', bs.func3)
@@ -181,7 +183,7 @@ class GovernanceUnitTest(PyonTestCase):
             self.governance_controller.check_process_operation_preconditions(bs, {}, {'op': 'test_op'})
         self.assertIn('No reason', cm.exception.message)
 
-        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', 'func2')
+        self.governance_controller.unregister_process_operation_precondition(bs, 'test_op', bs.func2)
         self.governance_controller.check_process_operation_preconditions(bs, {}, {'op': 'test_op'})
 
         self.governance_controller.register_process_operation_precondition(bs, 'test_op', self.pre_func1)
@@ -364,6 +366,13 @@ class GovernanceUnitTest(PyonTestCase):
         self.assertEqual(gov_values.actor_roles, {'ION': [ION_MANAGER, ORG_MANAGER_ROLE, ORG_MEMBER_ROLE]})
         self.assertEqual(gov_values.resource_id,'')
 
+
+class GovernanceTestProcess(LocalContextMixin):
+    name = 'gov_test'
+    id='gov_client'
+    process_type = 'simple'
+
+
 @attr('INT')
 class GovernanceIntTest(IonIntegrationTestCase):
 
@@ -371,6 +380,9 @@ class GovernanceIntTest(IonIntegrationTestCase):
     def setUp(self):
 
         self._start_container()
+
+        #Instantiate a process to represent the test
+        self.gov_client = GovernanceTestProcess()
 
         self.rr = self.container.resource_registry
 
@@ -525,3 +537,36 @@ class GovernanceIntTest(IonIntegrationTestCase):
 
         #verify that the commitment is returned
         self.assertIsNotNone(c)
+
+
+    ### THIS TEST USES THE HELLO SERVICE EXAMPLE
+
+    @attr('PRECONDITION1')
+    def test_multiple_process_pre_conditions(self):
+        hello1 = self.container.spawn_process('hello_service1','examples.service.hello_service','HelloService' )
+        self.addCleanup(self.container.terminate_process, hello1)
+
+        hello2 = self.container.spawn_process('hello_service2','examples.service.hello_service','HelloService' )
+        self.addCleanup(self.container.terminate_process, hello2)
+
+        hello3 = self.container.spawn_process('hello_service3','examples.service.hello_service','HelloService' )
+        #self.addCleanup(self.container.terminate_process, hello3)
+
+        client = HelloServiceProcessClient(node=self.container.node, process=self.gov_client)
+
+        actor_id='anonymous'
+        text='mytext 123'
+
+        actor_headers = get_actor_header(actor_id)
+        ret = client.hello(text, headers=actor_headers)
+        self.assertIn(text, ret)
+
+        with self.assertRaises(Unauthorized) as cm:
+            ret = client.noop(text=text)
+        self.assertIn('The noop operation has been denied', cm.exception.message)
+
+        self.container.terminate_process(hello3)
+
+        with self.assertRaises(Unauthorized) as cm:
+            ret = client.noop(text=text)
+        self.assertIn('The noop operation has been denied', cm.exception.message)
