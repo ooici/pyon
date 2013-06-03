@@ -1,6 +1,8 @@
 import msgpack
 
+from pyon.core.exception import BadRequest
 from pyon.core.interceptor.interceptor import Interceptor
+from pyon.util.containers import get_safe
 from pyon.util.log import log
 import numpy as np
 
@@ -92,6 +94,11 @@ def encode_ion(obj):
 
 
 class EncodeInterceptor(Interceptor):
+
+    def configure(self, config):
+        self.max_message_size = get_safe(config, 'container.messaging.max_message_size', 20000000)
+        log.debug("EncodeInterceptor enabled")
+
     def outgoing(self, invocation):
         log.debug("EncodeInterceptor.outgoing: %s", invocation)
         log.debug("Pre-transform: %s", invocation.message)
@@ -107,6 +114,12 @@ class EncodeInterceptor(Interceptor):
         # Logging binary stuff caused nose capture output to blow up when
         # there's an exception
         # log.debug("Post-transform: %s", invocation.message)
+
+        msg_size = len(invocation.message)
+        log.debug("message size: %s", msg_size)
+        if msg_size > self.max_message_size:
+            raise BadRequest('The message size %s is larger than the max_message_size value of %s' % (msg_size,self.max_message_size) )
+
         return invocation
 
     def incoming(self, invocation):
