@@ -1,4 +1,5 @@
 import msgpack
+import sys
 
 from pyon.core.exception import BadRequest
 from pyon.core.interceptor.interceptor import Interceptor
@@ -94,6 +95,9 @@ def encode_ion(obj):
 
 
 class EncodeInterceptor(Interceptor):
+
+    def __init__(self):
+        self.max_message_size = sys.maxint  # Will be set appropriately from configuration
 
     def configure(self, config):
         self.max_message_size = get_safe(config, 'container.messaging.max_message_size', 20000000)
