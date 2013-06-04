@@ -27,6 +27,18 @@ class IonObjectBase(object):
                 return True
         return False
 
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        return setattr(self, key, value)
+
+    def __contains__(self, item):
+        return hasattr(self, item)
+
+    def has_key(self, key):
+        return hasattr(self, key)
+
     def _validate(self):
         """
         Compare fields to the schema and raise AttributeError if mismatched.
@@ -167,9 +179,6 @@ class IonObjectBase(object):
     def _get_extends(self):
         parents = [parent.__name__ for parent in self.__class__.__mro__ if parent.__name__ not in ['IonObjectBase', 'object', self._get_type()]]
         return parents
-
-    def __contains__(self, item):
-        return hasattr(self, item)
 
     def update(self, other):
         """
