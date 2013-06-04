@@ -164,7 +164,7 @@ class PYCC(Plugin):
         for cc in self.ccs:
             pid = cc.pid
             debug.write('\tClosing container with pid:%d\n' % pid)
-            os.kill(pid, signal.SIGINT)
+            os.kill(pid, signal.SIGKILL)
             os.waitpid(pid, 0)
 
     def beforeTest(self, test):
