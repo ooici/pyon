@@ -851,7 +851,7 @@ class ExtendedResourceContainer(object):
 
                 for res in associated_resources:
                     assoc = self.get_associated_resource_info(origin_resource_type, resource_id, res)
-                    assoc_dict[assoc.resource_type] = assoc
+                    assoc_dict[assoc.key] = assoc
 
                 setattr(resource_data, field, assoc_dict)
                 continue
@@ -949,7 +949,12 @@ class ExtendedResourceContainer(object):
                 setattr(resource_data, field, assoc_list)
                 continue
 
-
+        # set key if we have one
+        key = resource_data.get_class_decorator_value('Key')
+        if key is None:
+            resource_data.key = resource_data.resource_type
+        else:
+            resource_data.key = key
 
         return resource_data
 
