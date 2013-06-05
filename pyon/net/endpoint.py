@@ -1122,7 +1122,19 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # sample (possibly) before we do any sending
         self._sample_request(response_headers['status_code'], response_headers['error_message'], msg, headers, result, response_headers)
 
-        return self.send(result, response_headers)
+        # possible to raise exception in sending interceptor stack, so if we catch an IonException, send that instead
+        try:
+            return self.send(result, response_headers)
+        except IonException as ex:
+            result = ""
+            response_headers = self._create_error_response(ex)
+
+            response_headers['error_message'] = "(while trying to send RPC response for conv-id %s) %s" % (headers.get('conv-id'), response_headers['error_message'])
+            response_headers['protocol']      = headers.get('protocol', '')
+            response_headers['conv-id']       = headers.get('conv-id', '')
+            response_headers['conv-seq']      = headers.get('conv-seq', 1) + 1
+
+            return self.send(result, response_headers)
 
     def _send(self, msg, headers=None, **kwargs):
         """
