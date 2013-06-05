@@ -877,6 +877,8 @@ class ExtendedResourceContainer(object):
 
         resource_data = IonObject(assoc_resource_type)
 
+        log.debug("get_associated_resource_info: %s", assoc_resource_type)
+
         for field in resource_data._schema:
 
             deco_value = resource_data.get_decorator_value(field, 'ResourceType')
@@ -902,29 +904,15 @@ class ExtendedResourceContainer(object):
                     assoc_list = [a for a in res_associations if a.st==assoc_filter[0] and a.ot==assoc_filter[2]]
 
                     def resource_available(res):
-                        for assoc in assoc_list:
-                            if assoc.st == origin_resource_type:
-                                if assoc.o == res._id:
-                                    if not resource_id:
-                                        return False
+                        # give me a list of associations relevent to the passed in resource
+                        rel_assocs = [a for a in assoc_list if res._id == (a.o if a.st == origin_resource_type else a.s)]
 
-                                    if assoc.s == resource_id:
-                                        return True
-                                    else:
-                                        return False
+                        # of those resources, give me the ids of resources whos types match what i am currently building for
+                        assocs     = [(a.s if a.st == origin_resource_type else a.o) for a in rel_assocs]
 
-                            else:
-                                if assoc.s == res._id:
-                                    if not resource_id:
-                                        return False
-
-                                    if assoc.o == resource_id:
-                                        return True
-                                    else:
-                                        return False
-
-                        return True
-
+                        # return true if there are no associations for the resource in question, or it has an association to
+                        # the current resource we are building for
+                        return len(assocs) == 0 or resource_id in assocs
 
                     #Iterate over the list and remove any object which are assigned to other resources and not the target resource
                     final_list = []
