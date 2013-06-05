@@ -51,7 +51,7 @@ class FileSystem(object):
     @classmethod 
     def _clean(cls, config):
         if not cls.root:
-            cls.root = os.path.join(config.get_safe('container.filesystem.root', '/tmp'), get_sys_name())
+            cls.root = os.path.join(config.get_safe('container.filesystem.root', '/tmp/ion'), get_sys_name())
         log.info('Removing %s', cls.root)
         if os.path.exists(cls.root):
             shutil.rmtree(cls.root)
@@ -61,7 +61,7 @@ class FileSystem(object):
         if FileSystem._force_clean:
             self._clean(CFG)
         if not FileSystem.root:
-            FileSystem.root = os.path.join(CFG.get_safe('container.filesystem.root', '/tmp'), get_sys_name())
+            FileSystem.root = os.path.join(CFG.get_safe('container.filesystem.root', '/tmp/ion'), get_sys_name())
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
