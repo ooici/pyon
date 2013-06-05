@@ -100,7 +100,7 @@ class EncodeInterceptor(Interceptor):
         self.max_message_size = sys.maxint  # Will be set appropriately from configuration
 
     def configure(self, config):
-        self.max_message_size = get_safe(config, 'container.messaging.max_message_size', 20000000)
+        self.max_message_size = get_safe(config, 'max_message_size', 20000000)
         log.debug("EncodeInterceptor enabled")
 
     def outgoing(self, invocation):
