@@ -6,7 +6,8 @@ from mock import Mock, mocksignature, patch, DEFAULT
 import unittest
 
 from zope.interface import implementedBy
-from pyon.core.bootstrap import IonObject, bootstrap_pyon, get_service_registry
+from pyon.core.bootstrap import IonObject, bootstrap_pyon, get_service_registry, CFG
+from pyon.util.file_sys import FileSystem
 
 bootstrap_pyon()
 
@@ -27,6 +28,10 @@ def pop_last_call(mock):
     mock.call_count -= 1
 
 class PyonTestCase(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self, *args, **kwargs)
+
+        self.addCleanup(self._file_sys_clean)
     # Call this function at the beginning of setUp if you need a mock ion
     # obj
 
@@ -57,6 +62,11 @@ class PyonTestCase(unittest.TestCase):
         thing = patcher.start()
         self.addCleanup(patcher.stop)
         return thing
+
+    def _file_sys_clean(self):
+        FileSystem._clean(CFG)
+
+
 
     def _create_service_mock(self, service_name):
         # set self.clients if not already set

@@ -14,7 +14,7 @@ import random
 import string
 from pyon.util.log import log
 from pyon.util.containers import DotDict
-from pyon.core.bootstrap import CFG as bootcfg
+from pyon.core.bootstrap import CFG as bootcfg, get_sys_name
 
 
 class FileSystemError(Exception):
@@ -39,6 +39,7 @@ class FileSystem(object):
     FS_DIRECTORY = DotDict(zip(FS_DIRECTORY_LIST,FS_DIRECTORY_LIST))
 
     FS = DotDict(zip(FS_DIRECTORY_LIST, FS_DIRECTORY_LIST))
+    root = ''
     _instance = None
 
 
@@ -49,22 +50,18 @@ class FileSystem(object):
     
     @classmethod 
     def _clean(cls, config):
-        for k,v in FileSystem.FS_DIRECTORY.iteritems():
-            s = v.lower() 
-            conf = config.get_safe('container.filesystem.%s' % s, None)
-            if conf:
-                FileSystem.FS_DIRECTORY[k] = conf
-            else:
-                FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
-            if os.path.exists(FS_DIRECTORY[k]):
-                log.debug('Removing %s' , FS_DIRECTORY[k])
-                shutil.rmtree(FS_DIRECTORY[k])
-
+        if not cls.root:
+            cls.root = os.path.join(config.get_safe('container.filesystem.root', '/tmp/ion'), get_sys_name())
+        log.info('Removing %s', cls.root)
+        if os.path.exists(cls.root):
+            shutil.rmtree(cls.root)
 
     def __init__(self, CFG):
         FileSystem._force_clean = CFG.get_safe('container.filesystem.force_clean',False)
         if FileSystem._force_clean:
             self._clean(CFG)
+        if not FileSystem.root:
+            FileSystem.root = os.path.join(CFG.get_safe('container.filesystem.root', '/tmp/ion'), get_sys_name())
 
         for k,v in FileSystem.FS_DIRECTORY.iteritems():
             s = v.lower() # Lower case string
@@ -72,7 +69,7 @@ class FileSystem(object):
             if conf:
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
-                FileSystem.FS_DIRECTORY[k] = os.path.join('/tmp',s)
+                FileSystem.FS_DIRECTORY[k] = os.path.join(os.path.join(FileSystem.root, get_sys_name()),s)
             # Check to make sure you're within your rights to access this
             if not FileSystem._sandbox(FileSystem.FS_DIRECTORY[k]):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
