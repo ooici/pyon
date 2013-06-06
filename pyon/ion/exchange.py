@@ -144,6 +144,7 @@ class ExchangeManager(object):
         # prepare priviledged transport
         self._priviledged_transport = self.get_transport(self._nodes.get('priviledged', self._nodes.get('primary')))
         self._priviledged_transport.lock = True     # prevent any attempt to close
+        self._priviledged_transport.add_on_close_callback(self._priviledged_transport_closed)
 
         self.default_xs         = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
         self.xs_by_name[ION_ROOT_XS] = self.default_xs
@@ -202,6 +203,16 @@ class ExchangeManager(object):
             ret[xsn].append(xn)
 
         return ret
+
+    def _priviledged_transport_closed(self, transport, code, text):
+        """
+        Callback for when the priviledged transport is closed.
+
+        If it's an error close, this is bad and will fail fast the container.
+        """
+        if not (code == 0 or code == 200):
+            log.error("The priviledged transport has failed (%s: %s)", code, text)
+            self.container.fail_fast("ExManager priviledged transport has failed (%s: %s)" % (code, text), True)
 
     def cleanup_xos(self):
         """
