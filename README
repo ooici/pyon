@@ -52,6 +52,7 @@ For Mac, use homebrew
 * Setup a virtualenv to for Pyon (use any name you like):
     > mkvirtualenv --no-site-packages --python=python2.7 ion27
     > workon ion27
+    > pip install numpy==1.6.2
 
 
 
