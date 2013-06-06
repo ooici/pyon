@@ -69,7 +69,7 @@ class FileSystem(object):
             if conf:
                 FileSystem.FS_DIRECTORY[k] = conf
             else:
-                FileSystem.FS_DIRECTORY[k] = os.path.join(os.path.join(FileSystem.root, get_sys_name()),s)
+                FileSystem.FS_DIRECTORY[k] = os.path.join(FileSystem.root, s)
             # Check to make sure you're within your rights to access this
             if not FileSystem._sandbox(FileSystem.FS_DIRECTORY[k]):
                 raise OSError('You are attempting to perform an operation beyond the scope of your permission. (%s is set to \'%s\')' % (k,FileSystem.FS_DIRECTORY[k]))
