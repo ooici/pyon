@@ -12,7 +12,7 @@ from pyon.util.async import spawn
 import unittest
 from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
 from mock import Mock, sentinel, patch, call, MagicMock
-from pyon.net.transport import BaseTransport, NameTrio
+from pyon.net.transport import BaseTransport, NameTrio, TransportError
 from pyon.net.messaging import NodeB
 from pyon.core.bootstrap import get_sys_name
 from pyon.core import exception
@@ -227,6 +227,20 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
     @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp_bad':fail_bad_host_cfg}, container=_make_server_cfg(primary='amqp_bad'))
     def test_start_stop_with_bad_host_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
+
+    def test_priviledged_transport_dying_means_fail_fast(self):
+        self._start_container()
+
+        self.container.fail_fast = Mock()
+
+        name = str(uuid4())[0:6]
+        bind = str(uuid4())[0:6]
+
+        xn = self.container.ex_manager.create_xn_queue(name)
+        self.assertRaises(TransportError, xn.unbind, bind)
+
+        self.assertEquals(self.container.fail_fast.call_count, 1)
+        self.assertIn("ExManager priviledged transport has failed", self.container.fail_fast.call_args[0][0])
 
 @attr('UNIT', group='exchange')
 class TestExchangeObjects(PyonTestCase):
