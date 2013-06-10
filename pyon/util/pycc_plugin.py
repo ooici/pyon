@@ -164,8 +164,20 @@ class PYCC(Plugin):
         for cc in self.ccs:
             pid = cc.pid
             debug.write('\tClosing container with pid:%d\n' % pid)
-            os.kill(pid, signal.SIGKILL)
-            os.waitpid(pid, 0)
+            os.kill(pid, signal.SIGINT)
+            import gevent
+            try:
+                with gevent.timeout.Timeout(20):
+                    os.waitpid(pid, 0)
+            except gevent.timeout.Timeout:
+                debug.write('Timeout waiting for container to die.  Going in for a kill.\n')
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    os.waitpid(pid, 0)
+                except:
+                    debug.write('Got an error during kill. Oh well...\n')
+                    import traceback
+                    traceback.print_exc(file=debug)
 
     def beforeTest(self, test):
         os.environ['BLAME'] = test.id()
