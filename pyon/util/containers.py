@@ -67,7 +67,7 @@ class DotDict(DotNotationGetItem, dict):
 
 
     def __dir__(self):
-        return [k for k in self.__dict__.keys() + self.keys() if DICT_LOCKING_ATTR != k]
+        return [k for k in self.__dict__.keys() + self.keys() if k != DICT_LOCKING_ATTR]
 
     def __getattr__(self, key):
         """ Make attempts to lookup by nonexistent attributes also attempt key lookups. """
@@ -113,11 +113,6 @@ class DotDict(DotNotationGetItem, dict):
     def clear(self):
         dict.__setattr__(self, DICT_LOCKING_ATTR, False)
         super(DotDict, self).clear()
-
-    def pop(self, *args, **kwargs):
-        if dict.__getattribute__(self, DICT_LOCKING_ATTR):
-            raise AttributeError('Cannot pop on a locked DotDict')
-        super(DotDict, self).pop(*args, **kwargs)
 
     def pop(self, *args, **kwargs):
         if dict.__getattribute__(self, DICT_LOCKING_ATTR):
