@@ -219,9 +219,10 @@ class ExceptionFactory(object):
             out = self._exception_map[str(code)](message)
         else:
             out = self._default(message)
-        if stacks:
-            for label, stack in stacks:
-                out.add_stack(label, stack)
+# TEMPORARY: disable adding stacks here until JIRA OOIION-1093 fixed to avoid memory leak
+#        if stacks:
+#            for label, stack in stacks:
+#                out.add_stack(label, stack)
         return out
 
 
