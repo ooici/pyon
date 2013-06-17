@@ -800,7 +800,7 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
             timeout = CFG.get_safe('endpoint.receive.timeout', 10)
 
         # we have a timeout, update reply-by header
-        headers['reply-by'] = str(int(headers['ts']) + timeout * 1000)
+        headers['reply-by'] = str(int(headers['ts']) + int(timeout * 1000))
         self.channel.setup_listener(NameTrio(self.channel._send_name.exchange)) # anon queue
         # call base send, and get back the headers it ended up building and sending
         # we extract the conv-id so we can tell the listener what is valid.
