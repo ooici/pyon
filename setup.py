@@ -28,6 +28,7 @@ setup(  name = 'pyon',
              'nose.plugins.0.10': [
                  'stats_plugin=pyon.util.container_stats_plugin:TestStats',
                  'pycc_plugin=pyon.util.pycc_plugin:PYCC',
+                 'gevent_block_plugin=pyon.util.gevent_block_plugin:GEVENT_BLOCK',
                  'timer_plugin=pyon.util.timer_plugin:TestTimer',
                  'queueblame=pyon.util.queueblame_plugin:QueueBlame',
                  'capture=pyon.util.capture_plugin:PyccCapture',
