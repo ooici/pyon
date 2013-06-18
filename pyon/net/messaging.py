@@ -176,7 +176,6 @@ class NodeB(BaseNode):
         amq_chan = blocking_cb(self.client.channel, 'on_open_callback', channel_number=ch_number)
         if amq_chan is None:
             log.error("AMQCHAN IS NONE THIS SHOULD NEVER HAPPEN, chan number requested: %s", ch_number)
-            traceback.print_stack()
             from pyon.container.cc import Container
             if Container.instance is not None:
                 Container.instance.fail_fast("AMQCHAN IS NONE, messaging has failed", True)
