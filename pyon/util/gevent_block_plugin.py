@@ -54,8 +54,11 @@ def alarm_handler(signum, frame):
         debug.write('CRITICAL> gevent blocking detected!\n' +\
         'Currently at %s():%d of file %s.\n' % ( frame.f_code.co_name,
             frame.f_lineno, frame.f_code.co_filename))
+        import traceback
+        st = traceback.extract_stack(frame)
+        debug.write("Stack trace: %s\n" % "".join(traceback.format_list(st)))
         # Optional.  Let's check if it's still blocking in next iteration.
-        signal.alarm(MAX_BLOCKING_TIME)
+        #signal.alarm(MAX_BLOCKING_TIME)
 
 class GEVENT_BLOCK(Plugin):
     name = 'gevent-block'
