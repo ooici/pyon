@@ -41,6 +41,12 @@ else:
     from gevent import monkey; monkey.patch_all()
 
 
+# Fix AttributeError("'_DummyThread' object has no attribute '_Thread__block'",) issue (OOIION-621)
+# http://stackoverflow.com/questions/13193278/understand-python-threading-bug
+import threading
+threading._DummyThread._Thread__stop = lambda x: 42
+
+
 # -------------------------------------------------------------------------
 # CONSTANTS FOR PYON CODE
 # CHANGE HERE BEFORE IMPORTING ANY FURTHER PYON CODE TO OVERRIDE
