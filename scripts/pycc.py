@@ -14,6 +14,8 @@ from uuid import uuid4
 
 from script_util import parse_args
 from pyon.core import log as logutil
+import logging
+log = logging.getLogger('pycc')
 #
 # WARNING - DO NOT IMPORT GEVENT OR PYON HERE. IMPORTS **MUST** BE DONE IN THE MAIN()
 # DUE TO DAEMONIZATION.
@@ -443,8 +445,9 @@ def main(opts, *args, **kwargs):
 
         start_container(container)
     except Exception as ex:
-        print "pycc: ===== CONTAINER START ERROR -- FAIL ====="
-        traceback.print_exc()
+#        print "pycc: ===== CONTAINER START ERROR -- FAIL ====="
+#        traceback.print_exc()
+        log.error('container start error', exc_info=True)
         stop_container(container)
         sys.exit(1)
 
@@ -452,8 +455,9 @@ def main(opts, *args, **kwargs):
         do_work(container)
     except Exception as ex:
         stop_container(container)
-        print "pycc: ===== CONTAINER PROCESS START ERROR -- ABORTING ====="
-        print ex
+#        print "pycc: ===== CONTAINER PROCESS START ERROR -- ABORTING ====="
+#        print ex
+        log.error('container process interruption', exc_info=True)
         sys.exit(1)
 
     # Assumption: stop is so robust, it does not fail even if it was only partially started
