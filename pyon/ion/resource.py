@@ -743,7 +743,7 @@ class ExtendedResourceContainer(object):
         assoc_list = []
         res_type = res_type or resource.type_
         resource_id = resource if type(resource) is str else resource._id
-        if target_type is not None and type(target_type) not in (list, tuple):
+        if target_type and type(target_type) not in (list, tuple):   # None and empty str left alone
             target_type = [target_type]
 
         # First validate the association predicate
