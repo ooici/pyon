@@ -2,6 +2,7 @@
 
 __author__ = 'Michael Meisinger'
 
+import pprint
 from nose.plugins.attrib import attr
 
 from pyon.ion.resource import ExtendedResourceContainer
@@ -11,7 +12,7 @@ from pyon.util.int_test import IonIntegrationTestCase
 
 
 @attr('INT', group='resources')
-class TestObservatoryManagementFullIntegration(IonIntegrationTestCase):
+class TestExtendedResourceIntegration(IonIntegrationTestCase):
 
     def setUp(self):
         self._start_container()
@@ -42,12 +43,8 @@ class TestObservatoryManagementFullIntegration(IonIntegrationTestCase):
         ext_deployment = extended_resource_handler.create_extended_resource_container(
             extended_resource_type=OT.TestExtendedResourceDeploy,
             resource_id=dep_id,
-            computed_resource_type=OT.BaseComputedAttributes,
-            ext_associations=None,
-            ext_exclude=None,
-            user_id=None)
+            computed_resource_type=OT.BaseComputedAttributes)
 
-        import pprint
         #pprint.pprint(ext_deployment.__dict__)
 
         self.assertEquals(ext_deployment.device_11._id, dev_id)
@@ -87,10 +84,7 @@ class TestObservatoryManagementFullIntegration(IonIntegrationTestCase):
         ext_deployment = extended_resource_handler.create_extended_resource_container(
             extended_resource_type=OT.TestExtendedResourceDeploy,
             resource_id=dep_id,
-            computed_resource_type=OT.BaseComputedAttributes,
-            ext_associations=None,
-            ext_exclude=None,
-            user_id=None)
+            computed_resource_type=OT.BaseComputedAttributes)
 
         #pprint.pprint(ext_deployment.__dict__)
 
@@ -122,3 +116,98 @@ class TestObservatoryManagementFullIntegration(IonIntegrationTestCase):
         self.assertEquals(ext_deployment.site_23, 1)
         self.assertEquals(ext_deployment.site_24._id, site_id)
         self.assertEquals(ext_deployment.site_31._id, site_id)
+
+    def test_extended_resource_directed(self):
+        obs1_obj = IonObject(RT.Observatory, name="Observatory 1")
+        obs1_id, _ = self.RR.create(obs1_obj)
+
+        ps1_obj = IonObject(RT.PlatformSite, name="PlatformSite 1")
+        ps1_id, _ = self.RR.create(ps1_obj)
+
+        ps2_obj = IonObject(RT.PlatformSite, name="PlatformSite 2")
+        ps2_id, _ = self.RR.create(ps2_obj)
+
+        is1_obj = IonObject(RT.InstrumentSite, name="InstrumentSite 1")
+        is1_id, _ = self.RR.create(is1_obj)
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+        ext_site = extended_resource_handler.create_extended_resource_container(
+            extended_resource_type=OT.TestExtendedResourceSite,
+            resource_id=ps1_id,
+            computed_resource_type=OT.BaseComputedAttributes)
+
+        #pprint.pprint(ext_site.__dict__)
+
+        self.assertEquals(ext_site.parent_site, None)
+        self.assertEquals(ext_site.child_sites, [])
+        self.assertEquals(ext_site.child_sites1, [])
+        self.assertEquals(ext_site.child_instrument_sites, [])
+
+        aid1, _ = self.RR.create_association(obs1_id, PRED.hasSite, ps1_id)
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+        ext_site = extended_resource_handler.create_extended_resource_container(
+            extended_resource_type=OT.TestExtendedResourceSite,
+            resource_id=ps1_id,
+            computed_resource_type=OT.BaseComputedAttributes)
+
+        #pprint.pprint(ext_site.__dict__)
+
+        self.assertEquals(ext_site.parent_site._id, obs1_id)
+        self.assertEquals(ext_site.child_sites, [])
+        self.assertEquals(ext_site.child_sites1, [])
+        self.assertEquals(ext_site.child_instrument_sites, [])
+
+        self.RR.create_association(ps1_id, PRED.hasSite, is1_id)
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+        ext_site = extended_resource_handler.create_extended_resource_container(
+            extended_resource_type=OT.TestExtendedResourceSite,
+            resource_id=ps1_id,
+            computed_resource_type=OT.BaseComputedAttributes)
+
+        #pprint.pprint(ext_site.__dict__)
+
+        self.assertEquals(ext_site.parent_site._id, obs1_id)
+        self.assertEquals(len(ext_site.child_sites), 1)
+        self.assertEquals(ext_site.child_sites[0]._id, is1_id)
+        self.assertEquals(len(ext_site.child_sites1), 1)
+        self.assertEquals(ext_site.child_sites1[0]._id, is1_id)
+        self.assertEquals(len(ext_site.child_instrument_sites), 1)
+        self.assertEquals(ext_site.child_instrument_sites[0]._id, is1_id)
+
+        self.RR.create_association(ps1_id, PRED.hasSite, ps2_id)
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+        ext_site = extended_resource_handler.create_extended_resource_container(
+            extended_resource_type=OT.TestExtendedResourceSite,
+            resource_id=ps1_id,
+            computed_resource_type=OT.BaseComputedAttributes)
+
+        #pprint.pprint(ext_site.__dict__)
+
+        self.assertEquals(ext_site.parent_site._id, obs1_id)
+        self.assertEquals(len(ext_site.child_sites), 2)
+        self.assertEquals(set(r._id for r in ext_site.child_sites), set([is1_id, ps2_id]))
+        self.assertEquals(len(ext_site.child_sites1), 2)
+        self.assertEquals(set(r._id for r in ext_site.child_sites1), set([is1_id, ps2_id]))
+        self.assertEquals(len(ext_site.child_instrument_sites), 1)
+        self.assertEquals(ext_site.child_instrument_sites[0]._id, is1_id)
+
+        self.RR.delete_association(aid1)
+
+        extended_resource_handler = ExtendedResourceContainer(self)
+        ext_site = extended_resource_handler.create_extended_resource_container(
+            extended_resource_type=OT.TestExtendedResourceSite,
+            resource_id=ps1_id,
+            computed_resource_type=OT.BaseComputedAttributes)
+
+        #pprint.pprint(ext_site.__dict__)
+
+        self.assertEquals(ext_site.parent_site, None)
+        self.assertEquals(len(ext_site.child_sites), 2)
+        self.assertEquals(set(r._id for r in ext_site.child_sites), set([is1_id, ps2_id]))
+        self.assertEquals(len(ext_site.child_sites1), 2)
+        self.assertEquals(set(r._id for r in ext_site.child_sites1), set([is1_id, ps2_id]))
+        self.assertEquals(len(ext_site.child_instrument_sites), 1)
+        self.assertEquals(ext_site.child_instrument_sites[0]._id, is1_id)
