@@ -427,8 +427,8 @@ class ExtendedResourceContainer(object):
         if extended_resource_type not in getextends(OT.ResourceContainer):
             raise BadRequest('The requested resource %s is not extended from %s' % (extended_resource_type, OT.ResourceContainer))
 
-        if computed_resource_type and computed_resource_type not in getextends(OT.ComputedAttributes):
-            raise BadRequest('The requested resource %s is not extended from %s' % (computed_resource_type, OT.ComputedAttributes))
+        if computed_resource_type and computed_resource_type not in getextends(OT.BaseComputedAttributes):
+            raise BadRequest('The requested resource %s is not extended from %s' % (computed_resource_type, OT.BaseComputedAttributes))
 
         resource_object = self._rr.read(resource_id)
 
@@ -532,7 +532,6 @@ class ExtendedResourceContainer(object):
 
             # Iterate over all of the decorators for the field
             for decorator in obj._schema[field]['decorators']:
-
                 field_start_time = time.time()
 
                 # Field gets value from method or service call (local to current executing process)
@@ -564,11 +563,10 @@ class ExtendedResourceContainer(object):
 
                 # Fill field based on compound association chains. Results in nested lists of resource objects
                 elif self.is_compound_association(decorator):
-
                     target_type = obj.get_decorator_value(field, decorator)
-                    if target_type.find(',') > 0: #Can specify multiple type filters, only handles two levels for now
+                    if target_type and ',' in target_type:   # Can specify multiple type filters, only handles two levels for now
                         target_type, final_target_type = target_type.split(',')
-                        final_target_types[field] = final_target_type # Keep track for later
+                        final_target_types[field] = final_target_type   # Keep track for later
 
                     predicates = self.get_compound_association_predicates(decorator)
                     assoc_list = self._find_associated_resources(resource, predicates[0], target_type)
@@ -579,20 +577,27 @@ class ExtendedResourceContainer(object):
                 # Fill field based on association with list of resource objects
                 elif self.is_association_predicate(decorator):
                     target_type = obj.get_decorator_value(field, decorator)
+                    if target_type and ',' in target_type:   # Can specify list of target types
+                        target_type = target_type.split(',')
                     assoc_list = self._find_associated_resources(resource, decorator, target_type)
-                    if assoc_list:
-                        if obj._schema[field]['type'] == 'list':
+                    if obj._schema[field]['type'] == 'list':
+                        if assoc_list:
                             field_needs.append((field, "L", assoc_list))
                             [resource_needs.add(target_id) for target_id, assoc in assoc_list]
-                        elif obj._schema[field]['type'] == 'int':
-                            setattr(obj, field, len(assoc_list))
-                        else:
+                    elif obj._schema[field]['type'] == 'int':
+                        setattr(obj, field, len(assoc_list))
+                    else:  # Can be nested object or None
+                        if assoc_list:
                             first_assoc = assoc_list[0]
                             if len(assoc_list) != 1:
                                 # WARNING: Swallow random further objects here!
                                 log.warn("Extended object field %s uses only 1 of %d associated resources", field, len(assoc_list))
                             field_needs.append((field, "O", first_assoc))
                             resource_needs.add(first_assoc[0])
+                        else:
+                            setattr(obj, field, None)
+                else:
+                    log.debug("Unknown decorator %s for field %s of resource %s", decorator, field, resource._id)
 
                 field_stop_time = time.time()
 
@@ -624,13 +629,13 @@ class ExtendedResourceContainer(object):
 
         # Step 4: Set fields to loaded resource objects based on type
         for field, need_type, needs in field_needs:
-            if need_type == 'L':
+            if need_type == 'L':    # case list
                 obj_list = [res_objs[target_id] for target_id, assoc in needs]
                 setattr(obj, field, obj_list)
-            elif need_type == 'O':
+            elif need_type == 'O':  # case nested object
                 target_id, assoc = needs
                 setattr(obj, field, res_objs[target_id])
-            elif need_type == 'A':
+            elif need_type == 'A':  # case compound
                 assoc_list, predicates = needs
                 obj_list = []
                 for target_id, assoc in assoc_list:
@@ -638,30 +643,29 @@ class ExtendedResourceContainer(object):
                     assoc_list1 = self._find_associated_resources(target_id, predicates[1], None, res_type)
                     obj_list.append([res_objs[target_id1] for target_id1, assoc1 in assoc_list1])
 
-
-                #Filter thelist to remove objects that might match the current resource type
+                # Filter the list to remove objects that might match the current resource type
                 result_obj_list = []
                 for ol_nested in obj_list:
                     if ol_nested:
                         #Only get the object types which don't match the current resource type and may match a final type
                         if final_target_types.has_key(field):
-                            result_obj_list.extend([target_obj for target_obj in ol_nested if ( target_obj.type_ != resource.type_ and target_obj.type_ == final_target_types[field] ) ])
+                            result_obj_list.extend([target_obj for target_obj in ol_nested if (target_obj.type_ != resource.type_ and target_obj.type_ == final_target_types[field]) ])
                         else:
-                            result_obj_list.extend([target_obj for target_obj in ol_nested if ( target_obj.type_ != resource.type_  ) ])
+                            result_obj_list.extend([target_obj for target_obj in ol_nested if (target_obj.type_ != resource.type_) ])
 
-                if result_obj_list:
-                    if obj._schema[field]['type'] == 'list':
+                if obj._schema[field]['type'] == 'list':
+                    if result_obj_list:
                         setattr(obj, field, result_obj_list)
-                    elif obj._schema[field]['type'] == 'int':
-                        setattr(obj, field, len(result_obj_list))
-                    else:
-
+                elif obj._schema[field]['type'] == 'int':
+                    setattr(obj, field, len(result_obj_list))
+                else:
+                    if result_obj_list:
                         if len(result_obj_list) != 1:
                             # WARNING: Swallow random further objects here!
                             log.warn("Extended object field %s uses only 1 of %d compound associated resources", field, len(result_obj_list))
-
-                        setattr(obj, field, result_obj_list[0]);
-
+                        setattr(obj, field, result_obj_list[0])
+                    else:
+                        setattr(obj, field, None)
 
     def set_extended_associations(self, res_container, ext_associations, ext_exclude):
         """
@@ -686,6 +690,7 @@ class ExtendedResourceContainer(object):
         self.ctx = dict(by_subject={}, by_object={})
         assocs = self._rr.find_associations(anyside=resource_id, id_only=False)
         self._add_associations(assocs)
+        log.debug("Found %s associations for resource %s", len(assocs), resource_id)
 
     def _add_associations(self, assocs):
         """
@@ -738,6 +743,8 @@ class ExtendedResourceContainer(object):
         assoc_list = []
         res_type = res_type or resource.type_
         resource_id = resource if type(resource) is str else resource._id
+        if target_type and type(target_type) not in (list, tuple):   # None and empty str left alone
+            target_type = [target_type]
 
         # First validate the association predicate
         pred = Predicates[association_predicate]
@@ -776,10 +783,10 @@ class ExtendedResourceContainer(object):
         assoc_list = []
         if backward:
             by_object = self.ctx['by_object'].get((resource_id,predicate), [])
-            assoc_list.extend([(assoc.s, assoc) for assoc in by_object if not target_type or assoc.st == target_type])
+            assoc_list.extend([(assoc.s, assoc) for assoc in by_object if not target_type or assoc.st in target_type])
         else:
             by_subject = self.ctx['by_subject'].get((resource_id,predicate), [])
-            assoc_list.extend([(assoc.o, assoc) for assoc in by_subject if not target_type or assoc.ot == target_type])
+            assoc_list.extend([(assoc.o, assoc) for assoc in by_subject if not target_type or assoc.ot in target_type])
         return assoc_list
 
 
