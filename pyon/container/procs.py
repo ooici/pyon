@@ -278,6 +278,10 @@ class ProcManager(object):
 
         #self.container.fail_fast("Container process (%s) failed: %s" % (svc, gproc.exception))
 
+        # Stop the container if this was the last process
+        if not self.procs and CFG.get_safe("container.processes.exit_once_empty", False):
+            self.container.fail_fast("Terminating container after last process (%s) failed: %s" % (gproc, gproc.exception))
+
     def _cleanup_method(self, queue_name, ep=None):
         """
         Common method to be passed to each spawned ION process to clean up their process-queue.

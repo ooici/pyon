@@ -6,7 +6,8 @@ from unittest import SkipTest
 from mock import Mock, patch, ANY, sentinel, call
 from nose.plugins.attrib import attr
 from couchdb.http import ResourceNotFound
-from gevent.event import AsyncResult
+from gevent.event import AsyncResult, Event
+import gevent
 
 from pyon.agent.simple_agent import SimpleResourceAgent
 from pyon.container.procs import ProcManager
@@ -46,11 +47,20 @@ class BadProcess(BaseService):
         bad = 3 / 0     # boom
         return bad
 
+    def sleep_target(self, *args, **kwargs):
+        self.sleep_event = Event()
+        gevent.sleep(0.2)
+        self.sleep_event.set()
+
+    def fail_target(self, *args, **kwargs):
+        raise Exception("Blow up to test failure chain")
+
 class SampleAgent(SimpleResourceAgent):
     dependencies = []
 
 class TestRPCServer(ProcessRPCServer):
     pass
+
 
 @attr('UNIT')
 class TestProcManager(PyonTestCase):
@@ -299,6 +309,26 @@ class TestProcManager(PyonTestCase):
         ep = self.pm._create_listening_endpoint(process=sentinel.process)
 
         self.assertIsInstance(ep, ConversationRPCServer)
+
+    def test_failed_process(self):
+        self.pm.start()
+        self.container.fail_fast = Mock()
+
+        self.pm.procs['pid1'] = Mock()
+
+        proc2 = BadProcess()
+        self.pm.proc_sup.spawn(name="bad", service=proc2, target=proc2.fail_target)
+        gevent.sleep(0)  # Allow the new thread to fail and trigger the chain
+
+        self.assertFalse(self.container.fail_fast.called)
+
+        del self.pm.procs['pid1']
+
+        proc3 = BadProcess()
+        self.pm.proc_sup.spawn(name="bad", service=proc3, target=proc3.fail_target)
+        gevent.sleep(0)  # Allow the new thread to fail and trigger the chain
+
+        self.assertTrue(self.container.fail_fast.called)
 
 @attr('INT')
 class TestProcManagerInt(IonIntegrationTestCase):
