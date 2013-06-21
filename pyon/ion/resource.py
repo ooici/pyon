@@ -103,17 +103,20 @@ def load_definitions():
     ot_list.append('IonObjectBase')
     ObjectTypes.clear()
     ObjectTypes.update(zip(ot_list, ot_list))
+    ObjectTypes.lock()
 
     # Resource Types
     rt_list = getextends('Resource')
     rt_list.append('Resource')
     ResourceTypes.clear()
     ResourceTypes.update(zip(rt_list, rt_list))
+    ResourceTypes.lock()
 
     # Predicate Types
     pt_list = get_predicate_type_list()
     PredicateType.clear()
     PredicateType.update(zip(pt_list, pt_list))
+    PredicateType.lock()
 
     # Compound Associations
     get_compound_associations_list()
@@ -123,16 +126,17 @@ def load_definitions():
     LifeCycleStates.clear()
     lcstates = list(CommonResourceLifeCycleSM.MATURITY)
     LifeCycleStates.update(zip(lcstates, lcstates))
+    LifeCycleStates.lock()
 
     AvailabilityStates.clear()
     avstates = list(CommonResourceLifeCycleSM.AVAILABILITY)
     AvailabilityStates.update(zip(avstates, avstates))
-
+    AvailabilityStates.lock()
 
     # Life cycle events
     LCE.clear()
     LCE.update(zip([e.upper() for e in CommonResourceLifeCycleSM.BASE_EVENTS], CommonResourceLifeCycleSM.BASE_EVENTS))
-
+    LCE.lock()
 
 def get_restype_lcsm(restype):
     return lcs_workflows.get(restype, None)
