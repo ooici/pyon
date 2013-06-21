@@ -775,9 +775,11 @@ class ProcManager(object):
         if process_instance._proc_type == SERVICE_PROCESS_TYPE:
             if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
                 # Registration of SERVICE process: in resource registry
-                service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=process_instance.name)
+                service_list, _ = self.container.resource_registry.find_resources(restype="Service", name=process_instance.name, id_only=True)
                 if service_list:
-                    process_instance._proc_svc_id = service_list[0]._id
+                    process_instance._proc_svc_id = service_list[0]
+                    if len(service_list) > 1:
+                        log.warn("More than 1 Service resource found with name %s: %s", process_instance.name, service_list)
                 else:
                     # We are starting the first process of a service instance
                     # TODO: This should be created by the HA Service agent in the future
@@ -786,10 +788,12 @@ class ProcManager(object):
 
                     # Create association to service definition resource
                     svcdef_list, _ = self.container.resource_registry.find_resources(restype="ServiceDefinition",
-                        name=process_instance.name)
+                        name=process_instance.name, id_only=True)
                     if svcdef_list:
+                        if len(svcdef_list) > 1:
+                            log.warn("More than 1 ServiceDefinition resource found with name %s: %s", process_instance.name, svcdef_list)
                         self.container.resource_registry.create_association(process_instance._proc_svc_id,
-                            "hasServiceDefinition", svcdef_list[0]._id)
+                            "hasServiceDefinition", svcdef_list[0])
                     else:
                         log.error("Cannot find ServiceDefinition resource for %s", process_instance.name)
 
