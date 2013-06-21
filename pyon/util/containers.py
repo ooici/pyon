@@ -62,7 +62,6 @@ class DotDict(DotNotationGetItem, dict):
     """
 
     def __init__(self, *args, **kwargs):
-        dict.__setattr__(self, DICT_LOCKING_ATTR, False)
         super(DotDict, self).__init__(*args, **kwargs)
 
 
@@ -74,7 +73,7 @@ class DotDict(DotNotationGetItem, dict):
         if self.has_key(key):
             return self[key]
 
-        if not dict.__getattribute__(self, DICT_LOCKING_ATTR):
+        if not hasattr(self, DICT_LOCKING_ATTR):
             import sys
             import dis
             frame = sys._getframe(1)
@@ -87,7 +86,7 @@ class DotDict(DotNotationGetItem, dict):
     def __setattr__(self, key, value):
         if key in dir(dict):
             raise AttributeError('%s conflicts with builtin.' % key)
-        if dict.__getattribute__(self, DICT_LOCKING_ATTR):
+        if hasattr(self, DICT_LOCKING_ATTR):
             raise AttributeError('Setting %s on a locked DotDict' % key)
         if isinstance(value, dict):
             self[key] = DotDict(value)
@@ -111,16 +110,18 @@ class DotDict(DotNotationGetItem, dict):
         dict.__setattr__(self, DICT_LOCKING_ATTR, True)
 
     def clear(self):
-        dict.__setattr__(self, DICT_LOCKING_ATTR, False)
+        if hasattr(self, DICT_LOCKING_ATTR):
+            dict.__delattr__(self, DICT_LOCKING_ATTR)
+
         super(DotDict, self).clear()
 
     def pop(self, *args, **kwargs):
-        if dict.__getattribute__(self, DICT_LOCKING_ATTR):
+        if hasattr(self, DICT_LOCKING_ATTR):
             raise AttributeError('Cannot pop on a locked DotDict')
         super(DotDict, self).pop(*args, **kwargs)
 
     def popitem(self):
-        if dict.__getattribute__(self, DICT_LOCKING_ATTR):
+        if hasattr(self, DICT_LOCKING_ATTR):
             raise AttributeError('Cannot popitem on a locked DotDict')
         super(DotDict, self).popitem()
 
