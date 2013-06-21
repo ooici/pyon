@@ -14,6 +14,8 @@ import os
 import re
 from copy import deepcopy
 
+DICT_LOCKING_ATTR = "__locked__"
+
 class DotNotationGetItem(object):
     """ Drive the behavior for DotList and DotDict lookups by dot notation, JSON-style. """
 
@@ -59,25 +61,33 @@ class DotDict(DotNotationGetItem, dict):
     do not use in performance-critical parts of your code.
     """
 
+    def __init__(self, *args, **kwargs):
+        super(DotDict, self).__init__(*args, **kwargs)
+
+
     def __dir__(self):
-        return self.__dict__.keys() + self.keys()
+        return [k for k in self.__dict__.keys() + self.keys() if k != DICT_LOCKING_ATTR]
 
     def __getattr__(self, key):
         """ Make attempts to lookup by nonexistent attributes also attempt key lookups. """
         if self.has_key(key):
             return self[key]
-        import sys
-        import dis
-        frame = sys._getframe(1)
-        if '\x00%c' % dis.opmap['STORE_ATTR'] in frame.f_code.co_code:
-            self[key] = DotDict()
-            return self[key]
+
+        if not hasattr(self, DICT_LOCKING_ATTR):
+            import sys
+            import dis
+            frame = sys._getframe(1)
+            if '\x00%c' % dis.opmap['STORE_ATTR'] in frame.f_code.co_code:
+                self[key] = DotDict()
+                return self[key]
 
         raise AttributeError(key)
 
-    def __setattr__(self,key,value):
+    def __setattr__(self, key, value):
         if key in dir(dict):
             raise AttributeError('%s conflicts with builtin.' % key)
+        if hasattr(self, DICT_LOCKING_ATTR):
+            raise AttributeError('Setting %s on a locked DotDict' % key)
         if isinstance(value, dict):
             self[key] = DotDict(value)
         else:
@@ -95,6 +105,26 @@ class DotDict(DotNotationGetItem, dict):
         if value is None:
             value = default
         return value
+
+    def lock(self):
+        dict.__setattr__(self, DICT_LOCKING_ATTR, True)
+
+    def clear(self):
+        if hasattr(self, DICT_LOCKING_ATTR):
+            dict.__delattr__(self, DICT_LOCKING_ATTR)
+
+        super(DotDict, self).clear()
+
+    def pop(self, *args, **kwargs):
+        if hasattr(self, DICT_LOCKING_ATTR):
+            raise AttributeError('Cannot pop on a locked DotDict')
+        super(DotDict, self).pop(*args, **kwargs)
+
+    def popitem(self):
+        if hasattr(self, DICT_LOCKING_ATTR):
+            raise AttributeError('Cannot popitem on a locked DotDict')
+        super(DotDict, self).popitem()
+
 
     @classmethod
     def fromkeys(cls, seq, value=None):

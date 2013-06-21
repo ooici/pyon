@@ -139,7 +139,7 @@ class TestResources(IonUnitTestCase):
         Instrument_device_to_actor_identity_association = Mock()
         Instrument_device_to_actor_identity_association._id = '666'
         Instrument_device_to_actor_identity_association.s = "123"
-        Instrument_device_to_actor_identity_association.st = RT.InstumentDevice
+        Instrument_device_to_actor_identity_association.st = RT.InstrumentDevice
         Instrument_device_to_actor_identity_association.p = PRED.hasOwner
         Instrument_device_to_actor_identity_association.o = "111"
         Instrument_device_to_actor_identity_association.ot = RT.ActorIdentity
@@ -149,7 +149,7 @@ class TestResources(IonUnitTestCase):
         Instrument_device_to_actor_identity_association2 = Mock()
         Instrument_device_to_actor_identity_association2._id = '667'
         Instrument_device_to_actor_identity_association2.s = "456"
-        Instrument_device_to_actor_identity_association2.st = RT.InstumentDevice
+        Instrument_device_to_actor_identity_association2.st = RT.InstrumentDevice
         Instrument_device_to_actor_identity_association2.p = PRED.hasOwner
         Instrument_device_to_actor_identity_association2.o = "111"
         Instrument_device_to_actor_identity_association2.ot = RT.ActorIdentity
