@@ -28,13 +28,31 @@ class Test_Containers(IonIntegrationTestCase):
         d.foo = "somethingnew"
         self.assertEqual("somethingnew", d.foo)
 
+        # DotDict only checks that an assignment operation is happening when it creates dummy entries
+        # ... it doesn't check that the dummy entry is on the left hand side of the assignment
+        k = d.foo1
+        self.assertIn("foo1", dir(d))
+
         d.lock()
+
+        # test assigning directly to a locked dict
         with self.assertRaises(AttributeError):
             d.foo = "somethingelse"
-
         self.assertEqual("somethingnew", d.foo)
 
+        # test dummy-creation-on-assignment loophole
+        with self.assertRaises(AttributeError):
+            k = d.foo2
+        self.assertNotIn("foo2", dir(d))
+
+        # test alternate dummy creation method: calling a function with it
+        with self.assertRaises(AttributeError):
+            k = lambda _: True
+            k(d.foo3)
+        self.assertNotIn("foo3", dir(d))
+
         self.assertNotIn(DICT_LOCKING_ATTR, dir(d))
+
 
     def test_dotdict_chaining(self):
         base = DotDict({'test':None})
