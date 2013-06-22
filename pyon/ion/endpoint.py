@@ -261,8 +261,9 @@ class ProcessRPCResponseEndpointUnit(ProcessEndpointUnitMixin, RPCResponseEndpoi
         """
         Gets the process' saturation, as an integer percentage (process time / total time).
         """
-        total, _, proc = self._process._process.time_stats  # we want the ion proc's stats
-        return str(int(proc / float(total) * 100))
+        total, _, proc, interval, interval_run = self._process._process.time_stats  # we want the ION proc's stats
+        #return str(int(proc / float(total) * 100))  # Total
+        return str(int(interval_run / float(interval) * 100))  # Percentage in current (partial) and prior interval
 
 class ProcessRPCServer(RPCServer):
     endpoint_unit_type = ProcessRPCResponseEndpointUnit

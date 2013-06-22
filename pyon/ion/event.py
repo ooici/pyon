@@ -16,7 +16,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.ion.identifier import create_unique_event_id
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
-from pyon.util.containers import get_ion_ts, is_valid_ts
+from pyon.util.containers import get_ion_ts_millis, is_valid_ts
 from pyon.util.log import log
 
 from interface.objects import Event
@@ -87,7 +87,7 @@ class EventPublisher(Publisher):
         to_name = (self._send_name.exchange, topic)
         log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
 
-        current_time = int(get_ion_ts())
+        current_time = get_ion_ts_millis()
 
         #Ensure valid created timestamp if supplied
         if event_object.ts_created:
