@@ -1,12 +1,11 @@
 
-'''
-This module file contains Governance related constants and helper functions used within the Container.
-'''
+"""This module file contains Governance related constants and helper functions used within the Container."""
+
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Inconsistent
 from pyon.ion.resource import RT, PRED, LCS, OT
-from pyon.util.containers import get_ion_ts, get_safe
+from pyon.util.containers import get_safe, get_ion_ts_millis
 from pyon.util.log import log
 
 #These constants are ubiquitous, so define in the container
@@ -208,7 +207,7 @@ def get_valid_resource_commitments(resource_id=None, actor_id=None):
         if not commitments:
             return None
 
-        cur_time = int(get_ion_ts())
+        cur_time = get_ion_ts_millis()
         commitment_list = []
         for com in commitments:
             if ( actor_id == None or com.consumer == actor_id )  and ( int(com.expiration) == 0 or ( int(com.expiration) > 0 and cur_time < int(com.expiration))):

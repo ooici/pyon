@@ -213,6 +213,8 @@ def for_name(modpath, classname):
 def current_time_millis():
     return int(round(time.time() * 1000))
 
+get_ion_ts_millis = current_time_millis
+
 def get_ion_ts():
     """
     Returns standard ION representation of a global timestamp.

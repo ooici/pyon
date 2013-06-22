@@ -2,15 +2,6 @@
 
 """Provides the communication layer above channels."""
 
-from pyon.core import bootstrap, exception
-from pyon.core.bootstrap import CFG, IonObject
-from pyon.core.exception import ExceptionFactory, IonException, BadRequest
-from pyon.net.channel import ChannelClosedError, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
-from pyon.core.interceptor.interceptor import Invocation, process_interceptors
-from pyon.util.containers import get_ion_ts
-from pyon.util.log import log
-from pyon.net.transport import NameTrio, BaseTransport
-
 from gevent import event, coros
 from gevent.timeout import Timeout
 from zope import interface
@@ -19,9 +10,18 @@ import time
 import inspect
 import traceback
 import sys
-from pyon.util.sflow import SFlowManager
 from types import MethodType
 import threading
+
+from pyon.core import bootstrap, exception
+from pyon.core.bootstrap import CFG, IonObject
+from pyon.core.exception import ExceptionFactory, IonException, BadRequest
+from pyon.net.channel import ChannelClosedError, PublisherChannel, ListenChannel, SubscriberChannel, ServerChannel, BidirClientChannel
+from pyon.core.interceptor.interceptor import Invocation, process_interceptors
+from pyon.util.containers import get_ion_ts, get_ion_ts_millis
+from pyon.util.log import log
+from pyon.net.transport import NameTrio, BaseTransport
+from pyon.util.sflow import SFlowManager
 
 # create special logging category for RPC message tracking
 import logging
@@ -30,6 +30,7 @@ rpclog = logging.getLogger('rpc')
 # create global accumulator for RPC times
 from ooi.timer import Timer, Accumulator
 stats = Accumulator(keys='!total', persist=True)
+
 
 class EndpointError(StandardError):
     pass
@@ -1200,7 +1201,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         ts = int(headers['ts'])
         reply_by = int(headers['reply-by'])
-        latency = int(get_ion_ts()) - ts         # we don't have access to response headers here, so calc again, not too big of a deal
+        latency = get_ion_ts_millis() - ts         # we don't have access to response headers here, so calc again, not too big of a deal
 
         # reply-by minus timestamp gives us max allowable, subtract 2x observed latency, give 10% margin, and convert to integers
         to_val = int((reply_by - ts - 2 * latency) / 1000 * 0.9)
@@ -1314,7 +1315,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
 
         # uS: process latency
         # 1-way message latency (req to svc ONLY) + processing time
-        cur_time_ms = int(get_ion_ts())
+        cur_time_ms = get_ion_ts_millis()
         time_taken = (cur_time_ms - int(headers.get('ts', cur_time_ms))) * 1000      # sflow wants microseconds!
 
         # build op name: typically sender-service.op, or falling back to sender.op
