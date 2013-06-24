@@ -25,6 +25,13 @@ class HelloService(BaseHelloService):
 
     def hello(self, text=''):
         log.debug("In hello_service.hello. Text=%s" % text)
+        try:
+            if text.startswith("sleep="):
+                st = float(text[6:])
+                import time
+                time.sleep(st)
+        except Exception as ex:
+            log.exception("No good")
         return "BACK:%s" % text
 
     def noop(self, text=''):

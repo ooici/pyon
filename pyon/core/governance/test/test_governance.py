@@ -510,7 +510,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         self.assertDictEqual(system_actor_header['ion-actor-roles'],{'ION': [ORG_MEMBER_ROLE]})
 
     def test_get_valid_resource_commitment(self):
-        from pyon.util.containers import get_ion_ts
+        from pyon.util.containers import get_ion_ts_millis
 
         # create ION org and an actor
         ion_org = IonObject(RT.Org, name='ION')
@@ -520,7 +520,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         actor_id, _ = self.rr.create(actor)
 
         # create an expired commitment in the org
-        ts = int(get_ion_ts()) - 50000
+        ts = get_ion_ts_millis() - 50000
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)
@@ -529,7 +529,7 @@ class GovernanceIntTest(IonIntegrationTestCase):
         self.assertIsNone(c)
 
         # create a commitment that has not expired yet
-        ts = int(get_ion_ts()) + 50000
+        ts = get_ion_ts_millis() + 50000
         com_obj = IonObject(RT.Commitment, provider=ion_org_id, consumer=actor_id, commitment=True, expiration=ts)
         com_id, _ = self.rr.create(com_obj)
         id = self.rr.create_association(ion_org_id, PRED.hasCommitment, com_id)

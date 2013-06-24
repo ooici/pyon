@@ -12,10 +12,12 @@ from gevent import greenlet, Timeout
 from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError
 from pyon.core.exception import Timeout as IonTimeout
-from pyon.util.containers import get_ion_ts
+from pyon.util.containers import get_ion_ts, get_ion_ts_millis
 from pyon.core.bootstrap import CFG
 import threading
 import traceback
+
+STAT_INTERVAL_LENGTH = 60000  # Interval time for process saturation stats collection
 
 class OperationInterruptedException(BaseException):
     """
@@ -69,7 +71,10 @@ class IonProcessThread(PyonThread):
 
         # processing vs idle time (ms)
         self._start_time        = None
-        self._proc_time         = 0
+        self._proc_time         = 0   # busy time since start
+        self._proc_time_prior   = 0   # busy time at the beginning of the prior interval
+        self._proc_time_prior2  = 0   # busy time at the beginning of 2 interval's ago
+        self._proc_interval_num = 0   # interval num of last record
 
         # for heartbeats, used to detect stuck processes
         self._heartbeat_secs    = heartbeat_secs    # amount of time to wait between heartbeats
@@ -111,7 +116,7 @@ class IonProcessThread(PyonThread):
 
                     # we've been in this for the last X ticks, or it's been X seconds, fail this part of the heartbeat
                     if self._heartbeat_count > CFG.get_safe('cc.timeout.heartbeat_proc_count_threshold', 30) or \
-                       int(get_ion_ts()) - int(self._heartbeat_time) >= CFG.get_safe('cc.timeout.heartbeat_proc_time_threshold', 30) * 1000:
+                       get_ion_ts_millis() - int(self._heartbeat_time) >= CFG.get_safe('cc.timeout.heartbeat_proc_time_threshold', 30) * 1000:
                         heartbeat_ok = False
                 else:
                     # it's made some progress
@@ -133,14 +138,24 @@ class IonProcessThread(PyonThread):
     @property
     def time_stats(self):
         """
-        Returns a 3-tuple of (total time, idle time, processing time), all in ms.
+        Returns a 5-tuple of (total time, idle time, processing time, time since prior interval start,
+        busy since prior interval start), all in ms (int).
         """
-        now = int(get_ion_ts())
+        now = get_ion_ts_millis()
         running_time = now - self._start_time
-
         idle_time = running_time - self._proc_time
 
-        return (running_time, idle_time, self._proc_time)
+        cur_interval = now / STAT_INTERVAL_LENGTH
+        now_since_prior = now - (cur_interval - 1) * STAT_INTERVAL_LENGTH
+
+        if cur_interval == self._proc_interval_num:
+            proc_time_since_prior = self._proc_time-self._proc_time_prior2
+        elif cur_interval-1 == self._proc_interval_num:
+            proc_time_since_prior = self._proc_time-self._proc_time_prior
+        else:
+            proc_time_since_prior = 0
+
+        return (running_time, idle_time, self._proc_time, now_since_prior, proc_time_since_prior)
 
     def _child_failed(self, child):
         """
@@ -210,7 +225,8 @@ class IonProcessThread(PyonThread):
             threading.current_thread().name = "%s-target" % self.name
 
         # start time
-        self._start_time = int(get_ion_ts())
+        self._start_time = get_ion_ts_millis()
+        self._proc_interval_num = self._start_time / STAT_INTERVAL_LENGTH
 
         # spawn control flow loop
         self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
@@ -320,7 +336,8 @@ class IonProcessThread(PyonThread):
             log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
 
             res = None
-            start_proc_time = int(get_ion_ts())
+            start_proc_time = get_ion_ts_millis()
+            self._record_proc_time(start_proc_time)
 
             # check context for expiration
             if context is not None and 'reply-by' in context:
@@ -370,12 +387,34 @@ class IonProcessThread(PyonThread):
                     # have to raise something friendlier on the client side
                     calling_gl.kill(exception=ContainerError(str(exc)), block=False)
             finally:
-                proc_time = int(get_ion_ts()) - start_proc_time
-                self._proc_time += proc_time
+                self._compute_proc_stats(start_proc_time)
 
                 self._ctrl_current = None
 
             ar.set(res)
+
+    def _record_proc_time(self, cur_time):
+        """Keep the _proc_time of the prior and prior-prior intervals for stats computation"""
+        cur_interval = cur_time / STAT_INTERVAL_LENGTH
+        if cur_interval == self._proc_interval_num:
+            # We're still in the same interval - no update
+            pass
+        elif cur_interval-1 == self._proc_interval_num:
+            # Record the stats from the prior interval
+            self._proc_interval_num = cur_interval
+            self._proc_time_prior2 = self._proc_time_prior
+            self._proc_time_prior = self._proc_time
+        elif cur_interval-1 > self._proc_interval_num:
+            # We skipped an entire interval - everything is prior2
+            self._proc_interval_num = cur_interval
+            self._proc_time_prior2 = self._proc_time
+            self._proc_time_prior = self._proc_time
+
+    def _compute_proc_stats(self, start_proc_time):
+        cur_time = get_ion_ts_millis()
+        self._record_proc_time(cur_time)
+        proc_time = cur_time - start_proc_time
+        self._proc_time += proc_time
 
     def start_listeners(self):
         """
