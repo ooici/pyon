@@ -586,10 +586,14 @@ class CouchDB_DataStore(DataStore):
         if keepviews and viewname in ds:
             return
         try:
-            del ds[viewname]
-        except ResourceNotFound:
-            pass
-        ds[viewname] = dict(views=viewdef)
+            try:
+                del ds[viewname]
+            except ResourceNotFound:
+                pass
+            ds[viewname] = dict(views=viewdef)
+        except Exception as ex:
+            # In case this gets executed concurrently and 2 processes perform the same creates
+            log.warn("Error defining datastore %s view %s (concurrent create?): %s", datastore_name, viewname, str(ex))
 
     def _update_views(self, datastore_name="", profile=None):
         ds, datastore_name = self._get_datastore(datastore_name)
