@@ -726,6 +726,8 @@ class ExtendedResourceContainer(object):
         return False
 
     def is_association_predicate(self, association):
+        if association and (association.endswith(">") or association.endswith("<")):
+            association = association[:-1]
         return Predicates.has_key(association)
 
     def is_compound_association(self, association):
@@ -736,6 +738,11 @@ class ExtendedResourceContainer(object):
             return CompoundAssociations[association]['predicates']
 
         return list()  # If not found then return empty list
+
+    def _allow_direction(self, assoc_direction, direction):
+        if not assoc_direction:
+            return True  # Either way is fine (empty str)
+        return assoc_direction == direction
 
     def _find_associated_resources(self, resource, association_predicate, target_type=None, res_type=None):
         """
@@ -750,31 +757,46 @@ class ExtendedResourceContainer(object):
         if target_type and type(target_type) not in (list, tuple):   # None and empty str left alone
             target_type = [target_type]
 
+        assoc_direction = ""
+        if association_predicate and (association_predicate.endswith(">") or association_predicate.endswith("<")):
+            assoc_direction = association_predicate[-1]
+            association_predicate = association_predicate[:-1]
+
         # First validate the association predicate
         pred = Predicates[association_predicate]
         if not pred:
-            return assoc_list  # Unknown association type so return empty list
+            return []  # Unknown association type so return empty list
 
         # Need to check through all of these in this order to account for specific vs base class inclusions
-        if self.is_predicate_association(pred, 'domain', res_type):
+        # @ TODO: This algorithm and the order is fragile
+        if self.is_predicate_association(pred, 'domain', res_type) and self._allow_direction(assoc_direction, ">"):
+            # Case 1: Association in schema with current exact resource type as SUBJECT
+
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
+
+            # If no objects were found, try finding as subjects just in case (unless direction requested)
+            if not assoc_list and not assoc_direction:
+                assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
+
+        elif self.is_predicate_association(pred, 'range', res_type) and self._allow_direction(assoc_direction, "<"):
+            # Case 2: Association in schema with current exact resource type as OBJECT
+
+            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
+
+        elif self.is_predicate_association_extension(pred, 'domain', res_type) and self._allow_direction(assoc_direction, ">"):
+            # Case 3: Association in schema with base type of current resource type as SUBJECT
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
 
             # If no objects were found, try finding as subjects just in case.
-            if not assoc_list:
+            if not assoc_list and not assoc_direction:
                 assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-        elif self.is_predicate_association(pred, 'range', res_type):
+        elif self.is_predicate_association_extension(pred, 'range', res_type) and self._allow_direction(assoc_direction, "<"):
+            # Case 4: Association in schema with base type of current resource type as OBJECT
             assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
 
-        elif self.is_predicate_association_extension(pred, 'domain', res_type):
-            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=False))
-
-            # If no objects were found, try finding as subjects just in case.
-            if not assoc_list:
-                assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
-
-        elif self.is_predicate_association_extension(pred, 'range', res_type):
-            assoc_list.extend(self._find_associations(resource_id, association_predicate, target_type, backward=True))
+        else:
+            log.warn("Cannot handle association predicate %s for resource type %s", association_predicate, res_type)
 
         return assoc_list
 
