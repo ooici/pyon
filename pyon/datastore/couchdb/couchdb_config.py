@@ -128,6 +128,8 @@ function(doc) {
       emit([doc.type_, "contact.email", doc.contact.email], null);
     } else if (doc.type_ == "DataProduct" && doc.ooi_product_name) {
       emit([doc.type_, "ooi_product_name", doc.ooi_product_name], null);
+    } else if (doc.type_ == "NotificationRequest" && doc.origin) {
+      emit([doc.type_, "origin", doc.origin], null);
     }
   }
 }""",
