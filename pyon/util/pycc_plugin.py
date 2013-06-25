@@ -121,6 +121,10 @@ class PYCC(Plugin):
                     '--rel=%s' % self.rel,
                     "--config={'system': {'auto_bootstrap': True}}"]
             debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
+            # Set PYCC env var in case CEI needs to skip tests in pycc mode
+            os.environ['PYCC_MODE'] = '1'
+            # Enable CEI mode for the tests
+            os.environ['CEI_LAUNCH_TEST'] = '1'
             newenv = os.environ.copy()
             po = subprocess.Popen(ccargs, env=newenv, close_fds=True)
             self.ccs.append(po)
@@ -137,10 +141,6 @@ class PYCC(Plugin):
             # Clean again to make sure the first nosetest starts on a clean
             # slate
             self.datastore_admin.clear_datastore(prefix=self.sysname)
-            # Set PYCC env var in case CEI needs to skip tests in pycc mode
-            os.environ['PYCC_MODE'] = '1'
-            # Enable CEI mode for the tests
-            os.environ['CEI_LAUNCH_TEST'] = '1'
 
             debug.write('Start nose tests now...\n')
         except Exception as e:
