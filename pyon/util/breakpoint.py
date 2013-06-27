@@ -1,9 +1,12 @@
 #!/usr/bin/env python
+
 '''
-@author Luke Campbell (Originall Dave Foster)
+@author Luke Campbell (Originally Dave Foster)
 @file extern/pyon/pyon/util/breakpoint.py
 @description Breakpoint utility
 '''
+
+import functools
 
 def breakpoint(scope=None):
     from IPython.config.loader import Config
@@ -61,3 +64,14 @@ def breakpoint(scope=None):
             exit_msg = 'Returning...')
 
         ipshell('Breakpoint')
+
+def debug_wrapper(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except:
+            from traceback import print_exc
+            print_exc()
+            raise
+    return wrapper
