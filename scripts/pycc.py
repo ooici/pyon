@@ -8,6 +8,7 @@ __license__ = 'Apache 2.0'
 import argparse
 import ast
 from copy import deepcopy
+import os
 import sys
 import traceback
 from uuid import uuid4
@@ -243,7 +244,6 @@ def main(opts, *args, **kwargs):
         """
         container.start()
 
-
     def do_work(container):
         """
         Performs initial startup actions with the container as requested in arguments.
@@ -271,7 +271,6 @@ def main(opts, *args, **kwargs):
             print "pycc: Container UI started ... listening on http://localhost:%s" % port
 
         if opts.signalparent:
-            import os
             import signal
             print 'pycc: Signal parent pid %d that pycc pid %d service start process is complete...' % (os.getppid(), os.getpid())
             os.kill(os.getppid(), signal.SIGUSR1)
@@ -307,14 +306,42 @@ def main(opts, *args, **kwargs):
             traceback.print_exc()
             return False
 
+    def _assert_ipython_dir():
+        # Fix OOIION-1124:
+        # When multiple containers are started in parallel, all start an embedded IPython shell/manhole.
+        # There might be a race condition between the IPython creating the default $HOME/.python dir
+        # leading to an error. Prevent this by...
+        homedir = os.path.expanduser('~')
+        homedir = os.path.realpath(homedir)
+        home_ipdir = os.path.join(homedir, ".ipython")
+        ipdir = os.path.normpath(os.path.expanduser(home_ipdir))
+        if not os.path.exists(ipdir):
+            log.warn("%s not found. Preventing potential race condition", ipdir)
+            for tries in range(3):
+                try:
+                    import gevent
+                    import random
+                    gevent.sleep(random.random() * 0.1)
+                    from IPython.core.application import BaseIPythonApplication
+                    ba = BaseIPythonApplication()
+                    ba.initialize()
+                    if os.path.exists(ipdir):
+                        log.debug("Success initializing IPython")
+                        break
+                except Exception as ex:
+                    log.debug("Failed IPython initialize attempt (try #%s): %s", tries, str(ex))
+
+        # At this point there should be
+        if not os.path.exists(ipdir):
+            log.error("%s not found after several tries", ipdir)
+
     def setup_ipython_shell(shell_api=None):
+        _assert_ipython_dir()
         ipy_config = _setup_ipython_config()
 
         # monkeypatch the ipython inputhook to be gevent-friendly
         import gevent   # should be auto-monkey-patched by pyon already.
         import select
-        import sys
-        import os
 
         def stdin_ready():
             infds, outfds, erfds = select.select([sys.stdin], [], [], 0)
@@ -364,6 +391,7 @@ def main(opts, *args, **kwargs):
             ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
 
     def setup_ipython_embed(shell_api=None):
+        _assert_ipython_dir()
         from gevent_zeromq import monkey_patch
         monkey_patch()
 
@@ -422,7 +450,6 @@ def main(opts, *args, **kwargs):
     def _setup_ipython_config():
         from IPython.config.loader import Config
         ipy_config = Config()
-        import os
         ipy_config.KernelApp.connection_file = os.path.join(os.path.abspath(os.curdir), "manhole-%s.json" % os.getpid())
         ipy_config.PromptManager.in_template = '><> '
         ipy_config.PromptManager.in2_template = '... '
