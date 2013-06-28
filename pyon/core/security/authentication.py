@@ -43,9 +43,9 @@ class Authentication(object):
         self.white_list = []
 
         # Look for certificates and keys in "the usual places"
-        certstore_path = self.certstore = CFG.authentication.get('certstore', CERTSTORE_PATH)
+        certstore_path = self.certstore = CFG.get_safe('authentication.certstore', CERTSTORE_PATH)
         log.debug("certstore_path: %s" % str(certstore_path))
-        keystore_path = self.certstore = CFG.authentication.get('keystore', KEYSTORE_PATH)
+        keystore_path = self.certstore = CFG.get_safe('authentication.keystore', KEYSTORE_PATH)
         log.debug("keystore_path: %s" % str(keystore_path))
 
         if certstore_path and keystore_path:

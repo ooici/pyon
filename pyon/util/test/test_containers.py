@@ -10,7 +10,6 @@ from pyon.util.containers import DotDict, create_unique_identifier, make_json, i
 from pyon.util.containers import DICT_LOCKING_ATTR
 from pyon.util.int_test import IonIntegrationTestCase
 
-
 @attr('UNIT', group='util')
 class Test_Containers(IonIntegrationTestCase):
 
@@ -52,6 +51,39 @@ class Test_Containers(IonIntegrationTestCase):
         self.assertNotIn("foo3", dir(d))
 
         self.assertNotIn(DICT_LOCKING_ATTR, dir(d))
+
+    def test_dotdict_copy(self):
+        d = DotDict({"foo": "bar"})
+        d2 = copy.copy(d)
+        self.assertTrue(hasattr(d2, "foo"))
+        self.assertEqual("bar", d2.foo)
+
+        # output_streams = copy(self.CFG.get_safe('process.publish_streams'))
+        v = "a12345"
+        CFG = DotDict()
+        CFG.process.publish_streams.salinity = v
+        print "CFG =", CFG
+        self.assertTrue(hasattr(CFG.process.publish_streams, "salinity"))
+        self.assertEqual(v, CFG.process.publish_streams.salinity)
+        self.assertEqual(v, CFG.get_safe("process.publish_streams").salinity)
+        self.assertEqual(v, copy.copy(CFG.get_safe("process.publish_streams")).salinity)
+
+        output_streams = copy.copy(CFG.get_safe("process.publish_streams"))
+        print "output_streams =", output_streams
+        self.assertTrue(hasattr(output_streams, "salinity"))
+        print "output_streams.salinity =", output_streams.salinity
+        self.assertEqual(v, output_streams.salinity)
+
+        first_stream = output_streams.popitem()
+        print "first_stream =", first_stream
+        self.assertEqual(v, first_stream[1])
+
+        d.lock()
+        dl = copy.copy(d)
+        self.assertTrue(hasattr(dl, "foo"))
+        self.assertEqual("bar", dl.foo)
+        with self.assertRaises(AttributeError):
+            d.foo2 = "nope"
 
 
     def test_dotdict_chaining(self):
