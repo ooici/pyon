@@ -76,6 +76,33 @@ class DirectoryStandalone(object):
         else:
             return direntry['attributes'] if direntry else None
 
+    def _get_unique_parents(self, entry_list):
+        """Returns a sorted, unique list of parents of DirEntries (excluding the root /)"""
+        if entry_list and type(entry_list) not in (list, tuple):
+            entry_list = [entry_list]
+        parents = set()
+        for entry in entry_list:
+            parents.add(entry.get("parent", "/"))
+        if "/" in parents:
+            parents.remove("/")
+        return sorted(parents)
+
+    def _ensure_parents_exist(self, entry_list, create=True):
+        parents_list = self._get_unique_parents(entry_list)
+        pe_list = []
+        try:
+            for parent in parents_list:
+                pe = self.lookup(parent)
+                if pe is None:
+                    pp, pk = parent.rsplit("/", 1)
+                    doc = self._create_dir_entry(object_id=create_unique_directory_id(), parent=pp, key=pk)
+                    pe_list.append(doc)
+                    if create:
+                        self.datastore.create_doc(doc)
+        except Exception as ex:
+            print "_ensure_parents_exist(): Error creating directory parents", ex
+        return pe_list
+
     def register(self, parent, key, create_only=False, **kwargs):
         """
         Add/replace an entry within directory, below a parent node or "/".
@@ -105,6 +132,7 @@ class DirectoryStandalone(object):
         else:
             doc = self._create_dir_entry(object_id=create_unique_directory_id(), parent=parent, key=key,
                 attributes=kwargs)
+            self._ensure_parents_exist([doc])
             self.datastore.create_doc(doc)
 
         return entry_old
@@ -122,7 +150,8 @@ class DirectoryStandalone(object):
             de = self._create_dir_entry(object_id=create_unique_directory_id(), parent=parent, key=key,
                 attributes=attrs, ts_created=cur_time, ts_updated=cur_time)
             de_list.append(de)
-        self.datastore.create_doc_mult(de_list)
+        pe_list = self._ensure_parents_exist(de_list, create=False)
+        self.datastore.create_doc_mult(pe_list + de_list)
 
     def _update_dir_entry(self, doc, parent, key, attributes=None, ts_updated=''):
         doc['attributes'] = attributes or {}
@@ -137,7 +166,7 @@ class DirectoryStandalone(object):
         doc['type_'] = 'DirEntry'
         doc['attributes'] = attributes or {}
         doc['key'] = key
-        doc['parent'] = parent
+        doc['parent'] = parent if parent else "/"
         doc['org'] = self.orgname
         doc['ts_created'] = ts_created or get_ion_ts()
         doc['ts_updated'] = ts_updated or get_ion_ts()

@@ -93,6 +93,7 @@ class Directory(object):
         orgname = orgname or self.orgname
         ts = ts or get_ion_ts()
         attributes = attributes if attributes is not None else {}
+        parent = parent or "/"
         de = DirEntry(org=orgname, parent=parent, key=key, attributes=attributes, ts_created=ts, ts_updated=ts)
         return de
 
@@ -127,6 +128,33 @@ class Directory(object):
         else:
             return direntry.attributes if direntry else None
 
+    def _get_unique_parents(self, entry_list):
+        """Returns a sorted, unique list of parents of DirEntries (excluding the root /)"""
+        if entry_list and type(entry_list) not in (list, tuple):
+            entry_list = [entry_list]
+        parents = set()
+        for entry in entry_list:
+            parents.add(entry.parent)
+        if "/" in parents:
+            parents.remove("/")
+        return sorted(parents)
+
+    def _ensure_parents_exist(self, entry_list, create=True):
+        parents_list = self._get_unique_parents(entry_list)
+        pe_list = []
+        try:
+            for parent in parents_list:
+                pe = self.lookup(parent)
+                if pe is None:
+                    pp, pk = parent.rsplit("/", 1)
+                    direntry = self._create_dir_entry(parent=pp, key=pk)
+                    pe_list.append(direntry)
+                    if create:
+                        self.dir_store.create(direntry, create_unique_directory_id())
+        except Exception as ex:
+            log.warn("_ensure_parents_exist(): Error creating directory parents", exc_info=True)
+        return pe_list
+
     def register(self, parent, key, create_only=False, **kwargs):
         """
         Add/replace an entry within directory, below a parent node or "/".
@@ -157,6 +185,7 @@ class Directory(object):
             self.dir_store.update(direntry)
         else:
             direntry = self._create_dir_entry(parent, key, attributes=kwargs, ts=cur_time)
+            self._ensure_parents_exist([direntry])
             self.dir_store.create(direntry, create_unique_directory_id())
 
         return entry_old
@@ -182,6 +211,8 @@ class Directory(object):
         for parent, key, attrs in entries:
             direntry = self._create_dir_entry(parent, key, attributes=attrs, ts=cur_time)
             de_list.append(direntry)
+        pe_list = self._ensure_parents_exist(de_list, create=False)
+        de_list.extend(pe_list)
         deid_list = [create_unique_directory_id() for i in xrange(len(de_list))]
         self.dir_store.create_mult(de_list, deid_list)
 
