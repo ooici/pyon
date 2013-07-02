@@ -69,7 +69,7 @@ class DotDict(DotNotationGetItem, dict):
         if self.has_key(key):
             return self[key]
 
-        if not self.has_key(DICT_LOCKING_ATTR):
+        if not self.__dict__.has_key(DICT_LOCKING_ATTR):
             import sys
             import dis
             frame = sys._getframe(1)
@@ -82,7 +82,7 @@ class DotDict(DotNotationGetItem, dict):
     def __setattr__(self, key, value):
         if key in dir(dict):
             raise AttributeError('%s conflicts with builtin.' % key)
-        if self.has_key(DICT_LOCKING_ATTR):
+        if self.__dict__.has_key(DICT_LOCKING_ATTR):
             raise AttributeError('Setting %s on a locked DotDict' % key)
         if isinstance(value, dict):
             self[key] = DotDict(value)
@@ -103,21 +103,21 @@ class DotDict(DotNotationGetItem, dict):
         return value
 
     def lock(self):
-        dict.__setattr__(self, DICT_LOCKING_ATTR, True)
+        self.__dict__[DICT_LOCKING_ATTR] = True
 
     def clear(self):
-        if self.has_key(DICT_LOCKING_ATTR):
-            dict.__delattr__(self, DICT_LOCKING_ATTR)
+        if self.__dict__.has_key(DICT_LOCKING_ATTR):
+            del self.__dict__[DICT_LOCKING_ATTR]
 
         super(DotDict, self).clear()
 
     def pop(self, *args, **kwargs):
-        if self.has_key(DICT_LOCKING_ATTR):
+        if self.__dict__.has_key(DICT_LOCKING_ATTR):
             raise AttributeError('Cannot pop on a locked DotDict')
         return super(DotDict, self).pop(*args, **kwargs)
 
     def popitem(self):
-        if self.has_key(DICT_LOCKING_ATTR):
+        if self.__dict__.has_key(DICT_LOCKING_ATTR):
             raise AttributeError('Cannot popitem on a locked DotDict')
         return super(DotDict, self).popitem()
 

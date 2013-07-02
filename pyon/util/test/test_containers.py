@@ -21,7 +21,7 @@ class Test_Containers(IonIntegrationTestCase):
         self.assertEqual(dotDict.a, "1")
         self.assertTrue('a' in dotDict)
 
-    def Xtest_dot_dict_constant(self):
+    def test_dot_dict_constant(self):
         d = DotDict({"foo": "bar"})
         self.assertEqual("bar", d.foo)
         d.foo = "somethingnew"
@@ -217,6 +217,3 @@ class Test_Containers(IonIntegrationTestCase):
         ts = get_ion_ts()
         self.assertEqual(is_valid_ts(ts), True)
 
-
-if __name__ == "__main__":
-    unittest.main()
