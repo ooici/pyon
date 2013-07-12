@@ -6,7 +6,7 @@ __license__ = 'Apache 2.0'
 
 import types
 
-from pyon.core.bootstrap import CFG, get_service_registry
+from pyon.core.bootstrap import CFG, get_service_registry, is_testing
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 from pyon.util.log import log
 from pyon.ion.resource import RT, OT
@@ -304,6 +304,8 @@ class GovernanceController(object):
 
         #This method can be called before policy management service is available during system startup
         if safe_mode and not self._is_policy_management_service_available():
+            if not is_testing():
+                log.warn("Requested update_container_policies() but ignore - Policy MS not available")
             return
 
         #Need to check to set here to set after the system actor is created

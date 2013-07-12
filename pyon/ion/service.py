@@ -315,8 +315,13 @@ class IonServiceRegistry(object):
                     service_resource, _ = rr_client.find_resources(restype='Service', name=service_name)
 
             #The service is available only of there is a single RR object for it and it is in one of these states:
+            if service_resource and len(service_resource) > 1:
+                log.warn("Found multiple service instances registered under name %s: %s", service_name, service_resource)
+
             if service_resource and ( service_resource[0].state == ServiceStateEnum.READY or service_resource[0].state == ServiceStateEnum.STEADY ):
                 return True
+            elif service_resource:
+                log.warn("Call to is_service_available() failed although a Service resource exists: %s", service_resource)
 
             return False
 
