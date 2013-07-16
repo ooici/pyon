@@ -23,7 +23,7 @@ class FSMStateError(FSMError):
 class FSMCommandUnknownError(FSMError):
     pass
 
-class FSMLockedError(FSMError)
+class FSMLockedError(FSMError):
     pass
 
 class InstrumentFSM(object):
