@@ -196,6 +196,12 @@ class InstTimeoutError(IonInstrumentError):
     status_code = 690
 
 
+class InstDriverClientTimeoutError(IonInstrumentError):
+    """
+    A special kind of timeout that only applies at the driver client level (not an instrument timeout).
+    """
+    status_code = 691
+
 class ResourceError(IonException):
     """
     A taskable resource error occurred.
