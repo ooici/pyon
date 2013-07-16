@@ -23,6 +23,8 @@ class FSMStateError(FSMError):
 class FSMCommandUnknownError(FSMError):
     pass
 
+class FSMLockedError(FSMError)
+    pass
 
 class InstrumentFSM(object):
     """
@@ -160,3 +162,40 @@ class ThreadSafeFSM(InstrumentFSM):
     def on_event(self, event, *args, **kwargs):
         with self._lock:
             return super(ThreadSafeFSM, self).on_event(event, *args, **kwargs)
+    def on_event_if_free(self, event, *args, **kwargs):
+        if not self._lock.acquire(blocking=False):
+            raise FSMLockedError
+        try:
+            retval = super(ThreadSafeFSM, self).on_event(event, *args, **kwargs)
+        finally:
+            self._lock.release()
+        return retval
+
+
+"""
+import gevent
+from gevent.coros import RLock
+
+r = RLock()
+
+
+def gfunc(name):
+
+    lock = r.acquire(blocking=False)
+    if not lock:
+        while not lock:
+            gevent.sleep(1)
+            lock = r.acquire(blocking=False)
+    print 'worker %s returned retval %s' % (name, str(lock))
+    x = 0
+    while x < 5:
+        gevent.sleep(1)
+        print 'worker %s count %i' % (name, x)
+        x += 1
+    r.release()
+
+
+gl1 = gevent.spawn(gfunc,'one')
+gl2 = gevent.spawn(gfunc,'two')
+gevent.joinall([gl1, gl2])
+"""
