@@ -599,8 +599,12 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         log.info('Resource agent %s publsihed state change: %s, time: %s result: %s',
                  self.id, state, get_ion_ts(), str(result))
 
-        self._set_state('agent_state', state)
-        self._flush_state()
+        try:
+            self._set_state('agent_state', state)
+            self._flush_state()
+        except Exception as ex:
+            log.info('Exception setting state: %s', str(ex))
+            log.exception('######## could not set state on enter.')
             
         self._on_state_enter(state)
 
