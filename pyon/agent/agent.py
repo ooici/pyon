@@ -605,7 +605,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         except Exception as ex:
             log.info('Exception setting state: %s', str(ex))
             log.exception('######## could not set state on enter.')
-            
+            raise
+
         self._on_state_enter(state)
 
     def _on_state_enter(self, state):
