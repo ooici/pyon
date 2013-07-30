@@ -723,6 +723,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 else:
                     setattr(self, 'aparam_' + key, val)
                 restored.append(key)
+                log.info('### Restored aparam: %s, %s', key, val)
             else:
                 unrestored.append(key)
         return (restored, unrestored)
