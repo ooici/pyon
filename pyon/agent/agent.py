@@ -206,6 +206,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         # If configured, wipe out the prior agent memory.
         restored_aparams = []
         unrestored_aparams = []
+        print '### bootmode = ' + str(bootmode)
+        log.info('Restoring aparams: bootmode=%s', str(bootmode))
         if bootmode == 'restart':
             (restored_aparams, unrestored_aparams) = self._restore_aparams()
             self._restore_resource(state, prev_state)            
@@ -604,6 +606,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             self._flush_state()
         except Exception as ex:
             log.info('Exception setting state: %s', str(ex))
+            print 'Exception setting state: ' + str(ex)
             log.exception('######## could not set state on enter.')
             raise
 
@@ -724,8 +727,13 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                     setattr(self, 'aparam_' + key, val)
                 restored.append(key)
                 log.info('### Restored aparam: %s, %s', key, val)
+                print '### Restored aparam: %s, %s' % (key, val)
             else:
                 unrestored.append(key)
+        log.info('Restored aparams: %s', str(restored))
+        log.info('Unrestored aparams: %s', str(unrestored))
+        print 'Restored aparams: %s' % str(restored)
+        print 'Unrestored aparams: %s' % str(unrestored)
         return (restored, unrestored)
         
     def _configure_aparams(self, aparams=[]):
