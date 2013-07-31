@@ -193,12 +193,32 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         # Create event publisher.
         self._event_publisher = EventPublisher()
 
+        # Retrieve stored states.
+        try:
+            state = self._get_state('agent_state') or ResourceAgentState.UNINITIALIZED
+            prev_state = self._get_state('agent_state') or ResourceAgentState.UNINITIALIZED
+
+        except Exception as ex:
+            log.error('Exception retrieving agent state in on_init: %s.', str(ex))
+            log.exception('Exception retrieving agent state in on_init.')
+            state = ResourceAgentState.UNINITIALIZED
+            prev_state = ResourceAgentState.UNINITIALIZED
+        else:
+            log.info('Got agent state: %s', state)
+            log.info('Got agent prior state: %s', prev_state)
+            print '###### Got agent state ' + str(state)
+            print '###### Got agent prior state ' + str(prev_state)
+
         # Load state.
         try:
             self._load_state()
         except Exception as ex:
             log.error('Error loading state in on_init: %s', str(ex))
             log.exception('Error loading state in on_init.')
+
+        # Start state machine.
+        self._initial_state = self.CFG.get('initial_state', None) or self._initial_state
+        self._fsm.start(self._initial_state)
 
         # If configured, wipe out the prior agent memory.
         restored_aparams = []
@@ -217,24 +237,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
                 log.exception('Error clearing state in on_init.')
 
         self._configure_aparams(unrestored_aparams)
-
-        # Retrieve stored states.
-        try:
-            state = self._get_state('agent_state')
-            prev_state = self._get_state('agent_state')
-        except Exception as ex:
-            log.error('Exception retrieving agent state in on_init: %s.', str(ex))
-            log.exception('Exception retrieving agent state in on_init.')
-            state = ResourceAgentState.UNINITIALIZED
-            prev_state = ResourceAgentState.UNINITIALIZED
-        else:
-            log.info('Got agent state: %s', state)
-            log.info('Got agent prior state: %s', prev_state)
-
-        # Start state machine.
-        self._initial_state = self.CFG.get('initial_state', None) or self._initial_state
-        self._fsm.start(self._initial_state)
-
 
     def on_quit(self):
         """
@@ -629,6 +631,10 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         except Exception as ex:
             log.error('Exception setting state: %s', str(ex))
             log.exception('Could not set state in _common_state_enter.')
+            print '########## error writing state!!!'
+
+        new_state = self._get_state('agent_state')
+        print '######### just wrote agent state: ' + new_state
 
         self._on_state_enter(state)
 
