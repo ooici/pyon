@@ -206,8 +206,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         else:
             log.info('Got agent state: %s', state)
             log.info('Got agent prior state: %s', prev_state)
-            print '###### Got agent state ' + str(state)
-            print '###### Got agent prior state ' + str(prev_state)
 
         # Load state.
         try:
@@ -631,10 +629,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         except Exception as ex:
             log.error('Exception setting state: %s', str(ex))
             log.exception('Could not set state in _common_state_enter.')
-            print '########## error writing state!!!'
 
         new_state = self._get_state('agent_state')
-        print '######### just wrote agent state: ' + new_state
 
         self._on_state_enter(state)
 
