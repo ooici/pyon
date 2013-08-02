@@ -494,6 +494,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
         try:
             result = self._fsm.on_event(cmd, *args, **kwargs)
+            #if not isinstance(result, dict):
+            #    result = {'result' : result}
             cmd_result.result = result
             self._on_command('execute_agent', cmd, args, kwargs, result)
 
@@ -585,6 +587,8 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         try:
             result = self._fsm.on_event(
                 ResourceAgentEvent.EXECUTE_RESOURCE, cmd, *args, **kwargs)
+            #if not isinstance(result, dict):
+            #    result = {'result' : result}
             cmd_result.result = result
             self._on_command('execute_resource', cmd, args, kwargs, result)
 
