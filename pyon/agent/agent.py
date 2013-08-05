@@ -107,6 +107,7 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
     resource agent service interface. This base class captures the mechanisms
     common to all resource agents and is subclassed with implementations
     specific for instrument agents, user agents, etc.
+    Pointless comment.
     """
 
     ##############################################################
