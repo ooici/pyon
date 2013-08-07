@@ -6,6 +6,7 @@ __author__ = 'Michael Meisinger'
 
 from copy import deepcopy
 import time
+import re
 
 from couchdb.http import ResourceNotFound
 from gevent.coros import RLock
@@ -132,6 +133,33 @@ class ProcManager(object):
             # Use provided config. Must be dict or DotDict
             if not isinstance(config, DotDict):
                 config = DotDict(config)
+            if config.get_safe("process.config_ref"):
+                # Use a reference
+                config_ref = config.get_safe("process.config_ref")
+                log.info("Enhancing new process spawn config from ref=%s" % config_ref)
+                matches = re.match(r'^([A-Za-z]+):([A-Za-z0-9]+)/(.+)$', config_ref)
+                if matches:
+                    ref_type, ref_id, ref_ext = matches.groups()
+                    if ref_type == "resources":
+                        if self.container.has_capability(self.container.CCAP.RESOURCE_REGISTRY):
+                            try:
+                                obj = self.container.resource_registry.read(ref_id)
+                                if obj and hasattr(obj, ref_ext):
+                                    ref_config = getattr(obj, ref_ext)
+                                    if isinstance(ref_config, dict):
+                                        dict_merge(process_cfg, ref_config, inplace=True)
+                                    else:
+                                        raise BadRequest("config_ref %s exists but not dict" % config_ref)
+                                else:
+                                    raise BadRequest("config_ref %s - attribute not found" % config_ref)
+                            except NotFound as nf:
+                                log.warn("config_ref %s - object not found" % config_ref)
+                                raise
+                        else:
+                            log.error("Container missing RESOURCE_REGISTRY capability to resolve process config ref %s" % config_ref)
+                    else:
+                        raise BadRequest("Unknown reference type in: %s" % config_ref)
+
             dict_merge(process_cfg, config, inplace=True)
             if self.container.spawn_args:
                 # Override config with spawn args
