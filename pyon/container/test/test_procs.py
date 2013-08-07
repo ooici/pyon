@@ -16,7 +16,7 @@ from pyon.ion.endpoint import ProcessRPCServer
 from pyon.ion.process import IonProcessError
 from pyon.ion.conversation import ConversationRPCServer
 from pyon.net.transport import NameTrio, TransportError
-from pyon.public import PRED, CCAP
+from pyon.public import PRED, CCAP, IonObject
 from pyon.ion.service import BaseService
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
@@ -521,3 +521,48 @@ class TestProcManagerInt(IonIntegrationTestCase):
                             call(ANY, ProcessStateEnum.FAILED),
                             call(ANY, ProcessStateEnum.FAILED)])
 
+
+    def test_process_config_reg(self):
+        self._start_container()
+
+        pm = self.container.proc_manager
+
+        # Test OK case
+
+        res_config = {'special':{'more':'exists'}}
+        res_obj = IonObject("AgentInstance", agent_spawn_config=res_config)
+        res_id, _ = self.container.resource_registry.create(res_obj)
+        config_ref = "resources:%s/agent_spawn_config" % res_id
+        config = {'process':{'config_ref':config_ref}}
+
+        pid1 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid1)
+
+        proc = pm.procs_by_name['sample1']
+        self.assertTrue(proc)
+        self.assertIn('special', proc.CFG)
+        self.assertTrue(proc.CFG.get_safe("special.more"), 'exists')
+
+        pm.terminate_process(pid1)
+
+        # Test failure cases
+
+        config_ref = "XXXXX:%s/agent_spawn_config" % res_id
+        config = {'process':{'config_ref':config_ref}}
+        with self.assertRaises(BadRequest) as ex:
+            pid2 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+
+        config_ref = "resources:badbadbad/agent_spawn_config"
+        config = {'process':{'config_ref':config_ref}}
+        with self.assertRaises(NotFound) as ex:
+            pid3 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+
+        config_ref = "resources:%s/not_existing" % res_id
+        config = {'process':{'config_ref':config_ref}}
+        with self.assertRaises(BadRequest) as ex:
+            pid4 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+
+        config_ref = "resources:%s/name" % res_id
+        config = {'process':{'config_ref':config_ref}}
+        with self.assertRaises(BadRequest) as ex:
+            pid4 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
