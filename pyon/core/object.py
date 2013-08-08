@@ -19,7 +19,26 @@ built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
 class IonObjectBase(object):
 
     def __str__(self):
-        return str(self.__dict__)
+        ds = str(self.__dict__)
+        # Remove the type_ from the dict str - cheaper this way than copying the dict
+        typeidx = ds.find("'type_': '")
+        if typeidx:
+            endidx = ds.find("'", typeidx+10)
+            if ds[typeidx-2] == ",":
+                typeidx -= 2
+            ds = ds[:typeidx] + ds[endidx+1:]
+
+        # This is a more eye pleasing variant but does not eval
+        return "%s(%s)" % (self.__class__.__name__, ds)
+
+        # This is a correct variant that can be evaled and requires the class imported
+        #return "%s(**%s)" % (self.__class__.__name__, ds)
+
+        # This is a longer correct variant that can be evaled and requires the IonObject imported
+        #return "IonObject('%s', %s)" % (self.__class__.__name__, ds)
+
+    def __repr__(self):
+        return self.__str__()
 
     def __eq__(self, other):
         if type(other) == type(self):
