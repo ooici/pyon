@@ -7,6 +7,7 @@
 '''
 
 import functools
+import traceback
 
 def breakpoint(scope=None):
     from IPython.config.loader import Config
@@ -63,7 +64,11 @@ def breakpoint(scope=None):
                 banner1="Entering Breakpoint Shell",
             exit_msg = 'Returning...')
 
-        ipshell('Breakpoint')
+        stack = traceback.extract_stack(limit=2)
+        message = 'File %s, line %s, in %s' % stack[0][:-1]
+
+        ipshell('Breakpoint @ ' + message)
+
 
 def debug_wrapper(func):
     @functools.wraps(func)
