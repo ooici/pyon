@@ -20,13 +20,16 @@ class IonObjectBase(object):
 
     def __str__(self):
         ds = str(self.__dict__)
-        # Remove the type_ from the dict str - cheaper this way than copying the dict
-        typeidx = ds.find("'type_': '")
-        if typeidx:
-            endidx = ds.find("'", typeidx+10)
-            if ds[typeidx-2] == ",":
-                typeidx -= 2
-            ds = ds[:typeidx] + ds[endidx+1:]
+        try:
+            # Remove the type_ from the dict str - cheaper this way than copying the dict
+            typeidx = ds.find("'type_': '")
+            if typeidx:
+                endidx = ds.find("'", typeidx+10)
+                if ds[typeidx-2] == ",":
+                    typeidx -= 2
+                ds = ds[:typeidx] + ds[endidx+1:]
+        except Exception as ex:
+            log.warn("Could not create IonObject __str__ representation")
 
         # This is a more eye pleasing variant but does not eval
         return "%s(%s)" % (self.__class__.__name__, ds)
