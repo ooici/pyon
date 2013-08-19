@@ -303,8 +303,10 @@ class GovernanceController(object):
 
         # This method can be called before policy management service is available during system startup
         if safe_mode and not self._is_policy_management_service_available():
-            if not is_testing() and process_instance.name not in (
-                "event_persister", "resource_registry", "system_management", "directory", "identity_management"):
+            if not is_testing() and (process_instance.name not in (
+                "resource_registry", "system_management", "directory", "identity_management") or
+                process_instance._proc_name != "event_persister"):
+                # We are in the early phases of bootstrapping
                 log.warn("update_container_policies(%s) - No update. Policy MS not available" % process_instance.name)
             return
 
