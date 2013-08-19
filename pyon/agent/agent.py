@@ -896,24 +896,8 @@ class ResourceAgentClient(ResourceAgentProcessClient):
             if len(agent_procs) > 1:
                 log.warn("Inconsistency: More than one agent registered for resource_id=%s: %s" % (
                     resource_id, agent_procs))
-                try:
-                    # Using the most recent DirEntry.ts_updated to find the best match
-                    remove_list = []
-                    for de in agent_procs:
-                        if int(de.ts_updated) > int(agent_proc_entry.ts_updated):
-                            remove_list.append(agent_proc_entry.key)
-                            agent_proc_entry = de
-                        elif de.key != agent_proc_entry.key:
-                            remove_list.append(de.key)
-
-                    log.info("Attempting to cleanup these agent directory entries: %s" % remove_list)
-                    for de in remove_list:
-                        bootstrap.container_instance.directory.unregister_safe('/Agents', de)
-                    log.info("Cleanup of %s old resource=%s agent directory entries succeeded" % (len(remove_list), resource_id))
-
-                except Exception as ex:
-                    log.warn("Cleanup of multiple agent directory entries for resource_id=%s failed: %s" % (
-                        resource_id, str(ex)))
+                agent_proc_entry = bootstrap.container_instance.directory._cleanup_outdated_entries(
+                    agent_procs, "agent resource_id=%s" % resource_id)
 
             agent_id = agent_proc_entry.key
             if client_instance is not None:

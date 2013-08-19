@@ -100,7 +100,8 @@ class Directory(object):
     def _read_by_path(self, path, orgname=None):
         """
         Given a qualified path, find entry in directory and return DirEntry
-        object or None if not found
+        object or None if not found.
+        A side effect is to clean any but the most recent entries found for this path.
         """
         if path is None:
             raise BadRequest("Illegal arguments")
@@ -112,10 +113,44 @@ class Directory(object):
 
         match = [doc for docid, index, doc in view_res]
         if len(match) > 1:
-            raise Inconsistent("More than one directory entry found for key %s" % path)
+            log.warn("More than one directory entry found for key %s" % path)
+            recent_match = self._cleanup_outdated_entries(match, "path=%s" % path)
+            return recent_match
         elif match:
             return match[0]
         return None
+
+    def _cleanup_outdated_entries(self, dir_entries, common="key"):
+        """
+        This function takes all DirEntry from the list and removes all but the most recent one
+        by ts_updated timestamp. It returns the most recent DirEntry and removes the others by
+        direct datastore operations.
+        """
+        if not dir_entries:
+            return
+        newest_entry = dir_entries[0]
+        try:
+            remove_list = []
+            for de in dir_entries:
+                if int(de.ts_updated) > int(newest_entry.ts_updated):
+                    remove_list.append(newest_entry)
+                    newest_entry = de
+                elif de.key != newest_entry.key:
+                    remove_list.append(de)
+
+            log.info("Attempting to cleanup these directory entries: %s" % remove_list)
+            for de in remove_list:
+                try:
+                    self.dir_store.delete(de)
+                except Exception as ex:
+                    log.warn("Removal of outdated %s directory entry failed: %s" % (common, de))
+            log.info("Cleanup of %s old %s directory entries succeeded" % (len(remove_list), common))
+
+        except Exception as ex:
+            log.warn("Cleanup of multiple directory entries for %s failed: %s" % (
+                common, str(ex)))
+
+        return newest_entry
 
     def lookup(self, parent, key=None, return_entry=False):
         """
