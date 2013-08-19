@@ -807,38 +807,38 @@ class ResourceAgentClient(ResourceAgentProcessClient):
     """
     def __init__(self, resource_id, *args, **kwargs):
         """
-        Client constructor.
+        Resource agent client constructor.
         @param resource_id The ID this service represents.
-        @param name Use this kwarg to set the target exchange name
+        @param name Use this kwarg to set the target exchange name (= agent process id or service name)
         (service or process).
         """
 
         # Assert and set the resource ID.
-        assert resource_id, "resource_id must be set for an agent"
+        if not resource_id:
+            raise BadRequest("resource_id must be set for an agent")
         self.resource_id = resource_id
+        self.agent_process_id = None
+        self.agent_dir_entry = None
 
         # Set the name, retrieve as proc ID if not set by user.
         if not 'name' in kwargs:
-            process_id = self._get_agent_process_id(self.resource_id)
-            if process_id:
-                kwargs = kwargs.copy()
-                kwargs['name'] = process_id
-                log.debug("Use agent process %s for resource_id=%s" % (process_id, self.resource_id))
+            self.agent_process_id = self._get_agent_process_id(self.resource_id, client_instance=self)
+            if self.agent_process_id:
+                log.debug("Use agent process %s for resource_id=%s" % (self.agent_process_id, self.resource_id))
             else:
-                # TODO: Check if there is a service for this type of resource
                 log.debug("No agent process found for resource_id %s" % self.resource_id)
                 raise NotFound("No agent process found for resource_id %s" % self.resource_id)
-
-        assert "name" in kwargs, "Name argument for agent target not set"
+        else:
+            self.agent_process_id = kwargs.pop("name")
 
         # transpose name -> to_name to make underlying layer happy
-        kwargs["to_name"] = kwargs.pop("name")
+        kwargs["to_name"] = self.agent_process_id
 
         # Superclass constructor.
         ResourceAgentProcessClient.__init__(self, *args, **kwargs)
 
     ##############################################################
-    # Client interface.
+    # Agent interface.
     ##############################################################
 
     def negotiate(self, *args, **kwargs):
@@ -885,15 +885,53 @@ class ResourceAgentClient(ResourceAgentProcessClient):
     ##############################################################
     
     @classmethod
-    def _get_agent_process_id(cls, resource_id):
+    def _get_agent_process_id(cls, resource_id, client_instance=None):
         """
-        Retrun the agent container proc id given the resource_id.
+        Return the agent container process id given the resource_id.
+        DO NOT USE THIS CALL. Use an instance of this class and rac.get_agent_process_id() instead
         """
         agent_procs = bootstrap.container_instance.directory.find_by_value('/Agents', 'resource_id', resource_id)
         if agent_procs:
+            agent_proc_entry = agent_procs[0]
             if len(agent_procs) > 1:
                 log.warn("Inconsistency: More than one agent registered for resource_id=%s: %s" % (
                     resource_id, agent_procs))
-            agent_id = agent_procs[0].key
+                try:
+                    # Using the most recent DirEntry.ts_updated to find the best match
+                    remove_list = []
+                    for de in agent_procs:
+                        if int(de.ts_updated) > int(agent_proc_entry.ts_updated):
+                            remove_list.append(agent_proc_entry.key)
+                            agent_proc_entry = de
+                        elif de.key != agent_proc_entry.key:
+                            remove_list.append(de.key)
+
+                    log.info("Attempting to cleanup these agent directory entries: %s" % remove_list)
+                    for de in remove_list:
+                        bootstrap.container_instance.directory.unregister_safe('/Agents', de)
+                    log.info("Cleanup of %s old resource=%s agent directory entries succeeded" % (len(remove_list), resource_id))
+
+                except Exception as ex:
+                    log.warn("Cleanup of multiple agent directory entries for resource_id=%s failed: %s" % (
+                        resource_id, str(ex)))
+
+            agent_id = agent_proc_entry.key
+            if client_instance is not None:
+                client_instance.agent_dir_entry = agent_proc_entry
             return str(agent_id)
         return None
+
+    def get_agent_process_id(self):
+        """
+        Returns the process id for the agent process representing this instance's resource
+        """
+        return self.agent_process_id
+
+    def get_agent_directory_entry(self):
+        """
+        Returns the directory entry for the agent process representing this instance's resource
+        """
+        return self.agent_dir_entry
+
+    def await_agent_process_launch(self, timeout=0):
+        raise NotImplementedError()

@@ -372,17 +372,17 @@ class TestProcManagerInt(IonIntegrationTestCase):
 
         pm = self.container.proc_manager
 
-        self._spawnproc(pm, 'service')
+        pid1 = self._spawnproc(pm, 'service')
 
-        self._spawnproc(pm, 'stream_process')
+        pid2 = self._spawnproc(pm, 'stream_process')
 
-        self._spawnproc(pm, 'agent', 'SampleAgent')
+        pid3 = self._spawnproc(pm, 'agent', 'SampleAgent')
 
-        self._spawnproc(pm, 'standalone')
+        pid4 = self._spawnproc(pm, 'standalone')
 
-        self._spawnproc(pm, 'simple')
+        pid5 = self._spawnproc(pm, 'simple')
 
-        self._spawnproc(pm, 'immediate')
+        pid6 = self._spawnproc(pm, 'immediate')
 
         with self.assertRaises(Exception) as ex:
             config = {'process':{'type':'unknown_type'}}
@@ -390,6 +390,14 @@ class TestProcManagerInt(IonIntegrationTestCase):
             self.assertEqual(ex.exception, 'Unknown process type: BAMM')
 
         self.assertEquals(len(pm.procs), 5)     # service, stream_proc, (no agent), standalone, simple.  NO IMMEDIATE
+
+        pm.terminate_process(pid1)
+        pm.terminate_process(pid2)
+        pm.terminate_process(pid3)
+        pm.terminate_process(pid4)
+        pm.terminate_process(pid5)
+
+        self.assertEquals(len(pm.procs), 0)
 
     def _spawnproc(self, pm, ptype, pcls=None):
         pcls = pcls or 'SampleProcess'
