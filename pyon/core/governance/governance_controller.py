@@ -296,19 +296,19 @@ class GovernanceController(object):
 
     def update_container_policies(self, process_instance, safe_mode=False):
         """
-        This must be called after registering a new process to load any applicable policies
+        Load any applicable process policies. Must be called after registering a new process.
 
-        @param process_instance:
-        @return:
+        @param safe_mode  If True, will not attempt to read policy if Policy MS not available
         """
 
-        #This method can be called before policy management service is available during system startup
+        # This method can be called before policy management service is available during system startup
         if safe_mode and not self._is_policy_management_service_available():
-            if not is_testing():
-                log.warn("Requested update_container_policies() but ignore - Policy MS not available")
+            if not is_testing() and process_instance.name not in (
+                "event_persister", "resource_registry", "system_management", "directory", "identity_management"):
+                log.warn("update_container_policies(%s) - No update. Policy MS not available" % process_instance.name)
             return
 
-        #Need to check to set here to set after the system actor is created
+        # Need to check to set here to set after the system actor is created
         if self.system_actor_id is None:
             system_actor = get_system_actor()
             if system_actor is not None:
@@ -316,13 +316,11 @@ class GovernanceController(object):
                 self.system_actor_user_header = get_system_actor_header()
 
         if process_instance._proc_type == SERVICE_PROCESS_TYPE:
-
             # look to load any existing policies for this service
 
             self.update_service_access_policy(process_instance._proc_listen_name)
 
         elif process_instance._proc_type == AGENT_PROCESS_TYPE:
-
             # look to load any existing policies for this agent service
             if process_instance.resource_type is None:
                 self.update_service_access_policy(process_instance.name)

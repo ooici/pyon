@@ -305,25 +305,27 @@ class IonServiceRegistry(object):
             service_resource = None
             from pyon.core.bootstrap import container_instance
             from interface.objects import ServiceStateEnum
-            #Use container direct RR connection if available, otherwise use messaging to the RR service
+            # Use container direct RR connection if available, otherwise use messaging to the RR service
             if hasattr(container_instance, 'has_capability') and container_instance.has_capability('RESOURCE_REGISTRY'):
                 service_resource, _ = container_instance.resource_registry.find_resources(restype='Service', name=service_name)
+            elif not local_rr_only:
+                from interface.services.coi.iresource_registry_service import ResourceRegistryServiceClient
+                rr_client = ResourceRegistryServiceClient(container_instance.node)
+                service_resource, _ = rr_client.find_resources(restype='Service', name=service_name)
             else:
-                if not local_rr_only:
-                    from interface.services.coi.iresource_registry_service import ResourceRegistryServiceClient
-                    rr_client = ResourceRegistryServiceClient(container_instance.node)
-                    service_resource, _ = rr_client.find_resources(restype='Service', name=service_name)
+                log.warn("is_service_available(%s) - No RR connection" % service_name)
 
-            #The service is available only of there is a single RR object for it and it is in one of these states:
+            # The service is available only of there is a single RR object for it and it is in one of these states:
             if service_resource and len(service_resource) > 1:
-                log.warn("Found multiple service instances registered under name %s: %s", service_name, service_resource)
+                log.warn("is_service_available(%s) - Found multiple service instances: %s", service_name, service_resource)
 
-            if service_resource and ( service_resource[0].state == ServiceStateEnum.READY or service_resource[0].state == ServiceStateEnum.STEADY ):
+            # MM 2013-08-17: Added PENDING, because this means service will be there shortly
+            if service_resource and service_resource[0].state in (ServiceStateEnum.READY, ServiceStateEnum.STEADY, ServiceStateEnum.PENDING):
                 return True
             elif service_resource:
-                log.warn("Call to is_service_available() failed although a Service resource exists: %s", service_resource)
+                log.warn("is_service_available(%s) - Service resource in invalid state", service_resource)
 
             return False
 
-        except Exception, e:
+        except Exception as ex:
             return False
