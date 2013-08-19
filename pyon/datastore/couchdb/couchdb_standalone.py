@@ -75,8 +75,8 @@ class CouchDataStore(object):
         Close any connections required for this datastore.
         """
         log.info("Closing connection to CouchDB")
-        map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
-        self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
+        map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.connection_pool.conns.values())
+        self.server.resource.session.connection_pool.conns = {}     # just in case we try to reuse this, for some reason
 
     # -------------------------------------------------------------------------
     # Couch database operations
