@@ -295,14 +295,18 @@ class CouchDB_DataStore(DataStore):
             # See https://code.google.com/p/couchdb-python/issues/detail?id=204
             # Fixed in client 0.9
             doc = None
+            fixedit = False
             for i in range(3):
                 try:
                     doc = ds.get(doc_id, rev=rev_id)
                     # If this passes we are good. Exit loop
+                    fixedit = True
                     break
                 except KeyError as ke:
                     log.warn("Couchdb_python 0.8 KeyError on read(%s) - try %s" % (doc_id, i))
                     gevent.sleep(0.05)
+            if not fixedit:
+                log.error("Couchdb_python 0.8 KeyError on read(%s) failed multiple retries" % doc_id)
 
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
