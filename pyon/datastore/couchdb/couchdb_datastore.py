@@ -6,6 +6,7 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 from uuid import uuid4
+import gevent
 import hashlib
 
 import couchdb
@@ -289,7 +290,20 @@ class CouchDB_DataStore(DataStore):
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         else:
-            doc = ds.get(doc_id, rev=rev_id)
+            # doc = ds.get(doc_id, rev=rev_id)
+            # Work around issue with couchdb_python 0.8 and concurrent use of this library
+            # See https://code.google.com/p/couchdb-python/issues/detail?id=204
+            # Fixed in client 0.9
+            doc = None
+            for i in range(3):
+                try:
+                    doc = ds.get(doc_id, rev=rev_id)
+                    # If this passes we are good. Exit loop
+                    break
+                except KeyError as ke:
+                    log.warn("Couchdb_python 0.8 KeyError on read(%s) - try %s" % (doc_id, i))
+                    gevent.sleep(0.05)
+
             if doc is None:
                 raise NotFound('Object with id %s does not exist.' % str(doc_id))
         if t:
