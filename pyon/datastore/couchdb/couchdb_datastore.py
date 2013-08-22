@@ -89,8 +89,13 @@ class CouchDB_DataStore(DataStore):
 
     def close(self):
         log.trace("Closing connection to %s", self.datastore_name)
-        map(lambda x: map(lambda y: y.close(), x), self.server.resource.session.conns.values())
-        self.server.resource.session.conns = {}     # just in case we try to reuse this, for some reason
+        # Compatiblity between couchdb client 8.0 and 9.0
+        if hasattr(self.server.resource.session, 'conns'):
+            conns = self.server.resource.session.conns
+        else:
+            conns = self.server.resource.session.connection_pool.conns
+        map(lambda x: map(lambda y: y.close(), x), conns.values())
+        conns = {}     # just in case we try to reuse this, for some reason
 
     def _get_datastore(self, datastore_name=None):
         datastore_name = datastore_name or self.datastore_name
