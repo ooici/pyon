@@ -11,7 +11,7 @@ import hashlib
 
 import couchdb
 from couchdb.client import ViewResults, Row
-from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
+from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound, ServerError
 
 from pyon.core.bootstrap import get_obj_registry, CFG
 from pyon.core.exception import BadRequest, Conflict, NotFound
@@ -112,6 +112,8 @@ class CouchDB_DataStore(DataStore):
             raise BadRequest("Datastore '%s' does not exist" % datastore_name)
         except ValueError:
             raise BadRequest("Datastore name '%s' invalid" % datastore_name)
+        except ServerError as se:
+            raise BadRequest("Data store name %s invalid" % datastore_name)
 
     def create_datastore(self, datastore_name="", create_indexes=True, profile=None):
         datastore_name = datastore_name or self.datastore_name
@@ -123,6 +125,11 @@ class CouchDB_DataStore(DataStore):
             self.server.create(datastore_name)
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
+        except ServerError as se:
+            if se.message[1][0] == 'illegal_database_name':
+                raise BadRequest("Data store name %s invalid" % datastore_name)
+            else:
+                raise
         if create_indexes:
             self._define_views(datastore_name, profile)
 
@@ -135,6 +142,11 @@ class CouchDB_DataStore(DataStore):
             log.warn('deleting data store %s: does not exist', datastore_name)
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
+        except ServerError as se:
+            if se.message[1][0] == 'illegal_database_name':
+                raise BadRequest("Data store name %s invalid" % datastore_name)
+            else:
+                raise
 
     def list_datastores(self):
         dbs = [db for db in self.server]

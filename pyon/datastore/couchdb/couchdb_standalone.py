@@ -7,7 +7,7 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 
 from uuid import uuid4
 import couchdb
-from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound
+from couchdb.http import PreconditionFailed, ResourceConflict, ResourceNotFound, ServerError
 
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.util.containers import get_safe, DictDiffer
@@ -122,6 +122,8 @@ class CouchDataStore(object):
             raise NotFound("Data store '%s' does not exist" % datastore_name)
         except ValueError:
             raise BadRequest("Data store name '%s' invalid" % datastore_name)
+        except ServerError as se:
+            raise BadRequest("Data store name %s invalid" % datastore_name)
 
     def create_datastore(self, datastore_name=None, **kwargs):
         """
@@ -136,6 +138,11 @@ class CouchDataStore(object):
             raise BadRequest("Data store with name %s already exists" % datastore_name)
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
+        except ServerError as se:
+            if se.message[1][0] == 'illegal_database_name':
+                raise BadRequest("Data store name %s invalid" % datastore_name)
+            else:
+                raise
 
     def delete_datastore(self, datastore_name=None):
         """
@@ -149,6 +156,11 @@ class CouchDataStore(object):
             raise NotFound('Data store %s does not exist' % datastore_name)
         except ValueError:
             raise BadRequest("Data store name %s invalid" % datastore_name)
+        except ServerError as se:
+            if se.message[1][0] == 'illegal_database_name':
+                raise BadRequest("Data store name %s invalid" % datastore_name)
+            else:
+                raise
 
     def list_datastores(self):
         """
