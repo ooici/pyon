@@ -7,6 +7,7 @@
 '''
 
 import gevent
+import functools
 
 def poll(poller, *args, **kwargs):
     '''
@@ -23,5 +24,18 @@ def poll(poller, *args, **kwargs):
             success = poller(*args, **kwargs)
             gevent.sleep(0.2)
     return success
+
+def poll_wrapper(timeout):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            success = False
+            with gevent.timeout.Timeout(timeout):
+                while not success:
+                    success = func(*args, **kwargs)
+                    gevent.sleep(0.2)
+            return success
+        return wrapper
+    return decorator
 
 
