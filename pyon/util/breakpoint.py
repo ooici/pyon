@@ -5,7 +5,6 @@
 @file extern/pyon/pyon/util/breakpoint.py
 @description Breakpoint utility
 '''
-
 import functools
 import traceback
 
@@ -53,6 +52,8 @@ def breakpoint(scope=None):
         if Container.instance:
             locals().update(get_shell_api(Container.instance))
 
+    from pyon.core.bootstrap import get_sys_name
+
     # Update namespace of interactive shell
     # TODO: Cleanup namespace even further
     # Now create an instance of the embeddable shell. The first argument is a
@@ -67,7 +68,7 @@ def breakpoint(scope=None):
         stack = traceback.extract_stack(limit=2)
         message = 'File %s, line %s, in %s' % stack[0][:-1]
 
-        ipshell('Breakpoint @ ' + message)
+        ipshell('(%s) Breakpoint @ %s' % (get_sys_name(), message))
 
 
 def debug_wrapper(func):
