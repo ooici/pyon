@@ -278,10 +278,6 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         interface.
         """
 
-        agent_cmds = self._fsm.get_events(current_state)
-        agent_cmds = self._filter_capabilities(agent_cmds)
-        agent_params = self.get_agent_parameters()
-
         try:
             [res_cmds, res_params] = self._fsm.on_event(ResourceAgentEvent.GET_RESOURCE_CAPABILITIES, current_state)
 
@@ -293,6 +289,14 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
             self._on_command_error('get_capabilities', None, None, None, ex)
   
         res_iface_cmds = self._get_resource_interface(current_state)
+
+        # get agent capabilities after getting resource capabilities because the GET_RESOURCE_CAPABILITIES event
+        # can be blocked by the agent's fsm if a previous event is already being processed in the fsm (like the
+        # potentially asynchronous GO_COMMAND event in the DIRECT_ACCESS state), and the processing 
+        # of that previous event could change the state of the agent's fsm
+        agent_cmds = self._fsm.get_events(current_state)
+        agent_cmds = self._filter_capabilities(agent_cmds)
+        agent_params = self.get_agent_parameters()
 
         caps = []
         for item in agent_cmds:

@@ -30,7 +30,7 @@ class TestMessagingSpeed(IonIntegrationTestCase):
         self.alive = True
         def sendem():
             while self.alive:
-                hsc.noop('data')
+                hsc.hello('data')
                 self.counter += 1
 
         start_time = time.time()
