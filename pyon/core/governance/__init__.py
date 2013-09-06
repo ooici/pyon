@@ -13,6 +13,8 @@ DEFAULT_ACTOR_ID = 'anonymous'
 ORG_MANAGER_ROLE = 'ORG_MANAGER'  # Can only act upon resource within the specific Org
 ORG_MEMBER_ROLE = 'ORG_MEMBER'    # Can only access resources within the specific Org
 ION_MANAGER = 'ION_MANAGER'   # Can act upon resources across all Orgs - like a Super User access
+INSTRUMENT_OPERATOR = 'INSTRUMENT_OPERATOR'
+OBSERVATORY_OPERATOR = 'OBSERVATORY_OPERATOR'
 
 
 #Helper methods
