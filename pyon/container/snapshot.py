@@ -82,7 +82,7 @@ class ContainerSnapshot(object):
         snap_result = {}
         snap_result["os.environ"] = dict(os.environ)
         snap_result["CFG"] = CFG
-        snap_result["sys.modules"] = {n:str(m) for (n,m) in sys.modules.iteritems()}
+        #snap_result["sys.modules"] = {n:str(m) for (n,m) in sys.modules.iteritems()}
         snap_result["sys.path"] = sys.path
 
         return snap_result
