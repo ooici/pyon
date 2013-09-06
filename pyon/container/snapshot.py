@@ -20,22 +20,27 @@ class ContainerSnapshot(object):
         self.container = container
         self.snapshot = {}
         self.snap_ts = None
-        self.snapshots = list(DEFAULT_SNAPSHOTS)
+        self.snapshots = set(DEFAULT_SNAPSHOTS)
 
-    def take_snapshot(self, include_list=None, exclude_list=None):
+    def take_snapshot(self, snapshot_id=None, include_list=None, exclude_list=None, snapshot_kwargs=None):
         if include_list:
-            self.snapshots.extend(include_list)
+            self.snapshots.add(include_list)
         if exclude_list:
             for item in exclude_list:
                 self.snapshots.remove(item)
+        if not snapshot_id:
+            snapshot_id = get_ion_ts()
+        if not snapshot_kwargs:
+            snapshot_kwargs = {}
 
+        self.snapshot["snapshot_ts_begin"] = get_ion_ts()
         self.snapshot["snapshot_list"] = self.snapshots
         for snap in self.snapshots:
             snap_func = "_snap_%s" % snap
             func = getattr(self, snap_func, None)
             if func:
                 try:
-                    snap_result = func()
+                    snap_result = func(**snapshot_kwargs)
                 except Exception as ex:
                     log.warn("Could not take snapshot %s: %s" % (snap, str(ex)))
                     snap_result = ["ERROR", str(ex)]
@@ -45,6 +50,7 @@ class ContainerSnapshot(object):
 
         self.snap_ts = get_ion_ts()
         self.snapshot["snapshot_ts"] = self.snap_ts
+        self.snapshot["snapshot_id"] = snapshot_id
 
     def persist_snapshot(self):
         cc_id = self.container.proc_manager.cc_id
@@ -65,7 +71,7 @@ class ContainerSnapshot(object):
 
     # -------------------------------------------------------------------------
 
-    def _snap_basic(self):
+    def _snap_basic(self, **kwargs):
         snap_result = {}
         snap_result["os.uname"] = os.uname()
         snap_result["os.getpid"] = os.getpid()
@@ -76,9 +82,34 @@ class ContainerSnapshot(object):
         snap_result["sys.version"] = sys.version
         snap_result["sys.subversion"] = sys.subversion
 
+        try:
+            import psutil
+            proc = psutil.Process(os.getpid())
+
+            snap_result["stat.vm.cpu_times"] = psutil.cpu_times().__dict__
+            snap_result["stat.vm.cpu_percent"] = str(psutil.cpu_percent())
+            snap_result["stat.vm.virtual_memory"] = psutil.virtual_memory().__dict__
+            snap_result["stat.vm.swap_memory"] = psutil.swap_memory().__dict__
+            snap_result["stat.vm.disk_usage"] = psutil.disk_usage("/").__dict__
+            snap_result["stat.vm.disk_io_counters"] = psutil.disk_io_counters().__dict__
+            snap_result["stat.vm.disk_partitions"] = [o.__dict__ for o in psutil.disk_partitions()]
+            snap_result["stat.vm.net_io_counters"] = {k:v.__dict__ for k,v in psutil.net_io_counters(pernic=True).iteritems()}
+
+            snap_result["stat.proc.cpu_times"] = proc.get_cpu_times().__dict__
+            snap_result["stat.proc.cpu_percent"] = str(proc.get_cpu_percent())
+            snap_result["stat.proc.mem_info"] = proc.get_ext_memory_info().__dict__
+            snap_result["stat.proc.create_time"] = str(proc.create_time)
+            snap_result["stat.proc.mem_percent"] = str(proc.get_memory_percent())
+            snap_result["stat.proc.open_files"] = [o.__dict__ for o in proc.get_open_files()]
+            #snap_result["stat.proc.connections"] = [o.__dict__ for o in proc.get_connections()]
+            snap_result["stat.proc.ctx_switches"] = proc.get_num_ctx_switches().__dict__
+
+        except Exception as ex:
+             log.warn("Could not take psutil stats: %s" % (str(ex)))
+
         return snap_result
 
-    def _snap_config(self):
+    def _snap_config(self, **kwargs):
         snap_result = {}
         snap_result["os.environ"] = dict(os.environ)
         snap_result["CFG"] = CFG
@@ -87,27 +118,25 @@ class ContainerSnapshot(object):
 
         return snap_result
 
-    def _snap_gevent(self):
+    def _snap_gevent(self, **kwargs):
         snap_result = {}
 
         greenlet_list = []
         snap_result["greenlets"] = greenlet_list
+
+        # See http://stackoverflow.com/questions/12510648/in-gevent-how-can-i-dump-stack-traces-of-all-running-greenlets
+        # See http://blog.ziade.org/2012/05/25/zmq-and-gevent-debugging-nightmares/
+        # This may be an expensive operation
+        # Working with stack traces has danger of memory leak, but it seems the code below is fine
         import gc
         import traceback
         from greenlet import greenlet
-
-        greenlets = []
-        for ob in gc.get_objects():
-            if not isinstance(ob, greenlet):
-                continue
-            if not ob:
-                continue
-            greenlets.append(ob)
+        greenlets = [obj for obj in gc.get_objects() if isinstance(obj, greenlet) and obj and not obj.dead]
         for ob in greenlets:
             greenlet_list.append((getattr(ob, "kwargs", ""), ''.join(traceback.format_stack(ob.gr_frame))))
         return snap_result
 
-    def _snap_processes(self):
+    def _snap_processes(self, **kwargs):
         proc_mgr = self.container.proc_manager
         snap_result = {}
         procs_dict = {}
@@ -126,7 +155,7 @@ class ContainerSnapshot(object):
 
         return snap_result
 
-    def _snap_policy(self):
+    def _snap_policy(self, **kwargs):
         gov_ctrl = self.container.governance_controller
         policies = gov_ctrl.get_active_policies()
         snap_result = {}
@@ -165,7 +194,7 @@ class ContainerSnapshot(object):
 
         return snap_result
 
-    def _snap_accumulators(self):
+    def _snap_accumulators(self, **kwargs):
         all_acc_dict = {}
         for acc_name, acc in get_accumulators().iteritems():
             acc_dict = {}

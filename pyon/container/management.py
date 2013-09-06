@@ -142,7 +142,8 @@ class ContainerSnapshotHandler(EventHandler):
                                                                     bootstrap.container_instance.proc_manager.cc_id))
                 return
 
-            cs.take_snapshot(action.include_snapshots, action.exclude_snapshots)
+            cs.take_snapshot(snapshot_id=action.snapshot_id, snapshot_kwargs=action.snapshot_kwargs,
+                             include_list=action.include_snapshots, exclude_list=action.exclude_snapshots)
             if action.persist_snapshot:
                 cs.persist_snapshot()
                 log.info("Container %s snapshot persisted (id=%s)" % (bootstrap.container_instance.id,
@@ -157,6 +158,10 @@ class PrepareSystemShutdownHandler(EventHandler):
     def can_handle_request(self, action):
         return isinstance(action, PrepareSystemShutdown)
     def handle_request(self, action):
+        # TODO: Perform some sensible action here
+        # Mode: stop all listeners from consuming
+        # Mode: disconnect all listerers
+        # Mode: interrupt all processing
         pass
 
 
