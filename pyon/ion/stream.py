@@ -126,6 +126,7 @@ class StreamSubscriber(Subscriber):
         '''
         self.started = True
         self.greenlet = gevent.spawn(self.listen)
+        self.greenlet._glname = "StreamSubscriber"
 
     def stop(self):
         '''
@@ -217,6 +218,7 @@ class StandaloneStreamSubscriber(Subscriber):
         '''
         self.started = True
         self.greenlet = gevent.spawn(self.listen)
+        self.greenlet._glname = "StandaloneStreamSubscriber"
 
     def stop(self):
         '''

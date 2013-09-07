@@ -58,6 +58,7 @@ class ContainerSnapshot(object):
         cc_obj.status_log.insert(0, self.snapshot)
         cc_obj.status_log = cc_obj.status_log[:3]
         self.container.resource_registry.update(cc_obj)
+        return cc_id
 
     def log_snapshot(self):
         log.info("Container snapshot taken at %s" % self.snap_ts)
@@ -133,7 +134,7 @@ class ContainerSnapshot(object):
         from greenlet import greenlet
         greenlets = [obj for obj in gc.get_objects() if isinstance(obj, greenlet) and obj and not obj.dead]
         for ob in greenlets:
-            greenlet_list.append((getattr(ob, "kwargs", ""), ''.join(traceback.format_stack(ob.gr_frame))))
+            greenlet_list.append((getattr(ob, "_glname", ""), ''.join(traceback.format_stack(ob.gr_frame))))
         return snap_result
 
     def _snap_processes(self, **kwargs):
