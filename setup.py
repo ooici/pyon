@@ -82,6 +82,7 @@ setup(  name = 'pyon',
             'python-gevent-profiler',
             'lxml==2.3.4', # Fails to compile on Linux ??!??
             'requests',
+            'psutil==1.0.1'
 
             # DM related dependencies for 'tables'
             # 'numpy==1.6.1',

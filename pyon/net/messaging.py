@@ -375,6 +375,7 @@ def make_node(connection_params=None, name=None, timeout=None):
     conn_parameters = ConnectionParameters(host=connection_params["host"], virtual_host=connection_params["vhost"], port=connection_params["port"], credentials=credentials)
     connection = PyonSelectConnection(conn_parameters , node.on_connection_open)
     ioloop_process = gevent.spawn(ioloop, connection, name=name)
+    ioloop_process._glname = "pyon.net AMQP ioloop proc"
     #ioloop_process = gevent.spawn(connection.ioloop.start)
     node.ready.wait(timeout=timeout)
     return node, ioloop_process

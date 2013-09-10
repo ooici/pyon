@@ -705,9 +705,11 @@ class LocalRouter(object):
         """
         self._queue_incoming = Queue()
         self._gl_msgs = self._gl_pool.spawn(self._run_gl_msgs)
+        self._gl_msgs._glname = "pyon.net AMQP msgs"
         self._gl_msgs.link_exception(self._child_failed)
 
         self.gl_ioloop = spawn(self._run_ioloop)
+        self.gl_ioloop._glname = "pyon.net AMQP ioloop"
 
     def stop(self):
         self._gl_msgs.kill()    # @TODO: better

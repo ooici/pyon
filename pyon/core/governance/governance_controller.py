@@ -13,10 +13,12 @@ from pyon.ion.resource import RT, OT
 from pyon.core.governance import get_system_actor_header, get_system_actor
 from pyon.core.governance.policy.policy_decision import PolicyDecisionPointManager
 from pyon.ion.event import EventSubscriber
-from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
-from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 from pyon.core.exception import NotFound, Unauthorized
 from pyon.container.procs import SERVICE_PROCESS_TYPE, AGENT_PROCESS_TYPE
+from pyon.util.containers import get_ion_ts, DictDiffer
+
+from interface.services.coi.ipolicy_management_service import PolicyManagementServiceProcessClient
+from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 class GovernanceController(object):
     """
@@ -38,6 +40,10 @@ class GovernanceController(object):
         self._is_container_org_boundary = False
         self._container_org_name = None
         self._container_org_id = None
+
+        # For policy debugging purposes. Keeps a list of most recent policy updates for later readout
+        self._policy_update_log = []
+        self._policy_snapshot = None
 
     def start(self):
 
@@ -73,6 +79,9 @@ class GovernanceController(object):
 
             self.rr_client = ResourceRegistryServiceProcessClient(node=self.container.node, process=self.container)
             self.policy_client = PolicyManagementServiceProcessClient(node=self.container.node, process=self.container)
+
+            self._policy_snapshot = self._get_policy_snapshot()
+            self._log_policy_update("start_governance_ctrl", message="Container start")
 
     def initialize_from_config(self, config):
 
@@ -201,40 +210,36 @@ class GovernanceController(object):
 
 
 
-    #Manage all of the policies in the container
+    # Manage all of the policies in the container
 
-    def policy_event_callback(self, *args, **kwargs):
+    def policy_event_callback(self, policy_event, *args, **kwargs):
         """
         The generic policy event call back for dispatching policy related events
-
-        @param args:
-        @param kwargs:
-        @return:
         """
-        #Need to check to set here to set after the system actor is created
+        # Need to check to set here to set after the system actor is created
         if self.system_actor_id is None:
             system_actor = get_system_actor()
             if system_actor is not None:
                 self.system_actor_id = system_actor._id
                 self.system_actor_user_header = get_system_actor_header()
 
-        policy_event = args[0]
-        if policy_event.type_ == OT.ResourcePolicyEvent:
-            self.resource_policy_event_callback(*args, **kwargs)
-        elif policy_event.type_ == OT.RelatedResourcePolicyEvent:
-            self.resource_policy_event_callback(*args, **kwargs)
-        elif policy_event.type_ == OT.ServicePolicyEvent:
-            self.service_policy_event_callback(*args, **kwargs)
+        log.info("Policy event callback received: %s" % policy_event)
 
-    def resource_policy_event_callback(self, *args, **kwargs):
+        if policy_event.type_ == OT.ResourcePolicyEvent:
+            self.resource_policy_event_callback(policy_event, *args, **kwargs)
+        elif policy_event.type_ == OT.RelatedResourcePolicyEvent:
+            self.resource_policy_event_callback(policy_event, *args, **kwargs)
+        elif policy_event.type_ == OT.ServicePolicyEvent:
+            self.service_policy_event_callback(policy_event, *args, **kwargs)
+
+        self._log_policy_update("policy_event_callback",
+                                message="Event processed",
+                                event=policy_event)
+
+    def resource_policy_event_callback(self, resource_policy_event, *args, **kwargs):
         """
         The ResourcePolicyEvent handler
-
-        @param args:
-        @param kwargs:
-        @return:
         """
-        resource_policy_event = args[0]
         log.debug('Resource policy event received: %s', str(resource_policy_event.__dict__))
 
         policy_id = resource_policy_event.origin
@@ -243,7 +248,7 @@ class GovernanceController(object):
 
         self.update_resource_access_policy(resource_id, delete_policy)
 
-    def service_policy_event_callback(self, *args, **kwargs):
+    def service_policy_event_callback(self, service_policy_event, *args, **kwargs):
         """
         The ServicePolicyEvent handler
 
@@ -251,7 +256,6 @@ class GovernanceController(object):
         @param kwargs:
         @return:
         """
-        service_policy_event = args[0]
         log.debug('Service policy event received: %s', str(service_policy_event.__dict__))
 
         policy_id = service_policy_event.origin
@@ -267,7 +271,6 @@ class GovernanceController(object):
 
         else:
             self.update_common_service_access_policy()
-
 
 
     def reset_policy_cache(self):
@@ -289,15 +292,109 @@ class GovernanceController(object):
         for proc in proc_list:
             self.update_container_policies(proc)
 
+        self._log_policy_update("reset_policy_cache")
+
 
     def _reset_container_policy_caches(self):
         self.policy_decision_point_manager.clear_policy_cache()
         self.unregister_all_process_policy_preconditions()
 
+    def _get_policy_snapshot(self):
+        policy_snap = {}
+        policy_snap["snap_ts"] = get_ion_ts()
+
+        policies = self.get_active_policies()
+        common_list = []
+        policy_snap["common_pdp"] = common_list
+        for rule in policies.get("common_service_access", {}).policy.rules:
+            rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
+            common_list.append(rule_dict)
+
+        service_dict = {}
+        policy_snap["service_pdp"] = service_dict
+        for (svc_name, sp) in policies.get("service_access", {}).iteritems():
+            for rule in sp.policy.rules:
+                if svc_name not in service_dict:
+                    service_dict[svc_name] = []
+                rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
+                service_dict[svc_name].append(rule_dict)
+
+        service_pre_dict = {}
+        policy_snap["service_precondition"] = service_pre_dict
+        for (svc_name, sp) in policies.get("service_operation", {}).iteritems():
+            for op, f in sp.iteritems():
+                if svc_name not in service_pre_dict:
+                    service_pre_dict[svc_name] = []
+                service_pre_dict[svc_name].append(op)
+
+        resource_dict = {}
+        policy_snap["resource_pdp"] = resource_dict
+        for (res_name, sp) in policies.get("resource_access", {}).iteritems():
+            for rule in sp.policy.rules:
+                if res_name not in service_dict:
+                    resource_dict[res_name] = []
+                rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
+                resource_dict[res_name].append(rule_dict)
+
+        return policy_snap
+
+    def _log_policy_update(self, update_type=None, message=None, event=None, process=None):
+        policy_update_dict = {}
+        policy_update_dict["update_ts"] = get_ion_ts()
+        policy_update_dict["update_type"] = update_type or ""
+        policy_update_dict["message"] = message or ""
+        if event:
+            policy_update_dict["event._id"] = getattr(event, "_id", "")
+            policy_update_dict["event.ts_created"] = getattr(event, "ts_created", "")
+            policy_update_dict["event.type_"] = getattr(event, "type_", "")
+            policy_update_dict["event.sub_type"] = getattr(event, "sub_type", "")
+        if process:
+            policy_update_dict["proc._proc_name"] = getattr(process, "_proc_name", "")
+            policy_update_dict["proc.name"] = getattr(process, "name", "")
+            policy_update_dict["proc._proc_listen_name"] = getattr(process, "_proc_listen_name", "")
+            policy_update_dict["proc.resource_type"] = getattr(process, "resource_type", "")
+            policy_update_dict["proc.resource_id"] = getattr(process, "resource_id", "")
+        any_change = False   # Change can only be detected in number/names of policy not content
+        snapshot = self._policy_snapshot
+        policy_now = self._get_policy_snapshot()
+        # Comparison of snapshot to current policy
+        try:
+            def compare_policy(pol_cur, pol_snap, key, res):
+                pol_cur_set = {d["id"] if isinstance(d, dict) else d for d in pol_cur}
+                pol_snap_set = {d["id"] if isinstance(d, dict) else d for d in pol_snap}
+                if pol_cur_set != pol_snap_set:
+                    policy_update_dict["snap.%s.%s.added" % (key, res)] = pol_cur_set - pol_snap_set
+                    policy_update_dict["snap.%s.%s.removed" % (key, res)] = pol_snap_set - pol_cur_set
+                    log.debug("Policy changed for %s.%s: %s vs %s" % (key, res, pol_cur_set, pol_snap_set))
+                    return True
+                return False
+            policy_update_dict["snap.snap_ts"] = snapshot["snap_ts"]
+            for key in ("common_pdp", "service_pdp", "service_precondition", "resource_pdp"):
+                pol_snap = snapshot[key]
+                pol_cur = policy_now[key]
+                if isinstance(pol_cur, dict):
+                    for res in pol_cur.keys():
+                        pol_list = pol_cur[res]
+                        snap_list = pol_snap.get(res, [])
+                        any_change = compare_policy(pol_list, snap_list, key, res) or any_change
+                elif isinstance(pol_cur, list):
+                    any_change = compare_policy(pol_cur, pol_snap, key, "common") or any_change
+
+            policy_update_dict["snap.policy_changed"] = str(any_change)
+        except Exception as ex:
+            log.warn("Cannot compare current policy to prior snapshot", exc_info=True)
+
+        self._policy_update_log.append(policy_update_dict)
+        self._policy_update_log = self._policy_update_log[-100:]
+        self._policy_snapshot = policy_now
+
+        log.info("Policy update logged. Type=%s, message=%s, changed=%s" % (update_type, message, any_change))
+
     def update_container_policies(self, process_instance, safe_mode=False):
         """
-        Load any applicable process policies. Must be called after registering a new process.
-
+        Load any applicable process policies. To be called by the container proc manager after
+        registering a new process.
+        @param process_instance  The ION process for which to load policy
         @param safe_mode  If True, will not attempt to read policy if Policy MS not available
         """
 
@@ -307,7 +404,11 @@ class GovernanceController(object):
                 "resource_registry", "system_management", "directory", "identity_management") and
                 process_instance._proc_name != "event_persister"):
                 # We are in the early phases of bootstrapping
-                log.warn("update_container_policies(%s) - No update. Policy MS not available" % process_instance.name)
+                log.warn("update_container_policies(%s) - No update. Policy MS not available" % process_instance._proc_name)
+
+            self._log_policy_update("update_container_policies",
+                                    message="No update. Policy MS not available",
+                                    process=process_instance)
             return
 
         # Need to check to set here to set after the system actor is created
@@ -332,6 +433,10 @@ class GovernanceController(object):
             if process_instance.resource_id:
                 # look to load any existing policies for this resource
                 self.update_resource_access_policy(process_instance.resource_id)
+
+        self._log_policy_update("update_container_policies",
+                                message="Updated",
+                                process=process_instance)
 
 
     def update_resource_access_policy(self, resource_id, delete_policy=False):
@@ -409,7 +514,7 @@ class GovernanceController(object):
         container_policies['service_operation'].update(self._service_op_preconditions)
         container_policies['resource_access'].update(self.policy_decision_point_manager.resource_policy_decision_point)
 
-        log.info(container_policies)
+        #log.info(container_policies)
 
         return container_policies
 

@@ -27,12 +27,15 @@ import gc
 from threading import Lock
 
 from ooi.logging import log, config
-from pyon.ion.event import EventPublisher, EventSubscriber
-from pyon.core import bootstrap
-from pyon.core.bootstrap import IonObject
 from ooi.timer import get_accumulators
 
-from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, ResetPolicyCache, TriggerGarbageCollection
+from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.container.snapshot import ContainerSnapshot
+from pyon.core import bootstrap
+from pyon.core.bootstrap import IonObject
+
+from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, \
+    ResetPolicyCache, TriggerGarbageCollection, TriggerContainerSnapshot, PrepareSystemShutdown
 
 
 # define selectors to determine if this message should be handled by this container.
@@ -43,14 +46,19 @@ class ContainerSelector(object):
     """
     def __init__(self, peer):
         self.peer = peer
+
     def should_handle(self, container):
         raise Exception('subclass must override this method')
+
     def get_peer(self):
         return IonObject(self.get_peer_class(), **self.get_peer_args())
+
     def get_peer_class(self):
         return self.__class__.__name__
+
     def get_peer_args(self):
         return {}
+
     def __str__(self):
         return self.__class__.__name__
 
@@ -62,6 +70,7 @@ class ContainerSelector(object):
         subclass = getattr(sys.modules[mod], clazz)
         return subclass(obj)
 
+
 class AllContainers(ContainerSelector):
     """ all containers should perform the action """
     def should_handle(self, container):
@@ -72,7 +81,6 @@ class AllContainers(ContainerSelector):
 #class ContainersByIP(ContainerSelector):
 #class ContainersRunningProcess(ContainerSelector):
 #class ContainersInExecutionEngine(ContainerSelector):
-
 
 
 # define types of messages that can be sent and handled
@@ -87,11 +95,13 @@ class EventHandler(object):
         """ subclass should implement better name if behavior varies with args """
         return self.__class__.__name__
 
+
 class LogLevelHandler(EventHandler):
     def can_handle_request(self, action):
         return isinstance(action, ChangeLogLevel)
     def handle_request(self, action):
         config.set_level(action.logger, action.level, action.recursive)
+
 
 class StatisticsHandler(EventHandler):
     def can_handle_request(self, action):
@@ -104,6 +114,7 @@ class StatisticsHandler(EventHandler):
             for a in get_accumulators().values():
                 a.clear()
 
+
 class PolicyCacheHandler(EventHandler):
     def can_handle_request(self, action):
         return isinstance(action, ResetPolicyCache)
@@ -111,11 +122,47 @@ class PolicyCacheHandler(EventHandler):
         if bootstrap.container_instance.has_capability(bootstrap.container_instance.CCAP.GOVERNANCE_CONTROLLER):
             bootstrap.container_instance.governance_controller.reset_policy_cache()
 
+
 class GarbageCollectionHandler(EventHandler):
     def can_handle_request(self, action):
         return isinstance(action, TriggerGarbageCollection)
     def handle_request(self, action):
         gc.collect()
+
+
+class ContainerSnapshotHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, TriggerContainerSnapshot)
+    def handle_request(self, action):
+        try:
+            cs = ContainerSnapshot(bootstrap.container_instance)
+            if action.clear_all:
+                cs.clear_snapshots()
+                log.info("Container %s snapshot cleared (id=%s)" % (bootstrap.container_instance.id,
+                                                                    bootstrap.container_instance.proc_manager.cc_id))
+                return
+
+            cs.take_snapshot(snapshot_id=action.snapshot_id, snapshot_kwargs=action.snapshot_kwargs,
+                             include_list=action.include_snapshots, exclude_list=action.exclude_snapshots)
+            if action.persist_snapshot:
+                cs.persist_snapshot()
+                log.info("Container %s snapshot persisted (id=%s)" % (bootstrap.container_instance.id,
+                                                                      bootstrap.container_instance.proc_manager.cc_id))
+            else:
+                cs.log_snapshot()
+        except Exception as ex:
+            log.warn("Error taking container snapshot", exc_info=True)
+
+
+class PrepareSystemShutdownHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, PrepareSystemShutdown)
+    def handle_request(self, action):
+        # TODO: Perform some sensible action here
+        # Mode: stop all listeners from consuming
+        # Mode: disconnect all listerers
+        # Mode: interrupt all processing
+        pass
 
 
 # TODO: other useful administrative actions
@@ -126,9 +173,11 @@ class GarbageCollectionHandler(EventHandler):
 
 # event listener to handle the messages
 
-SEND_RESULT_IF_NOT_SELECTED=False # terrible idea... but might want for debug or audit?
+SEND_RESULT_IF_NOT_SELECTED = False  # terrible idea... but might want for debug or audit?
 
-DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler(), PolicyCacheHandler(), GarbageCollectionHandler() ]
+DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler(), PolicyCacheHandler(), GarbageCollectionHandler(),
+                     ContainerSnapshotHandler(), PrepareSystemShutdownHandler() ]
+
 
 class ContainerManager(object):
     def __init__(self, container, handlers=DEFAULT_HANDLERS):

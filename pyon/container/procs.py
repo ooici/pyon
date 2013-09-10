@@ -403,6 +403,7 @@ class ProcManager(object):
                                    listeners=[rsvc1, rsvc2],
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=cleanup)
+        proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, process_instance.id)))
 
         # map gproc to process_instance
@@ -458,6 +459,7 @@ class ProcManager(object):
                                    listeners=[rsvc, process_instance.stream_subscriber],
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=cleanup)
+        proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_stream_process for %s" % process_instance._proc_name)
 
         # map gproc to process_instance
@@ -518,6 +520,7 @@ class ProcManager(object):
                                    listeners=listeners,
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=agent_cleanup)
+        proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % process_instance.id)
 
         # map gproc to process_instance
@@ -574,6 +577,7 @@ class ProcManager(object):
                                    listeners=[rsvc],
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=cleanup)
+        proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_standalone_process for %s" % process_instance.id)
 
         # map gproc to process_instance
@@ -617,6 +621,7 @@ class ProcManager(object):
                                    listeners=[],
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=cleanup)
+        proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_simple_process for %s" % process_instance.id)
 
         # map gproc to process_instance
