@@ -15,7 +15,7 @@ ORG_MEMBER_ROLE = 'ORG_MEMBER'    # Can only access resources within the specifi
 ION_MANAGER = 'ION_MANAGER'   # Can act upon resources across all Orgs - like a Super User access
 INSTRUMENT_OPERATOR = 'INSTRUMENT_OPERATOR'
 OBSERVATORY_OPERATOR = 'OBSERVATORY_OPERATOR'
-
+DATA_OPERATOR = 'DATA_OPERATOR'
 
 #Helper methods
 
