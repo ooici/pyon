@@ -151,6 +151,7 @@ class ContainerSnapshot(object):
                                        proc_start_time=getattr(proc, "_proc_start_time", ""),
                                        proc_svc_id=getattr(proc, "_proc_svc_id", ""),
                                        resource_id=getattr(proc, "resource_id", ""),
+                                       resource_type=getattr(proc, "resource_type", ""),
                                        time_stats=proc._process.time_stats
                                   )
 
@@ -158,40 +159,8 @@ class ContainerSnapshot(object):
 
     def _snap_policy(self, **kwargs):
         gov_ctrl = self.container.governance_controller
-        policies = gov_ctrl.get_active_policies()
-        snap_result = {}
-
-        common_list = []
-        snap_result["common_pdp"] = common_list
-        for rule in policies.get("common_service_access", {}).policy.rules:
-            rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
-            common_list.append(rule_dict)
-
-        service_dict = {}
-        snap_result["service_pdp"] = service_dict
-        for (svc_name, sp) in policies.get("service_access", {}).iteritems():
-            for rule in sp.policy.rules:
-                if svc_name not in service_dict:
-                    service_dict[svc_name] = []
-                rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
-                service_dict[svc_name].append(rule_dict)
-
-        service_pre_dict = {}
-        snap_result["service_precondition"] = service_pre_dict
-        for (svc_name, sp) in policies.get("service_operation", {}).iteritems():
-            for op, f in sp.iteritems():
-                if svc_name not in service_pre_dict:
-                    service_pre_dict[svc_name] = []
-                service_pre_dict[svc_name].append(op)
-
-        resource_dict = {}
-        snap_result["resource_pdp"] = resource_dict
-        for (res_name, sp) in policies.get("resource_access", {}).iteritems():
-            for rule in sp.policy.rules:
-                if res_name not in service_dict:
-                    resource_dict[res_name] = []
-                rule_dict = dict(id=rule.id, description=rule.description, effect=rule.effect.value)
-                resource_dict[res_name].append(rule_dict)
+        snap_result = gov_ctrl._get_policy_snapshot()
+        snap_result["update_log"] = gov_ctrl._policy_update_log
 
         return snap_result
 
