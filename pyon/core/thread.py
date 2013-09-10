@@ -64,6 +64,7 @@ class PyonThread(object):
         # Gevent spawn
         gl = spawn(self.target, *self.spawn_args, **self.spawn_kwargs)
         gl.link(lambda _: self.ev_exit.set())
+        gl._glname = "ION Thread %s" % str(self.target)
         return gl
 
     def _join(self, timeout=None):
@@ -92,6 +93,7 @@ class PyonThread(object):
 
     def start(self):
         self.proc = self._spawn()
+        self.proc._glname = "Container process supervisor"
         return self
 
     def notify_stop(self):

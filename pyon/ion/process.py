@@ -193,7 +193,9 @@ class IonProcessThread(PyonThread):
             else:
                 listen_thread_name          = "unknown-listener-%s" % (len(self.listeners)+1)
 
-            self._listener_map[listener]    = self.thread_manager.spawn(listener.listen, thread_name=listen_thread_name)
+            gl = self.thread_manager.spawn(listener.listen, thread_name=listen_thread_name)
+            gl.proc._glname = "ION Proc listener %s" % listen_thread_name
+            self._listener_map[listener] = gl
             self.listeners.append(listener)
         else:
             self._startup_listeners.append(listener)
@@ -230,6 +232,7 @@ class IonProcessThread(PyonThread):
 
         # spawn control flow loop
         self._ctrl_thread = self.thread_manager.spawn(self._control_flow)
+        self._ctrl_thread.proc._glname = "ION Proc CL %s" % self.name
 
         # wait on control flow loop, heartbeating as appropriate
         while not self._ctrl_thread.ev_exit.wait(timeout=self._heartbeat_secs):
