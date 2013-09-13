@@ -705,7 +705,9 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
     def _on_command_error(self, cmd, execute_cmd, args, kwargs, ex):
         """
         Common action after an unsuccessful agent command.
-        """        
+        """
+        log.exception("on command error")
+
         if isinstance(ex, FSMStateError):
             iex = Conflict(*(ex.args))
         
