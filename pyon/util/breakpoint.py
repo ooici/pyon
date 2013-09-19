@@ -8,7 +8,7 @@
 import functools
 import traceback
 
-def breakpoint(scope=None):
+def breakpoint(scope=None, global_scope=None):
     from IPython.config.loader import Config
     ipy_config = Config()
     ipy_config.PromptManager.in_template = '><> '
@@ -51,6 +51,9 @@ def breakpoint(scope=None):
         locals().update(scope)
         if Container.instance:
             locals().update(get_shell_api(Container.instance))
+    if global_scope is not None:
+        globals().update(global_scope)
+
 
     from pyon.core.bootstrap import get_sys_name
 
