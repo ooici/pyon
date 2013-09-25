@@ -36,7 +36,8 @@ setup(  name = 'pyon',
                  'insulateslave=pyon.util.insulate:InsulateSlave',
                  'gevent_profiler=pyon.util.nose_gevent_profiler:TestGeventProfiler',
                  'greenletleak=pyon.util.greenlet_plugin:GreenletLeak',
-                 'processleak=pyon.util.processblame_plugin:ProcessLeak'
+                 'processleak=pyon.util.processblame_plugin:ProcessLeak',
+                 'memprofile=pyon.util.memory_plugin:MemProfile'
              ],
             'console_scripts' : [
                 'pycc=scripts.pycc:entry',
