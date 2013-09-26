@@ -60,18 +60,18 @@ class MemProfile(Plugin):
                 str(a_cru_maxrss - b_cru_maxrss))])
             table.append(["", ""])
 
-            # header
-            table.insert(0, ['Test', 'Memory Stats'])
+        # header
+        table.insert(0, ['Test', 'Memory Stats'])
 
-            # get widths
-            widths = [max([len(row[x]) for row in table]) for x in xrange(len(table[0]))]
-            fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in table]
+        # get widths
+        widths = [max([len(row[x]) for row in table]) for x in xrange(len(table[0]))]
+        fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in table]
 
-            # insert col separation row
-            fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
+        # insert col separation row
+        fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
 
-            # write this all to sstream
-            stream.write("Memory report\n")
+        # write this all to sstream
+        stream.write("Memory report\n")
 
-            stream.write("\n".join(fmt_out))
-            stream.write("\n")
+        stream.write("\n".join(fmt_out))
+        stream.write("\n")
