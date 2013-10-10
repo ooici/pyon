@@ -7,6 +7,8 @@
 '''
 import functools
 import traceback
+import time
+import sys
 
 def breakpoint(scope=None, global_scope=None):
     from IPython.config.loader import Config
@@ -84,3 +86,23 @@ def debug_wrapper(func):
             print_exc()
             raise
     return wrapper
+
+
+_global_profile_t0 = time.time()
+_global_profile_level = 0
+
+def time_profile(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        global _global_profile_t0
+        global _global_profile_level
+        indent = ''.join(['    ' for i in xrange(_global_profile_level)])
+        t0 = time.time()
+        sys.stdout.write('%s%s\n' % (indent, func.__name__))
+        _global_profile_level += 1
+        retval = func(*args, **kwargs)
+        _global_profile_level -= 1
+        sys.stdout.write('%sExecution Time: %s\n%sTotal Time: %s\n' % (indent, time.time() - t0, indent, time.time() - _global_profile_t0))
+        return retval
+    return wrapper
+
