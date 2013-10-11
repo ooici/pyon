@@ -52,7 +52,7 @@ For Mac, use homebrew
 * Setup a virtualenv to for Pyon (use any name you like):
     > mkvirtualenv --no-site-packages --python=python2.7 ion27
     > workon ion27
-    > pip install numpy==1.6.2
+    > pip install numpy==1.7.1
 
 
 
@@ -62,7 +62,7 @@ DEVELOPMENT TIME DEPENDENCIES
 PACKAGES:
 
 Use Buildout to install the python package dependencies with:
-    > python bootstrap.py -v 1.7
+    > python bootstrap.py -v 2.2.0
     > bin/buildout
 
 ** Add following to your .bashrc profile on Macs if buildout fails to
