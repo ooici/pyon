@@ -213,7 +213,7 @@ def main(opts, *args, **kwargs):
 
             # build connect str
             connect_str = "-q -H %s -P %s -u %s -p %s -V %s" % (pyon_config.get_safe('server.amqp_priv.host', pyon_config.get_safe('server.amqp.host', 'localhost')),
-                                                                   pyon_config.get_safe('container.exchange.management.port', '15672'),
+                                                                   pyon_config.get_safe('container.exchange.management.port', '55672'),
                                                                    pyon_config.get_safe('container.exchange.management.username', 'guest'),
                                                                    pyon_config.get_safe('container.exchange.management.password', 'guest'),
                                                                    '/')
