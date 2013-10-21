@@ -475,7 +475,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 # so we discard _attachments while transforming between the two
                 if k not in ("type_", "_attachments", "_conflicts"):
                     setattr(ion_obj, k, v)
-                if k == "_conflict":
+                if k == "_conflicts":
                     log.warn("CouchDB conflict detected for ID=%S (ignored): %s", obj.get('_id', None), v)
 
             return ion_obj
