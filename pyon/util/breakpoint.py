@@ -106,3 +106,24 @@ def time_profile(func):
         return retval
     return wrapper
 
+class TimeIt:
+    def __init__(self, message):
+        self.message = message
+
+    def __enter__(self):
+        global _global_profile_t0
+        global _global_profile_level
+        self.t0 = time.time()
+        indent = ''.join(['    ' for i in xrange(_global_profile_level)])
+        sys.stdout.write('%s%s\n' % (indent, self.message))
+
+        _global_profile_level += 1
+
+    def __exit__(self, type, value, traceback):
+        global _global_profile_t0
+        global _global_profile_level
+
+        _global_profile_level -= 1
+        indent = ''.join(['    ' for i in xrange(_global_profile_level)])
+        sys.stdout.write('%sExecution Time: %s\n%sTotal Time: %s\n' % (indent, time.time() - self.t0, indent, time.time() - _global_profile_t0))
+        
