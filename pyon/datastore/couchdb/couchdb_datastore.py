@@ -914,7 +914,10 @@ class CouchDB_DataStore(DataStore):
         elif predicate:
             view_type = "by_pred"
             view = ds.view(self._get_viewname("association", view_type), **view_args)
-            key = [predicate]
+            if predicate == "*":
+                key = []
+            else:
+                key = [predicate]
             endkey = self._get_endkey(key)
             rows = view[key:endkey]
         else:
