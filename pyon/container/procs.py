@@ -162,10 +162,10 @@ class ProcManager(object):
                             try:
                                 obj = self.container.object_store.read_doc(ref_id)
                                 ref_config = obj
-                                if ref_ext and hasattr(obj, ref_ext):
-                                    ref_config = getattr(obj, ref_ext)
-                                elif ref_ext:
-                                    raise BadRequest("config_ref %s - attribute not found" % config_ref)
+                                if ref_ext:
+                                    ref_config = get_safe(obj, ref_ext, None)
+                                    if ref_config is None:
+                                        raise BadRequest("config_ref %s - attribute not found" % config_ref)
 
                                 if isinstance(ref_config, dict):
                                     dict_merge(process_cfg, ref_config, inplace=True)
