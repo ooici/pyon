@@ -137,7 +137,7 @@ class ProcManager(object):
                 # Use a reference
                 config_ref = config.get_safe("process.config_ref")
                 log.info("Enhancing new process spawn config from ref=%s" % config_ref)
-                matches = re.match(r'^([A-Za-z]+):([A-Za-z0-9]+)/(.+)$', config_ref)
+                matches = re.match(r'^([A-Za-z]+):([A-Za-z0-9_\.]+)/(.*)$', config_ref)
                 if matches:
                     ref_type, ref_id, ref_ext = matches.groups()
                     if ref_type == "resources":
@@ -157,6 +157,25 @@ class ProcManager(object):
                                 raise
                         else:
                             log.error("Container missing RESOURCE_REGISTRY capability to resolve process config ref %s" % config_ref)
+                    elif ref_type == "objects":
+                        if self.container.has_capability(self.container.CCAP.OBJECT_STORE):
+                            try:
+                                obj = self.container.object_store.read_doc(ref_id)
+                                ref_config = obj
+                                if ref_ext:
+                                    ref_config = get_safe(obj, ref_ext, None)
+                                    if ref_config is None:
+                                        raise BadRequest("config_ref %s - attribute not found" % config_ref)
+
+                                if isinstance(ref_config, dict):
+                                    dict_merge(process_cfg, ref_config, inplace=True)
+                                else:
+                                    raise BadRequest("config_ref %s exists but not dict" % config_ref)
+                            except NotFound as nf:
+                                log.warn("config_ref %s - object not found" % config_ref)
+                                raise
+                        else:
+                            log.error("Container missing OBJECT_STORE capability to resolve process config ref %s" % config_ref)
                     else:
                         raise BadRequest("Unknown reference type in: %s" % config_ref)
 
