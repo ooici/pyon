@@ -574,3 +574,38 @@ class TestProcManagerInt(IonIntegrationTestCase):
         config = {'process':{'config_ref':config_ref}}
         with self.assertRaises(BadRequest) as ex:
             pid4 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+
+
+        # Test for objects method
+
+        obj_id = "test_" + res_id
+        self.container.object_store.create_doc(res_config, object_id=obj_id)
+        obj2 = self.container.object_store.read_doc(obj_id)
+        self.assertEquals(obj2, res_config)
+
+        config_ref = "objects:%s/" % obj_id
+        config = {'process':{'config_ref':config_ref}}
+
+        pid1 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid1)
+
+        proc = pm.procs_by_name['sample1']
+        self.assertTrue(proc)
+        self.assertIn('special', proc.CFG)
+        self.assertTrue(proc.CFG.get_safe("special.more"), 'exists')
+
+        pm.terminate_process(pid1)
+
+
+        config_ref = "objects:%s/special" % obj_id
+        config = {'process':{'config_ref':config_ref}}
+
+        pid1 = pm.spawn_process('sample1', 'pyon.container.test.test_procs', 'SampleProcess', config)
+        self.assertTrue(pid1)
+
+        proc = pm.procs_by_name['sample1']
+        self.assertTrue(proc)
+        self.assertIn('more', proc.CFG)
+        self.assertTrue(proc.CFG.more, 'exists')
+
+        pm.terminate_process(pid1)
