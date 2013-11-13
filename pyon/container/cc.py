@@ -422,9 +422,11 @@ class ObjectStoreCapability(ContainerCapability):
         ContainerCapability.__init__(self, container)
         self.container.object_store = None
     def start(self):
-        self.container.object_store = self.container.datastore_manager.get_datastore("objects", DataStore.DS_PROFILE.OBJECTS)
+        from pyon.ion.objstore import ObjectStore
+        self.container.object_store = ObjectStore()
     def stop(self):
         self.container.object_store.close()
+        self.container.object_store = None
 
 class LocalRouterCapability(ContainerCapability):
     def __init__(self, container):
