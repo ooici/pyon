@@ -409,20 +409,20 @@ def recursive_encode(obj, encoding="utf8"):
             if type(v) in BASIC_TYPE_SET:
                 continue
             if type(v) is unicode:
-                obj[k] = v.encode("utf8")
+                obj[k] = v.encode(encoding)
                 continue
             recursive_encode(v, encoding=encoding)
         if fix_list:
             for k in fix_list:
                 v = obj.pop(k)
-                newk = k.encode("utf8")
+                newk = k.encode(encoding)
                 obj[newk] = v
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
             if type(v) in BASIC_TYPE_SET:
                 continue
             if type(v) is unicode:
-                obj[i] = v.encode("utf8")
+                obj[i] = v.encode(encoding)
                 continue
             recursive_encode(v, encoding=encoding)
     else:
