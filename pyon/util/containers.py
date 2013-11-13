@@ -12,6 +12,7 @@ import base64
 import uuid
 import os
 import re
+from types import NoneType
 from copy import deepcopy
 
 DICT_LOCKING_ATTR = "__locked__"
@@ -391,3 +392,40 @@ def get_default_sysname():
 
 def get_default_container_id():
     return string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
+
+
+BASIC_TYPE_SET = set((str, bool, int, float, long, NoneType))
+
+def recursive_encode(obj, encoding="utf8"):
+    """Recursively walks a dict/list collection and in-place encodes any unicode keys and values in
+    dicts and lists to UTF-8 encoded str"""
+    if isinstance(obj, dict):
+        fix_list = None
+        for k, v in obj.iteritems():
+            if type(k) is unicode:
+                if fix_list is None:
+                    fix_list = []
+                fix_list.append(k)
+            if type(v) in BASIC_TYPE_SET:
+                continue
+            if type(v) is unicode:
+                obj[k] = v.encode("utf8")
+                continue
+            recursive_encode(v, encoding=encoding)
+        if fix_list:
+            for k in fix_list:
+                v = obj.pop(k)
+                newk = k.encode("utf8")
+                obj[newk] = v
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            if type(v) in BASIC_TYPE_SET:
+                continue
+            if type(v) is unicode:
+                obj[i] = v.encode("utf8")
+                continue
+            recursive_encode(v, encoding=encoding)
+    else:
+        raise RuntimeError("unknown type: %s" % type(obj))
+
+    return obj
