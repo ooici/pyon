@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam Smith, Tom Lennan'
-__license__ = 'Apache 2.0'
 
 import inspect
 from copy import deepcopy
 
 from pyon.core.exception import NotFound
+from pyon.core.object import walk
 
 import interface.objects
 import interface.messages
 
-from pyon.core.object import walk
 
 enum_classes = {}
 model_classes = {}
 message_classes = {}
+
 
 def getextends(type):
     """
@@ -51,7 +51,6 @@ def get_message_class_parm_type(service_name, service_operation, parameter, in_o
     """
     Utility function to return the type for the specified parameters
     """
-
     class_name = service_name + '_' + service_operation + '_' + in_out
     if class_name in message_classes:
         cls = message_classes[class_name]
@@ -86,7 +85,7 @@ def is_ion_object(_def):
             return True
         elif _def in message_classes:
             return True
-    except:
+    except Exception:
         pass
 
     return False
@@ -96,7 +95,7 @@ def is_ion_object_dict(obj):
     try:
         if "type_" in obj:
             return True
-    except:
+    except Exception:
         pass
 
     return False
@@ -108,6 +107,7 @@ def has_class_decorator(class_obj, decorator):
             return True
     return False
 
+
 def get_class_decorator_value(class_obj, decorator):
 
     if getattr(class_obj, '_class_info'):
@@ -116,10 +116,11 @@ def get_class_decorator_value(class_obj, decorator):
 
     return None
 
+
 class IonObjectRegistry(object):
     """
-    A simple key-value store that stores by name and by definition hash for versioning.
-    Also includes optional persistence to a document database.
+    In memory registry for all ION object types and factory for creating new object instances.
+    Supports data objects, enum objects and message objects.
     """
 
     validate_setattr = False
@@ -139,11 +140,11 @@ class IonObjectRegistry(object):
         self.validate_setattr = CFG.get_safe('validate.setattr', False)
 
     def new(self, _def, _dict=None, **kwargs):
-        """ See get_def() for definition lookup options. """
-        #log.debug("In IonObjectRegistry.new")
-        #log.debug("name: %s" % _def)
-        #log.debug("_dict: %s" % str(_dict))
-        #log.debug("kwargs: %s" % str(kwargs))
+        """Instantiates an IonObject based on given object type name and initial values.
+        @param _def    Name of object type
+        @param _dict   A dict/DotDict/derivative with initial values
+        @param kwargs  Additional initial values
+        """
         if _def in model_classes:
             clzz = model_classes[_def]
         elif _def in message_classes:
@@ -153,8 +154,8 @@ class IonObjectRegistry(object):
         else:
             raise NotFound("No matching class found for name %s" % _def)
 
-        # Conditionally override the __setattr__ method to
-        # include additional client side validation
+        # Conditionally override the __setattr__ method to include additional client side validation
+        # NOTE: currently mandatory because it performs unicode to UTF-8 str conversion as side effect
         if self.validate_setattr:
             def validating_setattr(self, name, value):
                 from pyon.core.object import built_in_attrs
