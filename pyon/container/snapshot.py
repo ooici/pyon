@@ -12,7 +12,7 @@ from ooi.timer import get_accumulators
 from pyon.public import log, IonObject, BadRequest, CFG
 from pyon.util.containers import get_ion_ts
 
-DEFAULT_SNAPSHOTS = ["basic", "config", "processes", "policy", "accumulators", "gevent"]
+DEFAULT_SNAPSHOTS = ["basic", "config", "processes", "policy", "accumulators", "gevent", "gevent_block"]
 
 
 class ContainerSnapshot(object):
@@ -43,7 +43,6 @@ class ContainerSnapshot(object):
                     snap_result = func(**snapshot_kwargs)
                 except Exception as ex:
                     log.warn("Could not take snapshot %s: %s" % (snap, str(ex)))
-                    snap_result = ["ERROR", str(ex)]
                 self.snapshot[snap] = snap_result
             else:
                 log.warn("Snapshot function %s undefined" % snap_func)
@@ -78,7 +77,6 @@ class ContainerSnapshot(object):
         snap_result["os.getpid"] = os.getpid()
         snap_result["os.getppid"] = os.getppid()
         snap_result["socket.gethostname"] = socket.gethostname()
-        snap_result["socket.gethostbyname"] = socket.gethostbyname(socket.gethostname())
         snap_result["sys.argv"] = sys.argv
         snap_result["sys.version"] = sys.version
         snap_result["sys.subversion"] = sys.subversion
@@ -87,24 +85,25 @@ class ContainerSnapshot(object):
             import psutil
             proc = psutil.Process(os.getpid())
 
-            snap_result["stat.vm.cpu_times"] = psutil.cpu_times().__dict__
+            snap_result["stat.vm.cpu_times"] = psutil.cpu_times()._asdict()
             snap_result["stat.vm.cpu_percent"] = str(psutil.cpu_percent())
-            snap_result["stat.vm.virtual_memory"] = psutil.virtual_memory().__dict__
-            snap_result["stat.vm.swap_memory"] = psutil.swap_memory().__dict__
-            snap_result["stat.vm.disk_usage"] = psutil.disk_usage("/").__dict__
-            snap_result["stat.vm.disk_io_counters"] = psutil.disk_io_counters().__dict__
-            snap_result["stat.vm.disk_partitions"] = [o.__dict__ for o in psutil.disk_partitions()]
-            snap_result["stat.vm.net_io_counters"] = {k:v.__dict__ for k,v in psutil.net_io_counters(pernic=True).iteritems()}
+            snap_result["stat.vm.virtual_memory"] = psutil.virtual_memory()._asdict()
+            snap_result["stat.vm.swap_memory"] = psutil.swap_memory()._asdict()
+            snap_result["stat.vm.disk_usage"] = psutil.disk_usage("/")._asdict()
+            snap_result["stat.vm.disk_io_counters"] = psutil.disk_io_counters()._asdict()
+            snap_result["stat.vm.disk_partitions"] = [o._asdict() for o in psutil.disk_partitions()]
+            snap_result["stat.vm.net_io_counters"] = {k:v._asdict() for k,v in psutil.net_io_counters(pernic=True).iteritems()}
 
-            snap_result["stat.proc.cpu_times"] = proc.get_cpu_times().__dict__
+            snap_result["stat.proc.cpu_times"] = proc.get_cpu_times()._asdict()
             snap_result["stat.proc.cpu_percent"] = str(proc.get_cpu_percent())
-            snap_result["stat.proc.mem_info"] = proc.get_ext_memory_info().__dict__
+            snap_result["stat.proc.mem_info"] = proc.get_ext_memory_info()._asdict()
             snap_result["stat.proc.create_time"] = str(proc.create_time)
             snap_result["stat.proc.mem_percent"] = str(proc.get_memory_percent())
-            snap_result["stat.proc.open_files"] = [o.__dict__ for o in proc.get_open_files()]
+            snap_result["stat.proc.open_files"] = [o._asdict() for o in proc.get_open_files()]
             #snap_result["stat.proc.connections"] = [o.__dict__ for o in proc.get_connections()]
-            snap_result["stat.proc.ctx_switches"] = proc.get_num_ctx_switches().__dict__
-
+            snap_result["stat.proc.ctx_switches"] = proc.get_num_ctx_switches()._asdict()
+            #This might blow up if the machine doesn't have a real host name
+            snap_result["socket.gethostbyname"] = socket.gethostbyname(socket.gethostname())
         except Exception as ex:
              log.warn("Could not take psutil stats: %s" % (str(ex)))
 
@@ -135,6 +134,21 @@ class ContainerSnapshot(object):
         greenlets = [obj for obj in gc.get_objects() if isinstance(obj, greenlet) and obj and not obj.dead]
         for ob in greenlets:
             greenlet_list.append((getattr(ob, "_glname", ""), ''.join(traceback.format_stack(ob.gr_frame))))
+        return snap_result
+
+    def _snap_gevent_block(self, **kwargs):
+        from pyon.util.gevent_block_plugin import get_gevent_block
+        snap_result = {}
+
+        gevent_block_dict = {}
+        snap_result["gevent_block"] = gevent_block_dict
+
+        gevent_block = get_gevent_block()
+        if gevent_block:
+            #json encoding cannot take a non-string key. Let's clean it so it doesn't break persistence to db
+            snap_shots = gevent_block.get_snapshots()
+            for (_, gl_name), value in snap_shots.items():
+                gevent_block_dict.update({gl_name:value})
         return snap_result
 
     def _snap_processes(self, **kwargs):
