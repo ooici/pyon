@@ -35,8 +35,9 @@ from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 
 from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, \
-    ResetPolicyCache, TriggerGarbageCollection, TriggerContainerSnapshot, PrepareSystemShutdown
+    ResetPolicyCache, TriggerGarbageCollection, TriggerContainerSnapshot, PrepareSystemShutdown, StartGeventBlock, StopGeventBlock
 
+from pyon.util.gevent_block_plugin import get_gevent_alarm_block, get_gevent_monitor_block, get_gevent_block
 
 # define selectors to determine if this message should be handled by this container.
 # used by the message, manager should not interact with this directly
@@ -153,6 +154,23 @@ class ContainerSnapshotHandler(EventHandler):
         except Exception as ex:
             log.warn("Error taking container snapshot", exc_info=True)
 
+class StartGeventBlockHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, StartGeventBlock)
+    def handle_request(self, action):
+        if action.alarm_mode:
+            gevent_block = get_gevent_alarm_block()
+        else:
+            gevent_block = get_gevent_monitor_block()
+        gevent_block.start()
+
+class StopGeventBlockHandler(EventHandler):
+    def can_handle_request(self, action):
+        return isinstance(action, StopGeventBlock)
+    def handle_request(self, action):
+        gevent_block = get_gevent_block()
+        if gevent_block:
+            gevent_block.stop()
 
 class PrepareSystemShutdownHandler(EventHandler):
     def can_handle_request(self, action):
@@ -176,7 +194,7 @@ class PrepareSystemShutdownHandler(EventHandler):
 SEND_RESULT_IF_NOT_SELECTED = False  # terrible idea... but might want for debug or audit?
 
 DEFAULT_HANDLERS = [ LogLevelHandler(), StatisticsHandler(), PolicyCacheHandler(), GarbageCollectionHandler(),
-                     ContainerSnapshotHandler(), PrepareSystemShutdownHandler() ]
+                     ContainerSnapshotHandler(), PrepareSystemShutdownHandler(), StartGeventBlockHandler(), StopGeventBlockHandler() ]
 
 
 class ContainerManager(object):
