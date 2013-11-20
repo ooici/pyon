@@ -653,7 +653,7 @@ class ExtendedResourceContainer(object):
                     if ol_nested:
                         #Only get the object types which don't match the current resource type and may match a final type
                         if final_target_types.has_key(field):
-                            result_obj_list.extend([target_obj for target_obj in ol_nested if (target_obj.type_ != resource.type_ and target_obj.type_ == final_target_types[field]) ])
+                            result_obj_list.extend([target_obj for target_obj in ol_nested if (target_obj.type_ != resource.type_ and final_target_types[field] in target_obj._get_extends())])
                         else:
                             result_obj_list.extend([target_obj for target_obj in ol_nested if (target_obj.type_ != resource.type_) ])
 
