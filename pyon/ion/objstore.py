@@ -85,10 +85,10 @@ class ObjectStore(object):
         recursive_encode(obj)
         return obj
 
-    def read_mult(self, object_ids):
-        return self.obj_store.read_mult(object_ids)
+    def read_mult(self, object_ids, strict=True):
+        return self.obj_store.read_mult(object_ids, strict=strict)
 
-    def read_doc_mult(self, object_ids):
-        objs = self.obj_store.read_doc_mult(object_ids)
-        objs = [recursive_encode(obj) for obj in objs]
+    def read_doc_mult(self, object_ids, strict=True):
+        objs = self.obj_store.read_doc_mult(object_ids, strict=strict)
+        objs = [recursive_encode(obj) if obj is not None else None for obj in objs]
         return objs
