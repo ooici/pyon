@@ -140,6 +140,17 @@ class TestObjectStore(IonIntegrationTestCase):
         docs = self.os.read_mult(all_doc_ids)
         self.assertEquals(len(docs), len(all_doc_ids))
 
+        with self.assertRaises(NotFound):
+            self.os.read_mult([did1, "NONEXISTING", did2])
+
+        docs1 = self.os.read_mult([did1, "NONEXISTING", did2], strict=False)
+        self.assertEquals(len(docs1), 3)
+        self.assertEquals(docs1[1], None)
+
+        docs2 = self.os.read_doc_mult([did1, "NONEXISTING", did2], strict=False)
+        self.assertEquals(len(docs2), 3)
+        self.assertEquals(docs2[1], None)
+
         doc1r = self.os.read(did1)
         self.assertIsInstance(doc1r, Resource)
         self.assertEquals(doc1r.addl["x"][1], 2)

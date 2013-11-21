@@ -139,6 +139,15 @@ class Test_DataStores(IonIntegrationTestCase):
         self.assertTrue(role_objs[1]._id == data_provider_role_ooi_id)
         self.assertTrue(role_objs[2]._id == marine_operator_role_ooi_id)
 
+        with self.assertRaises(NotFound):
+            data_store.read_mult([admin_role_ooi_id, data_provider_role_ooi_id, "NONEXISTENT"])
+
+        role_objs1 = data_store.read_mult([admin_role_ooi_id, "NONEXISTENT", data_provider_role_ooi_id], strict=False)
+        self.assertTrue(len(role_objs1) == 3)
+        self.assertTrue(role_objs1[0]._id == admin_role_ooi_id)
+        self.assertTrue(role_objs1[1] is None)
+        self.assertTrue(role_objs1[2]._id == data_provider_role_ooi_id)
+
         # Construct three user info objects and assign them roles
         hvl_contact_info = {
             "individual_names_given": "Heitor Villa-Lobos",
