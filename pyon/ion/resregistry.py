@@ -119,10 +119,16 @@ class ResourceRegistry(object):
 
         return self.rr_store.read(object_id, rev_id)
 
-    def read_mult(self, object_ids=None):
+    def read_mult(self, object_ids=None, strict=True):
+        """
+        @param object_ids  a list of resource ids (can be empty)
+        @param strict  a bool - if True (default), raise a NotFound in case one of the resources was not found
+        Returns resource objects for given list of resource ids in the same order. If a resource object was not
+        found, contains None (unless strict==True) in which case NotFound will be raised.
+        """
         if object_ids is None:
             raise BadRequest("The object_ids parameter is empty")
-        return self.rr_store.read_mult(object_ids)
+        return self.rr_store.read_mult(object_ids, strict=strict)
 
     def update(self, object):
         if object is None:

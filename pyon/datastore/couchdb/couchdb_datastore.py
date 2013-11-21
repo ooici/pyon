@@ -335,28 +335,29 @@ class CouchDB_DataStore(DataStore):
             stats.add(t)
         return doc
 
-    def read_mult(self, object_ids, datastore_name="", _time=True):
+    def read_mult(self, object_ids, datastore_name="", strict=True, _time=True):
         if any([not isinstance(object_id, str) for object_id in object_ids]):
             raise BadRequest("Object ids are not string: %s" % str(object_ids))
-        docs = self.read_doc_mult(object_ids, datastore_name, _time=_time)
+        docs = self.read_doc_mult(object_ids, datastore_name, strict=strict,_time=_time)
         # Convert docs into Ion objects
-        obj_list = [self._persistence_dict_to_ion_object(doc) for doc in docs]
+        obj_list = [self._persistence_dict_to_ion_object(doc) if doc is not None else None for doc in docs]
         return obj_list
 
-    def read_doc_mult(self, object_ids, datastore_name="", _time=True):
+    def read_doc_mult(self, object_ids, datastore_name="", strict=True, _time=True):
         if not object_ids: return []
         ds, datastore_name = self._get_datastore(datastore_name)
         t = self._get_timer(condition=_time)
         docs = ds.view("_all_docs", keys=object_ids, include_docs=True)
         if t:
             self._complete_timing_step(t,datastore_name,'read_doc_mult.view')
-        # Check for docs not found
-        notfound_list = ['Object with id %s does not exist.' % str(row.key)
-                         for row in docs if row.doc is None]
-        if notfound_list:
-            raise NotFound("\n".join(notfound_list))
+        if strict:
+            # Check for docs not found
+            notfound_list = ['Object with id %s does not exist.' % str(row.key)
+                             for row in docs if row.doc is None]
+            if notfound_list:
+                raise NotFound("\n".join(notfound_list))
 
-        doc_list = [row.doc.copy() for row in docs]
+        doc_list = [row.doc.copy() if row.doc is not None else None for row in docs]
         if t:
             self._complete_timing_step(t,datastore_name,'read_doc_mult.copy')
             stats.add(t)
