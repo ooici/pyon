@@ -74,6 +74,7 @@ class PYCC(Plugin):
 
             # Force datastore loader to use the same sysname
             from pyon.datastore.datastore_admin import DatastoreAdmin
+            from pyon.datastore.datastore_common import DatastoreFactory
             self.datastore_admin = DatastoreAdmin(config=CFG)
 
             self.datastore_admin.clear_datastore(prefix=self.sysname)

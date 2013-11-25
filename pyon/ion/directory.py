@@ -30,7 +30,7 @@ class Directory(object):
         self.container = container or bootstrap.container_instance
         # Get an instance of datastore configured as directory.
         datastore_manager = datastore_manager or self.container.datastore_manager
-        self.dir_store = datastore_manager.get_datastore(DataStore.DS_DIRECTORY)
+        self.dir_store = datastore_manager.get_datastore(DataStore.DS_DIRECTORY, DataStore.DS_PROFILE.DIRECTORY)
 
         self.orgname = orgname or CFG.system.root_org
         self.is_root = (self.orgname == CFG.system.root_org)
@@ -297,7 +297,7 @@ class Directory(object):
             res = self.dir_store.find_by_view('directory', 'by_path',
                 start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        match = [value for docid, indexkey, value in res]
         return match
 
     def find_by_key(self, key=None, parent='/', **kwargs):
@@ -315,7 +315,7 @@ class Directory(object):
         res = self.dir_store.find_by_view('directory', 'by_key',
             start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        match = [value for docid, indexkey, value in res]
         return match
 
     def find_by_value(self, subtree='/', attribute=None, value=None, **kwargs):
@@ -331,7 +331,7 @@ class Directory(object):
         res = self.dir_store.find_by_view('directory', 'by_attribute',
                         start_key=start_key, end_key=end_key, id_only=True, convert_doc=True, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        match = [value for docid, indexkey, value in res]
         return match
 
     def remove_child_entries(self, parent, delete_parent=False):

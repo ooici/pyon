@@ -305,18 +305,6 @@ def is_string(obj):
         return isinstance(obj, str)
 
 
-if __name__ == '__main__':
-    dd = DotDict({'a':{'b':{'c':1, 'd':2}}})
-    print dd.a.b.c, dd.a.b.d
-    print dd.a.b
-    #print dd.foo
-
-    print dict.fromkeys(('a','b','c'), 'foo')
-    print DotDict.fromkeys(('a','b','c'), 'foo').a
-
-    dl = DotList([1, {'a':{'b':{'c':1, 'd':2}}}])
-    print dl[1].a.b.c
-
 def itersubclasses(cls, _seen=None):
     """
     itersubclasses(cls)

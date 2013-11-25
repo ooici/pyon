@@ -3,7 +3,7 @@
 __author__ = 'Seman Said, Michael Meisinger'
 
 from pyon.core.exception import NotFound, BadRequest, Inconsistent
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.datastore.datastore_common import DatastoreFactory, DataStore
 from pyon.ion.identifier import create_unique_directory_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
@@ -12,16 +12,13 @@ class DirectoryStandalone(object):
     """
     Directory service standalone class
     """
-
     def __init__(self, sysname=None, orgname=None, config=None):
         self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
         self.datastore_name = "resources"
-        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
-        try:
-            self.datastore.read_doc("_design/directory")
-        except NotFound:
-            self.datastore.define_profile_views("RESOURCES")
+        self.datastore = DatastoreFactory.get_datastore(datastore_name=self.datastore_name, config=config,
+                                                        scope=sysname, profile=DataStore.DS_PROFILE.DIRECTORY,
+                                                        variant=DatastoreFactory.DS_BASE)
 
     def close(self):
         self.datastore.close()
@@ -58,11 +55,10 @@ class DirectoryStandalone(object):
         find_key = [orgname, key, parent]
         view_res = self.datastore.find_docs_by_view('directory', 'by_key', key=find_key, id_only=True)
 
-        match = [doc for docid, index, doc in view_res]
-        if len(match) > 1:
+        if len(view_res) > 1:
             raise Inconsistent("More than one directory entry found for key %s" % path)
-        elif match:
-            return match[0]
+        elif view_res:
+            return view_res[0][2]  # First value
         return None
 
     def lookup(self, parent, key=None, return_entry=False):
@@ -195,5 +191,5 @@ class DirectoryStandalone(object):
             res = self.datastore.find_docs_by_view('directory', 'by_path',
                 start_key=start_key, end_key=end_key, id_only=True, **kwargs)
 
-        match = [doc for docid, indexkey, doc in res]
+        match = [value for docid, indexkey, value in res]
         return match
