@@ -29,10 +29,12 @@ from threading import Lock
 from ooi.logging import log, config
 from ooi.timer import get_accumulators
 
-from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.core.bootstrap import CFG
 from pyon.container.snapshot import ContainerSnapshot
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
+from pyon.ion.event import EventPublisher, EventSubscriber
+from pyon.util.tracer import CallTracer
 
 from interface.objects import ContainerManagementRequest, ChangeLogLevel, ReportStatistics, ClearStatistics, \
     ResetPolicyCache, TriggerGarbageCollection, TriggerContainerSnapshot, PrepareSystemShutdown, StartGeventBlock, StopGeventBlock
@@ -208,6 +210,12 @@ class ContainerManager(object):
         self.handlers = handlers[:]
 
     def start(self):
+        # Install the container tracer (could be its own
+        self.container_tracer = ContainerTracer()
+        self.container_tracer.start_tracing()
+        self.container.tracer = CallTracer
+        self.container.tracer.configure(CFG.get_safe("container.tracer", {}))
+
         ## create queue listener and publisher
         self.sender = EventPublisher(event_type="ContainerManagementResult")
         self.receiver = EventSubscriber(event_type="ContainerManagementRequest", callback=self._receive_event)
@@ -223,6 +231,8 @@ class ContainerManager(object):
             self.sender.close()
             self.running = False
         log.debug('container management stopped')
+
+        self.container_tracer.stop_tracing()
 
     def add_handler(self, handler):
         self.handlers.append(handler)
@@ -268,3 +278,101 @@ class ContainerManager(object):
                     result = e
                 self.sender.publish_event(origin=self.container.id, action=action, outcome=str(result))
                 log.debug('performed action: %s, outcome: %s', action, result)
+
+
+class ContainerTracer(object):
+    """Sets up the CallTracer utility for entities within the container"""
+
+    SAVE_MSG_MAX = 1000
+
+    def start_tracing(self):
+        # Messaging tracing
+        CallTracer.set_formatter("MSG.out", self._msg_trace_formatter)
+        CallTracer.set_formatter("MSG.in", self._msg_trace_formatter)
+
+        from pyon.net import endpoint
+        endpoint.callback_msg_out = self.trace_message_out
+        endpoint.callback_msg_in = self.trace_message_in
+
+    def stop_tracing(self):
+        from pyon.net import endpoint
+        endpoint.callback_msg_out = None
+
+    @staticmethod
+    def trace_message_in(msg, headers, env):
+        log_entry = dict(status="RECV %s bytes" % len(msg), headers=headers, env=env,
+                         content_length=len(msg), content=str(msg)[:ContainerTracer.SAVE_MSG_MAX])
+        CallTracer.log_scope_call("MSG.in", log_entry, include_stack=False)
+
+    @staticmethod
+    def trace_message_out(msg, headers, env):
+        log_entry = dict(status="SENT %s bytes" % len(msg), headers=headers, env=env,
+                         content_length=len(msg), content=str(msg)[:ContainerTracer.SAVE_MSG_MAX])
+        CallTracer.log_scope_call("MSG.out", log_entry, include_stack=False)
+
+    @staticmethod
+    def _msg_trace_formatter(log_entry, **kwargs):
+        # Warning: Make sure this code is reentrant. Will be called multiple times for the same entry
+        frags = []
+        msg_type = "UNKNOWN"
+        sub_type = ""
+        try:
+            content = log_entry.get("content", "")
+            headers = dict(log_entry.get("headers", {}))
+            env = log_entry.get("env", {})
+
+            if "sender" in headers or "sender-service" in headers:
+                # Case RPC msg
+                sender_service = headers.get('sender-service', '')
+                sender = headers.pop('sender', '').split(",", 1)[-1]
+                sender_name = headers.pop('sender-name', '')
+                sender_txt = (sender_name or sender_service) + " (%s)" % sender if sender else ""
+                recv = headers.pop('receiver', '?').split(",", 1)[-1]
+                op = "op=%s" % headers.pop('op', '?')
+                sub_type = op
+                stat = "status=%s" % headers.pop('status_code', '?')
+                conv_seq = headers.get('conv-seq', '0')
+
+                if conv_seq == 1:
+                    msg_type = "RPC REQUEST"
+                    frags.append("%s %s -> %s %s" % (msg_type, sender_txt, recv, op))
+                else:
+                    msg_type = "RPC REPLY"
+                    frags.append("%s %s -> %s %s" % (msg_type, sender_txt, recv, stat))
+                try:
+                    import msgpack
+                    msg = msgpack.unpackb(content)
+                    frags.append("\n C:")
+                    frags.append(str(msg))
+                except Exception as ex:
+                    pass
+            else:
+                # Case event/other msg
+                try:
+                    import msgpack
+                    msg = msgpack.unpackb(content)
+                    ev_type = msg["type_"] if isinstance(msg, dict) and "type_" in msg else "?"
+                    msg_type = "EVENT"
+                    sub_type = ev_type
+                    frags.append("%s %s" % (msg_type, ev_type))
+                    frags.append("\n C:")
+                    frags.append(str(msg))
+
+                except Exception:
+                    msg_type = "UNKNOWN"
+                    frags.append(msg_type)
+                    frags.append("\n C:")
+                    frags.append(content)
+
+            frags.append("\n H:")
+            frags.append(str(headers))
+            frags.append("\n E:")
+            frags.append(str(env))
+        except Exception as ex:
+            frags = ["ERROR parsing message: %s" % str(ex)]
+        log_entry["statement"] = "".join(frags)
+        log_entry["msg_type"] = msg_type
+        log_entry["sub_type"] = sub_type
+
+        return CallTracer._default_formatter(log_entry, **kwargs)
+
