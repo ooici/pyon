@@ -366,7 +366,6 @@ class EventRepository(object):
 
         events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
                                                id_only=False, **kwargs)
-
         return events
 
 

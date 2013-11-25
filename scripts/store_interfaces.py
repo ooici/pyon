@@ -10,7 +10,7 @@ import ast
 import pyon
 from pyon.core import bootstrap, config
 from pyon.core.interfaces.interfaces import InterfaceAdmin
-from script_util import parse_args
+from putil.script_util import parse_args
 
 def main():
     '''
@@ -90,8 +90,9 @@ def main():
         from pyon.util.file_sys import FileSystem
         print "store_interfaces: force_clean=True. DROP DATASTORES for sysname=%s" % bootstrap.get_sys_name()
         pyon_config = config.read_standard_configuration()      # Initial pyon.yml + pyon.local.yml
-        clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name())
+        clear_couch_util.clear_couch(bootstrap_config, prefix=bootstrap.get_sys_name(), sysname=bootstrap.get_sys_name())
         FileSystem._clean(pyon_config)
+
 
     # ion_config - Holds the new CFG object for the system (independent of this tool's config)
     ion_config = config.read_standard_configuration()
