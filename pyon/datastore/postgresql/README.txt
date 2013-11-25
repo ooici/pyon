@@ -1,4 +1,5 @@
 This directory contains a PostgreSQL datastore implementation for the Pyon container.
+See https://confluence.oceanobservatories.org/display/CIDev/Postgres+Datastore
 
 REQUIREMENTS/COMPATIBILITY:
 - PostgreSQL 9.2.0 or higher
@@ -13,19 +14,21 @@ BASIC FUNCTIONALITY:
 - Uses connection pool and psycopg2 to connect to PG
 
 ISSUES/MISSING FEATURES:
-- Replace string concatenation when constructing long statements
-- clear_couch_util ugly and misnamed
+- Check connection DSN credentials to validate correct config for both users
+- ts_created/ts_updated bigint
+- Connection reset when database restarted
 - support descending order for all finds
-- create_mult is (ab)used for both create and update in one call by preload! Fix test doing both
 - drop database timeout (concurrent users exist) does not raise exception in clear_couch
 - Make geospatial handling more modular, less hardcoded
 - find_associations return retired associations
 - trigger vacuum analyze
 - postgres connection error better distinction and message
-- Connection reset when database restarted
-- ts_created/ts_updated bigint
 
 FUTURE FEATURES:
+- deleted column for resources and associations (instead of using the lcstate==RETIRED)
+- More advanced order by queries
+- Replace string concatenation when constructing long statements
+- clear_couch_util ugly and misnamed. Should also use the code in the datastore class
 - Referential integrity support
 - Investigate distributed transactions (XA)
 - history support by copying into separate history table
@@ -33,7 +36,6 @@ FUTURE FEATURES:
 - Consider SQLAlchemy
 - update_mult
 - Read only datastore with different connection
-- find_resources_mult
 
 OPEN QUESTIONS:
 - FILESYSTEM datastore used by preservation MS or not?
