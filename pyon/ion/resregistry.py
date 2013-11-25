@@ -564,7 +564,7 @@ class ResourceRegistry(object):
         """
         if type(association) in (list, tuple) and len(association) == 3:
             subject, predicate, obj = association
-            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, obj=obj, id_only=True)
+            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, object=obj, id_only=True)
             success = True
             for aid in assoc_id_list:
                 success = success and self.rr_store.delete(aid, object_type="Association")

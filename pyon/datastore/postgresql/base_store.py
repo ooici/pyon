@@ -20,6 +20,7 @@ from ooi.logging import log
 
 from pyon.core.exception import BadRequest, Conflict, NotFound, Inconsistent
 from pyon.datastore.datastore_common import DataStore
+from pyon.datastore.datastore_query import DQ
 from pyon.datastore.postgresql.pg_util import PostgresConnectionPool, StatementBuilder, psycopg2_connect, TracingCursor
 from pyon.util.tracer import CallTracer
 
@@ -27,6 +28,7 @@ TABLE_PREFIX = "ion_"
 DEFAULT_USER = "ion"
 DEFAULT_DBNAME = "ion"
 DEFAULT_PROFILE = "BASIC"
+GEOSPATIAL_COLS = {"geom", "geom_loc", "geom_vert", "geom_temp"}
 
 # Mapping of object type to table name extension and special attribute names
 OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_created", "ts_updated", "geom", "geom_loc", "geom_vert", "geom_temp")),
@@ -36,8 +38,9 @@ OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_create
                }
 OBJ_TYPE_PRECED = {"R": 1, "A": 2, "D": 3}
 
-
+# Shared connection pool for container
 pg_connection_pool = None
+
 
 class PostgresDataStore(DataStore):
     """
@@ -322,7 +325,8 @@ class PostgresDataStore(DataStore):
 
     def compact_datastore(self, datastore_name=None):
         qual_ds_name = self._get_datastore_name(datastore_name)
-        raise NotImplementedError()
+        with self.pool.cursor(**self.cursor_args) as cur:
+            cur.execute("VACUUM ANALYZE")
 
     def datastore_exists(self, datastore_name=None):
         qual_ds_name = self._get_datastore_name(datastore_name)
@@ -361,56 +365,74 @@ class PostgresDataStore(DataStore):
         return []
 
     def _get_geom_value(self, col, doc):
+        """For a given geospatial column name, return the appropriate representation given a document"""
+        # TODO: This is information model dependent. Could extract somewhere
         res = None
-        if col == "geom":
-            if "geospatial_point_center" in doc:
-                lat, lon = doc["geospatial_point_center"].get("lat", 0), doc["geospatial_point_center"].get("lon", 0)
-                if lat != lon != 0:
-                    res = "POINT(%s %s)" % (lon, lat)   # x,y
-        elif col == "geom_loc":
-            geoc = None
-            if "geospatial_bounds" in doc:
-                geoc = doc["geospatial_bounds"]
-            elif "constraint_list" in doc:
-                for cons in doc["constraint_list"]:
-                    if isinstance(cons, dict) and cons.get("type_", None) == "GeospatialBounds":
-                        geoc = cons
-                        break
-            if geoc:
-                res = ("POLYGON((%(geospatial_longitude_limit_west)s %(geospatial_latitude_limit_south)s," +
-                       "%(geospatial_longitude_limit_east)s %(geospatial_latitude_limit_south)s," +
-                       "%(geospatial_longitude_limit_east)s %(geospatial_latitude_limit_north)s," +
-                       "%(geospatial_longitude_limit_west)s %(geospatial_latitude_limit_north)s, " +
-                       "%(geospatial_longitude_limit_west)s %(geospatial_latitude_limit_south)s))") % geoc
+        try:
+            if col == "geom":
+                if "geospatial_point_center" in doc:
+                    lat, lon = doc["geospatial_point_center"].get("lat", 0), doc["geospatial_point_center"].get("lon", 0)
+                    if lat != lon != 0:
+                        res = "POINT(%s %s)" % (lon, lat)   # x,y
+            elif col == "geom_loc":
+                geoc = None
+                if "geospatial_bounds" in doc:
+                    geoc = doc["geospatial_bounds"]
+                elif "constraint_list" in doc:
+                    # Find the first one - alternatively could expand a bbox
+                    for cons in doc["constraint_list"]:
+                        if isinstance(cons, dict) and cons.get("type_", None) == "GeospatialBounds":
+                            geoc = cons
+                            break
+                if geoc:
+                    try:
+                        geovals = dict(x1=float(geoc["geospatial_longitude_limit_west"]),
+                                       y1=float(geoc["geospatial_latitude_limit_south"]),
+                                       x2=float(geoc["geospatial_longitude_limit_east"]),
+                                       y2=float(geoc["geospatial_latitude_limit_north"]))
+                        res = ("POLYGON((%(x1)s %(y1)s, %(x2)s %(y1)s, %(x2)s %(y2)s, %(x1)s %(y2)s, %(x1)s %(y1)s))") % geovals
+                    except ValueError as ve:
+                        log.warn("GeospatialBounds location values not parseable %s: %s", geoc, ve)
 
-        elif col == "geom_vert":
-            geoc = None
-            if "geospatial_bounds" in doc:
-                geoc = doc["geospatial_bounds"]
-            elif "constraint_list" in doc:
-                for cons in doc["constraint_list"]:
-                    if isinstance(cons, dict) and cons.get("type_", None) == "GeospatialBounds":
-                        geoc = cons
-                        break
-            if geoc:
-                res = "LINESTRING(%(geospatial_vertical_min)s 0, %(geospatial_vertical_max)s 0)" % geoc
-        elif col == "geom_temp":
-            tempc = None
-            if "nominal_datetime" in doc:
-                tempc = doc["nominal_datetime"]
-            elif "constraint_list" in doc:
-                for cons in doc["constraint_list"]:
-                    if isinstance(cons, dict) and cons.get("type_", None) == "TemporalBounds":
-                        tempc = cons
-                        break
-            if tempc and tempc["start_datetime"] and tempc["end_datetime"]:
-                res = "LINESTRING(%(start_datetime)s 0, %(end_datetime)s 0)" % tempc
-        if res:
-            print "@@@col", res
+            elif col == "geom_vert":
+                geoc = None
+                if "geospatial_bounds" in doc:
+                    geoc = doc["geospatial_bounds"]
+                elif "constraint_list" in doc:
+                    # Find the first one - alternatively could expand a bbox
+                    for cons in doc["constraint_list"]:
+                        if isinstance(cons, dict) and cons.get("type_", None) == "GeospatialBounds":
+                            geoc = cons
+                            break
+                if geoc:
+                    try:
+                        geovals = dict(z1=float(geoc["geospatial_vertical_min"]),
+                                       z2=float(geoc["geospatial_vertical_max"]))
+                        res = "LINESTRING(%(z1)s 0, %(z2)s 0)" % geovals
+                    except ValueError as ve:
+                        log.warn("GeospatialBounds vertical values not parseable %s: %s", geoc, ve)
+            elif col == "geom_temp":
+                tempc = None
+                if "nominal_datetime" in doc:
+                    tempc = doc["nominal_datetime"]
+                elif "constraint_list" in doc:
+                    # Find the first one - alternatively could expand a bbox
+                    for cons in doc["constraint_list"]:
+                        if isinstance(cons, dict) and cons.get("type_", None) == "TemporalBounds":
+                            tempc = cons
+                            break
+                if tempc and tempc["start_datetime"] and tempc["end_datetime"]:
+                    try:
+                        geovals = dict(t1=int(tempc["start_datetime"]),
+                                       t2=int(tempc["end_datetime"]))
+                        res = "LINESTRING(%(t1)s 0, %(t2)s 0)" % geovals
+                    except ValueError as ve:
+                        log.warn("TemporalBounds values not parseable %s: %s", tempc, ve)
+            if res:
+                log.debug("Geospatial column %s value: %s", col, res)
+        except Exception as ex:
+            log.warn("Could not compute value for geospatial column %s: %s", col, ex)
         return res
-
-    def _is_geom_col(self, col_name):
-        return col_name in {"geom", "geom_loc", "geom_vert", "geom_temp"}
 
     def create_doc(self, doc, object_id=None, attachments=None, datastore_name=None):
         qual_ds_name = self._get_datastore_name(datastore_name)
@@ -436,13 +458,13 @@ class PostgresDataStore(DataStore):
                 xcol, xval = "", ""
                 if extra_cols:
                     for col in extra_cols:
-                        if self._is_geom_col(col):
+                        if col in GEOSPATIAL_COLS:
                             value = self._get_geom_value(col, doc)
                         else:
                             value = doc.get(col, None)
                         if value or type(value) is bool:
                             xcol += ", %s" % col
-                            xval += ", %(" + col + ")s" if not self._is_geom_col(col) else ", ST_GeomFromText(%(" + col + ")s,4326)"
+                            xval += ", %(" + col + ")s" if not col in GEOSPATIAL_COLS else ", ST_GeomFromText(%(" + col + ")s,4326)"
                             statement_args[col] = value
 
                 statement = "INSERT INTO " + table + " (id, rev, doc" + xcol + ") VALUES (%(id)s, 1, %(doc)s" + xval + ")"
@@ -502,7 +524,7 @@ class PostgresDataStore(DataStore):
                     sb.statement_args["doc"+str(i)] = doc_json
                     xval = ""
                     for col in extra_cols:
-                        if self._is_geom_col(col):
+                        if col in GEOSPATIAL_COLS:
                             xval += ", ST_GeomFromText(%(" + col + str(i) + ")s,4326)"
                             sb.statement_args[col + str(i)] = self._get_geom_value(col, doc)
                         else:
@@ -593,7 +615,7 @@ class PostgresDataStore(DataStore):
             for col in extra_cols:
                 value = doc.get(col, None)
                 if value or type(value) is bool:
-                    if self._is_geom_col(col):
+                    if col in GEOSPATIAL_COLS:
                         xval += ", " + col + "=ST_GeomFromText(%(" + col + ")s,4326)"
                         statement_args[col] = self._get_geom_value(col, doc)
                     else:
