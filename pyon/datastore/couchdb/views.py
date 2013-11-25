@@ -4,13 +4,15 @@ __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
 
-# NOTE: CANNOT import DataStore here!!!
-
-COUCHDB_CONFIGS = {
+# A profile is a collection of views
+COUCHDB_PROFILES = {
     "OBJECTS":{
         'views': ['object','association','attachment']
     },
     "RESOURCES":{
+        'views': ['resource','directory','association','attachment']
+    },
+    "DIRECTORY":{
         'views': ['resource','directory','association','attachment']
     },
     "EVENTS":{
@@ -18,12 +20,6 @@ COUCHDB_CONFIGS = {
     },
     "STATE":{
         'views': []
-    },
-    "SCIDATA":{
-        'views': ['datasets','manifest']
-    },
-    "EXAMPLES":{
-        'views':['posts']
     },
     "BASIC":{
         'views': []
@@ -35,6 +31,7 @@ COUCHDB_CONFIGS = {
 
 # Defines all the available CouchDB views and their map/reduce functions.
 # Views are associated to datastore based on profile.
+# Several views are in one design document.
 COUCHDB_VIEWS = {
     # -------------------------------------------------------------------------
     # Views for ION Resource objects
@@ -130,6 +127,10 @@ function(doc) {
       emit([doc.type_, "ooi_product_name", doc.ooi_product_name], null);
     } else if (doc.type_ == "NotificationRequest" && doc.origin) {
       emit([doc.type_, "origin", doc.origin], null);
+    } else if (doc.type_ == "Org" && doc.org_governance_name != undefined) {
+      emit([doc.type_, "org_governance_name", doc.org_governance_name], null);
+    } else if (doc.type_ == "UserRole" && doc.governance_name != undefined) {
+      emit([doc.type_, "governance_name", doc.governance_name], null);
     }
   }
 }""",
@@ -330,95 +331,28 @@ function(doc) {
         },
     },
 
-
     # -------------------------------------------------------------------------
-    'posts' : {
-        "dataset_by_id": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
-        },
-        "posts_by_id": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.post_id,doc._id);}}"
-        },
-        "posts_by_title": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.title,doc._id);}}"
-        },
-        "posts_by_updated": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.updated,doc._id);}}"
-        },
-        "posts_by_author": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit(doc.author.name,doc._id);}}"
-        },
-        "comments_by_post_id": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.ref_id,doc._id);}}"
-        },
-        "comments_by_author": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.author.name,doc._id);}}"
-        },
-        "comments_by_updated": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogComment\") { emit(doc.updated,doc._id);}}"
-        },
-        "posts_join_comments": {
-            "map": "function(doc)\n{\tif(doc.type_==\"BlogPost\") { emit([doc.post_id,0],doc._id);}\n\telse if(doc.type_==\"BlogComment\") { emit([doc.ref_id,1],doc._id);}\n}"
-        },
-        "posts_by_author_date": {
-            "map": "function(doc) {\n  if(doc.type_==\"BlogPost\")\n    emit([doc.author.name,doc.updated,doc.post_id], doc.post_id);\n  else if(doc.type==\"BlogComment\")\n    emit([doc.author.name,doc.updated,doc.ref_id], doc.ref_id);\n}"
-        }
-    },
-
-    # -------------------------------------------------------------------------
-    'datasets': {
-        # Bounds
-        # Map: https://gist.github.com/1781675#file_maps.js
-        # Reduce: https://gist.github.com/1781675#file_reduce_bounds.js
-        "bounds": {
-            "map": "\n/*\n * Author: Luke Campbell <lcampbell@asascience.com>\n * Description: Utility and map functions to map the DataContainer's bounding elements.\n */\n\n/*\n * Traverses an \"identifiable\" in a document to see if it contains a CoordinateAxis\n */\nfunction traverse(identifiable) {\n    if(identifiable.type_==\"CoordinateAxis\")\n    {\n        return identifiable.bounds_id;\n    }\n    else return null;\n}\n/*\n * Gets the CoordinateAxis objects and their bounds_ids\n */\nfunction get_bounds(doc)\n{\n    identifiables = doc.identifiables;\n    var bounds = [];\n    for(var i in identifiables)\n    {\n        var bounds_id = traverse(identifiables[i]);\n        if(bounds_id)\n            bounds.push(bounds_id);\n    }\n    return bounds;\n}\n\n/* Data map */\nfunction (doc) {\n    if(doc.type_ == \"StreamGranuleContainer\"){\n        var bounds = get_bounds(doc);\n        for(var b in bounds)\n        {\n            var key = bounds[b];\n            var s = String(key)\n            var pack = {};\n            pack[key] = doc.identifiables[key].value_pair;\n\n            emit([doc.stream_resource_id,1], pack);\n        }\n    }\n}\n\n",
-            "reduce": "\n\nfunction value_in(value,ary) {\n    for(var i in ary)\n    {\n        if(value == ary[i])\n            return i;\n    }\n}\nfunction get_keys(obj){\n    var keys = [];\n    for(var key in obj)\n        keys.push(key);\n    return keys;\n}\nfunction print_dic(obj) {\n    for(var key in obj)\n    {\n        debug(key);\n        debug(obj[key]);\n    }\n}\n\nfunction(keys,values,rereduce) {\n    var res_keys = [];\n    var results = values[0];\n        \n    /* Not a rereduce so populate the results dictionary */\n\n\n    for(var i in values)\n    {\n\n        var keys = get_keys(values[i]);\n        for(var j in keys)\n        {\n            var key = keys[j];\n\n            if(! value_in(key, res_keys))\n            {\n                res_keys.push(key);\n                results[key] = values[i][key];\n                continue;\n            }\n            var value = values[i][key];\n            results[key][0] = Math.min(value[0], results[key][0]);\n            results[key][1] = Math.max(value[1], results[key][1]);\n        }\n    }\n    return results;\n\n    \n    \n}"
-        },
-        # Stream join granule
-        # Map: https://gist.github.com/1781675#file_map_stream_join_granule.js
-        "stream_join_granule": {
-            "map": "function (doc) {\n    if(doc.type_ == \"StreamDefinitionContainer\")\n        emit([doc.stream_resource_id,0],doc._id);\n    else if(doc.type_ == \"StreamGranuleContainer\")\n        emit([doc.stream_resource_id,1], doc._id);\n}\n"
-        },
-        # Cannonical reference to Stream join granule
-        "dataset_by_id": {
-            "map": "function (doc) {\n    if(doc.type_ == \"StreamDefinitionContainer\")\n        emit([doc.stream_resource_id,0],doc._id);\n    else if(doc.type_ == \"StreamGranuleContainer\")\n        emit([doc.stream_resource_id,1], doc._id);\n}\n"
-        },
-        # https://gist.github.com/1781675#file_by_time.js
-        # This view only works for granules built using the constructor API or one that uses 'time_bounds' specifically.
-        "dataset_by_latest": {
-            "map": "/********************************\n * Author: Luke Campbell\n * Description: simple map to order by time\n ********************************/\n \n// If the doc has a time_bounds display it\nfunction get_time(doc) {\n    if(doc.identifiables.time_bounds) {\n        emit([doc.stream_resource_id,doc.identifiables.time_bounds.value_pair[0]],doc._id);\n    }   \n}\nfunction(doc) {\n  get_time(doc);\n}"
-        }
-
-    },
-
-    # -------------------------------------------------------------------------
-    'manifest': {
-        'by_dataset' : {
-            'map' : 'function(doc) { var i = Number(doc.ts_create); emit([doc.dataset_id, i], doc._id); }'
-        }
-    },
-
-    # -------------------------------------------------------------------------
+    # Catalog is used by current preservation_management_service (which in turn is not used)
     'catalog': {
         'file_by_name': {
-           "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"
-       },
+            "map": "\nfunction(doc) { \n\n    emit([doc.name + doc.extension, doc.owner_id, doc.group_id, doc.permissions, doc.modified_date, doc.created_date], doc._id);\n}\n\n        \n"
+        },
         "file_by_created_date": {
-           "map": "function(doc) {\n  emit(doc.created_date, doc._id);\n}"
-       },
-       "file_by_modified_date": {
-           "map": "function(doc) {\n  emit(doc.modified_date, doc._id);\n}"
-       },
-       "file_by_owner": {
-           "map": "function(doc) {\n  emit([doc.owner_id, doc.group_id, doc.name], doc._id);\n}"
-       },
-   }
+            "map": "function(doc) {\n  emit(doc.created_date, doc._id);\n}"
+        },
+        "file_by_modified_date": {
+            "map": "function(doc) {\n  emit(doc.modified_date, doc._id);\n}"
+        },
+        "file_by_owner": {
+            "map": "function(doc) {\n  emit([doc.owner_id, doc.group_id, doc.name], doc._id);\n}"
+        },
+    }
 }
 
-def get_couchdb_views(config):
-    store_config = COUCHDB_CONFIGS[config]
-    views = store_config['views']
-    res_views = {}
-    for view in views:
-        res_views[view] = COUCHDB_VIEWS[view]
-    return res_views
+def get_couchdb_view_designs(profile):
+    store_profile = COUCHDB_PROFILES[profile]
+    view_designs = store_profile['views']
+    res_designs = {}
+    for design in view_designs:
+        res_designs[design] = COUCHDB_VIEWS[design]
+    return res_designs
