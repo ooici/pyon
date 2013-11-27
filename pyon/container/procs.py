@@ -200,29 +200,33 @@ class ProcManager(object):
         self._call_proc_state_changed("%s.%s" % (module, cls), ProcessStateEnum.PENDING)
 
         try:
-            # spawn service by type
+            # Additional attributes to set with the process instance
+            proc_attr = {"_proc_type": process_type,
+                         "_proc_spawn_cfg": config
+                         }
+
+            # spawn process by type
             if process_type == SERVICE_PROCESS_TYPE:
-                process_instance = self._spawn_service_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_service_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             elif process_type == STREAM_PROCESS_TYPE:
-                process_instance = self._spawn_stream_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_stream_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             elif process_type == AGENT_PROCESS_TYPE:
-                process_instance = self._spawn_agent_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_agent_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             elif process_type == STANDALONE_PROCESS_TYPE:
-                process_instance = self._spawn_standalone_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_standalone_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             elif process_type == IMMEDIATE_PROCESS_TYPE:
-                process_instance = self._spawn_immediate_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_immediate_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             elif process_type == SIMPLE_PROCESS_TYPE:
-                process_instance = self._spawn_simple_process(process_id, name, module, cls, process_cfg)
+                process_instance = self._spawn_simple_process(process_id, name, module, cls, process_cfg, proc_attr)
 
             else:
                 raise BadRequest("Unknown process type: %s" % process_type)
 
-            process_instance._proc_type = process_type
             self._register_process(process_instance, name)
 
             process_instance.errcause = "OK"
@@ -393,12 +397,12 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: service
-    def _spawn_service_process(self, process_id, name, module, cls, config):
+    def _spawn_service_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as a service worker.
         Attach to service queue with service definition, attach to service pid
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
 
         listen_name = get_safe(config, "process.listen_name") or process_instance.name
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
@@ -445,12 +449,12 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: stream process
-    def _spawn_stream_process(self, process_id, name, module, cls, config):
+    def _spawn_stream_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as a data stream process.
         Attach to subscription queue with process function.
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
 
         listen_name = get_safe(config, "process.listen_name") or name
         log.debug("Stream Process (%s) listen_name: %s", name, listen_name)
@@ -501,12 +505,12 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: agent
-    def _spawn_agent_process(self, process_id, name, module, cls, config):
+    def _spawn_agent_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as agent process.
         Attach to service pid.
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
         if not isinstance(process_instance, ResourceAgent) and not isinstance(process_instance, SimpleResourceAgent):
             raise ContainerConfigError("Agent process must extend ResourceAgent")
         listeners = []
@@ -570,12 +574,12 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: standalone
-    def _spawn_standalone_process(self, process_id, name, module, cls, config):
+    def _spawn_standalone_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as standalone process.
         Attach to service pid.
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
         rsvc = self._create_listening_endpoint(node=self.container.node,
                                                from_name=process_instance.id,
                                                process=process_instance)
@@ -619,12 +623,12 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: simple
-    def _spawn_simple_process(self, process_id, name, module, cls, config):
+    def _spawn_simple_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as simple process.
         No attachments.
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
         # Add publishers if any...
         publish_streams = get_safe(config, "process.publish_streams")
         pub_names = self._set_publisher_endpoints(process_instance, publish_streams)
@@ -656,17 +660,17 @@ class ProcManager(object):
 
     # -----------------------------------------------------------------
     # PROCESS TYPE: immediate
-    def _spawn_immediate_process(self, process_id, name, module, cls, config):
+    def _spawn_immediate_process(self, process_id, name, module, cls, config, proc_attr):
         """
         Spawn a process acting as immediate one off process.
         No attachments.
         """
-        process_instance = self._create_process_instance(process_id, name, module, cls, config)
+        process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
         self._process_init(process_instance)
         self._process_start(process_instance)
         return process_instance
 
-    def _create_process_instance(self, process_id, name, module, cls, config):
+    def _create_process_instance(self, process_id, name, module, cls, config, proc_attr):
         """
         Creates an instance of a "service", be it a Service, Agent, Stream, etc.
 
@@ -685,6 +689,8 @@ class ProcManager(object):
         process_instance.CFG = config
         process_instance._proc_name = name
         process_instance._proc_start_time = time.time()
+        for att, att_val in proc_attr.iteritems():
+            setattr(process_instance, att, att_val)
 
         #Unless the process has been started as part of another Org, default to the container Org or the ION Org
         if config.has_key('org_governance_name'):
