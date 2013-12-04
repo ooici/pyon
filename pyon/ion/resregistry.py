@@ -9,12 +9,14 @@ __license__ = 'Apache 2.0'
 import base64
 
 from pyon.core import bootstrap
+from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
+from pyon.core.registry import getextends
 from pyon.datastore.datastore import DataStore
 from pyon.ion.event import EventPublisher
-from pyon.ion.identifier import create_unique_resource_id
-from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit
+from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
+from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit, Predicates
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -92,18 +94,24 @@ class ResourceRegistry(object):
 
         return res
 
+    def create_mult(self, res_list):
+        return self._create_mult(res_list)
+
     def _create_mult(self, res_list):
         cur_time = get_ion_ts()
+        id_list = []
         for resobj in res_list:
             lcsm = get_restype_lcsm(resobj._get_type())
             resobj.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
             resobj.availability = lcsm.initial_availability if lcsm else AS.AVAILABLE
             resobj.ts_created = cur_time
             resobj.ts_updated = cur_time
+            id_list.append(resobj._id if "_id" in resobj else create_unique_resource_id())
 
-        id_list = [create_unique_resource_id() for i in xrange(len(res_list))]
-        res = self.rr_store.create_mult(res_list, id_list)
+        res = self.rr_store.create_mult(res_list, id_list, allow_ids=True)
         res_list = [(rid, rrv) for success, rid, rrv in res]
+
+        # TODO: Associations with owners
 
         # TODO: Publish events (skipped, because this is inefficient one by one for a large list
 #        for rid,rrv in res_list:
@@ -389,6 +397,77 @@ class ResourceRegistry(object):
 
     def create_association(self, subject=None, predicate=None, object=None, assoc_type=None):
         return self.rr_store.create_association(subject, predicate, object, assoc_type)
+
+    def create_association_mult(self, assoc_list=None):
+        """
+        Create multiple associations between two IonObjects with a given predicate.
+        @param assoc_list  A list of 3-tuples of (subject, predicate, object). Subject/object can be str or object
+        """
+        if not assoc_list:
+            return []
+
+        lookup_rid = set()
+        for s, p, o in assoc_list:
+            if type(s) is str:
+                lookup_rid.add(s)
+            if type(o) is str:
+                lookup_rid.add(o)
+        lookup_rid = list(lookup_rid)
+        lookup_obj = self.read_mult(lookup_rid) if lookup_rid else []
+        res_by_id = dict(zip(lookup_rid, lookup_obj))
+
+        create_ts = get_ion_ts()
+        new_assoc_list = []
+        for s, p, o in assoc_list:
+            new_s = s
+            new_o = o
+            if type(s) is str:
+                new_s = res_by_id[s]
+                if not new_s:
+                    raise NotFound("Subject %s not found" % s)
+            else:
+                if "_id" not in s:
+                    raise BadRequest("Subject id not available")
+            if type(o) is str:
+                new_o = res_by_id[o]
+                if not new_o:
+                    raise NotFound("Object %s not found" % o)
+            else:
+                if "_id" not in object:
+                    raise BadRequest("Object id not available")
+
+            # Check that subject and object type are permitted by association definition
+            if p not in Predicates:
+                raise BadRequest("Predicate unknown %s" % p)
+            pt = Predicates.get(p)
+            if not new_s.type_ in pt['domain']:
+                found_st = False
+                for domt in pt['domain']:
+                    if new_s.type_ in getextends(domt):
+                        found_st = True
+                        break
+                if not found_st:
+                    raise BadRequest("Illegal subject type %s for predicate %s" % (new_s.type_, p))
+            if not new_o.type_ in pt['range']:
+                found_ot = False
+                for rant in pt['range']:
+                    if new_o.type_ in getextends(rant):
+                        found_ot = True
+                        break
+                if not found_ot:
+                    raise BadRequest("Illegal object type %s for predicate %s" % (new_o.type_, p))
+
+            # Skip duplicate check
+
+            assoc = IonObject("Association",
+                              s=new_s._id, st=new_s.type_,
+                              p=p,
+                              o=new_o._id, ot=new_o.type_,
+                              ts=create_ts)
+            new_assoc_list.append(assoc)
+
+        new_assoc_ids = [create_unique_association_id() for i in xrange(len(new_assoc_list))]
+        return self.rr_store.create_mult(new_assoc_list, new_assoc_ids)
 
     def delete_association(self, association=''):
         return self.rr_store.delete_association(association)
