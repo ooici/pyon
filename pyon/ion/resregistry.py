@@ -376,7 +376,11 @@ class ResourceRegistry(object):
         return attachment
 
     def delete_attachment(self, attachment_id=''):
-        return self.rr_store.delete(attachment_id, del_associations=True)
+        try:
+            self.rr_store.delete_attachment(attachment_id, attachment_name=self.DEFAULT_ATTACHMENT_NAME)
+        finally:
+            return self.delete(attachment_id, del_associations=True)
+
 
     def find_attachments(self, resource_id='', keyword=None,
                          limit=0, descending=False, include_content=False, id_only=True):
