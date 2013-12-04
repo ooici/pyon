@@ -555,10 +555,9 @@ class CouchDB_DataStore(DataStore):
         from pyon.ion.resource import Predicates
         from pyon.core.bootstrap import IonObject
 
-        try:
-            pt = Predicates.get(predicate)
-        except AttributeError:
+        if predicate not in Predicates:
             raise BadRequest("Predicate unknown %s" % predicate)
+        pt = Predicates.get(predicate)
         if not subject_type in pt['domain']:
             found_st = False
             for domt in pt['domain']:
