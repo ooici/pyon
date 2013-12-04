@@ -73,6 +73,33 @@ class TestResourceRegistry(IonIntegrationTestCase):
 
         read_obj5 = self.rr.read_object(rid1, PRED.hasResource, RT.PlatformDevice)
 
+        # Test create_association_mult
+        self.rr.delete_association(aid2)
+        self.rr.delete_association(aid3)
+
+        with self.assertRaises(BadRequest) as ex:
+            self.rr.create_association_mult([
+                (rid1, "Not Possible", rid3),
+                (rid4, PRED.hasResource, rid3)
+            ])
+
+        with self.assertRaises(NotFound) as ex:
+            self.rr.create_association_mult([
+                (rid1, PRED.hasResource, "NOT EXISTING"),
+                (rid4, PRED.hasResource, rid3)
+            ])
+
+        res_assocs = self.rr.create_association_mult([
+            (rid1, PRED.hasResource, rid3),
+            (rid4, PRED.hasResource, rid3)
+        ])
+        self.assertEquals(len(res_assocs), 2)
+        print res_assocs
+        assocs = [a[1] for a in res_assocs]
+        for a in assocs:
+             self.rr.delete_association(a)
+
+
     def test_rr_create_with_id(self):
         res_obj1 = IonObject(RT.Org)
 
