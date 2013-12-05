@@ -224,17 +224,18 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
         restored_aparams = []
         unrestored_aparams = []
         bootmode = self.CFG.get_safe('bootmode')
-        log.info('Restoring aparams: bootmode=%s', str(bootmode))
-        if bootmode == 'restart':
-            (restored_aparams, unrestored_aparams) = self._restore_aparams()
+        process_start_mode = self.CFG.get_safe("process.start_mode")
+        log.info('Restoring aparams: bootmode=%s process.start_mode=%s', bootmode, process_start_mode)
+        if bootmode == 'restart' or process_start_mode == "RESTART":
+            restored_aparams, unrestored_aparams = self._restore_aparams()
             self._restore_resource(state, prev_state)
         else:
             unrestored_aparams = self.get_agent_parameters()
-            try:
-                self._get_state_vector().clear()
-            except Exception as ex:
-                log.error('Error clearing state in on_init: %s', str(ex))
-                log.exception('Error clearing state in on_init.')
+            #try:
+            #    self._get_state_vector().clear()
+            #except Exception as ex:
+            #    log.error('Error clearing state in on_init: %s', str(ex))
+            #    log.exception('Error clearing state in on_init.')
 
         self._configure_aparams(unrestored_aparams)
 
