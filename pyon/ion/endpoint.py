@@ -385,7 +385,7 @@ class ProcessSubscriberEndpointUnit(ProcessEndpointUnitMixin, SubscriberEndpoint
 
         ctx = self._process.get_context()       # pull onto the locals here, for debuggability with manhole
         ar = self._routing_call(call, ctx, *op_args, **op_kwargs)
-        return ar.get() # timeout=timeout)  # REMOVED TIMEOUT
+        return ar.get()  # timeout=timeout)  # REMOVED TIMEOUT
 
 
 class ProcessSubscriber(Subscriber):
@@ -413,7 +413,8 @@ class ProcessSubscriber(Subscriber):
         return Subscriber.create_endpoint(self, **newkwargs)
 
     def __str__(self):
-        return "ProcessSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (hex(id(self)), str(self._recv_name), str(self._process), str(self._callback))
+        return "ProcessSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (
+            hex(id(self)), self._recv_name, self._process, self._callback)
 
 
 #
@@ -423,17 +424,19 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
     def __init__(self, xp_name=None, event_type=None, origin=None, queue_name=None, callback=None,
                  sub_type=None, origin_type=None, process=None, routing_call=None, auto_delete=None, *args, **kwargs):
 
-        self._auto_delete = auto_delete
+        self._auto_delete = auto_delete if auto_delete is not None else True
 
         BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
                                           queue_name=queue_name, sub_type=sub_type, origin_type=origin_type)
 
         log.debug("EventPublisher events pattern %s", self.binding)
 
-        ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
+        ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding,
+                                   callback=callback, process=process, routing_call=routing_call, **kwargs)
 
     def __str__(self):
-        return "ProcessEventSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (hex(id(self)), str(self._recv_name), str(self._process), str(self._callback))
+        return "ProcessEventSubscriber at %s:\n\trecv_name: %s\n\tprocess: %s\n\tcb: %s" % (
+            hex(id(self)), self._recv_name, self._process, self._callback)
 
     def _create_channel(self, **kwargs):
         """
