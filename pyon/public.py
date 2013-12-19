@@ -23,7 +23,7 @@ from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
 __all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 
 from pyon.core.exception import BadRequest, NotFound, Inconsistent, Conflict, IonException, Timeout
-__all__ += ['BadRequest','NotFound','Inconsistent','Conflict','IonException','Timeout']
+__all__ += ['BadRequest', 'NotFound', 'Inconsistent', 'Conflict', 'IonException', 'Timeout']
 
 from pyon.core import exception as iex
 __all__ += ['iex']
@@ -40,8 +40,8 @@ __all__ += ['Container', 'CCAP']
 from pyon.ion.service import BaseService
 __all__ += ['BaseService']
 
-from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher
-__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'ProcessSubscriber', 'ProcessPublisher']
+from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher, ProcessEventSubscriber
+__all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'ProcessSubscriber', 'ProcessPublisher', 'ProcessEventSubscriber']
 
 from pyon.ion.stream import StreamPublisher, StreamSubscriber
 __all__ += ['StreamPublisher', 'StreamSubscriber']

@@ -150,9 +150,6 @@ class EventPublisher(Publisher):
         return ret_val
 
 
-
-
-
 class BaseEventSubscriberMixin(object):
     """
     A mixin class for Event subscribers to facilitate inheritance.
@@ -224,7 +221,7 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         Note: an EventSubscriber needs to be closed to free broker resources
         """
         self._cbthread = None
-        self._auto_delete = auto_delete
+        self._auto_delete = auto_delete if auto_delete is not None else True
 
         BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
                                           queue_name=queue_name, sub_type=sub_type, origin_type=origin_type, pattern=pattern)

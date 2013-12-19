@@ -43,6 +43,9 @@ class IonObjectBase(object):
     def __repr__(self):
         return self.__str__()
 
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__, str(self.__dict__))
+
     def __eq__(self, other):
         if type(other) == type(self):
             if other.__dict__ == self.__dict__:
