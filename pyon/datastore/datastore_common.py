@@ -83,6 +83,7 @@ class DatastoreFactory(object):
 
         # Step 3: Instantiate type specific implementation
         store_class = named_any(variant_store)
+        profile = profile or DataStore.DS_PROFILE_MAPPING.get(datastore_name, DataStore.DS_PROFILE.BASIC)
         log.debug("get_datastore(%s, profile=%s, scope=%s) -> %s", datastore_name, profile, scope, store_class.__name__)
         store = store_class(datastore_name=datastore_name, config=server_cfg, profile=profile, scope=scope)
 

@@ -26,8 +26,7 @@ class PYCC(Plugin):
         Plugin.__init__(self)
         self.ccs = []
         self.container_started = False
-        self.blames = {'scidata':[], 'state':[], 'directory':[], 'events':[],
-                'resources':[], 'objects':[]}
+        self.blames = {'state': [], 'events': [], 'resources': [], 'objects': []}
         self.last_blame = {}
         self.sysname = None
 
@@ -121,7 +120,7 @@ class PYCC(Plugin):
                     '--logcfg=res/config/logging.pycc.yml',
                     '--rel=%s' % self.rel,
                     "--config={'system': {'auto_bootstrap': True}}"]
-            debug.write('Starting cc process: %s\n' % ' '.join(ccargs))
+            debug.write('Starting pycc process: %s\n' % ' '.join(ccargs))
             # Set PYCC env var in case CEI needs to skip tests in pycc mode
             os.environ['PYCC_MODE'] = '1'
             # Enable CEI mode for the tests
@@ -136,7 +135,7 @@ class PYCC(Plugin):
             debug.write('Child container is ready...\n')
 
             # Dump datastore
-            self.datastore_admin.dump_datastore(path='res/dd', compact=True)
+            self.datastore_admin.dump_datastore(path='res/dd')
             debug.write('Dump child container state to file...\n')
 
             # Clean again to make sure the first nosetest starts on a clean
