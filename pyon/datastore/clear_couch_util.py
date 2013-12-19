@@ -12,6 +12,7 @@
 import sys
 from optparse import OptionParser
 
+from ooi.logging import log
 from pyon.datastore.datastore_common import DatastoreFactory
 
 
@@ -156,6 +157,15 @@ def _clear_postgres(config, prefix, verbose=False, sysname=None):
         print "clear_couch: Connected to PostgreSQL as:", dsn.rsplit("=", 1)[0] + "=***"
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         with conn.cursor() as cur:
+
+            cur.execute("SELECT pid, datname FROM pg_stat_activity")
+            rows = cur.fetchall()
+            conn_by_db = {}
+            for row in rows:
+                conn_id, dbn = row[0], row[1]
+                conn_by_db.setdefault(dbn, []).append(conn_id)
+            print "clear_couch: Found %s open connections" % len(rows)
+
             cur.execute("SELECT datname FROM pg_database")
             rows = cur.fetchall()
             ignored_num = 0
@@ -164,10 +174,15 @@ def _clear_postgres(config, prefix, verbose=False, sysname=None):
                     db_name = row[0]
                     if (prefix == '*' and not db_name.startswith('_')) or db_name.lower().startswith(prefix.lower()):
                         print "clear_couch: (PostgreSQL) DROP DATABASE", db_name
-                        cur.execute("DROP DATABASE %s;" % db_name)
+                        if conn_by_db.get(db_name, None):
+                            for conn_id in conn_by_db[db_name]:
+                                cur.execute("SELECT pg_terminate_backend(%s)", (conn_id, ))
+                            print "clear_couch: Dropped %s open connections to database '%s'" % (len(conn_by_db[db_name]), db_name)
+                        cur.execute("DROP DATABASE %s" % db_name)
                     else:
                         ignored_num += 1
                 except Exception as ex:
+                    log.exception("")
                     print "Could not drop database '%s'" % db_name
 
             print 'clear_couch: Ignored %s existing databases' % ignored_num
