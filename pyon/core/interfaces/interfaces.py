@@ -45,14 +45,16 @@ class InterfaceAdmin:
         Main entry point into creating core datastores
         """
         ds = CouchDataStore(config=self.config, scope=self.sysname)
-        datastores = ['resources','events']
+        datastores = ['resources', 'events', 'state', 'objects']
+        ds_created = []
         count = 0
         for local_dsn in datastores:
             if not ds.exists_datastore(local_dsn):
                 ds.create_datastore(local_dsn)
                 count += 1
+                ds_created.append(local_dsn)
                 # NOTE: Views and other datastores are created by containers' DatastoreManager
-        print "store_interfaces: Created %s datastores..." % count
+        print "store_interfaces: Created %s datastores: %s" % (count, ds_created)
 
 
     def store_config(self, system_cfg):
