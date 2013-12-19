@@ -44,7 +44,7 @@ def main():
         print "clear_couch: dumping", sysname, "datastores to", options.dump_path
         from pyon.datastore.datastore_admin import DatastoreAdmin
         datastore_admin = DatastoreAdmin(config=config, sysname=sysname)
-        datastore_admin.dump_datastore(path=options.dump_path, compact=True)
+        datastore_admin.dump_datastore(path=options.dump_path)
     elif options.load_path:
         config = create_config(options.couch_host, options.couch_port, options.couch_uname, options.couch_pword)
         sysname = options.sysname or "mine"
