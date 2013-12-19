@@ -39,7 +39,7 @@ class EventError(IonException):
 
 class EventPublisher(Publisher):
 
-    def __init__(self, event_type=None, xp=None, **kwargs):
+    def __init__(self, event_type=None, xp=None, process=None, **kwargs):
         """
         Constructs a publisher of events for a specific type.
 
@@ -48,6 +48,7 @@ class EventPublisher(Publisher):
         """
 
         self.event_type = event_type
+        self.process = process
 
         if bootstrap.container_instance and getattr(bootstrap.container_instance, 'event_repository', None):
             self.event_repo = bootstrap.container_instance.event_repository
@@ -142,15 +143,27 @@ class EventPublisher(Publisher):
         """
 
         event_type = event_type or self.event_type
-        assert event_type
+        if not event_type:
+            raise BadRequest("No event_type provided")
 
         event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
         event_object.base_types = event_object._get_extends()
+        if not event_object.actor_id:
+            event_object.actor_id = self._get_actor_id()
         ret_val = self.publish_event_object(event_object)
         return ret_val
 
+    def _get_actor_id(self):
+        """Returns the current ion-actor-id from incoming process headers"""
+        try:
+            if not self.process:
+                return None
+            ctx = self.process.get_context()
+            return ctx.get('ion-actor-id', "") if ctx else ""
+        except Exception as ex:
+            pass
 
-
+        return ""
 
 
 class BaseEventSubscriberMixin(object):
