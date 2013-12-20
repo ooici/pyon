@@ -65,7 +65,7 @@ class ConvRepository(object):
         # Get an instance of datastore configured as directory.
         # May be persistent or mock, forced clean, with indexes
         datastore_manager = datastore_manager or bootstrap.container_instance.datastore_manager
-        self.conv_store = datastore_manager.get_datastore(CONV_DS_NAME, DataStore.DS_PROFILE.CONV)
+        self.conv_store = datastore_manager.get_datastore(DataStore.DS_CONVERSATIONS, DataStore.DS_PROFILE.CONV)
 
     def close(self):
         """

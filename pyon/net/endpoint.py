@@ -5,6 +5,7 @@
 from gevent import event, coros
 from gevent.timeout import Timeout
 from zope import interface
+import pprint
 import uuid
 import time
 import inspect
@@ -30,6 +31,10 @@ rpclog = logging.getLogger('rpc')
 # create global accumulator for RPC times
 from ooi.timer import Timer, Accumulator
 stats = Accumulator(keys='!total', persist=True)
+
+# Callback hooks for message in and out. Signature: def callback(msg, headers, env)
+callback_msg_out = None
+callback_msg_in = None
 
 
 class EndpointError(StandardError):
@@ -149,6 +154,10 @@ class EndpointUnit(object):
                     post-interceptor. Derivations will likely override the return value.
         """
         new_msg, new_headers = self.intercept_out(msg, headers)
+
+        # Provide a hook for all outgoing messages before they hit transport
+        trigger_msg_out_callback(new_msg, new_headers, self)
+
         self.channel.send(new_msg, new_headers)
 
         return new_msg, new_headers
@@ -391,6 +400,9 @@ class ListeningBaseEndpoint(BaseEndpoint):
             self.body           = None
             self.headers        = None
             self.error          = None
+
+            # Provide a hook for any message received
+            trigger_msg_in_callback(self.raw_body, self.raw_headers, self.delivery_tag, self.endpoint)
 
         def make_body(self):
             """
@@ -781,6 +793,10 @@ class RequestEndpointUnit(BidirectionalEndpointUnit):
             # it and consume again
             while True:
                 rmsg, rheaders, rdtag = self.channel.recv()
+
+                # Provide a hook for any message received
+                trigger_msg_in_callback(rmsg, rheaders, rdtag, self)
+
                 try:
                     nm, nh = self.intercept_in(rmsg, rheaders)
                 finally:
@@ -1361,6 +1377,7 @@ class RPCServer(RequestResponseServer):
     def __str__(self):
         return "RPCServer: recv_name: %s" % (str(self._recv_name))
 
+
 def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_tag=None, is_send=True):
     """
     Utility function to print an legible comprehensive summary of a received message.
@@ -1388,3 +1405,33 @@ def log_message(prefix="MESSAGE", msg=None, headers=None, recv=None, delivery_ta
                 prefix, _send_hl, _sender, _send_hl, _recv_hl, _recv, _recv_hl, _opstat, str(headers), _msg, _delivery)
         except Exception as ex:
             log.warning("%s log error: %s", prefix, str(ex))
+
+
+def trigger_msg_out_callback(body, headers, ep_unit):
+    """Helper function to perform a message out callback"""
+    if callback_msg_out:
+        try:
+            env = {}
+            if hasattr(ep_unit, "channel"):
+                env["routing_key"] = str(getattr(ep_unit.channel, "_send_name", "?"))
+            if hasattr(ep_unit, "_process"):
+                env["process"] = ep_unit._process
+            env["ep_type"] = type(ep_unit)
+            callback_msg_out(body, dict(headers), env)  # Must copy headers because they get muted during processing
+        except Exception as ex:
+            log.warn("Message out callback error: %s", str(ex))
+
+def trigger_msg_in_callback(body, headers, delivery_tag, ep_unit):
+    """Helper function to perform a message in callback"""
+    if callback_msg_in:
+        try:
+            env = {}
+            env["delivery_tag"] = delivery_tag
+            if hasattr(ep_unit, "_process"):
+                env["process"] = ep_unit._process
+            if hasattr(ep_unit, "_endpoint"):
+                env["recv_name"] = str(getattr(ep_unit._endpoint, "_recv_name", ""))
+            env["ep_type"] = type(ep_unit)
+            callback_msg_in(body, dict(headers), env)  # Must copy headers because they get muted during processing
+        except Exception as ex:
+            log.warn("Message in callback error: %s", str(ex))

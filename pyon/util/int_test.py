@@ -75,6 +75,7 @@ class IonIntegrationTestCase(unittest.TestCase):
             #self._force_clean()
             self._patch_out_start_rel()
             from pyon.datastore.datastore_admin import DatastoreAdmin
+            from pyon.datastore.datastore_common import DatastoreFactory
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
             # Turn off file system cleaning
@@ -145,8 +146,10 @@ class IonIntegrationTestCase(unittest.TestCase):
     @classmethod
     def _force_clean(cls, recreate=False):
         from pyon.core.bootstrap import get_sys_name, CFG
-        from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
-        datastore = CouchDataStore(config=CFG)
+        from pyon.datastore.datastore_common import DatastoreFactory
+        datastore = DatastoreFactory.get_datastore(config=CFG, variant=DatastoreFactory.DS_BASE, scope=get_sys_name())
+        #datastore = DatastoreFactory.get_datastore(config=CFG, variant=DatastoreFactory.DS_BASE)
+
         dbs = datastore.list_datastores()
         things_to_clean = filter(lambda x: x.startswith('%s_' % get_sys_name().lower()), dbs)
         try:

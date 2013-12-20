@@ -3,10 +3,6 @@
 """Resource Registry implementation"""
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
-
-
-import base64
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
@@ -25,7 +21,10 @@ from interface.objects import Attachment, AttachmentType, ResourceModificationTy
 
 class ResourceRegistry(object):
     """
-    Class that uses a data store to provide a resource registry.
+    Class that uses a datastore to provide a resource registry.
+    The resource registry adds knowledge of resource objects and associations.
+    Resources have lifecycle state.
+    Add special treatment of Attachment resources
     """
     DEFAULT_ATTACHMENT_NAME = 'resource.attachment'
 
@@ -33,9 +32,8 @@ class ResourceRegistry(object):
         self.container = container or bootstrap.container_instance
 
         # Get an instance of datastore configured as resource registry.
-        # May be persistent or mock, forced clean, with indexes
         datastore_manager = datastore_manager or self.container.datastore_manager
-        self.rr_store = datastore_manager.get_datastore("resources", DataStore.DS_PROFILE.RESOURCES)
+        self.rr_store = datastore_manager.get_datastore(DataStore.DS_RESOURCES, DataStore.DS_PROFILE.RESOURCES)
         self.name = 'container_resource_registry'
         self.id = 'container_resource_registry'
 
@@ -53,6 +51,9 @@ class ResourceRegistry(object):
         """
         self.rr_store.close()
 
+    # -------------------------------------------------------------------------
+    # Resource object manipulation
+
     def create(self, object=None, actor_id=None, object_id=None, attachments=None):
         """
         Accepts object that is to be stored in the data store and tags them with additional data
@@ -68,6 +69,11 @@ class ResourceRegistry(object):
             raise BadRequest("Object is not an IonObject")
         if not is_resource(object):
             raise BadRequest("Object is not a Resource")
+        if "_id" in object:
+            raise BadRequest("Object must not contain _id")
+        if "_rev" in object:
+            raise BadRequest("Object must not contain _rev")
+
 
         lcsm = get_restype_lcsm(object._get_type())
         object.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
@@ -84,7 +90,7 @@ class ResourceRegistry(object):
 
         if actor_id and actor_id != 'anonymous':
             log.debug("Associate resource_id=%s with owner=%s", res_id, actor_id)
-            self.rr_store.create_association(res_id, PRED.hasOwner, actor_id)
+            self.create_association(res_id, PRED.hasOwner, actor_id)
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceModifiedEvent",
@@ -95,9 +101,6 @@ class ResourceRegistry(object):
         return res
 
     def create_mult(self, res_list):
-        return self._create_mult(res_list)
-
-    def _create_mult(self, res_list):
         cur_time = get_ion_ts()
         id_list = []
         for resobj in res_list:
@@ -169,9 +172,20 @@ class ResourceRegistry(object):
         if not del_associations:
             self._delete_owners(object_id)
 
+        # Update first to RETIRED to give ElasticSearch a hint
         res_obj.lcstate = LCS.RETIRED
+        res_obj.availability = AS.PRIVATE
         self.rr_store.update(res_obj)
-        res = self.rr_store.delete(object_id, del_associations=del_associations)
+
+        if del_associations:
+            assoc_ids = self.find_associations(anyside=object_id, id_only=True)
+            self.rr_store.delete_doc_mult(assoc_ids, object_type="Association")
+            log.debug("Deleted %s associations for resource %s", len(assoc_ids), object_id)
+
+        elif self._is_in_association(object_id):
+            log.warn("Deleting object %s that still has associations" % object_id)
+
+        res = self.rr_store.delete(object_id)
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceModifiedEvent",
@@ -185,7 +199,7 @@ class ResourceRegistry(object):
         # Delete all owner users.
         owners, assocs = self.rr_store.find_objects(resource_id, PRED.hasOwner, RT.ActorIdentity, id_only=True)
         for aid in assocs:
-            self.rr_store.delete_association(aid)
+            self.delete_association(aid)
 
     def retire(self, resource_id):
         """
@@ -312,6 +326,10 @@ class ResourceRegistry(object):
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
                                      lcstate_before=old_state, availability_before=old_availability)
 
+
+    # -------------------------------------------------------------------------
+    # Attachment operations
+
     def create_attachment(self, resource_id='', attachment=None, actor_id=None):
         """
         Creates an Attachment resource from given argument and associates it with the given resource.
@@ -353,7 +371,7 @@ class ResourceRegistry(object):
         att_id, _ = self.create(attachment, attachments={self.DEFAULT_ATTACHMENT_NAME: content}, actor_id=actor_id)
 
         if resource_id:
-            self.rr_store.create_association(resource_id, PRED.hasAttachment, att_id)
+            self.create_association(resource_id, PRED.hasAttachment, att_id)
 
         return att_id
 
@@ -381,7 +399,6 @@ class ResourceRegistry(object):
         finally:
             return self.delete(attachment_id, del_associations=True)
 
-
     def find_attachments(self, resource_id='', keyword=None,
                          limit=0, descending=False, include_content=False, id_only=True):
         key = [resource_id]
@@ -399,8 +416,75 @@ class ResourceRegistry(object):
                     att.content = self.rr_store.read_attachment(doc=att._id, attachment_name=self.DEFAULT_ATTACHMENT_NAME)
             return atts
 
+
+    # -------------------------------------------------------------------------
+    # Association operations
+
     def create_association(self, subject=None, predicate=None, object=None, assoc_type=None):
-        return self.rr_store.create_association(subject, predicate, object, assoc_type)
+        """
+        Create an association between two IonObjects with a given predicate
+        @param assoc_type  DEPRECATED
+        """
+        if not (subject and predicate and object):
+            raise BadRequest("Association must have all elements set")
+
+        if type(subject) is str:
+            subject_id = subject
+            subject = self.read(subject_id)
+            subject_type = subject.type_
+        else:
+            if "_id" not in subject:
+                raise BadRequest("Subject id not available")
+            subject_id = subject._id
+            subject_type = subject.type_
+
+        if type(object) is str:
+            object_id = object
+            object = self.read(object_id)
+            object_type = object.type_
+        else:
+            if "_id" not in object:
+                raise BadRequest("Object id not available")
+            object_id = object._id
+            object_type = object.type_
+
+        # Check that subject and object type are permitted by association definition
+        try:
+            pt = Predicates.get(predicate)
+        except AttributeError:
+            raise BadRequest("Predicate unknown %s" % predicate)
+        if not subject_type in pt['domain']:
+            found_st = False
+            for domt in pt['domain']:
+                if subject_type in getextends(domt):
+                    found_st = True
+                    break
+            if not found_st:
+                raise BadRequest("Illegal subject type %s for predicate %s" % (subject_type, predicate))
+        if not object_type in pt['range']:
+            found_ot = False
+            for rant in pt['range']:
+                if object_type in getextends(rant):
+                    found_ot = True
+                    break
+            if not found_ot:
+                raise BadRequest("Illegal object type %s for predicate %s" % (object_type, predicate))
+
+        # Finally, ensure this isn't a duplicate
+        assoc_list = self.find_associations(subject_id, predicate, object_id, id_only=False)
+        if len(assoc_list) != 0:
+            assoc = assoc_list[0]
+            #print "**** Found associations:"
+            #import pprint
+            #pprint.pprint(assoc_list)
+            raise BadRequest("Association between %s and %s with predicate %s already exists" % (subject_id, object_id, predicate))
+
+        assoc = IonObject("Association",
+                          s=subject_id, st=subject_type,
+                          p=predicate,
+                          o=object_id, ot=object_type,
+                          ts=get_ion_ts())
+        return self.rr_store.create(assoc, create_unique_association_id())
 
     def create_association_mult(self, assoc_list=None):
         """
@@ -474,15 +558,45 @@ class ResourceRegistry(object):
         return self.rr_store.create_mult(new_assoc_list, new_assoc_ids)
 
     def delete_association(self, association=''):
-        return self.rr_store.delete_association(association)
+        """
+        Delete an association between two IonObjects
+        @param association  Association object, association id or 3-list of [subject, predicate, object]
+        """
+        if type(association) in (list, tuple) and len(association) == 3:
+            subject, predicate, obj = association
+            assoc_id_list = self.find_associations(subject=subject, predicate=predicate, object=obj, id_only=True)
+            success = True
+            for aid in assoc_id_list:
+                success = success and self.rr_store.delete(aid, object_type="Association")
+            return success
+        else:
+            return self.rr_store.delete(association, object_type="Association")
 
-    def find(self, **kwargs):
-        raise NotImplementedError("Do not use find. Use a specific find operation instead.")
+    def _is_in_association(self, obj_id):
+        if not obj_id:
+            raise BadRequest("Must provide object id")
+
+        assoc_ids = self.find_associations(anyside=obj_id, id_only=True, limit=1)
+        if assoc_ids:
+            log.debug("_is_in_association(%s): Object has associations: %s", obj_id, assoc_ids)
+            return True
+
+        return False
+
+    def read_association(self, association_id=None):
+        if not association_id:
+            raise BadRequest("Missing association_id parameter")
+
+        return self.rr_store.read(association_id, object_type="Association")
+
+
+    # -------------------------------------------------------------------------
+    # Resource find operations
 
     def read_object(self, subject="", predicate="", object_type="", assoc="", id_only=False):
         if assoc:
             if type(assoc) is str:
-                assoc = self.read(assoc)
+                assoc = self.read_association(assoc)
             return assoc.o if id_only else self.read(assoc.o)
         else:
             obj_list, assoc_list = self.find_objects(subject=subject, predicate=predicate, object_type=object_type, id_only=True)
@@ -496,7 +610,7 @@ class ResourceRegistry(object):
     def read_subject(self, subject_type="", predicate="", object="", assoc="", id_only=False):
         if assoc:
             if type(assoc) is str:
-                assoc = self.read(assoc)
+                assoc = self.read_association(assoc)
             return assoc.s if id_only else self.read(assoc.s)
         else:
             sub_list, assoc_list = self.find_subjects(subject_type=subject_type, predicate=predicate, object=object, id_only=True)
@@ -521,17 +635,15 @@ class ResourceRegistry(object):
 
     def find_subjects_mult(self, objects=[], id_only=False):
         return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only)
-    
+
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
-        if predicate:
-            assoc_type = assoc_type or 'H2H'
-        assoc = self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only)
+        assoc = self.rr_store.find_associations(subject, predicate, object, id_only=id_only)
         if not assoc:
-            raise NotFound("Association for subject/predicate/object/type %s/%s/%s/%s not found" % (
-                str(subject), str(predicate), str(object), str(assoc_type)))
+            raise NotFound("Association for subject/predicate/object/type %s/%s/%s not found" % (
+                subject, predicate, object))
         elif len(assoc) > 1:
-            raise Inconsistent("Duplicate associations found for subject/predicate/object/type %s/%s/%s/%s" % (
-                str(subject), str(predicate), str(object), str(assoc_type)))
+            raise Inconsistent("Duplicate associations found for subject/predicate/object/type %s/%s/%s" % (
+                subject, predicate, object))
         return assoc[0]
 
     def find_resources(self, restype="", lcstate="", name="", id_only=False):
@@ -547,6 +659,9 @@ class ResourceRegistry(object):
             limit=limit, skip=skip, descending=descending,
             id_only=id_only)
 
+
+    # -------------------------------------------------------------------------
+    # Extended resource framework operations
 
     def get_resource_extension(self, resource_id='', resource_extension='', computed_resource_type=None, ext_associations=None, ext_exclude=None, **kwargs ):
         """Returns any ExtendedResource object containing additional related information derived from associations
@@ -615,7 +730,7 @@ class ResourceRegistry(object):
 class ResourceRegistryServiceWrapper(object):
     """
     The purpose of this class is to provide the exact service interface of the resource_registry (YML)
-    interface definition. In particular for create that takes the owner out of the actor header.
+    interface definition. In particular for create that extracts the actor header for use as owner.
     """
     def __init__(self, rr, process):
         self._rr = rr
