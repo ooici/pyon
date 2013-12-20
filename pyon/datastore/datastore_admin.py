@@ -2,13 +2,13 @@
 
 """Helper functions for managing the datastore, e.g. from tests"""
 
-import yaml
+import json
 import datetime
 import os
 import os.path
 
 from pyon.core.exception import BadRequest, NotFound
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.datastore.datastore_common import DatastoreFactory
 from pyon.public import log
 
 
@@ -29,7 +29,7 @@ class DatastoreAdmin(object):
             return None
         return ("%s_%s" % (self.sysname, ds_name)).lower()
 
-    def dump_datastore(self, path=None, ds_name=None, clear_dir=True, compact=False):
+    def dump_datastore(self, path=None, ds_name=None, clear_dir=True):
         """
         Dumps CouchDB datastores into a directory as YML files.
         @param ds_name Logical name (such as "resources") of an ION datastore
@@ -42,21 +42,21 @@ class DatastoreAdmin(object):
             dtstr = datetime.datetime.today().strftime('%Y%m%d_%H%M%S')
             path = "res/preload/local/dump_%s" % dtstr
         if ds_name:
-            ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
-            if ds.exists_datastore(ds_name):
-                self._dump_datastore(path, ds_name, clear_dir, compact)
+            ds = DatastoreFactory.get_datastore(datastore_name=ds_name, config=self.config, scope=self.sysname)
+            if ds.datastore_exists(ds_name):
+                self._dump_datastore(path, ds_name, clear_dir)
             else:
                 log.warn("Datastore does not exist")
             ds.close()
         else:
-            ds_list = ['resources', 'objects', 'state', 'events', 'directory', 'scidata']
+            ds_list = ['resources', 'objects', 'state', 'events']
             for dsn in ds_list:
-                self._dump_datastore(path, dsn, clear_dir, compact)
+                self._dump_datastore(path, dsn, clear_dir)
 
-    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True, compact=False):
-        ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
+    def _dump_datastore(self, outpath_base, ds_name, clear_dir=True):
+        ds = DatastoreFactory.get_datastore(datastore_name=ds_name, config=self.config, scope=self.sysname)
         try:
-            if not ds.exists_datastore(ds_name):
+            if not ds.datastore_exists(ds_name):
                 log.warn("Datastore does not exist: %s" % ds_name)
                 return
 
@@ -70,22 +70,13 @@ class DatastoreAdmin(object):
                 [os.remove(os.path.join(outpath, f)) for f in os.listdir(outpath)]
 
             objs = ds.find_docs_by_view("_all_docs", None, id_only=False)
-            numwrites = 0
-            if compact:
-                compact_obj = [obj for obj_id, obj_key, obj in objs]
-                compact_obj.insert(0, "COMPACTDUMP")
-                with open("%s/%s_compact.yml" % (outpath, ds_name), 'w') as f:
-                    yaml.dump(compact_obj, f, default_flow_style=False)
-                numwrites = len(objs)
-            else:
-                for obj_id, obj_key, obj in objs:
-                    # Some object ids have slashes
-                    fn = obj_id.replace("/", "_")
-                    with open("%s/%s.yml" % (outpath, fn), 'w') as f:
-                        yaml.dump(obj, f, default_flow_style=False)
-                        numwrites += 1
+            compact_obj = [obj for obj_id, obj_key, obj in objs]
+            compact_obj= ["COMPACTDUMP", compact_obj]
+            with open("%s/%s_compact.json" % (outpath, ds_name), 'w') as f:
+                json.dump(compact_obj, f)
+            numwrites = len(objs)
 
-            log.info("Wrote %s objects to %s" % (numwrites, outpath))
+            log.info("Wrote %s files to %s" % (numwrites, outpath))
         finally:
             ds.close()
 
@@ -116,17 +107,17 @@ class DatastoreAdmin(object):
                 self._load_datastore(fp, fn, ignore_errors)
 
     def _load_datastore(self, path=None, ds_name=None, ignore_errors=True):
-        ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
+        ds = DatastoreFactory.get_datastore(datastore_name=ds_name, config=self.config, scope=self.sysname)
         try:
             objects = []
             for fn in os.listdir(path):
                 fp = os.path.join(path, fn)
                 try:
                     with open(fp, 'r') as f:
-                        yaml_text = f.read()
-                    obj = yaml.load(yaml_text)
+                        json_text = f.read()
+                    obj = json.loads(json_text)
                     if obj and type(obj) is list and obj[0] == "COMPACTDUMP":
-                        objects.extend(obj[1:])
+                        objects.extend(obj[1])
                     else:
                         objects.append(obj)
                 except Exception as ex:
@@ -144,7 +135,7 @@ class DatastoreAdmin(object):
                     log.info("DatastoreLoader: Loaded %s objects into %s" % (len(res), ds_name))
                 except Exception as ex:
                     if ignore_errors:
-                        log.warn("load error id=%s err=%s" % (fn, str(ex)))
+                        log.warn("load error err=%s" % (str(ex)))
                     else:
                         raise ex
         finally:
@@ -157,7 +148,7 @@ class DatastoreAdmin(object):
         """
         Clears a datastore or a set of datastores of common prefix
         """
-        ds = CouchDataStore(config=self.config, scope=self.sysname)
+        ds = DatastoreFactory.get_datastore(config=self.config, scope=self.sysname)
         try:
             if ds_name:
                 try:
@@ -165,13 +156,13 @@ class DatastoreAdmin(object):
                 except NotFound:
                     try:
                         # Try the unscoped version
-                        ds1 = CouchDataStore(config=self.config)
+                        ds1 = DatastoreFactory.get_datastore(config=self.config)
                         ds1.delete_datastore(ds_name)
                     except NotFound:
                         pass
             elif prefix:
                 prefix = prefix.lower()
-                ds_noscope = CouchDataStore(config=self.config)
+                ds_noscope = DatastoreFactory.get_datastore(config=self.config)
                 for dsn in ds_noscope.list_datastores():
                     if dsn.lower().startswith(prefix):
                         ds_noscope.delete_datastore(dsn)
@@ -181,12 +172,12 @@ class DatastoreAdmin(object):
             ds.close()
 
     def get_blame_objects(self):
-        ds_list = ['resources', 'objects', 'state', 'events', 'directory', 'scidata']
+        ds_list = ['resources', 'objects', 'state', 'events']
         blame_objs = {}
         for ds_name in ds_list:
             ret_objs = []
             try:
-                ds = CouchDataStore(ds_name, config=self.config, scope=self.sysname)
+                ds = DatastoreFactory.get_datastore(datastore_name=ds_name, config=self.config, scope=self.sysname)
                 ret_objs = ds.find_docs_by_view("_all_docs", None, id_only=False)
                 ds.close()
             except BadRequest:

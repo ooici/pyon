@@ -70,6 +70,7 @@ class Container(BaseContainerAgent):
         Container.instance = self
         self.container = self  # Make self appear as process to service clients
         self.CCAP = CCAP
+        self.CFG = CFG
 
         log.debug("Container (sysname=%s) initializing ..." % bootstrap.get_sys_name())
 

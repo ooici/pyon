@@ -255,6 +255,8 @@ def define_vars():
     if public_vars: return public_vars
     cc = container
     proc, pn = get_proc()
+    if cc.instance.has_capability(cc.instance.CCAP.RESOURCE_REGISTRY):
+        rr = cc.instance.resource_registry
     if cc.instance.has_capability(cc.instance.CCAP.GOVERNANCE_CONTROLLER):
         govc = cc.instance.governance_controller
     CFG = cfg

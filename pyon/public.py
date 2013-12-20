@@ -19,6 +19,9 @@ __all__ += ['ionprint']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
+from pyon.util.containers import get_ion_ts, DotDict, DotList, dict_merge, get_safe, named_any, get_ion_ts_millis
+__all__ += ['get_ion_ts', 'DotDict', 'DotList', 'dict_merge', 'get_safe', 'named_any', 'get_ion_ts_millis']
+
 from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
 __all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 

@@ -2,8 +2,8 @@
 
 __author__ = 'Michael Meisinger'
 
-from pyon.core.exception import NotFound
-from pyon.datastore.couchdb.couchdb_standalone import CouchDataStore
+from pyon.core.exception import NotFound, BadRequest
+from pyon.datastore.datastore_common import DatastoreFactory, DataStore
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.util.containers import get_ion_ts, get_default_sysname, get_safe
 
@@ -12,16 +12,13 @@ class ResourceRegistryStandalone(object):
     """
     Resource Registry service standalone class
     """
-
     def __init__(self, sysname=None, orgname=None, config=None):
         self.orgname = orgname or get_safe(config, 'system.root_org', 'ION')
         sysname = sysname or get_default_sysname()
         self.datastore_name = "resources"
-        self.datastore = CouchDataStore(self.datastore_name, config=config, scope=sysname)
-        try:
-            self.datastore.read_doc("_design/directory")
-        except NotFound:
-            self.datastore.define_profile_views("RESOURCES")
+        self.datastore = DatastoreFactory.get_datastore(datastore_name=self.datastore_name, config=config,
+                                                        scope=sysname, profile=DataStore.DS_PROFILE.RESOURCES,
+                                                        variant=DatastoreFactory.DS_BASE)
 
     def close(self):
         self.datastore.close()
@@ -33,7 +30,8 @@ class ResourceRegistryStandalone(object):
         if not "type_" in object:
             raise BadRequest("Object is not an IonObject")
         cur_time = get_ion_ts()
-        object['lcstate'] =  lcstate or "DEPLOYED_AVAILABLE"
+        object['lcstate'] =  lcstate or "DEPLOYED"
+        object['availability'] =  lcstate or "AVAILABLE"
         object['ts_created'] = cur_time
         object['ts_updated'] = cur_time
         new_res_id = create_unique_resource_id()
@@ -42,12 +40,13 @@ class ResourceRegistryStandalone(object):
         if actor_id and actor_id != 'anonymous':
             self.create_association(res_id, "hasOwner", actor_id)
 
-        return res
+        return res_id, rev
 
     def create_mult(self, res_list, lcstate=None):
         cur_time = get_ion_ts()
         for resobj in res_list:
-            resobj['lcstate'] = lcstate or "DEPLOYED_AVAILABLE"
+            resobj['lcstate'] = lcstate or "DEPLOYED"
+            resobj['availability'] = lcstate or "AVAILABLE"
             resobj['ts_created'] = cur_time
             resobj['ts_updated'] = cur_time
 
@@ -68,33 +67,29 @@ class ResourceRegistryStandalone(object):
             raise BadRequest("The object_ids parameter is empty")
         return self.datastore.read_doc_mult(object_ids)
 
-    def create_association(self, subject=None, predicate=None, obj=None, assoc_type='H2H'):
+    def create_association(self, subject=None, predicate=None, object=None, assoc_type=None):
         """
         Create an association between two IonObjects with a given predicate
         """
-        if not subject or not predicate or not obj:
+        if not subject or not predicate or not object:
             raise BadRequest("Association must have all elements set")
         if type(subject) is str:
             subject_id = subject
             subject = self.read(subject_id)
         else:
-            if "_id" not in subject or "_rev" not in subject:
-                raise BadRequest("Subject id or rev not available")
+            if "_id" not in subject:
+                raise BadRequest("Subject id not available")
             subject_id = subject._id
-        st = type(subject).__name__
+        st = subject.type_
 
-        if type(obj) is str:
-            object_id = obj
-            obj = self.read(object_id)
+        if type(object) is str:
+            object_id = object
+            object = self.read(object_id)
         else:
-            if "_id" not in obj or "_rev" not in obj:
-                raise BadRequest("Object id or rev not available")
-            object_id = obj._id
-        ot = type(obj).__name__
-
-        assoc_type = assoc_type or 'H2H'
-        if not assoc_type in AT:
-            raise BadRequest("Unsupported assoc_type: %s" % assoc_type)
+            if "_id" not in object:
+                raise BadRequest("Object id not available")
+            object_id = object._id
+        ot = object.type_
 
         # Check that subject and object type are permitted by association definition
         # Note: Need import here, so that import orders are not screwed up
@@ -103,10 +98,9 @@ class ResourceRegistryStandalone(object):
         from pyon.core.bootstrap import IonObject
 
         assoc = dict(type_="Association",
-            at=assoc_type,
-            s=subject_id, st=st, srv=subject._rev,
+            s=subject_id, st=st,
             p=predicate,
-            o=object_id, ot=ot, orv=obj._rev,
+            o=object_id, ot=ot,
             ts=get_ion_ts())
         return self.datastore.create_doc(assoc, create_unique_association_id())
 
