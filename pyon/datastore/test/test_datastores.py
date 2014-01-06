@@ -5,6 +5,7 @@ __license__ = 'Apache 2.0'
 
 from nose.plugins.attrib import attr
 from unittest import SkipTest
+from mock import Mock, patch, ANY
 
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import IonUnitTestCase
@@ -36,6 +37,18 @@ class Test_DataStores(IonIntegrationTestCase):
             self.ds_class = CouchPyonDataStore
         elif self.server_type == "postgresql":
             self.ds_class = PostgresPyonDataStore
+
+    def test_datastore_mock(self):
+        if self.server_type != "postgresql":
+            return
+
+        special_scope = get_sys_name() + "_special-scope"
+        with patch('pyon.datastore.postgresql.base_store.PostgresDataStore.datastore_exists'), \
+             patch('pyon.datastore.postgresql.pg_util.PostgresConnectionPool'):
+
+            ds1 = self.ds_class(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES, scope=special_scope)
+            self.assertNotIn("-", ds1.database)
+            self.assertIn("_specialscope", ds1.database)
 
     def test_datastore_database(self):
         ds = self.ds_class(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES, scope=get_sys_name())

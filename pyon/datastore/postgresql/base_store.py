@@ -22,6 +22,7 @@ from pyon.core.exception import BadRequest, Conflict, NotFound, Inconsistent
 from pyon.datastore.datastore_common import DataStore
 from pyon.datastore.datastore_query import DQ
 from pyon.datastore.postgresql.pg_util import PostgresConnectionPool, StatementBuilder, psycopg2_connect, TracingCursor
+from pyon.util.containers import create_basic_identifier
 from pyon.util.tracer import CallTracer
 
 TABLE_PREFIX = "ion_"
@@ -75,6 +76,7 @@ class PostgresDataStore(DataStore):
         self.profile = profile
         self.scope = scope
         if self.scope:
+            self.scope = create_basic_identifier(scope).lower()
             self.database = "%s_%s" % (self.scope, self.database)
         self.datastore_name = datastore_name
 
