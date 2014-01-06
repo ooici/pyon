@@ -307,37 +307,24 @@ def main(opts, *args, **kwargs):
             traceback.print_exc()
             return False
 
-    def _assert_ipython_dir():
+    def _exists_ipython_dir():
         # Fix OOIION-1124:
         # When multiple containers are started in parallel, all start an embedded IPython shell/manhole.
-        # There might be a race condition between the IPython creating the default $HOME/.python dir
-        # leading to an error. Prevent this by...
+        # There exists a race condition between the IPython creating the default $HOME/.python dir
+        # leading to an error.
         homedir = os.path.expanduser('~')
         homedir = os.path.realpath(homedir)
         home_ipdir = os.path.join(homedir, ".ipython")
         ipdir = os.path.normpath(os.path.expanduser(home_ipdir))
-        if not os.path.exists(ipdir):
-            log.warn("%s not found. Preventing potential race condition", ipdir)
-            for tries in range(3):
-                try:
-                    import gevent
-                    import random
-                    gevent.sleep(random.random() * 0.1)
-                    from IPython.core.application import BaseIPythonApplication
-                    ba = BaseIPythonApplication()
-                    ba.initialize()
-                    if os.path.exists(ipdir):
-                        log.debug("Success initializing IPython")
-                        break
-                except Exception as ex:
-                    log.debug("Failed IPython initialize attempt (try #%s): %s", tries, str(ex))
-
-        # At this point there should be
-        if not os.path.exists(ipdir):
-            log.error("%s not found after several tries", ipdir)
+        return os.path.exists(ipdir)
 
     def setup_ipython_shell(shell_api=None):
-        _assert_ipython_dir()
+        if not _exists_ipython_dir():
+            log.warn("IPython profile dir not found. Attempting to avoid race condition")
+            import gevent
+            import random
+            gevent.sleep(random.random() * 3.0)  # Introduce a random delay to make conflict less likely
+
         ipy_config = _setup_ipython_config()
 
         # monkeypatch the ipython inputhook to be gevent-friendly
@@ -379,20 +366,33 @@ def main(opts, *args, **kwargs):
         # IPython at the system command line. Any parameters you want to define for
         # configuration can thus be specified here.
         with patch("IPython.core.interactiveshell.InteractiveShell.init_virtualenv"):
-            ipshell = InteractiveShellEmbed(config=ipy_config,
-                banner1 =\
-                """              ____                                ________  _   __   ____________   ____  ___
+            for tries in range(3):
+                try:
+                    ipshell = InteractiveShellEmbed(config=ipy_config,
+                        banner1 =\
+                        """              ____                                ________  _   __   ____________   ____  ___
              / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
             / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
            / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
           /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
                 /____/""",
-                exit_msg = 'Leaving ION shell, shutting down container.')
+                        exit_msg = 'Leaving ION shell, shutting down container.')
 
-            ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
+                    ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
+                    break
+                except Exception as ex:
+                    log.debug("Failed IPython initialize attempt (try #%s): %s", tries, str(ex))
+                    import gevent
+                    import random
+                    gevent.sleep(random.random() * 0.5)
 
     def setup_ipython_embed(shell_api=None):
-        _assert_ipython_dir()
+        if not _exists_ipython_dir():
+            log.warn("IPython profile dir not found. Attempting to avoid race condition")
+            import gevent
+            import random
+            gevent.sleep(random.random() * 3.0)  # Introduce a random delay to make conflict less likely
+
         from gevent_zeromq import monkey_patch
         monkey_patch()
 
@@ -440,7 +440,15 @@ def main(opts, *args, **kwargs):
         ipy_config.Application.ipython_dir = temp_dir
 
         with patch("IPython.core.interactiveshell.InteractiveShell.init_virtualenv"):
-            embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
+            for tries in range(3):
+                try:
+                    embed_kernel(local_ns=shell_api, config=ipy_config)      # blocks until INT
+                    break
+                except Exception as ex:
+                    log.debug("Failed IPython initialize attempt (try #%s): %s", tries, str(ex))
+                    import gevent
+                    import random
+                    gevent.sleep(random.random() * 0.5)
 
         # @TODO: race condition here versus ipython, this will leave junk in tmp dir
         #try:
