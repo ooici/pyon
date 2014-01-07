@@ -124,7 +124,10 @@ class Directory(object):
         """
         This function takes all DirEntry from the list and removes all but the most recent one
         by ts_updated timestamp. It returns the most recent DirEntry and removes the others by
-        direct datastore operations.
+        direct datastore operations. If there are multiple entries with most recent timestamp, the
+        first encountered is kept and the others non-deterministically removed.
+        Note: This operation can be called for DirEntries without common keys, e.g. for all
+        entries registering an agent for a device.
         """
         if not dir_entries:
             return
@@ -133,9 +136,6 @@ class Directory(object):
             for de in dir_entries:
                 if int(de.ts_updated) > int(newest_entry.ts_updated):
                     newest_entry = de
-                if de.key != newest_entry.key:
-                    log.error("_cleanup_outdated_entries does not support different keys: %s", dir_entries)
-                    return newest_entry
 
             remove_list = [de for de in dir_entries if de is not newest_entry]
 
