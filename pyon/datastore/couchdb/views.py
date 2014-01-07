@@ -350,7 +350,7 @@ function(doc) {
 }
 
 def get_couchdb_view_designs(profile):
-    store_profile = COUCHDB_PROFILES[profile]
+    store_profile = COUCHDB_PROFILES.get(profile, None) or COUCHDB_PROFILES["BASIC"]
     view_designs = store_profile['views']
     res_designs = {}
     for design in view_designs:
