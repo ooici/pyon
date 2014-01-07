@@ -130,13 +130,14 @@ class Directory(object):
             return
         newest_entry = dir_entries[0]
         try:
-            remove_list = []
             for de in dir_entries:
                 if int(de.ts_updated) > int(newest_entry.ts_updated):
-                    remove_list.append(newest_entry)
                     newest_entry = de
-                elif de.key != newest_entry.key:
-                    remove_list.append(de)
+                if de.key != newest_entry.key:
+                    log.error("_cleanup_outdated_entries does not support different keys: %s", dir_entries)
+                    return newest_entry
+
+            remove_list = [de for de in dir_entries if de is not newest_entry]
 
             log.info("Attempting to cleanup these directory entries: %s" % remove_list)
             for de in remove_list:
