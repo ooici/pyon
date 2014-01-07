@@ -3,11 +3,14 @@
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+from nose.plugins.attrib import attr
+
 from pyon.core.bootstrap import CFG
 from pyon.ion.directory import Directory
 from pyon.util.unit_test import IonUnitTestCase
-from nose.plugins.attrib import attr
 from pyon.datastore.datastore import DatastoreManager
+
+from interface.objects import DirEntry
 
 
 @attr('UNIT',group='datastore')
@@ -105,5 +108,40 @@ class TestDirectory(IonUnitTestCase):
 
         res_list = directory.find_by_key("X", parent="/BranchB")
         self.assertEquals(len(res_list), 1)
+
+        # Test _cleanup_outdated_entries
+        directory.register("/some", "dupentry", foo="ingenious")
+        de = directory.lookup("/some/dupentry", return_entry=True)
+        de1_attrs = de.__dict__.copy()
+        del de1_attrs["_id"]
+        del de1_attrs["_rev"]
+        del de1_attrs["type_"]
+        de1 = DirEntry(**de1_attrs)
+        de_id1,_ = directory.dir_store.create(de1)
+
+        res_list = directory.find_by_key("dupentry", parent="/some")
+        self.assertEquals(2, len(res_list))
+
+        de = directory.lookup("/some/dupentry", return_entry=True)
+        res_list = directory.find_by_key("dupentry", parent="/some")
+        self.assertEquals(1, len(res_list))
+
+        de1_attrs = de.__dict__.copy()
+        del de1_attrs["_id"]
+        del de1_attrs["_rev"]
+        del de1_attrs["type_"]
+        de1_attrs["ts_updated"] = str(int(de1_attrs["ts_updated"]) + 10)
+        de1_attrs["attributes"]["unique"] = "NEW"
+        de1 = DirEntry(**de1_attrs)
+        de_id1,_ = directory.dir_store.create(de1)
+
+        res_list = directory.find_by_key("dupentry", parent="/some")
+        self.assertEquals(2, len(res_list))
+
+        de = directory.lookup("/some/dupentry", return_entry=True)
+        res_list = directory.find_by_key("dupentry", parent="/some")
+        self.assertEquals(1, len(res_list))
+        self.assertEquals("NEW", res_list[0].attributes["unique"])
+
 
         directory.stop()
