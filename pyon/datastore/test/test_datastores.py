@@ -326,6 +326,14 @@ class Test_DataStores(IonIntegrationTestCase):
         # Delete Dataset by object id
         data_store.delete(head)
 
+        xobj = dict(some="content")
+        xoid, _ = data_store.create_doc(xobj)
+        xobj2 = data_store.read_doc(xoid)
+        xobj2["_deleted"] = True
+        data_store.update_doc(xobj2)
+        with self.assertRaises(NotFound):
+            data_store.read_doc(xoid)
+
         # Try to re-delete Dataset by object id.  Should throw exception.
         with self.assertRaises(NotFound):
             data_store.delete(head._id)
