@@ -579,7 +579,11 @@ class PostgresDataStore(DataStore):
         #log.debug('update_doc(): Update document id=%s', doc['_id'])
 
         with self.pool.cursor(**self.cursor_args) as cur:
-            oid, version = self._update_doc(cur, qual_ds_name, doc)
+            if "_deleted" in doc:
+                self._delete_doc(cur, qual_ds_name, doc["_id"])
+                oid, version = doc["_id"], doc["_rev"]
+            else:
+                oid, version = self._update_doc(cur, qual_ds_name, doc)
 
         return oid, version
 
