@@ -22,17 +22,18 @@ from pyon.core.exception import BadRequest, Conflict, NotFound, Inconsistent
 from pyon.datastore.datastore_common import DataStore
 from pyon.datastore.datastore_query import DQ
 from pyon.datastore.postgresql.pg_util import PostgresConnectionPool, StatementBuilder, psycopg2_connect, TracingCursor
-from pyon.util.containers import create_basic_identifier
+from pyon.util.containers import create_basic_identifier, parse_ion_ts
 from pyon.util.tracer import CallTracer
 
 TABLE_PREFIX = "ion_"
 DEFAULT_USER = "ion"
 DEFAULT_DBNAME = "ion"
 DEFAULT_PROFILE = "BASIC"
-GEOSPATIAL_COLS = {"geom", "geom_loc", "geom_vert", "geom_temp"}
+GEOSPATIAL_COLS = {"geom", "geom_loc"}
+NUMRANGE_COLS = {"vertical_range", "temporal_range"}
 
 # Mapping of object type to table name extension and special attribute names
-OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_created", "ts_updated", "geom", "geom_loc", "geom_vert", "geom_temp")),
+OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_created", "ts_updated", "geom", "geom_loc", "vertical_range", "temporal_range")),
                "A": ("_assoc", ("s", "st", "p", "o", "ot", "retired")),
                "D": ("_dir", ("org", "parent", "key")),
                "E": ("", ("origin", "origin_type", "sub_type", "ts_created", "type_")),
@@ -371,12 +372,13 @@ class PostgresDataStore(DataStore):
         # TODO: This is information model dependent. Could extract somewhere
         res = None
         try:
-            if col == "geom":
+            if col == "geom":  # Resource center point (POINT type)
                 if "geospatial_point_center" in doc:
                     lat, lon = doc["geospatial_point_center"].get("lat", 0), doc["geospatial_point_center"].get("lon", 0)
                     if lat != lon != 0:
                         res = "POINT(%s %s)" % (lon, lat)   # x,y
-            elif col == "geom_loc":
+
+            elif col == "geom_loc":  # Resource bounding box (POLYGON shape, 2D)
                 geoc = None
                 if "geospatial_bounds" in doc:
                     geoc = doc["geospatial_bounds"]
@@ -396,7 +398,18 @@ class PostgresDataStore(DataStore):
                     except ValueError as ve:
                         log.warn("GeospatialBounds location values not parseable %s: %s", geoc, ve)
 
-            elif col == "geom_vert":
+            if res:
+                log.debug("Geospatial column %s value: %s", col, res)
+        except Exception as ex:
+            log.warn("Could not compute value for geospatial column %s: %s", col, ex)
+        return res
+
+    def _get_range_value(self, col, doc):
+        """For a given range column name, return the appropriate representation given a document"""
+        # TODO: This is information model dependent. Could extract somewhere
+        res = None
+        try:
+            if col == "vertical_range":  # Resource vertical intent (NUMRANGE)
                 geoc = None
                 if "geospatial_bounds" in doc:
                     geoc = doc["geospatial_bounds"]
@@ -410,31 +423,66 @@ class PostgresDataStore(DataStore):
                     try:
                         geovals = dict(z1=float(geoc["geospatial_vertical_min"]),
                                        z2=float(geoc["geospatial_vertical_max"]))
-                        res = "LINESTRING(%(z1)s 0, %(z2)s 0)" % geovals
+                        res = "[%s, %s]" % (geovals["z1"], geovals["z2"])
                     except ValueError as ve:
                         log.warn("GeospatialBounds vertical values not parseable %s: %s", geoc, ve)
-            elif col == "geom_temp":
+
+            elif col == "temporal_range":  # Resource temporal intent (NUMRANGE)
                 tempc = None
                 if "nominal_datetime" in doc:
+                    # Case for DataProduct resources
                     tempc = doc["nominal_datetime"]
                 elif "constraint_list" in doc:
+                    # Case for Deployment resources
                     # Find the first one - alternatively could expand a bbox
                     for cons in doc["constraint_list"]:
                         if isinstance(cons, dict) and cons.get("type_", None) == "TemporalBounds":
                             tempc = cons
                             break
+                elif "ts_created" in doc and "ts_updated" in doc:
+                    # All other resources.
+                    # Values are in seconds float since epoch
+                    tempc = dict(start_datetime=parse_ion_ts(doc["ts_created"]),
+                                 end_datetime=parse_ion_ts(doc["ts_updated"]))
+
                 if tempc and tempc["start_datetime"] and tempc["end_datetime"]:
                     try:
-                        geovals = dict(t1=int(tempc["start_datetime"]),
-                                       t2=int(tempc["end_datetime"]))
-                        res = "LINESTRING(%(t1)s 0, %(t2)s 0)" % geovals
+                        geovals = dict(t1=float(tempc["start_datetime"]),
+                                       t2=float(tempc["end_datetime"]))
+                        res = "[%s, %s]" % (geovals["t1"], geovals["t2"])
                     except ValueError as ve:
                         log.warn("TemporalBounds values not parseable %s: %s", tempc, ve)
             if res:
-                log.debug("Geospatial column %s value: %s", col, res)
+                log.debug("Numrange column %s value: %s", col, res)
         except Exception as ex:
-            log.warn("Could not compute value for geospatial column %s: %s", col, ex)
+            log.warn("Could not compute value for numrange column %s: %s", col, ex)
         return res
+
+    def _create_value_expression(self, col, doc, valuename, value_dict, allow_null_values=False, assign=False):
+        """Returns part of an SQL statement to insert or update a value for a column.
+        Places the value into a dict for the DB client to convert properly"""
+        if col in GEOSPATIAL_COLS:
+            value = self._get_geom_value(col, doc)
+        elif col in NUMRANGE_COLS:
+            value = self._get_range_value(col, doc)
+        else:
+            value = doc.get(col, None)
+
+        if allow_null_values or value or type(value) is bool:
+            insert_expr = ", "
+            if assign:
+                insert_expr += col + "="
+            if col in GEOSPATIAL_COLS:
+                insert_expr += "ST_GeomFromText(%(" + valuename + ")s,4326)"
+            elif col in NUMRANGE_COLS:
+                insert_expr += "%(" + valuename + ")s::numrange"
+            else:
+                insert_expr += "%(" + valuename + ")s"
+            value_dict[valuename] = value
+        else:
+            insert_expr = None
+
+        return insert_expr
 
     def create_doc(self, doc, object_id=None, attachments=None, datastore_name=None):
         qual_ds_name = self._get_datastore_name(datastore_name)
@@ -460,14 +508,10 @@ class PostgresDataStore(DataStore):
                 xcol, xval = "", ""
                 if extra_cols:
                     for col in extra_cols:
-                        if col in GEOSPATIAL_COLS:
-                            value = self._get_geom_value(col, doc)
-                        else:
-                            value = doc.get(col, None)
-                        if value or type(value) is bool:
+                        insert_expr = self._create_value_expression(col, doc, col, statement_args)
+                        if insert_expr:
                             xcol += ", %s" % col
-                            xval += ", %(" + col + ")s" if not col in GEOSPATIAL_COLS else ", ST_GeomFromText(%(" + col + ")s,4326)"
-                            statement_args[col] = value
+                            xval += insert_expr
 
                 statement = "INSERT INTO " + table + " (id, rev, doc" + xcol + ") VALUES (%(id)s, 1, %(doc)s" + xval + ")"
                 cur.execute(statement, statement_args)
@@ -526,12 +570,9 @@ class PostgresDataStore(DataStore):
                     sb.statement_args["doc"+str(i)] = doc_json
                     xval = ""
                     for col in extra_cols:
-                        if col in GEOSPATIAL_COLS:
-                            xval += ", ST_GeomFromText(%(" + col + str(i) + ")s,4326)"
-                            sb.statement_args[col + str(i)] = self._get_geom_value(col, doc)
-                        else:
-                            xval += ", %(" + col + str(i) + ")s"
-                            sb.statement_args[col + str(i)] = doc.get(col, None)
+                        valuename = col + str(i)
+                        insert_expr = self._create_value_expression(col, doc, valuename, sb.statement_args, allow_null_values=True)
+                        xval += insert_expr
 
                     sb.append("(%(id", str(i), ")s, 1, %(doc", str(i), ")s", xval, ")")
 
@@ -619,14 +660,9 @@ class PostgresDataStore(DataStore):
         xval = ""
         if extra_cols:
             for col in extra_cols:
-                value = doc.get(col, None)
-                if value or type(value) is bool:
-                    if col in GEOSPATIAL_COLS:
-                        xval += ", " + col + "=ST_GeomFromText(%(" + col + ")s,4326)"
-                        statement_args[col] = self._get_geom_value(col, doc)
-                    else:
-                        xval += ", " + col + "=%(" + col + ")s"
-                        statement_args[col] = doc.get(col, None)
+                insert_expr = self._create_value_expression(col, doc, col, statement_args, assign=True)
+                if insert_expr:
+                    xval += insert_expr
 
         cur.execute("UPDATE "+table+" SET doc=%(doc)s, rev=%(revn)s" + xval + " WHERE id=%(id)s AND rev=%(rev)s",
                     statement_args)

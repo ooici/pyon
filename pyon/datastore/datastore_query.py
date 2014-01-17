@@ -11,29 +11,39 @@ from pyon.datastore.datastore_common import DataStore
 class DatastoreQueryConst(object):
 
     # Expression
-    EXP_AND = "exp:and"
-    EXP_OR = "exp:or"
-    EXP_NOT = "exp:not"
+    EXP_PREFIX = "exp:"
+    EXP_AND = EXP_PREFIX + "and"
+    EXP_OR = EXP_PREFIX + "or"
+    EXP_NOT = EXP_PREFIX + "not"
 
     # Operators
-    OP_EQ = "op:eq"
-    OP_NEQ = "op:neq"
-    OP_LT = "op:lt"
-    OP_LTE = "op:lte"
-    OP_GT = "op:gt"
-    OP_GTE = "op:gte"
-    OP_LIKE = "op:like"
-    OP_ILIKE = "op:ilike"
-    OP_FUZZY = "op:fuzzy"
-    XOP_IN = "xop:in"
+    OP_PREFIX = "op:"
+    OP_EQ = OP_PREFIX + "eq"
+    OP_NEQ = OP_PREFIX + "neq"
+    OP_LT = OP_PREFIX + "lt"
+    OP_LTE = OP_PREFIX + "lte"
+    OP_GT = OP_PREFIX + "gt"
+    OP_GTE = OP_PREFIX + "gte"
+    OP_LIKE = OP_PREFIX + "like"
+    OP_ILIKE = OP_PREFIX + "ilike"
+    OP_FUZZY = OP_PREFIX + "fuzzy"
 
-    XOP_BETWEEN = "xop:between"
-    XOP_ATTLIKE = "xop:attlike"
-    XOP_ALLMATCH = "xop:allmatch"
+    XOP_PREFIX = "xop:"
+    XOP_IN = XOP_PREFIX + "in"
+    XOP_BETWEEN = XOP_PREFIX + "between"
+    XOP_ATTLIKE = XOP_PREFIX + "attlike"
+    XOP_ATTILIKE = XOP_PREFIX + "attilike"
+    XOP_ALLMATCH = XOP_PREFIX + "allmatch"
 
-    GOP_OVERLAPS_BBOX = "gop:overlaps"
-    GOP_CONTAINEDBY_BBOX = "gop:containedby"
-    GOP_CONTAINS_BBOX = "gop:contains"
+    GOP_PREFIX = "gop:"
+    GOP_OVERLAPS_BBOX = GOP_PREFIX + "overlaps"
+    GOP_WITHIN_BBOX = GOP_PREFIX + "within"
+    GOP_CONTAINS_BBOX = GOP_PREFIX + "contains"
+
+    ROP_PREFIX = "rop:"
+    ROP_OVERLAPS_RANGE = ROP_PREFIX + "overlaps"
+    ROP_WITHIN_RANGE = ROP_PREFIX + "within"
+    ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"
 
     # Object and resource attribute
     ATT_ID = "att:id"
@@ -45,8 +55,8 @@ class DatastoreQueryConst(object):
     RA_AVAILABILITY = "ra:availability"
     RA_GEOM = "ra:geom"
     RA_GEOM_LOC = "ra:geom_loc"
-    RA_GEOM_VERT = "ra:geom_vert"
-    RA_GEOM_TEMP = "ra:geom_temp"
+    RA_VERT_RANGE = "ra:vertical_range"
+    RA_TEMP_RANGE = "ra:temporal_range"
 
 
 DQ = DatastoreQueryConst
@@ -118,21 +128,45 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
         else:
             return self.op_expr(self.OP_ILIKE, colname, value)
 
-    def between(self, col, val1, val2):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
-        return self.op_expr(self.XOP_BETWEEN, colname, val1, val2)
-
     def fuzzy(self, col, value):
         self._check_col(col)
         colname = col.split(":", 1)[1]
         return self.op_expr(self.OP_FUZZY, colname, value)
 
+    # --- Special operators
+
+    def between(self, col, val1, val2):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.XOP_BETWEEN, colname, val1, val2)
+
     def all_match(self, value):
         return self.op_expr(self.XOP_ALLMATCH, value)
 
-    def attr_like(self, attr, value):
-        return self.op_expr(self.XOP_ATTLIKE, attr, value)
+    def attr_like(self, attr, value, case_sensitive=True):
+        if case_sensitive:
+            return self.op_expr(self.XOP_ATTLIKE, attr, value)
+        else:
+            return self.op_expr(self.XOP_ATTILIKE, attr, value)
+
+    # --- Range operators
+
+    def overlaps_range(self, col, x1, y1):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.ROP_OVERLAPS_RANGE, colname, x1, y1)
+
+    def contains_range(self, col, x1, y1):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.ROP_CONTAINS_RANGE, colname, x1, y1)
+
+    def within_range(self, col, x1, y1):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.ROP_WITHIN_RANGE, colname, x1, y1)
+
+    # --- Geospatial operators
 
     def overlaps_bbox(self, col, x1, y1, x2, y2):
         self._check_col(col)
@@ -144,10 +178,12 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
         colname = col.split(":", 1)[1]
         return self.op_expr(self.GOP_CONTAINS_BBOX, colname, x1, y1, x2, y2)
 
-    def containedby_bbox(self, col, x1, y1, x2, y2):
+    def within_bbox(self, col, x1, y1, x2, y2):
         self._check_col(col)
         colname = col.split(":", 1)[1]
-        return self.op_expr(self.GOP_CONTAINEDBY_BBOX, colname, x1, y1, x2, y2)
+        return self.op_expr(self.GOP_WITHIN_BBOX, colname, x1, y1, x2, y2)
+
+    # --- Ordering
 
     def order_by(self, column, asc=True, *args):
         pass
