@@ -439,11 +439,11 @@ class PostgresDataStore(DataStore):
                         if isinstance(cons, dict) and cons.get("type_", None) == "TemporalBounds":
                             tempc = cons
                             break
-                elif "ts_created" in doc and "ts_updated" in doc:
-                    # All other resources.
-                    # Values are in seconds float since epoch
-                    tempc = dict(start_datetime=parse_ion_ts(doc["ts_created"]),
-                                 end_datetime=parse_ion_ts(doc["ts_updated"]))
+                #elif "ts_created" in doc and "ts_updated" in doc:
+                #    # All other resources.
+                #    # Values are in seconds float since epoch
+                #    tempc = dict(start_datetime=parse_ion_ts(doc["ts_created"]),
+                #                 end_datetime=parse_ion_ts(doc["ts_updated"]))
 
                 if tempc and tempc["start_datetime"] and tempc["end_datetime"]:
                     try:
