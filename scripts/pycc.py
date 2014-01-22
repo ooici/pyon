@@ -58,6 +58,7 @@ def entry():
     parser.add_argument('-v', '--version', action='version', version='pyon v%s' % (version))
     parser.add_argument('-x', '--proc', type=str, help='Qualified name of process to start and then exit.')
     parser.add_argument('-X', '--no_container', action='store_true', help='Perform pre-initialization steps and stop before starting a container.')
+    parser.add_argument('-egb', '--enable_gbmonitor', action='store_true', help='Enable gevent block monitor.', default=False)
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
@@ -285,6 +286,10 @@ def main(opts, *args, **kwargs):
             ipg = gevent.spawn(is_parent_gone)
 
             container.gl_parent_watch = ipg
+
+        if opts.enable_gbmonitor:
+            from pyon.util.gevent_block_plugin import get_gevent_monitor_block
+            get_gevent_monitor_block().start()
 
         if not opts.noshell and not opts.daemon:
             # Keep container running while there is an interactive shell
