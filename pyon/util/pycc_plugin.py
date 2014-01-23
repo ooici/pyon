@@ -29,6 +29,7 @@ class PYCC(Plugin):
         self.blames = {'state': [], 'events': [], 'resources': [], 'objects': []}
         self.last_blame = {}
         self.sysname = None
+        self.enablegb = False
 
     def options(self, parser, env):
         """Register command line options"""
@@ -36,12 +37,15 @@ class PYCC(Plugin):
         parser.add_option('--pycc-rel', type='string', dest='pycc_rel',
                 help='Rel file path, res/deploy/r2deploy.yml by default',
                 default='res/deploy/r2deploy.yml')
+        parser.add_option('--pycc-enablegb', action='store_true', dest='enablegb',
+                default='False', help='Enable gevent block monitor')
 
     def configure(self, options, conf):
         """Configure the plugin and system, based on selected options."""
         super(PYCC, self).configure(options, conf)
         if self.enabled:
             self.rel = options.pycc_rel
+        self.enablegb = options.enablegb
 
     def begin(self):
         """Called before any tests are collected or run. Use this to
@@ -120,6 +124,8 @@ class PYCC(Plugin):
                     '--logcfg=res/config/logging.pycc.yml',
                     '--rel=%s' % self.rel,
                     "--config={'system': {'auto_bootstrap': True}}"]
+            if self.enablegb:
+                ccargs.insert(1, '-egb')
             debug.write('Starting pycc process: %s\n' % ' '.join(ccargs))
             # Set PYCC env var in case CEI needs to skip tests in pycc mode
             os.environ['PYCC_MODE'] = '1'
