@@ -130,9 +130,11 @@ class GeventAlarmBlock(object):
         if then is not None:
             blocking_time = now - then
             if blocking_time > MAX_BLOCKING_TIME:
+                from pyon.util.log import log
                 from pyon.util.containers import get_ion_ts, get_datetime_str
                 msg = "Greenlet %s with name %s blocked the os thread for %.4f seconds before %s.\n" % (repr(origin), getattr(origin, "_glname", "None"), blocking_time, get_datetime_str(get_ion_ts()) )
-                self._last_traces = self._last_traces[-3:]
+                log.warn(msg)
+                self._last_traces = self._last_traces[-1:]
                 if self._last_traces:
                     msg += 'Last blocked traces:\n'
                     msg += '\n'.join(self._last_traces)
@@ -142,7 +144,7 @@ class GeventAlarmBlock(object):
                     test_id = ''
                 key = str(hex(id(origin)))
                 self._snap_shots[(test_id, key)].append(msg)
-                self._snap_shots[(test_id, key)] = self._snap_shots[(test_id, key)][-3:]
+                self._snap_shots[(test_id, key)] = self._snap_shots[(test_id, key)][-1:]
         signal.alarm(0)
 
     def _alarm_handler(self, signum, frame):
@@ -218,9 +220,11 @@ class GeventMonitorBlock(object):
         if then is not None:
             blocking_time = now - then
             if blocking_time > MAX_BLOCKING_TIME:
+                from pyon.util.log import log
                 from pyon.util.containers import get_ion_ts, get_datetime_str
                 msg = "Greenlet %s with name %s blocked the os thread for %.4f seconds before %s.\n" % (repr(origin), getattr(origin, "_glname", "None"), blocking_time, get_datetime_str(get_ion_ts()) )
-                self._last_traces = self._last_traces[-3:]
+                log.warn(msg)
+                self._last_traces = self._last_traces[-1:]
                 if self._last_traces:
                     msg += 'Last blocked traces:\n'
                     msg += '\n'.join(self._last_traces)
@@ -230,7 +234,7 @@ class GeventMonitorBlock(object):
                     test_id = ''
                 key = str(hex(id(origin)))
                 self._snap_shots[(test_id, key)].append(msg)
-                self._snap_shots[(test_id, key)] = self._snap_shots[(test_id, key)][-3:]
+                self._snap_shots[(test_id, key)] = self._snap_shots[(test_id, key)][-1:]
 
     def _greenlet_blocking_monitor(self):
         while not self._stop_monitor:
@@ -278,11 +282,13 @@ class GEVENT_BLOCK(Plugin):
     def options(self, parser, env):
         super(GEVENT_BLOCK, self).options(parser, env=env)
         parser.add_option("--gevent-block-alarm", action="store_true", dest="block_alarm", help="Use alarm instead of monitor thread to detect block traces.")
+        parser.add_option("--gevent-block-noreport", action="store_true", dest="noreport", help="Suppress report output", default=False)
 
     def configure(self, options, conf):
         super(GEVENT_BLOCK, self).configure(options, conf)
 
         self._block_alarm = options.block_alarm
+        self._noreport = options.noreport
 
     def begin(self):
         #Pass by reference value of self.current_test so we can share test id with gevent block class.
@@ -298,40 +304,41 @@ class GEVENT_BLOCK(Plugin):
         self._current_test.append(test.id())
 
     def report(self, stream):
-        table = []
+        if not self._noreport:
+            table = []
 
-        snapshots = self._greenlet_block.get_snapshots()
-        for key, msgs in snapshots.items():
-            t_id, gl_id = key
+            snapshots = self._greenlet_block.get_snapshots()
+            for key, msgs in snapshots.items():
+                t_id, gl_id = key
 
-            # printable tid: don't need the full path
-            pt_id = ".".join(t_id.split(".")[-2:])
+                # printable tid: don't need the full path
+                pt_id = ".".join(t_id.split(".")[-2:])
 
-            table.append([pt_id, "" ])
+                table.append([pt_id, "" ])
 
-            table.append(["", 'greenlet %s most recent blocking traces:' % gl_id])
-            for index, msg in enumerate(msgs):
-                table.append(["", "Blocking msg %d:" % (index+1)])
-                table.append(["", msg])
+                table.append(["", 'greenlet %s most recent blocking traces:' % gl_id])
+                for index, msg in enumerate(msgs):
+                    table.append(["", "Blocking msg %d:" % (index+1)])
+                    table.append(["", msg])
 
-            table.append(["", ""])
+                table.append(["", ""])
 
-        # header
-        table.insert(0, ['Test', 'Blocked Greenlet'])
+            # header
+            table.insert(0, ['Test', 'Blocked Greenlet'])
 
-        # get widths
-        widths = [max([len(row[x]) for row in table]) for x in xrange(len(table[0]))]
-        #fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in table]
-        fmt_out = [" "* 30 + "".join([x for i, x in enumerate(row)]) for row in table]
+            # get widths
+            widths = [max([len(row[x]) for row in table]) for x in xrange(len(table[0]))]
+            #fmt_out = [" ".join([x.ljust(widths[i]) for i, x in enumerate(row)]) for row in table]
+            fmt_out = [" "* 30 + "".join([x for i, x in enumerate(row)]) for row in table]
 
-        # insert col separation row
-        #fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
+            # insert col separation row
+            #fmt_out.insert(1, " ".join([''.ljust(widths[i], '=') for i in xrange(len(widths))]))
 
-        # write this all to sstream
-        stream.write("Greenlet block report\n")
+            # write this all to sstream
+            stream.write("Greenlet block report\n")
 
-        stream.write("\n".join(fmt_out))
-        stream.write("\n")
+            stream.write("\n".join(fmt_out))
+            stream.write("\n")
 
     def finalize(self, result):
         """Called after all report output, including output from all
