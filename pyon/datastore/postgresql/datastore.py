@@ -306,7 +306,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id FROM " + table
         else:
             query = "SELECT id, doc, s, st, p, o, ot FROM " + table
-        query_clause = " WHERE "
+        query_clause = " WHERE retired<>true AND "
         query_args = dict(s=subject_id, o=object_id, p=predicate)
 
         if subject and obj:
