@@ -107,6 +107,10 @@ class EventPublisher(Publisher):
         else:
             event_object.ts_created = str(current_time)
 
+        # Set the actor id based on
+        if not event_object.actor_id:
+            event_object.actor_id = self._get_actor_id()
+
         #Validate this object - ideally the validator should pass on problems, but for now just log
         #any errors and keep going, since seeing invalid situations are better than skipping validation.
         try:
@@ -148,22 +152,20 @@ class EventPublisher(Publisher):
 
         event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
         event_object.base_types = event_object._get_extends()
-        if not event_object.actor_id:
-            event_object.actor_id = self._get_actor_id()
         ret_val = self.publish_event_object(event_object)
         return ret_val
 
     def _get_actor_id(self):
         """Returns the current ion-actor-id from incoming process headers"""
+        actor_id = ""
         try:
-            if not self.process:
-                return None
-            ctx = self.process.get_context()
-            return ctx.get('ion-actor-id', "") if ctx else ""
+            if self.process:
+                ctx = self.process.get_context()
+                actor_id = ctx.get('ion-actor-id', None) or ""
         except Exception as ex:
             pass
 
-        return ""
+        return actor_id
 
 
 class BaseEventSubscriberMixin(object):
