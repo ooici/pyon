@@ -5,7 +5,9 @@
 @file extern/pyon/pyon/util/breakpoint.py
 @description Breakpoint utility
 '''
+
 import functools
+import inspect
 import traceback
 import time
 import sys
@@ -87,6 +89,27 @@ def debug_wrapper(func):
             raise
     return wrapper
 
+def get_stack(message=None, stack_first_frame=1, max_frames=15):
+    try:
+        stack = inspect.stack()
+        frame_num = stack_first_frame
+        context = []
+        while len(stack) > frame_num and frame_num < (max_frames + stack_first_frame):
+            exec_line = "%s:%s:%s" % (stack[frame_num][1], stack[frame_num][2], stack[frame_num][3])
+            context.insert(0, exec_line)
+            if exec_line.endswith("_control_flow") or exec_line.endswith("load_ion") or exec_line.endswith("spawn_process")\
+                or exec_line.endswith(":main") or exec_line.endswith(":dispatch_request"):
+                break
+            frame_num += 1
+        stack_str = "\n ".join(context)
+        if message:
+            stack_str = message + "\n" + stack_str
+        return stack_str
+    except Exception as ex:
+        stack_str = "ERROR: " + str(ex)
+        if message:
+            stack_str = message + "\n" + stack_str
+        return stack_str
 
 _global_profile_t0 = time.time()
 _global_profile_level = 0
