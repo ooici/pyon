@@ -45,6 +45,7 @@ from contextlib import contextmanager
 from gevent.event import AsyncResult, Event
 from pyon.net.transport import AMQPTransport, NameTrio
 from pyon.util.fsm import FSM
+from pyon.core.bootstrap import CFG
 import sys
 import os
 import traceback
@@ -106,6 +107,11 @@ class BaseChannel(object):
 
     @property
     def exchange_auto_delete(self):
+        # Fix OOIION-1710: Added because exchanges get deleted on broker restart
+        if CFG.get_safe('container.exchange.names.durable', False):
+            self._exchange_auto_delete = False
+            return False
+
         if self._exchange_auto_delete is not None:
             return self._exchange_auto_delete
 
@@ -123,6 +129,11 @@ class BaseChannel(object):
 
     @property
     def exchange_durable(self):
+        # Fix OOIION-1710: Added because exchanges get deleted on broker restart
+        if CFG.get_safe('container.exchange.names.durable', False):
+            self._exchange_durable = True
+            return True
+
         if self._exchange_durable is not None:
             return self._exchange_durable
 
