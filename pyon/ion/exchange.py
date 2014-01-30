@@ -839,10 +839,20 @@ class ExchangeSpace(XOTransport, NameTrio):
 
     @property
     def exchange_durable(self):
+        # Fix OOIION-1710: Added because exchanges get deleted on broker restart
+        if CFG.get_safe('container.exchange.names.durable', False):
+            self._xs_durable = True
+            return True
+
         return self._xs_durable
 
     @property
     def exchange_auto_delete(self):
+        # Fix OOIION-1710: Added because exchanges get deleted on broker restart
+        if CFG.get_safe('container.exchange.names.durable', False):
+            self._xs_auto_delete = False
+            return False
+
         return self._xs_auto_delete
 
     @property
@@ -983,7 +993,13 @@ class ExchangePoint(ExchangeName):
         return None     # @TODO: correct?
 
     def declare(self):
-        self.declare_exchange_impl(self.exchange)
+        param_kwargs = {}
+        # Fix OOIION-1710: Added because exchanges get deleted on broker restart
+        if CFG.get_safe('container.exchange.names.durable', False):
+            param_kwargs["durable"] = True
+            param_kwargs["auto_delete"] = False
+
+        self.declare_exchange_impl(self.exchange, **param_kwargs)
 
     def delete(self):
         self.delete_exchange_impl(self.exchange)
