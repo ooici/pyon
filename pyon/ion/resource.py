@@ -605,7 +605,7 @@ class ExtendedResourceContainer(object):
 
                 field_stop_time = time.time()
 
-                log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time)
+                #log.debug("Time to process field %s(%s) %f secs", field, decorator, field_stop_time - field_start_time)
 
         # field_needs contains a list of what's needed to load in next step (different cases)
         if not field_needs:

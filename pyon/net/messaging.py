@@ -212,7 +212,7 @@ class NodeB(BaseNode):
 
         @type ch_type   BaseChannel
         """
-        log.debug("NodeB.channel")
+        #log.debug("NodeB.channel")
         with self._lock:
             # having _queue_auto_delete on is a pre-req to being able to pool.
             if ch_type == channel.BidirClientChannel and not ch_type._queue_auto_delete:
@@ -354,7 +354,7 @@ class PyonSelectConnection(SelectConnection):
         # get lowest available!
         ch_num = min(available)
 
-        log.debug("_next_channel_number: %d (of %d possible, %d used, %d bad)", ch_num, len(available), len(self._channels), len(self._bad_channel_numbers))
+        #log.debug("_next_channel_number: %d (of %d possible, %d used, %d bad)", ch_num, len(available), len(self._channels), len(self._bad_channel_numbers))
 
         return ch_num
 
