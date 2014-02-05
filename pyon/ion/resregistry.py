@@ -180,7 +180,7 @@ class ResourceRegistry(object):
         if del_associations:
             assoc_ids = self.find_associations(anyside=object_id, id_only=True)
             self.rr_store.delete_doc_mult(assoc_ids, object_type="Association")
-            log.debug("Deleted %s associations for resource %s", len(assoc_ids), object_id)
+            #log.debug("Deleted %s associations for resource %s", len(assoc_ids), object_id)
 
         elif self._is_in_association(object_id):
             log.warn("Deleting object %s that still has associations" % object_id)

@@ -274,7 +274,7 @@ class PolicyDecisionPointManager(object):
         actor_roles = invocation.get_header_value('ion-actor-roles', {})
         message_format = invocation.get_header_value('format', '')
 
-        log.debug("Checking XACML Request: receiver_type: %s, sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s", receiver_type, sender, receiver, op, ion_actor_id, actor_roles)
+        #log.debug("Checking XACML Request: receiver_type: %s, sender: %s, receiver:%s, op:%s,  ion_actor_id:%s, ion_actor_roles:%s", receiver_type, sender, receiver, op, ion_actor_id, actor_roles)
 
         request = Request()
         subject = Subject()
@@ -291,7 +291,7 @@ class PolicyDecisionPointManager(object):
         #If this process is not associated wiht the root Org, then iterate over the roles associated with the user only for
         #the Org that this process is associated with otherwise include all roles and create attributes for each
         if org_governance_name == self.governance_controller.system_root_org_name:
-            log.debug("Including roles for all Orgs")
+            #log.debug("Including roles for all Orgs")
             #If the process Org name is the same for the System Root Org, then include all of them to be safe
             for org in actor_roles:
                 self.create_org_role_attribute(actor_roles[org],subject)

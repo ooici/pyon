@@ -105,10 +105,10 @@ class IonObjectBase(object):
 
             # Basic type checking
             field_val = fields[key]
-            if 'decorators' in schema_val:
-                log.debug("Validating %s: %s: %s: %s" % (key, schema_val["type"], schema_val["decorators"], str(field_val)))
-            else:
-                log.debug("Validating %s: %s: %s" % (key, schema_val["type"], str(field_val)))
+            #if 'decorators' in schema_val:
+                #log.debug("Validating %s: %s: %s: %s" % (key, schema_val["type"], schema_val["decorators"], str(field_val)))
+            #else:
+                #log.debug("Validating %s: %s: %s" % (key, schema_val["type"], str(field_val)))
             if type(field_val).__name__ != schema_val['type']:
 
                 # if the schema doesn't define a type, we can't very well validate it

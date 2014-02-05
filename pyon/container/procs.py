@@ -370,7 +370,7 @@ class ProcManager(object):
         """
         Internal method to call all registered process state change callbacks.
         """
-        log.debug("Proc State Changed (%s): %s", ProcessStateEnum._str_map.get(state, state), svc)
+        #log.debug("Proc State Changed (%s): %s", ProcessStateEnum._str_map.get(state, state), svc)
         for cb in self._proc_state_change_callbacks:
             cb(svc, state, self.container)
 
