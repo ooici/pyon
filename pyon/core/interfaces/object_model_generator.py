@@ -365,9 +365,9 @@ class ObjectModelGenerator:
                     value = dec[1] if len(dec) == 2 else ""
                     # Add it to the decorator list
                     if not decorators:
-                        decorators = '"' + key + '":"' + value + '"'
+                        decorators = '"' + key + '": "' + value + '"'
                     else:
-                        decorators = decorators + ', "' + key + '":"' + value + '"'
+                        decorators = decorators + ', "' + key + '": "' + value + '"'
                 else:
                     init_lines.append('      ' + line + '\n')
                     if not description:
@@ -422,7 +422,7 @@ class ObjectModelGenerator:
                     if enum_type:
                         current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'enum_type': '" + enum_type + "', 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     else:
-                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators':{" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
+                        current_class_schema += "\n                '" + field + "': {'type': '" + value_type + "', 'default': " + converted_value + ", 'decorators': {" + decorators + "}" + ", 'description': '" + re.escape(description) + "'},"
                     decorators = ''
                     description = ''
                     csv_description = ''
@@ -437,9 +437,9 @@ class ObjectModelGenerator:
                     value = dec[1] if len(dec) == 2 else ""
                     # Add it to the decorator list
                     if not class_decorators:
-                        class_decorators = '"' + key + '":"' + value + '"'
+                        class_decorators = '"' + key + '": "' + value + '"'
                     else:
-                        class_decorators = class_decorators + ', "' + key + '":"' + value + '"'
+                        class_decorators = class_decorators + ', "' + key + '": "' + value + '"'
                     continue
 
                 #Handle class level comments
@@ -495,7 +495,8 @@ class ObjectModelGenerator:
                 class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
                 self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n"
 
-                self.dataobject_output_text += "    _class_info = {'name': '" + "', 'decorators': {" + class_decorators + "} }\n\n"
+                self.dataobject_output_text += "    _class_info = {'name': '" + "', 'decorators': {" + class_decorators + \
+                                               "}, 'docstring': '"+ re.escape(class_comment)+"'}\n\n"
                 self.dataobject_output_text += "    def __init__(self"
                 current_class_comment = class_comment
                 class_comment = ''
