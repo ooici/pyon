@@ -267,8 +267,7 @@ class TestAMQPTransport(PyonTestCase):
         self.assertRaises(TransportError, tp._sync_call, async_func, 'callback')
         tp._client.transport.connection.mark_bad_channel.assert_called_once_with(tp._client.channel_number)
 
-    @patch('pyon.net.transport.log')
-    def test__on_underlying_close(self, mocklog):
+    def test__on_underlying_close(self):
         client = Mock()
         tp = AMQPTransport(client)
         cb = Mock()
@@ -277,8 +276,6 @@ class TestAMQPTransport(PyonTestCase):
         tp._on_underlying_close(200, sentinel.text)
 
         cb.assert_called_once_with(tp, 200, sentinel.text)
-        self.assertEquals(mocklog.debug.call_count, 1)
-        self.assertIn(sentinel.text, mocklog.debug.call_args[0])
 
         self.assertEquals(client.callbacks.remove.call_count, 4)
         self.assertEquals(client.callbacks.remove.call_args_list, [call(client.channel_number, 'Basic.GetEmpty'),
