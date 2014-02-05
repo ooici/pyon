@@ -385,8 +385,7 @@ class TestRecvChannel(PyonTestCase):
 
         self.assertFalse(self.ch._on_stop_consume.called)
 
-    @patch('pyon.net.channel.log')
-    def test_stop_consume_raises_warning_with_auto_delete(self, mocklog):
+    def test_stop_consume_raises_warning_with_auto_delete(self):
         transport = AMQPTransport(Mock())
         transport.stop_consume_impl = Mock()
         self.ch.on_channel_open(transport)
@@ -402,8 +401,8 @@ class TestRecvChannel(PyonTestCase):
 
         self.ch.stop_consume()
 
-        self.assertTrue(mocklog.debug.called)
-        self.assertIn(sentinel.queue, mocklog.debug.call_args[0])
+        self.assertTrue(self.ch._transport.stop_consume_impl.called)
+        self.assertIn(self.ch._consumer_tag, self.ch._transport.stop_consume_impl.call_args[0])
 
     def test_recv(self):
         # replace recv_queue with a mock obj
