@@ -82,7 +82,7 @@ class ProcessEndpointUnitMixin(EndpointUnit):
                 header.update({'sender-service': "%s,%s" % (self.channel._send_name.exchange, self._process.name)})
 
         context = self.get_context()
-        log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
+        #log.debug('ProcessEndpointUnitMixin._build_header has context of: %s', context)
 
 
         # use context to set security attributes forward

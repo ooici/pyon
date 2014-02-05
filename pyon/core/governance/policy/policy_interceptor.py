@@ -52,7 +52,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        log.trace("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
+        #log.trace("PolicyInterceptor.outgoing: %s", invocation.get_arg_value('process', invocation))
 
 
         #Check for a field with the ResourceId decorator and if found, then set resource-id
@@ -81,7 +81,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
 
     def incoming(self, invocation):
 
-        log.trace("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
+        #log.trace("PolicyInterceptor.incoming: %s", invocation.get_arg_value('process', invocation))
 
         #print "========"
         #print invocation.headers
@@ -132,12 +132,12 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
             #then skip checking policy yet again - should help with performance and to simplify policy
             #All calls from the RMS must be checked
             if not always_verify_policy and process_type == 'service' and sender != 'resource_management' and self.has_valid_token(invocation, PERMIT_SUB_CALLS):
-                log.debug("Skipping policy check for service call %s %s since token is valid", receiver, op)
+                #log.debug("Skipping policy check for service call %s %s since token is valid", receiver, op)
                 #print "skipping call to " + receiver + " " + op + " from " + actor_id + " process_type: " + process_type
                 invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_SKIPPED
                 return invocation
 
-            log.debug("Checking request for %s: %s(%s) from %s  ", process_type, receiver, op, actor_id)
+            #log.debug("Checking request for %s: %s(%s) from %s  ", process_type, receiver, op, actor_id)
 
             #Annotate the message has started policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
@@ -157,7 +157,7 @@ class PolicyInterceptor(BaseInternalGovernanceInterceptor):
                 elif process_type == 'service':
                     ret = self.governance_controller.policy_decision_point_manager.check_service_request_policies(invocation)
 
-            log.debug("Policy Decision: %s", ret)
+            #log.debug("Policy Decision: %s", ret)
 
             #Annonate the message has completed policy checking
             invocation.message_annotations[GovernanceDispatcher.POLICY__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_COMPLETE

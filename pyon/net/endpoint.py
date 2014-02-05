@@ -1222,7 +1222,7 @@ class RPCResponseEndpointUnit(ResponseEndpointUnit):
         # reply-by minus timestamp gives us max allowable, subtract 2x observed latency, give 10% margin, and convert to integers
         to_val = int((reply_by - ts - 2 * latency) / 1000 * 0.9)
 
-        log.debug("calculated timeout val of %s for conv-id %s", to_val, headers.get('conv-id', 'NONE'))
+        #log.debug("calculated timeout val of %s for conv-id %s", to_val, headers.get('conv-id', 'NONE'))
 
         return to_val
 

@@ -278,7 +278,7 @@ class ThreadManager(object):
                 proc.join()
 
         time_elapsed = time.time() - time_start
-        log.debug('Took %.2fs to shutdown %d child threads', time_elapsed, child_count)
+        #log.debug('Took %.2fs to shutdown %d child threads', time_elapsed, child_count)
 
         return time_elapsed
 

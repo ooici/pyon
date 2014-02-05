@@ -86,7 +86,7 @@ class EventPublisher(Publisher):
 
         topic = self._topic(event_object)
         to_name = (self._send_name.exchange, topic)
-        log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
+        #log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
 
         current_time = get_ion_ts_millis()
 

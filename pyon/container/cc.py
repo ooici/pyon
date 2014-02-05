@@ -326,7 +326,7 @@ class Container(BaseContainerAgent):
 
         while self._capabilities:
             capability = self._capabilities.pop()
-            log.debug("stop(): Stopping '%s'" % capability)
+            #log.debug("stop(): Stopping '%s'" % capability)
             try:
                 cap_obj = self._cap_instances[capability]
                 cap_obj.stop()
