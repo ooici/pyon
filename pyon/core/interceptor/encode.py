@@ -104,8 +104,8 @@ class EncodeInterceptor(Interceptor):
         log.debug("EncodeInterceptor enabled")
 
     def outgoing(self, invocation):
-        log.debug("EncodeInterceptor.outgoing: %s", invocation)
-        log.debug("Pre-transform: %s", invocation.message)
+        #log.debug("EncodeInterceptor.outgoing: %s", invocation)
+        #log.debug("Pre-transform: %s", invocation.message)
 
         # msgpack the content (ensures string)
         invocation.message = msgpack.packb(invocation.message, default=encode_ion)
@@ -120,17 +120,17 @@ class EncodeInterceptor(Interceptor):
         # log.debug("Post-transform: %s", invocation.message)
 
         msg_size = len(invocation.message)
-        log.debug("message size: %s", msg_size)
+        #log.debug("message size: %s", msg_size)
         if msg_size > self.max_message_size:
             raise BadRequest('The message size %s is larger than the max_message_size value of %s' % (msg_size,self.max_message_size) )
 
         return invocation
 
     def incoming(self, invocation):
-        log.debug("EncodeInterceptor.incoming: %s", invocation)
+        #log.debug("EncodeInterceptor.incoming: %s", invocation)
         # Logging binary stuff caused nose capture output to blow up when
         # there's an exception
         # log.debug("Pre-transform: %s", invocation.message)
         invocation.message = msgpack.unpackb(invocation.message, object_hook=decode_ion, use_list=1)
-        log.debug("Post-transform: %s", invocation.message)
+        #log.debug("Post-transform: %s", invocation.message)
         return invocation

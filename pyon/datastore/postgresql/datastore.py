@@ -161,7 +161,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         return res_list
 
     def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
-        log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
+        #log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
 
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
@@ -199,7 +199,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             rows = cur.fetchall()
 
         obj_assocs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
-        log.debug("find_objects() found %s objects", len(obj_assocs))
+        #log.debug("find_objects() found %s objects", len(obj_assocs))
         if id_only:
             res_ids = [self._prep_id(row[0]) for row in rows]
             return res_ids, obj_assocs
@@ -208,7 +208,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             return res_objs, obj_assocs
 
     def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, **kwargs):
-        log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s", subject_type, predicate, obj, id_only)
+        #log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s", subject_type, predicate, obj, id_only)
 
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
@@ -246,7 +246,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             rows = cur.fetchall()
 
         obj_assocs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
-        log.debug("find_subjects() found %s subjects", len(obj_assocs))
+        #log.debug("find_subjects() found %s subjects", len(obj_assocs))
         if id_only:
             res_ids = [self._prep_id(row[0]) for row in rows]
             return res_ids, obj_assocs
@@ -296,7 +296,7 @@ class PostgresPyonDataStore(PostgresDataStore):
                 else:
                     anyside_ids = [anyside._id]
 
-        log.debug("find_associations(subject=%s, predicate=%s, object=%s, anyside=%s)", subject_id, predicate, object_id, anyside_ids)
+        #log.debug("find_associations(subject=%s, predicate=%s, object=%s, anyside=%s)", subject_id, predicate, object_id, anyside_ids)
 
         qual_ds_name = self._get_datastore_name()
         table = qual_ds_name + "_assoc"
@@ -363,7 +363,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             assocs = [self._prep_id(row[0]) for row in rows]
         else:
             assocs = [self._persistence_dict_to_ion_object(row[1]) for row in rows]
-        log.debug("find_associations() found %s associations", len(assocs))
+        #log.debug("find_associations() found %s associations", len(assocs))
 
         return assocs
 

@@ -259,7 +259,7 @@ class BaseChannel(object):
         """
         Closes the AMQP connection.
         """
-        log.trace("BaseChannel.close_impl (%s)", self.get_channel_id())
+        #log.trace("BaseChannel.close_impl (%s)", self.get_channel_id())
         if self._transport:
 
             # the close destroys self._transport, so keep a ref here
@@ -348,7 +348,7 @@ class SendChannel(BaseChannel):
         Sets up this channel to send to a name.
         @param  name    The name this channel should send to. Should be a NameTrio.
         """
-        log.debug("SendChannel.connect: %s", name)
+        #log.debug("SendChannel.connect: %s", name)
 
         self._send_name = name
         self._exchange = name.exchange
@@ -507,7 +507,7 @@ class RecvChannel(BaseChannel):
         @param  name        A tuple of (exchange, queue). Queue may be left None for the broker to generate one.
         @param  binding     If not set, uses name.
         """
-        log.debug('setup_listener name: %s', name)
+        #log.debug('setup_listener name: %s', name)
         name        = name or self._recv_name
         exchange    = name.exchange
         queue       = name.queue
@@ -611,8 +611,8 @@ class RecvChannel(BaseChannel):
         #log.debug("RecvChannel._on_stop_consume")
 
         with self._ensure_transport():
-            if self.queue_auto_delete and isinstance(self._transport, AMQPTransport):
-                log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
+            #if self.queue_auto_delete and isinstance(self._transport, AMQPTransport):
+                #log.debug("Autodelete is on, this will destroy this queue: %s", self._recv_name.queue)
 
             self._transport.stop_consume_impl(self._consumer_tag)
 
@@ -666,7 +666,7 @@ class RecvChannel(BaseChannel):
         If we've declared and we're not auto_delete, must delete here.
         Also put a ChannelShutdownMessage in the recv queue so anything blocking on reading it will get notified via ChannelClosedError.
         """
-        log.debug("RecvChannel.close_impl (%s)", self.get_channel_id())
+        #log.debug("RecvChannel.close_impl (%s)", self.get_channel_id())
 
         self._recv_queue.put(ChannelShutdownMessage())
 
@@ -931,7 +931,7 @@ class ListenChannel(RecvChannel):
 
         try:
             with self._recv_queue.await_n(n=n) as ar:
-                log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
+                #log.debug("accept: waiting for %s msgs, timeout=%s", n, timeout)
                 ar.get(timeout=timeout)
         finally:
             if not was_consuming:

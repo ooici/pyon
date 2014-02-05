@@ -19,13 +19,13 @@ class ValidateInterceptor(Interceptor):
 
     def outgoing(self, invocation):
         # Set validate flag in header if IonObject(s) found in message
-        log.debug("ValidateInterceptor.outgoing: %s", invocation)
+        #log.debug("ValidateInterceptor.outgoing: %s", invocation)
 
         #Nothing to validate on the outbound side
         return invocation
 
     def incoming(self, invocation):
-        log.debug("ValidateInterceptor.incoming: %s", invocation)
+        #log.debug("ValidateInterceptor.incoming: %s", invocation)
 
         if self.enabled:
             payload = invocation.message
@@ -36,7 +36,7 @@ class ValidateInterceptor(Interceptor):
                 if is_ion_object(clzz):
                     payload = IonObject(clzz, payload)
 
-            log.debug("Payload, pre-validate: %s", payload)
+            #log.debug("Payload, pre-validate: %s", payload)
 
             # IonObject _validate will throw AttributeError on validation failure.
             # Raise corresponding BadRequest exception into message stack.

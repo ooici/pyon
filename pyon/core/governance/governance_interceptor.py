@@ -46,7 +46,7 @@ class GovernanceInterceptor(BaseInternalGovernanceInterceptor):
         if not self.enabled:
             return invocation
 
-        log.trace("GovernanceInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
+        #log.trace("GovernanceInterceptor.outgoing: %s", invocation.get_arg_value('process',invocation))
 
         if self.governance_controller is not None:
             self.governance_controller.process_outgoing_message(invocation)
@@ -58,7 +58,7 @@ class GovernanceInterceptor(BaseInternalGovernanceInterceptor):
         if not self.enabled:
             return invocation
 
-        log.trace("GovernanceInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
+        #log.trace("GovernanceInterceptor.incoming: %s", invocation.get_arg_value('process',invocation))
 
         if self.governance_controller is not None:
             self.governance_controller.process_incoming_message(invocation)

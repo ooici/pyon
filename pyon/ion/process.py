@@ -336,7 +336,7 @@ class IonProcessThread(PyonThread):
 
         for calltuple in self._ctrl_queue:
             calling_gl, ar, call, callargs, callkwargs, context = calltuple
-            log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
+            #log.debug("control_flow making call: %s %s %s (has context: %s)", call, callargs, callkwargs, context is not None)
 
             res = None
             start_proc_time = get_ion_ts_millis()

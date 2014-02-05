@@ -42,10 +42,10 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
     def outgoing(self, invocation):
 
-        if invocation.args.has_key('process'):
-            log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation.get_arg_value('process',invocation).name)
-        else:
-            log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation)
+        #if invocation.args.has_key('process'):
+            #log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation.get_arg_value('process',invocation).name)
+        #else:
+            #log.trace("ConversationMonitorInterceptor.outgoing: %s" % invocation)
 
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
@@ -66,10 +66,10 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
 
     def incoming(self, invocation):
 
-        if invocation.args.has_key('process'):
-            log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation.get_arg_value('process',invocation).name)
-        else:
-            log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation)
+        #if invocation.args.has_key('process'):
+            #log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation.get_arg_value('process',invocation).name)
+        #else:
+            #log.trace("ConversationMonitorInterceptor.incoming: %s" % invocation)
 
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = GovernanceDispatcher.STATUS_STARTED
 
@@ -203,7 +203,7 @@ class ConversationMonitorInterceptor(BaseInternalGovernanceInterceptor):
         err_msg = 'Conversation interceptor error for message %s from %s: %s' %(cur_label, msg_from, error)
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_ANNOTATION] = dispatcher_status
         invocation.message_annotations[GovernanceDispatcher.CONVERSATION__STATUS_REASON_ANNOTATION] = err_msg
-        log.debug("ConversationMonitorInterceptor error: %s", err_msg)
+        #log.debug("ConversationMonitorInterceptor error: %s", err_msg)
 
 
 

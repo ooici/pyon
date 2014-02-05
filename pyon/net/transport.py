@@ -242,10 +242,8 @@ class AMQPTransport(BaseTransport):
         self.lock = False
 
     def _on_underlying_close(self, code, text):
-        logmeth = log.debug
         if not (code == 0 or code == 200):
-            logmeth = log.error
-        logmeth("AMQPTransport.underlying closed:\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.channel_number, code, text)
+            log.error("AMQPTransport.underlying closed:\n\tchannel number: %s\n\tcode: %d\n\ttext: %s", self.channel_number, code, text)
 
         # PIKA BUG: in v0.9.5, this amq_chan instance will be left around in the callbacks
         # manager, and trips a bug in the handler for on_basic_deliver. We attempt to clean
@@ -333,7 +331,7 @@ class AMQPTransport(BaseTransport):
         return tuple(ret_vals)
 
     def declare_exchange_impl(self, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", self._client.channel_number, exchange, exchange_type, durable, auto_delete)
+        #log.debug("AMQPTransport.declare_exchange_impl(%s): %s, T %s, D %s, AD %s", self._client.channel_number, exchange, exchange_type, durable, auto_delete)
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
@@ -352,7 +350,7 @@ class AMQPTransport(BaseTransport):
         self._sync_call(self._client.exchange_delete, 'callback', exchange=exchange)
 
     def declare_queue_impl(self, queue, durable=False, auto_delete=True):
-        log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", self._client.channel_number, queue, durable, auto_delete)
+        #log.debug("AMQPTransport.declare_queue_impl(%s): %s, D %s, AD %s", self._client.channel_number, queue, durable, auto_delete)
         arguments = {}
 
         if os.environ.get('QUEUE_BLAME', None) is not None:
@@ -372,14 +370,14 @@ class AMQPTransport(BaseTransport):
         self._sync_call(self._client.queue_delete, 'callback', queue=queue)
 
     def bind_impl(self, exchange, queue, binding):
-        log.debug("AMQPTransport.bind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
+        #log.debug("AMQPTransport.bind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
         self._sync_call(self._client.queue_bind, 'callback',
                                         queue=queue,
                                         exchange=exchange,
                                         routing_key=binding)
 
     def unbind_impl(self, exchange, queue, binding):
-        log.debug("AMQPTransport.unbind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
+        #log.debug("AMQPTransport.unbind_impl(%s): EX %s, Q %s, B %s", self._client.channel_number, exchange, queue, binding)
         self._sync_call(self._client.queue_unbind, 'callback', queue=queue,
                                                      exchange=exchange,
                                                      routing_key=binding)
@@ -388,7 +386,7 @@ class AMQPTransport(BaseTransport):
         """
         Acks a message.
         """
-        log.debug("AMQPTransport.ack(%s): %s", self._client.channel_number, delivery_tag)
+        #log.debug("AMQPTransport.ack(%s): %s", self._client.channel_number, delivery_tag)
         self._client.basic_ack(delivery_tag)
 
     def reject_impl(self, delivery_tag, requeue=False):
@@ -404,7 +402,7 @@ class AMQPTransport(BaseTransport):
 
         @return A consumer tag to be used when stop_consume_impl is called.
         """
-        log.debug("AMQPTransport.start_consume_impl(%s): %s", self._client.channel_number, queue)
+        #log.debug("AMQPTransport.start_consume_impl(%s): %s", self._client.channel_number, queue)
         consumer_tag = self._client.basic_consume(callback,
                                             queue=queue,
                                             no_ack=no_ack,
@@ -415,7 +413,7 @@ class AMQPTransport(BaseTransport):
         """
         Stops consuming by consumer tag.
         """
-        log.debug("AMQPTransport.stop_consume_impl(%s): %s", self._client.channel_number, consumer_tag)
+        #log.debug("AMQPTransport.stop_consume_impl(%s): %s", self._client.channel_number, consumer_tag)
         self._sync_call(self._client.basic_cancel, 'callback', consumer_tag)
 
         # PIKA 0.9.5 / GEVENT interaction problem here
@@ -463,14 +461,14 @@ class AMQPTransport(BaseTransport):
         """
         Adjusts quality of service for a channel.
         """
-        log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", self._client.channel_number, prefetch_size, prefetch_count, global_)
+        #log.debug("AMQPTransport.qos_impl(%s): pf_size %s, pf_count %s, global_ %s", self._client.channel_number, prefetch_size, prefetch_count, global_)
         self._sync_call(self._client.basic_qos, 'callback', prefetch_size=prefetch_size, prefetch_count=prefetch_count, global_=global_)
 
     def publish_impl(self, exchange, routing_key, body, properties, immediate=False, mandatory=False, durable_msg=False):
         """
         Publishes a message on an exchange.
         """
-        log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
+        #log.debug("AMQPTransport.publish(%s): ex %s key %s", self._client.channel_number, exchange, routing_key)
         #log.debug("AMQPTransport.publish(%s): ex %s key %s, size %d", self._client.channel_number, exchange, routing_key, len(repr(body))+len(repr(properties)))
 
         if durable_msg:
