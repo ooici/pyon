@@ -40,6 +40,11 @@ class DatastoreQueryConst(object):
     GOP_WITHIN_BBOX = GOP_PREFIX + "within"
     GOP_CONTAINS_BBOX = GOP_PREFIX + "contains"
 
+    WKT_PREFIX = "wkt:"
+    WKT_OVERLAPS = WKT_PREFIX + "overlaps"
+    WKT_WITHIN = WKT_PREFIX + "within"
+    WKT_CONTAINS = WKT_PREFIX + "contains"
+
     ROP_PREFIX = "rop:"
     ROP_OVERLAPS_RANGE = ROP_PREFIX + "overlaps"
     ROP_WITHIN_RANGE = ROP_PREFIX + "within"
@@ -182,6 +187,23 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
         self._check_col(col)
         colname = col.split(":", 1)[1]
         return self.op_expr(self.GOP_WITHIN_BBOX, colname, x1, y1, x2, y2)
+
+    # --- Geospatial (WKT) operators
+
+    def overlaps_wkt(self, col, wkt, buf):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.WKT_OVERLAPS, colname, wkt, buf)
+
+    def contains_wkt(self, col, wkt, buf):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.WKT_CONTAINS, colname, wkt, buf)
+
+    def within_wkt(self, col, wkt, buf):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.WKT_WITHIN, colname, wkt, buf)
 
     # --- Ordering
 
