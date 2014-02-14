@@ -23,6 +23,9 @@ class PostgresQueryBuilder(object):
               DQ.GOP_OVERLAPS_BBOX: "&&",
               DQ.GOP_CONTAINS_BBOX: "~",
               DQ.GOP_WITHIN_BBOX: "@",
+              DQ.WKT_OVERLAPS: "ST_Intersects(%s,%s)",
+              DQ.WKT_CONTAINS: "ST_Contains(%s,%s)",
+              DQ.WKT_WITHIN: "ST_Within(%s,%s)",
               DQ.ROP_OVERLAPS_RANGE: "&&",
               DQ.ROP_CONTAINS_RANGE: "@>",
               DQ.ROP_WITHIN_RANGE: "<@",
@@ -78,6 +81,14 @@ class PostgresQueryBuilder(object):
             colname, x1, y1, x2, y2 = args
             return "%s %s ST_MakeEnvelope(%s,%s,%s,%s,4326)" % (colname, self.OP_STR[op],
                     self._value(x1), self._value(y1), self._value(x2), self._value(y2))
+        elif op.startswith(DQ.WKT_PREFIX):
+            colname, wkt, buf = args
+            # PostGIS geometry from WKT http://postgis.net/docs/ST_GeomFromEWKT.html
+            geom_from_wkt = 'ST_GeomFromEWKT(\'SRID=4326;%s\')' % (wkt)
+            # if buffer specified, wrap geometry in buffer http://postgis.net/docs/ST_Buffer.html
+            if buf:
+                geom_from_wkt = 'ST_Buffer(%s, %f)' % (geom_from_wkt,float(buf))
+            return self.OP_STR[op] % (colname, geom_from_wkt)
         elif op == DQ.EXP_AND:
             return "(%s)" % " AND ".join(self._build_where(ex) for ex in args)
         elif op == DQ.EXP_OR:
