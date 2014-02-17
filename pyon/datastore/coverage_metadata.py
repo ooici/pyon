@@ -14,7 +14,7 @@ from pyon.util.log import log
 from interface.objects import ProcessState
 
 
-class CoverageRepository(object):
+class CoverageMetadataStore(object):
     """
     Class that uses a data store to provide a persistent state repository for ION processes.
     """
