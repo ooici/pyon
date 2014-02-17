@@ -372,9 +372,11 @@ class Container(BaseContainerAgent):
 
         traceback.print_exc()
 
+        self._kill_fast()
+
+    def _kill_fast(self):
         # The exit code of the terminated process is set to non-zero
         os.kill(os.getpid(), signal.SIGTERM)
-
 
 class PidfileCapability(ContainerCapability):
     def start(self):
