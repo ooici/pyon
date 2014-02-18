@@ -183,6 +183,9 @@ class NodeB(BaseNode):
 
         transport = AMQPTransport(amq_chan)
 
+        # return the pending in collection (lets this number be assigned again later)
+        self.client._pending.remove(transport.channel_number)
+
         # by default, everything should have a prefetch count of 1 (configurable)
         # this can be overridden by the channel get_n related methods
         transport.qos_impl(prefetch_count=CFG.get_safe('container.messaging.endpoint.prefetch_count', 1))
@@ -326,6 +329,7 @@ class PyonSelectConnection(SelectConnection):
                  reconnection_strategy=None):
         SelectConnection.__init__(self, parameters=parameters, on_open_callback=on_open_callback, reconnection_strategy=reconnection_strategy)
         self._bad_channel_numbers = set()
+        self._pending = set()
 
     def _next_channel_number(self):
         """
@@ -347,6 +351,9 @@ class PyonSelectConnection(SelectConnection):
         # also subtract out poison channels
         available.difference_update(self._bad_channel_numbers)
 
+        # also subtract out pending channels
+        available.difference_update(self._pending)
+
         # used all of our channels
         if len(available) == 0:
             raise NoFreeChannels()
@@ -354,7 +361,10 @@ class PyonSelectConnection(SelectConnection):
         # get lowest available!
         ch_num = min(available)
 
-        #log.debug("_next_channel_number: %d (of %d possible, %d used, %d bad)", ch_num, len(available), len(self._channels), len(self._bad_channel_numbers))
+        #log.debug("_next_channel_number: %d (of %d possible, %d used, %d bad, %d pending: %s)", ch_num, len(available), len(self._channels), len(self._bad_channel_numbers), len(self._pending), self._pending)
+
+        # add to set of pending
+        self._pending.add(ch_num)
 
         return ch_num
 
