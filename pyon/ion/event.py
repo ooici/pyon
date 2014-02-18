@@ -330,9 +330,9 @@ class EventRepository(object):
         event_obj = self.event_store.read(event_id)
         return event_obj
 
-    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, id_only=False, **kwargs):
         log.trace("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s",
-                  event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None))
+                  event_type, origin, start_ts, end_ts, kwargs.get("descending", None), kwargs.get("limit", None))
         events = None
 
         design_name = "event"
@@ -367,7 +367,7 @@ class EventRepository(object):
             end_key.append(end_ts)
 
         events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
-                                               id_only=False, **kwargs)
+                                               id_only=id_only, **kwargs)
         return events
 
 
