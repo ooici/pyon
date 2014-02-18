@@ -363,6 +363,13 @@ class TestPyonSelectConnection(PyonTestCase):
 
         self.assertRaises(NoFreeChannels, self.conn._next_channel_number)
 
+    def text__next_channel_number_adds_to_pending(self):
+        ch = self.conn._next_channel_number()
+        self.assertIn(ch, self.conn._pending)
+
+        ch2 = self.conn._next_channel_number()
+        self.assertNotEquals(ch, ch2)
+
 @attr('INT')
 class TestNodeBInt(IonIntegrationTestCase):
     def setUp(self):
@@ -394,5 +401,4 @@ class TestNodeBInt(IonIntegrationTestCase):
         self.assertNotEquals(curpoolchids, [o.get_channel_id() for o in self.node._bidir_pool.itervalues()])
         self.assertNotIn(ch, self.node._bidir_pool.itervalues())
         self.assertIn(ch, self.node._dead_pool)
-
 
