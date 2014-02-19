@@ -139,7 +139,7 @@ class IonIntegrationTestCase(unittest.TestCase):
 #                main_gl.throw(AssertionError("Container.fail_fast trying to terminate OS process, preventing"))
 #            spawn(call_in_main_context, greenlet.getcurrent())
 
-        patcher = patch('pyon.container.cc.os.kill')        # , kill)
+        patcher = patch('pyon.container.cc.Container._kill_fast')
         patcher.start()
         self.addCleanup(patcher.stop)
 
