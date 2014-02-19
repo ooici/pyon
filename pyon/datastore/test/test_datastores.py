@@ -37,16 +37,16 @@ class TestDataStoreUnitTest(IonUnitTestCase):
 
         # DatastoreQueryBuilder - WKT
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.overlaps_wkt(qb.RA_GEOM_LOC,wkt,buf))
-        self.assertEquals(qb.get_query()['where'], ['wkt:overlaps', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+        qb.build_query(where=qb.overlaps_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:overlaps_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.contains_wkt(qb.RA_GEOM_LOC,wkt,buf))
-        self.assertEquals(qb.get_query()['where'], ['wkt:contains', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+        qb.build_query(where=qb.contains_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:contains_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.within_wkt(qb.RA_GEOM_LOC,wkt,buf))
-        self.assertEquals(qb.get_query()['where'], ['wkt:within', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+        qb.build_query(where=qb.within_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:within_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
 
 @attr('INT', group='datastore')
 class TestDataStores(IonIntegrationTestCase):
@@ -886,12 +886,12 @@ class TestDataStores(IonIntegrationTestCase):
         self.assertEquals(len(res), 1)
 
         # two tests: first should NOT have above Site1 in radius, second should
-        qb = DatastoreQueryBuilder(where=qb.overlaps_wkt(qb.RA_GEOM,'POINT(2.0 2.0)',0.5))
+        qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',0.5))
         qb.build_query()
         res = data_store.find_resources_mult(qb.get_query())
         self.assertEquals(len(res), 0)
         # -- additional 0.001 is to compensate for outer edge NOT being considered an overlap/intersect
-        qb = DatastoreQueryBuilder(where=qb.overlaps_wkt(qb.RA_GEOM,'POINT(2.0 2.0)',1.001))
+        qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',1.001))
         qb.build_query()
         res = data_store.find_resources_mult(qb.get_query())
         self.assertEquals(len(res), 1)

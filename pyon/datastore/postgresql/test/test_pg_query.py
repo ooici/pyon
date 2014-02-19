@@ -26,32 +26,32 @@ class PostgresDataStoreUnitTest(IonUnitTestCase):
         
         # PostgresQueryBuilder - WKT (no buffer)
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.overlaps_wkt(qb.RA_GEOM_LOC,wkt,0.0))
+        qb.build_query(where=qb.overlaps_geom(qb.RA_GEOM_LOC,wkt,0.0))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Intersects(geom_loc,ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'))")
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.contains_wkt(qb.RA_GEOM_LOC,wkt,0.0))
+        qb.build_query(where=qb.contains_geom(qb.RA_GEOM_LOC,wkt,0.0))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Contains(geom_loc,ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'))")
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.within_wkt(qb.RA_GEOM_LOC,wkt,0.0))
+        qb.build_query(where=qb.within_geom(qb.RA_GEOM_LOC,wkt,0.0))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Within(geom_loc,ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'))")
 
         # PostgresQueryBuilder - WKT (with buffer)
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.overlaps_wkt(qb.RA_GEOM_LOC,wkt,buf))
+        qb.build_query(where=qb.overlaps_geom(qb.RA_GEOM_LOC,wkt,buf))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Intersects(geom_loc,ST_Buffer(ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'), 0.100000))")
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.contains_wkt(qb.RA_GEOM_LOC,wkt,buf))
+        qb.build_query(where=qb.contains_geom(qb.RA_GEOM_LOC,wkt,buf))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Contains(geom_loc,ST_Buffer(ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'), 0.100000))")
 
         qb = DatastoreQueryBuilder()
-        qb.build_query(where=qb.within_wkt(qb.RA_GEOM_LOC,wkt,buf))
+        qb.build_query(where=qb.within_geom(qb.RA_GEOM_LOC,wkt,buf))
         pqb = PostgresQueryBuilder(qb.get_query(), 'test')
         self.assertEquals(pqb.get_query(),"SELECT id,doc FROM test WHERE ST_Within(geom_loc,ST_Buffer(ST_GeomFromEWKT('SRID=4326;POINT(-72.0 40.0)'), 0.100000))")

@@ -40,10 +40,9 @@ class DatastoreQueryConst(object):
     GOP_WITHIN_BBOX = GOP_PREFIX + "within"
     GOP_CONTAINS_BBOX = GOP_PREFIX + "contains"
 
-    WKT_PREFIX = "wkt:"
-    WKT_OVERLAPS = WKT_PREFIX + "overlaps"
-    WKT_WITHIN = WKT_PREFIX + "within"
-    WKT_CONTAINS = WKT_PREFIX + "contains"
+    GOP_OVERLAPS_GEOM = GOP_PREFIX + "overlaps_geom"
+    GOP_WITHIN_GEOM = GOP_PREFIX + "within_geom"
+    GOP_CONTAINS_GEOM = GOP_PREFIX + "contains_geom"
 
     ROP_PREFIX = "rop:"
     ROP_OVERLAPS_RANGE = ROP_PREFIX + "overlaps"
@@ -190,20 +189,20 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
 
     # --- Geospatial (WKT) operators
 
-    def overlaps_wkt(self, col, wkt, buf):
+    def overlaps_geom(self, col, wkt, buf):
         self._check_col(col)
         colname = col.split(":", 1)[1]
-        return self.op_expr(self.WKT_OVERLAPS, colname, wkt, buf)
+        return self.op_expr(self.GOP_OVERLAPS_GEOM, colname, wkt, buf)
 
-    def contains_wkt(self, col, wkt, buf):
+    def contains_geom(self, col, wkt, buf):
         self._check_col(col)
         colname = col.split(":", 1)[1]
-        return self.op_expr(self.WKT_CONTAINS, colname, wkt, buf)
+        return self.op_expr(self.GOP_CONTAINS_GEOM, colname, wkt, buf)
 
-    def within_wkt(self, col, wkt, buf):
+    def within_geom(self, col, wkt, buf):
         self._check_col(col)
         colname = col.split(":", 1)[1]
-        return self.op_expr(self.WKT_WITHIN, colname, wkt, buf)
+        return self.op_expr(self.GOP_WITHIN_GEOM, colname, wkt, buf)
 
     # --- Ordering
 
