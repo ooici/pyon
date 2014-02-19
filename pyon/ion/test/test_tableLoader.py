@@ -41,7 +41,7 @@ from interface.objects import DataProduct
 import unittest
 import gevent
 import numpy as np
-
+,)
 from pyon.ion.tableLoader import resource_parser
 
 '''
