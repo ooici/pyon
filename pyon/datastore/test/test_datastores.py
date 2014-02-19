@@ -27,9 +27,29 @@ OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
 
-
 @attr('UNIT', group='datastore')
-class Test_DataStores(IonIntegrationTestCase):
+class TestDataStoreUnitTest(IonUnitTestCase):
+
+    def test_datastore_query_builder(self):
+
+        wkt = 'POINT(-72.0 40.0)'
+        buf = 0.1
+
+        # DatastoreQueryBuilder - WKT
+        qb = DatastoreQueryBuilder()
+        qb.build_query(where=qb.overlaps_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:overlaps_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+
+        qb = DatastoreQueryBuilder()
+        qb.build_query(where=qb.contains_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:contains_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+
+        qb = DatastoreQueryBuilder()
+        qb.build_query(where=qb.within_geom(qb.RA_GEOM_LOC,wkt,buf))
+        self.assertEquals(qb.get_query()['where'], ['gop:within_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
+
+@attr('INT', group='datastore')
+class TestDataStores(IonIntegrationTestCase):
 
     def setUp(self):
         self.server_type = CFG.get_safe("container.datastore.default_server", "couchdb")
@@ -835,9 +855,6 @@ class Test_DataStores(IonIntegrationTestCase):
         res = self.data_store.create(ass_obj, create_unique_association_id())
         return res
 
-#@attr('UNIT', group='datastore')
-#class DataStoreUnitTest(IonUnitTestCase):
-
     def test_datastore_query(self):
         if self.server_type != "postgresql":
             raise SkipTest("find_resources_mult only works with Postgres")
@@ -856,14 +873,25 @@ class Test_DataStores(IonIntegrationTestCase):
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.or_(qb.and_(qb.eq(qb.RA_NAME, "Buoy1"), qb.eq(qb.RA_NAME, "Buoy1")), qb.eq(qb.RA_NAME, "Buoy1")))
         res = data_store.find_resources_mult(qb.get_query())
-        print res
+        self.assertEquals(len(res), 1)
 
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.and_(qb.like(qb.RA_NAME, "Si%"), qb.overlaps_bbox(qb.RA_GEOM, 1, -1.2, 4, 4)))
         res = data_store.find_resources_mult(qb.get_query())
-        print res
+        self.assertEquals(len(res), 1)
 
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.attr_like("description", "My%"))
         res = data_store.find_resources_mult(qb.get_query())
-        print res
+        self.assertEquals(len(res), 1)
+
+        # two tests: first should NOT have above Site1 in radius, second should
+        qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',0.5))
+        qb.build_query()
+        res = data_store.find_resources_mult(qb.get_query())
+        self.assertEquals(len(res), 0)
+        # -- additional 0.001 is to compensate for outer edge NOT being considered an overlap/intersect
+        qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',1.001))
+        qb.build_query()
+        res = data_store.find_resources_mult(qb.get_query())
+        self.assertEquals(len(res), 1)
