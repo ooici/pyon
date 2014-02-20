@@ -15,7 +15,7 @@ from pyon.ion.identifier import create_unique_resource_id, create_unique_associa
 from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit, Predicates
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
-#from pyon.public import CFG
+from pyon.util.breakpoint import breakpoint
 from interface.objects import Attachment, AttachmentType, ResourceModificationType
 
 from pyon.ion.tableLoader import resource_parser
@@ -39,9 +39,17 @@ class ResourceRegistry(object):
         self.id = 'container_resource_registry'
 
         self.event_pub = EventPublisher()
-
+        
         self.rr_table_loader = resource_parser()
-        self.rr_table_loader.reset()
+        self.geos_available = False
+        try:
+            self.rr_table_loader.reset()
+            self.geos_available = True
+            pass
+        except Exception, e:
+            #check the eoi geoserver importer service is started
+            raise e
+        
 
     def start(self):
         pass
@@ -110,7 +118,7 @@ class ResourceRegistry(object):
         #if self.container.cfg.get_safe('system.fdw',None):
         if object._get_type() in ['Dataset']:
             print res
-            pdict = object['parameter_dictionary']            
+            pdict = object['parameter_dictionary']     
             self.rr_table_loader.createSingleResource(res_id,pdict)
     
 

@@ -219,8 +219,8 @@ class resource_parser():
 
                 pass
 
-            createTableString+=LATITUDE+" "+REAL
-            createTableString+=LONGITUDE+" "+REAL
+            #createTableString+=LATITUDE+" "+REAL
+            #createTableString+=LONGITUDE+" "+REAL
 
             pos = createTableString.rfind(',')
             createTableString = createTableString[:pos] + ' ' + createTableString[pos+1:]
@@ -235,7 +235,7 @@ class resource_parser():
                 self.cur.execute(createTableString)
                 self.con.commit()
 
-                self.cur.execute(self.generateTableView(dataset_id))
+                self.cur.execute(self.generateTableView(dataset_id,"lat","lon"))
                 self.con.commit()
 
                 return ((self.doesTableExist(dataset_id)),valid_types)
@@ -255,11 +255,11 @@ class resource_parser():
     '''
     generate table view including geom
     '''
-    def generateTableView(self,dataset_id):
+    def generateTableView(self,dataset_id,lat_field,lon_field):
         sqlquery = '''
-        CREATE or replace VIEW "%s_view" as SELECT ST_SetSRID(ST_MakePoint(10, 10),4326) as 
+        CREATE or replace VIEW "_%s_view" as SELECT ST_SetSRID(ST_MakePoint(%s, %s),4326) as 
         geom, * from "%s";
-        '''% (dataset_id,dataset_id)
+        '''% (dataset_id,lon_field,lat_field,dataset_id)
         return sqlquery
 
     '''
