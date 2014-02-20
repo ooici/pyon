@@ -33,7 +33,7 @@ GEOSPATIAL_COLS = {"geom", "geom_loc"}
 NUMRANGE_COLS = {"vertical_range", "temporal_range"}
 
 # Mapping of object type to table name extension and special attribute names
-OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_created", "ts_updated", "geom", "geom_loc", "vertical_range", "temporal_range")),
+OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "visibility", "name", "ts_created", "ts_updated", "geom", "geom_loc", "vertical_range", "temporal_range")),
                "A": ("_assoc", ("s", "st", "p", "o", "ot", "retired")),
                "D": ("_dir", ("org", "parent", "key")),
                "E": ("", ("origin", "origin_type", "sub_type", "ts_created", "type_")),
@@ -896,7 +896,7 @@ class PostgresDataStore(DataStore):
     def refresh_views(self, datastore_name="", profile=None):
         pass
 
-    def _get_view_args(self, all_args):
+    def _get_view_args(self, all_args, access_args=None):
         view_args = {}
         if all_args:
             view_args.update(all_args)
@@ -907,6 +907,8 @@ class PostgresDataStore(DataStore):
             extra_clause += " OFFSET %s " % all_args['skip']
 
         view_args['extra_clause'] = extra_clause
+        if access_args:
+            view_args.update(access_args)
         return view_args
 
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,

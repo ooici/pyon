@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-"""Datastore query expressions"""
+"""Datastore query expressions.
+
+This module provides constants and a factory class to compose structured queries against a datastore,
+including resources, events, objects datastores. It is inspired by the capabilities of a SQL query language
+such as Postgres+PostGIS, but is not targeted at a specific DMBS. Specific mapping classes can then provide
+a mapping to the datastore technology.
+"""
 
 __author__ = 'Michael Meisinger'
 
@@ -9,6 +15,7 @@ from pyon.datastore.datastore_common import DataStore
 
 
 class DatastoreQueryConst(object):
+    """Constants for generic datastore query expressions"""
 
     # Expression
     EXP_PREFIX = "exp:"
@@ -17,39 +24,40 @@ class DatastoreQueryConst(object):
     EXP_NOT = EXP_PREFIX + "not"
 
     # Operators
-    OP_PREFIX = "op:"
-    OP_EQ = OP_PREFIX + "eq"
-    OP_NEQ = OP_PREFIX + "neq"
-    OP_LT = OP_PREFIX + "lt"
-    OP_LTE = OP_PREFIX + "lte"
-    OP_GT = OP_PREFIX + "gt"
-    OP_GTE = OP_PREFIX + "gte"
-    OP_LIKE = OP_PREFIX + "like"
-    OP_ILIKE = OP_PREFIX + "ilike"
-    OP_FUZZY = OP_PREFIX + "fuzzy"
+    OP_PREFIX = "op:"                # Simple operators prefix
+    OP_EQ = OP_PREFIX + "eq"         # Find objects with special attr equal to given value
+    OP_NEQ = OP_PREFIX + "neq"       # Find objects with special attr not equal to given value
+    OP_LT = OP_PREFIX + "lt"         # Find objects with special attr lower than given value
+    OP_LTE = OP_PREFIX + "lte"       # Find objects with special attr lower than or equal given value
+    OP_GT = OP_PREFIX + "gt"         # Find objects with special attr greater than given value
+    OP_GTE = OP_PREFIX + "gte"       # Find objects with special attr greater than or equal given value
+    OP_LIKE = OP_PREFIX + "like"     # Find objects with special attr matching given pattern (case sensitive)
+    OP_ILIKE = OP_PREFIX + "ilike"   # Find objects with special attr matching given pattern (case insensitive)
+    OP_FUZZY = OP_PREFIX + "fuzzy"   # Find objects with special attr similar to given value (case insensitive)
 
-    XOP_PREFIX = "xop:"
-    XOP_IN = XOP_PREFIX + "in"
-    XOP_BETWEEN = XOP_PREFIX + "between"
-    XOP_ATTLIKE = XOP_PREFIX + "attlike"
-    XOP_ATTILIKE = XOP_PREFIX + "attilike"
-    XOP_ALLMATCH = XOP_PREFIX + "allmatch"
+    XOP_PREFIX = "xop:"                     # Extended operators prefix
+    XOP_IN = XOP_PREFIX + "in"              # Find objects with attr equal to one of given values
+    XOP_BETWEEN = XOP_PREFIX + "between"    # Find objects with attr between 2 given values (inclusive)
+    XOP_ATTLIKE = XOP_PREFIX + "attlike"    # Find objects with attr matching given pattern (case sensitive)
+    XOP_ATTILIKE = XOP_PREFIX + "attilike"  # Find objects with attr matching given pattern (case insensitive)
+    XOP_ALLMATCH = XOP_PREFIX + "allmatch"  # Find objects where values occurs within any of the first level attributes
+    XOP_ISTYPE = XOP_PREFIX + "istype"      # Find objects with type or base type equal to given value (e.g. events)
 
-    GOP_PREFIX = "gop:"
-    GOP_OVERLAPS_BBOX = GOP_PREFIX + "overlaps"
-    GOP_WITHIN_BBOX = GOP_PREFIX + "within"
-    GOP_CONTAINS_BBOX = GOP_PREFIX + "contains"
+    GOP_PREFIX = "gop:"                               # Geospatial operators prefix
+    GOP_OVERLAPS_BBOX = GOP_PREFIX + "overlaps"       # Find objects with geometry overlapping given bbox
+    GOP_WITHIN_BBOX = GOP_PREFIX + "within"           # Find objects with geometry within given bbox
+    GOP_CONTAINS_BBOX = GOP_PREFIX + "contains"       # Find objects with geometry containing given bbox
 
-    GOP_OVERLAPS_GEOM = GOP_PREFIX + "overlaps_geom"
-    GOP_WITHIN_GEOM = GOP_PREFIX + "within_geom"
-    GOP_CONTAINS_GEOM = GOP_PREFIX + "contains_geom"
+    GOP_OVERLAPS_GEOM = GOP_PREFIX + "overlaps_geom"  # Find objects with geometry overlapping given WKT geometry
+    GOP_WITHIN_GEOM = GOP_PREFIX + "within_geom"      # Find objects with geometry within given WKT geometry
+    GOP_CONTAINS_GEOM = GOP_PREFIX + "contains_geom"  # Find objects with geometry containing given WKT geometry
 
-    ROP_PREFIX = "rop:"
-    ROP_OVERLAPS_RANGE = ROP_PREFIX + "overlaps"
-    ROP_WITHIN_RANGE = ROP_PREFIX + "within"
-    ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"
+    ROP_PREFIX = "rop:"                               # Range operators prefix
+    ROP_OVERLAPS_RANGE = ROP_PREFIX + "overlaps"      # Find objects with range overlapping given range
+    ROP_WITHIN_RANGE = ROP_PREFIX + "within"          # Find objects with range containing given range
+    ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"      # Find objects with range containing given range
 
-    # Object and resource attribute
+    # Object, resource and event attribute
     ATT_ID = "att:id"
     ATT_TYPE = "att:type_"
     RA_NAME = "ra:name"
@@ -61,6 +69,15 @@ class DatastoreQueryConst(object):
     RA_GEOM_LOC = "ra:geom_loc"
     RA_VERT_RANGE = "ra:vertical_range"
     RA_TEMP_RANGE = "ra:temporal_range"
+    EA_ORIGIN = "ea:origin"
+    EA_ORIGIN_TYPE = "ea:origin_type"
+    EA_SUB_TYPE = "ea:sub_type"
+    EA_ACTOR_ID = "ea:actor_id"
+
+    # Query types
+    QTYPE_RES = "qt:resource"
+    QTYPE_ASSOC = "qt:association"
+    QTYPE_OBJ = "qt:object"
 
 
 DQ = DatastoreQueryConst
@@ -96,6 +113,9 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
     def get_query(self):
         self.check_query(self.query)
         return self.query
+
+    # -------------------------------------------------------------------------
+    # Helpers to construct query filter expressions. Nest with and_ and or_
 
     def op_expr(self, operator, *args):
         return [operator, args or []]

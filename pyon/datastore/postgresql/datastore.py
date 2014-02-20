@@ -108,59 +108,35 @@ class PostgresPyonDataStore(PostgresDataStore):
     # -------------------------------------------------------------------------
     # View operations
 
-    def find_objects_mult(self, subjects, id_only=False):
+    def find_objects_mult(self, subjects, id_only=False, predicate=None, access_args=None):
         """
         Returns a list of associations for a given list of subjects
         """
-        #ds, datastore_name = self._get_datastore()
-        #validate_is_instance(subjects, list, 'subjects is not a list of resource_ids')
-        #view_args = dict(keys=subjects, include_docs=True)
-        #results = self.query_view(self._get_view_name("association", "by_bulk"), view_args)
-        #ids = [i['value'] for i in results]
-        #assocs = [i['doc'] for i in results]
-        #self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
-        #if id_only:
-        #    return ids, assocs
-        #else:
-        #    return self.read_mult(ids), assocs
-
         # TODO: Port this implementation to Postgres single query
         res_list = [[], []]
         if not subjects:
             return res_list
         for sub in subjects:
-            res_ids, res_assocs = self.find_objects(subject=sub, id_only=id_only)
+            res_ids, res_assocs = self.find_objects(subject=sub, id_only=id_only, predicate=predicate, access_args=access_args)
             res_list[0].extend(res_ids)
             res_list[1].extend(res_assocs)
         return res_list
 
-    def find_subjects_mult(self, objects, id_only=False):
+    def find_subjects_mult(self, objects, id_only=False, predicate=None, access_args=None):
         """
         Returns a list of associations for a given list of objects
         """
-        #ds, datastore_name = self._get_datastore()
-        #validate_is_instance(objects, list, 'objects is not a list of resource_ids')
-        #view_args = dict(keys=objects, include_docs=True)
-        #results = self.query_view(self._get_view_name("association", "by_subject_bulk"), view_args)
-        #ids = [i['value'] for i in results]
-        #assocs = [i['doc'] for i in results]
-        #self._count(find_assocs_mult_call=1, find_assocs_mult_obj=len(ids))
-        #if id_only:
-        #    return ids, assocs
-        #else:
-        #    return self.read_mult(ids), assocs
-
         # TODO: Port this implementation to Postgres single query
         res_list = [[], []]
         if not objects:
             return res_list
         for obj in objects:
-            res_ids, res_assocs = self.find_subjects(obj=obj, id_only=id_only)
+            res_ids, res_assocs = self.find_subjects(obj=obj, id_only=id_only, predicate=predicate, access_args=access_args)
             res_list[0].extend(res_ids)
             res_list[1].extend(res_assocs)
         return res_list
 
-    def find_objects(self, subject, predicate=None, object_type=None, id_only=False, **kwargs):
+    def find_objects(self, subject, predicate=None, object_type=None, id_only=False, access_args=None, **kwargs):
         #log.debug("find_objects(subject=%s, predicate=%s, object_type=%s, id_only=%s", subject, predicate, object_type, id_only)
 
         if type(id_only) is not bool:
@@ -179,12 +155,15 @@ class PostgresPyonDataStore(PostgresDataStore):
                 subject_id = subject._id
 
         qual_ds_name = self._get_datastore_name()
-        view_args = self._get_view_args(kwargs)
+        assoc_table_name = qual_ds_name+"_assoc"
+        table_names = dict(ds=qual_ds_name, dsa=assoc_table_name)
+        view_args = self._get_view_args(kwargs, access_args)
 
         if id_only:
-            query = "SELECT o, doc FROM %(dsa)s WHERE retired<>true " % dict(dsa=qual_ds_name+"_assoc")
+            #query = "SELECT o, doc FROM %(dsa)s WHERE retired<>true " % table_names
+            query = "SELECT %(dsa)s.o, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.o=%(ds)s.id " % table_names
         else:
-            query = "SELECT %(ds)s.doc, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.o=%(ds)s.id " % dict(ds=qual_ds_name, dsa=qual_ds_name+"_assoc")
+            query = "SELECT %(ds)s.doc, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.o=%(ds)s.id " % table_names
         query_args = dict(s=subject_id, ot=object_type, p=predicate)
 
         query_clause = "AND s=%(s)s"
@@ -193,6 +172,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             if object_type:
                 query_clause += " AND ot=%(ot)s"
 
+        query_clause = self._add_access_filter(access_args, qual_ds_name, query_clause, query_args)
         extra_clause = view_args.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -207,7 +187,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             res_objs = [self._persistence_dict_to_ion_object(row[0]) for row in rows]
             return res_objs, obj_assocs
 
-    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, **kwargs):
+    def find_subjects(self, subject_type=None, predicate=None, obj=None, id_only=False, access_args=None, **kwargs):
         #log.debug("find_subjects(subject_type=%s, predicate=%s, object=%s, id_only=%s", subject_type, predicate, obj, id_only)
 
         if type(id_only) is not bool:
@@ -226,12 +206,15 @@ class PostgresPyonDataStore(PostgresDataStore):
                 object_id = obj._id
 
         qual_ds_name = self._get_datastore_name()
-        view_args = self._get_view_args(kwargs)
+        assoc_table_name = qual_ds_name+"_assoc"
+        table_names = dict(ds=qual_ds_name, dsa=assoc_table_name)
+        view_args = self._get_view_args(kwargs, access_args)
 
         if id_only:
-            query = "SELECT s, doc FROM %(dsa)s WHERE retired<>true " % dict(dsa=qual_ds_name+"_assoc")
+            #query = "SELECT s, doc FROM %(dsa)s WHERE retired<>true " % table_names
+            query = "SELECT %(dsa)s.s, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.s=%(ds)s.id " % table_names
         else:
-            query = "SELECT %(ds)s.doc, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.s=%(ds)s.id " % dict(ds=qual_ds_name, dsa=qual_ds_name+"_assoc")
+            query = "SELECT %(ds)s.doc, %(dsa)s.doc FROM %(dsa)s, %(ds)s WHERE retired<>true AND %(dsa)s.s=%(ds)s.id " % table_names
         query_args = dict(o=object_id, st=subject_type, p=predicate)
 
         query_clause = "AND o=%(o)s"
@@ -240,6 +223,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             if subject_type:
                 query_clause += " AND st=%(st)s"
 
+        query_clause = self._add_access_filter(access_args, qual_ds_name, query_clause, query_args)
         extra_clause = view_args.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -375,14 +359,51 @@ class PostgresPyonDataStore(PostgresDataStore):
             res_docs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
             return res_docs, res_assocs
 
-    def find_resources(self, restype="", lcstate="", name="", id_only=True):
-        return self.find_resources_ext(restype=restype, lcstate=lcstate, name=name, id_only=id_only)
+    def _add_access_filter(self, view_args, tablename, query_clause, query_args):
+        """Returns a Postgres SQL filter clause and referenced values for resource queries filtered
+        by resource visibility and current actor role/facility membership/superuser status"""
+        view_args = view_args if view_args is not None else {}
+        current_actor_id = view_args.get("current_actor_id", None)
+        superuser_actor_ids = view_args.get("superuser_actor_ids", None) or []
+
+        access_filter = ""
+        access_args = {}
+        access_args["current_actor_id"] = current_actor_id
+        assoc_tablename = tablename + "_assoc"
+        if current_actor_id in superuser_actor_ids:
+            # Current user is a superuser - no additional filter
+            pass
+        elif current_actor_id and current_actor_id != "anonymous":
+            # Registered actor
+            # - Return all PUBLIC, REGISTERED
+            access_filter += tablename + ".visibility NOT IN (3,4)"  # 1, 2, null and other values
+            # - Return all owned by user independent of visibility
+            access_filter += " OR (" + tablename + ".id IN (SELECT s FROM " + assoc_tablename + \
+                             " WHERE p='hasOwner' AND o=%(current_actor_id)s))"
+            # - Return all FACILITY if user is in same facility
+            access_filter += " OR (" + tablename + ".visibility=3 AND " + tablename + ".id IN (SELECT o FROM " + assoc_tablename + \
+                             " WHERE p='hasResource' AND st='Org' AND s IN (SELECT s FROM " + assoc_tablename + \
+                             " WHERE p='hasMembership' AND st='Org' AND o=%(current_actor_id)s)))"
+        else:
+            # Anonymous access
+            # All public resources
+            access_filter += tablename + ".visibility NOT IN (2,3,4)"
+
+        if query_clause and access_filter:
+            query_clause += " AND (" + access_filter + ")"
+        elif not query_clause and access_filter:
+            query_clause = " WHERE " + access_filter
+        query_args.update(access_args)
+        return query_clause
+
+    def find_resources(self, restype="", lcstate="", name="", id_only=True, access_args=None):
+        return self.find_resources_ext(restype=restype, lcstate=lcstate, name=name, id_only=id_only, access_args=access_args)
 
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id=None, alt_id_ns=None,
-                           limit=None, skip=None, descending=None, id_only=True):
-        filter_kwargs = self._get_view_args(dict(limit=limit, skip=skip, descending=descending))
+                           limit=None, skip=None, descending=None, id_only=True, access_args=None):
+        filter_kwargs = self._get_view_args(dict(limit=limit, skip=skip, descending=descending), access_args)
         if name:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
@@ -426,6 +447,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             # Returns ALL documents, only limited by filter
             query_clause = ""
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -460,6 +482,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if restype:
             query_clause += " AND type_=%(type_)s"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -486,6 +509,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if restype:
             query_clause += " AND type_=%(type_)s"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -515,6 +539,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if restype:
             query_clause += " AND type_=%(type_)s"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -543,6 +568,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if restype:
             query_clause += " AND type_=%(type_)s"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -576,6 +602,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if restype:
             query_clause += " AND type_=%(type_)s"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -595,21 +622,6 @@ class PostgresPyonDataStore(PostgresDataStore):
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
         filter = filter if filter is not None else {}
         qual_ds_name = self._get_datastore_name()
-        #if id_only:
-        #    query = "SELECT id, x[1], x[2] FROM (SELECT json_altids(doc) as x, * FROM " + qual_ds_name + ") AS A"
-        #else:
-        #    query = "SELECT id, x[1], x[2], doc FROM (SELECT json_altids(doc) as x, * FROM " + qual_ds_name + ") AS A"
-        #query_args = dict(aid=alt_id, ans=alt_id_ns)
-        #query_clause = " WHERE lcstate<>'RETIRED' "
-        #
-        #if not alt_id and not alt_id_ns:
-        #    query_clause += " "
-        #elif alt_id and not alt_id_ns:
-        #    query_clause += " AND x[2]=%(aid)s"
-        #elif alt_id_ns and not alt_id:
-        #    query_clause += " AND x[1]=%(ans)s"
-        #else:
-        #    query_clause += " AND x[1]=%(ans)s AND x[2]=%(aid)s"
 
         query = "SELECT id, type_, doc FROM " + qual_ds_name
         query_args = dict(aid=[alt_id], ans=[alt_id_ns])
@@ -624,6 +636,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         else:
             query_clause += "AND %(aid)s <@ json_altids_id(doc) AND %(ans)s <@ json_altids_ns(doc)"
 
+        query_clause = self._add_access_filter(filter, qual_ds_name, query_clause, query_args)
         extra_clause = filter.get("extra_clause", "")
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(query + query_clause + extra_clause, query_args)
@@ -674,7 +687,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         log.debug("find_by_view() found %s objects" % (len(res_rows)))
         return res_rows
 
-    def find_resources_mult(self, query):
+    def find_by_query(self, query, access_args=None):
         """
         Find resources given a datastore query expression dict.
         @param query  a dict representation of a datastore query
@@ -683,10 +696,12 @@ class PostgresPyonDataStore(PostgresDataStore):
         qual_ds_name = self._get_datastore_name()
 
         pqb = PostgresQueryBuilder(query, qual_ds_name)
+        pqb.where = self._add_access_filter(access_args, qual_ds_name, pqb.where, pqb.values)
+
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(pqb.get_query(), pqb.get_values())
             rows = cur.fetchall()
-            log.info("find_resources_mult() QUERY: %s (%s rows)", cur.query, cur.rowcount)
+            log.info("find_by_query() QUERY: %s (%s rows)", cur.query, cur.rowcount)
 
         id_only = query["query_args"].get("id_only", True)
         if id_only:
@@ -695,6 +710,8 @@ class PostgresPyonDataStore(PostgresDataStore):
         else:
             res_docs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
             return res_docs
+
+    find_resources_mult = find_by_query   # Alias
 
     # -------------------------------------------------------------------------
     # Internal operations

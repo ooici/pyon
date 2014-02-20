@@ -197,39 +197,3 @@ class InterfaceAdmin:
         self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"
-
-#
-#def change_config():
-#    if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
-#        if parent.startswith("/Config"):
-#            self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
-#                origin="Directory")
-"""
-        self._assert_existence("/", "Agents",
-            description="Running agents are registered here")
-
-        self._assert_existence("/", "Config",
-            description="System configuration is registered here")
-
-        self._assert_existence("/", "Containers",
-            description="Running containers are registered here")
-
-        self._assert_existence("/", "ObjectTypes",
-            description="ObjectTypes are registered here")
-
-        self._assert_existence("/", "Org",
-            description="Org specifics are registered here",
-            is_root=self.is_root)
-
-        self._assert_existence("/Org", "Resources",
-            description="Shared Org resources are registered here")
-
-        self._assert_existence("/", "ResourceTypes",
-            description="Resource types are registered here")
-
-        self._assert_existence("/", "ServiceInterfaces",
-            description="Service interface definitions are registered here")
-
-        self._assert_existence("/", "Services",
-            description="Service instances are registered here")
-"""

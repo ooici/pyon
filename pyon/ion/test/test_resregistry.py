@@ -6,11 +6,11 @@ import uuid
 
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound, Inconsistent, BadRequest
-from pyon.ion.resource import PRED, RT, LCS, AS, LCE, lcstate
+from pyon.ion.resource import PRED, RT, LCS, AS, LCE, lcstate, create_access_args
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
 
-from interface.objects import Attachment, AttachmentType
+from interface.objects import Attachment, AttachmentType, ResourceVisibilityEnum
 
 
 @attr('INT', group='resource')
@@ -354,3 +354,172 @@ class TestResourceRegistry(IonIntegrationTestCase):
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
         self.assertEquals(inst_obj1.availability, AS.AVAILABLE)
+
+    def test_visibility(self):
+        res_objs = [
+            (IonObject(RT.ActorIdentity, name="system"), ),
+            (IonObject(RT.ActorIdentity, name="AI1"), ),
+            (IonObject(RT.ActorIdentity, name="AI2"), ),
+            (IonObject(RT.ActorIdentity, name="AI3"), ),
+
+            (IonObject(RT.Org, name="Org1"), ),
+            (IonObject(RT.Org, name="Org2"), ),
+
+            (IonObject(RT.InstrumentDevice, name="ID1a", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.InstrumentDevice, name="ID1b", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.PRIVATE), "AI1"),
+            (IonObject(RT.InstrumentDevice, name="ID1c", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.InstrumentDevice, name="ID2a", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.InstrumentDevice, name="ID2b", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.InstrumentDevice, name="ID2c", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), ),
+            (IonObject(RT.InstrumentDevice, name="ID3a", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.InstrumentDevice, name="ID3b", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.InstrumentDevice, name="ID3c", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), ),
+            (IonObject(RT.InstrumentDevice, name="ID4a", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.InstrumentDevice, name="ID4b", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.InstrumentDevice, name="ID4c", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), ),
+
+            (IonObject(RT.DataProduct, name="DP1a", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.DataProduct, name="DP1b", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.PRIVATE), "AI1"),
+            (IonObject(RT.DataProduct, name="DP1c", visibility=ResourceVisibilityEnum.PUBLIC, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.DataProduct, name="DP2a", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.DataProduct, name="DP2b", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.DataProduct, name="DP2c", visibility=ResourceVisibilityEnum.REGISTERED, availability=AS.AVAILABLE), ),
+            (IonObject(RT.DataProduct, name="DP3a", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.DataProduct, name="DP3b", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.DataProduct, name="DP3c", visibility=ResourceVisibilityEnum.FACILITY, availability=AS.AVAILABLE), ),
+            (IonObject(RT.DataProduct, name="DP4a", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), "AI1"),
+            (IonObject(RT.DataProduct, name="DP4b", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), "AI2"),
+            (IonObject(RT.DataProduct, name="DP4c", visibility=ResourceVisibilityEnum.OWNER, availability=AS.AVAILABLE), ),
+        ]
+        assocs = [
+            ("Org1", PRED.hasMembership, "AI2"),
+            ("Org1", PRED.hasResource, "ID3a"),
+            ("Org1", PRED.hasResource, "ID3b"),
+            ("Org1", PRED.hasResource, "ID3c"),
+
+            ("ID1a", PRED.hasOutputProduct, "DP1a"),
+            ("ID1b", PRED.hasOutputProduct, "DP1b"),
+            ("ID1c", PRED.hasOutputProduct, "DP1c"),
+            ("ID2a", PRED.hasOutputProduct, "DP2a"),
+            ("ID2b", PRED.hasOutputProduct, "DP2b"),
+            ("ID2c", PRED.hasOutputProduct, "DP2c"),
+            ("ID3a", PRED.hasOutputProduct, "DP3a"),
+            ("ID3b", PRED.hasOutputProduct, "DP3b"),
+            ("ID3c", PRED.hasOutputProduct, "DP3c"),
+            ("ID4a", PRED.hasOutputProduct, "DP4a"),
+            ("ID4b", PRED.hasOutputProduct, "DP4b"),
+            ("ID4c", PRED.hasOutputProduct, "DP4c"),
+
+            ("DP1a", PRED.hasSource, "ID1a"),
+            ("DP1b", PRED.hasSource, "ID1b"),
+            ("DP1c", PRED.hasSource, "ID1c"),
+            ("DP2a", PRED.hasSource, "ID2a"),
+            ("DP2b", PRED.hasSource, "ID2b"),
+            ("DP2c", PRED.hasSource, "ID2c"),
+            ("DP3a", PRED.hasSource, "ID3a"),
+            ("DP3b", PRED.hasSource, "ID3b"),
+            ("DP3c", PRED.hasSource, "ID3c"),
+            ("DP4a", PRED.hasSource, "ID4a"),
+            ("DP4b", PRED.hasSource, "ID4b"),
+            ("DP4c", PRED.hasSource, "ID4c"),
+        ]
+        res_by_name = {}
+        for res_entry in res_objs:
+            res_obj = res_entry[0]
+            res_name = res_obj.name
+            res_obj.alt_ids.append("TEST:%s" % res_name)
+            actor_id = res_by_name[res_entry[1]] if len(res_entry) > 1 else None
+            rid, _ = self.rr.create(res_obj, actor_id=actor_id)
+            res_by_name[res_name] = rid
+        for assoc in assocs:
+            sname, p, oname = assoc
+            s, o = res_by_name[sname], res_by_name[oname]
+            self.rr.create_association(s, p, o)
+
+        # Finds with different caller actors
+        # - Anonymous call (expects only PUBLIC)
+        rids, _ = self.rr.find_resources(restype=RT.InstrumentDevice, id_only=True)
+        self.assertEquals(len(rids), 3)
+        for rname in ["ID1a", "ID1b", "ID1c"]:
+            self.assertIn(res_by_name[rname], rids)
+
+        # - Registered user call (expects to see all REGISTERED and owned resources)
+        access_args = create_access_args(current_actor_id=res_by_name["AI1"])
+        rids, _ = self.rr.find_resources(restype=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 8)
+        for rname in ["ID1a", "ID1b", "ID1c", "ID2a", "ID2b", "ID2c", "ID3a", "ID4a"]:
+            self.assertIn(res_by_name[rname], rids, "Resource %s" % rname)
+
+        # - Facility
+        access_args = create_access_args(current_actor_id=res_by_name["AI2"])
+        rids, _ = self.rr.find_resources(restype=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        #self.assertEquals(len(rids), 9)
+        for rname in ["ID1a", "ID1b", "ID1c", "ID2a", "ID2b", "ID2c", "ID3a", "ID3b", "ID4b"]:
+            self.assertIn(res_by_name[rname], rids, "Resource %s" % rname)
+
+        # - Superuser call (expects to see all)
+        access_args = create_access_args(current_actor_id=res_by_name["AI1"],
+                                         superuser_actor_ids=[res_by_name["AI1"]])
+        rids, _ = self.rr.find_resources(restype=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 12)
+
+
+
+        # Find by association
+        # - Anonymous
+        rids, _ = self.rr.find_subjects(subject_type=RT.InstrumentDevice, predicate=PRED.hasOutputProduct,
+                                        object=res_by_name["DP1a"], id_only=True)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID1a"])
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP1a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID1a"])
+
+        # - Owner
+        rids, _ = self.rr.find_subjects(subject_type=RT.InstrumentDevice, predicate=PRED.hasOutputProduct,
+                                        object=res_by_name["DP4a"], id_only=True)
+        self.assertEquals(len(rids), 0)
+        access_args = create_access_args(current_actor_id=res_by_name["AI1"])
+        rids, _ = self.rr.find_subjects(subject_type=RT.InstrumentDevice, predicate=PRED.hasOutputProduct,
+                                        object=res_by_name["DP4a"], id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID4a"])
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP4a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True)
+        self.assertEquals(len(rids), 0)
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP4a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID4a"])
+
+        # - Superuser
+        access_args = create_access_args(current_actor_id=res_by_name["AI3"],
+                                         superuser_actor_ids=[res_by_name["AI3"]])
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP4a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID4a"])
+
+        # - Facility
+        rids, _ = self.rr.find_subjects(subject_type=RT.InstrumentDevice, predicate=PRED.hasOutputProduct,
+                                        object=res_by_name["DP3a"], id_only=True)
+        self.assertEquals(len(rids), 0)
+        access_args = create_access_args(current_actor_id=res_by_name["AI2"])
+        rids, _ = self.rr.find_subjects(subject_type=RT.InstrumentDevice, predicate=PRED.hasOutputProduct,
+                                        object=res_by_name["DP3a"], id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID3a"])
+
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP3a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True)
+        self.assertEquals(len(rids), 0)
+        rids, _ = self.rr.find_objects(subject=res_by_name["DP3a"], predicate=PRED.hasSource,
+                                       object_type=RT.InstrumentDevice, id_only=True, access_args=access_args)
+        self.assertEquals(len(rids), 1)
+        self.assertEquals(rids[0], res_by_name["ID3a"])
+
+        #from pyon.util.breakpoint import breakpoint
+        #breakpoint()
+
+        self.rr.rr_store.delete_mult(res_by_name.values())

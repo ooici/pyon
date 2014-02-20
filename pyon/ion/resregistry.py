@@ -5,14 +5,16 @@
 __author__ = 'Michael Meisinger'
 
 from pyon.core import bootstrap
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.core.registry import getextends
 from pyon.datastore.datastore import DataStore
 from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
-from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit, Predicates
+from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, \
+    lcstate, lcsplit, Predicates, create_access_args
+from pyon.ion.process import get_ion_actor_id
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 
@@ -38,6 +40,8 @@ class ResourceRegistry(object):
         self.id = 'container_resource_registry'
 
         self.event_pub = EventPublisher()
+
+        self.superuser_actors = None
 
     def start(self):
         pass
@@ -621,20 +625,26 @@ class ResourceRegistry(object):
                     subject_type, predicate, object, len(sub_list)))
             return sub_list[0] if id_only else self.read(sub_list[0])
 
-    def find_objects(self, subject="", predicate="", object_type="", id_only=False, limit=None, skip=None, descending=None):
-        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only, limit=limit, skip=skip, descending=descending)
+    def find_objects(self, subject="", predicate="", object_type="", id_only=False,
+                     limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only,
+                                          limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_subjects(self, subject_type="", predicate="", object="", id_only=False, limit=None, skip=None, descending=None):
-        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only, limit=limit, skip=skip, descending=descending)
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False,
+                      limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only,
+                                           limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None, limit=None, skip=None, descending=None):
-        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside, limit=limit, skip=skip, descending=descending)
+    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None,
+                          limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside,
+                                               limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_objects_mult(self, subjects=[], id_only=False):
-        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only)
+    def find_objects_mult(self, subjects=[], id_only=False, access_args=None):
+        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only, access_args=access_args)
 
-    def find_subjects_mult(self, objects=[], id_only=False):
-        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only)
+    def find_subjects_mult(self, objects=[], id_only=False, access_args=None):
+        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only, access_args=access_args)
 
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         assoc = self.rr_store.find_associations(subject, predicate, object, id_only=id_only)
@@ -646,18 +656,37 @@ class ResourceRegistry(object):
                 subject, predicate, object))
         return assoc[0]
 
-    def find_resources(self, restype="", lcstate="", name="", id_only=False):
-        return self.rr_store.find_resources(restype, lcstate, name, id_only=id_only)
+    def find_resources(self, restype="", lcstate="", name="", id_only=False, access_args=None):
+        return self.rr_store.find_resources(restype, lcstate, name, id_only=id_only, access_args=access_args)
 
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id="", alt_id_ns="",
-                           limit=None, skip=None, descending=None, id_only=False):
+                           limit=None, skip=None, descending=None, id_only=False, access_args=None):
         return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
             keyword=keyword, nested_type=nested_type,
             attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
-            id_only=id_only)
+            id_only=id_only, access_args=access_args)
+
+
+    def get_superuser_actors(self, reset=False):
+        """Returns a memoized list of system superusers, including the system actor and all actors with
+        ION_MANAGER role assignment"""
+        if reset or self.superuser_actors is None:
+            found_actors = []
+            system_actor_name = CFG.get_safe("system.system_actor", "ionsystem")
+            sysactors,_ = self.find_resources(restype=RT.ActorIdentity, name=system_actor_name, id_only=True)
+            found_actors.extend(sysactors)
+            ion_mgrs,_ = self.find_resources_ext(restype=RT.UserRole, attr_name="governance_name", attr_value="ION_MANAGER", id_only=False)
+            # roles,_ = self.find_resources(restype=RT.UserRole, id_only=False)
+            # ion_mgrs = [role for role in roles if role.governance_name == "ION_MANAGER"]
+            actors, assocs = self.find_subjects_mult(ion_mgrs, id_only=False)
+            super_actors = list({actor._id for actor, assoc in zip(actors, assocs) if assoc.p == PRED.hasRole and assoc.st == RT.ActorIdentity})
+            found_actors.extend(super_actors)
+            self.superuser_actors = found_actors
+            log.info("get_superuser_actors(): system actor=%s, superuser actors=%s" % (sysactors, super_actors))
+        return self.superuser_actors
 
 
     # -------------------------------------------------------------------------
@@ -722,15 +751,16 @@ class ResourceRegistry(object):
         return resource_data
 
 
-    #This is a method used for testing - do not remove
+    # This is a method used for testing - do not remove
     def get_user_id_test(self, resource_id, user_id=None):
         return user_id
 
 
 class ResourceRegistryServiceWrapper(object):
     """
-    The purpose of this class is to provide the exact service interface of the resource_registry (YML)
-    interface definition. In particular for create that extracts the actor header for use as owner.
+    The purpose of this class is to map the service interface of the resource_registry service (YML)
+    to the container's resource registry instance.
+    In particular it extracts the actor from the current message context for use as owner.
     """
     def __init__(self, rr, process):
         self._rr = rr
@@ -742,15 +772,49 @@ class ResourceRegistryServiceWrapper(object):
         return getattr(self._rr, attr)
 
     def create(self, object=None):
-        ion_actor_id = None
-        if self._process:
-            ctx = self._process.get_context()
-            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
-        return self._rr.create(object=object, actor_id=ion_actor_id)
+        return self._rr.create(object=object, actor_id=get_ion_actor_id(self._process))
 
     def create_attachment(self, resource_id='', attachment=None):
-        ion_actor_id = None
-        if self._process:
-            ctx = self._process.get_context()
-            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
-        return self._rr.create_attachment(resource_id=resource_id, attachment=attachment, actor_id=ion_actor_id)
+        return self._rr.create_attachment(resource_id=resource_id, attachment=attachment, actor_id=get_ion_actor_id(self._process))
+
+    def find_objects(self, subject="", predicate="", object_type="", id_only=False, limit=0, skip=0, descending=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_objects(subject=subject, predicate=predicate,
+            object_type=object_type, id_only=id_only,
+            limit=limit, skip=skip, descending=descending, access_args=access_args)
+
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False, limit=0, skip=0, descending=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_subjects(subject_type=subject_type, predicate=predicate,
+            object=object, id_only=id_only,
+            limit=limit, skip=skip, descending=descending, access_args=access_args)
+
+    def find_objects_mult(self, subjects=None, id_only=False, predicate=""):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_objects_mult(subjects=subjects, id_only=id_only,
+                                                        predicate=predicate, access_args=access_args)
+
+    def find_subjects_mult(self, objects=None, id_only=False, predicate=""):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_subjects_mult(objects=objects, id_only=id_only,
+                                                         predicate=predicate, access_args=access_args)
+
+    def find_resources(self, restype="", lcstate="", name="", id_only=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_resources(restype=restype, lcstate=lcstate, name=name, id_only=id_only,
+                                                     access_args=access_args)
+
+    def find_resources_ext(self, restype='', lcstate='', name='', keyword='', nested_type='', attr_name='', attr_value='',
+                           alt_id='', alt_id_ns='', limit=0, skip=0, descending=False, id_only=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
+            keyword=keyword, nested_type=nested_type, attr_name=attr_name, attr_value=attr_value,
+            alt_id=alt_id, alt_id_ns=alt_id_ns,
+            limit=limit, skip=skip, descending=descending,
+            id_only=id_only, access_args=access_args)

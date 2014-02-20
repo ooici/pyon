@@ -142,14 +142,12 @@ def get_restype_lcsm(restype):
     return lcs_workflows.get(restype, None)
 
 
-# TODO: Remove references to this from coi-services
-# def get_maturity_visibility(lcstate):
-
-
 def is_resource(object):
+    """Returns true if the given object is a resource (i.e. a sub-type of Resource)"""
     return issubtype(object.type_, "Resource")
 
 def lcstate(maturity, availability):
+    """Helper method that creates a composite lcstate and availability string"""
     if not maturity and maturity not in LCS:
         return BadRequest("lcstate maturity %s unknown" % maturity)
     if not availability and availability not in AS:
@@ -158,6 +156,14 @@ def lcstate(maturity, availability):
 
 def lcsplit(lcstate):
     return lcstate.split('_', 1)
+
+def create_access_args(current_actor_id=None, superuser_actor_ids=None):
+    """Returns a dict that can be provided to resource registry and datastore find operations to indicate
+    the caller's and
+    """
+    access_args = dict(current_actor_id=current_actor_id,
+                       superuser_actor_ids=superuser_actor_ids)
+    return access_args
 
 
 def get_object_schema(resource_type):

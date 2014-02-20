@@ -77,6 +77,9 @@ class PostgresQueryBuilder(object):
         elif op.startswith(DQ.ROP_PREFIX):
             colname, x1, y1 = args
             return "%s %s %s::numrange" % (colname, self.OP_STR[op], self._value("[%s,%s]" % (x1, y1)))
+        elif op.startswith(DQ.GOP_PREFIX) and op.endswith("_geom"):
+            colname, geom_wkt = args
+            return "%s %s ST_GeomFromText(%s,4326)" % (colname, self.OP_STR[op], self._value(geom_wkt))
         elif op.startswith(DQ.GOP_PREFIX):
             if op.endswith('_geom'):
                 colname, wkt, buf = args
