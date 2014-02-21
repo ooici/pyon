@@ -307,7 +307,17 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.RETIRED)
-        self.assertEquals(inst_obj1.availability, AS.PRIVATE)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
+
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
+        with self.assertRaises(BadRequest):
+            self.rr.execute_lifecycle_transition(iid, LCE.ANNOUNCE)
+
+        self.rr.execute_lifecycle_transition(iid, LCE.DELETE)
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.DELETED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
         massocs = self.rr.find_associations(anyside=mid)
         self.assertEquals(len(massocs), 0)
@@ -318,12 +328,6 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(len(res_objs), 0)
         aids,_ = self.rr.find_objects(iid, PRED.hasModel, RT.InstrumentModel, id_only=True)
         self.assertEquals(len(aids), 0)
-
-        with self.assertRaises(BadRequest):
-            self.rr.execute_lifecycle_transition(iid, LCE.RETIRE)
-        with self.assertRaises(BadRequest):
-            self.rr.execute_lifecycle_transition(iid, LCE.ANNOUNCE)
-
 
         inst_obj = IonObject("InstrumentDevice", name='instrument')
         iid, _ = self.rr.create(inst_obj)
@@ -342,18 +346,20 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertEquals(inst_obj1.lcstate, LCS.PLANNED)
         self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
-        with self.assertRaises(BadRequest):
-            self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.AVAILABLE))
-
-        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.DISCOVERABLE))
+        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED, AS.DISCOVERABLE))
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
         self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
-        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED,AS.AVAILABLE))
+        self.rr.set_lifecycle_state(iid, lcstate(LCS.DEPLOYED, AS.AVAILABLE))
         inst_obj1 = self.rr.read(iid)
         self.assertEquals(inst_obj1.lcstate, LCS.DEPLOYED)
         self.assertEquals(inst_obj1.availability, AS.AVAILABLE)
+
+        self.rr.set_lifecycle_state(iid, lcstate(LCS.INTEGRATED, AS.DISCOVERABLE))
+        inst_obj1 = self.rr.read(iid)
+        self.assertEquals(inst_obj1.lcstate, LCS.INTEGRATED)
+        self.assertEquals(inst_obj1.availability, AS.DISCOVERABLE)
 
     def test_visibility(self):
         res_objs = [

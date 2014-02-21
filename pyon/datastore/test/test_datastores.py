@@ -889,12 +889,12 @@ class TestDataStores(IonIntegrationTestCase):
         # two tests: first should NOT have above Site1 in radius, second should
         qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',0.5))
         qb.build_query()
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 0)
         # -- additional 0.001 is to compensate for outer edge NOT being considered an overlap/intersect
         qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',1.001))
         qb.build_query()
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 1)
 
         # Access tests

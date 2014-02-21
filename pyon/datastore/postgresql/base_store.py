@@ -1044,7 +1044,7 @@ class PostgresDataStore(DataStore):
             query = "SELECT id, name, type_, lcstate FROM " + qual_ds_name
         else:
             query = "SELECT id, name, type_, lcstate, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' AND "
+        query_clause = " WHERE lcstate<>'DELETED' AND "
         query_args = dict(key=key, start=start_key, end=end_key)
 
         if view_name == "by_type":
@@ -1072,7 +1072,7 @@ class PostgresDataStore(DataStore):
             query = "SELECT R.id, R.name, R.type_, R.lcstate, json_keywords(R.doc) FROM " + qual_ds_name + " AS R," + qual_ds_name + "_assoc AS A"
         else:
             query = "SELECT R.id, R.name, R.type_, R.lcstate, json_keywords(R.doc), R.doc FROM " + qual_ds_name + " AS R," + qual_ds_name + "_assoc AS A"
-        query_clause = " WHERE R.id=A.o and A.p='hasAttachment' AND R.lcstate<>'RETIRED' AND A.retired<>true "
+        query_clause = " WHERE R.id=A.o and A.p='hasAttachment' AND R.lcstate<>'DELETED' AND A.retired<>true "
         query_args = dict(key=key, start=start_key, end=end_key)
         order_clause = " ORDER BY R.ts_created"
 

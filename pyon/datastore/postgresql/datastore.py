@@ -11,7 +11,7 @@ from pyon.datastore.postgresql.base_store import PostgresDataStore
 from pyon.datastore.postgresql.pg_query import PostgresQueryBuilder
 from pyon.datastore.datastore import DataStore
 from pyon.util.log import log
-from pyon.ion.resource import CommonResourceLifeCycleSM, OT, RT
+from pyon.ion.resource import AvailabilityStates, OT, RT
 
 
 class PostgresPyonDataStore(PostgresDataStore):
@@ -438,7 +438,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id, name, type_, lcstate FROM " + qual_ds_name
         else:
             query = "SELECT id, name, type_, lcstate, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(type_=restype, lcstate=lcstate)
 
         if restype:
@@ -473,7 +473,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         query_clause = " WHERE "
         query_args = dict(type_=restype, lcstate=lcstate)
 
-        is_maturity = lcstate not in CommonResourceLifeCycleSM.AVAILABILITY
+        is_maturity = lcstate not in AvailabilityStates
         if is_maturity:
             query_clause += "lcstate=%(lcstate)s"
         else:
@@ -502,7 +502,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id, name, type_ FROM " + qual_ds_name
         else:
             query = "SELECT id, name, type_, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(name=name, type_=restype)
 
         query_clause += "AND name=%(name)s"
@@ -532,7 +532,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id, type_ FROM " + qual_ds_name
         else:
             query = "SELECT id, type_, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(type_=restype, kw=[keyword])
 
         query_clause += "AND %(kw)s <@ json_keywords(doc)"
@@ -561,7 +561,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id, type_ FROM " + qual_ds_name
         else:
             query = "SELECT id, type_, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(type_=restype, nest=[nested_type])
 
         query_clause += "AND %(nest)s <@ json_nested(doc)"
@@ -590,7 +590,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             query = "SELECT id, type_, json_specialattr(doc) FROM " + qual_ds_name
         else:
             query = "SELECT id, type_, json_specialattr(doc), doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(type_=restype, att=attr_name, val=attr_value)
 
         if attr_value is not None:
@@ -625,7 +625,7 @@ class PostgresPyonDataStore(PostgresDataStore):
 
         query = "SELECT id, type_, doc FROM " + qual_ds_name
         query_args = dict(aid=[alt_id], ans=[alt_id_ns])
-        query_clause = " WHERE lcstate<>'RETIRED' "
+        query_clause = " WHERE lcstate<>'DELETED' "
 
         if not alt_id and not alt_id_ns:
             query_clause += "AND json_altids_ns(doc) is not null"

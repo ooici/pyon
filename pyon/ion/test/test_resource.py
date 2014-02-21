@@ -8,7 +8,7 @@ from mock import Mock
 from unittest import SkipTest
 from nose.plugins.attrib import attr
 
-from pyon.ion.resource import lcs_workflows, CommonResourceLifeCycleSM, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate, get_object_schema
+from pyon.ion.resource import lcs_workflows, LCS, LCE, ExtendedResourceContainer, OT, RT, PRED, AS, lcstate, get_object_schema
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, Inconsistent
 from pyon.util.unit_test import IonUnitTestCase
@@ -20,53 +20,70 @@ class TestResources(IonUnitTestCase):
     def test_resource_lcworkflow(self):
         default_workflow = lcs_workflows['InstrumentDevice']
 
-        self.assertEquals(len(CommonResourceLifeCycleSM.BASE_STATES), 18)
-        self.assertEquals(len(default_workflow.BASE_STATES), 18)
+        self.assertEquals(len(default_workflow.lcstate_states), 7)
+        self.assertEquals(len(default_workflow.lcstate_transitions), 24)
 
-        self.assert_(lcstate(LCS.DRAFT, AS.PRIVATE) in CommonResourceLifeCycleSM.BASE_STATES)
+        self.assertEquals(len(default_workflow.availability_states), 3)
+        self.assertEquals(len(default_workflow.availability_transitions), 6)
 
-        self.assert_(CommonResourceLifeCycleSM.is_in_state(lcstate(LCS.DRAFT, AS.PRIVATE), lcstate(LCS.DRAFT, AS.PRIVATE)))
+        self.assertIn(LCS.DRAFT, default_workflow.lcstate_states)
+        self.assertIn(AS.PRIVATE, default_workflow.availability_states)
 
-        events = set(ev for (s0,ev) in CommonResourceLifeCycleSM.BASE_TRANSITIONS)
-        self.assertFalse(set(CommonResourceLifeCycleSM.BASE_STATES) & events)
+        self.assertTrue(default_workflow.is_in_state(LCS.DRAFT, LCS.DRAFT))
+        self.assertTrue(default_workflow.is_in_state(AS.PRIVATE, AS.PRIVATE))
 
-        self.assertEquals(len(default_workflow.transitions), 84)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.DRAFT, LCE.PLAN), LCS.PLANNED)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.PLANNED, LCE.PLAN), None)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.PLANNED, LCE.DEVELOP), LCS.DEVELOPED)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.DEVELOPED, LCE.RETIRE), LCS.RETIRED)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.DEVELOPED, LCE.DELETE), LCS.DELETED)
+        self.assertEquals(default_workflow.get_lcstate_successor(LCS.RETIRED, LCE.DELETE), LCS.DELETED)
 
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.PLAN), lcstate(LCS.PLANNED,AS.PRIVATE))
+        self.assertEquals(default_workflow.get_availability_successor(AS.PRIVATE, LCE.ANNOUNCE), AS.DISCOVERABLE)
+        self.assertEquals(default_workflow.get_availability_successor(AS.DISCOVERABLE, LCE.UNANNOUNCE), AS.PRIVATE)
+        self.assertEquals(default_workflow.get_availability_successor(AS.PRIVATE, LCE.ENABLE), AS.AVAILABLE)
+        self.assertEquals(default_workflow.get_availability_successor(AS.AVAILABLE, LCE.DISABLE), AS.DISCOVERABLE)
+        self.assertEquals(default_workflow.get_availability_successor(AS.AVAILABLE, LCE.UNANNOUNCE), AS.PRIVATE)
 
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.ANNOUNCE), lcstate(LCS.DRAFT,AS.DISCOVERABLE))
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.DISCOVERABLE), LCE.UNANNOUNCE), lcstate(LCS.DRAFT,AS.PRIVATE))
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.PRIVATE), LCE.ENABLE), lcstate(LCS.DRAFT,AS.AVAILABLE))
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.AVAILABLE), LCE.DISABLE), lcstate(LCS.DRAFT,AS.DISCOVERABLE))
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DRAFT,AS.AVAILABLE), LCE.UNANNOUNCE), lcstate(LCS.DRAFT,AS.PRIVATE))
+        self.assertEquals(default_workflow.get_lcstate_successors(LCS.PLANNED),
+                          {LCE.DEVELOP: LCS.DEVELOPED,
+                           LCE.INTEGRATE: LCS.INTEGRATED,
+                           LCE.DEPLOY: LCS.DEPLOYED,
+                           LCE.RETIRE: LCS.RETIRED,
+                           LCE.DELETE: LCS.DELETED})
 
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.PLANNED,AS.PRIVATE), LCE.PLAN), None)
+        self.assertEquals(default_workflow.get_lcstate_successors(LCS.RETIRED),
+                          {LCE.DELETE: LCS.DELETED})
 
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.PLANNED,AS.PRIVATE), LCE.DEVELOP), lcstate(LCS.DEVELOPED,AS.PRIVATE))
-        self.assertEquals(default_workflow.get_successor(lcstate(LCS.DEVELOPED,AS.PRIVATE), LCE.RETIRE), lcstate(LCS.RETIRED,AS.PRIVATE))
+        self.assertEquals(default_workflow.get_availability_successors(AS.PRIVATE),
+                          {LCE.ANNOUNCE: AS.DISCOVERABLE,
+                           LCE.ENABLE: AS.AVAILABLE})
 
-        self.assertEquals(default_workflow.get_successors(lcstate(LCS.PLANNED,AS.PRIVATE)), {LCE.DEVELOP: lcstate(LCS.DEVELOPED,AS.PRIVATE),
-                                                                                 LCE.INTEGRATE: lcstate(LCS.INTEGRATED,AS.PRIVATE),
-                                                                                 LCE.DEPLOY: lcstate(LCS.DEPLOYED,AS.PRIVATE),
-                                                                                 LCE.ANNOUNCE: lcstate(LCS.PLANNED,AS.DISCOVERABLE),
-                                                                                 LCE.ENABLE: lcstate(LCS.PLANNED,AS.AVAILABLE),
-                                                                                 LCE.RETIRE: lcstate(LCS.RETIRED,AS.PRIVATE)})
+        # Simplified workflows
+        infres_workflow = lcs_workflows['DataProduct']
 
-#        self.assertEquals(default_workflow.get_predecessors(LCS.DEVELOPED_PRIVATE), {LCS.PLANNED: LCE.DEVELOP})
+        self.assertEquals(len(infres_workflow.lcstate_states), 4)
+        self.assertEquals(len(infres_workflow.availability_states), 3)
 
+        simple_workflow = lcs_workflows['Deployment']
 
+        self.assertEquals(len(simple_workflow.lcstate_states), 5)
+        self.assertEquals(len(simple_workflow.availability_states), 3)
+
+        # Cloning a LCSM
         restrictions = dict(
-            initial_state=LCS.DRAFT,
+            initial_lcstate=LCS.DRAFT,
             initial_availability=AS.PRIVATE,
-            illegal_states=[LCS.DEVELOPED, LCS.INTEGRATED],
-            illegal_transitions=[],
+            remove_states=[LCS.DEVELOPED, LCS.INTEGRATED],
+            remove_transitions=[],
             )
 
         restricted_wf = default_workflow._clone_with_restrictions(restrictions)
 
-        for (a_state, a_transition), a_newstate in restricted_wf.transitions.iteritems():
+        for (a_state, a_transition), a_newstate in restricted_wf.lcstate_transitions.iteritems():
             if LCS.DEVELOPED in a_state or LCS.DEVELOPED in a_newstate:
                 self.fail("Workflow contains illegal state")
+
 
 
     def test_create_extended_resource_container(self):
@@ -173,8 +190,8 @@ class TestResources(IonUnitTestCase):
         self.assertEquals(extended_res.resource_object.name, 'TestSystem_Resource')
         self.assertEquals(extended_res.owner_count, 2)
         self.assertEquals(extended_res.single_owner.name, user_info.name)
-        self.assertEquals(len(extended_res.lcstate_transitions), 5)
-        self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['develop', 'deploy', 'retire', 'plan', 'integrate']))
+        self.assertEquals(len(extended_res.lcstate_transitions), 6)
+        self.assertEquals(set(extended_res.lcstate_transitions.keys()), set(['develop', 'deploy', 'retire', 'plan', 'integrate', 'delete']))
         self.assertEquals(len(extended_res.availability_transitions), 2)
         self.assertEquals(set(extended_res.availability_transitions.keys()), set(['enable', 'announce']))
 
@@ -225,12 +242,11 @@ class TestResources(IonUnitTestCase):
         '''
         return IonObject(RT.SystemResource, name=resource_name)
 
-    @attr('SCHEMA')
     def test_get_object_schema(self):
 
         schema = get_object_schema('InstrumentSite')
-        self.assertEqual(len(schema['schemas']), 5)
-        self.assertItemsEqual([k for k,v in schema['schemas'].iteritems()], ['InstrumentSite', 'PlatformPort', 'GeospatialCoordinateReferenceSystem', 'GeospatialIndex', 'SiteEnvironmentType'])
+        self.assertEqual(len(schema['schemas']), 6)
+        self.assertItemsEqual([k for k,v in schema['schemas'].iteritems()], ['InstrumentSite', 'PlatformPort', 'GeospatialCoordinateReferenceSystem', 'GeospatialIndex', 'SiteEnvironmentType', 'ResourceVisibilityEnum'])
 
         #Loop through all of the schemas and get them too.
         for k, v in schema['schemas'].iteritems():
