@@ -67,13 +67,13 @@ class InterfaceAdmin:
         """
         de = self.dir.lookup(self.DIR_CONFIG_PATH + "/CFG")
         if de:
-            #print "store_interfaces: WARN: Config already exists. Overwrite"
-            return
-        print "store_interfaces: Storing system config in directory..."
+            print "store_interfaces: Updating system config in directory..."
+        else:
+            print "store_interfaces: Storing system config in directory..."
         self.dir.register(self.DIR_CONFIG_PATH, "CFG", **deepcopy(system_cfg))
 
     def store_interfaces(self, object_definition_file=None,
-                         service_definition_file=None, idempotent=False):
+                         service_definition_file=None, idempotent=True):
         """
         Main entry point into storing interfaces
         """
@@ -90,7 +90,7 @@ class InterfaceAdmin:
             if self.idempotent:
                 de = self.rr.find_by_type("ServiceDefinition", id_only=True)
                 if de:
-                    #print "store_interfaces: Interfaces already stored. Ignoring"
+                    print "store_interfaces: Interfaces already stored. Not updating."
                     return
             # load all files
             self.store_object_interfaces()
