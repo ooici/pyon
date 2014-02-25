@@ -161,14 +161,7 @@ class IonObjectRegistry(object):
                 from pyon.core.object import built_in_attrs
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
-                def unicode_to_utf8(value):
-                    if isinstance(value, unicode):
-                        value = str(value.encode('utf8'))
-                    return value
-                def recursive_encoding(value):
-                    value = walk(value, unicode_to_utf8, 'key_value')
-                    return value
-                self.__dict__[name] = recursive_encoding(value)
+                self.__dict__[name] = value
 
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)

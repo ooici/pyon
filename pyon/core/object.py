@@ -462,13 +462,17 @@ class IonObjectDeserializer(IonObjectSerializationBase):
     def _transform(self, obj):
         # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict) and "type_" in obj:
-            objc    = obj.copy()
-            type    = objc['type_'].encode('ascii')
+            objc  = obj
+            otype = objc['type_'].encode('ascii')   # Correct?
 
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
-            ion_obj = self._obj_registry.new(type)
+            ion_obj = self._obj_registry.new(otype)
             for k, v in objc.iteritems():
+
+                # unicode translate to utf8
+                if isinstance(v, unicode):
+                    v = str(v.encode('utf8'))
 
                 # CouchDB adds _attachments and puts metadata in it
                 # in pyon metadata is in the document
@@ -482,6 +486,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 
         return obj
 
+    deserialize = IonObjectSerializationBase.operate
 
 class IonObjectBlameDeserializer(IonObjectDeserializer):
 
