@@ -527,6 +527,7 @@ class PostgresDataStore(DataStore):
         return oid, version
 
     def create_doc_mult(self, docs, object_ids=None, datastore_name=None):
+        """Creates a list of objects and returns 3-tuples of (Success, id, rev)."""
         if type(docs) is not list:
             raise BadRequest("Invalid type for docs:%s" % type(docs))
         if object_ids and len(object_ids) != len(docs):

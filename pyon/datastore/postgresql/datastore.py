@@ -593,7 +593,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         query_clause = " WHERE lcstate<>'DELETED' "
         query_args = dict(type_=restype, att=attr_name, val=attr_value)
 
-        if attr_value is not None:
+        if attr_value:  # Note: cannot make None test here (and allow empty string because of default service args "")
             query_clause += "AND json_specialattr(doc)=%(spc)s"
             query_args['spc'] = "%s=%s" % (attr_name, attr_value)
         else:

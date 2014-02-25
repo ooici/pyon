@@ -104,7 +104,9 @@ class ResourceRegistry(object):
 
         return res
 
-    def create_mult(self, res_list):
+    def create_mult(self, res_list, actor_id=None):
+        """Creates a list of resources from objects. Objects may have _id in it to predetermine their ID.
+        Returns a list of 2-tuples (resource_id, rev)"""
         cur_time = get_ion_ts()
         id_list = []
         for resobj in res_list:
@@ -116,17 +118,23 @@ class ResourceRegistry(object):
             id_list.append(resobj._id if "_id" in resobj else create_unique_resource_id())
 
         res = self.rr_store.create_mult(res_list, id_list, allow_ids=True)
-        res_list = [(rid, rrv) for success, rid, rrv in res]
+        rid_list = [(rid, rrv) for success, rid, rrv in res]
 
-        # TODO: Associations with owners
+        # Associations with owners
+        if actor_id and actor_id != 'anonymous':
+            assoc_list = []
+            for resobj, (rid, rrv) in zip(res_list, rid_list):
+                resobj._id = rid
+                assoc_list.append((resobj, PRED.hasOwner, actor_id))
+            self.create_association_mult(assoc_list)
 
-        # TODO: Publish events (skipped, because this is inefficient one by one for a large list
-#        for rid,rrv in res_list:
-#            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-#                origin=res_id, origin_type=object.type_,
-#                mod_type=ResourceModificationType.CREATE)
+        # Publish events
+        for resobj, (rid, rrv) in zip(res_list, rid_list):
+            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+                origin=rid, origin_type=resobj.type_,
+                mod_type=ResourceModificationType.CREATE)
 
-        return res_list
+        return rid_list
 
     def read(self, object_id='', rev_id=''):
         if not object_id:
@@ -644,11 +652,11 @@ class ResourceRegistry(object):
         return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside,
                                                limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_objects_mult(self, subjects=[], id_only=False, access_args=None):
-        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only, access_args=access_args)
+    def find_objects_mult(self, subjects=[], id_only=False, predicate="", access_args=None):
+        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only, predicate=predicate, access_args=access_args)
 
-    def find_subjects_mult(self, objects=[], id_only=False, access_args=None):
-        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only, access_args=access_args)
+    def find_subjects_mult(self, objects=[], id_only=False, predicate="", access_args=None):
+        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only, predicate=predicate, access_args=access_args)
 
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         assoc = self.rr_store.find_associations(subject, predicate, object, id_only=id_only)
