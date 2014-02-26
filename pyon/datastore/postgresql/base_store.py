@@ -644,7 +644,11 @@ class PostgresDataStore(DataStore):
         with self.pool.cursor(**self.cursor_args) as cur:
             result_list = []
             for doc in docs:
-                oid, version = self._update_doc(cur, qual_ds_name, doc)
+                if "_deleted" in doc:
+                    self._delete_doc(cur, qual_ds_name, doc["_id"])
+                    oid, version = doc["_id"], doc["_rev"]
+                else:
+                    oid, version = self._update_doc(cur, qual_ds_name, doc)
                 result_list.append((True, oid, version))
 
         return result_list
