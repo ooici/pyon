@@ -696,7 +696,8 @@ class PostgresPyonDataStore(PostgresDataStore):
         qual_ds_name = self._get_datastore_name()
 
         pqb = PostgresQueryBuilder(query, qual_ds_name)
-        pqb.where = self._add_access_filter(access_args, qual_ds_name, pqb.where, pqb.values)
+        if self.profile == DataStore.DS_PROFILE.RESOURCES:
+            pqb.where = self._add_access_filter(access_args, qual_ds_name, pqb.where, pqb.values)
 
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute(pqb.get_query(), pqb.get_values())
@@ -711,7 +712,6 @@ class PostgresPyonDataStore(PostgresDataStore):
             res_docs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
             return res_docs
 
-    find_resources_mult = find_by_query   # Alias
 
     # -------------------------------------------------------------------------
     # Internal operations
