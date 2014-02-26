@@ -394,7 +394,8 @@ class PostgresDataStore(DataStore):
                                        y1=float(geoc["geospatial_latitude_limit_south"]),
                                        x2=float(geoc["geospatial_longitude_limit_east"]),
                                        y2=float(geoc["geospatial_latitude_limit_north"]))
-                        res = ("POLYGON((%(x1)s %(y1)s, %(x2)s %(y1)s, %(x2)s %(y2)s, %(x1)s %(y2)s, %(x1)s %(y1)s))") % geovals
+                        if any((geovals["x1"], geovals["x2"], geovals["y1"], geovals["y2"])):
+                            res = ("POLYGON((%(x1)s %(y1)s, %(x2)s %(y1)s, %(x2)s %(y2)s, %(x1)s %(y2)s, %(x1)s %(y1)s))") % geovals
                     except ValueError as ve:
                         log.warn("GeospatialBounds location values not parseable %s: %s", geoc, ve)
 
@@ -423,7 +424,8 @@ class PostgresDataStore(DataStore):
                     try:
                         geovals = dict(z1=float(geoc["geospatial_vertical_min"]),
                                        z2=float(geoc["geospatial_vertical_max"]))
-                        res = "[%s, %s]" % (geovals["z1"], geovals["z2"])
+                        if any((geovals["z1"], geovals["z2"])):
+                            res = "[%s, %s]" % (geovals["z1"], geovals["z2"])
                     except ValueError as ve:
                         log.warn("GeospatialBounds vertical values not parseable %s: %s", geoc, ve)
 
@@ -449,7 +451,8 @@ class PostgresDataStore(DataStore):
                     try:
                         geovals = dict(t1=float(tempc["start_datetime"]),
                                        t2=float(tempc["end_datetime"]))
-                        res = "[%s, %s]" % (geovals["t1"], geovals["t2"])
+                        if any((geovals["t1"], geovals["t2"])):
+                            res = "[%s, %s]" % (geovals["t1"], geovals["t2"])
                     except ValueError as ve:
                         log.warn("TemporalBounds values not parseable %s: %s", tempc, ve)
             if res:

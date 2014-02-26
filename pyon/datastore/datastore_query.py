@@ -139,6 +139,26 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
         colname = col.split(":", 1)[1]
         return self.op_expr(self.OP_NEQ, colname, value)
 
+    def gt(self, col, value):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.OP_GT, colname, value)
+
+    def gte(self, col, value):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.OP_GTE, colname, value)
+
+    def lt(self, col, value):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.OP_LT, colname, value)
+
+    def lte(self, col, value):
+        self._check_col(col)
+        colname = col.split(":", 1)[1]
+        return self.op_expr(self.OP_LTE, colname, value)
+
     def in_(self, col, *args):
         self._check_col(col)
         colname = col.split(":", 1)[1]
@@ -226,13 +246,27 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
 
     # --- Ordering
 
-    def order_by(self, column, asc=True, *args):
-        pass
+    def order_by(self, column, sort="asc", *args):
+        order_by_list = []
+        if type(column) in (list, tuple):
+            for col in column:
+                if type(col) in (list, tuple):
+                    colname, colsort = col
+                    order_by_list.append((colname, colsort))
+                else:
+                    order_by_list.append((col, sort))
+        else:
+            order_by_list = [(column, sort)]
+
+        return order_by_list
 
     def _check_col(self, col):
         profile = self.query["query_args"]["profile"]
         if profile == DataStore.DS_PROFILE.RESOURCES:
             if not (col.startswith("ra") or col.startswith("att")):
+                raise BadRequest("Query column unknown: %s" % col)
+        elif profile == DataStore.DS_PROFILE.EVENTS:
+            if not (col.startswith("ea") or col.startswith("att") or col == DQ.RA_TS_CREATED):
                 raise BadRequest("Query column unknown: %s" % col)
 
 

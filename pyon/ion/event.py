@@ -82,25 +82,27 @@ class EventPublisher(Publisher):
         @param event_object     the event object to be published
         @retval event_object    the event object which was published
         """
-        assert event_object
+        if not event_object:
+            raise BadRequest("Must provide event_object")
 
         topic = self._topic(event_object)
         to_name = (self._send_name.exchange, topic)
-        #log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
 
         current_time = get_ion_ts_millis()
 
-        #Ensure valid created timestamp if supplied
+        event_object.base_types = event_object._get_extends()
+
+        # Ensure valid created timestamp if supplied
         if event_object.ts_created:
 
             if not is_valid_ts(event_object.ts_created):
                 raise BadRequest("The ts_created value is not a valid timestamp: '%s'" % (event_object.ts_created))
 
-            #Reject events that are older than specified time
+            # Reject events that are older than specified time
             if int(event_object.ts_created) > ( current_time + VALID_EVENT_TIME_PERIOD ):
                 raise BadRequest("This ts_created value is too far in the future:'%s'" % (event_object.ts_created))
 
-            #Reject events that are older than specified time
+            # Reject events that are older than specified time
             if int(event_object.ts_created) < (current_time - VALID_EVENT_TIME_PERIOD) :
                 raise BadRequest("This ts_created value is too old:'%s'" % (event_object.ts_created))
 
@@ -151,7 +153,6 @@ class EventPublisher(Publisher):
             raise BadRequest("No event_type provided")
 
         event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
-        event_object.base_types = event_object._get_extends()
         ret_val = self.publish_event_object(event_object)
         return ret_val
 
