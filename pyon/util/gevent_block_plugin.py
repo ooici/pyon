@@ -73,24 +73,25 @@ def get_gevent_monitor_block():
     return _gevent_block
 
 class GeventAlarmBlock(object):
-    oldtrace = None
-    _last_traces = []
-    _snap_shots = defaultdict(list)
-
-    # Read current test id
-    _current_test = None
-
-    # A global variable for tracking the time of the last greenlet switch.
-    # For server processes that use a single OS-level thread, a global works fine.
-    # You might like to use a threadlocal for complicated setups.
-    #Used by alarm mode
-    _last_switch_time = None
-    _momento_time = None
-
-    _started = False
 
     def __init__(self, current_test=None):
         self._current_test = current_test
+        self.oldtrace = None
+        self._last_traces = []
+        self._snap_shots = defaultdict(list)
+        self._blocking_time = {}
+
+        # Read current test id
+        self._current_test = None
+
+        # A global variable for tracking the time of the last greenlet switch.
+        # For server processes that use a single OS-level thread, a global works fine.
+        # You might like to use a threadlocal for complicated setups.
+        #Used by alarm mode
+        self._last_switch_time = None
+        self._momento_time = None
+
+        self._started = False
 
     def start(self):
         # A trace function that gets executed on every greenlet switch.
@@ -161,6 +162,7 @@ class GeventAlarmBlock(object):
     def get_snapshots(self):
         return copy(self._snap_shots)
 
+
     def log_snapshots(self):
         snapshots = self.get_snapshots()
         from ooi.logging import log
@@ -171,22 +173,23 @@ class GeventAlarmBlock(object):
                 log.warn(msg)
 
 class GeventMonitorBlock(object):
-    oldtrace = None
-    _last_traces = []
-    _snap_shots = defaultdict(list)
-
-    # Read current test id
-    _current_test = None
-
-    _last_switch_time = None
-    _active_hub = None
-    _greenlet_switch_counter = 0
-    _stop_monitor = False
-    _active_greenlet = None
-    _started = False
 
     def __init__(self, current_test=None):
         self._current_test = current_test
+        self.oldtrace = None
+        self._last_traces = []
+        self._snap_shots = defaultdict(list)
+        self._blocking_time = {}
+
+        # Read current test id
+        self._current_test = None
+
+        self._last_switch_time = None
+        self._active_hub = None
+        self._greenlet_switch_counter = 0
+        self._stop_monitor = False
+        self._active_greenlet = None
+        self._started = False
 
     def start(self):
         if self._started:
@@ -235,6 +238,7 @@ class GeventMonitorBlock(object):
                 key = str(hex(id(origin)))
                 self._snap_shots[(test_id, key)].append(msg)
                 self._snap_shots[(test_id, key)] = self._snap_shots[(test_id, key)][-1:]
+                self._blocking_time[(test_id,key)] = self._blocking_time.get((test_id,key), 0) + blocking_time
 
     def _greenlet_blocking_monitor(self):
         while not self._stop_monitor:
@@ -260,7 +264,15 @@ class GeventMonitorBlock(object):
                     self._last_traces.append("Greenlet appears to be blocked at %s \n" % get_datetime_str(get_ion_ts()) + "".join(stack))
 
     def get_snapshots(self):
-        return copy(self._snap_shots)
+        snapshots = copy(self._snap_shots)
+        blocking_stats = self.get_blocking_time()
+        if blocking_stats:
+            for test_id, key in blocking_stats.keys():
+                snapshots[(test_id,key)].append('Greelet %s blocked a TOTAL of %fs.' % (key, blocking_stats[(test_id,key)]))
+        return snapshots
+
+    def get_blocking_time(self):
+        return copy(self._blocking_time)
 
     def log_snapshots(self):
         snapshots = self.get_snapshots()
@@ -274,11 +286,6 @@ class GeventMonitorBlock(object):
 class GEVENT_BLOCK(Plugin):
     name = 'gevent-block'
 
-    _block_alarm = False
-    _greenlet_block = None
-
-    _current_test = []
-
     def options(self, parser, env):
         super(GEVENT_BLOCK, self).options(parser, env=env)
         parser.add_option("--gevent-block-alarm", action="store_true", dest="block_alarm", help="Use alarm instead of monitor thread to detect block traces.")
@@ -291,6 +298,7 @@ class GEVENT_BLOCK(Plugin):
         self._noreport = options.noreport
 
     def begin(self):
+        self._current_test = []
         #Pass by reference value of self.current_test so we can share test id with gevent block class.
         if self._block_alarm:
             self._greenlet_block = GeventAlarmBlock(self._current_test)
