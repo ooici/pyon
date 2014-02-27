@@ -115,6 +115,10 @@ class IonObjectBase(object):
                 if schema_val['type'] == 'NoneType':
                     continue
 
+                # Allow unicode instead of str. This may be too lenient.
+                if schema_val['type'] == 'str' and type(field_val).__name__ == 'unicode':
+                    continue
+
                 # Already checked for required above.  Assume optional and continue
                 if field_val is None:
                     continue
