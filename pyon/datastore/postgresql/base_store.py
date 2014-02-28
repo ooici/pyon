@@ -336,7 +336,7 @@ class PostgresDataStore(DataStore):
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name=%s)", (qual_ds_name,))
             exists = cur.fetchone()[0]
-            log.info("Datastore '%s' exists: %s", datastore_name or qual_ds_name, exists)
+            log.debug("Datastore '%s' exists: %s", datastore_name or qual_ds_name, exists)
 
         return exists
 
@@ -917,7 +917,7 @@ class PostgresDataStore(DataStore):
 
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                           id_only=True, **kwargs):
-        log.info("find_docs_by_view() %s/%s, %s, %s, %s, %s, %s, %s", design_name, view_name, key, keys, start_key, end_key, id_only, kwargs)
+        log.debug("find_docs_by_view() %s/%s, %s, %s, %s, %s, %s, %s", design_name, view_name, key, keys, start_key, end_key, id_only, kwargs)
 
         funcname = "_find_%s" % (design_name) if view_name else "_find_all_docs"
         if not hasattr(self, funcname):
@@ -926,7 +926,7 @@ class PostgresDataStore(DataStore):
         filter = self._get_view_args(kwargs)
 
         res_list = getattr(self, funcname)(key=key, view_name=view_name, keys=keys, start_key=start_key, end_key=end_key, id_only=id_only, filter=filter)
-        log.info("find_docs_by_view() found %s results", len(res_list))
+        log.debug("find_docs_by_view() found %s results", len(res_list))
         return res_list
 
     def _find_all_docs(self, view_name, key=None, keys=None, start_key=None, end_key=None,

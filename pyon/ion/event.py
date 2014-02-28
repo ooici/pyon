@@ -13,7 +13,7 @@ from gevent import event as gevent_event
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
-from pyon.ion.identifier import create_unique_event_id
+from pyon.ion.identifier import create_unique_event_id, create_simple_unique_id
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
 from pyon.util.containers import get_ion_ts_millis, is_valid_ts
@@ -85,12 +85,12 @@ class EventPublisher(Publisher):
         if not event_object:
             raise BadRequest("Must provide event_object")
 
-        topic = self._topic(event_object)
+        event_object.base_types = event_object._get_extends()
+
+        topic = self._topic(event_object)  # Routing key generated using type_, base_types, origin, origin_type, sub_type
         to_name = (self._send_name.exchange, topic)
 
         current_time = get_ion_ts_millis()
-
-        event_object.base_types = event_object._get_extends()
 
         # Ensure valid created timestamp if supplied
         if event_object.ts_created:
@@ -214,11 +214,14 @@ class BaseEventSubscriberMixin(object):
         # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
 
         # prefix the queue_name, if specified, with the sysname
-        # this is because queue names transcend xp boundaries (see R1 OOIION-477)
         if queue_name is not None:
             if not queue_name.startswith(bootstrap.get_sys_name()):
                 queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
-                log.warn("queue_name specified, prepending sys_name to it: %s", queue_name)
+        else:
+            queue_name = create_simple_unique_id()
+            if hasattr(self, "_process") and self._process:
+                queue_name = "%s_%s" % (self._process._proc_name, queue_name)
+            queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
 
         # set this name to be picked up by inherited folks
         self._ev_recv_name = (xp_name, queue_name)
