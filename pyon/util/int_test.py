@@ -109,6 +109,28 @@ class IonIntegrationTestCase(unittest.TestCase):
         self._force_clean()         # deletes only
         bootstrap.testing_fast = False
 
+    def _start_tracer_log(self, config=None):
+        """Temporarily enables tracer log and configures it until end of test (cleanUp)"""
+        if not self.container:
+            return
+        from pyon.util import tracer
+        if not tracer.trace_data["config"].get("log_trace", False):
+            tracer_cfg_old = tracer.trace_data["config"]
+            tracer.trace_data["config"] = tracer.trace_data["config"].copy()
+            tracer.trace_data["config"]["log_trace"] = True
+            if config:
+                tracer.trace_data["config"].update(config)
+
+            def cleanup_tracer():
+                tracer.trace_data["config"] = tracer_cfg_old
+                log.info("--------------- Stopping Tracer Logging ---------------")
+            self.addCleanup(cleanup_tracer)
+            log.info("--------------- Starting Tracer Logging ---------------")
+
+    def _breakpoint(self, scope=None, global_scope=None):
+        from pyon.util.breakpoint import breakpoint
+        breakpoint(scope=scope, global_scope=global_scope)
+
     def _turn_on_queue_auto_delete(self):
         patcher = patch('pyon.net.channel.RecvChannel._queue_auto_delete', True)
         patcher.start()

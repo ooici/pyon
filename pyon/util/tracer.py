@@ -7,6 +7,7 @@ __author__ = 'Michael Meisinger'
 
 import inspect
 from collections import defaultdict
+from contextlib import contextmanager
 # create special logging category for tracer logging
 import logging
 tracerlog = logging.getLogger('tracer')
@@ -28,7 +29,7 @@ DEFAULT_CONFIG = {"enabled": True,
 trace_data = dict(trace_log=[],                # Global log
                   format_cb={},                # Scope specific formatter function
                   scope_seq=defaultdict(int),  # Sequence number per scope
-                  config=DEFAULT_CONFIG,       # Store config dict
+                  config=DEFAULT_CONFIG.copy(),  # Store config dict
                   )
 SCOPE_COLOR = {
     "MSG": 31,
@@ -236,3 +237,19 @@ class CallTracer(object):
         trace_data["enabled"] = enabled
         if not enabled:
             CallTracer.clear_all()
+
+    @staticmethod
+    @contextmanager
+    def log_traces(config=None):
+        """
+        Context manager to enable trace logging for the duration of a with.
+        """
+        tracer_cfg_old = trace_data["config"]
+        try:
+            trace_data["config"] = trace_data["config"].copy()
+            trace_data["config"]["log_trace"] = True
+            if config:
+                trace_data["config"].update(config)
+            yield trace_data["config"]
+        finally:
+            trace_data["config"] = tracer_cfg_old
