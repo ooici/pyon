@@ -14,6 +14,7 @@ import unittest
 @attr('UNIT')
 class ObjectTest(IonIntegrationTestCase):
     def setUp(self):
+        self.patch_cfg('pyon.core.bootstrap.CFG', {'validate':{'setattr': True}})
         self.registry = IonObjectRegistry()
 
     def test_new(self):
@@ -23,6 +24,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEqual(obj.time, "1341269890404")
 
     def test_validate(self):
+
         obj = self.registry.new('SampleObject')
         self.name = 'monkey'
         self.int = 1

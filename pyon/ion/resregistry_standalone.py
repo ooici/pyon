@@ -32,6 +32,7 @@ class ResourceRegistryStandalone(object):
         cur_time = get_ion_ts()
         object['lcstate'] =  lcstate or "DEPLOYED"
         object['availability'] =  lcstate or "AVAILABLE"
+        object['visibility'] = object.get('visibility', 1)
         object['ts_created'] = cur_time
         object['ts_updated'] = cur_time
         new_res_id = create_unique_resource_id()
@@ -47,6 +48,7 @@ class ResourceRegistryStandalone(object):
         for resobj in res_list:
             resobj['lcstate'] = lcstate or "DEPLOYED"
             resobj['availability'] = lcstate or "AVAILABLE"
+            resobj['visibility'] = resobj.get('visibility', 1)
             resobj['ts_created'] = cur_time
             resobj['ts_updated'] = cur_time
 

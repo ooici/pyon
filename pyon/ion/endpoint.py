@@ -428,7 +428,7 @@ class ProcessEventSubscriber(ProcessSubscriber, BaseEventSubscriberMixin):
         BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
                                           queue_name=queue_name, sub_type=sub_type, origin_type=origin_type)
 
-        log.debug("EventPublisher events pattern %s", self.binding)
+        log.debug("ProcessEventSubscriber events pattern %s", self.binding)
 
         ProcessSubscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, process=process, routing_call=routing_call, **kwargs)
 

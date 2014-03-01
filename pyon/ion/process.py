@@ -19,6 +19,7 @@ import traceback
 
 STAT_INTERVAL_LENGTH = 60000  # Interval time for process saturation stats collection
 
+
 class OperationInterruptedException(BaseException):
     """
     Interrupted exception. Used by external items timing out execution in the
@@ -29,8 +30,10 @@ class OperationInterruptedException(BaseException):
     """
     pass
 
+
 class IonProcessError(StandardError):
     pass
+
 
 class IonProcessThread(PyonThread):
     """
@@ -493,8 +496,9 @@ class IonProcessThreadManager(PyonThreadManager):
     def _create_thread(self, target=None, **kwargs):
         return IonProcessThread(target=target, heartbeat_secs=self.heartbeat_secs, **kwargs)
 
-# ---------------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------------
+# Process type variants
 
 class StandaloneProcess(BaseService):
     """
@@ -519,3 +523,15 @@ class ImmediateProcess(BaseService):
     Has no messaging attachment.
     """
     process_type = "immediate"
+
+
+# ---------------------------------------------------------------------------------------------------
+# Process helpers
+
+def get_ion_actor_id(process):
+    """Given an ION process, return the ion-actor-id from the context, if set and present"""
+    ion_actor_id = None
+    if process:
+        ctx = process.get_context()
+        ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
+    return ion_actor_id

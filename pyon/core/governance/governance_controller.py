@@ -388,7 +388,10 @@ class GovernanceController(object):
         self._policy_update_log = self._policy_update_log[-100:]
         self._policy_snapshot = policy_now
 
-        log.info("Policy update logged. Type=%s, message=%s, changed=%s" % (update_type, message, any_change))
+        if any_change:
+            log.info("Container policy changed. Cause: %s/%s" % (update_type, message))
+        else:
+            log.debug("Container policy checked but no change. Cause: %s/%s" % (update_type, message))
 
     def update_container_policies(self, process_instance, safe_mode=False):
         """
@@ -397,7 +400,6 @@ class GovernanceController(object):
         @param process_instance  The ION process for which to load policy
         @param safe_mode  If True, will not attempt to read policy if Policy MS not available
         """
-
         # This method can be called before policy management service is available during system startup
         if safe_mode and not self._is_policy_management_service_available():
             if not is_testing() and (process_instance.name not in (
@@ -435,7 +437,7 @@ class GovernanceController(object):
                 self.update_resource_access_policy(process_instance.resource_id)
 
         self._log_policy_update("update_container_policies",
-                                message="Updated",
+                                message="Checked",
                                 process=process_instance)
 
 

@@ -102,7 +102,11 @@ class PostgresQueryBuilder(object):
     def _build_order_by(self, expr):
         if not expr:
             return ""
-        raise BadRequest("Unknown expr: %s" % expr)
+        order_by_list = []
+        for col, colsort in expr:
+            order_by_list.append("%s %s" % (col, "DESC" if colsort.lower() == "desc" else "ASC"))
+        order_by = ",".join(order_by_list)
+        return order_by
 
     def get_query(self):
         qargs = self.query["query_args"]
