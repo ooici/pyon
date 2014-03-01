@@ -24,6 +24,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEqual(obj.time, "1341269890404")
 
     def test_validate(self):
+
         obj = self.registry.new('SampleObject')
         self.name = 'monkey'
         self.int = 1
