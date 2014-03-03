@@ -8,6 +8,7 @@ from pyon.core.registry import IonObjectRegistry
 from pyon.core.bootstrap import IonObject
 from pyon.util.int_test import IonIntegrationTestCase
 from nose.plugins.attrib import attr
+import unittest
 
 
 @attr('UNIT')
@@ -138,6 +139,7 @@ class ObjectTest(IonIntegrationTestCase):
         # Should work
         obj._validate
 
+    @unittest.skip("no more recursive encoding on set")
     def test_recursive_encoding(self):
         obj = self.registry.new('SampleObject')
         a_dict = {'1':u"♣ Temporal Domain ♥",
