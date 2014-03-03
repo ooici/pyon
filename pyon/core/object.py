@@ -11,10 +11,10 @@ import pprint
 import StringIO
 
 from pyon.util.log import log
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, CONFLICT
 
 
-built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
+built_in_attrs = set(['_id', '_rev', 'type_', 'blame_', 'persisted_version'])
 
 class IonObjectBase(object):
 
@@ -121,6 +121,10 @@ class IonObjectBase(object):
 
                 # Already checked for required above.  Assume optional and continue
                 if field_val is None:
+                    continue
+
+                # Allow unicode instead of str. This may be too lenient.
+                if schema_val['type'] == 'str' and type(field_val).__name__ == 'unicode':
                     continue
 
                 # IonObjects are ok for dict fields too!
@@ -425,6 +429,14 @@ class IonObjectSerializer(IonObjectSerializationBase):
             res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
             if not 'type_' in res:
                 res['type_'] = obj._get_type()
+
+            # update persisted_version if serializing for persistence
+            if 'TypeVersion' in obj._class_info['decorators']:
+
+                # convert TypeVersion in decorator from string to int
+                # this is a hack because the object_model_generator converts TypeVersion to string
+                res['persisted_version'] = int(obj._class_info['decorators']['TypeVersion'])
+
             return res
 
         return obj
@@ -470,6 +482,13 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
             ion_obj = self._obj_registry.new(otype)
+
+            # get outdated attributes in data that are not defined in the current schema
+            extra_attributes = objc.viewkeys() - ion_obj._schema.viewkeys() - built_in_attrs
+            for extra in extra_attributes:
+                objc.pop(extra)
+                log.info('discard %s not in current schema' % extra)
+
             for k, v in objc.iteritems():
 
                 # unicode translate to utf8
@@ -479,7 +498,27 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 # CouchDB adds _attachments and puts metadata in it
                 # in pyon metadata is in the document
                 # so we discard _attachments while transforming between the two
-                if k not in ("type_", "_attachments", "_conflicts"):
+                if  (v != None) and k not in ("type_", "_attachments", "_conflicts"):
+                    try:
+                        # hack: (ignore dicts)
+                        # if attribute is an ion object but doesn't have the same class
+                        if ( k not in built_in_attrs and ("type_" in v) and (ion_obj._schema[k]["type"] != v["type_"] )):
+                            # hack to ignore special case for tolerating current practice
+                            # of stuffing objects in dicts
+                            if (ion_obj._schema[k]["type"] == 'dict'):
+                                pass
+                            else:
+                                V = self._obj_registry.new(v["type_"])
+                                # check that v is subclass of k
+                                if not ion_obj.check_inheritance_chain(type(V), ion_obj._schema[k]["type"]):
+                                #if not issubclass(V.__class__,getattr(ion_obj,k).__class__):
+                                    error_msg = ("data \"%s\" read in has type %s and is not a subclass of %s.%s that is of type %s"
+                                                 % (str(v), V.__class__.__name__+":"+v["type_"], otype, k,
+                                                    str(getattr(ion_obj,k).__class__.__name__+":"+ion_obj._schema[k]["type"])))
+                                    log.error(error_msg)
+                                    continue # do not setattr
+                    except TypeError:
+                        pass
                     setattr(ion_obj, k, v)
                 if k == "_conflicts":
                     log.warn("CouchDB conflict detected for ID=%S (ignored): %s", obj.get('_id', None), v)
@@ -488,7 +527,6 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 
         return obj
 
-    deserialize = IonObjectSerializationBase.operate
 
 class IonObjectBlameDeserializer(IonObjectDeserializer):
 

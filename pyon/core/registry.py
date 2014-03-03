@@ -162,7 +162,6 @@ class IonObjectRegistry(object):
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
                 self.__dict__[name] = value
-
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)
 
@@ -171,10 +170,14 @@ class IonObjectRegistry(object):
             # the init values of complex types.  Instantiate new object and substitute
             # into the argument dict.
             tmpdict = deepcopy(_dict)
+
             for key in tmpdict:
-                if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
-                    obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
-                    tmpdict[key] = obj_param
+                if key in clzz._schema:
+                    if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
+                        obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
+                        tmpdict[key] = obj_param
+                else:
+                    raise AttributeError("'%s' object has no attribute '%s'" % (clzz.__name__, key))
 
             # Apply dict values, then override with kwargs
             keywordargs = tmpdict
@@ -182,5 +185,6 @@ class IonObjectRegistry(object):
             obj = clzz(**keywordargs)
         else:
             obj = clzz(**kwargs)
-
+        if hasattr(clzz,'_class_info') and 'TypeVersion' in obj._class_info['decorators']:
+            obj.persisted_version = clzz._class_info['decorators']['TypeVersion']
         return obj

@@ -449,6 +449,9 @@ class ExtendedResourceContainer(object):
         # Fill lcstate related resource container fields
         self.set_container_lcstate_info(res_container)
 
+        # Fill resource container info; currently only type_version
+        self.set_res_container_info(res_container)
+
         # Fill resource container fields
         self.set_container_field_values(res_container, ext_exclude, **kwargs)
 
@@ -467,6 +470,14 @@ class ExtendedResourceContainer(object):
         #log.info("ResourceContainer: %s" % res_container)
 
         return res_container
+
+    def set_res_container_info(self, res_container):
+        """
+        Set info in resource container, such as type_version.
+        This is true for all resources, independent of the type.
+        """
+        res_container.type_version = res_container.resource.get_class_decorator_value('TypeVersion')
+
 
     def set_container_lcstate_info(self, res_container):
         """

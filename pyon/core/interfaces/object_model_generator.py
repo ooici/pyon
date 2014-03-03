@@ -352,7 +352,10 @@ class ObjectModelGenerator:
         description = ''
         csv_description = ''
         class_comment = ''
-
+        #current_type_version = False
+        type_version = False
+        version_num_pattern = re.compile("[0-9]+")
+        type_version_pattern = re.compile("TypeVersion\":\s\"[0-9]+")
         for line in self.data_yaml_text.split('\n'):
             if line.isspace():
                 continue
@@ -429,7 +432,6 @@ class ObjectModelGenerator:
             elif line and (line[0].isalpha() or line.startswith("#")):
                 if '!enum' in line:
                     continue
-
                 #Handle class level decorators
                 if line.startswith('#@'):
                     dec = line.strip()[2:].split("=")
@@ -440,7 +442,6 @@ class ObjectModelGenerator:
                         class_decorators = '"' + key + '": "' + value + '"'
                     else:
                         class_decorators = class_decorators + ', "' + key + '": "' + value + '"'
-                    continue
 
                 #Handle class level comments
                 if line.startswith('#'):
@@ -454,9 +455,20 @@ class ObjectModelGenerator:
                 if first_time:
                     first_time = False
                 else:
-                    self.class_args_dict[current_class] = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators': ""}
+                    current_class_args_dict = {'args': args, 'fields': fields, 'field_details': field_details, 'extends': super_class, 'description': current_class_comment, 'decorators': ""}
+                    if current_class in self.class_args_dict:
+                        self.class_args_dict[current_class].update(current_class_args_dict)
+                    else:
+                        self.class_args_dict[current_class] = current_class_args_dict
+
+                    # initialize persisted_version with cumulative schema_version
                     for arg in args:
+                        if  'persisted_version' in arg:
+                            ctv=self.class_args_dict[current_class]['cumulative_version']
+                            arg = re.sub(version_num_pattern,str(ctv),arg)
                         self.dataobject_output_text += arg
+
+
                     self.dataobject_output_text += "):\n"
                     for init_line in init_lines:
                         self.dataobject_output_text += init_line
@@ -471,6 +483,7 @@ class ObjectModelGenerator:
                 field_details = []
                 init_lines = []
                 current_class = line.split(":")[0]
+
                 try:
                     current_class_def_dict = self.def_dict[current_class]
                 except KeyError:
@@ -495,6 +508,25 @@ class ObjectModelGenerator:
                 class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
                 self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n"
 
+                # current_type_version (ctv)
+                ctv = (re.findall(version_num_pattern,str(re.findall(type_version_pattern,class_decorators))))
+                if len(ctv)>0:
+                    ctv = int(ctv[0])
+                else:
+                    ctv = 0
+                if super_class in self.class_args_dict and 'cumulative_version' in self.class_args_dict[super_class]:
+                    if ctv == 0:
+                        ctv = 1
+                    ctv = ctv + self.class_args_dict[super_class]['cumulative_version'] -1
+                    if not re.match(type_version_pattern,class_decorators):
+                        class_decorators="\"TypeVersion\": \"1\""
+
+                class_decorators=re.sub(type_version_pattern,"TypeVersion\": \""+str(ctv),class_decorators)
+
+                if ctv:
+                    self.class_args_dict[current_class]={}
+                    self.class_args_dict[current_class]['cumulative_version']=ctv
+
                 self.dataobject_output_text += "    _class_info = {'name': '" + "', 'decorators': {" + class_decorators + \
                                                "}, 'docstring': '"+ re.escape(class_comment)+"'}\n\n"
                 self.dataobject_output_text += "    def __init__(self"
@@ -503,8 +535,9 @@ class ObjectModelGenerator:
                 class_decorators = ''
         if len(args) > 0:
             for arg in args:
-                self.dataobject_output_text += arg
+               self.dataobject_output_text += arg
             self.dataobject_output_text += "):\n"
+
             for init_line in init_lines:
                 self.dataobject_output_text += init_line
         if len(current_class_schema) > 0:
