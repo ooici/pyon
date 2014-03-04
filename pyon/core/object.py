@@ -11,10 +11,10 @@ import pprint
 import StringIO
 
 from pyon.util.log import log
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, CONFLICT
 
 
-built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
+built_in_attrs = set(['_id', '_rev', 'type_', 'blame_', 'persisted_version'])
 
 class IonObjectBase(object):
 
@@ -121,6 +121,10 @@ class IonObjectBase(object):
 
                 # Already checked for required above.  Assume optional and continue
                 if field_val is None:
+                    continue
+
+                # Allow unicode instead of str. This may be too lenient.
+                if schema_val['type'] == 'str' and type(field_val).__name__ == 'unicode':
                     continue
 
                 # IonObjects are ok for dict fields too!
@@ -425,6 +429,14 @@ class IonObjectSerializer(IonObjectSerializationBase):
             res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
             if not 'type_' in res:
                 res['type_'] = obj._get_type()
+
+            # update persisted_version if serializing for persistence
+            if 'TypeVersion' in obj._class_info['decorators']:
+
+                # convert TypeVersion in decorator from string to int
+                # this is a hack because the object_model_generator converts TypeVersion to string
+                res['persisted_version'] = int(obj._class_info['decorators']['TypeVersion'])
+
             return res
 
         return obj
@@ -470,6 +482,13 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
             ion_obj = self._obj_registry.new(otype)
+
+            # get outdated attributes in data that are not defined in the current schema
+            extra_attributes = objc.viewkeys() - ion_obj._schema.viewkeys() - built_in_attrs
+            for extra in extra_attributes:
+                objc.pop(extra)
+                log.info('discard %s not in current schema' % extra)
+
             for k, v in objc.iteritems():
 
                 # unicode translate to utf8
@@ -479,7 +498,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 # CouchDB adds _attachments and puts metadata in it
                 # in pyon metadata is in the document
                 # so we discard _attachments while transforming between the two
-                if k not in ("type_", "_attachments", "_conflicts"):
+                if  (v != None) and k not in ("type_", "_attachments", "_conflicts"):
                     setattr(ion_obj, k, v)
                 if k == "_conflicts":
                     log.warn("CouchDB conflict detected for ID=%S (ignored): %s", obj.get('_id', None), v)
@@ -488,7 +507,6 @@ class IonObjectDeserializer(IonObjectSerializationBase):
 
         return obj
 
-    deserialize = IonObjectSerializationBase.operate
 
 class IonObjectBlameDeserializer(IonObjectDeserializer):
 
