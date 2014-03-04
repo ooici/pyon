@@ -352,8 +352,6 @@ class ObjectModelGenerator:
         description = ''
         csv_description = ''
         class_comment = ''
-        #current_type_version = False
-        type_version = False
         version_num_pattern = re.compile("[0-9]+")
         type_version_pattern = re.compile("TypeVersion\":\s\"[0-9]+")
         for line in self.data_yaml_text.split('\n'):
@@ -462,11 +460,22 @@ class ObjectModelGenerator:
                         self.class_args_dict[current_class] = current_class_args_dict
 
                     # initialize persisted_version with cumulative schema_version
+                    i = 0
+                    pv_index = i
                     for arg in args:
                         if  'persisted_version' in arg:
                             ctv=self.class_args_dict[current_class]['cumulative_version']
+                            if ctv != 0:
+                                pv_index = i
                             arg = re.sub(version_num_pattern,str(ctv),arg)
+                            pv_arg = arg
                         self.dataobject_output_text += arg
+                        i = i + 1
+                    if pv_index != 0:
+                        # initialize persisted_version with cumulative schema_version
+                        # for use in generating documents later.
+                        args[pv_index]=pv_arg
+                        pv_index = 0
 
 
                     self.dataobject_output_text += "):\n"
@@ -508,22 +517,36 @@ class ObjectModelGenerator:
                 class_comment_temp = "\n    '''\n    " + class_comment.replace("'''","\\'\\'\\'") + "\n    '''" if class_comment else ''
                 self.dataobject_output_text += "class " + line + "):" + class_comment_temp + "\n\n"
 
-                # current_type_version (ctv)
+                # get current_type_version (ctv) from decorator
                 ctv = (re.findall(version_num_pattern,str(re.findall(type_version_pattern,class_decorators))))
+
+                # if found
                 if len(ctv)>0:
+                    # convert to an int
                     ctv = int(ctv[0])
                 else:
+                    # else note that the class has no ctv
                     ctv = 0
+                # however, if the super class has ctv
                 if super_class in self.class_args_dict and 'cumulative_version' in self.class_args_dict[super_class]:
+                    # and current class does not
                     if ctv == 0:
+                        # then give it at least a ctv of 1 to differentiate from classes where we don't track versions
                         ctv = 1
+                    # add the type version from super; because versions in parents imply them in children
                     ctv = ctv + self.class_args_dict[super_class]['cumulative_version'] -1
+                    # if current class did not have a decorator give it one
+                    #  because we determined that it has one via its super
                     if not re.match(type_version_pattern,class_decorators):
                         class_decorators="\"TypeVersion\": \"1\""
-
+                # for all current classes that have a TypeVersion; upgrade it with information from super
+                # (note the schema yml files  will be modified by a human
+                # who won't manually copy, paste, and add the inherited version info, so we do it)
                 class_decorators=re.sub(type_version_pattern,"TypeVersion\": \""+str(ctv),class_decorators)
 
+                # for current classes that have a ctv (non-zero)
                 if ctv:
+                    # save ctv so that its children may inherit
                     self.class_args_dict[current_class]={}
                     self.class_args_dict[current_class]['cumulative_version']=ctv
 
@@ -545,6 +568,15 @@ class ObjectModelGenerator:
                 self.dataobject_output_text += current_class_schema + "\n              }.items())\n"
             else:
                 self.dataobject_output_text += current_class_schema + "\n              }\n"
+
+        # clean up cumulative version from dictionary because it creates problems
+        # while generating document
+        cv_classes=[]
+        for cv_class, cv in self.class_args_dict.iteritems():
+            if 'cumulative_version' in cv:
+                cv_classes.append(cv_class)
+        for cv_class in cv_classes:
+            del self.class_args_dict[cv_class]
 
     def generate_object_specs(self):
         print " Object interface generator: Generating additional object specs in HTML and CSV"
