@@ -224,6 +224,7 @@ class ObjectTest(IonIntegrationTestCase):
     # undergoes a type change. For example new_resource has changed its type
     # from SampleResource_V2 to SampleResource_V3
     # (note: here SampleResource versions are used as different types not different versions)
+    @unittest.skip("type safety is not accounted for anymore")
     def test_complex_version_del_attrib(self):
 
         io_serializer = IonObjectSerializer()
