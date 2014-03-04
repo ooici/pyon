@@ -9,7 +9,7 @@ from pyon.core.bootstrap import get_obj_registry
 from pyon.core.exception import BadRequest, Conflict, NotFound
 from pyon.core.object import IonObjectBase, IonObjectSerializer, IonObjectDeserializer
 from pyon.datastore.couchdb.couch_common import AbstractCouchDataStore
-from pyon.ion.resource import CommonResourceLifeCycleSM
+from pyon.ion.resource import AvailabilityStates
 from pyon.util.arg_check import validate_is_instance
 from pyon.util.log import log
 
@@ -378,7 +378,7 @@ class PyonCouchDataStoreMixin(AbstractCouchDataStore):
             lcstate,_ = lcstate.split("_", 1)
         filter = filter if filter is not None else {}
         ds, datastore_name = self._get_datastore()
-        key = [1, lcstate] if lcstate in CommonResourceLifeCycleSM.AVAILABILITY else [0, lcstate]
+        key = [1, lcstate] if lcstate in AvailabilityStates else [0, lcstate]
         if restype:
             key.append(restype)
         endkey = self._get_endkey(key)

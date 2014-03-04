@@ -3,19 +3,21 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
-from pyon.util.unit_test import PyonTestCase
-from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
-from nose.plugins.attrib import attr
-from pyon.net.transport import NameTrio, BaseTransport, AMQPTransport
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.core import bootstrap
-
 from mock import Mock, sentinel, patch, MagicMock
 from gevent.event import Event
 from gevent import spawn
 from gevent.queue import Queue
 import Queue as PQueue
 import time
+from nose.plugins.attrib import attr
+
+from pyon.util.unit_test import PyonTestCase
+from pyon.core import bootstrap
+from pyon.core.bootstrap import CFG
+from pyon.net.channel import BaseChannel, SendChannel, RecvChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, ChannelError, ChannelShutdownMessage, ListenChannel, PublisherChannel
+from pyon.net.transport import NameTrio, BaseTransport, AMQPTransport
+from pyon.util.int_test import IonIntegrationTestCase
+
 
 @attr('UNIT')
 class TestBaseChannel(PyonTestCase):
@@ -802,7 +804,9 @@ class TestServerChannel(PyonTestCase):
 @attr('INT')
 class TestChannelInt(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}},
+                                                              'datastore':CFG['container']['datastore']},
+                                                 'server':CFG['server']})
         self._start_container()
 
     #@skip('Not working consistently on buildbot')
@@ -1037,6 +1041,8 @@ class TestChannelInt(IonIntegrationTestCase):
 @attr('INT')
 class TestChannelIntLocalTransport(TestChannelInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}},
+                                                              'datastore':CFG['container']['datastore']},
+                                                 'server':CFG['server']})
         self._start_container()
 

@@ -33,7 +33,7 @@ GEOSPATIAL_COLS = {"geom", "geom_loc"}
 NUMRANGE_COLS = {"vertical_range", "temporal_range"}
 
 # Mapping of object type to table name extension and special attribute names
-OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "name", "ts_created", "ts_updated", "geom", "geom_loc", "vertical_range", "temporal_range")),
+OBJ_SPECIAL = {"R": ("", ("type_", "lcstate", "availability", "visibility", "name", "ts_created", "ts_updated", "geom", "geom_loc", "vertical_range", "temporal_range")),
                "A": ("_assoc", ("s", "st", "p", "o", "ot", "retired")),
                "D": ("_dir", ("org", "parent", "key")),
                "E": ("", ("origin", "origin_type", "sub_type", "ts_created", "type_")),
@@ -336,7 +336,7 @@ class PostgresDataStore(DataStore):
         with self.pool.cursor(**self.cursor_args) as cur:
             cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name=%s)", (qual_ds_name,))
             exists = cur.fetchone()[0]
-            log.info("Datastore '%s' exists: %s", datastore_name or qual_ds_name, exists)
+            log.debug("Datastore '%s' exists: %s", datastore_name or qual_ds_name, exists)
 
         return exists
 
@@ -394,7 +394,8 @@ class PostgresDataStore(DataStore):
                                        y1=float(geoc["geospatial_latitude_limit_south"]),
                                        x2=float(geoc["geospatial_longitude_limit_east"]),
                                        y2=float(geoc["geospatial_latitude_limit_north"]))
-                        res = ("POLYGON((%(x1)s %(y1)s, %(x2)s %(y1)s, %(x2)s %(y2)s, %(x1)s %(y2)s, %(x1)s %(y1)s))") % geovals
+                        if any((geovals["x1"], geovals["x2"], geovals["y1"], geovals["y2"])):
+                            res = ("POLYGON((%(x1)s %(y1)s, %(x2)s %(y1)s, %(x2)s %(y2)s, %(x1)s %(y2)s, %(x1)s %(y1)s))") % geovals
                     except ValueError as ve:
                         log.warn("GeospatialBounds location values not parseable %s: %s", geoc, ve)
 
@@ -423,7 +424,8 @@ class PostgresDataStore(DataStore):
                     try:
                         geovals = dict(z1=float(geoc["geospatial_vertical_min"]),
                                        z2=float(geoc["geospatial_vertical_max"]))
-                        res = "[%s, %s]" % (geovals["z1"], geovals["z2"])
+                        if any((geovals["z1"], geovals["z2"])):
+                            res = "[%s, %s]" % (geovals["z1"], geovals["z2"])
                     except ValueError as ve:
                         log.warn("GeospatialBounds vertical values not parseable %s: %s", geoc, ve)
 
@@ -449,7 +451,8 @@ class PostgresDataStore(DataStore):
                     try:
                         geovals = dict(t1=float(tempc["start_datetime"]),
                                        t2=float(tempc["end_datetime"]))
-                        res = "[%s, %s]" % (geovals["t1"], geovals["t2"])
+                        if any((geovals["t1"], geovals["t2"])):
+                            res = "[%s, %s]" % (geovals["t1"], geovals["t2"])
                     except ValueError as ve:
                         log.warn("TemporalBounds values not parseable %s: %s", tempc, ve)
             if res:
@@ -527,6 +530,7 @@ class PostgresDataStore(DataStore):
         return oid, version
 
     def create_doc_mult(self, docs, object_ids=None, datastore_name=None):
+        """Creates a list of objects and returns 3-tuples of (Success, id, rev)."""
         if type(docs) is not list:
             raise BadRequest("Invalid type for docs:%s" % type(docs))
         if object_ids and len(object_ids) != len(docs):
@@ -644,7 +648,11 @@ class PostgresDataStore(DataStore):
         with self.pool.cursor(**self.cursor_args) as cur:
             result_list = []
             for doc in docs:
-                oid, version = self._update_doc(cur, qual_ds_name, doc)
+                if "_deleted" in doc:
+                    self._delete_doc(cur, qual_ds_name, doc["_id"])
+                    oid, version = doc["_id"], doc["_rev"]
+                else:
+                    oid, version = self._update_doc(cur, qual_ds_name, doc)
                 result_list.append((True, oid, version))
 
         return result_list
@@ -892,7 +900,7 @@ class PostgresDataStore(DataStore):
     def refresh_views(self, datastore_name="", profile=None):
         pass
 
-    def _get_view_args(self, all_args):
+    def _get_view_args(self, all_args, access_args=None):
         view_args = {}
         if all_args:
             view_args.update(all_args)
@@ -903,11 +911,13 @@ class PostgresDataStore(DataStore):
             extra_clause += " OFFSET %s " % all_args['skip']
 
         view_args['extra_clause'] = extra_clause
+        if access_args:
+            view_args.update(access_args)
         return view_args
 
     def find_docs_by_view(self, design_name, view_name, key=None, keys=None, start_key=None, end_key=None,
                           id_only=True, **kwargs):
-        log.info("find_docs_by_view() %s/%s, %s, %s, %s, %s, %s, %s", design_name, view_name, key, keys, start_key, end_key, id_only, kwargs)
+        log.debug("find_docs_by_view() %s/%s, %s, %s, %s, %s, %s, %s", design_name, view_name, key, keys, start_key, end_key, id_only, kwargs)
 
         funcname = "_find_%s" % (design_name) if view_name else "_find_all_docs"
         if not hasattr(self, funcname):
@@ -916,7 +926,7 @@ class PostgresDataStore(DataStore):
         filter = self._get_view_args(kwargs)
 
         res_list = getattr(self, funcname)(key=key, view_name=view_name, keys=keys, start_key=start_key, end_key=end_key, id_only=id_only, filter=filter)
-        log.info("find_docs_by_view() found %s results", len(res_list))
+        log.debug("find_docs_by_view() found %s results", len(res_list))
         return res_list
 
     def _find_all_docs(self, view_name, key=None, keys=None, start_key=None, end_key=None,
@@ -1038,7 +1048,7 @@ class PostgresDataStore(DataStore):
             query = "SELECT id, name, type_, lcstate FROM " + qual_ds_name
         else:
             query = "SELECT id, name, type_, lcstate, doc FROM " + qual_ds_name
-        query_clause = " WHERE lcstate<>'RETIRED' AND "
+        query_clause = " WHERE lcstate<>'DELETED' AND "
         query_args = dict(key=key, start=start_key, end=end_key)
 
         if view_name == "by_type":
@@ -1066,7 +1076,7 @@ class PostgresDataStore(DataStore):
             query = "SELECT R.id, R.name, R.type_, R.lcstate, json_keywords(R.doc) FROM " + qual_ds_name + " AS R," + qual_ds_name + "_assoc AS A"
         else:
             query = "SELECT R.id, R.name, R.type_, R.lcstate, json_keywords(R.doc), R.doc FROM " + qual_ds_name + " AS R," + qual_ds_name + "_assoc AS A"
-        query_clause = " WHERE R.id=A.o and A.p='hasAttachment' AND R.lcstate<>'RETIRED' AND A.retired<>true "
+        query_clause = " WHERE R.id=A.o and A.p='hasAttachment' AND R.lcstate<>'DELETED' AND A.retired<>true "
         query_args = dict(key=key, start=start_key, end=end_key)
         order_clause = " ORDER BY R.ts_created"
 

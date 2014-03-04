@@ -16,7 +16,8 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.couchdb.datastore import CouchPyonDataStore
 from pyon.util.containers import get_ion_ts
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
-from pyon.ion.resource import RT, PRED, LCS, AS, lcstate
+from pyon.ion.resource import RT, PRED, LCS, AS, lcstate, create_access_args
+from pyon.util.tracer import CallTracer
 
 from pyon.datastore.postgresql.datastore import PostgresPyonDataStore
 from pyon.datastore.datastore_query import DatastoreQueryBuilder
@@ -26,6 +27,7 @@ import interface.objects
 OWNER_OF = "XOWNER_OF"
 HAS_A = "XHAS_A"
 BASED_ON = "XBASED_ON"
+
 
 @attr('UNIT', group='datastore')
 class TestDataStoreUnitTest(IonUnitTestCase):
@@ -48,6 +50,7 @@ class TestDataStoreUnitTest(IonUnitTestCase):
         qb.build_query(where=qb.within_geom(qb.RA_GEOM_LOC,wkt,buf))
         self.assertEquals(qb.get_query()['where'], ['gop:within_geom', ('geom_loc', 'POINT(-72.0 40.0)', 0.1)])
 
+
 @attr('INT', group='datastore')
 class TestDataStores(IonIntegrationTestCase):
 
@@ -57,6 +60,8 @@ class TestDataStores(IonIntegrationTestCase):
             self.ds_class = CouchPyonDataStore
         elif self.server_type == "postgresql":
             self.ds_class = PostgresPyonDataStore
+        # We're running outside of a container - configure the tracer
+        CallTracer.configure(CFG.get_safe("container.tracer", {}))
 
     def test_datastore_mock(self):
         if self.server_type != "postgresql":
@@ -311,32 +316,9 @@ class TestDataStores(IonIntegrationTestCase):
         #with self.assertRaises(NotFound):
         #    data_store.update(spurious_obj)
 
-        # List all the revisions of Dataset in data store, should be two
-#        res = data_store.list_object_revisions(data_set_uuid)
-#        self.assertTrue(len(res) == 2)
-
         # Do another update to the object
         data_set_read_obj_2.description = "USGS instantaneous value data for station 01491000"
         write_tuple_3 = data_store.update(data_set_read_obj_2)
-
-        # List revisions of Dataset in data store, should now be three
-#        res = data_store.list_object_revisions(data_set_uuid)
-#        self.assertTrue(len(res) == 3)
-
-        # Retrieve original version of Dataset
-#        obj1 = data_store.read(data_set_uuid, rev_id=write_tuple_1[1])
-#        self.assertTrue(obj1._id == data_set_uuid)
-#        self.assertTrue(obj1.description == "Real-time water data for Choptank River near Greensboro, MD")
-
-        # Retrieve second version of Dataset
-#        obj2 = data_store.read(data_set_uuid, rev_id=write_tuple_2[1])
-#        self.assertTrue(obj2._id == data_set_uuid)
-#        self.assertTrue(obj2.description == "Updated Description")
-
-        # Retrieve third version of Dataset
-#        obj3 = data_store.read(data_set_uuid, rev_id=write_tuple_3[1])
-#        self.assertTrue(obj3._id == data_set_uuid)
-#        self.assertTrue(obj3.description == "USGS instantaneous value data for station 01491000")
 
         # Retrieve HEAD version of Dataset
         head = data_store.read(data_set_uuid)
@@ -351,6 +333,14 @@ class TestDataStores(IonIntegrationTestCase):
         xobj2 = data_store.read_doc(xoid)
         xobj2["_deleted"] = True
         data_store.update_doc(xobj2)
+        with self.assertRaises(NotFound):
+            data_store.read_doc(xoid)
+
+        xobj = dict(some="content1")
+        xoid, _ = data_store.create_doc(xobj)
+        xobj2 = data_store.read_doc(xoid)
+        xobj2["_deleted"] = True
+        data_store.update_doc_mult([xobj2])
         with self.assertRaises(NotFound):
             data_store.read_doc(xoid)
 
@@ -857,41 +847,69 @@ class TestDataStores(IonIntegrationTestCase):
 
     def test_datastore_query(self):
         if self.server_type != "postgresql":
-            raise SkipTest("find_resources_mult only works with Postgres")
+            raise SkipTest("find_by_query only works with Postgres")
 
         data_store = self.ds_class(datastore_name='ion_test_ds', profile=DataStore.DS_PROFILE.RESOURCES, scope=get_sys_name())
+        # Just in case previous run failed without cleaning up, delete data store
+        try:
+            data_store.delete_datastore()
+        except NotFound:
+            pass
+        data_store.create_datastore()
         self.data_store = data_store
+
         self.resources = {}
+        from interface.objects import GeospatialIndex, ResourceVisibilityEnum
 
         # Create a few resources
         plat1_obj_id = self._create_resource(RT.PlatformDevice, 'Buoy1', description='My Platform')
+        aid1_obj_id = self._create_resource(RT.ActorIdentity, 'Actor1')
+        plat2_obj_id = self._create_resource(RT.PlatformDevice, 'Buoy2', visibility=ResourceVisibilityEnum.OWNER)
+        self._create_association(plat2_obj_id, PRED.hasOwner, aid1_obj_id)
+        plat3_obj_id = self._create_resource(RT.PlatformDevice, 'Buoy3', visibility=ResourceVisibilityEnum.OWNER)
 
-        from interface.objects import GeospatialIndex
         dp1_obj_id = self._create_resource(RT.PlatformSite, 'Site1', geospatial_point_center=GeospatialIndex(lat=1.0, lon=2.0))
 
         # Queries
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.or_(qb.and_(qb.eq(qb.RA_NAME, "Buoy1"), qb.eq(qb.RA_NAME, "Buoy1")), qb.eq(qb.RA_NAME, "Buoy1")))
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 1)
 
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.and_(qb.like(qb.RA_NAME, "Si%"), qb.overlaps_bbox(qb.RA_GEOM, 1, -1.2, 4, 4)))
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 1)
 
         qb = DatastoreQueryBuilder()
         qb.build_query(where=qb.attr_like("description", "My%"))
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 1)
 
         # two tests: first should NOT have above Site1 in radius, second should
         qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',0.5))
         qb.build_query()
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 0)
         # -- additional 0.001 is to compensate for outer edge NOT being considered an overlap/intersect
         qb = DatastoreQueryBuilder(where=qb.overlaps_geom(qb.RA_GEOM,'POINT(2.0 2.0)',1.001))
         qb.build_query()
-        res = data_store.find_resources_mult(qb.get_query())
+        res = data_store.find_by_query(qb.get_query())
         self.assertEquals(len(res), 1)
+
+        # Access tests
+        qb = DatastoreQueryBuilder()
+        qb.build_query(where=qb.or_(qb.and_(qb.like(qb.RA_NAME, "Buoy%"), qb.eq(qb.ATT_TYPE, RT.PlatformDevice))))
+        res = data_store.find_by_query(qb.get_query())
+        self.assertEquals(len(res), 1)
+
+        access_args = create_access_args(current_actor_id=aid1_obj_id)
+        res = data_store.find_by_query(qb.get_query(), access_args=access_args)
+        self.assertEquals(len(res), 2)
+
+        access_args = create_access_args(current_actor_id=aid1_obj_id, superuser_actor_ids=[aid1_obj_id])
+        res = data_store.find_by_query(qb.get_query(), access_args=access_args)
+        self.assertEquals(len(res), 3)
+
+        # Clean up
+        self.data_store.delete_mult([plat1_obj_id, plat2_obj_id, plat3_obj_id, aid1_obj_id, dp1_obj_id])

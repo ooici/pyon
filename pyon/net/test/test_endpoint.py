@@ -3,25 +3,26 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
+from nose.plugins.attrib import attr
+from mock import Mock, sentinel, patch, ANY, call, MagicMock
+from gevent import event, spawn
 import unittest
 from zope.interface.declarations import implements
 from zope.interface.interface import Interface
-from pyon.core import exception
-from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, RecvChannel, ListenChannel
-from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
-from gevent import event, spawn
-from pyon.net.messaging import NodeB
-from pyon.ion.service import BaseService
+from gevent import sleep
+
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
-from nose.plugins.attrib import attr
-from mock import Mock, sentinel, patch, ANY, call, MagicMock
+from pyon.core import exception
+from pyon.core.bootstrap import get_sys_name, CFG
 from pyon.container.cc import Container
 from pyon.core.interceptor.interceptor import Invocation
+from pyon.net.channel import BaseChannel, SendChannel, BidirClientChannel, SubscriberChannel, ChannelClosedError, ServerChannel, RecvChannel, ListenChannel
+from pyon.net.endpoint import EndpointUnit, BaseEndpoint, RPCServer, Subscriber, Publisher, RequestResponseClient, RequestEndpointUnit, RPCRequestEndpointUnit, RPCClient, RPCResponseEndpointUnit, EndpointError, SendingBaseEndpoint, ListeningBaseEndpoint
+from pyon.net.messaging import NodeB
+from pyon.ion.service import BaseService
 from pyon.net.transport import NameTrio, BaseTransport
 from pyon.util.sflow import SFlowManager
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.core.bootstrap import get_sys_name
-from gevent import sleep
 
 # NO INTERCEPTORS - we use these mock-like objects up top here which deliver received messages that don't go through the interceptor stack.
 no_interceptors = {'message_incoming': [],
@@ -347,7 +348,9 @@ class TestListeningBaseEndpoint(PyonTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointInt(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}},
+                                                              'datastore':CFG['container']['datastore']},
+                                                 'server':CFG['server']})
         self._start_container()
 
     def test_get_stats(self):
@@ -386,7 +389,9 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointIntWithLocal(TestListeningBaseEndpointInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
+        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}},
+                                                              'datastore':CFG['container']['datastore']},
+                                                 'server':CFG['server']})
         self._start_container()
 
 @attr('UNIT')
