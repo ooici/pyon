@@ -499,26 +499,6 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 # in pyon metadata is in the document
                 # so we discard _attachments while transforming between the two
                 if  (v != None) and k not in ("type_", "_attachments", "_conflicts"):
-                    try:
-                        # hack: (ignore dicts)
-                        # if attribute is an ion object but doesn't have the same class
-                        if ( k not in built_in_attrs and ("type_" in v) and (ion_obj._schema[k]["type"] != v["type_"] )):
-                            # hack to ignore special case for tolerating current practice
-                            # of stuffing objects in dicts
-                            if (ion_obj._schema[k]["type"] == 'dict'):
-                                pass
-                            else:
-                                V = self._obj_registry.new(v["type_"])
-                                # check that v is subclass of k
-                                if not ion_obj.check_inheritance_chain(type(V), ion_obj._schema[k]["type"]):
-                                #if not issubclass(V.__class__,getattr(ion_obj,k).__class__):
-                                    error_msg = ("data \"%s\" read in has type %s and is not a subclass of %s.%s that is of type %s"
-                                                 % (str(v), V.__class__.__name__+":"+v["type_"], otype, k,
-                                                    str(getattr(ion_obj,k).__class__.__name__+":"+ion_obj._schema[k]["type"])))
-                                    log.error(error_msg)
-                                    continue # do not setattr
-                    except TypeError:
-                        pass
                     setattr(ion_obj, k, v)
                 if k == "_conflicts":
                     log.warn("CouchDB conflict detected for ID=%S (ignored): %s", obj.get('_id', None), v)
