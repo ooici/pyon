@@ -105,7 +105,8 @@ class serviceTests(IonIntegrationTestCase):
         #make sure store is empty 
         # use get request on the ooi store
         # http://localhost:8080/geoserver/rest/workspaces/geonode/datastores/ooi/featuretypes.xml or .json (might be easier)
-        #
+        print ""
+        pass
 
     def test_create_dataset_verify_geoserver_layer(self):
         #generate layer and check that the service created it in geoserver
@@ -148,12 +149,12 @@ class serviceTests(IonIntegrationTestCase):
         # verify that the layer exists in geoserver
         try:
             r = requests.get('http://localhost:8080/geoserver/rest/layers/ooi_'+dataset_id+'_ooi.xml',auth=(USERNAME,PASSWORD))
-            self.assertTrue(r.status_code=200)
+            self.assertTrue(r.status_code==200)
         except Exception, e:
             print "check service and layer exist..."
             self.assertTrue(False)
 
-     def test_verify_importer_service_online(self):
+    def test_verify_importer_service_online(self):
         try:
             r = requests.get('http://localhost:8844')
             self.assertTrue(r.status_code==200)
@@ -166,8 +167,10 @@ class serviceTests(IonIntegrationTestCase):
         # pass the create command to the service and check that the layer exists in  geoserver similar to the one above
         # send add layer directly to localhost 8844 with some params
         # store gets reset every time container is started
+        print ""
+        pass
 
-    def test_fdt_created_during     
+    def test_fdt_created_during(self):  
         # generate a data product and check that the FDT exists
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
         pdict_id = ph.create_extended_parsed()
@@ -221,12 +224,16 @@ class serviceTests(IonIntegrationTestCase):
         # pass the remove command to the service and check that the layer exists in geoserver similar to the one above
         # send remove layer directly to localhost 8844 with some params
         # check store
+        print ""
+        pass
 
     def test_update_geolayer_directory(self):
         # pass the update command to the service and check that the layer exists in geoserver similar to the one above
         # send update layer directly to localhost 8844 with some params
         # check store
         #does add then remove
+        print ""
+        pass
 
     def test_get_data_from_FDW(self):
         # generate a data product and check that the FDW can get data
@@ -275,7 +282,7 @@ class serviceTests(IonIntegrationTestCase):
         # make a WMS/WFS request...somet like this (or both)
         url = 'http://localhost:8080/geoserver/geonode/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=geonode:ooi_'+dataset_id+'_ooi&maxFeatures=1&outputFormat=csv'
         r = requests.get(url)
-        assertTrue(r.status_code=200)
+        assertTrue(r.status_code==200)
         #check r.text does not contain <ServiceException code="InvalidParameterValue" locator="typeName">
 
 
