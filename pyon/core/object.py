@@ -498,7 +498,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
                 # CouchDB adds _attachments and puts metadata in it
                 # in pyon metadata is in the document
                 # so we discard _attachments while transforming between the two
-                if  (v != None) and k not in ("type_", "_attachments", "_conflicts"):
+                if k not in ("type_", "_attachments", "_conflicts"):
                     setattr(ion_obj, k, v)
                 if k == "_conflicts":
                     log.warn("CouchDB conflict detected for ID=%S (ignored): %s", obj.get('_id', None), v)
