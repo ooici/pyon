@@ -22,23 +22,28 @@ REAL = "real,"
 INT = "int,"
 TIMEDATE = "timestamp,"
 
-LATITUDE = "latitude"
-LONGITUDE = "longitude"
+LATITUDE = "lat"
+LONGITUDE = "lon"
 
 RESETSTORE = "resetstore"
 REMOVELAYER = "removelayer"
 ADDLAYER = "addlayer"
 
 SERVER = "http://localhost:8844"
+DATABASE = 'postgres'
+DB_USER = 'rpsdev'
+
+TABLE_PREFIX = "_"
+VIEW_SUFFIX = "_view"
 
 class resource_parser():
 
     def __init__(self):
         self.con = None
         try:
-            self.con = psycopg2.connect(database='postgres', user='rpsdev')
+            self.con = psycopg2.connect(database=DATABASE, user=DB_USER)
             self.cur = self.con.cursor()
-
+            #checks the connection
             self.cur.execute('SELECT version()')
             ver = self.cur.fetchone()
             print ver
@@ -205,11 +210,8 @@ class resource_parser():
                         print value_encoding
                         print cm_type[1]
 
-                    #is it a time field, i.e goes the name contain time
-                    #if (name.find('time')>=0):
-                    #    createTableString+="\""+name+"\" "+TIMEDATE
-                    #else:
                     if (cm_type[1] == "ArrayType"):
+                        #ignore array types
                         pass
                     else:
                         [encoding,prim_type] = self.getValueEncoding(name,value_encoding)          
@@ -218,9 +220,6 @@ class resource_parser():
                             valid_types[name] = prim_type
 
                 pass
-
-            #createTableString+=LATITUDE+" "+REAL
-            #createTableString+=LONGITUDE+" "+REAL
 
             pos = createTableString.rfind(',')
             createTableString = createTableString[:pos] + ' ' + createTableString[pos+1:]
@@ -234,8 +233,8 @@ class resource_parser():
             try:
                 self.cur.execute(createTableString)
                 self.con.commit()
-
-                self.cur.execute(self.generateTableView(dataset_id,"lat","lon"))
+                #should always be lat and lon
+                self.cur.execute(self.generateTableView(dataset_id,LATITUDE,LONGITUDE))
                 self.con.commit()
 
                 return ((self.doesTableExist(dataset_id)),valid_types)
@@ -257,9 +256,9 @@ class resource_parser():
     '''
     def generateTableView(self,dataset_id,lat_field,lon_field):
         sqlquery = '''
-        CREATE or replace VIEW "_%s_view" as SELECT ST_SetSRID(ST_MakePoint(%s, %s),4326) as 
+        CREATE or replace VIEW "%s%s%s" as SELECT ST_SetSRID(ST_MakePoint(%s, %s),4326) as 
         geom, * from "%s";
-        '''% (dataset_id,lon_field,lat_field,dataset_id)
+        '''% (TABLE_PREFIX,dataset_id,VIEW_SUFFIX,lon_field,lat_field,dataset_id)
         return sqlquery
 
     '''
