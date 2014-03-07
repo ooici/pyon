@@ -122,6 +122,9 @@ class DotDict(DotNotationGetItem, dict):
             raise AttributeError('Cannot popitem on a locked DotDict')
         return super(DotDict, self).popitem()
 
+    def as_dict(self):
+        return simple_deepcopy(self)
+
 
     @classmethod
     def fromkeys(cls, seq, value=None):
@@ -149,6 +152,18 @@ class DictDiffer(object):
     def unchanged(self):
         return set(o for o in self.intersect if self.past_dict[o] == self.current_dict[o])
 
+
+def simple_deepcopy(coll):
+    """Performs a recursive deep copy on given collection, only using dict, list and set
+    collection types and not checking for cycles."""
+    if isinstance(coll, dict):
+        return {k: simple_deepcopy(v) for k, v in coll.iteritems()}
+    elif isinstance(coll, set):
+        return {simple_deepcopy(v) for v in coll}
+    elif hasattr(coll, "__iter__"):
+        return [simple_deepcopy(v) for v in coll]
+    else:
+        return coll
 
 # dict_merge from: http://appdelegateinc.com/blog/2011/01/12/merge-deeply-nested-dicts-in-python/
 
@@ -382,7 +397,7 @@ def get_default_container_id():
     return string.replace('%s_%d' % (os.uname()[1], os.getpid()), ".", "_")
 
 
-BASIC_TYPE_SET = set((str, bool, int, float, long, NoneType))
+BASIC_TYPE_SET = {str, bool, int, float, long, NoneType}
 
 def recursive_encode(obj, encoding="utf8"):
     """Recursively walks a dict/list collection and in-place encodes any unicode keys and values in
@@ -417,3 +432,4 @@ def recursive_encode(obj, encoding="utf8"):
         raise RuntimeError("unknown type: %s" % type(obj))
 
     return obj
+
