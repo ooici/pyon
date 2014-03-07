@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
-
 '''
 @author Luke Campbell <lcampbell@asascience.com>
 @file pyon/core/interceptor/test/interceptor_test.py
 @description test lib for interceptor
 '''
+
 import unittest
+from nose.plugins.attrib import attr
+
+from pyon.util.unit_test import PyonTestCase
 from pyon.core.interceptor.encode import EncodeInterceptor
 from pyon.core.interceptor.validate import ValidateInterceptor
 from pyon.core.interceptor.interceptor import Invocation
-from pyon.core.exception import BadRequest
-from pyon.util.unit_test import PyonTestCase
-from nose.plugins.attrib import attr
-from pyon.public import IonObject
+from pyon.public import IonObject, DotDict, BadRequest
 
 try:
     import numpy as np
@@ -24,26 +24,26 @@ except ImportError as e:
 @attr('UNIT')
 class InterceptorTest(PyonTestCase):
     @unittest.skipIf(not _have_numpy,'No numpy')
-    def test_numpy_codec(self):
+    def test_numpy_encode(self):
 
         a = np.array([90,8010,3,14112,3.14159265358979323846264],dtype='float32')
 
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
+        mangled = encode.outgoing(invoke)
 
-        received = codec.incoming(mangled)
+        received = encode.incoming(mangled)
 
         b = received.message
         self.assertTrue((a==b).all())
 
         # Rank 1, length 1 works:
         a = np.array([90,8010,3,14112,3.14159265358979323846264],dtype='float32')
-        mangled = codec.outgoing(invoke)
+        mangled = encode.outgoing(invoke)
 
-        received = codec.incoming(mangled)
+        received = encode.incoming(mangled)
 
         b = received.message
         self.assertTrue((a==b).all())
@@ -54,11 +54,11 @@ class InterceptorTest(PyonTestCase):
         a = np.array([(90,8010,3,14112,3.14159265358979323846264)],dtype='float32')
         invoke = Invocation()
         invoke.message = {'double stuffed':[a,a,a]}
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
+        mangled = encode.outgoing(invoke)
 
-        received = codec.incoming(mangled)
+        received = encode.incoming(mangled)
 
         b = received.message
         c = b.get('double stuffed')
@@ -69,10 +69,10 @@ class InterceptorTest(PyonTestCase):
         a = {1,2}
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
-        received = codec.incoming(mangled)
+        mangled = encode.outgoing(invoke)
+        received = encode.incoming(mangled)
         b = received.message
 
         self.assertEquals(a,b)
@@ -81,10 +81,10 @@ class InterceptorTest(PyonTestCase):
         a = np.uint64(312)
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
-        received = codec.incoming(mangled)
+        mangled = encode.outgoing(invoke)
+        received = encode.incoming(mangled)
         b = received.message
 
         self.assertEquals(a,b)
@@ -93,10 +93,10 @@ class InterceptorTest(PyonTestCase):
         a = slice(5,20,2)
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
-        received = codec.incoming(mangled)
+        mangled = encode.outgoing(invoke)
+        received = encode.incoming(mangled)
         b = received.message
 
         self.assertEquals(a,b)
@@ -105,10 +105,10 @@ class InterceptorTest(PyonTestCase):
         a = np.dtype('float32')
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
-        received = codec.incoming(mangled)
+        mangled = encode.outgoing(invoke)
+        received = encode.incoming(mangled)
         b = received.message
 
         self.assertEquals(a,b)
@@ -116,10 +116,10 @@ class InterceptorTest(PyonTestCase):
         a = np.dtype('object')
         invoke = Invocation()
         invoke.message = a
-        codec = EncodeInterceptor()
+        encode = EncodeInterceptor()
 
-        mangled = codec.outgoing(invoke)
-        received = codec.incoming(mangled)
+        mangled = encode.outgoing(invoke)
+        received = encode.incoming(mangled)
         b = received.message
 
         self.assertEquals(a,b)
@@ -366,3 +366,36 @@ class InterceptorTest(PyonTestCase):
         self.assertEqual(deco_value,None)
 
 
+
+    def test_encode_dotdict(self):
+        from interface.messages import process_dispatcher_schedule_process_in
+        msg_obj = process_dispatcher_schedule_process_in()
+        msg_obj.name = "process"
+        msg_obj.configuration = {"process": {"property": "FOO"}}
+
+        invoke = Invocation()
+        invoke.message = msg_obj
+        encode = EncodeInterceptor()
+
+        mangled = encode.outgoing(invoke)
+        msg_encoded1 = mangled.message
+        received = encode.incoming(mangled)
+        msg_rec1 = received.message
+
+        msg_obj = process_dispatcher_schedule_process_in()
+        msg_obj.name = "process"
+        msg_obj.configuration = DotDict()
+        msg_obj.configuration.process.property = "FOO"
+
+        invoke = Invocation()
+        invoke.message = msg_obj
+        encode = EncodeInterceptor()
+
+        mangled = encode.outgoing(invoke)
+        msg_encoded2 = mangled.message
+        received = encode.incoming(mangled)
+        msg_rec2 = received.message
+
+        self.assertEquals(msg_encoded1, msg_encoded2)
+        self.assertIsInstance(msg_rec1["configuration"], dict)
+        self.assertIsInstance(msg_rec2["configuration"], dict)
