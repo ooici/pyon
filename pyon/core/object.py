@@ -422,7 +422,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
     Defines a _transform method to turn IonObjects into dictionaries to be deserialized by
     an IonObjectDeserializer.
 
-    Used by the codec interceptor and when being written to CouchDB.
+    Used when being written to Datastore.
     """
     def _transform(self, obj):
         if isinstance(obj, IonObjectBase):
