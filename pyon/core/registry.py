@@ -141,6 +141,7 @@ class IonObjectRegistry(object):
 
     def new(self, _def, _dict=None, **kwargs):
         """Instantiates an IonObject based on given object type name and initial values.
+        Note: This is called for the IonObject() instantiation but not for the ObjType() instantiation.
         @param _def    Name of object type
         @param _dict   A dict/DotDict/derivative with initial values
         @param kwargs  Additional initial values
