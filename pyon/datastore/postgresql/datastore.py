@@ -720,7 +720,7 @@ class PostgresPyonDataStore(PostgresDataStore):
         if ion_object is None:
             return None
 
-        obj_dict = self._io_serializer.serialize(ion_object)
+        obj_dict = self._io_serializer.serialize(ion_object, update_version=True)
         return obj_dict
 
     def _persistence_dict_to_ion_object(self, obj_dict):
