@@ -137,7 +137,7 @@ class IonObjectRegistry(object):
             message_classes[name] = clzz
 
         from pyon.core.bootstrap import CFG
-        self.validate_setattr = CFG.get_safe('validate.setattr', False)
+        self.validate_setattr = CFG.get_safe('container.objects.validate.setattr', False)
 
     def new(self, _def, _dict=None, **kwargs):
         """Instantiates an IonObject based on given object type name and initial values.
