@@ -21,9 +21,10 @@ class DataStore(object):
     DS_DIRECTORY = DS_RESOURCES
     DS_STATE = "state"
     DS_CONVERSATIONS = "conversations"
+    DS_COVERAGE = "coverage"
 
     # Enumeration of index profiles for datastores
-    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'CONV', 'FILESYSTEM', 'BASIC', 'SCIDATA']
+    DS_PROFILE_LIST = ['OBJECTS', 'RESOURCES', 'DIRECTORY', 'STATE', 'EVENTS', 'CONV', 'FILESYSTEM', 'BASIC', 'SCIDATA', 'COVERAGE']
     DS_PROFILE = DotDict(zip(DS_PROFILE_LIST, DS_PROFILE_LIST))
     DS_PROFILE.lock()
 
@@ -34,6 +35,7 @@ class DataStore(object):
         DS_EVENTS: DS_PROFILE.EVENTS,
         DS_STATE: DS_PROFILE.STATE,
         DS_CONVERSATIONS: DS_PROFILE.OBJECTS,
+        DS_COVERAGE: DS_PROFILE.COVERAGE,
         }
 
     def __init__(self, datastore_name=None, profile=None, config=None, container=None, scope=None, **kwargs):
@@ -43,7 +45,7 @@ class DataStore(object):
 class DatastoreFactory(object):
     """Helps to create instances of datastores"""
 
-    DS_BASE = "base"    # A standalone variant
+    DS_BASE = "base"    # A standalone variant                                    of
     DS_FULL = "full"    # A datastore that requires pyon initialization
 
     @classmethod
