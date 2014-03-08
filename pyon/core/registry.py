@@ -185,6 +185,5 @@ class IonObjectRegistry(object):
             obj = clzz(**keywordargs)
         else:
             obj = clzz(**kwargs)
-        if hasattr(clzz,'_class_info') and 'TypeVersion' in obj._class_info['decorators']:
-            obj.persisted_version = clzz._class_info['decorators']['TypeVersion']
+
         return obj

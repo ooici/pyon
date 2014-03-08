@@ -439,7 +439,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
                     # convert TypeVersion in decorator from string to int
                     # because the object_model_generator converts TypeVersion to string
-                    res['persisted_version'] = int(obj._class_info['decorators']['TypeVersion'])
+                    res['persisted_version'] = obj._class_info['decorators']['TypeVersion']
                 return res
 
             return obj
