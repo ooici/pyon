@@ -424,24 +424,33 @@ class IonObjectSerializer(IonObjectSerializationBase):
 
     Used when being written to Datastore.
     """
-    def _transform(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
-            if not 'type_' in res:
-                res['type_'] = obj._get_type()
 
-            # update persisted_version if serializing for persistence
-            if 'TypeVersion' in obj._class_info['decorators']:
+    def _transform(self, update_version=False):
 
-                # convert TypeVersion in decorator from string to int
-                # this is a hack because the object_model_generator converts TypeVersion to string
-                res['persisted_version'] = int(obj._class_info['decorators']['TypeVersion'])
+        def _transform(obj):
 
-            return res
+            if isinstance(obj, IonObjectBase):
+                res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
+                if not 'type_' in res:
+                    res['type_'] = obj._get_type()
 
-        return obj
+                # update persisted_version if serializing for persistence
+                if update_version and 'TypeVersion' in obj._class_info['decorators']:
 
-    serialize = IonObjectSerializationBase.operate
+                    # convert TypeVersion in decorator from string to int
+                    # because the object_model_generator converts TypeVersion to string
+                    res['persisted_version'] = obj._class_info['decorators']['TypeVersion']
+                return res
+
+            return obj
+        return _transform
+
+
+    def serialize(self, obj, update_version=False):
+
+        self._transform_method = self._transform(update_version)
+
+        return IonObjectSerializationBase.operate(self, obj)
 
 class IonObjectBlameSerializer(IonObjectSerializer):
 

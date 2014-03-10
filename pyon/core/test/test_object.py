@@ -58,7 +58,7 @@ class ObjectTest(IonIntegrationTestCase):
         # create an initial version of SampleResource
         io_serializer = IonObjectSerializer()
         obj = IonObject('SampleResource', {'num': 9, 'other_field': 'test value'})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 1)
         # verify that the simulated previous version does not have new_attribute
         self.assertEquals('new_attribute' in obj_dict, False)
@@ -78,7 +78,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj_dict['persisted_version'], 1)
 
         # simulate update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 2)
 
@@ -92,7 +92,7 @@ class ObjectTest(IonIntegrationTestCase):
             IonObject('SampleResource_V2', {'num': 9, 'other_field': 'test value','more_new_attribute': {'key':'value'}})
         # simulate creating a version 2 of SampleResource that has "new_attribute"
         obj = IonObject('SampleResource_V2', {'num': 9, 'other_field': 'test value','new_attribute': {'key':'value'}})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is 2
         self.assertEquals(obj_dict['persisted_version'], 2)
         # verify that the simulated version 2 data does have new_attribute
@@ -119,7 +119,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj_dict['persisted_version'], 2)
 
         # simulate update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 3)
 
@@ -128,7 +128,7 @@ class ObjectTest(IonIntegrationTestCase):
 
         io_serializer = IonObjectSerializer()
         obj = IonObject('SampleEvent', {'num': 9, 'other_field': 'test value'})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 1)
         # simulate a previous version data of SampleEvent_V2
         obj_dict['type_'] = 'SampleEvent_V2'
@@ -148,7 +148,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj_dict['persisted_version'], 1)
 
         # simulate create/update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 2)
 
@@ -162,7 +162,7 @@ class ObjectTest(IonIntegrationTestCase):
             IonObject('SampleEvent_V2', {'num': 9, 'other_field': 'test value','more_new_attribute': {'key':'value'}})
 
         obj = IonObject('SampleEvent_V2', {'num': 9, 'other_field': 'test value','new_attribute': {'key':'value'}})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 2)
         # simulate a next version data of SampleEvent_V2
         obj_dict['type_'] = 'SampleEvent_V3'
@@ -186,7 +186,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj_dict['persisted_version'], 2)
 
         # simulate create/update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 3)
 
@@ -194,7 +194,7 @@ class ObjectTest(IonIntegrationTestCase):
 
         io_serializer = IonObjectSerializer()
         obj = IonObject('SampleComplexEvent', {'num': 9, 'other_field': 'test value'})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 1)
         # simulate a previous version data of SampleComplexEvent_V2
         obj_dict['type_'] = 'SampleComplexEvent_V2'
@@ -216,7 +216,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj_dict['persisted_version'], 1)
 
         # simulate create/update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 2)
 
@@ -234,7 +234,7 @@ class ObjectTest(IonIntegrationTestCase):
 
         obj = IonObject('SampleComplexEvent_V2', {'num': 9, 'other_field': 'test value','new_resource': {'num': 9, 'other_field': 'test value','new_attribute':{'key':'value'}}})
         # create simulated saved data
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 2)
         # simulate a next version data of SampleComplexEvent_V2
         obj_dict['type_'] = 'SampleComplexEvent_V3'
@@ -271,7 +271,7 @@ class ObjectTest(IonIntegrationTestCase):
 
 
         # simulate create/update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that version is updated
         self.assertEquals(obj_dict['persisted_version'], 3)
         # verify that version is updated fo the subsumed object
@@ -290,7 +290,7 @@ class ObjectTest(IonIntegrationTestCase):
 
         obj = IonObject('SampleComplexEvent_V2', {'num': 9, 'other_field': 'test value','new_resource':
             {'num': 9, 'other_field': 'test value','new_attribute':{'key':'value'}}})
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         self.assertEquals(obj_dict['persisted_version'], 2)
 
         # verify that the simulated previous version data does have new_resource
@@ -325,7 +325,7 @@ class ObjectTest(IonIntegrationTestCase):
         self.assertEquals(obj.new_resource.persisted_version, 2)
 
         # simulate create/update
-        obj_dict = io_serializer.serialize(obj)
+        obj_dict = io_serializer.serialize(obj,True)
         # verify that versions are unchanged
         self.assertEquals(obj_dict['persisted_version'], 3)
         # verify that versions are updated in the subsumed object
