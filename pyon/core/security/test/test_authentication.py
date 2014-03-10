@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from nose.plugins.attrib import attr
+from unittest import skip
+
 from pyon.core.security.authentication import Authentication
 from pyon.util.unit_test import PyonTestCase
 
@@ -11,6 +13,7 @@ class AuthenticationTest(PyonTestCase):
     def setUp(self):
         pass
 
+    @skip("PLEASE UPDATE CERTIFICATE")
     def test_authentication(self):
         private_key = """
 -----BEGIN RSA PRIVATE KEY-----
