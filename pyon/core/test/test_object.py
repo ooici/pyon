@@ -16,7 +16,7 @@ import unittest
 @attr('UNIT')
 class ObjectTest(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.core.bootstrap.CFG', {'validate':{'setattr': True}})
+        self.patch_cfg('pyon.core.bootstrap.CFG', {'container':{'objects':{'validate':{'setattr': True}}}})
         self.registry = IonObjectRegistry()
 
     def test_new(self):

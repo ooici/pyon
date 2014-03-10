@@ -19,43 +19,6 @@ import hashlib
 
 from pyon.core.interceptor.encode import encode_ion, decode_ion
 
-"""
-def decode_numpy( obj):
-    if "__ion_array__" in obj:
-        return numpy.array(obj['content'],dtype=numpy.dtype(obj['shape']['type']))
-
-    elif '__complex__' in obj:
-        return complex(obj['real'], obj['imag'])
-        ## Always return object
-    return obj
-
-def encode_numpy( obj):
-    if isinstance(obj, numpy.ndarray):
-        return {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tolist(),"__ion_array__":True}
-
-    elif isinstance(obj, complex):
-        return {'__complex__': True, 'real': obj.real, 'imag': obj.imag}
-
-    else:
-        # Must raise type error to avoid recursive failure
-        raise TypeError('Unknown type in user specified encoder')
-    return obj
-
-def decode_numpy_as_string( obj):
-    if "__ion_array__" in obj:
-        return numpy.frombuffer(obj['content'],dtype=numpy.dtype(obj['shape']['type'])).reshape(obj['shape']['lengths'])
-
-    return obj
-
-def encode_numpy_as_string( obj):
-    if isinstance(obj, numpy.ndarray):
-        return {"shape":{"type":str(obj.dtype),"nd":len(obj.shape),"lengths":obj.shape},"content":obj.tostring(),"__ion_array__":True}
-
-    else:
-        # Must raise type error to avoid recursive failure
-        raise TypeError('Unknown type in user specified encoder')
-    return obj
-"""
 
 def sha1(buf):
     return hashlib.sha1(buf).hexdigest().upper()
