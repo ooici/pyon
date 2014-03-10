@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Messaging object encoder/decoder for IonObjects and numpy data"""
+
 import msgpack
 import sys
 import numpy as np
@@ -27,7 +29,8 @@ class EncodeTypes(object):
     NPVAL = 'n'
 
 
-# Global lazy load reference to the Pyon object registry (we be set on first use, not on load)
+# Global lazy load reference to the Pyon object registry (we be set on first use, not on load).
+# Note: We need this here so that the decode_ion/encode_ion functions can be imported (i.e. be static).
 obj_registry = None
 
 
@@ -37,6 +40,11 @@ def decode_ion(obj):
 
     # NOTE: Just matching on dict with "type_" is a bit weak
     if "type_" in obj:
+        if "__noion__" in obj:
+            # INTERNAL: Allow dicts to mask as IonObject without being decoded (with all defaults set and validated)
+            obj.pop("__noion__")
+            return obj
+
         global obj_registry
         if obj_registry is None:
             obj_registry = get_obj_registry()
@@ -44,7 +52,7 @@ def decode_ion(obj):
         ion_obj = obj_registry.new(obj["type_"])
         for k, v in obj.iteritems():
             # unicode translate to utf8
-            # Note: That's not recursive within dicts/list or any other types
+            # Note: This is not recursive within dicts/list or any other types
             if isinstance(v, unicode):
                 v = v.encode('utf8')
             if k != "type_":
@@ -79,6 +87,7 @@ def decode_ion(obj):
         return dt.type(obj['o'])
 
     return obj
+
 
 def encode_ion(obj):
     """
