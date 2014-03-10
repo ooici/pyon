@@ -7,7 +7,9 @@ __author__ = 'Michael Meisinger'
 import getpass
 import os.path
 from uuid import uuid4
-import simplejson as json
+# Note: standard json is faster than simplejson for dumps
+# See https://confluence.oceanobservatories.org/display/CIDev/Container+Messaging+Performance
+import json
 
 try:
     import psycopg2

@@ -39,8 +39,6 @@ FUTURE FEATURES:
 
 OPEN QUESTIONS:
 - EXPLAIN ANALYZE queries
-- Use postgres 9.3 json operators?
-- Rewrite some of the json functions
 - list_datastores() must maintain compatible result, prefixing database with sysname (because of framework code)
-- Use msgpack for object serialization instead of json and custom accessor functions?
+- Use msgpack and BYTEA for object serialization instead of json and custom accessor functions?
 - rewrite association queries as select * from resources where id in (select from assoc)
