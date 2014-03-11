@@ -290,7 +290,6 @@ class MessagingPerfTest(IonUnitTestCase):
         time_serialize(test_obj1, "dict of ion nested", has_ion=True)
 
         from pyon.core.interceptor.interceptor import Invocation
-        from pyon.core.interceptor.codec import CodecInterceptor
         from pyon.core.interceptor.encode import EncodeInterceptor
         encode = EncodeInterceptor()
         invocation = Invocation()
