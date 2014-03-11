@@ -31,7 +31,7 @@ def main():
     parser.add_option("-u", "--username", dest="couch_uname", default=None, help="Username for the couch server", action="store", type=str, metavar="UNAME")
     parser.add_option("-p", "--password", dest="couch_pword", default=None, help="Password for the couch server", action="store", type=str, metavar="PWORD")
     parser.add_option("-s", "--sysname", dest="sysname", default=None, help="The sysname prefix to clear in couch", action="store", type=str, metavar="SYSNAME")
-    parser.add_option("-t", "--store_type", dest="couch_type", default="couchdb", help="Datastore type", action="store", type=str, metavar="DSTYPE")
+    parser.add_option("-t", "--store_type", dest="couch_type", default="postgresql", help="Datastore type", action="store", type=str, metavar="DSTYPE")
     parser.add_option("-v", "--verbose", help="More verbose output", action="store_true")
     parser.add_option("-d", "--dump", dest="dump_path", default=None, help="Dump sysname datastores to path", action="store", type=str, metavar="DPATH")
     parser.add_option("-l", "--load", dest="load_path", default=None, help="Load dumped datastore from path", action="store", type=str, metavar="LPATH")

@@ -2,34 +2,40 @@
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
 
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.util.unit_test import PyonTestCase
-from nose.plugins.attrib import attr
-from examples.service.hello_service import HelloService
-from interface.services.examples.hello.ihello_service import HelloServiceClient
-from pyon.net.endpoint import RPCServer, Subscriber, Publisher
-from pyon.util.async import spawn
 import unittest
-from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
+from nose.plugins.attrib import attr
 from mock import Mock, sentinel, patch, call, MagicMock
-from pyon.net.transport import BaseTransport, NameTrio, TransportError
-from pyon.net.messaging import NodeB
-from pyon.core.bootstrap import get_sys_name
-from pyon.core import exception
 import requests
-from pyon.net.channel import SendChannel
-from pyon.core.bootstrap import CFG
-from pyon.util.containers import DotDict
 from gevent.queue import Queue
 import os
 import time
 from gevent.timeout import Timeout
 from uuid import uuid4
 import simplejson as json
+from copy import deepcopy
 
-def _make_server_cfg(**kwargs):
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import PyonTestCase
+from pyon.core.bootstrap import get_sys_name
+from pyon.core import exception
+from pyon.core.bootstrap import CFG
+from pyon.util.async import spawn
+from pyon.ion.exchange import ExchangeManager, ION_ROOT_XS, ExchangeNameProcess, ExchangeNameService, ExchangeName, ExchangeNameQueue, ExchangeManagerError
+from pyon.net.endpoint import RPCServer, Subscriber, Publisher
+from pyon.net.transport import BaseTransport, NameTrio, TransportError
+from pyon.net.messaging import NodeB
+from pyon.net.channel import SendChannel
+from pyon.util.containers import DotDict
+
+from examples.service.hello_service import HelloService
+
+from interface.services.examples.hello.ihello_service import HelloServiceClient
+
+
+def _make_container_cfg(**kwargs):
     ddkwargs = DotDict(**kwargs)
     return DotDict(CFG.container, messaging=DotDict(CFG.container.messaging, server=ddkwargs))
+
 
 dict_amqp                = DotDict(type='amqp')
 dict_amqp_again          = DotDict(type='amqp')
@@ -48,11 +54,11 @@ class TestExchangeManager(PyonTestCase):
     def test_verify_service(self, mockmessaging):
         PyonTestCase.test_verify_service(self)
 
-    @patch.dict('pyon.ion.exchange.CFG', container=_make_server_cfg())
+    @patch.dict('pyon.ion.exchange.CFG', container=_make_container_cfg())
     def test_start_with_no_connections(self, mockmessaging):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp}, container=_make_server_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
     def test_start_with_one_connection(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
@@ -63,7 +69,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(self.ex_manager._nodes['primary'], mockmessaging.make_node.return_value[0])
         self.assertEquals(self.ex_manager._ioloops['primary'], mockmessaging.make_node.return_value[1])
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_again'))
     def test_start_with_multi_connections(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
@@ -80,14 +86,14 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(self.ex_manager._nodes['secondary'], mockmessaging.make_node.return_value[0])
         self.assertEquals(self.ex_manager._ioloops['secondary'], mockmessaging.make_node.return_value[1])
 
-    @patch.dict('pyon.ion.exchange.CFG', server={}, container=_make_server_cfg(primary='idontexist'))
+    @patch.dict('pyon.ion.exchange.CFG', server={}, container=_make_container_cfg(primary='idontexist'))
     def test_start_with_non_existing_connection_in_server(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
 
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         self.assertFalse(mockmessaging.make_node.called)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_fail':dict_amqp_fail}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail'))
     def test_start_with_working_and_failing_connection(self, mockmessaging):
 
         # set up return values - first is amqp (Working) second is amqp_fail (not working)
@@ -106,7 +112,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(len(self.ex_manager._nodes), 1)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_fail':dict_amqp_fail}, container=_make_server_cfg(primary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp_fail'))
     def test_start_with_only_failing_connections(self, mockmessaging):
         nodemock = Mock()
         nodemock.running = False
@@ -117,7 +123,7 @@ class TestExchangeManager(PyonTestCase):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp}, container=_make_server_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
     def test_start_stop(self, mockmessaging):
         nodemock = Mock()
         iomock = Mock()
@@ -132,7 +138,7 @@ class TestExchangeManager(PyonTestCase):
     def test_default_node_no_connections(self, mockmessaging):
         self.assertIsNone(self.ex_manager.default_node)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_not_default':dict_amqp_not_default}, container=_make_server_cfg(secondary='amqp_not_default'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_not_default':dict_amqp_not_default, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(secondary='amqp_not_default'))
     def test_default_node_no_default_name(self, mockmessaging):
         nodemock = Mock()
         mockmessaging.make_node.return_value = (nodemock, Mock())     # node, ioloop
@@ -141,7 +147,7 @@ class TestExchangeManager(PyonTestCase):
 
         self.assertEquals(self.ex_manager.default_node, nodemock)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again}, container=_make_server_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_again'))
     def test_default_node(self, mockmessaging):
 
         # set up return values - amqp returns this named version, amqp_again does not
@@ -193,14 +199,14 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
     def setUp(self):
         pass
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb}, container=_make_server_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
     def test_start_stop(self):
         self._start_container()
 
         self.assertEquals(self.container.node, self.container.ex_manager.default_node)
         self.assertEquals(len(self.container.ex_manager._nodes), 1)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb, 'amqp_fail':fail_bad_user_cfg}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail'))
     def test_start_stop_with_one_success_and_one_failure(self):
         self._start_container()
 
@@ -208,7 +214,7 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertIn('primary', self.container.ex_manager._nodes)
         self.assertNotIn('secondary', self.container.ex_manager._nodes)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'couchdb':CFG.server.couchdb, 'amqp_fail':fail_bad_user_cfg, 'amqp_fail2':fail_bad_port_cfg}, container=_make_server_cfg(primary='amqp', secondary='amqp_fail', thirdly='amqp_fail2'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg, 'amqp_fail2':fail_bad_port_cfg}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail', thirdly='amqp_fail2'))
     def test_start_stop_with_one_success_and_multiple_failures(self):
         self._start_container()
 
@@ -216,15 +222,15 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertIn('primary', self.container.ex_manager._nodes)
         self.assertNotIn('secondary', self.container.ex_manager._nodes)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp':fail_bad_user_cfg}, container=_make_server_cfg())
+    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp':fail_bad_user_cfg}, container=_make_container_cfg())
     def test_start_stop_with_no_connections(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp_bad':fail_bad_port_cfg}, container=_make_server_cfg(primary='amqp_bad'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_port_cfg}, container=_make_container_cfg(primary='amqp_bad'))
     def test_start_stop_with_bad_port_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'couchdb':CFG.server.couchdb, 'amqp_bad':fail_bad_host_cfg}, container=_make_server_cfg(primary='amqp_bad'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_host_cfg}, container=_make_container_cfg(primary='amqp_bad'))
     def test_start_stop_with_bad_host_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
@@ -479,8 +485,10 @@ class TestExchangeObjects(PyonTestCase):
 class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
+                                                              'datastore':CFG['container']['datastore'],
                                                               'exchange':{'auto_register': False},
-                                                              'messaging':{'server':{'primary':'amqp', 'priviledged':None}}}})
+                                                              'messaging':{'server':{'primary':'amqp', 'priviledged':None}}},
+                                                 'server':CFG['server']})
         self._start_container()
 
     def test_rpc_with_xn(self):
@@ -627,9 +635,12 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 class TestExchangeObjectsIntWithLocal(TestExchangeObjectsInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
+                                                              'datastore':CFG['container']['datastore'],
                                                               'exchange':{'auto_register': False},
-                                                              'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}}})
+                                                              'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}},
+                                                 'server':CFG['server']})
         self._start_container()
+
 
 @attr('INT', group='exchange')
 @patch.dict('pyon.ion.exchange.CFG', {'container':{'capability':{'profile':"res/profile/development.yml"},'exchange':{'auto_register': False}}})
@@ -703,10 +714,22 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
         self.assertNotIn(xn.queue, self.container.ex_manager.list_queues())
 
 @attr('INT', group='exchange')
-@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False, 'names':{'durable':True}}}})
+@patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register': False,
+                                                               'names':{'durable':True}}}})
 class TestExchangeObjectsDurableFlag(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
+        def cleanup_broker():
+            # @Dave: This is maybe too brute force and there is maybe a better pattern...
+            connect_str = "-q -H %s -P %s -u %s -p %s -V %s" % (CFG.get_safe('server.amqp_priv.host', CFG.get_safe('server.amqp.host', 'localhost')),
+                                                                   CFG.get_safe('container.exchange.management.port', '55672'),
+                                                                   CFG.get_safe('container.exchange.management.username', 'guest'),
+                                                                   CFG.get_safe('container.exchange.management.password', 'guest'),
+                                                                   '/')
+
+            from putil.rabbithelper import clean_by_sysname
+            clean_by_sysname(connect_str, get_sys_name())
+        self.addCleanup(cleanup_broker)
 
     @patch.dict('pyon.ion.exchange.CFG', {'container':{'exchange':{'names':{'durable':False}}}})
     def test_durable_off_on_create(self):
