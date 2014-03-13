@@ -35,7 +35,9 @@ import numpy as np
 import requests
 import json
 import platform
+from pyon.util.config import Config
 
+USING_EOI_SERVICES = Config(["res/config/eoi.yml"]).data['eoi']['meta']['use_eoi_services']
 USERNAME = 'ion'
 PASSWORD = 'ion'
 GS_HOSTNAME = 'localhost'
@@ -50,6 +52,7 @@ IMPORTER_SERVICE_URL = ''.join(['http://', IS_HOSTNAME, ':', IS_PORT])
 """
 The following integration tests (INTMAN) are to ONLY be run manually
 """
+
 @attr('INTMAN', group='eoi')
 class DatasetLoadTest(IonIntegrationTestCase):
     def setUp(self):
@@ -60,6 +63,7 @@ class DatasetLoadTest(IonIntegrationTestCase):
         self.pubsub_management       = PubsubManagementServiceClient()
         self.resource_registry       = self.container.resource_registry
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_create_dataset(self):        
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
         pdict_id = ph.create_extended_parsed()
@@ -145,6 +149,7 @@ class ServiceTests(IonIntegrationTestCase):
         gevent.sleep(1) # Yield to other greenlets, had an issue with connectivity
 	self.offering_id = dataset_id
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_reset_store(self):
         # Makes sure store is empty 
 	self.assertTrue(_reset_store())
@@ -156,6 +161,7 @@ class ServiceTests(IonIntegrationTestCase):
 	layers = json.loads(r.content)
 	self.assertTrue(len(layers['layers']) == 0)
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_create_dataset_verify_geoserver_layer(self):
         #generate layer and check that the service created it in geoserver
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
@@ -201,6 +207,7 @@ class ServiceTests(IonIntegrationTestCase):
             print "check service and layer exist..."
             self.assertTrue(False)
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')        
     def test_verify_importer_service_online(self):
         try:
             r = requests.get('http://localhost:8844')
@@ -343,12 +350,14 @@ class ServiceTests(IonIntegrationTestCase):
         assertTrue(r.status_code==200)
         #check r.text does not contain <ServiceException code="InvalidParameterValue" locator="typeName">
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_sos_response(self):
 	expected_content = 'SOS SERVICE IS UP.....Hello World!'
 	url = GS_OWS_URL+'?request=echo&service=sos'
 	r = requests.get(url)
 	self.assertEqual(r.content, expected_content)
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_sos_get_capabilities(self):
 	# Validates reponse is not an exception, assues valid otherwise
         self.setup_resource()
@@ -358,6 +367,7 @@ class ServiceTests(IonIntegrationTestCase):
         self.assertEquals(r.status_code, 200)
 	self.assertTrue(r.content.find('<sos:Capabilities') >= 0)
 
+    @unittest.skipIf(not USING_EOI_SERVICES, 'Skip test in TABLE LOADER as services are not loaded')
     def test_sos_get_offering(self):
 	# Validates reponse is not an exception, assues valid otherwise
 	# TODO: Use deterministic <swe:values> for comparison
@@ -374,23 +384,32 @@ class ServiceTests(IonIntegrationTestCase):
 Helper functions
 """
 def _get_all_layers():
-    """
-	{"layers":{"layer":[{"name":"ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi","href":"http:\/\/eoi-dev1.oceanobservatories.org:8080\/geoserver\/rest\/layers\/ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi.json"}]}}
-    """
-    url = ''.join([GS_REST_URL,'/layers.json'])
-    r = requests.get(url,auth=(USERNAME,PASSWORD))
-    if r.status_code == 200:
-    	layers = json.loads(r.content)
-    else:
+    try:
+    
+        """
+    	{"layers":{"layer":[{"name":"ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi","href":"http:\/\/eoi-dev1.oceanobservatories.org:8080\/geoserver\/rest\/layers\/ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi.json"}]}}
+        """
+        url = ''.join([GS_REST_URL,'/layers.json'])
+        r = requests.get(url,auth=(USERNAME,PASSWORD))
+        if r.status_code == 200:
+        	layers = json.loads(r.content)
+        else:
+            layers = {'layers':''}
+        return layers
+    except Exception, e:
+        print "Service might not be running..."
         layers = {'layers':''}
-    return layers
+        return layers
 
 def _reset_store():
-    url = ''.join([IMPORTER_SERVICE_URL,'/service=resetstore&name=ooi&id=ooi'])
-    r = requests.post(url)
-    if r.status_code == 200:
-        return True
-    else:
-    	return False
+    try:
+        url = ''.join([IMPORTER_SERVICE_URL,'/service=resetstore&name=ooi&id=ooi'])
+        r = requests.post(url)
+        if r.status_code == 200:
+            return True
+        else:
+        	return False
+    except Exception, e:
+            return False        
 
 
