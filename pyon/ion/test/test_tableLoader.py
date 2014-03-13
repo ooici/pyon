@@ -41,6 +41,7 @@ PASSWORD = 'ion'
 GS_HOSTNAME = 'localhost'
 GS_PORT = '8080'
 GS_REST_URL = ''.join(['http://', GS_HOSTNAME, ':', GS_PORT, '/geoserver/rest'])
+GS_OWS_URL = ''.join(['http://', GS_HOSTNAME, ':', GS_PORT, '/geoserver/ows'])
 
 IS_HOSTNAME = 'localhost'
 IS_PORT = '8844'
@@ -112,6 +113,37 @@ class ServiceTests(IonIntegrationTestCase):
         self.data_product_management = DataProductManagementServiceClient()
         self.pubsub_management       = PubsubManagementServiceClient()
         self.resource_registry       = self.container.resource_registry
+	self.offering_id	     = ''
+
+    def setup_resource(self):
+        ph = ParameterHelper(self.dataset_management, self.addCleanup)
+        pdict_id = ph.create_extended_parsed()
+
+        stream_def_id = self.pubsub_management.create_stream_definition('example', parameter_dictionary_id=pdict_id)
+        self.addCleanup(self.pubsub_management.delete_stream_definition, stream_def_id)
+
+        tdom, sdom = time_series_domain()
+
+        dp = DataProduct(name='example')
+        dp.spatial_domain = sdom.dump()
+        dp.temporal_domain = tdom.dump()
+
+        data_product_id = self.data_product_management.create_data_product(dp, stream_def_id)
+        self.addCleanup(self.data_product_management.delete_data_product, data_product_id)
+
+        self.data_product_management.activate_data_product_persistence(data_product_id)
+        self.addCleanup(self.data_product_management.suspend_data_product_persistence, data_product_id)
+
+        dataset_id = self.resource_registry.find_objects(data_product_id, PRED.hasDataset, id_only=True)[0][0]
+        monitor = DatasetMonitor(dataset_id)
+        self.addCleanup(monitor.stop)
+
+        rdt = ph.get_rdt(stream_def_id)
+        ph.fill_rdt(rdt,100)
+        ph.publish_rdt_to_data_product(data_product_id, rdt)
+
+        gevent.sleep(1) # Yield to other greenlets, had an issue with connectivity
+	self.offering_id = dataset_id
 
     def test_reset_store(self):
         # Makes sure store is empty 
@@ -311,7 +343,36 @@ class ServiceTests(IonIntegrationTestCase):
         assertTrue(r.status_code==200)
         #check r.text does not contain <ServiceException code="InvalidParameterValue" locator="typeName">
 
+    def test_sos_response(self):
+	expected_content = 'SOS SERVICE IS UP.....Hello World!'
+	url = GS_OWS_URL+'?request=echo&service=sos'
+	r = requests.get(url)
+	self.assertEqual(r.content, expected_content)
 
+    def test_sos_get_capabilities(self):
+	# Validates reponse is not an exception, assues valid otherwise
+        self.setup_resource()
+        expected_content = ''
+        url = GS_OWS_URL+'?request=getCapabilities&service=sos&version=1.0.0&offering=_'+self.offering_id+'_view'
+        r = requests.get(url)
+        self.assertEquals(r.status_code, 200)
+	self.assertTrue(r.content.find('<sos:Capabilities') >= 0)
+
+    def test_sos_get_offering(self):
+	# Validates reponse is not an exception, assues valid otherwise
+	# TODO: Use deterministic <swe:values> for comparison
+	self.setup_resource()
+	expected_content = ''
+        url = GS_OWS_URL+'?request=getObservation&service=sos&version=1.0.0&offering=_'+self.offering_id+'_view&observedproperty=time,temp,density&responseformat=text/xml'
+        r = requests.get(url)
+	self.assertEquals(r.status_code, 200)
+	self.assertTrue(r.content.find('<om:ObservationCollection') >= 0)
+        self.assertTrue(r.content.find('ExceptionReport') == -1)
+
+
+"""
+Helper functions
+"""
 def _get_all_layers():
     """
 	{"layers":{"layer":[{"name":"ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi","href":"http:\/\/eoi-dev1.oceanobservatories.org:8080\/geoserver\/rest\/layers\/ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi.json"}]}}
@@ -331,4 +392,5 @@ def _reset_store():
         return True
     else:
     	return False
+
 
