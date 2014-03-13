@@ -17,9 +17,10 @@ from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_r
 from pyon.ion.process import get_ion_actor_id
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
-
+from pyon.util.breakpoint import breakpoint
 from interface.objects import Attachment, AttachmentType, ResourceModificationType
 
+from pyon.ion.tableLoader import resource_parser
 
 class ResourceRegistry(object):
     """
@@ -40,6 +41,21 @@ class ResourceRegistry(object):
         self.id = 'container_resource_registry'
 
         self.event_pub = EventPublisher()
+        
+        self.rr_table_loader = resource_parser()
+        self.geos_available = False
+        #check that the services are available 
+        if (self.rr_table_loader.useGeoServices):
+            self.geos_available = True
+            # if they are proceed with the reset
+            try:
+                self.rr_table_loader.reset()
+                self.geos_available = True
+                pass
+            except Exception, e:
+                #check the eoi geoserver importer service is started
+                raise e
+        
 
         self.superuser_actors = None
 
@@ -54,6 +70,9 @@ class ResourceRegistry(object):
         Pass-through method to close the underlying datastore.
         """
         self.rr_store.close()
+        #close the DS connection
+        if (self.geos_available):
+            self.rr_table_loader.close()
 
     # -------------------------------------------------------------------------
     # Resource object manipulation
@@ -67,6 +86,7 @@ class ResourceRegistry(object):
         they get attached to the object.
         Returns a tuple containing object and revision identifiers.
         """
+
         if object is None:
             raise BadRequest("Object not present")
         if not isinstance(object, IonObjectBase):
@@ -90,7 +110,7 @@ class ResourceRegistry(object):
         else:
             new_res_id = object_id
         res = self.rr_store.create(object, new_res_id, attachments=attachments)
-        res_id, rev = res
+        res_id, rev = res        
 
         if actor_id and actor_id != 'anonymous':
             log.debug("Associate resource_id=%s with owner=%s", res_id, actor_id)
@@ -101,6 +121,16 @@ class ResourceRegistry(object):
                                      origin=res_id, origin_type=object.type_,
                                      sub_type="CREATE",
                                      mod_type=ResourceModificationType.CREATE)
+
+
+        #get the newly created resource and add to EOI postgres table
+        #if self.container.cfg.get_safe('system.fdw',None):
+        if (self.geos_available):
+            if object._get_type() in ['Dataset']:
+                print res
+                pdict = object['parameter_dictionary']     
+                self.rr_table_loader.createSingleResource(res_id,pdict)
+    
 
         return res
 
@@ -174,6 +204,13 @@ class ResourceRegistry(object):
                                      sub_type="UPDATE",
                                      mod_type=ResourceModificationType.UPDATE)
 
+        #if self.container.cfg.get_safe('system.fdw',None):
+        if (self.geos_available):
+            if object._get_type() in ['Dataset']:
+                pdict = object['parameter_dictionary'] 
+                self.rr_table_loader.removeSingleResource(res_id)           
+                self.rr_table_loader.createSingleResource(res_id,pdict)
+
         return self.rr_store.update(object)
 
     def delete(self, object_id='', del_associations=False):
@@ -199,6 +236,11 @@ class ResourceRegistry(object):
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="DELETE",
                                      mod_type=ResourceModificationType.DELETE)
+
+        #if self.container.cfg.get_safe('system.fdw',None):
+        if (self.geos_available):
+            if res_obj._get_type() in ['Dataset']:
+                self.rr_table_loader.removeSingleResource(res_id)        
 
         return res
 
