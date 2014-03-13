@@ -1,7 +1,8 @@
 """
-@author Abird
+@author Andy Bird
+@author Jim Case
 @brief Test cases for the tableloader, 
-table loader is A Service to load data products in to postgres and geoserver from the resource registry
+table loader is a service to load data products in to postgres and geoserver from the resource registry
 """
 
 import sys
@@ -32,11 +33,23 @@ import os
 import gevent
 import numpy as np
 import requests
+import json
+import platform
 
-USERNAME = "admin"
-PASSWORD = "admin"
+USERNAME = 'ion'
+PASSWORD = 'ion'
+GS_HOSTNAME = 'localhost'
+GS_PORT = '8080'
+GS_REST_URL = ''.join(['http://', GS_HOSTNAME, ':', GS_PORT, '/geoserver/rest'])
 
-@attr('INT', group='eoi')
+IS_HOSTNAME = 'localhost'
+IS_PORT = '8844'
+IMPORTER_SERVICE_URL = ''.join(['http://', IS_HOSTNAME, ':', IS_PORT])
+
+"""
+The following integration tests (INTMAN) are to ONLY be run manually
+"""
+@attr('INTMAN', group='eoi')
 class DatasetLoadTest(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
@@ -46,8 +59,7 @@ class DatasetLoadTest(IonIntegrationTestCase):
         self.pubsub_management       = PubsubManagementServiceClient()
         self.resource_registry       = self.container.resource_registry
 
-    def test_create_dataset(self):
-        
+    def test_create_dataset(self):        
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
         pdict_id = ph.create_extended_parsed()
 
@@ -92,7 +104,7 @@ GEOSERVER TESTS
 FDW TESTS
 '''
 @attr('INT', group='eoi')
-class serviceTests(IonIntegrationTestCase):
+class ServiceTests(IonIntegrationTestCase):
     def setUp(self):
         self._start_container()
         self.container.start_rel_from_url('res/deploy/r2deploy.yml')
@@ -101,12 +113,16 @@ class serviceTests(IonIntegrationTestCase):
         self.pubsub_management       = PubsubManagementServiceClient()
         self.resource_registry       = self.container.resource_registry
 
-    def verify_no_layers_exist_initally(self):
-        #make sure store is empty 
-        # use get request on the ooi store
-        # http://localhost:8080/geoserver/rest/workspaces/geonode/datastores/ooi/featuretypes.xml or .json (might be easier)
-        print ""
-        pass
+    def test_reset_store(self):
+        # Makes sure store is empty 
+	self.assertTrue(_reset_store())
+	url = ''.join([GS_REST_URL,'/layers.json'])
+	# Asserts layers were able to be retrieved
+	r = requests.get(url,auth=(USERNAME,PASSWORD))
+	self.assertTrue(r.status_code == 200)
+	# Asserts there are no layers in the ooi store
+	layers = json.loads(r.content)
+	self.assertTrue(len(layers['layers']) == 0)
 
     def test_create_dataset_verify_geoserver_layer(self):
         #generate layer and check that the service created it in geoserver
@@ -137,7 +153,6 @@ class serviceTests(IonIntegrationTestCase):
         ph.publish_rdt_to_data_product(data_product_id, rdt)
         self.assertTrue(monitor.event.wait(10))
 
-
         gevent.sleep(1) # Yield to other greenlets, had an issue with connectivity
 
         print "--------------------------------"
@@ -148,7 +163,7 @@ class serviceTests(IonIntegrationTestCase):
         
         # verify that the layer exists in geoserver
         try:
-            r = requests.get('http://localhost:8080/geoserver/rest/layers/ooi_'+dataset_id+'_ooi.xml',auth=(USERNAME,PASSWORD))
+            r = requests.get(GS_REST_URL + '/layers/ooi_' + dataset_id + '_ooi.xml',auth=(USERNAME,PASSWORD))
             self.assertTrue(r.status_code==200)
         except Exception, e:
             print "check service and layer exist..."
@@ -163,13 +178,22 @@ class serviceTests(IonIntegrationTestCase):
             print "check service is started on port..."
             self.assertTrue(False)
 
-    def test_add_geolayer_directory(self):
+    @unittest.skip('Not yet implemented')
+    def test_add_geoserver_layer(self):
         # pass the create command to the service and check that the layer exists in  geoserver similar to the one above
         # send add layer directly to localhost 8844 with some params
         # store gets reset every time container is started
-        print ""
-        pass
+	# Makes sure store is empty
+        self.assertTrue(_reset_store())
+	params = {'temp_L1': 'real', 'conductivity_L1': 'real', 'temp': 'real', 'density': 'real', 'pressure_L1': 'real', 'lon': 'real', 'lat_lookup': 'real', 'density_lookup': 'real', 'pressure': 'real', 'lon_lookup': 'real', 'geom': 'geom', 'time': 'time', 'lat': 'real', 'salinity': 'real', 'conductivity': 'real'}
+	url = ''.join([IMPORTER_SERVICE_URL,'/service=addlayer&name=junk&id=junk&params='+params])
+	r = requests.get(IMPORTER_SERVICE_URL+'/service=addlayer&name=45a6a3cea12e470b90f3e5a769f22161&id=45a6a3cea12e470b90f3e5a769f22161&params='+str(params))
+    	if r.status_code == 200:
+    	    return True
+    	else:
+	    return False
 
+    @unittest.skip('Not yet implemented')
     def test_fdt_created_during(self):  
         # generate a data product and check that the FDT exists
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
@@ -219,7 +243,7 @@ class serviceTests(IonIntegrationTestCase):
         #r = requests.get('http://localhost:8080/geoserver/rest/workspaces/geonode/datastores/ooi/featuretypes/ooi_'+dataset_id+'_ooi.json',auth=('admin','admin'))
         #use r.json() or r.text and parse the output and compare the params
 
-
+    @unittest.skip('Not yet implemented')
     def test_remove_geolayer_directory(self):
         # pass the remove command to the service and check that the layer exists in geoserver similar to the one above
         # send remove layer directly to localhost 8844 with some params
@@ -227,6 +251,7 @@ class serviceTests(IonIntegrationTestCase):
         print ""
         pass
 
+    @unittest.skip('Not yet implemented')
     def test_update_geolayer_directory(self):
         # pass the update command to the service and check that the layer exists in geoserver similar to the one above
         # send update layer directly to localhost 8844 with some params
@@ -235,6 +260,7 @@ class serviceTests(IonIntegrationTestCase):
         print ""
         pass
 
+    @unittest.skip('Not yet implemented')
     def test_get_data_from_FDW(self):
         # generate a data product and check that the FDW can get data
         ph = ParameterHelper(self.dataset_management, self.addCleanup)
@@ -286,4 +312,23 @@ class serviceTests(IonIntegrationTestCase):
         #check r.text does not contain <ServiceException code="InvalidParameterValue" locator="typeName">
 
 
+def _get_all_layers():
+    """
+	{"layers":{"layer":[{"name":"ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi","href":"http:\/\/eoi-dev1.oceanobservatories.org:8080\/geoserver\/rest\/layers\/ooi_7c0026a3d38a4b05974c58e236a9ea56_ooi.json"}]}}
+    """
+    url = ''.join([GS_REST_URL,'/layers.json'])
+    r = requests.get(url,auth=(USERNAME,PASSWORD))
+    if r.status_code == 200:
+    	layers = json.loads(r.content)
+    else:
+        layers = {'layers':''}
+    return layers
+
+def _reset_store():
+    url = ''.join([IMPORTER_SERVICE_URL,'/service=resetstore&name=ooi&id=ooi'])
+    r = requests.post(url)
+    if r.status_code == 200:
+        return True
+    else:
+    	return False
 
