@@ -46,19 +46,44 @@ class resource_parser():
 
         self.coverageFDWSever = dataMap['eoi']['fdw']['server']
 
-
         self.con = None
+        self.postgres_db_availabe = False
+        self.importer_service_available = False
+        
         try:
             self.con = psycopg2.connect(database=self.DATABASE, user=self.DB_USER,password=self.DB_PASS)
             self.cur = self.con.cursor()
             #checks the connection
             self.cur.execute('SELECT version()')
             ver = self.cur.fetchone()
+            self.postgres_db_availabe = True
+            self.importer_service_available = self.checkForImporterService();
             print ver
 
         except psycopg2.DatabaseError, e:
             #error setting up connection
             print 'Error %s' % e
+
+        self.useGeoServices = False
+        if (self.postgres_db_availabe and self.importer_service_available):
+            self.useGeoServices = True
+            print "TableLoader:Using geoservices..."
+        else:
+            print "TableLoader:NOT using geoservices..."
+
+    def checkForImporterService(self):
+        try:
+            r = requests.get(self.SERVER+'/service=alive&name=ooi&id=ooi')
+            print "importerservice status code:" + str(r.status_code)
+            #alive service returned ok
+            if (r.status_code == 200):
+                return True
+            else:
+                return False
+        except Exception, e:
+            #SERVICE IS REALLY NOT AVAILABLE
+            print "service is really not available..."
+            return False
 
     def close(self):
         if self.con:

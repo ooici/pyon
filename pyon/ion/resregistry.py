@@ -44,13 +44,17 @@ class ResourceRegistry(object):
         
         self.rr_table_loader = resource_parser()
         self.geos_available = False
-        try:
-            self.rr_table_loader.reset()
+        #check that the services are available 
+        if (self.rr_table_loader.useGeoServices):
             self.geos_available = True
-            pass
-        except Exception, e:
-            #check the eoi geoserver importer service is started
-            raise e
+            # if they are proceed with the reset
+            try:
+                self.rr_table_loader.reset()
+                self.geos_available = True
+                pass
+            except Exception, e:
+                #check the eoi geoserver importer service is started
+                raise e
         
 
         self.superuser_actors = None
@@ -67,7 +71,8 @@ class ResourceRegistry(object):
         """
         self.rr_store.close()
         #close the DS connection
-        self.rr_table_loader.close()
+        if (self.geos_available):
+            self.rr_table_loader.close()
 
     # -------------------------------------------------------------------------
     # Resource object manipulation
@@ -120,10 +125,11 @@ class ResourceRegistry(object):
 
         #get the newly created resource and add to EOI postgres table
         #if self.container.cfg.get_safe('system.fdw',None):
-        if object._get_type() in ['Dataset']:
-            print res
-            pdict = object['parameter_dictionary']     
-            self.rr_table_loader.createSingleResource(res_id,pdict)
+        if (self.geos_available):
+            if object._get_type() in ['Dataset']:
+                print res
+                pdict = object['parameter_dictionary']     
+                self.rr_table_loader.createSingleResource(res_id,pdict)
     
 
         return res
@@ -199,10 +205,11 @@ class ResourceRegistry(object):
                                      mod_type=ResourceModificationType.UPDATE)
 
         #if self.container.cfg.get_safe('system.fdw',None):
-        if object._get_type() in ['Dataset']:
-            pdict = object['parameter_dictionary'] 
-            self.rr_table_loader.removeSingleResource(res_id)           
-            self.rr_table_loader.createSingleResource(res_id,pdict)
+        if (self.geos_available):
+            if object._get_type() in ['Dataset']:
+                pdict = object['parameter_dictionary'] 
+                self.rr_table_loader.removeSingleResource(res_id)           
+                self.rr_table_loader.createSingleResource(res_id,pdict)
 
         return self.rr_store.update(object)
 
@@ -231,8 +238,9 @@ class ResourceRegistry(object):
                                      mod_type=ResourceModificationType.DELETE)
 
         #if self.container.cfg.get_safe('system.fdw',None):
-        if res_obj._get_type() in ['Dataset']:
-            self.rr_table_loader.removeSingleResource(res_id)        
+        if (self.geos_available):
+            if res_obj._get_type() in ['Dataset']:
+                self.rr_table_loader.removeSingleResource(res_id)        
 
         return res
 
