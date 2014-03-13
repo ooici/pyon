@@ -67,13 +67,13 @@ class InterfaceAdmin:
         """
         de = self.dir.lookup(self.DIR_CONFIG_PATH + "/CFG")
         if de:
-            #print "store_interfaces: WARN: Config already exists. Overwrite"
-            return
-        print "store_interfaces: Storing system config in directory..."
+            print "store_interfaces: Updating system config in directory..."
+        else:
+            print "store_interfaces: Storing system config in directory..."
         self.dir.register(self.DIR_CONFIG_PATH, "CFG", **deepcopy(system_cfg))
 
     def store_interfaces(self, object_definition_file=None,
-                         service_definition_file=None, idempotent=False):
+                         service_definition_file=None, idempotent=True):
         """
         Main entry point into storing interfaces
         """
@@ -90,7 +90,7 @@ class InterfaceAdmin:
             if self.idempotent:
                 de = self.rr.find_by_type("ServiceDefinition", id_only=True)
                 if de:
-                    #print "store_interfaces: Interfaces already stored. Ignoring"
+                    print "store_interfaces: Interfaces already stored. Not updating."
                     return
             # load all files
             self.store_object_interfaces()
@@ -197,39 +197,3 @@ class InterfaceAdmin:
         self.bulk_resources = []
 
         print "store_interfaces: Storing interfaces successful"
-
-#
-#def change_config():
-#    if self.event_pub and bootstrap.container_instance and bootstrap.container_instance.node:
-#        if parent.startswith("/Config"):
-#            self.event_pub.publish_event(event_type="ContainerConfigModifiedEvent",
-#                origin="Directory")
-"""
-        self._assert_existence("/", "Agents",
-            description="Running agents are registered here")
-
-        self._assert_existence("/", "Config",
-            description="System configuration is registered here")
-
-        self._assert_existence("/", "Containers",
-            description="Running containers are registered here")
-
-        self._assert_existence("/", "ObjectTypes",
-            description="ObjectTypes are registered here")
-
-        self._assert_existence("/", "Org",
-            description="Org specifics are registered here",
-            is_root=self.is_root)
-
-        self._assert_existence("/Org", "Resources",
-            description="Shared Org resources are registered here")
-
-        self._assert_existence("/", "ResourceTypes",
-            description="Resource types are registered here")
-
-        self._assert_existence("/", "ServiceInterfaces",
-            description="Service interface definitions are registered here")
-
-        self._assert_existence("/", "Services",
-            description="Service instances are registered here")
-"""

@@ -19,14 +19,14 @@ __all__ += ['ionprint']
 from pyon.util.async import spawn, switch
 __all__ += ['spawn', 'switch']
 
-from pyon.util.containers import get_ion_ts, DotDict, DotList, dict_merge, get_safe, named_any, get_ion_ts_millis
-__all__ += ['get_ion_ts', 'DotDict', 'DotList', 'dict_merge', 'get_safe', 'named_any', 'get_ion_ts_millis']
+from pyon.util.containers import DotDict, DotList, dict_merge, get_safe, named_any, get_ion_ts, get_ion_ts_millis
+__all__ += ['DotDict', 'DotList', 'dict_merge', 'get_safe', 'named_any', 'get_ion_ts', 'get_ion_ts_millis']
 
 from pyon.core.thread import PyonThreadError, PyonThread, PyonThreadManager
 __all__ += ['PyonThreadError', 'PyonThread', 'PyonThreadManager']
 
 from pyon.core.exception import BadRequest, NotFound, Inconsistent, Conflict, IonException, Timeout
-__all__ += ['BadRequest','NotFound','Inconsistent','Conflict','IonException','Timeout']
+__all__ += ['BadRequest', 'NotFound', 'Inconsistent', 'Conflict', 'IonException', 'Timeout']
 
 from pyon.core import exception as iex
 __all__ += ['iex']
@@ -34,8 +34,8 @@ __all__ += ['iex']
 from pyon.net import messaging, channel, endpoint
 __all__ += ['messaging', 'channel', 'endpoint']
 
-from pyon.ion.process import IonProcessThreadManager, SimpleProcess, StandaloneProcess, ImmediateProcess
-__all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess']
+from pyon.ion.process import IonProcessThreadManager, SimpleProcess, StandaloneProcess, ImmediateProcess, get_ion_actor_id
+__all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'ImmediateProcess', 'get_ion_actor_id']
 
 from pyon.container.cc import Container, CCAP
 __all__ += ['Container', 'CCAP']

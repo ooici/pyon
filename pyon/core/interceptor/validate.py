@@ -1,5 +1,9 @@
+#!/usr/bin/env python
+
+"""Messaging interceptor to validate IonObjects"""
+
 from pyon.core.interceptor.interceptor import Interceptor
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import BadRequest
 from pyon.core.object import IonObjectBase, walk
 from pyon.core.registry import is_ion_object
@@ -15,17 +19,16 @@ class ValidateInterceptor(Interceptor):
     def configure(self, config):
         if "enabled" in config:
             self.enabled = config["enabled"]
+        self.enabled = self.enabled and CFG.get_safe("container.objects.validate.interceptor", True)
         log.debug("ValidateInterceptor enabled: %s" % str(self.enabled))
 
     def outgoing(self, invocation):
         # Set validate flag in header if IonObject(s) found in message
-        #log.debug("ValidateInterceptor.outgoing: %s", invocation)
 
         #Nothing to validate on the outbound side
         return invocation
 
     def incoming(self, invocation):
-        #log.debug("ValidateInterceptor.incoming: %s", invocation)
 
         if self.enabled:
             payload = invocation.message

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""ION Resource definitions and functions. Life-cycle FSM. Extended resource framework"""
+"""ION Resource definitions and functions, resource lifecycle framework, extended resource framework"""
 
 __author__ = 'Michael Meisinger, Stephen Henrie'
 __license__ = 'Apache 2.0'
@@ -17,6 +17,9 @@ from pyon.util.containers import DotDict, named_any, get_ion_ts
 from pyon.util.execute import get_method_arguments, get_remote_info, execute_method
 from pyon.util.log import log
 
+
+# -----------------------------------------------------------------------------
+# Global imports for resources (types, lifecycle management, associations)
 
 # Object Types
 ObjectTypes = DotDict()
@@ -42,14 +45,18 @@ LCS_NONE = "NONE"
 AvailabilityStates = DotDict()
 AS = AvailabilityStates
 
-# Life cycle events
+# Life cycle events (transitions)
 LCE = DotDict()
 
 lcs_workflow_defs = {}
 lcs_workflows = {}
 
 
+# -----------------------------------------------------------------------------
+# System initialization functions
+
 def get_predicate_type_list():
+    """Parses the associations.yml file for permissible associations"""
     Predicates.clear()
     assoc_defs = Config(["res/config/associations.yml"]).data['AssociationDefinitions']
     for ad in assoc_defs:
@@ -60,6 +67,7 @@ def get_predicate_type_list():
 
 
 def get_compound_associations_list():
+    """Parses the associations.yml file for compound associations for the extended resource framework"""
     CompoundAssociations.clear()
     CompoundAssociations.update(Config(["res/config/associations.yml"]).data['CompoundAssociations'])
     return CompoundAssociations.keys()
@@ -67,8 +75,7 @@ def get_compound_associations_list():
 
 def initialize_res_lcsms():
     """
-    Initializes default and special resource type state machines
-    @todo. Make dynamic later and maybe move out.
+    Initializes resource type lifecycle state machines.
     """
     res_lifecycle = (Config(["res/config/resource_lifecycle.yml"])).data
 
@@ -121,50 +128,45 @@ def load_definitions():
     # Compound Associations
     get_compound_associations_list()
 
-    # Life cycle states
+    # Lifecycle, availability states and transition events
     initialize_res_lcsms()
+    lcstates, avstates, fsmevents = get_all_lcsm_names()
+
     LifeCycleStates.clear()
-    lcstates = list(CommonResourceLifeCycleSM.MATURITY)
     LifeCycleStates.update(zip(lcstates, lcstates))
     LifeCycleStates.lock()
 
     AvailabilityStates.clear()
-    avstates = list(CommonResourceLifeCycleSM.AVAILABILITY)
     AvailabilityStates.update(zip(avstates, avstates))
     AvailabilityStates.lock()
 
-    # Life cycle events
     LCE.clear()
-    LCE.update(zip([e.upper() for e in CommonResourceLifeCycleSM.BASE_EVENTS], CommonResourceLifeCycleSM.BASE_EVENTS))
+    LCE.update(zip([e.upper() for e in fsmevents], fsmevents))
     LCE.lock()
 
-def get_restype_lcsm(restype):
-    return lcs_workflows.get(restype, None)
 
-
-# TODO: Remove references to this from coi-services
-# def get_maturity_visibility(lcstate):
-
+# -----------------------------------------------------------------------------
+# Resource use helper function
 
 def is_resource(object):
+    """Returns true if the given object is a resource (i.e. a sub-type of Resource)"""
     return issubtype(object.type_, "Resource")
 
-def lcstate(maturity, availability):
-    if not maturity and maturity not in LCS:
-        return BadRequest("lcstate maturity %s unknown" % maturity)
-    if not availability and availability not in AS:
-        return BadRequest("lcstate availability %s unknown" % availability)
-    return "%s_%s" % (maturity, availability)
 
-def lcsplit(lcstate):
-    return lcstate.split('_', 1)
+def create_access_args(current_actor_id=None, superuser_actor_ids=None):
+    """Returns a dict that can be provided to resource registry and datastore find operations to indicate
+    the caller's and
+    """
+    access_args = dict(current_actor_id=current_actor_id,
+                       superuser_actor_ids=superuser_actor_ids)
+    return access_args
 
 
 def get_object_schema(resource_type):
     """
     This function returns the schema for a given resource_type
-    @param resource_type:
-    @return:
+    @param resource_type  name of an object type
+    @return  schema dict
     """
 
     schema_info = dict()
@@ -212,7 +214,6 @@ def get_object_schema(resource_type):
                     value = IonObject(ret_obj._schema[field]['enum_type'], {})
                     schema_info['schemas'][ret_obj._schema[field]['enum_type']] = value._str_map
 
-
         schema_info['object'] = ret_obj
 
     elif isenum(resource_type):
@@ -224,160 +225,149 @@ def get_object_schema(resource_type):
 
     return schema_info
 
+
+# -----------------------------------------------------------------------------
+# Resource lifecycle
+
+def get_restype_lcsm(restype):
+    return lcs_workflows.get(restype, None)
+
+
+def get_default_lcsm():
+    pass
+
+
+def lcstate(maturity, availability):
+    """Creates a composite lcstate and availability string"""
+    if not maturity and maturity not in LCS:
+        return BadRequest("lcstate maturity %s unknown" % maturity)
+    if not availability and availability not in AS:
+        return BadRequest("lcstate availability %s unknown" % availability)
+    return "%s_%s" % (maturity, availability)
+
+
+def lcsplit(lcstate):
+    """Splits a composite lcstate and availability string into a tuple"""
+    return lcstate.split('_', 1)
+
+
+def get_all_lcsm_names():
+    """Returns 3 lists of lcstate, availability state and transition event names"""
+    lcstates = sorted({lcs for lcsm in lcs_workflow_defs.values() for lcs in lcsm.lcstate_states})
+    avstates = sorted({avs for lcsm in lcs_workflow_defs.values() for avs in lcsm.availability_states})
+    fsmevents = set()
+    for lcsm in lcs_workflow_defs.values():
+        for src, evt in lcsm.lcstate_transitions.keys():
+            fsmevents.add(evt)
+        for src, evt in lcsm.availability_transitions.keys():
+            fsmevents.add(evt)
+    fsmevents = sorted(fsmevents)
+
+    return lcstates, avstates, fsmevents
+
+
 class ResourceLifeCycleSM(object):
     """
-    Base class for all resource type life cycle state workflows. Subclasses
-    defined states and transitions.
+    Holds a resource type life cycle state workflow with states and transitions.
     """
-    BASE_STATES = []
-    STATE_ALIASES = {}
-    BASE_TRANSITIONS = {}
 
     def __init__(self, **kwargs):
-        self.transitions = {}
-        self.initial_state = kwargs.get('initial_state', None)
-        self.initial_availability = kwargs.get('initial_availability', None)
         self._kwargs = kwargs
+        self._initialize_fsms()
 
-    @classmethod
-    def is_in_state(cls, current_state, query_state):
-        return (current_state == query_state) or (current_state in cls.STATE_ALIASES[query_state])
+    def _initialize_fsms(self):
+        # lcstate FSM
+        lc_states = self._kwargs.get('lcstate_states', None) or []
+        lc_trans = self._kwargs.get('lcstate_transitions', None) or []
+        self.lcstate_states, self.lcstate_transitions = self._get_fsm_definition(lc_states, lc_trans)
+        self.initial_state = self._kwargs.get('initial_lcstate', None)
+
+        # availability FSM
+        av_states = self._kwargs.get('availability_states', None) or []
+        av_trans = self._kwargs.get('availability_transitions', None) or []
+        self.availability_states, self.availability_transitions = self._get_fsm_definition(av_states, av_trans)
+        self.initial_availability = self._kwargs.get('initial_availability', None)
+
+        self.state_aliases = {}
+
+    def _get_fsm_definition(self, state_def, trans_def):
+        fsm_states = set()
+        fsm_states.update(state_def)
+        fsm_transitions = {(src, evt): targ for src, evt, targ in trans_def}
+        return fsm_states, fsm_transitions
+
+    def is_in_state(self, current_state, query_state):
+        return (current_state == query_state) or (current_state in self.state_aliases[query_state])
 
     def _clone_with_restrictions(self, wfargs=None):
         wfargs = wfargs if not None else {}
         clone = self.__class__(**wfargs)
+        clone.lcstate_states = self.lcstate_states.copy()
+        clone.lcstate_transitions = self.lcstate_transitions.copy()
+        clone.availability_states = self.availability_states.copy()
+        clone.availability_transitions = self.availability_transitions.copy()
         clone._apply_restrictions(**wfargs)
         return clone
 
     def _apply_restrictions(self, **kwargs):
-        self.illegal_states = kwargs.get('illegal_states', None)
-        if self.illegal_states:
-            trans_new = self.transitions.copy()
-            for (a_state, a_transition), a_newstate in self.transitions.iteritems():
-                ost_lcs, ost_av = lcsplit(a_state)
-                nst_lcs, nst_av = lcsplit(a_newstate)
-                if a_state in self.illegal_states or a_newstate in self.illegal_states or \
-                                ost_lcs in self.illegal_states or ost_av in self.illegal_states or \
-                                nst_lcs in self.illegal_states or nst_av in self.illegal_states:
-                    del trans_new[(a_state, a_transition)]
-            self.transitions = trans_new
+        self.remove_states = kwargs.get('remove_states', None)
+        if self.remove_states:
+            trans_new = self.lcstate_transitions.copy()
+            for (src, evt), targ in self.lcstate_transitions.iteritems():
+                if src in self.remove_states or targ in self.remove_states:
+                    del trans_new[(src, evt)]
+            self.lcstate_transitions = trans_new
+            self.lcstate_states = self.lcstate_states - set(self.remove_states)
 
-    def get_successor(self, current_state, transition_event):
+    def get_lcstate_successor(self, current_state, transition_event):
         """
-        For given current_state and transition_event, return the successor state if
+        For given current_state and transition_event, return the lcstate successor state if
         defined in the FSM transitions or None
         """
-        return self.transitions.get((current_state, transition_event), None)
+        return self.lcstate_transitions.get((current_state, transition_event), None)
 
-    def get_successors(self, some_state):
+    def get_availability_successor(self, current_state, transition_event):
+        """
+        For given current_state and transition_event, return the availability successor state if
+        defined in the FSM transitions or None
+        """
+        return self.availability_transitions.get((current_state, transition_event), None)
+
+    def get_lcstate_successors(self, some_state):
         """
         For a given state, return a dict of possible transition events => successor states
         """
-        ret = {}
-        for (a_state, a_transition), a_newstate in self.transitions.iteritems():
-            if a_state == some_state:
-                #keyed on transition because they are unique with respect to origin state
-                ret[a_transition] = a_newstate
+        if some_state and "_" in some_state:
+            raise BadRequest("Compound lcstates are obsolete")
+        return {evt: targ for (src, evt), targ in self.lcstate_transitions.iteritems() if src == some_state}
 
-        return ret
+    def get_availability_successors(self, some_state):
+        """
+        For a given state, return a dict of possible transition events => successor states
+        """
+        if some_state and "_" in some_state:
+            raise BadRequest("Compound lcstates are obsolete")
+        return {evt: targ for (src, evt), targ in self.availability_transitions.iteritems() if src == some_state}
 
-    def get_predecessors(self, some_state):
+    def get_lcstate_predecessors(self, some_state):
         """
         For a given state, return a dict of possible predecessor states => the transition to move
         """
-        ret = {}
-        for (a_state, a_transition), a_newstate in self.transitions.iteritems():
-            if a_newstate == some_state:
-                #keyed on state because they are unique with respect to destination state
-                ret[a_state] = a_transition
+        if some_state and "_" in some_state:
+            raise BadRequest("Compound lcstates are obsolete")
+        return {src: evt for (src, evt), targ in self.lcstate_transitions.iteritems() if targ == some_state}
 
-        return ret
-
-
-class CommonResourceLifeCycleSM(ResourceLifeCycleSM):
-    """
-    Common resource type life cycle state workflow. Specialized
-    clones may remove states and transitions.
-    Supports hierarchical states.
-    """
-
-    MATURITY = ['DRAFT', 'PLANNED', 'DEVELOPED', 'INTEGRATED', 'DEPLOYED', 'RETIRED']
-    AVAILABILITY = ['PRIVATE', 'DISCOVERABLE', 'AVAILABLE']
-
-    BASE_STATES = ["%s_%s" % (m, v) for m in MATURITY for v in AVAILABILITY]
-
-    # lcstate (maturity) transition events
-    PLAN = "plan"
-    DEVELOP = "develop"
-    INTEGRATE = "integrate"
-    DEPLOY = "deploy"
-    RETIRE = "retire"
-
-    # Availability transition events
-    ANNOUNCE = "announce"
-    UNANNOUNCE = "unannounce"
-    ENABLE = "enable"
-    DISABLE = "disable"
-
-    MAT_EVENTS = [PLAN, DEVELOP, INTEGRATE, DEPLOY, RETIRE]
-    AVAIL_EVENTS = [ANNOUNCE, UNANNOUNCE, ENABLE, DISABLE]
-
-    BASE_EVENTS = MAT_EVENTS + AVAIL_EVENTS
-
-    BASE_TRANSITIONS = {}
-
-    # Transitions changing availability
-    for m in MATURITY:
-        if m != 'RETIRED':
-            BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ANNOUNCE)] = "%s_%s" % (m, 'DISCOVERABLE')
-            BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
-
-            BASE_TRANSITIONS[("%s_%s" % (m, 'DISCOVERABLE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
-            BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), DISABLE)] = "%s_%s" % (m, 'DISCOVERABLE')
-
-            BASE_TRANSITIONS[("%s_%s" % (m, 'PRIVATE'), ENABLE)] = "%s_%s" % (m, 'AVAILABLE')
-            BASE_TRANSITIONS[("%s_%s" % (m, 'AVAILABLE'), UNANNOUNCE)] = "%s_%s" % (m, 'PRIVATE')
-
-    # Transitions changing maturity
-    for v in AVAILABILITY:
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), PLAN)] = "%s_%s" % ('PLANNED', v)
-
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('INTEGRATED', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('DEPLOYED', v), DEVELOP)] = "%s_%s" % ('DEVELOPED', v)
-
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), INTEGRATE)] = "%s_%s" % ('INTEGRATED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), INTEGRATE)] = "%s_%s" % ('INTEGRATED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('DEVELOPED', v), INTEGRATE)] = "%s_%s" % ('INTEGRATED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('DEPLOYED', v), INTEGRATE)] = "%s_%s" % ('INTEGRATED', v)
-
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('DEVELOPED', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
-        BASE_TRANSITIONS[("%s_%s" % ('INTEGRATED', v), DEPLOY)] = "%s_%s" % ('DEPLOYED', v)
-
-        BASE_TRANSITIONS[("%s_%s" % ('DRAFT', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
-        BASE_TRANSITIONS[("%s_%s" % ('PLANNED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
-        BASE_TRANSITIONS[("%s_%s" % ('DEVELOPED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
-        BASE_TRANSITIONS[("%s_%s" % ('INTEGRATED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
-        BASE_TRANSITIONS[("%s_%s" % ('DEPLOYED', v), RETIRE)] = "%s_%s" % ('RETIRED', 'PRIVATE')
+    def get_availability_predecessors(self, some_state):
+        """
+        For a given state, return a dict of possible predecessor states => the transition to move
+        """
+        if some_state and "_" in some_state:
+            raise BadRequest("Compound lcstates are obsolete")
+        return {src: evt for (src, evt), targ in self.availability_transitions.iteritems() if targ == some_state}
 
 
-    def __init__(self, **kwargs):
-        super(CommonResourceLifeCycleSM, self).__init__(**kwargs)
-        for (s0, ev), s1 in self.BASE_TRANSITIONS.iteritems():
-            self.transitions[(s0, ev)] = s1
-            #import pprint; pprint.pprint(self.transitions)
-
-    def _create_basic_transitions(self):
-        pass
-
-    def _add_constraints(self):
-        pass
-
-
-
+# -----------------------------------------------------------------------------
+# Extended resource framework
 
 class ExtendedResourceContainer(object):
     """
@@ -459,6 +449,9 @@ class ExtendedResourceContainer(object):
         # Fill lcstate related resource container fields
         self.set_container_lcstate_info(res_container)
 
+        # Fill resource container info; currently only type_version
+        self.set_res_container_info(res_container)
+
         # Fill resource container fields
         self.set_container_field_values(res_container, ext_exclude, **kwargs)
 
@@ -478,6 +471,14 @@ class ExtendedResourceContainer(object):
 
         return res_container
 
+    def set_res_container_info(self, res_container):
+        """
+        Set info in resource container, such as type_version.
+        This is true for all resources, independent of the type.
+        """
+        res_container.type_version = res_container.resource.get_class_decorator_value('TypeVersion')
+
+
     def set_container_lcstate_info(self, res_container):
         """
         Set lcstate related fields in resource container, such as available lcstate transitions.
@@ -485,17 +486,10 @@ class ExtendedResourceContainer(object):
         """
         restype_workflow = get_restype_lcsm(res_container.resource.type_)
         if restype_workflow:
-            successors = restype_workflow.get_successors(lcstate(res_container.resource.lcstate, res_container.resource.availability))
-            res_container.lcstate_transitions = {}
-            res_container.availability_transitions = {}
-            for event, target in successors.iteritems():
-                target_lcstate, target_availability = lcsplit(target)
-                if not target_lcstate == res_container.resource.lcstate:
-                    res_container.lcstate_transitions[event] = target_lcstate
-                if not target_availability == res_container.resource.availability:
-                    res_container.availability_transitions[event] = target_availability
+            res_container.lcstate_transitions = restype_workflow.get_lcstate_successors(res_container.resource.lcstate)
+            res_container.availability_transitions = restype_workflow.get_availability_successors(res_container.resource.availability)
         else:
-            res_container.lcstate_transitions = {"retire": "RETIRED"}
+            res_container.lcstate_transitions = {LCE.RETIRE: LCS.RETIRED, LCE.DELETE: LCS.DELETED}
             res_container.availability_transitions = {}
 
     def set_container_field_values(self, res_container, ext_exclude, **kwargs):

@@ -25,7 +25,7 @@ ISSUES/MISSING FEATURES:
 - postgres connection error better distinction and message
 
 FUTURE FEATURES:
-- deleted column for resources and associations (instead of using the lcstate==RETIRED)
+- deleted column for resources (instead of using the lcstate==DELETED)
 - More advanced order by queries
 - Replace string concatenation when constructing long statements
 - clear_couch_util ugly and misnamed. Should also use the code in the datastore class
@@ -38,11 +38,7 @@ FUTURE FEATURES:
 - Read only datastore with different connection
 
 OPEN QUESTIONS:
-- FILESYSTEM datastore used by preservation MS or not?
 - EXPLAIN ANALYZE queries
-- check query_view implementation (seems to be unused)
-- Use postgres 9.3 json operators
-- Rewrite some of the json functions
 - list_datastores() must maintain compatible result, prefixing database with sysname (because of framework code)
-- Use msgpack for object serialization instead of json and custom accessor functions?
+- Use msgpack and BYTEA for object serialization instead of json and custom accessor functions?
 - rewrite association queries as select * from resources where id in (select from assoc)

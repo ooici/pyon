@@ -137,10 +137,11 @@ class IonObjectRegistry(object):
             message_classes[name] = clzz
 
         from pyon.core.bootstrap import CFG
-        self.validate_setattr = CFG.get_safe('validate.setattr', False)
+        self.validate_setattr = CFG.get_safe('container.objects.validate.setattr', False)
 
     def new(self, _def, _dict=None, **kwargs):
         """Instantiates an IonObject based on given object type name and initial values.
+        Note: This is called for the IonObject() instantiation but not for the ObjType() instantiation.
         @param _def    Name of object type
         @param _dict   A dict/DotDict/derivative with initial values
         @param kwargs  Additional initial values
@@ -161,15 +162,7 @@ class IonObjectRegistry(object):
                 from pyon.core.object import built_in_attrs
                 if name not in self._schema and name not in built_in_attrs:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
-                def unicode_to_utf8(value):
-                    if isinstance(value, unicode):
-                        value = str(value.encode('utf8'))
-                    return value
-                def recursive_encoding(value):
-                    value = walk(value, unicode_to_utf8, 'key_value')
-                    return value
-                self.__dict__[name] = recursive_encoding(value)
-
+                self.__dict__[name] = value
             setattrmethod = validating_setattr
             setattr(clzz, "__setattr__", setattrmethod)
 
@@ -178,10 +171,14 @@ class IonObjectRegistry(object):
             # the init values of complex types.  Instantiate new object and substitute
             # into the argument dict.
             tmpdict = deepcopy(_dict)
+
             for key in tmpdict:
-                if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
-                    obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
-                    tmpdict[key] = obj_param
+                if key in clzz._schema:
+                    if isinstance(tmpdict[key], dict) and clzz._schema[key]["type"] in model_classes:
+                        obj_param = self.new(clzz._schema[key]["type"], tmpdict[key])
+                        tmpdict[key] = obj_param
+                else:
+                    raise AttributeError("'%s' object has no attribute '%s'" % (clzz.__name__, key))
 
             # Apply dict values, then override with kwargs
             keywordargs = tmpdict

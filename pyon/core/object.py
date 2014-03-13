@@ -11,10 +11,10 @@ import pprint
 import StringIO
 
 from pyon.util.log import log
-from pyon.core.exception import BadRequest
+from pyon.core.exception import BadRequest, CONFLICT
 
 
-built_in_attrs = set(['_id', '_rev', 'type_', 'blame_'])
+built_in_attrs = set(['_id', '_rev', 'type_', 'blame_', 'persisted_version'])
 
 class IonObjectBase(object):
 
@@ -115,8 +115,16 @@ class IonObjectBase(object):
                 if schema_val['type'] == 'NoneType':
                     continue
 
+                # Allow unicode instead of str. This may be too lenient.
+                if schema_val['type'] == 'str' and type(field_val).__name__ == 'unicode':
+                    continue
+
                 # Already checked for required above.  Assume optional and continue
                 if field_val is None:
+                    continue
+
+                # Allow unicode instead of str. This may be too lenient.
+                if schema_val['type'] == 'str' and type(field_val).__name__ == 'unicode':
                     continue
 
                 # IonObjects are ok for dict fields too!
@@ -414,20 +422,35 @@ class IonObjectSerializer(IonObjectSerializationBase):
     Defines a _transform method to turn IonObjects into dictionaries to be deserialized by
     an IonObjectDeserializer.
 
-    Used by the codec interceptor and when being written to CouchDB.
+    Used when being written to Datastore.
     """
 
-    serialize = IonObjectSerializationBase.operate
+    def _transform(self, update_version=False):
 
-    def _transform(self, obj):
-        if isinstance(obj, IonObjectBase):
-            res = dict((k, v) for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs)
-            if not 'type_' in res:
-                res['type_'] = obj._get_type()
-            return res
+        def _transform(obj):
 
-        return obj
+            if isinstance(obj, IonObjectBase):
+                res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
+                if not 'type_' in res:
+                    res['type_'] = obj._get_type()
 
+                # update persisted_version if serializing for persistence
+                if update_version and 'TypeVersion' in obj._class_info['decorators']:
+
+                    # convert TypeVersion in decorator from string to int
+                    # because the object_model_generator converts TypeVersion to string
+                    res['persisted_version'] = obj._class_info['decorators']['TypeVersion']
+                return res
+
+            return obj
+        return _transform
+
+
+    def serialize(self, obj, update_version=False):
+
+        self._transform_method = self._transform(update_version)
+
+        return IonObjectSerializationBase.operate(self, obj)
 
 class IonObjectBlameSerializer(IonObjectSerializer):
 
@@ -462,13 +485,24 @@ class IonObjectDeserializer(IonObjectSerializationBase):
     def _transform(self, obj):
         # Note: This check to detect an IonObject is a bit risky (only type_)
         if isinstance(obj, dict) and "type_" in obj:
-            objc    = obj.copy()
-            type    = objc['type_'].encode('ascii')
+            objc  = obj
+            otype = objc['type_'].encode('ascii')   # Correct?
 
             # don't supply a dict - we want the object to initialize with all its defaults intact,
             # which preserves things like IonEnumObject and invokes the setattr behavior we want there.
-            ion_obj = self._obj_registry.new(type)
+            ion_obj = self._obj_registry.new(otype)
+
+            # get outdated attributes in data that are not defined in the current schema
+            extra_attributes = objc.viewkeys() - ion_obj._schema.viewkeys() - built_in_attrs
+            for extra in extra_attributes:
+                objc.pop(extra)
+                log.info('discard %s not in current schema' % extra)
+
             for k, v in objc.iteritems():
+
+                # unicode translate to utf8
+                if isinstance(v, unicode):
+                    v = str(v.encode('utf8'))
 
                 # CouchDB adds _attachments and puts metadata in it
                 # in pyon metadata is in the document

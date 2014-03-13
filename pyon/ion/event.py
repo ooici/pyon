@@ -13,7 +13,7 @@ from gevent import event as gevent_event
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
-from pyon.ion.identifier import create_unique_event_id
+from pyon.ion.identifier import create_unique_event_id, create_simple_unique_id
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
 from pyon.util.containers import get_ion_ts_millis, is_valid_ts
@@ -82,25 +82,27 @@ class EventPublisher(Publisher):
         @param event_object     the event object to be published
         @retval event_object    the event object which was published
         """
-        assert event_object
+        if not event_object:
+            raise BadRequest("Must provide event_object")
 
-        topic = self._topic(event_object)
+        event_object.base_types = event_object._get_extends()
+
+        topic = self._topic(event_object)  # Routing key generated using type_, base_types, origin, origin_type, sub_type
         to_name = (self._send_name.exchange, topic)
-        #log.trace("Publishing %s event message %s:%s -> %s", event_object.type_, event_object.origin_type, event_object.origin, to_name)
 
         current_time = get_ion_ts_millis()
 
-        #Ensure valid created timestamp if supplied
+        # Ensure valid created timestamp if supplied
         if event_object.ts_created:
 
             if not is_valid_ts(event_object.ts_created):
                 raise BadRequest("The ts_created value is not a valid timestamp: '%s'" % (event_object.ts_created))
 
-            #Reject events that are older than specified time
+            # Reject events that are older than specified time
             if int(event_object.ts_created) > ( current_time + VALID_EVENT_TIME_PERIOD ):
                 raise BadRequest("This ts_created value is too far in the future:'%s'" % (event_object.ts_created))
 
-            #Reject events that are older than specified time
+            # Reject events that are older than specified time
             if int(event_object.ts_created) < (current_time - VALID_EVENT_TIME_PERIOD) :
                 raise BadRequest("This ts_created value is too old:'%s'" % (event_object.ts_created))
 
@@ -151,7 +153,6 @@ class EventPublisher(Publisher):
             raise BadRequest("No event_type provided")
 
         event_object = bootstrap.IonObject(event_type, origin=origin, **kwargs)
-        event_object.base_types = event_object._get_extends()
         ret_val = self.publish_event_object(event_object)
         return ret_val
 
@@ -213,11 +214,14 @@ class BaseEventSubscriberMixin(object):
         # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
 
         # prefix the queue_name, if specified, with the sysname
-        # this is because queue names transcend xp boundaries (see R1 OOIION-477)
         if queue_name is not None:
             if not queue_name.startswith(bootstrap.get_sys_name()):
                 queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
-                log.warn("queue_name specified, prepending sys_name to it: %s", queue_name)
+        else:
+            queue_name = create_simple_unique_id()
+            if hasattr(self, "_process") and self._process:
+                queue_name = "%s_%s" % (self._process._proc_name, queue_name)
+            queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
 
         # set this name to be picked up by inherited folks
         self._ev_recv_name = (xp_name, queue_name)
@@ -330,9 +334,9 @@ class EventRepository(object):
         event_obj = self.event_store.read(event_id)
         return event_obj
 
-    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, **kwargs):
+    def find_events(self, event_type=None, origin=None, start_ts=None, end_ts=None, id_only=False, **kwargs):
         log.trace("Retrieving persistent event for event_type=%s, origin=%s, start_ts=%s, end_ts=%s, descending=%s, limit=%s",
-                  event_type,origin,start_ts,end_ts,kwargs.get("descending", None),kwargs.get("limit",None))
+                  event_type, origin, start_ts, end_ts, kwargs.get("descending", None), kwargs.get("limit", None))
         events = None
 
         design_name = "event"
@@ -367,7 +371,7 @@ class EventRepository(object):
             end_key.append(end_ts)
 
         events = self.event_store.find_by_view(design_name, view_name, start_key=start_key, end_key=end_key,
-                                               id_only=False, **kwargs)
+                                               id_only=id_only, **kwargs)
         return events
 
 

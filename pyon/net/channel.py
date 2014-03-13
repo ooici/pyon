@@ -561,7 +561,7 @@ class RecvChannel(BaseChannel):
         assert self._recv_name# and isinstance(self._recv_name, tuple) and self._recv_name[1]
         assert self._transport
 
-        log.info("Destroying queue: %s", self._recv_name)
+        log.debug("Destroying queue: %s", self._recv_name)
         with self._ensure_transport():
             self._transport.delete_queue_impl(queue=self._recv_name.queue)
 

@@ -5,14 +5,16 @@
 __author__ = 'Michael Meisinger'
 
 from pyon.core import bootstrap
-from pyon.core.bootstrap import IonObject
+from pyon.core.bootstrap import IonObject, CFG
 from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.core.registry import getextends
 from pyon.datastore.datastore import DataStore
 from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
-from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, lcstate, lcsplit, Predicates
+from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, \
+    lcstate, lcsplit, Predicates, create_access_args
+from pyon.ion.process import get_ion_actor_id
 from pyon.util.containers import get_ion_ts
 from pyon.util.log import log
 from pyon.util.breakpoint import breakpoint
@@ -50,6 +52,8 @@ class ResourceRegistry(object):
             #check the eoi geoserver importer service is started
             raise e
         
+
+        self.superuser_actors = None
 
     def start(self):
         pass
@@ -90,7 +94,7 @@ class ResourceRegistry(object):
             raise BadRequest("Object must not contain _rev")
 
 
-        lcsm = get_restype_lcsm(object._get_type())
+        lcsm = get_restype_lcsm(object.type_)
         object.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
         object.availability = lcsm.initial_availability if lcsm else AS.AVAILABLE
         cur_time = get_ion_ts()
@@ -109,7 +113,7 @@ class ResourceRegistry(object):
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-                                     origin=res_id, origin_type=object._get_type(),
+                                     origin=res_id, origin_type=object.type_,
                                      sub_type="CREATE",
                                      mod_type=ResourceModificationType.CREATE)
 
@@ -124,11 +128,13 @@ class ResourceRegistry(object):
 
         return res
 
-    def create_mult(self, res_list):
+    def create_mult(self, res_list, actor_id=None):
+        """Creates a list of resources from objects. Objects may have _id in it to predetermine their ID.
+        Returns a list of 2-tuples (resource_id, rev)"""
         cur_time = get_ion_ts()
         id_list = []
         for resobj in res_list:
-            lcsm = get_restype_lcsm(resobj._get_type())
+            lcsm = get_restype_lcsm(resobj.type_)
             resobj.lcstate = lcsm.initial_state if lcsm else LCS.DEPLOYED
             resobj.availability = lcsm.initial_availability if lcsm else AS.AVAILABLE
             resobj.ts_created = cur_time
@@ -136,17 +142,23 @@ class ResourceRegistry(object):
             id_list.append(resobj._id if "_id" in resobj else create_unique_resource_id())
 
         res = self.rr_store.create_mult(res_list, id_list, allow_ids=True)
-        res_list = [(rid, rrv) for success, rid, rrv in res]
+        rid_list = [(rid, rrv) for success, rid, rrv in res]
 
-        # TODO: Associations with owners
+        # Associations with owners
+        if actor_id and actor_id != 'anonymous':
+            assoc_list = []
+            for resobj, (rid, rrv) in zip(res_list, rid_list):
+                resobj._id = rid
+                assoc_list.append((resobj, PRED.hasOwner, actor_id))
+            self.create_association_mult(assoc_list)
 
-        # TODO: Publish events (skipped, because this is inefficient one by one for a large list
-#        for rid,rrv in res_list:
-#            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-#                origin=res_id, origin_type=object._get_type(),
-#                mod_type=ResourceModificationType.CREATE)
+        # Publish events
+        for resobj, (rid, rrv) in zip(res_list, rid_list):
+            self.event_pub.publish_event(event_type="ResourceModifiedEvent",
+                origin=rid, origin_type=resobj.type_,
+                mod_type=ResourceModificationType.CREATE)
 
-        return res_list
+        return rid_list
 
     def read(self, object_id='', rev_id=''):
         if not object_id:
@@ -182,7 +194,7 @@ class ResourceRegistry(object):
             object.availability = res_obj.availability
 
         self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-                                     origin=object._id, origin_type=object._get_type(),
+                                     origin=object._id, origin_type=object.type_,
                                      sub_type="UPDATE",
                                      mod_type=ResourceModificationType.UPDATE)
 
@@ -202,11 +214,6 @@ class ResourceRegistry(object):
         if not del_associations:
             self._delete_owners(object_id)
 
-        # Update first to RETIRED to give ElasticSearch a hint
-        res_obj.lcstate = LCS.RETIRED
-        res_obj.availability = AS.PRIVATE
-        self.rr_store.update(res_obj)
-
         if del_associations:
             assoc_ids = self.find_associations(anyside=object_id, id_only=True)
             self.rr_store.delete_doc_mult(assoc_ids, object_type="Association")
@@ -219,7 +226,7 @@ class ResourceRegistry(object):
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceModifiedEvent",
-                                     origin=res_obj._id, origin_type=res_obj._get_type(),
+                                     origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="DELETE",
                                      mod_type=ResourceModificationType.DELETE)
 
@@ -236,129 +243,138 @@ class ResourceRegistry(object):
             self.delete_association(aid)
 
     def retire(self, resource_id):
+        return self.execute_lifecycle_transition(resource_id, LCE.RETIRE)
+
+    def lcs_delete(self, resource_id):
         """
-        This is the official "delete" for resource objects: they are set to RETIRED lcstate.
-        All associations are set to retired as well.
+        This is the official "delete" for resource objects: they are set to DELETED lcstate.
+        All associations are set to deleted as well.
         """
         res_obj = self.read(resource_id)
         old_state = res_obj.lcstate
-        old_availability = res_obj.availability
-        if old_state == LCS.RETIRED:
-            raise BadRequest("Resource id=%s already RETIRED" % (resource_id))
+        if old_state == LCS.DELETED:
+            raise BadRequest("Resource id=%s already DELETED" % (resource_id))
 
-        res_obj.lcstate = LCS.RETIRED
-        res_obj.availability = AS.PRIVATE
+        res_obj.lcstate = LCS.DELETED
         res_obj.ts_updated = get_ion_ts()
 
         updres = self.rr_store.update(res_obj)
         log.debug("retire(res_id=%s). Change %s_%s to %s_%s", resource_id,
-                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
+                  old_state, res_obj.availability, res_obj.lcstate, res_obj.availability)
 
         assocs = self.find_associations(anyside=resource_id, id_only=False)
         for assoc in assocs:
-            assoc.retired = True
+            assoc.retired = True  # retired means soft deleted
         if assocs:
             self.rr_store.update_mult(assocs)
-            log.debug("retire(res_id=%s). Retired %s associations", resource_id, len(assocs))
+            log.debug("lcs_delete(res_id=%s). Retired %s associations", resource_id, len(assocs))
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
-                                     lcstate_before=old_state, availability_before=old_availability)
+                                     lcstate_before=old_state, availability_before=res_obj.availability)
 
 
     def execute_lifecycle_transition(self, resource_id='', transition_event=''):
-        if transition_event == LCE.RETIRE:
-            return self.retire(resource_id)
+        if transition_event == LCE.DELETE:
+            return self.lcs_delete(resource_id)
 
         res_obj = self.read(resource_id)
-
-        old_state = res_obj.lcstate
+        old_lcstate = res_obj.lcstate
         old_availability = res_obj.availability
-        old_lcs = lcstate(old_state, old_availability)
 
-        restype = res_obj._get_type()
-        restype_workflow = get_restype_lcsm(restype)
-        if not restype_workflow:
-            raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
+        if transition_event == LCE.RETIRE:
+            if res_obj.lcstate == LCS.RETIRED or res_obj.lcstate == LCS.DELETED:
+                raise BadRequest("Resource id=%s, type=%s, lcstate=%s, availability=%s has no transition for event %s" % (
+                    resource_id, res_obj.type_, old_lcstate, old_availability, transition_event))
+            res_obj.lcstate = LCS.RETIRED
+        else:
+            restype = res_obj.type_
+            restype_workflow = get_restype_lcsm(restype)
+            if not restype_workflow:
+                raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
-        new_state = restype_workflow.get_successor(old_lcs, transition_event)
-        if not new_state:
-            raise BadRequest("Resource id=%s, type=%s, lcstate=%s has no transition for event %s" % (
-                resource_id, restype, old_lcs, transition_event))
+            new_lcstate = restype_workflow.get_lcstate_successor(old_lcstate, transition_event)
+            new_availability = restype_workflow.get_availability_successor(old_availability, transition_event)
+            if not new_lcstate and not new_availability:
+                raise BadRequest("Resource id=%s, type=%s, lcstate=%s, availability=%s has no transition for event %s" % (
+                    resource_id, restype, old_lcstate, old_availability, transition_event))
 
-        lcmat, lcav = lcsplit(new_state)
-        res_obj.lcstate = lcmat
-        res_obj.availability = lcav
+            if new_lcstate:
+                res_obj.lcstate = new_lcstate
+            if new_availability:
+                res_obj.availability = new_availability
 
         res_obj.ts_updated = get_ion_ts()
         self.rr_store.update(res_obj)
         log.debug("execute_lifecycle_transition(res_id=%s, event=%s). Change %s_%s to %s_%s", resource_id, transition_event,
-                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
+                  old_lcstate, old_availability, res_obj.lcstate, res_obj.availability)
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
-                                     lcstate_before=old_state, availability_before=old_availability,
+                                     lcstate_before=old_lcstate, availability_before=old_availability,
                                      transition_event=transition_event)
 
-        return lcstate(res_obj.lcstate, res_obj.availability)
+        return "%s_%s" % (res_obj.lcstate, res_obj.availability)
 
     def set_lifecycle_state(self, resource_id='', target_lcstate=''):
         """Sets the lifecycle state (if possible) to the target state. Supports compound states"""
         if not target_lcstate:
             raise BadRequest("Bad life-cycle state %s" % target_lcstate)
-        if target_lcstate.startswith('RETIRED'):
-            return self.retire(resource_id)
+        if target_lcstate.startswith(LCS.DELETED):
+            self.lcs_delete(resource_id)
+        if target_lcstate.startswith(LCS.RETIRED):
+            self.execute_lifecycle_transition(resource_id, LCE.RETIRE)
 
         res_obj = self.read(resource_id)
-        old_target = target_lcstate
-        old_state = res_obj.lcstate
+        old_lcstate = res_obj.lcstate
         old_availability = res_obj.availability
-        old_lcs = lcstate(old_state, old_availability)
-        restype = res_obj._get_type()
+
+        restype = res_obj.type_
         restype_workflow = get_restype_lcsm(restype)
         if not restype_workflow:
             raise BadRequest("Resource id=%s type=%s has no lifecycle" % (resource_id, restype))
 
         if '_' in target_lcstate:    # Support compound
-            target_lcmat, target_lcav = lcsplit(target_lcstate)
-            if target_lcmat not in LCS:
-                raise BadRequest("Unknown life-cycle state %s" % target_lcmat)
-            if target_lcav and target_lcav not in AS:
-                raise BadRequest("Unknown life-cycle availability %s" % target_lcav)
+            target_lcs, target_av = lcsplit(target_lcstate)
+            if target_lcs not in LCS:
+                raise BadRequest("Unknown life-cycle state %s" % target_lcs)
+            if target_av and target_av not in AS:
+                raise BadRequest("Unknown life-cycle availability %s" % target_av)
         elif target_lcstate in LCS:
-            target_lcmat, target_lcav = target_lcstate, res_obj.availability
-            target_lcstate = lcstate(target_lcmat, target_lcav)
+            target_lcs, target_av = target_lcstate, res_obj.availability
         elif target_lcstate in AS:
-            target_lcmat, target_lcav = res_obj.lcstate, target_lcstate
-            target_lcstate = lcstate(target_lcmat, target_lcav)
+            target_lcs, target_av = res_obj.lcstate, target_lcstate
         else:
             raise BadRequest("Unknown life-cycle state %s" % target_lcstate)
 
         # Check that target state is allowed
-        if not target_lcstate in restype_workflow.get_successors(old_lcs).values():
-            raise BadRequest("Target state %s not reachable for resource in state %s" % (target_lcstate, old_lcs))
+        lcs_successors = restype_workflow.get_lcstate_successors(old_lcstate)
+        av_successors = restype_workflow.get_availability_successors(old_availability)
+        found_lcs, found_av = target_lcs in lcs_successors.values(), target_av in av_successors.values()
+        if not found_lcs and not found_av:
+            raise BadRequest("Target state %s not reachable for resource in state %s_%s" % (
+                target_lcstate, old_lcstate, old_availability))
 
-        res_obj.lcstate = target_lcmat
-        res_obj.availability = target_lcav
-
+        res_obj.lcstate = target_lcs
+        res_obj.availability = target_av
         res_obj.ts_updated = get_ion_ts()
 
         updres = self.rr_store.update(res_obj)
-        log.debug("set_lifecycle_state(res_id=%s, target=%s). Change %s_%s to %s_%s", resource_id, old_target,
-                  old_state, old_availability, res_obj.lcstate, res_obj.availability)
+        log.debug("set_lifecycle_state(res_id=%s, target=%s). Change %s_%s to %s_%s", resource_id, target_lcstate,
+                  old_lcstate, old_availability, res_obj.lcstate, res_obj.availability)
 
         if self.container.has_capability(self.container.CCAP.EVENT_PUBLISHER):
             self.event_pub.publish_event(event_type="ResourceLifecycleEvent",
                                      origin=res_obj._id, origin_type=res_obj.type_,
                                      sub_type="%s.%s" % (res_obj.lcstate, res_obj.availability),
                                      lcstate=res_obj.lcstate, availability=res_obj.availability,
-                                     lcstate_before=old_state, availability_before=old_availability)
+                                     lcstate_before=old_lcstate, availability_before=old_availability)
 
 
     # -------------------------------------------------------------------------
@@ -655,20 +671,26 @@ class ResourceRegistry(object):
                     subject_type, predicate, object, len(sub_list)))
             return sub_list[0] if id_only else self.read(sub_list[0])
 
-    def find_objects(self, subject="", predicate="", object_type="", id_only=False, limit=None, skip=None, descending=None):
-        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only, limit=limit, skip=skip, descending=descending)
+    def find_objects(self, subject="", predicate="", object_type="", id_only=False,
+                     limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_objects(subject, predicate, object_type, id_only=id_only,
+                                          limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_subjects(self, subject_type="", predicate="", object="", id_only=False, limit=None, skip=None, descending=None):
-        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only, limit=limit, skip=skip, descending=descending)
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False,
+                      limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only,
+                                           limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None, limit=None, skip=None, descending=None):
-        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside, limit=limit, skip=skip, descending=descending)
+    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None,
+                          limit=None, skip=None, descending=None, access_args=None):
+        return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside,
+                                               limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_objects_mult(self, subjects=[], id_only=False):
-        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only)
+    def find_objects_mult(self, subjects=[], id_only=False, predicate="", access_args=None):
+        return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only, predicate=predicate, access_args=access_args)
 
-    def find_subjects_mult(self, objects=[], id_only=False):
-        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only)
+    def find_subjects_mult(self, objects=[], id_only=False, predicate="", access_args=None):
+        return self.rr_store.find_subjects_mult(objects=objects, id_only=id_only, predicate=predicate, access_args=access_args)
 
     def get_association(self, subject="", predicate="", object="", assoc_type=None, id_only=False):
         assoc = self.rr_store.find_associations(subject, predicate, object, id_only=id_only)
@@ -680,18 +702,37 @@ class ResourceRegistry(object):
                 subject, predicate, object))
         return assoc[0]
 
-    def find_resources(self, restype="", lcstate="", name="", id_only=False):
-        return self.rr_store.find_resources(restype, lcstate, name, id_only=id_only)
+    def find_resources(self, restype="", lcstate="", name="", id_only=False, access_args=None):
+        return self.rr_store.find_resources(restype, lcstate, name, id_only=id_only, access_args=access_args)
 
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id="", alt_id_ns="",
-                           limit=None, skip=None, descending=None, id_only=False):
+                           limit=None, skip=None, descending=None, id_only=False, access_args=None):
         return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
             keyword=keyword, nested_type=nested_type,
             attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
-            id_only=id_only)
+            id_only=id_only, access_args=access_args)
+
+
+    def get_superuser_actors(self, reset=False):
+        """Returns a memoized list of system superusers, including the system actor and all actors with
+        ION_MANAGER role assignment"""
+        if reset or self.superuser_actors is None:
+            found_actors = []
+            system_actor_name = CFG.get_safe("system.system_actor", "ionsystem")
+            sysactors,_ = self.find_resources(restype=RT.ActorIdentity, name=system_actor_name, id_only=True)
+            found_actors.extend(sysactors)
+            ion_mgrs,_ = self.find_resources_ext(restype=RT.UserRole, attr_name="governance_name", attr_value="ION_MANAGER", id_only=False)
+            # roles,_ = self.find_resources(restype=RT.UserRole, id_only=False)
+            # ion_mgrs = [role for role in roles if role.governance_name == "ION_MANAGER"]
+            actors, assocs = self.find_subjects_mult(ion_mgrs, id_only=False)
+            super_actors = list({actor._id for actor, assoc in zip(actors, assocs) if assoc.p == PRED.hasRole and assoc.st == RT.ActorIdentity})
+            found_actors.extend(super_actors)
+            self.superuser_actors = found_actors
+            log.info("get_superuser_actors(): system actor=%s, superuser actors=%s" % (sysactors, super_actors))
+        return self.superuser_actors
 
 
     # -------------------------------------------------------------------------
@@ -756,15 +797,16 @@ class ResourceRegistry(object):
         return resource_data
 
 
-    #This is a method used for testing - do not remove
+    # This is a method used for testing - do not remove
     def get_user_id_test(self, resource_id, user_id=None):
         return user_id
 
 
 class ResourceRegistryServiceWrapper(object):
     """
-    The purpose of this class is to provide the exact service interface of the resource_registry (YML)
-    interface definition. In particular for create that extracts the actor header for use as owner.
+    The purpose of this class is to map the service interface of the resource_registry service (YML)
+    to the container's resource registry instance.
+    In particular it extracts the actor from the current message context for use as owner.
     """
     def __init__(self, rr, process):
         self._rr = rr
@@ -776,15 +818,49 @@ class ResourceRegistryServiceWrapper(object):
         return getattr(self._rr, attr)
 
     def create(self, object=None):
-        ion_actor_id = None
-        if self._process:
-            ctx = self._process.get_context()
-            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
-        return self._rr.create(object=object, actor_id=ion_actor_id)
+        return self._rr.create(object=object, actor_id=get_ion_actor_id(self._process))
 
     def create_attachment(self, resource_id='', attachment=None):
-        ion_actor_id = None
-        if self._process:
-            ctx = self._process.get_context()
-            ion_actor_id = ctx.get('ion-actor-id', None) if ctx else None
-        return self._rr.create_attachment(resource_id=resource_id, attachment=attachment, actor_id=ion_actor_id)
+        return self._rr.create_attachment(resource_id=resource_id, attachment=attachment, actor_id=get_ion_actor_id(self._process))
+
+    def find_objects(self, subject="", predicate="", object_type="", id_only=False, limit=0, skip=0, descending=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_objects(subject=subject, predicate=predicate,
+            object_type=object_type, id_only=id_only,
+            limit=limit, skip=skip, descending=descending, access_args=access_args)
+
+    def find_subjects(self, subject_type="", predicate="", object="", id_only=False, limit=0, skip=0, descending=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_subjects(subject_type=subject_type, predicate=predicate,
+            object=object, id_only=id_only,
+            limit=limit, skip=skip, descending=descending, access_args=access_args)
+
+    def find_objects_mult(self, subjects=None, id_only=False, predicate=""):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_objects_mult(subjects=subjects, id_only=id_only,
+                                                        predicate=predicate, access_args=access_args)
+
+    def find_subjects_mult(self, objects=None, id_only=False, predicate=""):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_subjects_mult(objects=objects, id_only=id_only,
+                                                         predicate=predicate, access_args=access_args)
+
+    def find_resources(self, restype="", lcstate="", name="", id_only=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_resources(restype=restype, lcstate=lcstate, name=name, id_only=id_only,
+                                                     access_args=access_args)
+
+    def find_resources_ext(self, restype='', lcstate='', name='', keyword='', nested_type='', attr_name='', attr_value='',
+                           alt_id='', alt_id_ns='', limit=0, skip=0, descending=False, id_only=False):
+        access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
+                                         superuser_actor_ids=self._rr.get_superuser_actors())
+        return self._rr.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
+            keyword=keyword, nested_type=nested_type, attr_name=attr_name, attr_value=attr_value,
+            alt_id=alt_id, alt_id_ns=alt_id_ns,
+            limit=limit, skip=skip, descending=descending,
+            id_only=id_only, access_args=access_args)
