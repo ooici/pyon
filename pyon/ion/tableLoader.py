@@ -9,39 +9,47 @@ import os
 from pyon.util.breakpoint import breakpoint
 from pyon.ion.resource import LCS, LCE, PRED
 from pyon.util.file_sys import FileSystem, FS
+from pyon.util.config import Config
 #from ion.services.dm.inventory.dataset_management_service import DatasetManagementService
 import time
 import psycopg2
 import sys
 import requests
+import os
 
-coverageFDWSever = "cov_srv"
 DEBUG = True
 
 REAL = "real,"
 INT = "int,"
 TIMEDATE = "timestamp,"
 
-LATITUDE = "lat"
-LONGITUDE = "lon"
-
-RESETSTORE = "resetstore"
-REMOVELAYER = "removelayer"
-ADDLAYER = "addlayer"
-
-SERVER = "http://localhost:8844"
-DATABASE = 'postgres'
-DB_USER = 'rpsdev'
-
-TABLE_PREFIX = "_"
-VIEW_SUFFIX = "_view"
-
 class resource_parser():
 
     def __init__(self):
+        eoiData = Config(["res/config/eoi.yml"])
+        dataMap = eoiData.data
+        
+        self.LATITUDE = dataMap['eoi']['meta']['lat_field']
+        self.LONGITUDE = dataMap['eoi']['meta']['lon_field']
+
+        self.RESETSTORE = dataMap['eoi']['importer_service']['reset_store']
+        self.REMOVELAYER = dataMap['eoi']['importer_service']['remove_layer']
+        self.ADDLAYER = dataMap['eoi']['importer_service']['add_layer']
+
+        self.SERVER = dataMap['eoi']['importer_service']['server']+":"+str(dataMap['eoi']['importer_service']['port'])
+        self.DATABASE = dataMap['eoi']['postgres']['database']
+        self.DB_USER = dataMap['eoi']['postgres']['user_name']
+        self.DB_PASS =  dataMap['eoi']['postgres']['password']
+
+        self.TABLE_PREFIX = dataMap['eoi']['postgres']['table_prefix']
+        self.VIEW_SUFFIX = dataMap['eoi']['postgres']['table_suffix']
+
+        self.coverageFDWSever = dataMap['eoi']['fdw']['server']
+
+
         self.con = None
         try:
-            self.con = psycopg2.connect(database=DATABASE, user=DB_USER)
+            self.con = psycopg2.connect(database=self.DATABASE, user=self.DB_USER,password=self.DB_PASS)
             self.cur = self.con.cursor()
             #checks the connection
             self.cur.execute('SELECT version()')
@@ -61,10 +69,10 @@ class resource_parser():
         try:
             
             if prim_types is None:
-                r = requests.get(SERVER+'/service='+request+'&name='+resource_id+'&id='+resource_id)
+                r = requests.get(self.SERVER+'/service='+request+'&name='+resource_id+'&id='+resource_id)
                 self.processStatusCode(r.status_code) 
             else:
-                r = requests.get(SERVER+'/service='+request+'&name='+resource_id+'&id='+resource_id+"&params="+str(prim_types))
+                r = requests.get(self.SERVER+'/service='+request+'&name='+resource_id+'&id='+resource_id+"&params="+str(prim_types))
                 self.processStatusCode(r.status_code) 
                 
         except Exception, e:
@@ -82,7 +90,7 @@ class resource_parser():
             self.dropExistingTable(row[0],use_cascade =True)    
 
         #reset the layer information on geoserver
-        self.sendGeoNodeRequest(RESETSTORE,"ooi") 
+        self.sendGeoNodeRequest(self.RESETSTORE,"ooi") 
 
     def processStatusCode(self,status_code):        
         if (status_code ==200):
@@ -106,7 +114,7 @@ class resource_parser():
             pass
 
         # try and remove it from geoserver
-        self.sendGeoNodeRequest(REMOVELAYER,resource_id)
+        self.sendGeoNodeRequest(self.REMOVELAYER,resource_id)
 
     '''
     creates a single resource
@@ -128,7 +136,7 @@ class resource_parser():
 
         if (success):
             #generate geoserver layer
-            self.sendGeoNodeRequest(ADDLAYER,new_resource_id,prim_types)
+            self.sendGeoNodeRequest(self.ADDLAYER,new_resource_id,prim_types)
     
     def getValueEncoding(self,name,value_encoding):
         encodingString = None
@@ -234,7 +242,7 @@ class resource_parser():
                 self.cur.execute(createTableString)
                 self.con.commit()
                 #should always be lat and lon
-                self.cur.execute(self.generateTableView(dataset_id,LATITUDE,LONGITUDE))
+                self.cur.execute(self.generateTableView(dataset_id,self.LATITUDE,self.LONGITUDE))
                 self.con.commit()
 
                 return ((self.doesTableExist(dataset_id)),valid_types)
@@ -258,14 +266,14 @@ class resource_parser():
         sqlquery = '''
         CREATE or replace VIEW "%s%s%s" as SELECT ST_SetSRID(ST_MakePoint(%s, %s),4326) as 
         geom, * from "%s";
-        '''% (TABLE_PREFIX,dataset_id,VIEW_SUFFIX,lon_field,lat_field,dataset_id)
+        '''% (self.TABLE_PREFIX,dataset_id,self.VIEW_SUFFIX,lon_field,lat_field,dataset_id)
         return sqlquery
 
     '''
     add the server info to the sql create table request
     '''
     def addServerInfo(self, sqlquery,coverage_path):
-        sqlquery += ") server " +coverageFDWSever+ " options(k \'1\',cov_path \'"+coverage_path+"\');"
+        sqlquery += ") server " +self.coverageFDWSever+ " options(k \'1\',cov_path \'"+coverage_path+"\');"
         return sqlquery
 
     def modifySQLTable(self, dataset_id, params):
