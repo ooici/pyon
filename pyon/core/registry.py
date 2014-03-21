@@ -159,8 +159,8 @@ class IonObjectRegistry(object):
         # NOTE: currently mandatory because it performs unicode to UTF-8 str conversion as side effect
         if self.validate_setattr:
             def validating_setattr(self, name, value):
-                from pyon.core.object import built_in_attrs
-                if name not in self._schema and name not in built_in_attrs:
+                from pyon.core.object import BUILT_IN_ATTRS
+                if name not in self._schema and name not in BUILT_IN_ATTRS:
                     raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, name))
                 self.__dict__[name] = value
             setattrmethod = validating_setattr

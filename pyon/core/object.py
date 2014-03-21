@@ -7,14 +7,11 @@ import os
 import re
 import inspect
 from collections import OrderedDict, Mapping, Iterable
-import pprint
-import StringIO
 
 from pyon.util.log import log
-from pyon.core.exception import BadRequest, CONFLICT
+from pyon.core.exception import BadRequest
 
-
-built_in_attrs = set(['_id', '_rev', 'type_', 'blame_', 'persisted_version'])
+BUILT_IN_ATTRS = {'_id', '_rev', 'type_', 'blame_', 'persisted_version'}
 
 class IonObjectBase(object):
 
@@ -69,7 +66,7 @@ class IonObjectBase(object):
         fields, schema = self.__dict__, self._schema
 
         # Check for extra fields not defined in the schema
-        extra_fields = fields.viewkeys() - schema.viewkeys() - built_in_attrs
+        extra_fields = fields.viewkeys() - schema.viewkeys() - BUILT_IN_ATTRS
         if len(extra_fields) > 0:
             raise AttributeError('Fields found that are not in the schema: %r' % (list(extra_fields)))
 
@@ -87,7 +84,7 @@ class IonObjectBase(object):
 
         # Check each attribute
         for key in fields.iterkeys():
-            if key in built_in_attrs:
+            if key in BUILT_IN_ATTRS:
                 continue
 
             schema_val = schema[key]
@@ -430,7 +427,7 @@ class IonObjectSerializer(IonObjectSerializationBase):
         def _transform(obj):
 
             if isinstance(obj, IonObjectBase):
-                res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in built_in_attrs}
+                res = {k:v for k, v in obj.__dict__.iteritems() if k in obj._schema or k in BUILT_IN_ATTRS}
                 if not 'type_' in res:
                     res['type_'] = obj._get_type()
 
@@ -493,7 +490,7 @@ class IonObjectDeserializer(IonObjectSerializationBase):
             ion_obj = self._obj_registry.new(otype)
 
             # get outdated attributes in data that are not defined in the current schema
-            extra_attributes = objc.viewkeys() - ion_obj._schema.viewkeys() - built_in_attrs
+            extra_attributes = objc.viewkeys() - ion_obj._schema.viewkeys() - BUILT_IN_ATTRS
             for extra in extra_attributes:
                 objc.pop(extra)
                 log.info('discard %s not in current schema' % extra)
