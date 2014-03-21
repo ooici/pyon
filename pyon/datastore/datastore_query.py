@@ -57,7 +57,7 @@ class DatastoreQueryConst(object):
     ROP_WITHIN_RANGE = ROP_PREFIX + "within"          # Find objects with range containing given range
     ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"      # Find objects with range containing given range
 
-    # Object, resource and event attribute
+    # Object, resource and event attributes
     ATT_ID = "att:id"
     ATT_TYPE = "att:type_"
     RA_NAME = "ra:name"
@@ -73,11 +73,16 @@ class DatastoreQueryConst(object):
     EA_ORIGIN_TYPE = "ea:origin_type"
     EA_SUB_TYPE = "ea:sub_type"
     EA_ACTOR_ID = "ea:actor_id"
+    EA_TS_CREATED = RA_TS_CREATED
 
     # Query types
     QTYPE_RES = "qt:resource"
     QTYPE_ASSOC = "qt:association"
     QTYPE_OBJ = "qt:object"
+
+    # Order
+    ORDER_ASC = "asc"
+    ORDER_DESC = "desc"
 
 
 DQ = DatastoreQueryConst
