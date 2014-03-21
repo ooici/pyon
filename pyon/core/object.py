@@ -548,16 +548,3 @@ class IonObjectBlameDeserializer(IonObjectDeserializer):
         return obj
 
 ion_serializer = IonObjectSerializer()
-
-
-# Pretty print IonObjects
-def ionprint(obj):
-    d = ion_serializer.serialize(obj)
-
-    fstream = StringIO.StringIO()
-
-    pprint.pprint(d, stream=fstream)
-
-    result = fstream.getvalue()
-    fstream.close()
-    return result
