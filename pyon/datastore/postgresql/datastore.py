@@ -238,17 +238,22 @@ class PostgresPyonDataStore(PostgresDataStore):
             res_objs = [self._persistence_dict_to_ion_object(row[0]) for row in rows]
             return res_objs, obj_assocs
 
-    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True, anyside=None, **kwargs):
+    def find_associations(self, subject=None, predicate=None, obj=None, assoc_type=None, id_only=True,
+                          anyside=None, query=None, **kwargs):
         if type(id_only) is not bool:
             raise BadRequest('id_only must be type bool, not %s' % type(id_only))
-        if not (subject or obj or predicate or anyside):
+        if not (subject or obj or predicate or anyside or query):
             raise BadRequest("Illegal parameters: No S/P/O or anyside")
-            #if assoc_type:
-        #    raise BadRequest("Illegal parameters: assoc_type deprecated")
         if anyside and (subject or obj):
             raise BadRequest("Illegal parameters: anyside cannot be combined with S/O")
         if anyside and predicate and type(anyside) in (list, tuple):
             raise BadRequest("Illegal parameters: anyside list cannot be combined with P")
+
+        if query:
+            query["query_args"]["id_only"] = id_only
+            query["query_args"]["ds_sub"] = "assoc"
+            # TODO: filter out retired
+            return self.find_by_query(query)
 
         subject_id, object_id, anyside_ids = None, None, None
         if subject:
@@ -359,7 +364,7 @@ class PostgresPyonDataStore(PostgresDataStore):
             res_docs = [self._persistence_dict_to_ion_object(row[-1]) for row in rows]
             return res_docs, res_assocs
 
-    def _add_access_filter(self, view_args, tablename, query_clause, query_args):
+    def _add_access_filter(self, view_args, tablename, query_clause, query_args, add_where=True):
         """Returns a Postgres SQL filter clause and referenced values for resource queries filtered
         by resource visibility and current actor role/facility membership/superuser status"""
         view_args = view_args if view_args is not None else {}
@@ -392,8 +397,26 @@ class PostgresPyonDataStore(PostgresDataStore):
         if query_clause and access_filter:
             query_clause += " AND (" + access_filter + ")"
         elif not query_clause and access_filter:
-            query_clause = " WHERE " + access_filter
+            if add_where:
+                query_clause = " WHERE " + access_filter
+            else:
+                query_clause = access_filter
+
         query_args.update(access_args)
+        return query_clause
+
+    def _add_deleted_filter(self, tablename, ds_sub, query_clause, query_args, show_all=False):
+        if show_all:
+            return query_clause
+        deleted_filter = ""
+        if not ds_sub:
+            deleted_filter = tablename + ".lcstate<>'DELETED'"
+        elif ds_sub == "assoc":
+            deleted_filter = tablename + ".retired<>true"
+        if query_clause and deleted_filter:
+            query_clause += " AND " + deleted_filter
+        elif not query_clause and deleted_filter:
+            query_clause = deleted_filter
         return query_clause
 
     def find_resources(self, restype="", lcstate="", name="", id_only=True, access_args=None):
@@ -402,9 +425,18 @@ class PostgresPyonDataStore(PostgresDataStore):
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id=None, alt_id_ns=None,
-                           limit=None, skip=None, descending=None, id_only=True, access_args=None):
+                           limit=None, skip=None, descending=None, id_only=True, query=None, access_args=None):
         filter_kwargs = self._get_view_args(dict(limit=limit, skip=skip, descending=descending), access_args)
-        if name:
+        if query:
+            qargs = query["query_args"]
+            if id_only is not None:
+                qargs["id_only"] = id_only
+            if limit is not None and limit != 0:
+                qargs["limit"] = limit
+            if skip is not None and skip != 0:
+                qargs["skip"] = skip
+            return self.find_by_query(query, access_args=access_args)
+        elif name:
             if lcstate:
                 raise BadRequest("find by name does not support lcstate")
             return self.find_res_by_name(name, restype, id_only, filter=filter_kwargs)
@@ -696,10 +728,16 @@ class PostgresPyonDataStore(PostgresDataStore):
         qual_ds_name = self._get_datastore_name()
 
         pqb = PostgresQueryBuilder(query, qual_ds_name)
+        if self.profile == DataStore.DS_PROFILE.RESOURCES and not query["query_args"].get("ds_sub", None):
+            pqb.where = self._add_access_filter(access_args, qual_ds_name, pqb.where, pqb.values, add_where=False)
+
         if self.profile == DataStore.DS_PROFILE.RESOURCES:
-            pqb.where = self._add_access_filter(access_args, qual_ds_name, pqb.where, pqb.values)
+            pqb.where = self._add_deleted_filter(pqb.basetable, query["query_args"].get("ds_sub", None),
+                                                 pqb.where, pqb.values,
+                                                 show_all=query["query_args"].get("show_all", False))
 
         with self.pool.cursor(**self.cursor_args) as cur:
+            #log.info(pqb.get_query())
             cur.execute(pqb.get_query(), pqb.get_values())
             rows = cur.fetchall()
             log.info("find_by_query() QUERY: %s (%s rows)", cur.query, cur.rowcount)

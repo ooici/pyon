@@ -10,6 +10,7 @@ from pyon.core.exception import BadRequest, NotFound, Inconsistent
 from pyon.core.object import IonObjectBase
 from pyon.core.registry import getextends
 from pyon.datastore.datastore import DataStore
+from pyon.datastore.datastore_query import DatastoreQueryBuilder, DQ
 from pyon.ion.event import EventPublisher
 from pyon.ion.identifier import create_unique_resource_id, create_unique_association_id
 from pyon.ion.resource import LCS, LCE, PRED, RT, AS, OT, get_restype_lcsm, is_resource, ExtendedResourceContainer, \
@@ -647,10 +648,10 @@ class ResourceRegistry(object):
         return self.rr_store.find_subjects(subject_type, predicate, object, id_only=id_only,
                                            limit=limit, skip=skip, descending=descending, access_args=access_args)
 
-    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None,
+    def find_associations(self, subject="", predicate="", object="", assoc_type=None, id_only=False, anyside=None, query=None,
                           limit=None, skip=None, descending=None, access_args=None):
         return self.rr_store.find_associations(subject, predicate, object, assoc_type, id_only=id_only, anyside=anyside,
-                                               limit=limit, skip=skip, descending=descending, access_args=access_args)
+                                               query=query, limit=limit, skip=skip, descending=descending, access_args=access_args)
 
     def find_objects_mult(self, subjects=[], id_only=False, predicate="", access_args=None):
         return self.rr_store.find_objects_mult(subjects=subjects, id_only=id_only, predicate=predicate, access_args=access_args)
@@ -674,12 +675,14 @@ class ResourceRegistry(object):
     def find_resources_ext(self, restype="", lcstate="", name="",
                            keyword=None, nested_type=None,
                            attr_name=None, attr_value=None, alt_id="", alt_id_ns="",
-                           limit=None, skip=None, descending=None, id_only=False, access_args=None):
+                           limit=None, skip=None, descending=None, id_only=False,
+                           query=None,
+                           access_args=None):
         return self.rr_store.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
             keyword=keyword, nested_type=nested_type,
             attr_name=attr_name, attr_value=attr_value, alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
-            id_only=id_only, access_args=access_args)
+            id_only=id_only, query=query, access_args=access_args)
 
 
     def get_superuser_actors(self, reset=False):
@@ -830,3 +833,79 @@ class ResourceRegistryServiceWrapper(object):
             alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
             id_only=id_only, access_args=access_args)
+
+
+class ResourceQuery(DatastoreQueryBuilder):
+    """
+    Helper class to build datastore queries for the resource registry.
+    Based on the DatastoreQueryBuilder
+    """
+
+    def __init__(self):
+        super(ResourceQuery, self).__init__(datastore=DataStore.DS_RESOURCES, profile=DataStore.DS_PROFILE.RESOURCES)
+
+    def filter_type(self, type_expr):
+        return self.eq_in(DQ.ATT_TYPE, type_expr)
+
+    def filter_lcstate(self, expr):
+        return self.eq_in(DQ.RA_LCSTATE, expr)
+
+    def filter_availability(self, expr):
+        return self.eq_in(DQ.RA_AVAILABILITY, expr)
+
+    def filter_name(self, name_expr, cmpop=None):
+        return self.txt_cmp(DQ.RA_NAME, name_expr, cmpop)
+
+    def filter_attribute(self, attr_name, expr, cmpop=None):
+        return self.txt_cmp(attr_name, expr, cmpop)
+
+    def filter_by_association(self, target=None, target_type=None, predicate=None, direction=None, target_filter=None):
+        """Establishes a filter by association to target(s) based on various criteria (predicate, target id, target type,
+        association direction) over one or multiple levels.
+        @param predicate  A predicate or list of predicate (one level) or list of (predicate/list of predicate) for multi level
+        @param target  An id (str) or list of ids of associated resources as determined by
+        @param target_type  A type (str) or list of types of associated resources
+        @param direction  Indicates the directionality of associations in one character: S=to subject (== find objects),
+                O=to object (==find subjects), A=any side (== find associated). If this expression is more than one
+                character long, it indicates to search multiple levels, e.g. "SO" -- TODO: >-<
+        @param target_filter  Filter expressions applicable to association target
+        """
+        return self.associated_with(target=target, target_type=target_type, predicate=predicate,
+                                    direction=direction, target_filter=target_filter)
+
+    def filter_associated_with_subject(self, object=None, object_type=None, predicate=None, target_filter=None):
+        """Shorthand for a filter by association with a subject"""
+        return self.filter_by_association(predicate=predicate, target=object, target_type=object_type,
+                                          direction="S", target_filter=target_filter)
+
+    def filter_associated_with_object(self, subject=None, subject_type=None, predicate=None, target_filter=None):
+        """Shorthand for a filter by association with an object"""
+        return self.filter_by_association(predicate=predicate, target=subject, target_type=subject_type,
+                                          direction="O", target_filter=target_filter)
+
+    def filter_associated_with(self, target=None, target_type=None, predicate=None, target_filter=None):
+        """Shorthand for a filter by association with another resource (any direction)"""
+        return self.filter_by_association(predicate=predicate, target=target, target_type=target_type,
+                                          direction="A", target_filter=target_filter)
+
+
+
+class AssociationQuery(DatastoreQueryBuilder):
+    def __init__(self):
+        super(AssociationQuery, self).__init__(datastore=DataStore.DS_RESOURCES,
+                                               profile=DataStore.DS_PROFILE.RESOURCES, ds_sub="assoc")
+
+    def filter_subject(self, expr):
+        return self.eq_in(DQ.AA_SUBJECT, expr)
+
+    def filter_subject_type(self, expr):
+        return self.eq_in(DQ.AA_SUBJECT_TYPE, expr)
+
+    def filter_object(self, expr):
+        return self.eq_in(DQ.AA_OBJECT, expr)
+
+    def filter_object_type(self, expr):
+        return self.eq_in(DQ.AA_OBJECT_TYPE, expr)
+
+    def filter_predicate(self, expr):
+        return self.eq_in(DQ.AA_PREDICATE, expr)

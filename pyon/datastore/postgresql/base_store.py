@@ -935,7 +935,7 @@ class PostgresDataStore(DataStore):
 
     def _find_all_docs(self, view_name, key=None, keys=None, start_key=None, end_key=None,
                        id_only=True, filter=None):
-        if view_name != "_all_docs":
+        if view_name and view_name != "_all_docs":
             log.warn("Using _all_docs view instead of requested %s", view_name)
 
         qual_ds_name = self._get_datastore_name()
