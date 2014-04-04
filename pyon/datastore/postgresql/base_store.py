@@ -690,6 +690,8 @@ class PostgresDataStore(DataStore):
         if profile == DataStore.DS_PROFILE.RESOURCES:
             if doc.get("type_", None) == "Association":
                 obj_type = "A"
+            elif doc.get("type_", None) == "DirEntry":
+                obj_type = "D"
             elif doc.get("type_", None):
                 obj_type = "R"
         elif profile == DataStore.DS_PROFILE.DIRECTORY:
