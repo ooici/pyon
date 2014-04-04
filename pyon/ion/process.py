@@ -438,7 +438,7 @@ class IonProcessThread(PyonThread):
             for listener in self._startup_listeners:
                 self.add_endpoint(listener)
 
-            with Timeout(seconds=CFG.get_safe('cc.timeout.start_listener', 10)):
+            with Timeout(seconds=CFG.get_safe('cc.timeout.start_listener', 30)):
                 waitall([x.get_ready_event() for x in self.listeners])
 
         except Timeout:

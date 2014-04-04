@@ -311,7 +311,9 @@ class AMQPTransport(BaseTransport):
         kwargs[cb_arg] = cb
         with self._push_close_cb(eb):
             func(*args, **kwargs)
-            ret_vals = ar.get(timeout=10)
+            # Note: MM (2014-04-03): It seems that gevent block or something else can lead to this timeout
+            # hitting. Increased from 10 to 20
+            ret_vals = ar.get(timeout=20)
 
         if isinstance(ret_vals, TransportError):
 
