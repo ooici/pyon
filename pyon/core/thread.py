@@ -195,7 +195,7 @@ class ThreadManager(object):
         if self._failure_notify_callback:
             self._failure_notify_callback(gproc)
 
-    def ensure_ready(self, proc, errmsg=None, timeout=10):
+    def ensure_ready(self, proc, errmsg=None, timeout=20):
         """
         Waits until either the thread dies or reports it is ready, whichever comes first.
 
@@ -205,7 +205,7 @@ class ThreadManager(object):
 
         @param  proc        The thread to wait on.
         @param  errmsg      A custom error message to put in the ContainerError's message. May be blank.
-        @param  timeout     Amount of time (in seconds) to wait for the ready, default 10 seconds.
+        @param  timeout     Amount of time (in seconds) to wait for the ready, default 20 seconds.
         @throws ContainerError  If the thread dies or if we get a timeout before the process signals ready.
         """
 
