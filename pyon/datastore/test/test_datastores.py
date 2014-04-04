@@ -360,9 +360,30 @@ class TestDataStores(IonIntegrationTestCase):
         o2 = IonObject("Dataset", name="Another one")
         res = data_store.create_mult((o1, o2))
         self.assertTrue(all([success for success, oid, rev in res]))
+        oids = [oid for success, oid, rev in res]
 
         res = data_store.list_objects()
         self.assertTrue(len(res) == 8 + numcoredocs)
+
+        o1 = dict(type_="Resource", name="name1xxx", visibility=1, lcstate=LCS.DRAFT, availability=AS.AVAILABLE)
+        o2 = dict(type_="DirEntry", key="key1", parent="/Parent", org="ION")
+        o3 = dict(type_="Association", s=oids[0], o=oids[1], st="Dataset", ot="Dataset", p="some", retired=False)
+
+        res = data_store.create_doc_mult([o1, o2, o3])
+
+        start_key = ["ION", "/Parent", 0]
+        end_key = ["ION", "/Parent"]
+        res1 = data_store.find_docs_by_view("directory", "by_parent", start_key=start_key, end_key=end_key, id_only=True)
+        self.assertEquals(len(res1), 1)
+
+        res1 = data_store.find_associations(predicate="some", id_only=True)
+        self.assertEquals(len(res1), 1)
+
+        res1,_ = data_store.find_resources(name="name1xxx", id_only=True)
+        self.assertEquals(len(res1), 1)
+
+        res = data_store.list_objects()
+        self.assertTrue(len(res) == 11 + numcoredocs)
 
         # Delete data store to clean up
         data_store.delete_datastore()
