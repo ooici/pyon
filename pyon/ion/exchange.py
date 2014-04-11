@@ -48,6 +48,9 @@ class ExchangeManager(object):
         log.debug("ExchangeManager initializing ...")
         self.container = container
 
+        self._rr_client = None
+        self._ems_client = None
+
         # Define the callables that can be added to Container public API
         # @TODO: remove
         self.container_api = [self.create_xs,
@@ -70,10 +73,6 @@ class ExchangeManager(object):
         self.xs_by_name = {}                    # friendly named XS to XSO
         self.xn_by_name = {}                    # friendly named XN to XNO
         # xn by xs is a property
-
-        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
-        self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
-        self._rr_client = ResourceRegistryServiceProcessClient(process=self.container)
 
         # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
         self._nodes     = {}
@@ -148,6 +147,10 @@ class ExchangeManager(object):
 
         self.default_xs         = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
         self.xs_by_name[ION_ROOT_XS] = self.default_xs
+
+        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
+        self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
+
 
         log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
 
@@ -303,6 +306,9 @@ class ExchangeManager(object):
         if self.container.has_capability('RESOURCE_REGISTRY'):
             return self.container.resource_registry
 
+        if self._rr_client is None:
+            self._rr_client = ResourceRegistryServiceProcessClient(process=self.container)
+
         return self._rr_client
 
     def get_transport(self, node):
@@ -454,11 +460,13 @@ class ExchangeManager(object):
 
         self.xn_by_name[name] = xn
 
-        if use_ems and self._ems_available():
+        xso = self._get_xs_obj(xs._exchange)
+
+        if use_ems and self._ems_available() and xso is not None:
             log.debug("Using EMS to create_xn")
             xno = ResExchangeName(name=name, xn_type=xn.xn_type)
 
-            self._ems_client.declare_exchange_name(xno, self._get_xs_obj(xs._exchange)._id, headers=self._build_security_headers())     # @TODO: exchange is wrong
+            self._ems_client.declare_exchange_name(xno, xso._id, headers=self._build_security_headers())     # @TODO: exchange is wrong
         else:
             self._ensure_default_declared()
             xn.declare()

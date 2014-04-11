@@ -405,12 +405,14 @@ class ProcManager(object):
         process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
 
         listen_name = get_safe(config, "process.listen_name") or process_instance.name
+        listen_name_xo = self.container.create_xn_service(listen_name)
+
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
         process_instance._proc_listen_name = listen_name
 
         # Service RPC endpoint
         rsvc1 = self._create_listening_endpoint(node=self.container.node,
-                                                from_name=listen_name,
+                                                from_name=listen_name_xo,
                                                 process=process_instance)
         # Named local RPC endpoint
         rsvc2 = self._create_listening_endpoint(node=self.container.node,
@@ -427,7 +429,7 @@ class ProcManager(object):
                                    proc_name=process_instance._proc_name,
                                    cleanup_method=cleanup)
         proc.proc._glname = "ION Proc %s" % process_instance._proc_name
-        self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, process_instance.id)))
+        self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((str(listen_name), process_instance.id)))
 
         # map gproc to process_instance
         self._spawned_proc_to_process[proc.proc] = process_instance
