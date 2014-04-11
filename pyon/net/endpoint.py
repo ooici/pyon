@@ -325,6 +325,24 @@ class BaseEndpoint(object):
         """
         pass
 
+    def _ensure_name_trio(self, name):
+        """
+        Helper method to ensure a NameTrio on the passed in name.
+
+        This BaseEndpoint method assumes RPC - override where appropriate. @TODO for events
+
+        Returns a NameTrio - if the name parameter is already a NameTrio, returns that.
+        """
+        # ensure NameTrio
+        if not isinstance(name, NameTrio):
+            name = NameTrio(".".join([bootstrap.get_sys_name(),
+                                      'ion.xs',     # @TODO: remove
+                                      CFG.get_safe('exchange.core_xps.ion_rpc', 'ioncore')]),
+                            name)   # if name is a tuple it takes precedence
+            #log.debug("MAKINGNAMETRIO %s\n%s", name, ''.join(traceback.format_list(traceback.extract_stack()[-10:-1])))
+
+        return name
+
 class SendingBaseEndpoint(BaseEndpoint):
     def __init__(self, node=None, to_name=None, name=None, transport=None):
         BaseEndpoint.__init__(self, node=node, transport=transport)
@@ -334,8 +352,7 @@ class SendingBaseEndpoint(BaseEndpoint):
         self._send_name = to_name or name
 
         # ensure NameTrio
-        if not isinstance(self._send_name, NameTrio):
-            self._send_name = NameTrio(bootstrap.get_sys_name(), self._send_name)   # if send_name is a tuple it takes precedence
+        self._send_name = self._ensure_name_trio(self._send_name)
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         e = BaseEndpoint.create_endpoint(self, to_name=to_name, existing_channel=existing_channel, **kwargs)
@@ -343,9 +360,7 @@ class SendingBaseEndpoint(BaseEndpoint):
         name = to_name or self._send_name
         assert name
 
-        # ensure NameTrio
-        if not isinstance(name, NameTrio):
-            name = NameTrio(bootstrap.get_sys_name(), name)     # if name is a tuple it takes precedence
+        name = self._ensure_name_trio(name)
 
         e.channel.connect(name)
         return e
@@ -453,8 +468,7 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._recv_name = from_name or name
 
         # ensure NameTrio
-        if not isinstance(self._recv_name, NameTrio):
-            self._recv_name = NameTrio(bootstrap.get_sys_name(), self._recv_name, binding)   # if _recv_name is tuple it takes precedence
+        self._recv_name = self._ensure_name_trio(self._recv_name)
 
         self._ready_event = event.Event()
         self._binding = binding
