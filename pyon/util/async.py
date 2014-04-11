@@ -3,9 +3,12 @@
 __author__ = 'Adam R. Smith,Luke'
 
 import gevent
+import os
+import fcntl
 from gevent.event import Event
 from collections import Iterable
 from functools import wraps
+
 
 spawn = gevent.spawn
 
@@ -63,10 +66,6 @@ def blocking_cb(func, cb_arg, *args, **kwargs):
     return tuple(ret_vals)
 
 #--------------------------------------------------------------------------------
-
-import os
-import fcntl
-import gevent
 
 _pythread = None
 
