@@ -2,13 +2,14 @@
 
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
-import gevent
-import time
 
-from pyon.util.async import blocking_cb, AsyncDispatcher
+from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
+import gevent
+import time
+import unittest
 
 @attr('UNIT')
 class AsyncTest(IonIntegrationTestCase):
@@ -34,9 +35,10 @@ class TestThreads(PyonTestCase):
                 raise
         return clib
 
-    def clib_timeout(self):
+    def clib_timeout(self, n=5):
         clib = self.load_clib()
-        clib.sleep(5)
+        clib.sleep(int(n))
+        return n
 
     def test_true_block(self):
         t0 = time.time()
@@ -63,5 +65,44 @@ class TestThreads(PyonTestCase):
         # Proof that they run concurrently and the clib call doesn't block gevent
         self.assertTrue((t1 - t0) < 6)
 
+    def dispatch(self, ar, callback, *args, **kwargs):
+        try:
+            retval = callback(*args, **kwargs)
+            ar.set(retval)
+        except Exception as e:
+            ar.set_exception(e)
 
-        
+    @unittest.skip("Conceptual test, no need to run everytime")
+    def test_pyblock(self):
+        '''
+        Test to show that gevent can become blocked by python
+        '''
+        t0 = time.time()
+        g = gevent.spawn(self.pyblock, 49979687)
+        gevent.sleep(0) # Gentle yield
+        t1 = time.time() 
+
+
+
+    def pyblock(self, n):
+        i = 2
+        while i < n:
+            if n % i == 0:
+                return i
+            i+= 1
+        return None
+
+
+    def test_gevent(self):
+        pythread = get_pythread()
+        ar = AsyncResult()
+        t0 = time.time()
+        thread = pythread.start_new_thread(self.dispatch, (ar, self.clib_timeout, 5))
+        gevent.sleep(5)
+        v = ar.wait(10)
+        t1 = time.time()
+
+
+
+
+

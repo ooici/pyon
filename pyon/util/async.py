@@ -88,6 +88,46 @@ def get_pythread():
             fp.close() # Close the file
     return _pythread
 
+def nonblock_pipe():
+    r, w = os.pipe()
+    fcntl.fcntl(r, fcntl.F_SETFD, os.O_NONBLOCK)
+    fcntl.fcntl(w, fcntl.F_SETFD, os.O_NONBLOCK)
+    return r,w 
+
+_async_pipe_read, _async_pipe_write = nonblock_pipe()
+
+def _async_pipe_read_callback(event, evtype):
+    '''
+    libevent callback to read from the pipe
+    '''
+    try:
+        os.read(event.fd, 1)
+    except EnvironmentError:
+        pass # EAGAIN
+
+# create a libevent callback to read from the pipe
+gevent.core.event(gevent.core.EV_READ | gevent.core.EV_PERSIST,
+                  _async_pipe_read,
+                  _async_pipe_read_callback).add() 
+                  
+
+class AsyncResult(gevent.event.AsyncResult):
+
+    def __init__(self):
+        gevent.event.AsyncResult.__init__(self)
+
+    def get(self, *args, **kwargs):
+        return gevent.event.AsyncResult.get(self, *args, **kwargs)
+
+    def set_exception(self, exception):
+        gevent.event.AsyncResult.set_exception(self, exception)
+        os.write(_async_pipe_write, '\0')
+
+    def set(self, value):
+        gevent.event.AsyncResult.set(self, value)
+        os.write(_async_pipe_write, '\0')
+
+
 class AsyncEvent(gevent.event.Event):
     '''
     A gevent-friendly event to be signaled by a posix thread and respected by 
@@ -116,10 +156,7 @@ class AsyncEvent(gevent.event.Event):
         self._close()
 
     def _pipe(self):
-        r, w  = os.pipe()
-        fcntl.fcntl(r, fcntl.F_SETFD, os.O_NONBLOCK)
-        fcntl.fcntl(w, fcntl.F_SETFD, os.O_NONBLOCK)
-        return r, w
+        return nonblock_pipe()
 
     def _pipe_read(self, event, eventtype):
         '''
@@ -132,6 +169,7 @@ class AsyncEvent(gevent.event.Event):
             # file descriptors set with O_NONBLOCK return -1 and set errno to
             # EAGAIN, we just want to ignore it and try again later
             pass
+        
 
     def set(self):
         '''
