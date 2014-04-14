@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult
+from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult, ThreadJob, AsyncQueue, AsyncTask, ThreadExit, ThreadPool
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr
@@ -72,15 +72,16 @@ class TestThreads(PyonTestCase):
         except Exception as e:
             ar.set_exception(e)
 
-    @unittest.skip("Conceptual test, no need to run everytime")
+    #@unittest.skip("Conceptual test, no need to run everytime")
     def test_pyblock(self):
         '''
         Test to show that gevent can become blocked by python
         '''
         t0 = time.time()
-        g = gevent.spawn(self.pyblock, 49979687)
+        g = gevent.spawn(self.pyblock, 49979687) # usually blocks for about 10s on my machine
         gevent.sleep(0) # Gentle yield
         t1 = time.time() 
+        self.assertTrue((t1-t0) > 5)
 
 
 
@@ -101,8 +102,33 @@ class TestThreads(PyonTestCase):
         gevent.sleep(5)
         v = ar.wait(10)
         t1 = time.time()
+        self.assertTrue((t1-t0) < 6)
 
+    def test_thread_queue(self):
+        job_queue = AsyncQueue()
+        task = AsyncTask(self.clib_timeout, 5)
+        job_worker = ThreadJob(job_queue)
+        job_queue.put(task)
+        job_queue.put(ThreadExit())
+        pythread = get_pythread()
+        thread = pythread.start_new_thread(job_worker.run, tuple())
 
+        v = task.ar.wait(10)
+        print v
 
+    def test_thread_pool(self):
+        pool = ThreadPool()
+        t0 = time.time()
+        results = []
+        for i in xrange(5):
+            ar = pool.apply_async(self.clib_timeout, 5)
+            results.append(ar)
+
+        for r in results:
+            r.wait(10)
+            
+        t1 = time.time()
+        print (t1 - t0)
+        pool.close()
 
 
