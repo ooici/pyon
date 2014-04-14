@@ -79,7 +79,7 @@ class IonIntegrationTestCase(unittest.TestCase):
             da = DatastoreAdmin(config=CFG)
             da.load_datastore('res/dd')
             # Turn off file system cleaning
-            # The child container should NOT clean out the parent's filesystem, 
+            # The child container should NOT clean out the parent's filesystem,
             # they should share like good containers sometimes do
             CFG.container.file_system.force_clean = False
         else:
@@ -160,7 +160,9 @@ class IonIntegrationTestCase(unittest.TestCase):
 
         finally:
             datastore.close()
-        FileSystem._clean(CFG)
+
+        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
+            FileSystem._clean(CFG)
 
 
     def patch_cfg(self, cfg_obj_or_str, *args, **kwargs):
