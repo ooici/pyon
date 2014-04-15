@@ -245,7 +245,8 @@ class AsyncTask(object):
 
 
 class ThreadExit(Exception):
-    pass
+    def __init__(self):
+        self.ar = AsyncResult()
 
 class ThreadJob(object):
     def __init__(self, queue):
@@ -268,9 +269,10 @@ class ThreadJob(object):
             if not entry:
                 self.sleep(0.02)
                 continue
-            # If the entry is a ThreadExit, raise it and kill the thread
+            # If the entry is a ThreadExit, break the loop and exit from the thread
             elif isinstance(entry, ThreadExit):
-                raise entry
+                entry.ar.set(True)
+                break
 
             # An unrecognized task
             elif not isinstance(entry, AsyncTask):
@@ -290,6 +292,37 @@ class ThreadJob(object):
                 print_exc()
                 # Note: the AR has an exception set so clients can observe task status
                 ar.set_exception(e)
+
+
+'''
+Thread Pool Limitations:
+    - Any thread task that imports a gevent monkey-patched module will probably
+      raise an exception if gevent tries to context switch while in the child
+      thread.
+    - When closing threads, it is VERY prudent to synchronize the threads,
+      otherwise the threads will be dangling.
+    - Currently, there is no way to force a thread to quit, especially since
+      most of these threads probably won't be running in the python
+      interpreter. We could use the pthread library to forcefully quit a
+      thread, but the memory could leak and it could cause some serious issues
+      in the interpreter.
+    - If a timeout is placed on synchronizing closing threads, a SystemError is
+      raised, the intent with this is to fast fail a container. If threads
+      aren't synchronized in time and a timeout is applied, then there is a
+      bigger problem. 
+      - If only a subset of threads are closed, but the alive ones are still
+        listening on the queue, you wind up with an inconsistent thread pool,
+        and reliably executing tasks on the pool and managing what the pool
+        believes to be the correct number of threads, becomes a stochastic
+        system.
+
+Advisements:
+    - Keep the thread tasks as small as possible.
+    - Try to limit the uses to only the code that absolutely blocks gevent.
+    - If a thread blocks too long, it may be advisable to increase the threadpool temporarily.
+'''
+
+
 
 class ThreadPool(object):
     '''
@@ -311,18 +344,43 @@ class ThreadPool(object):
             self.pythread.start_new_thread(job_worker.run, tuple())
         self.active = True
 
-    def resize(self, newsize):
+    def _check_exit(self, n, sync=False, timeout=None):
+        exits = []
+        for i in xrange(n):
+            exit = ThreadExit()
+            exits.append(exit)
+            self.queue.put(exit)
+
+        if not sync:
+            return # No synchronization probably not good...
+
+        self._inner_check(exits, timeout)
+
+
+    def _inner_check(self, exits, timeout=None):
+        if timeout is not None:
+            t0 = time.time()
+        i = len(exits)
+        while i > 0:
+            if timeout is not None and time.time() > (t0 + timeout):
+                raise SystemError("Failed to close and synchronize threads. Thread pool is now inconsistent")
+            for exit in exits:
+                if exit.ar.ready():
+                    i-=1
+
+
+    def resize(self, newsize, sync=False, timeout=None):
         '''
         Resizes the available pool
         '''
         assert newsize > 0, "Must have a positive number of threads"
         if newsize > self.poolsize:
-            for i in xrange(newsize - self.poolsize):
-                job_worker = ThreadJob(self.queue)
-                self.pythread.start_new_thread(job_worker.run, tuple())
+            n = newsize - self.poolsize
+            self._spawn_threads(n)
         else:
-            for i in xrange(self.poolsize - newsize):
-                self.queue.put(ThreadExit())
+            n = self.poolsize - newsize
+            self._check_exit(n, sync, timeout)
+
         self.poolsize = newsize
 
 
@@ -349,14 +407,13 @@ class ThreadPool(object):
         retval = task.ar.get()
         return retval
 
-    def close(self):
+    def close(self, sync=False, timeout=None):
         '''
         Sends each thread an Exit exception and deactivates the thread pool.
 
         Note: There is no synchronization to verify that the threads each exited
         '''
-        for i in xrange(self.poolsize):
-            self.queue.put(ThreadExit())
+        self._check_exit(self.poolsize, sync, timeout)
         self.active = False
 
     def map(self, func, arg_list):

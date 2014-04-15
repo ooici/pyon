@@ -126,7 +126,6 @@ class TestThreads(PyonTestCase):
         Test that verifies the capabilities of the thread pool don't block gevent
         '''
         pool = ThreadPool()
-        self.addCleanup(pool.close)
 
         # apply_sync for 5 threads all run concurrently
         with Timer() as timer:
@@ -161,5 +160,20 @@ class TestThreads(PyonTestCase):
             pool.map(self.clib_timeout, arg_list)
         self.assertTrue(timer.dt < 5)
 
+        pool.resize(4) # Bump up the pool size
 
+        arg_list = [(2,), (2,), (2,), (2,)]
+        # Pause each of the 4 workers for two seconds
+        pool.map_async(self.clib_timeout, arg_list)
+
+        # Now immediately resize to two
+        with Timer() as timer:
+            pool.resize(2, sync=True)
+        self.assertTrue(timer.dt > 2 and timer.dt < 3)
+
+        pool.resize(4)
+        with self.assertRaises(SystemError):
+            arg_list = [(2,), (2,), (2,), (2,)]
+            pool.map_async(self.clib_timeout, arg_list)
+            pool.close(sync=True, timeout=1)
 
