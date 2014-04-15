@@ -325,6 +325,9 @@ Advisements:
     - Keep the thread tasks as small as possible.
     - Try to limit the uses to only the code that absolutely blocks gevent.
     - If a thread blocks too long, it may be advisable to increase the threadpool temporarily.
+
+Based on the concepts presented by the gevent-playground module:
+https://bitbucket.org/denis/gevent-playground/src/61bb12c9b4e41b58a763a7ef53fbe9a89cea1e04/geventutil/threadpool.py?at=default
 '''
 
 
