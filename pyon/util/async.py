@@ -285,41 +285,70 @@ class ThreadPool(object):
     def __init__(self, poolsize=5):
         self.poolsize = poolsize
         self.queue = AsyncQueue()
+        self.pythread = get_pythread()
+        self.active = False
+        # sets active to True
         self._spawn_threads(self.poolsize)
 
     def _spawn_threads(self, num):
-        pythread = get_pythread()
         for i in xrange(num):
             job_worker = ThreadJob(self.queue)
-            pythread.start_new_thread(job_worker.run, tuple())
+            self.pythread.start_new_thread(job_worker.run, tuple())
+        self.active = True
 
     def resize(self, newsize):
-        pass
+        assert newsize > 0, "Must have a positive number of threads"
+        if newsize > self.poolsize:
+            for i in xrange(newsize - self.poolsize):
+                job_worker = ThreadJob(self.queue)
+                self.pythread.start_new_thread(job_worker.run, tuple())
+        else:
+            for i in xrange(self.poolsize - newsize):
+                self.queue.put(ThreadExit())
+        self.poolsize = newsize
+
 
     def apply_async(self, func, *args, **kwargs):
-        # TODO Pool still active?
+        '''Run func, using the given args and kwargs in the thread pool.
+        Returns :class:`AsyncResult`
+        '''
+
+        assert self.active, "Thread pool is deactivated"
+
         task = AsyncTask(func, *args, **kwargs)
         self.queue.put(task)
         return task.ar
 
     def apply(self, func, *args, **kwargs):
-        pass
+        '''Run func, using the given args and kwargs in the thread pool,
+        but block the current greenlet until the result is ready.
+        Returns the value from func after execution'''
+
+        assert self.active, "Thread pool is deactivated"
+
+        task = AsyncTask(func, *args, **kwargs)
+        self.queue.put(task)
+        retval = task.ar.get()
+        return retval
 
     def close(self):
+        '''
+        Sends each thread an Exit exception and deactivates the thread pool.
+
+        Note: There is no synchronization to verify that the threads each exited
+        '''
         for i in xrange(self.poolsize):
             self.queue.put(ThreadExit())
+        self.active = False
 
-    def map(self, func, arg_list, abort=False):
-        pass
+    def map(self, func, arg_list):
+        jobs = self.map_async(func, arg_list)
+        gevent.event.waitall(jobs)
+        return jobs
 
     def map_async(self, func, arg_list):
-        pass
-
-    def queue_remove(self, async_res):
-        pass
-
-    def queue_remove_empty(self, async_res_list):
-        pass
+        async_jobs = [self.apply_async(func, *i) for i in arg_list]
+        return async_jobs
 
 
 class AsyncDispatcher(object):
