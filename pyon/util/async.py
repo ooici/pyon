@@ -259,29 +259,44 @@ class ThreadJob(object):
         pytime.sleep(n)
 
     def run(self):
+        '''
+        Runs a loop, listening for tasks
+        '''
         while True:
             entry = self.queue.get()
+            # If there is no task available sleep for 0.02s
             if not entry:
                 self.sleep(0.02)
                 continue
+            # If the entry is a ThreadExit, raise it and kill the thread
             elif isinstance(entry, ThreadExit):
-                break
+                raise entry
+
+            # An unrecognized task
             elif not isinstance(entry, AsyncTask):
                 raise Exception("Invalid task")
+
             ar = entry.ar
             callback = entry.callback
             args = entry.args
             kwargs = entry.kwargs
+            # If a task raises or fails then just print the stack trace and
+            # continue processing
             try:
                 retval = callback(*args, **kwargs)
                 ar.set(retval)
             except Exception as e:
                 from traceback import print_exc
                 print_exc()
+                # Note: the AR has an exception set so clients can observe task status
                 ar.set_exception(e)
-        print "Exiting thread"
 
 class ThreadPool(object):
+    '''
+    A pool of threads that can be used to run gevent-blocking code
+    
+    pool = ThreadPool(10)
+    '''
     def __init__(self, poolsize=5):
         self.poolsize = poolsize
         self.queue = AsyncQueue()
@@ -297,6 +312,9 @@ class ThreadPool(object):
         self.active = True
 
     def resize(self, newsize):
+        '''
+        Resizes the available pool
+        '''
         assert newsize > 0, "Must have a positive number of threads"
         if newsize > self.poolsize:
             for i in xrange(newsize - self.poolsize):
@@ -342,11 +360,22 @@ class ThreadPool(object):
         self.active = False
 
     def map(self, func, arg_list):
+        '''
+        Takes a function and an iterable argument list.
+        Runs func against each argument list in the iterable and returns a list
+        of results, the results list will block the current greenlet in a
+        gevent-safe way.
+        '''
         jobs = self.map_async(func, arg_list)
         gevent.event.waitall(jobs)
         return jobs
 
     def map_async(self, func, arg_list):
+        '''
+        Takes a function and an iterable argument list.
+        Runs func using each argument list in the iterable and returns a list
+        of AsyncResult objects.
+        '''
         async_jobs = [self.apply_async(func, *i) for i in arg_list]
         return async_jobs
 
