@@ -11,6 +11,23 @@ import gevent
 import time
 import unittest
 
+class Timer(object):
+    '''
+    Simple context manager to measure the time to execute a block of code
+    '''
+    def __init__(self):
+        object.__init__(self)
+        self.dt = None
+
+    def __enter__(self):
+        self._t = time.time()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.dt = time.time() - self._t
+
+
+
 @attr('UNIT')
 class AsyncTest(IonIntegrationTestCase):
     def i_call_callbacks(self, cb):
@@ -40,30 +57,27 @@ class TestThreads(PyonTestCase):
         clib.sleep(int(n))
         return n
 
-    def test_true_block(self):
-        t0 = time.time()
-        self.clib_timeout()
-        t1 = time.time()
+    def test_async_dispatcher(self):
+        # Verify that the clib based sleep works correctly and doesn't raise
+        with Timer() as timer:
+            self.clib_timeout(2)
+        self.assertTrue(timer.dt >= 2)
 
-        self.assertTrue((t1 - t0) >= 5)
-
-        t0 = time.time()
-        g = gevent.spawn(self.clib_timeout)
-        gevent.sleep(5)
-        g.join()
-        t1 = time.time()
+        # Verify that we can't concurrently use gevent and a clib's sleep
+        with Timer() as timer:
+            gevent.spawn(self.clib_timeout, 2)
+            gevent.sleep(2)
+            # Don't even need to join the thread
         # If it was concurrent delta-t will be less than 10
-        self.assertTrue((t1 - t0) >= 10)
+        self.assertTrue(timer.dt >= 4)
 
         # Syncing with gevent
-        t0 = time.time()
-        with AsyncDispatcher(self.clib_timeout) as dispatcher:
-            gevent.sleep(5)
+        with Timer() as timer, AsyncDispatcher(self.clib_timeout, 2) as dispatcher:
+            gevent.sleep(2)
             dispatcher.wait(10)
-        t1 = time.time()
 
         # Proof that they run concurrently and the clib call doesn't block gevent
-        self.assertTrue((t1 - t0) < 6)
+        self.assertTrue(timer.dt < 3)
 
     def dispatch(self, ar, callback, *args, **kwargs):
         try:
@@ -77,15 +91,21 @@ class TestThreads(PyonTestCase):
         '''
         Test to show that gevent can become blocked by python
         '''
-        t0 = time.time()
-        g = gevent.spawn(self.pyblock, 49979687) # usually blocks for about 10s on my machine
-        gevent.sleep(0) # Gentle yield
-        t1 = time.time() 
-        self.assertTrue((t1-t0) > 5)
+        with Timer() as timer:
+            # This usually blocks for about 10s on my machine
+            gevent.spawn(self.pyblock, 49979687)
+            gevent.sleep(0) # Gentle yield to the spawned thread
+
+        # If gevent didn't get blocked then timer.dt would be a fraction of a second
+        self.assertTrue(timer.dt > 5)
 
 
 
     def pyblock(self, n):
+        '''
+        A naive primality test. 
+        Provides proof that pure python can block gevent by not yielding
+        '''
         i = 2
         while i < n:
             if n % i == 0:
@@ -94,41 +114,52 @@ class TestThreads(PyonTestCase):
         return None
 
 
-    def test_gevent(self):
-        pythread = get_pythread()
-        ar = AsyncResult()
-        t0 = time.time()
-        thread = pythread.start_new_thread(self.dispatch, (ar, self.clib_timeout, 5))
-        gevent.sleep(5)
-        v = ar.wait(10)
-        t1 = time.time()
-        self.assertTrue((t1-t0) < 6)
-
-    def test_thread_queue(self):
-        job_queue = AsyncQueue()
-        task = AsyncTask(self.clib_timeout, 5)
-        job_worker = ThreadJob(job_queue)
-        job_queue.put(task)
-        job_queue.put(ThreadExit())
-        pythread = get_pythread()
-        thread = pythread.start_new_thread(job_worker.run, tuple())
-
-        v = task.ar.wait(10)
-        print v
+    def delayed_set(self, ar, n):
+        '''
+        A greenlet task to wait a few then set an ar
+        '''
+        gevent.sleep(n)
+        ar.set(True)
 
     def test_thread_pool(self):
+        '''
+        Test that verifies the capabilities of the thread pool don't block gevent
+        '''
         pool = ThreadPool()
-        t0 = time.time()
-        results = []
-        for i in xrange(5):
-            ar = pool.apply_async(self.clib_timeout, 5)
-            results.append(ar)
+        self.addCleanup(pool.close)
 
-        for r in results:
-            r.wait(10)
-            
-        t1 = time.time()
-        print (t1 - t0)
-        pool.close()
+        # apply_sync for 5 threads all run concurrently
+        with Timer() as timer:
+            results = []
+            for i in xrange(5):
+                ar = pool.apply_async(self.clib_timeout, 2)
+                results.append(ar)
+
+            for r in results:
+                r.wait(10)
+                
+        self.assertTrue(timer.dt < 3)
+
+
+        # apply for one thread doesn't block gevent
+        with Timer() as timer:
+            # Launch a greenlet that sets an ar after 5s
+            sync_ar = gevent.event.AsyncResult()
+            gevent.spawn(self.delayed_set, sync_ar, 2)
+            # Blocks the current gevent thread while waiting for the result
+            v = pool.apply(self.clib_timeout, 2)
+            # If the pool blocks gevent the time for both actions will be greater than 10
+            self.assertEquals(v, 2)
+            self.assertTrue(sync_ar.wait(5))
+
+        self.assertTrue(timer.dt < 3)
+
+        # Pool size
+        pool.resize(2)
+        with Timer() as timer:
+            arg_list = [(2,), (2,), (2,), (2,)]
+            pool.map(self.clib_timeout, arg_list)
+        self.assertTrue(timer.dt < 5)
+
 
 
