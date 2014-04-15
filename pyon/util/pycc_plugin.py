@@ -80,7 +80,9 @@ class PYCC(Plugin):
             from pyon.datastore.datastore_common import DatastoreFactory
             self.datastore_admin = DatastoreAdmin(config=CFG)
 
-            self.datastore_admin.clear_datastore(prefix=self.sysname)
+            # Clean datastore and file system before pycc container starts
+            from pyon.util.int_test import IonIntegrationTestCase
+            IonIntegrationTestCase._force_clean(False)
 
             def die(signum, frame):
                 # For whatever reason, the parent doesn't die some times
