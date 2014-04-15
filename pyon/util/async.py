@@ -128,7 +128,6 @@ gevent.core.event(gevent.core.EV_READ | gevent.core.EV_PERSIST,
                   
 
 class AsyncResult(gevent.event.AsyncResult):
-
     def __init__(self):
         gevent.event.AsyncResult.__init__(self)
 
@@ -237,6 +236,9 @@ class AsyncQueue(object):
         return retval
 
 class AsyncTask(object):
+    '''
+    A structure to represent the elements of a threadable task
+    '''
     def __init__(self, callback, *args, **kwargs):
         self.ar = AsyncResult()
         self.callback = callback
@@ -249,6 +251,9 @@ class ThreadExit(Exception):
         self.ar = AsyncResult()
 
 class ThreadJob(object):
+    '''
+    A thread pool worker
+    '''
     def __init__(self, queue):
         self.queue = queue
 
@@ -372,6 +377,11 @@ class ThreadPool(object):
     def resize(self, newsize, sync=False, timeout=None):
         '''
         Resizes the available pool
+
+        If `sync` is set and the thread pool is reduced, the method will
+        synchronize with each exiting thread to ensure an exit was successful.
+        If `timeout` is set with the `sync` a SystemError will be raised if the
+        timeout is exceeded.
         '''
         assert newsize > 0, "Must have a positive number of threads"
         if newsize > self.poolsize:
@@ -409,9 +419,13 @@ class ThreadPool(object):
 
     def close(self, sync=False, timeout=None):
         '''
-        Sends each thread an Exit exception and deactivates the thread pool.
-
-        Note: There is no synchronization to verify that the threads each exited
+        Sends each thread an Exit exception and deactivates the thread pool. If
+        `sync` is set to True, the ThreadPool with synchronize with each thread
+        before close returns. If `timeout` is set to a postive number and
+        `sync` is set, then a SystemError will be raised if the timeout is
+        exceeded before the threads have exited.
+        
+        Raises SystemError if timeout is exceeded before all the threads have exited.
         '''
         self._check_exit(self.poolsize, sync, timeout)
         self.active = False
