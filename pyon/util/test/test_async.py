@@ -3,7 +3,7 @@
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
 
-from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult, ThreadJob, AsyncQueue, AsyncTask, ThreadExit, ThreadPool
+from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult, ThreadJob, AsyncTask, ThreadExit, ThreadPool
 from pyon.util.int_test import IonIntegrationTestCase
 from pyon.util.unit_test import PyonTestCase
 from nose.plugins.attrib import attr

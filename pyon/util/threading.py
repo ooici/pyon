@@ -38,7 +38,7 @@ def get_pytime():
     finally:
         if fp:
             fp.close()
-    return _pythread
+    return _pytime
 
 # thread imports
 start_new_thread = get_pythread().start_new_thread
@@ -117,7 +117,7 @@ class Condition(object):
             lock = RLock()
 
         self.__lock = lock
-        # Export th elock's acquire() and release() methods
+        # Export the lock's acquire() and release() methods
         self.acquire = lock.acquire
         self.release = lock.release
 
