@@ -9,6 +9,7 @@ from gevent.event import Event
 from collections import Iterable
 from functools import wraps
 import time
+from pyon.util.threading import Queue, get_pythread, get_pytime
 
 
 spawn = gevent.spawn
@@ -67,42 +68,6 @@ def blocking_cb(func, cb_arg, *args, **kwargs):
     return tuple(ret_vals)
 
 #--------------------------------------------------------------------------------
-
-_pythread = None
-
-def get_pythread():
-    '''
-    Loads the 'thread' module, free of monkey patching.
-    '''
-    global _pythread
-    if _pythread:
-        return _pythread # Cache the module so we don't have to use imp every time
-
-    import imp
-    fp, path, desc = imp.find_module('thread')
-    try:
-        _pythread = imp.load_module('pythread', fp, path, desc)
-    finally:
-        if fp:
-            fp.close() # Close the file
-    return _pythread
-
-
-_pytime = None
-def get_pytime():
-    global _pytime
-    if _pytime:
-        return _pytime
-
-    import imp
-    fp, path, desc = imp.find_module('time')
-    try:
-        _pytime = imp.load_module('pytime', fp, path, desc)
-    finally:
-        if fp:
-            fp.close()
-    return _pytime
-
 
 def nonblock_pipe():
     r, w = os.pipe()
@@ -215,26 +180,6 @@ class AsyncEvent(gevent.event.Event):
             except:
                 pass
 
-class AsyncQueue(object):
-    '''
-    An extremely primitive queue that has a mutex over pthreads
-    '''
-    def __init__(self):
-        self.__queue = []
-        pythread = get_pythread()
-        self.lock = pythread.allocate_lock()
-
-    def put(self, item):
-        with self.lock:
-            self.__queue.append(item)
-
-    def get(self):
-        retval = None
-        with self.lock:
-            if self.__queue:
-                retval = self.__queue.pop(0)
-        return retval
-
 class AsyncTask(object):
     '''
     A structure to represent the elements of a threadable task
@@ -269,34 +214,34 @@ class ThreadJob(object):
         Runs a loop, listening for tasks
         '''
         while True:
-            entry = self.queue.get()
-            # If there is no task available sleep for 0.02s
-            if not entry:
-                self.sleep(0.02)
-                continue
-            # If the entry is a ThreadExit, break the loop and exit from the thread
-            elif isinstance(entry, ThreadExit):
-                entry.ar.set(True)
-                break
-
-            # An unrecognized task
-            elif not isinstance(entry, AsyncTask):
-                raise Exception("Invalid task")
-
-            ar = entry.ar
-            callback = entry.callback
-            args = entry.args
-            kwargs = entry.kwargs
-            # If a task raises or fails then just print the stack trace and
-            # continue processing
+            entry = self.queue.get(block=True)
             try:
-                retval = callback(*args, **kwargs)
-                ar.set(retval)
-            except Exception as e:
-                from traceback import print_exc
-                print_exc()
-                # Note: the AR has an exception set so clients can observe task status
-                ar.set_exception(e)
+                # If the entry is a ThreadExit, break the loop and exit from the thread
+                if isinstance(entry, ThreadExit):
+                    entry.ar.set(True)
+                    break
+
+                # An unrecognized task
+                elif not isinstance(entry, AsyncTask):
+                    raise Exception("Invalid task")
+
+                ar = entry.ar
+                callback = entry.callback
+                args = entry.args
+                kwargs = entry.kwargs
+                # If a task raises or fails then just print the stack trace and
+                # continue processing
+                try:
+                    retval = callback(*args, **kwargs)
+                    ar.set(retval)
+                except Exception as e:
+                    from traceback import print_exc
+                    print_exc()
+                    # Note: the AR has an exception set so clients can observe task status
+                    ar.set_exception(e)
+            finally:
+                self.queue.task_done()
+
 
 
 '''
@@ -340,7 +285,7 @@ class ThreadPool(object):
     '''
     def __init__(self, poolsize=5):
         self.poolsize = poolsize
-        self.queue = AsyncQueue()
+        self.queue = Queue()
         self.pythread = get_pythread()
         self.active = False
         # sets active to True
