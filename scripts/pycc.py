@@ -14,6 +14,7 @@ import traceback
 from uuid import uuid4
 
 from putil.script_util import parse_args
+from pyon.util.file_sys import FileSystem
 from pyon.core import log as logutil
 import logging
 log = logging.getLogger('pycc')
@@ -224,6 +225,11 @@ def main(opts, *args, **kwargs):
             deleted_exchanges, deleted_queues = clean_by_sysname(connect_str, bootstrap.get_sys_name())
             print "      exchanges deleted (%s): %s" % (len(deleted_exchanges), ",".join(deleted_exchanges))
             print "         queues deleted (%s): %s" % (len(deleted_queues), ",".join(deleted_queues))
+
+        if opts.force_clean:
+            path = os.path.join(pyon_config.get_safe('container.filesystem.root', '/tmp/ion'), bootstrap.get_sys_name())
+            print "force_clean: Removing", path
+            FileSystem._clean(pyon_config)
 
         # Auto-bootstrap interfaces
         if bootstrap_config.system.auto_bootstrap:
