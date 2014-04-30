@@ -57,9 +57,6 @@ class FileSystem(object):
             shutil.rmtree(cls.root)
 
     def __init__(self, CFG):
-        FileSystem._force_clean = CFG.get_safe('container.filesystem.force_clean',False)
-        if FileSystem._force_clean:
-            self._clean(CFG)
         if not FileSystem.root:
             FileSystem.root = os.path.join(CFG.get_safe('container.filesystem.root', '/tmp/ion'), get_sys_name())
 
