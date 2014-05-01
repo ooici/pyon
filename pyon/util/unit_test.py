@@ -8,6 +8,7 @@ import unittest
 from zope.interface import implementedBy
 from pyon.core.bootstrap import IonObject, bootstrap_pyon, get_service_registry, CFG
 from pyon.util.file_sys import FileSystem
+import os
 
 bootstrap_pyon()
 
@@ -64,7 +65,8 @@ class PyonTestCase(unittest.TestCase):
         return thing
 
     def _file_sys_clean(self):
-        FileSystem._clean(CFG)
+        if os.environ.get('CEI_LAUNCH_TEST', None) is None:
+            FileSystem._clean(CFG)
 
 
 
