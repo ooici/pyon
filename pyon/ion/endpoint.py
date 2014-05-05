@@ -172,7 +172,7 @@ class ProcessRPCClient(RPCClient):
         self._process = process
 
         if 'to_name' in kwargs and kwargs['to_name'] is not None and not isinstance(kwargs['to_name'], BaseTransport):
-            container = self._process.container or self._get_container_instance()
+            container = (hasattr(self._process, 'container') and self._process.container) or self._get_container_instance()
             if container:
                 kwargs['to_name'] = container.create_xn_service(kwargs['to_name'])
             else:
