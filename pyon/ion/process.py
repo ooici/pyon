@@ -3,19 +3,21 @@
 __author__ = 'Adam R. Smith, Michael Meisinger, Dave Foster <dfoster@asascience.com>'
 __license__ = 'Apache 2.0'
 
+import threading
+import traceback
+import gevent
+from gevent import greenlet, Timeout
+from gevent.event import Event, AsyncResult
+from gevent.queue import Queue
+
 from pyon.util.log import log
 from pyon.core.thread import PyonThreadManager, PyonThread, ThreadManager, PyonThreadTraceback, PyonHeartbeatError
 from pyon.ion.service import BaseService
-from gevent.event import Event, waitall, AsyncResult
-from gevent.queue import Queue
-from gevent import greenlet, Timeout
 from pyon.util.async import spawn
 from pyon.core.exception import IonException, ContainerError
 from pyon.core.exception import Timeout as IonTimeout
 from pyon.util.containers import get_ion_ts, get_ion_ts_millis
 from pyon.core.bootstrap import CFG
-import threading
-import traceback
 
 STAT_INTERVAL_LENGTH = 60000  # Interval time for process saturation stats collection
 
@@ -164,7 +166,7 @@ class IonProcessThread(PyonThread):
         """
         Occurs when any child greenlet fails.
 
-        Propogates the error up to the process supervisor.
+        Propagates the error up to the process supervisor.
         """
         # remove the child from the list of children (so we can shut down cleanly)
         for x in self.thread_manager.children:
@@ -439,7 +441,11 @@ class IonProcessThread(PyonThread):
                 self.add_endpoint(listener)
 
             with Timeout(seconds=CFG.get_safe('cc.timeout.start_listener', 30)):
-                waitall([x.get_ready_event() for x in self.listeners])
+                if gevent.__version__.startswith("1"):
+                    gevent.wait([x.get_ready_event() for x in self.listeners])
+                else:
+                    from gevent.event import waitall
+                    waitall([x.get_ready_event() for x in self.listeners])
 
         except Timeout:
 

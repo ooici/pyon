@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
-"""Classes to build and manage pyon container worker processes."""
+"""Classes to build and manage concurrent pyon worker processes (greenlets/threads)."""
 
 __author__ = 'Adam R. Smith'
 __license__ = 'Apache 2.0'
-
-from pyon.util.async import *
-from pyon.util.log import log
-from pyon.core.exception import ContainerError
 
 import time
 import os
 import signal
 from gevent.event import AsyncResult
+
+from pyon.util.async import Event, spawn
+from pyon.util.log import log
+from pyon.core.exception import ContainerError
 
 
 class PyonThreadError(Exception):
@@ -29,8 +29,10 @@ class PyonThreadTraceback(object):
     def __str__(self):
         return self._msg
 
+
 class PyonHeartbeatError(PyonThreadError):
     pass
+
 
 class PyonThread(object):
     """
@@ -208,7 +210,6 @@ class ThreadManager(object):
         @param  timeout     Amount of time (in seconds) to wait for the ready, default 20 seconds.
         @throws ContainerError  If the thread dies or if we get a timeout before the process signals ready.
         """
-
         if not errmsg:
             errmsg = "ensure_ready failed"
 
@@ -219,12 +220,13 @@ class ThreadManager(object):
 
         # link either a greenlet failure due to exception OR a success via ready event
         proc.proc.link_exception(cb)
-        proc.get_ready_event().rawlink(cb)
+        ready_evt = proc.get_ready_event()
+        ready_evt.rawlink(cb)
 
         retval = ev.wait(timeout=timeout)
 
         # unlink the events: ready event is probably harmless but the exception one, we want to install our own later
-        proc.get_ready_event().unlink(cb)
+        ready_evt.unlink(cb)
 
         # if the thread is stopped while we are waiting, proc.proc is set to None
         if proc.proc is not None:

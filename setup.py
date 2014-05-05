@@ -58,7 +58,7 @@ setup(  name = 'pyon',
         package_data = {'': ['*.xml']},
         install_requires = [
             'utilities',
-            'greenlet==0.4.0',
+            'greenlet==0.4.2',
             # Don't put == version on gevent
             'gevent',
             'simplejson',
