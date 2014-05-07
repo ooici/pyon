@@ -8,7 +8,7 @@ __license__ = 'Apache 2.0'
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, get_service_registry
 from pyon.net import messaging
-from pyon.net.transport import NameTrio, TransportError, ComposableTransport
+from pyon.net.transport import NameTrio, TransportError, XOTransport
 from pyon.util.log import log
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
@@ -846,18 +846,9 @@ class ExchangeManager(object):
 
         return content
 
-
-class XOTransport(ComposableTransport):
-    def __init__(self, exchange_manager, priviledged_transport, node):
-        self._exchange_manager = exchange_manager
-        self.node              = node
-
-        ComposableTransport.__init__(self, priviledged_transport, None, *ComposableTransport.common_methods)
-
-    def setup_listener(self, binding, default_cb):
-        log.debug("XOTransport passing on setup_listener")
-        pass
-
+##############################################################################
+##############################################################################
+##############################################################################
 
 class ExchangeSpace(XOTransport, NameTrio):
 
