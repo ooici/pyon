@@ -141,11 +141,11 @@ class ExchangeManager(object):
         map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
 
         # prepare priviledged transport
-        self._priviledged_transport = self.get_transport(self._nodes.get('priviledged', self._nodes.get('primary')))
+        self._priviledged_transport = self.get_transport(self.priv_or_default_node)
         self._priviledged_transport.lock = True     # prevent any attempt to close
         self._priviledged_transport.add_on_close_callback(self._priviledged_transport_closed)
 
-        self.default_xs         = ExchangeSpace(self, self._priviledged_transport, ION_ROOT_XS)
+        self.default_xs         = ExchangeSpace(self, self._priviledged_transport, self.priv_or_default_node, ION_ROOT_XS)
         self.xs_by_name[ION_ROOT_XS] = self.default_xs
 
         # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
@@ -192,6 +192,15 @@ class ExchangeManager(object):
             return self._nodes.values()[0]
 
         return None
+
+    @property
+    def priv_or_default_node(self):
+        """
+        Returns the privileged or default node.
+
+        Used by EMS.
+        """
+        return self._nodes.get('priviledged', self.default_node)
 
     @property
     def xn_by_xs(self):
@@ -335,8 +344,12 @@ class ExchangeManager(object):
 
     def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True):
         log.debug("ExchangeManager.create_xs: %s", name)
+        # @TODO: based on xs/xp
+        node = self.priv_or_default_node
+
         xs = ExchangeSpace(self,
                            self._priviledged_transport,
+                           node,
                            name,
                            exchange_type=exchange_type,
                            durable=durable,
@@ -387,9 +400,14 @@ class ExchangeManager(object):
 
     def create_xp(self, name, xs=None, use_ems=True, **kwargs):
         log.debug("ExchangeManager.create_xp: %s", name)
+
+        # @TODO: based on xs/xp
+        node = self.priv_or_default_node
+
         xs = xs or self.default_xs
         xp = ExchangePoint(self,
                            self._priviledged_transport,
+                           node,
                            name,
                            xs,
                            **kwargs)
@@ -437,21 +455,27 @@ class ExchangeManager(object):
         xs = xs or self.default_xs
         log.info("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
 
+        # @TODO: based on xs/xp
+        node = self.priv_or_default_node
+
         if xn_type == "service":
             xn = ExchangeNameService(self,
                                      self._priviledged_transport,
+                                     node,
                                      name,
                                      xs,
                                      **kwargs)
         elif xn_type == "process":
             xn = ExchangeNameProcess(self,
                                      self._priviledged_transport,
+                                     node,
                                      name,
                                      xs,
                                      **kwargs)
         elif xn_type == "queue":
             xn = ExchangeNameQueue(self,
                                    self._priviledged_transport,
+                                   node,
                                    name,
                                    xs,
                                    **kwargs)
@@ -824,8 +848,10 @@ class ExchangeManager(object):
 
 
 class XOTransport(ComposableTransport):
-    def __init__(self, exchange_manager, priviledged_transport):
+    def __init__(self, exchange_manager, priviledged_transport, node):
         self._exchange_manager = exchange_manager
+        self.node              = node
+
         ComposableTransport.__init__(self, priviledged_transport, None, *ComposableTransport.common_methods)
 
     def setup_listener(self, binding, default_cb):
@@ -837,8 +863,11 @@ class ExchangeSpace(XOTransport, NameTrio):
 
     ION_DEFAULT_XS = "ioncore"
 
-    def __init__(self, exchange_manager, priviledged_transport, exchange, exchange_type='topic', durable=False, auto_delete=True):
-        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
+    def __init__(self, exchange_manager, priviledged_transport, node, exchange, exchange_type='topic', durable=False, auto_delete=True):
+        XOTransport.__init__(self,
+                             exchange_manager=exchange_manager,
+                             priviledged_transport=priviledged_transport,
+                             node=node)
         NameTrio.__init__(self, exchange=exchange)
 
         self._xs_exchange_type = exchange_type
@@ -884,8 +913,11 @@ class ExchangeName(XOTransport, NameTrio):
     _xn_auto_delete = None
     _declared_queue = None
 
-    def __init__(self, exchange_manager, priviledged_transport, name, xs, durable=None, auto_delete=None):
-        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
+    def __init__(self, exchange_manager, priviledged_transport, node, name, xs, durable=None, auto_delete=None):
+        XOTransport.__init__(self,
+                             exchange_manager=exchange_manager,
+                             priviledged_transport=priviledged_transport,
+                             node=node)
         NameTrio.__init__(self, exchange=None, queue=name)
 
         self._xs             = xs
@@ -981,10 +1013,13 @@ class ExchangePoint(ExchangeName):
 
     xn_type = "XN_XP"
 
-    def __init__(self, exchange_manager, priviledged_transport, name, xs, xptype=None):
+    def __init__(self, exchange_manager, priviledged_transport, node, name, xs, xptype=None):
         xptype = xptype or 'ttree'
 
-        XOTransport.__init__(self, exchange_manager=exchange_manager, priviledged_transport=priviledged_transport)
+        XOTransport.__init__(self,
+                             exchange_manager=exchange_manager,
+                             priviledged_transport=priviledged_transport,
+                             node=node)
         NameTrio.__init__(self, exchange=name)
 
         self._xs        = xs
@@ -1016,7 +1051,7 @@ class ExchangePoint(ExchangeName):
         """
         Returns an ExchangePointRoute used for sending messages to an exchange point.
         """
-        return ExchangePointRoute(self._exchange_manager, self._transports[0], name, self)
+        return ExchangePointRoute(self._exchange_manager, self._transports[0], self.node, name, self)
 
     def get_stats(self):
         raise NotImplementedError("get_stats not implemented for XP")
@@ -1032,8 +1067,8 @@ class ExchangePointRoute(ExchangeName):
     This object is created via ExchangePoint.create_route
     """
 
-    def __init__(self, exchange_manager, priviledged_transport, name, xp):
-        ExchangeName.__init__(self, exchange_manager, priviledged_transport, name, xp)     # xp goes to xs param
+    def __init__(self, exchange_manager, priviledged_transport, node, name, xp):
+        ExchangeName.__init__(self, exchange_manager, priviledged_transport, node, name, xp)     # xp goes to xs param
 
     @property
     def queue_durable(self):
