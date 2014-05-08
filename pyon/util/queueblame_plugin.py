@@ -42,7 +42,7 @@ class QueueBlame(Plugin):
         containermock.resource_registry.find_resources.return_value = ([], None)
 
         self.ex_manager = ExchangeManager(containermock)      # needs to be able to setattr
-        self.ex_manager._nodes['priviledged'] = DotDict(client=DotDict(parameters=DotDict(host=CFG.get_safe('server.amqp.host', 'localhost'))))
+        #self.ex_manager._nodes['priviledged'] = DotDict(client=DotDict(parameters=DotDict(host=CFG.get_safe('server.amqp.host', 'localhost'))))
 
     def finalize(self, result):
         pass
