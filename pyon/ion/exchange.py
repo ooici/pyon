@@ -388,7 +388,8 @@ class ExchangeManager(object):
         Returns a 2-tuple of name, node.
         """
         for broker_name, broker_cfg in CFG.get_safe('exchange.exchange_brokers', {}).iteritems():
-            if xs_name in broker_cfg['join_xs']:
+            # @TODO: bug in DotList, contains not implemented correctly
+            if xs_name in list(broker_cfg['join_xs']):
                 return broker_name, self._priv_nodes.get(broker_name, self._nodes.get(broker_name, None))
 
         # return default node, have to look up the name
@@ -409,12 +410,13 @@ class ExchangeManager(object):
         Returns a 2-tuple of name, node.
         """
         for broker_name, broker_cfg in CFG.get_safe('exchange.exchange_brokers', {}).iteritems():
-            if xp_name in broker_cfg['join_xp']:
+            # @TODO: bug in DotList, contains not implemented correctly
+            if xp_name in list(broker_cfg['join_xp']):
                 return broker_name, self._priv_nodes.get(broker_name, self._nodes.get(broker_name, None))
 
         # @TODO: iterate exchange.exchange_spaces.<item>.exchange_points?
 
-        return self._get_node_for_xs(xs_name) 
+        return self._get_node_for_xs(xs_name)
 
     def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True, declare=True):
         log.debug("ExchangeManager.create_xs: %s", name)

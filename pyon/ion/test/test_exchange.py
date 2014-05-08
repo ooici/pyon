@@ -248,6 +248,53 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(len(self.ex_manager._priv_nodes), 1)
         self.assertNotIn('secondary', self.ex_manager._priv_nodes)
 
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again'),
+                                            secondary=_make_broker_cfg(server='amqp_again',
+                                                                       join_xs=['blake','keen','dopefish'])))
+    def test__get_node_for_xs(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        one, _ = self.ex_manager._get_node_for_xs('ioncore')
+        self.assertEquals(one, 'primary')
+
+        two, _ = self.ex_manager._get_node_for_xs('keen')
+        self.assertEquals(two, 'secondary')
+
+        three, _ = self.ex_manager._get_node_for_xs('dopefish')
+        self.assertEquals(three, 'secondary')
+
+        four, _ = self.ex_manager._get_node_for_xs('duke')  # not explicitly known
+        self.assertEquals(four, 'primary')
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again',
+                                                                     join_xp=['events', 'data']),
+                                            secondary=_make_broker_cfg(server='amqp_again',
+                                                                       join_xs=['blake','keen','dopefish'],
+                                                                       join_xp=['try'])))
+    def test__get_node_for_xp(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        one, _ = self.ex_manager._get_node_for_xp('data', 'ioncore')
+        self.assertEquals(one, 'primary')
+
+        two, _ = self.ex_manager._get_node_for_xp('data', 'keen')    # maybe not intuitive?
+        self.assertEquals(two, 'primary')
+
+        three, _ = self.ex_manager._get_node_for_xp('try', '')
+        self.assertEquals(three, 'secondary')
+
+        four, _ = self.ex_manager._get_node_for_xp('unknown', 'dopefish')  # falls back to xs
+        self.assertEquals(four, 'secondary')
+
+        five, _ = self.ex_manager._get_node_for_xp('unknown', 'unknown')  # falls back to defaults
+        self.assertEquals(five, 'primary')
+
 @attr('INT', group='COI')
 class TestExchangeManagerInt(IonIntegrationTestCase):
 
@@ -602,7 +649,8 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
                                                               'datastore':CFG['container']['datastore'],
                                                               'exchange':{'auto_register': False}},
-                                                 'exchange': _make_exchange_cfg(system_broker=_make_broker_cfg(server='amqp')),
+                                                 'exchange': _make_exchange_cfg(system_broker=_make_broker_cfg(server='amqp'),
+                                                                                other=_make_broker_cfg(server='amqp', join_xs=['other'])),
                                                  'server':CFG['server']})
         self._start_container()
 
@@ -634,6 +682,19 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # did we get back what we expected?
         self.assertEquals(ret, 'BACK:hi there')
+
+    def test_create_xn_on_diff_broker(self):
+        xs = self.container.create_xs('other')
+        self.assertEquals(xs.node, self.container.ex_manager._nodes['other'])
+
+        xn = self.container.create_xn_service('hello', xs=xs)
+        self.assertEquals(xn.node, self.container.ex_manager._nodes['other'])
+
+        xn = self.container.create_xn_service('other_hello')
+        self.assertEquals(xn.node, self.container.ex_manager._nodes['system_broker'])
+
+        # @TODO: name collisions in xn_by_name/RR with same name/different XS?
+        # should likely raise error
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
