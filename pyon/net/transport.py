@@ -1032,11 +1032,11 @@ class XOTransport(ComposableTransport):
     """
     Base Transport object for Exchange Objects.
     """
-    def __init__(self, exchange_manager, priviledged_transport, node):
+    def __init__(self, exchange_manager, privileged_transport, node):
         self._exchange_manager = exchange_manager
         self.node              = node
 
-        ComposableTransport.__init__(self, priviledged_transport, None, *ComposableTransport.common_methods)
+        ComposableTransport.__init__(self, privileged_transport, None, *ComposableTransport.common_methods)
 
     def setup_listener(self, binding, default_cb):
         log.debug("XOTransport passing on setup_listener")

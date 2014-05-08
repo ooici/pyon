@@ -228,15 +228,6 @@ class ExchangeManager(object):
         return None
 
     @property
-    def priv_or_default_node(self):
-        """
-        Returns the privileged or default node.
-
-        Used by EMS.
-        """
-        return self._nodes.get('priviledged', self.default_node)
-
-    @property
     def xn_by_xs(self):
         """
         Get a list of XNs associated by XS (friendly name).
@@ -252,13 +243,13 @@ class ExchangeManager(object):
 
     def _privileged_transport_closed(self, name, transport, code, text):
         """
-        Callback for when the priviledged transport is closed.
+        Callback for when the privileged transport is closed.
 
         If it's an error close, this is bad and will fail fast the container.
         """
         if not (code == 0 or code == 200):
-            log.error("The priviledged transport has failed (%s: %s)", code, text)
-            self.container.fail_fast("ExManager priviledged transport has failed (%s: %s)" % (code, text), True)
+            log.error("The privileged transport has failed (%s: %s)", code, text)
+            self.container.fail_fast("ExManager privileged transport (broker %s) has failed (%s: %s)" % (name, code, text), True)
 
     def cleanup_xos(self):
         """
@@ -870,7 +861,7 @@ class ExchangeManager(object):
         """
         Builds a URL to be used with the Rabbit HTTP management API.
         """
-        node = self._nodes.get('priviledged', self._nodes.values()[0])
+        node = self._priv_nodes.get(ION_DEFAULT_BROKER, self.default_node)
         host = node.client.parameters.host
 
         url = "http://%s:%s/api/%s" % (host, CFG.get_safe("container.exchange.management.port", "55672"), "/".join(feats))
@@ -943,10 +934,10 @@ class ExchangeSpace(XOTransport, NameTrio):
 
     ION_DEFAULT_XS = "ioncore"
 
-    def __init__(self, exchange_manager, priviledged_transport, node, exchange, exchange_type='topic', durable=False, auto_delete=True):
+    def __init__(self, exchange_manager, privileged_transport, node, exchange, exchange_type='topic', durable=False, auto_delete=True):
         XOTransport.__init__(self,
                              exchange_manager=exchange_manager,
-                             priviledged_transport=priviledged_transport,
+                             privileged_transport=privileged_transport,
                              node=node)
         NameTrio.__init__(self, exchange=exchange)
 
@@ -993,10 +984,10 @@ class ExchangeName(XOTransport, NameTrio):
     _xn_auto_delete = None
     _declared_queue = None
 
-    def __init__(self, exchange_manager, priviledged_transport, node, name, xs, durable=None, auto_delete=None):
+    def __init__(self, exchange_manager, privileged_transport, node, name, xs, durable=None, auto_delete=None):
         XOTransport.__init__(self,
                              exchange_manager=exchange_manager,
-                             priviledged_transport=priviledged_transport,
+                             privileged_transport=privileged_transport,
                              node=node)
         NameTrio.__init__(self, exchange=None, queue=name)
 
@@ -1093,12 +1084,12 @@ class ExchangePoint(ExchangeName):
 
     xn_type = "XN_XP"
 
-    def __init__(self, exchange_manager, priviledged_transport, node, name, xs, xptype=None):
+    def __init__(self, exchange_manager, privileged_transport, node, name, xs, xptype=None):
         xptype = xptype or 'ttree'
 
         XOTransport.__init__(self,
                              exchange_manager=exchange_manager,
-                             priviledged_transport=priviledged_transport,
+                             privileged_transport=privileged_transport,
                              node=node)
         NameTrio.__init__(self, exchange=name)
 
@@ -1147,8 +1138,8 @@ class ExchangePointRoute(ExchangeName):
     This object is created via ExchangePoint.create_route
     """
 
-    def __init__(self, exchange_manager, priviledged_transport, node, name, xp):
-        ExchangeName.__init__(self, exchange_manager, priviledged_transport, node, name, xp)     # xp goes to xs param
+    def __init__(self, exchange_manager, privileged_transport, node, name, xp):
+        ExchangeName.__init__(self, exchange_manager, privileged_transport, node, name, xp)     # xp goes to xs param
 
     @property
     def queue_durable(self):
