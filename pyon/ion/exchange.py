@@ -116,7 +116,7 @@ class ExchangeManager(object):
             broker_name, cfgkey, is_priv = b
 
             if cfgkey not in CFG.server:
-                raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, name))
+                raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, broker_name))
 
             total_count += 1
             log.debug("Starting connection: %s", broker_name)
@@ -152,7 +152,7 @@ class ExchangeManager(object):
                         self._ioloops[broker_name]      = ioloop
 
             except socket.error as e:
-                log.warn("Could not start connection %s due to socket error, continuing", name)
+                log.warn("Could not start connection %s due to socket error, continuing", broker_name)
 
         fail_count = total_count - len(self._nodes) - len(self._priv_nodes)
         if fail_count > 0 or total_count == 0:
