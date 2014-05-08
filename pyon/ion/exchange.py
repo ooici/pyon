@@ -27,8 +27,9 @@ from interface.services.coi.iexchange_management_service import ExchangeManageme
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 
-ION_URN_PREFIX = "urn:ionx"
-ION_ROOT_XS = "ioncore"
+ION_URN_PREFIX     = "urn:ionx"
+ION_ROOT_XS        = "ioncore"
+ION_DEFAULT_BROKER = "system_broker"
 
 
 def valid_xname(name):
@@ -75,8 +76,15 @@ class ExchangeManager(object):
         # xn by xs is a property
 
         # mapping of node/ioloop runner by connection name (in config, named via container.messaging.server keys)
-        self._nodes     = {}
-        self._ioloops   = {}
+        # also privileged connections to those same nodes, if existing.
+        self._nodes           = {}
+        self._ioloops         = {}
+        self._priv_nodes      = {}
+        self._priv_ioloops    = {}
+
+        # cache of privileged transports
+        # they may not be created by privileged connections, as privileged connections are optional.
+        self._priv_transports = {}
 
         # public toggle switch for if EMS should be used by default
         self.use_ems    = True
@@ -86,32 +94,44 @@ class ExchangeManager(object):
 
         total_count = 0
 
-        def handle_failure(name, node):
-            log.warn("Node %s could not be started", name)
+        def handle_failure(name, node, priv):
+            log.warn("Node %s (privileged: %s) could not be started", priv, name)
             node.ready.set()        # let it fall out below
 
-        # Establish connection(s) to broker
-        for name, cfgkey in CFG.container.messaging.server.iteritems():
-            if not cfgkey:
+        # read broker config to get nodes to connect to
+        brokers = []
+        for broker_name, broker_cfg in CFG.get_safe('exchange.exchange_brokers').iteritems():
+            cfg_key = broker_cfg.get('server', None)
+            if not cfg_key:
                 continue
+
+            brokers.append((broker_name, cfg_key, False))
+
+            priv_key = broker_cfg.get('server_priv', None)
+            if priv_key is not None:
+                brokers.append((broker_name, priv_key, True))
+
+        # connect to all known brokers
+        for b in brokers:
+            broker_name, cfgkey, is_priv = b
 
             if cfgkey not in CFG.server:
                 raise ExchangeManagerError("Config key %s (name: %s) (from CFG.container.messaging.server) not in CFG.server" % (cfgkey, name))
 
             total_count += 1
-            log.debug("Starting connection: %s", name)
+            log.debug("Starting connection: %s", broker_name)
 
-            # start it with a zero timeout so it comes right back to us
             try:
                 cfg_params = CFG.server[cfgkey]
 
                 if cfg_params['type'] == 'local':
                     node, ioloop = messaging.make_local_node(0, self.container.local_router)
                 else:
-                    node, ioloop = messaging.make_node(cfg_params, name, 0)
+                    # start it with a zero timeout so it comes right back to us
+                    node, ioloop = messaging.make_node(cfg_params, broker_name, 0)
 
                 # install a finished handler directly on the ioloop just for this startup period
-                fail_handle = lambda _: handle_failure(name, node)
+                fail_handle = lambda _: handle_failure(broker_name, node, is_priv)
                 ioloop.link(fail_handle)
 
                 # wait for the node ready event, with a large timeout just in case
@@ -124,13 +144,17 @@ class ExchangeManager(object):
                 if not node.running:
                     ioloop.kill()      # make sure ioloop dead
                 else:
-                    self._nodes[name] = node
-                    self._ioloops[name] = ioloop
+                    if is_priv:
+                        self._priv_nodes[broker_name]   = node
+                        self._priv_ioloops[broker_name] = ioloop
+                    else:
+                        self._nodes[broker_name]        = node
+                        self._ioloops[broker_name]      = ioloop
 
             except socket.error as e:
                 log.warn("Could not start connection %s due to socket error, continuing", name)
 
-        fail_count = total_count - len(self._nodes)
+        fail_count = total_count - len(self._nodes) - len(self._priv_nodes)
         if fail_count > 0 or total_count == 0:
             if fail_count == total_count:
                 raise ExchangeManagerError("No node connection was able to start (%d nodes attempted, %d nodes failed)" % (total_count, fail_count))
@@ -139,20 +163,23 @@ class ExchangeManager(object):
 
         # load interceptors into each
         map(lambda x: x.setup_interceptors(CFG.interceptor), self._nodes.itervalues())
+        map(lambda x: x.setup_interceptors(CFG.interceptor), self._priv_nodes.itervalues())
 
-        # prepare priviledged transport
-        self._priviledged_transport = self.get_transport(self.priv_or_default_node)
-        self._priviledged_transport.lock = True     # prevent any attempt to close
-        self._priviledged_transport.add_on_close_callback(self._priviledged_transport_closed)
+        # prepare privileged transports
+        for name in self._nodes:
+            node = self._priv_nodes.get(name, self._nodes[name])
+            transport = self.get_transport(node)
+            transport.lock = True    # prevent any attempt to close
+            transport.add_on_close_callback(lambda *a, **kw: self._privileged_transport_closed(name, *a, **kw))
+            self._priv_transports[name] = transport
 
-        self.default_xs         = ExchangeSpace(self, self._priviledged_transport, self.priv_or_default_node, ION_ROOT_XS)
-        self.xs_by_name[ION_ROOT_XS] = self.default_xs
+        # create default Exchange Space
+        self.default_xs = self.create_xs(ION_ROOT_XS)
 
         # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
         self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
 
-
-        log.debug("Started %d connections (%s)", len(self._nodes), ",".join(self._nodes.iterkeys()))
+        log.debug("Started %d connections (%s)", len(self._nodes) + len(self._priv_nodes), ",".join(self._nodes.keys() + self._priv_nodes.keys()))
 
     def stop(self, *args, **kwargs):
         # ##############
@@ -167,15 +194,22 @@ class ExchangeManager(object):
         # /HACK
         # ##############
 
-        log.debug("ExchangeManager.stopping (%d connections)", len(self._nodes))
+        log.debug("ExchangeManager.stopping (%d connections)", len(self._nodes) + len(self._priv_nodes))
 
         for name in self._nodes:
             self._nodes[name].stop_node()
             self._ioloops[name].kill()
             #self._nodes[name].client.ioloop.start()     # loop until connection closes
 
-        self._priviledged_transport.lock = False
-        self._priviledged_transport.close()
+        for name in self._priv_nodes:
+            self._priv_nodes[name].stop_node()
+            self._priv_ioloops[name].kill()
+            #self._priv_nodes[name].client.ioloop.start()
+
+        # @TODO: does this do anything? node's already gone by this point
+        for transport in self._priv_transports.itervalues():
+            transport.lock = False
+            transport.close()
 
         # @TODO undeclare root xs??  need to know if last container
         #self.default_xs.delete()
@@ -185,10 +219,10 @@ class ExchangeManager(object):
         """
         Returns the default node connection.
         """
-        if 'primary' in self._nodes:
-            return self._nodes['primary']
+        if ION_DEFAULT_BROKER in self._nodes:
+            return self._nodes[ION_DEFAULT_BROKER]
         elif len(self._nodes):
-            log.warn("No primary connection, returning first available")
+            log.warn("No default connection, returning first available")
             return self._nodes.values()[0]
 
         return None
@@ -216,7 +250,7 @@ class ExchangeManager(object):
 
         return ret
 
-    def _priviledged_transport_closed(self, transport, code, text):
+    def _privileged_transport_closed(self, name, transport, code, text):
         """
         Callback for when the priviledged transport is closed.
 
@@ -330,6 +364,16 @@ class ExchangeManager(object):
             transport = node._new_transport()
             return transport
 
+    def _get_priv_transport(self, node_name):
+        """
+        Returns the privileged transport corresponding to the node name.
+        Does basic error checking.
+        """
+        if not node_name in self._priv_transports:
+            raise ExchangeManagerError("No transport available for node %s", node_name)
+
+        return self._priv_transports[node_name]
+
     def _build_security_headers(self):
         """
         Builds additional security headers to be passed through to EMS.
@@ -342,13 +386,53 @@ class ExchangeManager(object):
 
         return None
 
-    def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True):
+    def _get_node_for_xs(self, xs_name):
+        """
+        Finds a node to be used by an ExchangeSpace.
+
+        Looks up the given exchange space in CFG under the exchange.exchange_brokers section.
+
+        Will return the default node if none found.
+
+        Returns a 2-tuple of name, node.
+        """
+        for broker_name, broker_cfg in CFG.get_safe('exchange.exchange_brokers', {}).iteritems():
+            if xs_name in broker_cfg['join_xs']:
+                return broker_name, self._priv_nodes.get(broker_name, self._nodes.get(broker_name, None))
+
+        # return default node, have to look up the name
+        default_node = self.default_node
+        for name, node in self._nodes.iteritems():
+            if node == default_node:
+                return name, node
+
+        # couldn't find a default, raise
+        raise ExchangeManagerError("Could not find a node or default for XS %s", xs_name)
+
+    def _get_node_for_xp(self, xp_name, xs_name):
+        """
+        Finds a node to be used by an ExchangePoint, falling back to an ExchangeSpace if none found.
+
+        Similar to _get_node_for_xs.
+
+        Returns a 2-tuple of name, node.
+        """
+        for broker_name, broker_cfg in CFG.get_safe('exchange.exchange_brokers', {}).iteritems():
+            if xp_name in broker_cfg['join_xp']:
+                return broker_name, self._priv_nodes.get(broker_name, self._nodes.get(broker_name, None))
+
+        # @TODO: iterate exchange.exchange_spaces.<item>.exchange_points?
+
+        return self._get_node_for_xs(xs_name) 
+
+    def create_xs(self, name, use_ems=True, exchange_type='topic', durable=False, auto_delete=True, declare=True):
         log.debug("ExchangeManager.create_xs: %s", name)
-        # @TODO: based on xs/xp
-        node = self.priv_or_default_node
+
+        node_name, node = self._get_node_for_xs(name)
+        transport       = self._get_priv_transport(node_name)
 
         xs = ExchangeSpace(self,
-                           self._priviledged_transport,
+                           transport,
                            node,
                            name,
                            exchange_type=exchange_type,
@@ -367,8 +451,11 @@ class ExchangeManager(object):
             xso_id = self._ems_client.create_exchange_space(xso, org_id, headers=self._build_security_headers())
 
             log.debug("Created RR XS object, id: %s", xso_id)
-        else:
-            self._ensure_default_declared()
+        elif declare:
+            # declare default but only if we're not making default!
+            if self.default_xs is not None and name != ION_ROOT_XS:
+                self._ensure_default_declared()
+
             xs.declare()
 
         self.xs_by_name[name] = xs
@@ -398,15 +485,16 @@ class ExchangeManager(object):
             except TransportError as ex:
                 log.warn("Could not delete XS (%s): %s", name, ex)
 
-    def create_xp(self, name, xs=None, use_ems=True, **kwargs):
+    def create_xp(self, name, xs=None, use_ems=True, declare=True, **kwargs):
         log.debug("ExchangeManager.create_xp: %s", name)
 
-        # @TODO: based on xs/xp
-        node = self.priv_or_default_node
+        xs              = xs or self.default_xs
 
-        xs = xs or self.default_xs
+        node_name, node = self._get_node_for_xp(name, xs._exchange)
+        transport       = self._get_priv_transport(node_name)
+
         xp = ExchangePoint(self,
-                           self._priviledged_transport,
+                           transport,
                            node,
                            name,
                            xs,
@@ -421,7 +509,7 @@ class ExchangeManager(object):
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
 
             xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id, headers=self._build_security_headers())        # @TODO: _exchange is wrong
-        else:
+        elif declare:
             self._ensure_default_declared()
             xp.declare()
 
@@ -451,30 +539,31 @@ class ExchangeManager(object):
             except TransportError as ex:
                 log.warn("Could not delete XP (%s): %s", name, ex)
 
-    def _create_xn(self, xn_type, name, xs=None, use_ems=True, **kwargs):
+    def _create_xn(self, xn_type, name, xs=None, use_ems=True, declare=True, **kwargs):
         xs = xs or self.default_xs
         log.info("ExchangeManager._create_xn: type: %s, name=%s, xs=%s, kwargs=%s", xn_type, name, xs, kwargs)
 
         # @TODO: based on xs/xp
-        node = self.priv_or_default_node
+        node_name, node = self._get_node_for_xs(xs._exchange)   # feels wrong
+        transport       = self._get_priv_transport(node_name)
 
         if xn_type == "service":
             xn = ExchangeNameService(self,
-                                     self._priviledged_transport,
+                                     transport,
                                      node,
                                      name,
                                      xs,
                                      **kwargs)
         elif xn_type == "process":
             xn = ExchangeNameProcess(self,
-                                     self._priviledged_transport,
+                                     transport,
                                      node,
                                      name,
                                      xs,
                                      **kwargs)
         elif xn_type == "queue":
             xn = ExchangeNameQueue(self,
-                                   self._priviledged_transport,
+                                   transport,
                                    node,
                                    name,
                                    xs,
@@ -491,7 +580,7 @@ class ExchangeManager(object):
             xno = ResExchangeName(name=name, xn_type=xn.xn_type)
 
             self._ems_client.declare_exchange_name(xno, xso._id, headers=self._build_security_headers())     # @TODO: exchange is wrong
-        else:
+        elif declare:
             self._ensure_default_declared()
             xn.declare()
 
