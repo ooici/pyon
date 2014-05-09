@@ -33,6 +33,7 @@ from pyon.core.exception import ServerError
 from interface.services.iresource_agent import BaseResourceAgent
 from interface.services.iresource_agent import ResourceAgentProcessClient
 from interface.objects import CapabilityType
+from interface.objects import ResourceAgentExecutionStatus
 from interface.services.coi.iresource_registry_service import ResourceRegistryServiceProcessClient
 
 #Agent imports
@@ -239,11 +240,35 @@ class ResourceAgent(BaseResourceAgent, StatefulProcessMixin):
 
         self._configure_aparams(unrestored_aparams)
 
+    def on_start(self):
+        """
+        Publishes a ResourceAgentLifecycleEvent with sub_type='STARTED' and
+        attributes including the initial state determined in on_init.
+        """
+        evt = dict(event_type='ResourceAgentLifecycleEvent',
+                   origin_type=self.ORIGIN_TYPE,
+                   origin=self.resource_id,
+                   sub_type='STARTED',
+                   process_id=self.id,
+                   agent_state=self._initial_state,
+                   execution_status=ResourceAgentExecutionStatus.OK)
+        self._event_publisher.publish_event(**evt)
+        log.debug('agent lifecycle event published: %s', evt)
+
     def on_quit(self):
         """
-        ION on_quit called prior to terminating the process.
+        Publishes a ResourceAgentLifecycleEvent with sub_type='STOPPED' and
+        attributes including the current FSM's state.
         """
-        pass
+        evt = dict(event_type='ResourceAgentLifecycleEvent',
+                   origin_type=self.ORIGIN_TYPE,
+                   origin=self.resource_id,
+                   sub_type='STOPPED',
+                   process_id=self.id,
+                   agent_state=self._fsm.get_current_state(),
+                   execution_status=ResourceAgentExecutionStatus.OK)
+        self._event_publisher.publish_event(**evt)
+        log.debug('agent lifecycle event published: %s', evt)
 
     ##############################################################
     # Governance interfaces and helpers
