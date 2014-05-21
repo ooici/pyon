@@ -76,6 +76,7 @@ class PostgresQueryBuilder(object):
         """
         Builds a SQL filter expression string from given query expression
         @param expr  A query expression clause
+        @param params  A dict holding values for parametric substitution
         @param table_prefix  Table prefix for column names to next clause in subqueries, e.g. "MYTABLE."
         """
         if not expr:
@@ -145,7 +146,7 @@ class PostgresQueryBuilder(object):
         elif op == DQ.EXP_NOT:
             return "NOT (%s)" % self._build_where(args[0], table_prefix=table_prefix)
         elif op == DQ.ASSOP_ASSOCIATED:
-            """Find resources associated with an n-th degree resource"""
+            # Find resources associated with an n-th degree resource
             target, target_type, predicate, direction, target_filter = args
             def assoc_level(lvnum, idcol):
                 lvdir = direction[lvnum]
@@ -209,8 +210,8 @@ class PostgresQueryBuilder(object):
             xpr = assoc_level(0, "id")
             return xpr
         elif op == DQ.ASSOP_DESCEND_O or op == DQ.ASSOP_DESCEND_S:
-            """Find resources that are child of a resource.
-            Can limit search depth, predicate, child type and does not follow cycles."""
+            # Find resources that are child of a resource.
+            # Can limit search depth, predicate, child type and does not follow cycles.
             target, target_type, predicate, max_depth = args
             assoc_table = self.basetable if self.basetable.endswith("_assoc") else self.basetable + "_assoc"
             if predicate and type(predicate) not in (list, tuple):
