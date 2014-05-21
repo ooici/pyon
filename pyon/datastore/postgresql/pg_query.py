@@ -84,9 +84,9 @@ class PostgresQueryBuilder(object):
                 geom_from_wkt = 'ST_GeomFromEWKT(\'SRID=4326;%s\')' % (wkt)
                 # if buffer specified, wrap geometry in buffer http://postgis.net/docs/ST_Buffer.html
                 if buf:
-                    if buf.lower().endswith('km'):
+                    if buf.lower().endswith('m'):
                         geom_from_wkt = '%s::geography' % geom_from_wkt # in meters instead of CRS units
-                        buf = buf[:-2] # remove trailing 'km'
+                        buf = buf[:-1] # remove trailing 'm'
                     geom_from_wkt = 'ST_Buffer(%s, %f)' % (geom_from_wkt,float(buf))
                 return self.OP_STR[op] % (colname, geom_from_wkt)
             else:
