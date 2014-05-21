@@ -825,14 +825,14 @@ class ResourceRegistryServiceWrapper(object):
                                                      access_args=access_args)
 
     def find_resources_ext(self, restype='', lcstate='', name='', keyword='', nested_type='', attr_name='', attr_value='',
-                           alt_id='', alt_id_ns='', limit=0, skip=0, descending=False, id_only=False):
+                           alt_id='', alt_id_ns='', limit=0, skip=0, descending=False, id_only=False, query=''):
         access_args = create_access_args(current_actor_id=get_ion_actor_id(self._process),
                                          superuser_actor_ids=self._rr.get_superuser_actors())
         return self._rr.find_resources_ext(restype=restype, lcstate=lcstate, name=name,
             keyword=keyword, nested_type=nested_type, attr_name=attr_name, attr_value=attr_value,
             alt_id=alt_id, alt_id_ns=alt_id_ns,
             limit=limit, skip=skip, descending=descending,
-            id_only=id_only, access_args=access_args)
+            id_only=id_only, query=query, access_args=access_args)
 
 
 class ResourceQuery(DatastoreQueryBuilder):
@@ -858,6 +858,9 @@ class ResourceQuery(DatastoreQueryBuilder):
 
     def filter_attribute(self, attr_name, expr, cmpop=None):
         return self.txt_cmp(attr_name, expr, cmpop)
+
+    def filter_owner(self, owner_actor):
+        return self.filter_associated_with_subject(object=owner_actor, object_type=RT.ActorIdentity, predicate=PRED.hasOwner)
 
     def filter_by_association(self, target=None, target_type=None, predicate=None, direction=None, target_filter=None):
         """Establishes a filter by association to target(s) based on various criteria (predicate, target id, target type,
@@ -888,11 +891,11 @@ class ResourceQuery(DatastoreQueryBuilder):
         return self.filter_by_association(predicate=predicate, target=target, target_type=target_type,
                                           direction="A", target_filter=target_filter)
 
-    def filter_object_descendents(self, parent=None, object_type=None, predicate=None, max_depth=0):
+    def filter_object_descendants(self, parent=None, object_type=None, predicate=None, max_depth=0):
         """Filter to all descendant (child) resources in the association object direction"""
         return self.op_expr(self.ASSOP_DESCEND_O, parent, object_type, predicate, max_depth)
 
-    def filter_subject_descendents(self, parent=None, subject_type=None, predicate=None, max_depth=0):
+    def filter_subject_descendants(self, parent=None, subject_type=None, predicate=None, max_depth=0):
         """Filter to all descendant (child) resources in the association subject direction"""
         return self.op_expr(self.ASSOP_DESCEND_S, parent, subject_type, predicate, max_depth)
 
@@ -917,8 +920,8 @@ class AssociationQuery(DatastoreQueryBuilder):
     def filter_predicate(self, expr):
         return self.eq_in(DQ.AA_PREDICATE, expr)
 
-    def filter_object_descendents(self, parent=None, object_type=None, predicate=None, max_depth=0):
+    def filter_object_descendants(self, parent=None, object_type=None, predicate=None, max_depth=0):
         return self.op_expr(self.ASSOP_DESCEND_O, parent, object_type, predicate, max_depth)
 
-    def filter_subject_descendents(self, parent=None, subject_type=None, predicate=None, max_depth=0):
+    def filter_subject_descendants(self, parent=None, subject_type=None, predicate=None, max_depth=0):
         return self.op_expr(self.ASSOP_DESCEND_S, parent, subject_type, predicate, max_depth)

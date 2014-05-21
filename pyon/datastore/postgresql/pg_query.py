@@ -5,6 +5,7 @@
 __author__ = 'Michael Meisinger'
 
 from pyon.core.exception import BadRequest
+from pyon.datastore.datastore import DataStore
 from pyon.datastore.datastore_query import DQ, DatastoreQueryBuilder
 
 
@@ -46,16 +47,30 @@ class PostgresQueryBuilder(object):
             self.cols.append("doc")
         self._valcnt = 0
         self.values = {}
+        self.query_params = query.get("query_params", {})
 
         self.where = self._build_where(self.query["where"])
         self.order_by = self._build_order_by(self.query["order_by"])
 
     def _value(self, value):
         """Saves a value for later type conformant insertion into the query"""
-        self._valcnt += 1
-        valname = "v" + str(self._valcnt)
-        self.values[valname] = value
-        return "%(" + valname + ")s"
+        if value and type(value) in (list, tuple):
+            valstr = ",".join(self._value(val) for val in value)
+            return valstr
+        else:
+            self._valcnt += 1
+            valname = "v" + str(self._valcnt)
+            self.values[valname] = value
+            return "%(" + valname + ")s"
+
+    def _sub_param(self, value):
+        if not self.query_params or not isinstance(value, basestring):
+            return value
+        if value and value.startswith("$(") and value.endswith(")"):
+            paramname = value[2:-1]
+            # Fail silently if paramname not in dict
+            return self.query_params.get(paramname, None)
+        return value
 
     def _build_where(self, expr, table_prefix=None):
         """
@@ -68,25 +83,42 @@ class PostgresQueryBuilder(object):
         table_prefix = table_prefix or ""
         op, args = expr
         if op.startswith(DQ.OP_PREFIX):
-            colname, value = args
-            return "%s%s%s%s" % (table_prefix, colname, self.OP_STR[op], self._value(value))
+            attname, value = args
+            if self._is_standard_col(attname):
+                return "%s%s%s%s" % (table_prefix, attname, self.OP_STR[op], self._value(self._sub_param(value)))
+            else:
+                return "json_string(%sdoc,%s)%s%s" % (table_prefix, self._value(attname), self.OP_STR[op],
+                                                      self._value(self._sub_param(value)))
         elif op == DQ.XOP_IN:
             attname = args[0]
             values = args[1:]
-            in_exp = ",".join(["%s" % self._value(val) for val in values])
-            return table_prefix + attname + " IN (" + in_exp + ")"
+            in_exp = ",".join(["%s" % self._value(self._sub_param(val)) for val in values])
+            if self._is_standard_col(attname):
+                return table_prefix + attname + " IN (" + in_exp + ")"
+            else:
+                return "json_string(%sdoc,%s) IN (%s)" % (table_prefix, self._value(attname), in_exp)
         elif op == DQ.XOP_BETWEEN:
             attname, value1, value2 = args
-            return "%s%s BETWEEN %s AND %s" % (table_prefix, attname, self._value(value1), self._value(value2))
+            if self._is_standard_col(attname):
+                return "%s%s BETWEEN %s AND %s" % (table_prefix, attname,
+                                                   self._value(self._sub_param(value1)),
+                                                   self._value(self._sub_param(value2)))
+            else:
+                return "json_string(%sdoc,%s) BETWEEN %s AND %s" % (table_prefix, self._value(attname),
+                                                                    self._value(self._sub_param(value1)),
+                                                                    self._value(self._sub_param(value2)))
         elif op == DQ.XOP_ATTLIKE or op == DQ.XOP_ATTILIKE:
             attname, value = args
-            return "json_string(%sdoc,%s) %s %s" % (table_prefix, self._value(attname), self.OP_STR[op], self._value(value))
+            return "json_string(%sdoc,%s) %s %s" % (table_prefix, self._value(attname), self.OP_STR[op],
+                                                    self._value(self._sub_param(value)))
         elif op == DQ.XOP_ALLMATCH:
             value = args[0]
-            return "json_allattr(%sdoc) ILIKE %s" % (table_prefix, self._value("%" + str(value) + "%"))
+            return "json_allattr(%sdoc) ILIKE %s" % (table_prefix, self._value("%" + str(self._sub_param(value)) + "%"))
         elif op.startswith(DQ.ROP_PREFIX):
             colname, x1, y1 = args
-            return "%s%s %s %s::numrange" % (table_prefix, colname, self.OP_STR[op], self._value("[%s,%s]" % (x1, y1)))
+            return "%s%s %s %s::numrange" % (table_prefix, colname, self.OP_STR[op],
+                                             self._value("[%s,%s]" % (self._sub_param(x1),
+                                                                      self._sub_param(y1))))
         elif op.startswith(DQ.GOP_PREFIX):
             if op.endswith('_geom'):
                 colname, wkt, buf = args
@@ -127,14 +159,14 @@ class PostgresQueryBuilder(object):
                         # Recursion end
                         if target and type(target) in (list, tuple):
                             lvxpr += ltab + "." + aatt + " IN ("
-                            lvxpr += ",".join("%s" % self._value(targ) for targ in target) + ")"
+                            lvxpr += ",".join("%s" % self._value(self._sub_param(targ)) for targ in target) + ")"
                         elif target:
-                            lvxpr += ltab + "." + aatt + "=%s" % self._value(target)
+                            lvxpr += ltab + "." + aatt + "=%s" % self._value(self._sub_param(target))
                         elif target_type and type(target_type) in (list, tuple):
                             lvxpr += ltab + "." + aatt + "t IN ("
-                            lvxpr += ",".join("%s" % self._value(targ) for targ in target_type) + ")"
+                            lvxpr += ",".join("%s" % self._value(self._sub_param(targ)) for targ in target_type) + ")"
                         elif target_type:
-                            lvxpr += ltab + "." + aatt + "t=%s" % self._value(target_type)
+                            lvxpr += ltab + "." + aatt + "t=%s" % self._value(self._sub_param(target_type))
                             if target_filter:
                                 lvxpr += " AND " + ltab + "." + aatt + " IN (SELECT id from " + self.basetable + " AS ART WHERE "
                                 lvxpr += self._build_where(target_filter, table_prefix="ART.")
@@ -153,9 +185,9 @@ class PostgresQueryBuilder(object):
                     # Add predicate clause
                     if lvpred and type(lvpred) in (list, tuple):
                         lvxpr += " AND " + ltab + ".p IN ("
-                        lvxpr += ",".join("%s" % self._value(pr) for pr in lvpred) + ")"
+                        lvxpr += ",".join("%s" % self._value(self._sub_param(pr)) for pr in lvpred) + ")"
                     elif lvpred:
-                        lvxpr += " AND " + ltab + ".p=%s" % self._value(lvpred)
+                        lvxpr += " AND " + ltab + ".p=%s" % self._value(self._sub_param(lvpred))
 
                     lvxpr += ")"
 
@@ -184,16 +216,20 @@ class PostgresQueryBuilder(object):
             if predicate and type(predicate) not in (list, tuple):
                 predicate = [predicate]
             if predicate:
-                predval = ",".join("%s" % self._value(p) for p in predicate)
+                predval = ",".join("%s" % self._value(self._sub_param(p)) for p in predicate)
+            if target_type and type(target_type) not in (list, tuple):
+                target_type = [target_type]
+            if target_type:
+                ttypeval = ",".join("%s" % self._value(self._sub_param(targ)) for targ in target_type)
             idatt, aatt = ("s", "o") if op == DQ.ASSOP_DESCEND_O else ("o", "s")
             xpr = "id IN ("
             xpr += "WITH RECURSIVE ch_res(chid, path, depth, cycle) AS ("
             xpr += "SELECT " + aatt + ", ARRAY[id::text], 1, false FROM " + assoc_table
-            xpr += " WHERE " + idatt + "=%s" % self._value(target)
+            xpr += " WHERE " + idatt + "=%s" % self._value(self._sub_param(target))
             if predicate:
                 xpr += " AND p IN (%s)" % predval
             if target_type:
-                xpr += " AND " + aatt + "t=%s" % self._value(target_type)
+                xpr += " AND " + aatt + "t IN (%s)" % ttypeval
             xpr += " UNION ALL "
             xpr += "SELECT ass." + aatt + ", ARRAY[ass.id::text] || ch.path, ch.depth + 1, ass.id=ANY(ch.path) FROM ch_res ch, " + assoc_table + " ass"
             xpr += " WHERE ass." + idatt + " = ch.chid AND NOT ch.cycle"
@@ -202,7 +238,7 @@ class PostgresQueryBuilder(object):
             if predicate:
                 xpr += " AND ass.p IN (%s)" % predval
             if target_type:
-                xpr += " AND " + aatt + "t=%s" % self._value(target_type)
+                xpr += " AND " + aatt + "t IN (%s)" % ttypeval
             if self.basetable.endswith("_assoc"):
                 xpr += ") SELECT path[1] FROM ch_res)"
             else:
@@ -244,3 +280,15 @@ class PostgresQueryBuilder(object):
 
     def get_values(self):
         return self.values
+
+    def _is_standard_col(self, col):
+        datastore = self.query["query_args"].get("datastore", "")
+        profile = self.query["query_args"].get("profile", "")
+        ds_sub = self.query["query_args"].get("ds_sub", "")
+        if profile == DataStore.DS_PROFILE.RESOURCES and ds_sub == "assoc":
+            return col in {"id", "s", "st", "p", "o", "ot"}
+        elif profile == DataStore.DS_PROFILE.RESOURCES:
+            return col in {"id", "type_", "name", "lcstate", "availability", "ts_created", "ts_updated"}
+        elif profile == DataStore.DS_PROFILE.EVENTS:
+            return col in {"id", "type_", "origin", "origin_type", "sub_type", "actor_id"}
+        raise BadRequest("Unknown query profile")

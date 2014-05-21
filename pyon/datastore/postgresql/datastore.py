@@ -737,10 +737,15 @@ class PostgresPyonDataStore(PostgresDataStore):
                                                  show_all=query["query_args"].get("show_all", False))
 
         with self.pool.cursor(**self.cursor_args) as cur:
-            #log.info(pqb.get_query())
+            exec_query = pqb.get_query()
             cur.execute(pqb.get_query(), pqb.get_values())
             rows = cur.fetchall()
             log.info("find_by_query() QUERY: %s (%s rows)", cur.query, cur.rowcount)
+            query_res = {}
+            query["_result"] = query_res
+            query_res["statement_gen"] = exec_query
+            query_res["statement_sql"] = cur.query
+            query_res["rowcount"] = cur.rowcount
 
         id_only = query["query_args"].get("id_only", True)
         if id_only:
