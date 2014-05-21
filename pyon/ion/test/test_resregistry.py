@@ -710,6 +710,18 @@ class TestResourceRegistry(IonIntegrationTestCase):
         self.assertIn(res_obj[1].name, {"PS0", "PS1", "IS1"})
         self.assertIn(res_obj[2].name, {"PS0", "PS1", "IS1"})
 
+        # --- Association descendents (recursively)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_object_descendents(res_by_name["OS1"], predicate=[PRED.hasSite]))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 3)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_object_descendents(res_by_name["OS1"], predicate=[PRED.hasSite], max_depth=2))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
         rq = ResourceQuery()
         res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
         self.assertGreaterEqual(len(res_obj), 9)
@@ -768,6 +780,17 @@ class TestResourceRegistry(IonIntegrationTestCase):
         assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
         self.assertEquals(len(assoc_objs), 8)
 
+        # --- Association descendents (recursively)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_object_descendents(res_by_name["OS1"], predicate=[PRED.hasSite]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 3)
+
+        #print assoc_objs
+
+        #from pyon.util.breakpoint import breakpoint
+        #breakpoint()
 
         # --- Clean up
 

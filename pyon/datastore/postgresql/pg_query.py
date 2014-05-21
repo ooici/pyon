@@ -113,6 +113,7 @@ class PostgresQueryBuilder(object):
         elif op == DQ.EXP_NOT:
             return "NOT (%s)" % self._build_where(args[0], table_prefix=table_prefix)
         elif op == DQ.ASSOP_ASSOCIATED:
+            """Find resources associated with an n-th degree resource"""
             target, target_type, predicate, direction, target_filter = args
             def assoc_level(lvnum, idcol):
                 lvdir = direction[lvnum]
@@ -174,6 +175,38 @@ class PostgresQueryBuilder(object):
 
             # id in (select from assoc where xxx)
             xpr = assoc_level(0, "id")
+            return xpr
+        elif op == DQ.ASSOP_DESCEND_O or op == DQ.ASSOP_DESCEND_S:
+            """Find resources that are child of a resource.
+            Can limit search depth, predicate, child type and does not follow cycles."""
+            target, target_type, predicate, max_depth = args
+            assoc_table = self.basetable if self.basetable.endswith("_assoc") else self.basetable + "_assoc"
+            if predicate and type(predicate) not in (list, tuple):
+                predicate = [predicate]
+            if predicate:
+                predval = ",".join("%s" % self._value(p) for p in predicate)
+            idatt, aatt = ("s", "o") if op == DQ.ASSOP_DESCEND_O else ("o", "s")
+            xpr = "id IN ("
+            xpr += "WITH RECURSIVE ch_res(chid, path, depth, cycle) AS ("
+            xpr += "SELECT " + aatt + ", ARRAY[id::text], 1, false FROM " + assoc_table
+            xpr += " WHERE " + idatt + "=%s" % self._value(target)
+            if predicate:
+                xpr += " AND p IN (%s)" % predval
+            if target_type:
+                xpr += " AND " + aatt + "t=%s" % self._value(target_type)
+            xpr += " UNION ALL "
+            xpr += "SELECT ass." + aatt + ", ARRAY[ass.id::text] || ch.path, ch.depth + 1, ass.id=ANY(ch.path) FROM ch_res ch, " + assoc_table + " ass"
+            xpr += " WHERE ass." + idatt + " = ch.chid AND NOT ch.cycle"
+            if max_depth > 0:
+                xpr += " AND ch.depth<%s" % self._value(max_depth)
+            if predicate:
+                xpr += " AND ass.p IN (%s)" % predval
+            if target_type:
+                xpr += " AND " + aatt + "t=%s" % self._value(target_type)
+            if self.basetable.endswith("_assoc"):
+                xpr += ") SELECT path[1] FROM ch_res)"
+            else:
+                xpr += ") SELECT chid FROM ch_res)"
             return xpr
         else:
             raise BadRequest("Unknown op: %s" % op)

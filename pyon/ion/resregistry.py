@@ -888,6 +888,13 @@ class ResourceQuery(DatastoreQueryBuilder):
         return self.filter_by_association(predicate=predicate, target=target, target_type=target_type,
                                           direction="A", target_filter=target_filter)
 
+    def filter_object_descendents(self, parent=None, object_type=None, predicate=None, max_depth=0):
+        """Filter to all descendant (child) resources in the association object direction"""
+        return self.op_expr(self.ASSOP_DESCEND_O, parent, object_type, predicate, max_depth)
+
+    def filter_subject_descendents(self, parent=None, subject_type=None, predicate=None, max_depth=0):
+        """Filter to all descendant (child) resources in the association subject direction"""
+        return self.op_expr(self.ASSOP_DESCEND_S, parent, subject_type, predicate, max_depth)
 
 
 class AssociationQuery(DatastoreQueryBuilder):
@@ -909,3 +916,9 @@ class AssociationQuery(DatastoreQueryBuilder):
 
     def filter_predicate(self, expr):
         return self.eq_in(DQ.AA_PREDICATE, expr)
+
+    def filter_object_descendents(self, parent=None, object_type=None, predicate=None, max_depth=0):
+        return self.op_expr(self.ASSOP_DESCEND_O, parent, object_type, predicate, max_depth)
+
+    def filter_subject_descendents(self, parent=None, subject_type=None, predicate=None, max_depth=0):
+        return self.op_expr(self.ASSOP_DESCEND_S, parent, subject_type, predicate, max_depth)

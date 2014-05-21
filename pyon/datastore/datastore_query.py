@@ -63,7 +63,9 @@ class DatastoreQueryConst(object):
     ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"      # Find objects with range containing given range
 
     ASSOP_PREFIX = "assop:"                           # Association operators prefix
-    ASSOP_ASSOCIATED = ASSOP_PREFIX + "associated"    # Resource is a associated with
+    ASSOP_ASSOCIATED = ASSOP_PREFIX + "associated"    # Resource is associated with other resources
+    ASSOP_DESCEND_O = ASSOP_PREFIX + "descend_o"      # Find all descendents of resource (object direction)
+    ASSOP_DESCEND_S = ASSOP_PREFIX + "descend_s"      # Find all descendents of resource (subject direction)
 
     # Object, resource and event attributes
     ATT_ID = "att:id"
