@@ -13,6 +13,7 @@ from gevent import event as gevent_event
 from pyon.core import bootstrap
 from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
+from pyon.datastore.datastore_query import QUERY_EXP_KEY, DatastoreQueryBuilder, DQ
 from pyon.ion.identifier import create_unique_event_id, create_simple_unique_id
 from pyon.net.endpoint import Publisher, Subscriber
 from pyon.util.async import spawn
@@ -374,6 +375,21 @@ class EventRepository(object):
                                                id_only=id_only, **kwargs)
         return events
 
+    def find_events_query(self, query, id_only=False):
+        """
+        Find events or event ids by using a standard datastore query. This function fills in datastore and
+        profile entries, so these can be omitted from the datastore query.
+        """
+        if not query or not isinstance(query, dict) or not QUERY_EXP_KEY in query:
+            raise BadRequest("Illegal events query")
+        qargs = query["query_args"]
+        qargs["datastore"] = DataStore.DS_EVENTS
+        qargs["profile"] = DataStore.DS_PROFILE.EVENTS
+        qargs["id_only"] = id_only
+        events = self.event_store.find_by_query(query)
+        log.debug("find_events_query() found %s events", len(events))
+        return events
+
 
 class EventGate(EventSubscriber):
     def __init__(self, *args, **kwargs):
@@ -392,7 +408,6 @@ class EventGate(EventSubscriber):
         pass
 
 
-
 def handle_stream_exception(iorigin="stream_exception"):
     """
     decorator for stream exceptions
@@ -409,3 +424,35 @@ def handle_stream_exception(iorigin="stream_exception"):
         return wrapped
     return real_decorator
 
+
+class EventQuery(DatastoreQueryBuilder):
+    """
+    Helper class to build datastore queries for the event repository.
+    Based on the DatastoreQueryBuilder
+    """
+    def __init__(self):
+        super(EventQuery, self).__init__(datastore=DataStore.DS_EVENTS, profile=DataStore.DS_PROFILE.EVENTS)
+
+    def filter_type(self, type_expr, cmpop=None):
+        return self.txt_cmp(DQ.ATT_TYPE, type_expr, cmpop)
+
+    def filter_origin(self, origin_expr, cmpop=None):
+        return self.txt_cmp(DQ.EA_ORIGIN, origin_expr, cmpop)
+
+    def filter_origin_type(self, origin_expr, cmpop=None):
+        return self.txt_cmp(DQ.EA_ORIGIN_TYPE, origin_expr, cmpop)
+
+    def filter_sub_type(self, type_expr, cmpop=None):
+        return self.txt_cmp(DQ.EA_SUB_TYPE, type_expr, cmpop)
+
+    def filter_ts_created(self, from_expr=None, to_expr=None):
+        from_expr = self._make_ion_ts(from_expr)
+        to_expr = self._make_ion_ts(to_expr)
+
+        if from_expr and to_expr:
+            return self.and_(self.gte(DQ.EA_TS_CREATED, from_expr),
+                             self.lte(DQ.EA_TS_CREATED, to_expr))
+        elif from_expr:
+            return self.gte(DQ.EA_TS_CREATED, from_expr)
+        elif to_expr:
+            return self.lte(DQ.EA_TS_CREATED, to_expr)

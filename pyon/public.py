@@ -34,11 +34,14 @@ __all__ += ['IonProcessThreadManager', 'SimpleProcess', 'StandaloneProcess', 'Im
 from pyon.ion.endpoint import ProcessRPCClient, ProcessRPCServer, ProcessSubscriber, ProcessPublisher
 __all__ += ['ProcessRPCClient', 'ProcessRPCServer', 'ProcessSubscriber', 'ProcessPublisher']
 
-from pyon.ion.event import EventPublisher, EventSubscriber
-__all__ += ['StreamProcess', 'EventPublisher', 'EventSubscriber']
+from pyon.ion.event import EventPublisher, EventSubscriber, EventQuery
+__all__ += ['EventPublisher', 'EventSubscriber', 'EventQuery']
 
 from pyon.ion.resource import RT, OT, PRED, LCS, LCE, AS
 __all__ += ['RT', 'OT', 'PRED', 'LCS', 'LCE', 'AS']
+
+from pyon.ion.resregistry import ResourceQuery, AssociationQuery, DQ
+__all__ += ['ResourceQuery', 'AssociationQuery', 'DQ']
 
 from pyon.ion.service import BaseService
 __all__ += ['BaseService']

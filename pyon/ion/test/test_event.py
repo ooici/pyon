@@ -3,6 +3,7 @@
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
 __license__ = 'Apache 2.0'
 
+import datetime
 import time
 import sys
 
@@ -11,20 +12,22 @@ from nose.plugins.attrib import attr
 from gevent import event, queue
 from unittest import SkipTest
 
+from pyon.util.int_test import IonIntegrationTestCase
+from pyon.util.unit_test import IonUnitTestCase
+
 from pyon.core import bootstrap
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import BadRequest, FilesystemError, StreamingError, CorruptionError
 from pyon.datastore.datastore import DatastoreManager, DataStore
-from pyon.ion.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception
+from pyon.ion.event import EventPublisher, EventSubscriber, EventRepository, handle_stream_exception, EventQuery, DQ
 from pyon.ion.identifier import create_unique_event_id
+from pyon.ion.resource import OT
 from pyon.util.containers import get_ion_ts, DotDict
-from pyon.util.int_test import IonIntegrationTestCase
-from pyon.util.unit_test import IonUnitTestCase
 
-from interface.objects import Event, ResourceLifecycleEvent
+from interface.objects import Event, ResourceLifecycleEvent, ResourceOperatorEvent, ResourceCommandEvent
 
 
-@attr('UNIT',group='event')
+@attr('UNIT', group='event')
 class TestEvents(IonUnitTestCase):
     def test_event_subscriber_auto_delete(self):
         mocknode = Mock()
@@ -37,7 +40,7 @@ class TestEvents(IonUnitTestCase):
 
         self.assertEquals(ev._chan.queue_auto_delete, sentinel.auto_delete)
 
-@attr('INT',group='event')
+@attr('INT', group='event')
 class TestEventsInt(IonIntegrationTestCase):
 
     def setUp(self):
@@ -105,15 +108,6 @@ class TestEventsInt(IonIntegrationTestCase):
 
         self.assertEquals(res[1].description, "more testing")
         self.assertAlmostEquals(int(res[1].ts_created), int(get_ion_ts()), delta=5000)
-
-
-
-    def Xtest_pub_with_event_repo(self):
-        pub = EventPublisher(event_type="ResourceEvent", node=self.container.node)
-        pub.publish_event(origin="specifics", description="hallo")
-
-        evs = self.container.event_repository.find_events(origin='specifics')
-        self.assertEquals(len(evs), 1)
 
     def test_pub_on_different_origins(self):
         ar = event.AsyncResult()
@@ -360,7 +354,8 @@ class TestEventsInt(IonIntegrationTestCase):
         self.assertEquals(exception_event.exception_type, "<class 'pyon.core.exception.CorruptionError'>")
         self.assertEquals(exception_event.origin, "specific") 
 
-@attr('UNIT',group='datastore')
+
+@attr('UNIT', group='event')
 class TestEventRepository(IonUnitTestCase):
     def test_event_repo(self):
         dsm = DatastoreManager()
@@ -481,3 +476,130 @@ class TestEventRepository(IonUnitTestCase):
         events_r = event_repo.find_events(event_type='DeviceStatusEvent')
         self.assertEquals(len(events_r), 4)
 
+
+@attr('INT', group='event')
+class TestEventRepoInt(IonIntegrationTestCase):
+
+    def setUp(self):
+        self._start_container()
+        self.er = self.container.event_repository
+
+    def test_event_query(self):
+        t0 = 136304640000
+        events = [
+            ("RME1", ResourceCommandEvent(origin="O1", origin_type="OT1", sub_type="ST1", ts_created=str(t0))),
+            ("RME2", ResourceCommandEvent(origin="O2", origin_type="OT1", sub_type="ST2", ts_created=str(t0+1))),
+            ("RME3", ResourceCommandEvent(origin="O2", origin_type="OT2", sub_type="ST3", ts_created=str(t0+2))),
+
+            ("RLE1", ResourceOperatorEvent(origin="O1", origin_type="OT3", sub_type="ST4", ts_created=str(t0+3))),
+            ("RLE2", ResourceOperatorEvent(origin="O3", origin_type="OT3", sub_type="ST5", ts_created=str(t0+4))),
+            ("RLE3", ResourceOperatorEvent(origin="O3", origin_type="OT2", sub_type="ST6", ts_created=str(t0+5))),
+        ]
+        ev_by_alias = {}
+        for (alias, event) in events:
+            evid, _ = self.container.event_repository.put_event(event)
+            ev_by_alias[alias] = evid
+
+        # --- Basic event queries
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type(OT.ResourceCommandEvent))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 3)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type(OT.ResourceCommandEvent))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=True)
+        self.assertEquals(len(ev_obj), 3)
+        self.assertTrue(all([True for eo in ev_obj if isinstance(eo, basestring)]))
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_sub_type("ST", cmpop=DQ.TXT_CONTAINS))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 6)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_sub_type("st", cmpop=DQ.TXT_ICONTAINS))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 6)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_sub_type("^ST(1|2)", cmpop=DQ.TXT_REGEX))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_sub_type("^st(1|2)", cmpop=DQ.TXT_IREGEX))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        eq = EventQuery()
+        eq.set_filter(eq.not_(eq.filter_sub_type("^st(1|2)", cmpop=DQ.TXT_IREGEX)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 4)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type([OT.ResourceCommandEvent, OT.ResourceOperatorEvent]))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 6)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type([OT.ResourceCommandEvent, OT.ResourceOperatorEvent]),
+                      eq.filter_origin_type("OT2"))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type([OT.ResourceCommandEvent, OT.ResourceOperatorEvent]),
+                      eq.filter_origin_type(["OT2", "OT1"]))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 4)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type([OT.ResourceCommandEvent, OT.ResourceOperatorEvent]),
+                      eq.filter_sub_type("ST1"))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 1)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_type([OT.ResourceCommandEvent, OT.ResourceOperatorEvent]),
+                      eq.filter_sub_type(["ST2", "ST3"]))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        # --- Temporal range queries
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(str(t0), str(t0)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 1)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(str(t0), str(t0+1)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(t0, t0+1))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 2)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(datetime.datetime.fromtimestamp(float(t0)/1000),
+                                           datetime.datetime.fromtimestamp(float(t0)/1000)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 1)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(str(t0-10), str(t0-1)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 0)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(from_expr=str(t0+3)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 3)
+
+        eq = EventQuery()
+        eq.set_filter(eq.filter_ts_created(to_expr=str(t0+2)))
+        ev_obj = self.er.find_events_query(query=eq.get_query(), id_only=False)
+        self.assertEquals(len(ev_obj), 3)

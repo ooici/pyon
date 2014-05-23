@@ -10,6 +10,9 @@ a mapping to the datastore technology.
 
 __author__ = 'Michael Meisinger'
 
+import datetime
+import time
+
 from pyon.core.exception import BadRequest
 from pyon.datastore.datastore_common import DataStore
 
@@ -34,6 +37,8 @@ class DatastoreQueryConst(object):
     OP_LIKE = OP_PREFIX + "like"     # Find objects with special attr matching given pattern (case sensitive)
     OP_ILIKE = OP_PREFIX + "ilike"   # Find objects with special attr matching given pattern (case insensitive)
     OP_FUZZY = OP_PREFIX + "fuzzy"   # Find objects with special attr similar to given value (case insensitive)
+    OP_REGEX = OP_PREFIX + "regex"   # Find objects with special attr matching given value POSIX regex
+    OP_IREGEX = OP_PREFIX + "iregex" # Find objects with special attr matching given value POSIX regex (case insensitive)
 
     XOP_PREFIX = "xop:"                     # Extended operators prefix
     XOP_IN = XOP_PREFIX + "in"              # Find objects with attr equal to one of given values
@@ -57,7 +62,12 @@ class DatastoreQueryConst(object):
     ROP_WITHIN_RANGE = ROP_PREFIX + "within"          # Find objects with range containing given range
     ROP_CONTAINS_RANGE = ROP_PREFIX + "contains"      # Find objects with range containing given range
 
-    # Object, resource and event attribute
+    ASSOP_PREFIX = "assop:"                           # Association operators prefix
+    ASSOP_ASSOCIATED = ASSOP_PREFIX + "associated"    # Resource is associated with other resources
+    ASSOP_DESCEND_O = ASSOP_PREFIX + "descend_o"      # Find all descendants of resource (object direction)
+    ASSOP_DESCEND_S = ASSOP_PREFIX + "descend_s"      # Find all descendants of resource (subject direction)
+
+    # Object, resource and event attributes
     ATT_ID = "att:id"
     ATT_TYPE = "att:type_"
     RA_NAME = "ra:name"
@@ -73,26 +83,47 @@ class DatastoreQueryConst(object):
     EA_ORIGIN_TYPE = "ea:origin_type"
     EA_SUB_TYPE = "ea:sub_type"
     EA_ACTOR_ID = "ea:actor_id"
+    EA_TS_CREATED = RA_TS_CREATED
+    AA_SUBJECT = "aa:s"
+    AA_SUBJECT_TYPE = "aa:st"
+    AA_OBJECT = "aa:o"
+    AA_OBJECT_TYPE = "aa:ot"
+    AA_PREDICATE = "aa:p"
 
     # Query types
     QTYPE_RES = "qt:resource"
     QTYPE_ASSOC = "qt:association"
     QTYPE_OBJ = "qt:object"
 
+    # Order
+    ORDER_ASC = "asc"
+    ORDER_DESC = "desc"
+
+    # Text comparisons
+    TXT_EQUALS = "txt:equals"
+    TXT_IEQUALS = "txt:iequals"
+    TXT_CONTAINS = "txt:contains"
+    TXT_ICONTAINS = "txt:icontains"
+    TXT_MATCH = "txt:match"
+    TXT_IMATCH = "txt:imatch"
+    TXT_REGEX = "txt:regex"
+    TXT_IREGEX = "txt:iregex"
 
 DQ = DatastoreQueryConst
+QUERY_EXP_KEY = "QUERYEXP"
 QUERY_EXP_ID = "qexp_v1.0"
 
 
 class DatastoreQueryBuilder(DatastoreQueryConst):
     """Helps create structured queries to the datastore"""
 
-    def __init__(self, profile=None, datastore=None, where=None, order_by=None, id_only=False, limit=0, skip=0, **kwargs):
+    def __init__(self, profile=None, datastore=None, ds_sub=None, where=None, order_by=None, id_only=False, limit=0, skip=0, **kwargs):
         self.query = {}
         self.query["QUERYEXP"] = QUERY_EXP_ID
         qargs = self.query.setdefault("query_args", {})
         qargs["profile"] = profile or DataStore.DS_PROFILE.RESOURCES
         qargs["datastore"] = datastore or DataStore.DS_RESOURCES
+        qargs["ds_sub"] = ds_sub or ""
         self.build_query(where=where, order_by=order_by, id_only=id_only, limit=limit, skip=skip)
 
     def build_query(self, where=None, order_by=None, id_only=None, limit=None, skip=None, **kwargs):
@@ -117,8 +148,15 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
     # -------------------------------------------------------------------------
     # Helpers to construct query filter expressions. Nest with and_ and or_
 
-    def op_expr(self, operator, *args):
-        return [operator, args or []]
+    def where(self, where_expr, *args, **kwargs):
+        """Sets the filter expression (where clause) of the query"""
+        if where_expr is not None and args:
+            if kwargs.get("or_filters", False):
+                self.query["where"] = self.or_(where_expr, *args)
+            else:
+                self.query["where"] = self.and_(where_expr, *args)
+        else:
+            self.query["where"] = where_expr if where_expr is not None else ""
 
     def and_(self, *args):
         return self.op_expr(self.EXP_AND, *args)
@@ -129,53 +167,93 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
     def not_(self, *args):
         return self.op_expr(self.EXP_NOT, *args)
 
+    set_filter = where
+    filter_and = and_
+    filter_or = or_
+    filter_not = not_
+
+    def op_expr(self, operator, *args):
+        return [operator, args or []]
+
     def eq(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_EQ, colname, value)
 
     def neq(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_NEQ, colname, value)
 
     def gt(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_GT, colname, value)
 
     def gte(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_GTE, colname, value)
 
     def lt(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_LT, colname, value)
 
     def lte(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_LTE, colname, value)
 
     def in_(self, col, *args):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.XOP_IN, colname, *args)
 
     def like(self, col, value, case_sensitive=True):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         if case_sensitive:
             return self.op_expr(self.OP_LIKE, colname, value)
         else:
             return self.op_expr(self.OP_ILIKE, colname, value)
 
     def fuzzy(self, col, value):
-        self._check_col(col)
-        colname = col.split(":", 1)[1]
+        colname = self._get_attname(col)
         return self.op_expr(self.OP_FUZZY, colname, value)
+
+    def regex(self, col, value, case_sensitive=True):
+        colname = self._get_attname(col)
+        if case_sensitive:
+            return self.op_expr(self.OP_REGEX, colname, value)
+        else:
+            return self.op_expr(self.OP_IREGEX, colname, value)
+
+    def eq_in(self, col, expr):
+        """Filter to list of values if type iterable else value equality"""
+        if type(expr) in (list, tuple):
+            return self.in_(col, *expr)
+        else:
+            return self.eq(col, expr)
+
+    def txt_cmp(self, col, value, cmpop):
+        """Text comparison"""
+        cmpop = cmpop or self.TXT_EQUALS
+        if cmpop != self.TXT_EQUALS and type(value) in (list, tuple):
+            raise BadRequest("Filter does not support list of values")
+        if cmpop == self.TXT_EQUALS:
+            if type(value) in (list, tuple):
+                return self.in_(col, *value)
+            else:
+                return self.eq(col, value)
+        elif cmpop == self.TXT_IEQUALS:
+            return self.like(col, value, case_sensitive=False)
+        elif cmpop == self.TXT_CONTAINS:
+            return self.like(col, "%" + value + "%")
+        elif cmpop == self.TXT_ICONTAINS:
+            return self.like(col, "%" + value + "%", case_sensitive=False)
+        elif cmpop == self.TXT_MATCH:
+            return self.like(col, value, case_sensitive=True)
+        elif cmpop == self.TXT_IMATCH:
+            return self.like(col, value, case_sensitive=False)
+        elif cmpop == self.TXT_REGEX:
+            return self.regex(col, value, case_sensitive=True)
+        elif cmpop == self.TXT_IREGEX:
+            return self.regex(col, value, case_sensitive=False)
+        else:
+            raise BadRequest("Filter compare op not supported: %s" % cmpop)
 
     # --- Special operators
 
@@ -244,6 +322,11 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
         colname = col.split(":", 1)[1]
         return self.op_expr(self.GOP_WITHIN_GEOM, colname, wkt, buf)
 
+    # --- By association
+
+    def associated_with(self, target=None, target_type=None, predicate=None, direction=None, target_filter=None):
+        return self.op_expr(self.ASSOP_ASSOCIATED, target, target_type, predicate, direction, target_filter)
+
     # --- Ordering
 
     def order_by(self, column, sort="asc", *args):
@@ -260,15 +343,51 @@ class DatastoreQueryBuilder(DatastoreQueryConst):
 
         return order_by_list
 
+    # --- Other query parameters
+
+    def set_skip(self, skip):
+        qargs = self.query["query_args"]
+        if skip is not None:
+            qargs["skip"] = skip
+
+    def set_limit(self, limit):
+        qargs = self.query["query_args"]
+        if limit is not None:
+            qargs["limit"] = limit
+
+    def set_id_only(self, id_only):
+        qargs = self.query["query_args"]
+        if id_only is not None:
+            qargs["id_only"] = id_only
+
+    def set_query_parameters(self, params):
+        if not params:
+            return
+        self.query.setdefault("query_params", {}).update(params)
+
+    # --- Internal functions
+
     def _check_col(self, col):
         profile = self.query["query_args"]["profile"]
         if profile == DataStore.DS_PROFILE.RESOURCES:
-            if not (col.startswith("ra") or col.startswith("att")):
+            if not (col.startswith("ra") or col.startswith("att") or col.startswith("aa")):
                 raise BadRequest("Query column unknown: %s" % col)
         elif profile == DataStore.DS_PROFILE.EVENTS:
             if not (col.startswith("ea") or col.startswith("att") or col == DQ.RA_TS_CREATED):
                 raise BadRequest("Query column unknown: %s" % col)
 
+    def _get_attname(self, col):
+        attname = col.split(":", 1)[-1]
+        return attname
+
+    def _make_ion_ts(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime.datetime):
+            return str(int(time.mktime(value.timetuple()) * 1000))
+        if type(value) is float:
+            return str(int(value))
+        return str(value)
 
     @classmethod
     def check_query(cls, query):

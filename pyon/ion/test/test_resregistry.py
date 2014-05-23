@@ -3,12 +3,13 @@
 __author__ = 'Michael Meisinger'
 
 import uuid
+from nose.plugins.attrib import attr
 
+from pyon.util.int_test import IonIntegrationTestCase
 from pyon.core.bootstrap import IonObject
 from pyon.core.exception import NotFound, Inconsistent, BadRequest
 from pyon.ion.resource import PRED, RT, LCS, AS, LCE, lcstate, create_access_args
-from pyon.util.int_test import IonIntegrationTestCase
-from nose.plugins.attrib import attr
+from pyon.ion.resregistry import ResourceQuery, AssociationQuery
 
 from interface.objects import Attachment, AttachmentType, ResourceVisibilityEnum
 
@@ -550,5 +551,256 @@ class TestResourceRegistry(IonIntegrationTestCase):
 
         #from pyon.util.breakpoint import breakpoint
         #breakpoint()
+
+        self.rr.rr_store.delete_mult(res_by_name.values())
+
+    def test_resource_query(self):
+        res_objs = [
+            (IonObject(RT.InstrumentDevice, name="ID1", lcstate=LCS.DEPLOYED), ),
+            (IonObject(RT.InstrumentDevice, name="ID2", lcstate=LCS.INTEGRATED), ),
+
+            (IonObject(RT.InstrumentSite, name="IS1", lcstate=LCS.INTEGRATED), ),
+
+            (IonObject(RT.PlatformDevice, name="PD1"), ),
+
+            (IonObject(RT.PlatformSite, name="PS1"), ),
+
+            (IonObject(RT.PlatformSite, name="PS0"), ),
+
+            (IonObject(RT.Observatory, name="OS1"), ),
+
+            (IonObject(RT.DataProduct, name="DP1"), ),
+            (IonObject(RT.DataProduct, name="DP2"), ),
+        ]
+        assocs = [
+            ("ID1", PRED.hasOutputProduct, "DP1"),
+            ("ID1", PRED.hasOutputProduct, "DP2"),
+
+            ("PD1", PRED.hasDevice, "ID1"),
+
+            ("OS1", PRED.hasSite, "PS0"),
+            ("PS0", PRED.hasSite, "PS1"),
+            ("PS1", PRED.hasSite, "IS1"),
+
+            ("PS1", PRED.hasDevice, "PD1"),
+            ("IS1", PRED.hasDevice, "ID1"),
+        ]
+        res_by_name = {}
+        for res_entry in res_objs:
+            res_obj = res_entry[0]
+            res_name = res_obj.name
+            res_obj.alt_ids.append("TEST:%s" % res_name)
+            actor_id = res_by_name[res_entry[1]] if len(res_entry) > 1 else None
+            rid, _ = self.rr.create(res_obj, actor_id=actor_id)
+            res_by_name[res_name] = rid
+        for assoc in assocs:
+            sname, p, oname = assoc
+            s, o = res_by_name[sname], res_by_name[oname]
+            self.rr.create_association(s, p, o)
+
+        # --- Simple resource filters
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type(RT.InstrumentDevice))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type([RT.InstrumentDevice, RT.PlatformDevice]))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 3)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type([RT.InstrumentDevice, RT.PlatformDevice]),
+                      rq.filter_name("ID1"))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 1)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type([RT.InstrumentDevice, RT.PlatformDevice]),
+                      rq.filter_name(["ID1", "PD1"]))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type([RT.InstrumentDevice, RT.PlatformDevice]),
+                      rq.filter_name("ID", cmpop=ResourceQuery.TXT_CONTAINS))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        # --- Association query
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_associated_with_object(res_by_name["ID1"]))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        # --- Association queries with a target filter
+
+        rq = ResourceQuery()
+        target_filter = rq.eq(rq.RA_NAME, "DP1")
+        rq.set_filter(rq.filter_type([RT.InstrumentDevice, RT.PlatformDevice]),
+                      rq.filter_associated_with_subject(predicate=PRED.hasOutputProduct,
+                                                        target_filter=target_filter))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 1)
+        self.assertEquals(res_obj[0].name, "ID1")
+
+        rq = ResourceQuery()
+        target_filter = rq.eq(rq.RA_NAME, "DP1")
+        rq.set_filter(rq.filter_type(RT.InstrumentDevice),
+                      rq.filter_associated_with_subject(predicate=[PRED.hasOutputProduct, PRED.hasSource],
+                                                        target_filter=target_filter))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 1)
+        self.assertEquals(res_obj[0].name, "ID1")
+
+        rq = ResourceQuery()
+        target_filter = rq.eq(rq.RA_NAME, "DP1")
+        rq.set_filter(rq.filter_type(RT.InstrumentDevice),
+                      rq.filter_associated_with_subject(predicate=PRED.hasOutputProduct,
+                                                        object_type=RT.DataProduct,
+                                                        target_filter=target_filter))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 1)
+        self.assertEquals(res_obj[0].name, "ID1")
+
+        rq = ResourceQuery()
+        target_filter = rq.and_(rq.eq(rq.RA_NAME, "DP1"),
+                                rq.eq(rq.ATT_TYPE, RT.DataProduct))
+        rq.set_filter(rq.filter_type(RT.InstrumentDevice),
+                      rq.filter_associated_with_subject(predicate=PRED.hasOutputProduct,
+                                                        target_filter=target_filter))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 1)
+        self.assertEquals(res_obj[0].name, "ID1")
+
+        #rq = ResourceQuery()
+        #rq.set_filter(rq.filter_by_association(res_by_name["ID1"], direction="SO"))
+        #res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+
+        # --- Multi-hop associations
+
+        rq = ResourceQuery()
+        # This will find InstrumentDevice child of PlatformDevice
+        rq.set_filter(rq.filter_by_association(res_by_name["PS1"], predicate=[PRED.hasDevice, PRED.hasDevice], direction="OO"))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        #print "\n".join("%s %s %s" % (ro._id, ro.type_, ro.name) for ro in res_obj)
+        self.assertEquals(len(res_obj), 1)
+        self.assertEquals(res_obj[0].name, "ID1")
+
+        rq = ResourceQuery()
+        # This will find PlatformDevice for site PLUS InstrumentDevice child of PlatformDevice
+        rq.set_filter(rq.filter_by_association(res_by_name["PS1"], predicate=[PRED.hasDevice, PRED.hasDevice], direction="OO"),
+                      rq.filter_by_association(res_by_name["PS1"], predicate=[PRED.hasDevice], direction="O"),
+                      or_filters=True)
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+        self.assertIn(res_obj[0].name, {"ID1", "PD1"})
+        self.assertIn(res_obj[1].name, {"ID1", "PD1"})
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_by_association(res_by_name["OS1"], predicate=[PRED.hasSite], direction="O"),
+                      rq.filter_by_association(res_by_name["OS1"], predicate=[PRED.hasSite,PRED.hasSite], direction="OO"),
+                      rq.filter_by_association(res_by_name["OS1"], predicate=[PRED.hasSite,PRED.hasSite,PRED.hasSite], direction="OOO"),
+                      or_filters=True)
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 3)
+        self.assertIn(res_obj[0].name, {"PS0", "PS1", "IS1"})
+        self.assertIn(res_obj[1].name, {"PS0", "PS1", "IS1"})
+        self.assertIn(res_obj[2].name, {"PS0", "PS1", "IS1"})
+
+        # --- Association descendants (recursively)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_object_descendants(res_by_name["OS1"], predicate=[PRED.hasSite]))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 3)
+
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_object_descendants(res_by_name["OS1"], predicate=[PRED.hasSite], max_depth=2))
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        rq = ResourceQuery()
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertGreaterEqual(len(res_obj), 9)
+
+        # --- Parameterized queries
+
+        query_params = dict(restype=RT.InstrumentDevice)
+        rq = ResourceQuery()
+        rq.set_filter(rq.filter_type("$(restype)"))
+        rq.set_query_parameters(query_params)
+        res_obj = self.rr.find_resources_ext(query=rq.get_query(), id_only=False)
+        self.assertEquals(len(res_obj), 2)
+
+        # --- Association query
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject(res_by_name["ID1"]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 2)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject([res_by_name["ID1"], res_by_name["PS1"]]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 4)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_object([res_by_name["DP1"], res_by_name["DP2"]]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 2)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject([res_by_name["ID1"], res_by_name["PS1"]]),
+                      aq.filter_predicate(PRED.hasOutputProduct))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 2)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject(res_by_name["ID1"]),
+                      aq.filter_predicate(PRED.hasOutputProduct),
+                      aq.filter_object(res_by_name["DP1"]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 1)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject_type(RT.InstrumentDevice))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 2)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_subject_type([RT.Observatory, RT.PlatformSite]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 4)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_object_type(RT.DataProduct))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 2)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_object_type([RT.PlatformSite, RT.InstrumentSite]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 3)
+
+        aq = AssociationQuery()
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 8)
+
+        # --- Association descendants (recursively)
+
+        aq = AssociationQuery()
+        aq.set_filter(aq.filter_object_descendants(res_by_name["OS1"], predicate=[PRED.hasSite]))
+        assoc_objs = self.rr.find_associations(query=aq.get_query(), id_only=False)
+        self.assertEquals(len(assoc_objs), 3)
+
+        #print assoc_objs
+
+        #from pyon.util.breakpoint import breakpoint
+        #breakpoint()
+
+        # --- Clean up
 
         self.rr.rr_store.delete_mult(res_by_name.values())
