@@ -1,7 +1,7 @@
 Pyon Utilities
-========
+==============
 
-Modules contained in here are utillity classes Pyon uses, but are not enclosed 
+Modules contained in here are utility classes Pyon uses, but are not enclosed
 in the `pyon/` top level directory. Anything included from `pyon/` does 
 automatic gevent monkey-patching, and items here may be used in places where 
 this is not allowed.

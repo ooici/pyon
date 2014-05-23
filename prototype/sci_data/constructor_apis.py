@@ -19,7 +19,6 @@ from interface.objects import RangeSet
 from interface.objects import StreamGranuleContainer
 import hashlib
 import pyon
-from pyon.core.object import ionprint
 from pyon.util.containers import get_ion_ts
 
 import datetime
@@ -453,7 +452,7 @@ class StreamDefinitionConstructor(object):
         """
         Print the dataset metadata for debug purposes.
         """
-        return ionprint(self._stream_definition)
+        return str(self._stream_definition)
 
     def close_structure(self):
         """

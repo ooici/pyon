@@ -27,7 +27,7 @@ log = logging.getLogger('pycc')
 
 version = "2.0"     # TODO: extract version info from the code (tag/commit)
 description = '''
-pyon (ION capability container) v%s
+pyon (OOINet capability container) v%s
 ''' % (version)
 
 # See below __main__ for STEP 1
@@ -63,7 +63,7 @@ def entry():
     opts, extra = parser.parse_known_args()
     args, kwargs = parse_args(extra)
 
-    print "pycc: ION Container starter with command line options:" , str(opts)
+    print "pycc: OOINet Container starter with command line options:" , str(opts)
 
     # -o or --nomanhole implies --noshell
     if opts.nomanhole:
@@ -381,16 +381,14 @@ def main(opts, *args, **kwargs):
             for tries in range(3):
                 try:
                     ipshell = InteractiveShellEmbed(config=ipy_config,
-                        banner1 =\
-                        """              ____                                ________  _   __   ____________   ____  ___
-             / __ \__  ______  ____              /  _/ __ \/ | / /  / ____/ ____/  / __ \|__ \\
-            / /_/ / / / / __ \/ __ \   ______    / // / / /  |/ /  / /   / /      / /_/ /__/ /
-           / ____/ /_/ / /_/ / / / /  /_____/  _/ // /_/ / /|  /  / /___/ /___   / _, _// __/
-          /_/    \__, /\____/_/ /_/           /___/\____/_/ |_/   \____/\____/  /_/ |_|/____/
-                /____/""",
-                        exit_msg = 'Leaving ION shell, shutting down container.')
+                        banner1 = """           ____  ____  _____   __     __     ____________
+          / __ \/ __ \/  _/ | / /__  / /_   / ____/ ____/
+         / / / / / / // //  |/ / _ \/ __/  / /   / /
+        / /_/ / /_/ // // /|  /  __/ /_   / /___/ /___
+        \____/\____/___/_/ |_/\___/\__/   \____/\____/""",
+                        exit_msg = 'Leaving OOINet CC shell, shutting down container.')
 
-                    ipshell('Pyon (PID: %s) - ION R2 CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
+                    ipshell('Pyon (PID: %s) - OOINet CC interactive IPython shell. Type ionhelp() for help' % os.getpid())
                     break
                 except Exception as ex:
                     log.debug("Failed IPython initialize attempt (try #%s): %s", tries, str(ex))

@@ -16,13 +16,13 @@ version = '2.1.0'
 
 setup(  name = 'pyon',
         version = version,
-        description = 'OOI ION Python Capability Container and Core Modules',
+        description = 'OOI Python Capability Container and Core Modules',
         url = 'https://github.com/ooici/pyon',
         download_url = 'http://sddevrepo.oceanobservatories.org/releases/',
         license = 'Apache 2.0',
         author = 'Ocean Observatories Initiative',
         author_email = 'contactooici@oceanobservatories.org',
-        keywords = ['ooi','ooici','pyon'],
+        keywords = ['ooi','ooici','pyon','ooinet'],
         packages = find_packages(),
         entry_points = {
              'nose.plugins.0.10': [
@@ -52,7 +52,6 @@ setup(  name = 'pyon',
             'http://sddevrepo.oceanobservatories.org/releases/',
             'https://github.com/ooici/gevent-profiler/tarball/master#egg=python-gevent-profiler',
             'https://github.com/ooici/utilities/tarball/v2013.06.11#egg=utilities-2013.06.11',
-            #'https://github.com/ooici/couchbase-python-client/tarball/ooici#egg=couchbase-python-client-0.8.2a1',
         ],
         test_suite = 'pyon',
         package_data = {'': ['*.xml']},
@@ -69,7 +68,7 @@ setup(  name = 'pyon',
             'gevent_zeromq==0.2.5',
             'zope.interface',
             'couchdb==0.9',
-            'psycopg2==2.5.1',
+            'psycopg2==2.5.3',
             # 'lockfile==0.9.1',
             'python-daemon==1.6',
             'M2Crypto==0.21.1-pl1',
@@ -82,14 +81,8 @@ setup(  name = 'pyon',
             'mock==0.8',
             'ndg-xacml==0.5.1',
             'python-gevent-profiler',
-            'lxml==2.3.4', # Fails to compile on Linux ??!??
+            'lxml==2.3.4',
             'requests',
             'psutil==1.0.1'
-
-            # DM related dependencies for 'tables'
-            # 'numpy==1.6.1',
-            # 'numexpr==1.4.2',
-            # 'cython==0.14.1',
-            # 'tables==2.3',
         ],
      )

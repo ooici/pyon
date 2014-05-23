@@ -1,11 +1,12 @@
 ===========================================================
 Ocean Observatories Initiative Cyberinfrastructure (OOI CI)
 Integrated Observatory Network (ION)
+OOINet
 
-pyon - Python COI Capability Container and Core Modules R2
+pyon - Python Capability Container and Core Modules
 https://confluence.oceanobservatories.org/x/ehdTAQ
 
-(C) UC Regents, 2010-2011
+(C) UC Regents, 2010-2014
 ===========================================================
 
 
@@ -17,43 +18,48 @@ Install the following if not yet present:
 * OS Packages and package management:
 For Mac, use homebrew
     > /usr/bin/ruby <(curl -fsSkL raw.github.com/mxcl/homebrew/go)
-- python 2.7.2
-    Download and use installer on a Mac.
-    If you need to build from source (like on some linux distributions), enable the following in the build:
-      - SSL
-      - sqlite
-- git 1.7.7: Use brew or download the Mac or Linux installer and run it
-- couchdb 1.1.0 (optional if memory mockdb is used)
-    You will need to upgrade couchdb to at least 1.1.0.
-- rabbitmq 2.6.1 or later (recommended, but can use rabbitmq on amoeba)
-    Use brew.
-    Alternative: download generic Linux version and unpack into a suitable directory.
-- Install libevent, libyaml, couchdb, python, and rabbitmq with Homebrew
-    > brew install libevent libyaml couchdb python rabbitmq hdf5
-    You can even reinstall git using brew to clean up your /usr/local directory
-    (If you have trouble with brew 'MD5 mismatch' errors, try running 'brew update' 
-    and try the install again)
-    Linux: Note that many installs have much older versions installed by default.
-      - libevent: Install with package manager
-      - libyaml: You need the -dev or -devel version. If you don't have such a package, use extern/setup-libyaml.sh
-      - couchdb: Make sure to have the appropriate version
-- Install libxml2
-  > Mac should already have libxml2 installed as part of the developer toolkit, if it's not or you're running an older version you can use homebrew to install it
-  > Linux may have to install libxml2 using your preferred package manager. Be sure to install the development package libxml2-dev or libxml2-devel
+- python 2.7.x
+    > brew install python --framework --universal
+    Note: see 'brew doctor' for any path issues
+- git 1.7.7 or higher: Use brew or download the Mac or Linux installer and run it
+    > brew install git
 
-* python packages and environment management:
+- Install core packages with Homebrew
+
+    > brew install libevent libyaml zeromq rabbitmq hdf5 pkg-config netcdf udunits
+
+    Linux: Note that many installs have much older versions installed by default.
+    (If you have trouble with brew 'MD5 mismatch' errors, try running 'brew update'
+    and try the install again)
+    For any kind of installation trouble run 'brew doctor' and fix any issues.
+
+- Install Postgres with Homebrew
+
+    > brew install postgres postgis
+
+    If you have trouble with the installation, please see:
+    https://confluence.oceanobservatories.org/display/CIDev/Postgres+Datastore
+    https://confluence.oceanobservatories.org/display/CIDev/M112+Geospatial+Search
+
+    As user postgres:
+    > createuser -s ion
+
+* Python packages and environment management:
 - pip
     > easy_install pip
 - virtualenv and virtualenvwrapper modules for your python 2.7 installation
     > easy_install --upgrade virtualenv
     > easy_install --upgrade virtualenvwrapper
-    Note: This may require Mac's XCode (use XCode 3.3 free version)
+    Note: This require Mac's XCode with installed command line tools
 
-* Setup a virtualenv to for Pyon (use any name you like):
-    > mkvirtualenv --no-site-packages --python=python2.7 ion27
-    > workon ion27
+* Setup a virtualenv to use for Pyon:
+    > mkvirtualenv --no-site-packages pyon
+
+* Pin setuptools in your virtualenv
+    > pip install -U setuptools==0.8
+
+* Install numpy to the virtualenv
     > pip install numpy==1.7.1
-
 
 
 DEVELOPMENT TIME DEPENDENCIES
@@ -112,28 +118,28 @@ Generate service definition interfaces and abstract base classes files:
 RUN-TIME DEPENDENCIES
 =====================
 
-COUCHDB (OBJECT DATA STORE):
+POSTGRESQL (DATABASE):
 
-Run couchdb in second terminal before starting the container or running tests:
-    > couchdb
+Run postgresql in second terminal before starting the container or running tests:
+    > /usr/local/bin/postgres -D /usr/local/var/postgres
 
 
 RABBITMQ (MESSAGE BROKER):
-    > sudo sbin/rabbitmq-server
+    > rabbitmq-server
 
 
 SOURCE PATH:
 
-Add the current directory to your PYTHONPATH for an easier time running scripts. Add the following
-line to your ~/.profile (create it if it doesnt not exist, or use bash_profile if you already have that):
-    > export PYTHONPATH=.
+Add the current directory to your PYTHONPATH for an easier time running
+scripts. Add the following line to your ~/.profile (create it if it
+doesn't exist, or use bash_profile if you already have that):
+    export PYTHONPATH=.
 
 
 TEST
 ====
 
 Run the unittests:
-    bin/unittest
     bin/nosetests -a UNIT
 
 Run code coverage:
@@ -189,7 +195,7 @@ start the container from the command line below (the -n seems to be required)
 DATASTORE
 =========
 
-View and manipulate the CouchDB datastore, by accessing http://localhost:5984/_utils
+Use psql
 
 
 EXAMPLES
