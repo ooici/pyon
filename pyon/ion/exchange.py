@@ -13,6 +13,7 @@ from pyon.util.log import log
 from pyon.ion.resource import RT
 from pyon.core.exception import Timeout, ServiceUnavailable, ServerError
 from pyon.ion.endpoint import ProcessEndpointUnitMixin
+from pyon.ion.identifier import create_simple_unique_id
 
 import gevent
 import requests
@@ -58,7 +59,8 @@ class ExchangeManager(object):
                               self.create_xp,
                               self.create_xn_service,
                               self.create_xn_process,
-                              self.create_xn_queue]
+                              self.create_xn_queue,
+                              self.create_xn_event]
 
         # Add the public callables to Container
         for call in self.container_api:
@@ -496,12 +498,15 @@ class ExchangeManager(object):
         # put in xn_by_name anyway
         self.xn_by_name[name] = xp
 
-        if use_ems and self._ems_available():
+        # is the exchange object for the XS available?
+        xso = self._get_xs_obj(xs._exchange)        # @TODO: _exchange is wrong
+
+        if use_ems and self._ems_available() and xso is not None:
             log.debug("Using EMS to create_xp")
             # create an RR object
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
 
-            xpo_id = self._ems_client.create_exchange_point(xpo, self._get_xs_obj(xs._exchange)._id, headers=self._build_security_headers())        # @TODO: _exchange is wrong
+            xpo_id = self._ems_client.create_exchange_point(xpo, xso._id, headers=self._build_security_headers())
         elif declare:
             self._ensure_default_declared()
             xp.declare()
@@ -564,6 +569,13 @@ class ExchangeManager(object):
         else:
             raise StandardError("Unknown XN type: %s" % xn_type)
 
+        self._register_xn(name, xn, xs, use_ems=use_ems, declare=declare)
+        return xn
+
+    def _register_xn(self, name, xn, xs, use_ems=True, declare=True):
+        """
+        Helper method to register an XN with EMS/RR.
+        """
         self.xn_by_name[name] = xn
 
         xso = self._get_xs_obj(xs._exchange)
@@ -587,6 +599,41 @@ class ExchangeManager(object):
 
     def create_xn_queue(self, name, xs=None, **kwargs):
         return self._create_xn('queue', name, xs=xs, **kwargs)
+
+    def create_xn_event(self, name, event_type=None, origin=None, sub_type=None, origin_type=None, pattern=None, xp=None, **kwargs):
+        """
+        Creates an ExchangeNameEvent suitable for listening with an EventSubscriber.
+        
+        Pass None for the name to have one automatically generated.
+        If you pass a pattern, it takes precedence over making a new one from event_type/origin/sub_type/origin_type.
+        """
+        # make a name if no name exists
+        name = name or create_simple_unique_id()
+
+        # get event xp for the xs if not set
+        if not xp:
+            # pull from configuration
+            eventxp = CFG.get_safe('exchange.core_xps.events', 'ioncore.events')
+            xp = self.create_xp(eventxp)
+
+        node      = xp.node
+        transport = xp._transports[0]
+
+        xn = ExchangeNameEvent(self,
+                               transport,
+                               node,
+                               name,
+                               xp,
+                               event_type=event_type,
+                               origin=origin,
+                               sub_type=sub_type,
+                               origin_type=origin_type,
+                               pattern=pattern,
+                               **kwargs)
+
+        self._register_xn(name, xn, xp)
+
+        return xn
 
     def delete_xn(self, xn, use_ems=False):
         log.debug("ExchangeManager.delete_xn: name=%s", "TODO")  # xn.build_xlname())
@@ -1188,3 +1235,32 @@ class ExchangeNameQueue(ExchangeName):
 
     def setup_listener(self, binding, default_cb):
         log.debug("ExchangeQueue.setup_listener: passing on binding")
+
+class ExchangeNameEvent(ExchangeName):
+    """
+    Listening ExchangeName for Event subscribers.
+    """
+    xn_type = "XN_EVENT"
+
+    def __init__(self, exchange_manager, privileged_transport, node, name, xp, event_type=None, origin=None, sub_type=None, origin_type=None, pattern=None):
+        ExchangeName.__init__(self, exchange_manager, privileged_transport, node, name, xp)     # xp goes to xs param
+
+        self._queue = name
+
+        if not pattern:
+            from pyon.ion.event import BaseEventSubscriberMixin
+            self._binding = BaseEventSubscriberMixin._topic(event_type,
+                                                            origin,
+                                                            sub_type=sub_type,
+                                                            origin_type=origin_type)
+        else:
+            self._binding = pattern
+
+    @property
+    def queue_durable(self):
+        return self._xs.queue_durable
+
+    @property
+    def queue_auto_delete(self):
+        return self._xs.queue_auto_delete
+
