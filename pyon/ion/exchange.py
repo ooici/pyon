@@ -223,7 +223,7 @@ class ExchangeManager(object):
             self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
 
         return self._ems_client
-    p
+
     @property
     def default_node(self):
         """
