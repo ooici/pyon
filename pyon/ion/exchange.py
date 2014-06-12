@@ -178,9 +178,6 @@ class ExchangeManager(object):
         # create default Exchange Space
         self.default_xs = self.create_xs(ION_ROOT_XS)
 
-        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
-        self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
-
         log.debug("Started %d connections (%s)", len(self._nodes) + len(self._priv_nodes), ",".join(self._nodes.keys() + self._priv_nodes.keys()))
 
     def stop(self, *args, **kwargs):
@@ -216,6 +213,17 @@ class ExchangeManager(object):
         # @TODO undeclare root xs??  need to know if last container
         #self.default_xs.delete()
 
+    @property
+    def ems_client(self):
+        """
+        Lazy-initializing EMS client for internal use.
+        """
+        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
+        if self._ems_client is None:
+            self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
+
+        return self._ems_client
+    p
     @property
     def default_node(self):
         """
@@ -443,7 +451,7 @@ class ExchangeManager(object):
             # create a RR object
             xso = ResExchangeSpace(name=name)
 
-            xso_id = self._ems_client.create_exchange_space(xso, org_id, headers=self._build_security_headers())
+            xso_id = self.ems_client.create_exchange_space(xso, org_id, headers=self._build_security_headers())
 
             log.debug("Created RR XS object, id: %s", xso_id)
         elif declare:
@@ -472,7 +480,7 @@ class ExchangeManager(object):
             log.debug("Using EMS to delete_xs")
             xso = self._get_xs_obj(name)
 
-            self._ems_client.delete_exchange_space(xso._id, headers=self._build_security_headers())
+            self.ems_client.delete_exchange_space(xso._id, headers=self._build_security_headers())
             del self._xs_cache[name]
         else:
             try:
@@ -506,7 +514,7 @@ class ExchangeManager(object):
             # create an RR object
             xpo = ResExchangePoint(name=name, topology_type=xp._xptype)
 
-            xpo_id = self._ems_client.create_exchange_point(xpo, xso._id, headers=self._build_security_headers())
+            xpo_id = self.ems_client.create_exchange_point(xpo, xso._id, headers=self._build_security_headers())
         elif declare:
             self._ensure_default_declared()
             xp.declare()
@@ -530,7 +538,7 @@ class ExchangeManager(object):
 
             xpo_id = xpo_ids[0][0]
 
-            self._ems_client.delete_exchange_point(xpo_id, headers=self._build_security_headers())
+            self.ems_client.delete_exchange_point(xpo_id, headers=self._build_security_headers())
         else:
             try:
                 xp.delete()
@@ -584,7 +592,7 @@ class ExchangeManager(object):
             log.debug("Using EMS to create_xn")
             xno = ResExchangeName(name=name, xn_type=xn.xn_type)
 
-            self._ems_client.declare_exchange_name(xno, xso._id, headers=self._build_security_headers())     # @TODO: exchange is wrong
+            self.ems_client.declare_exchange_name(xno, xso._id, headers=self._build_security_headers())     # @TODO: exchange is wrong
         elif declare:
             self._ensure_default_declared()
             xn.declare()
@@ -652,7 +660,7 @@ class ExchangeManager(object):
 
             xno_id = xno_ids[0][0]
 
-            self._ems_client.undeclare_exchange_name(xno_id, headers=self._build_security_headers())        # "canonical name" currently understood to be RR id
+            self.ems_client.undeclare_exchange_name(xno_id, headers=self._build_security_headers())        # "canonical name" currently understood to be RR id
         else:
             try:
                 xn.delete()
@@ -945,7 +953,7 @@ class ExchangeManager(object):
 
         if use_ems and self._ems_available():
             log.debug("Directing call to EMS")
-            content = self._ems_client.call_management(url, method, headers=self._build_security_headers())
+            content = self.ems_client.call_management(url, method, headers=self._build_security_headers())
         else:
             meth = getattr(requests, method)
 
