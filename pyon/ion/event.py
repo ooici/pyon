@@ -96,10 +96,9 @@ class EventPublisher(Publisher):
 
         topic = self._topic(event_object)  # Routing key generated using type_, base_types, origin, origin_type, sub_type
         container = (hasattr(self, '_process') and hasattr(self._process, 'container') and self._process.container) or BaseEndpoint._get_container_instance()
-        if container:
+        if container and container.has_capability(container.CCAP.EXCHANGE_MANAGER):
             # make sure we are an xp, if not, upgrade
             if not isinstance(self._send_name, XOTransport):
-                assert container.has_capability(container.CCAP.EXCHANGE_MANAGER)
                 self._send_name = container.create_xp(self._send_name)
 
             xp = self._send_name

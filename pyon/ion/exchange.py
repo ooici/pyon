@@ -176,7 +176,7 @@ class ExchangeManager(object):
             self._priv_transports[name] = transport
 
         # create default Exchange Space
-        self.default_xs = self.create_xs(ION_ROOT_XS)
+        self.default_xs = self._create_root_xs()
 
         log.debug("Started %d connections (%s)", len(self._nodes) + len(self._priv_nodes), ",".join(self._nodes.keys() + self._priv_nodes.keys()))
 
@@ -340,7 +340,43 @@ class ExchangeManager(object):
 
         return self.org_id
 
+    def _create_root_xs(self):
+        """
+        The ROOT/default XS needs a special creation because simply trying to create it is a chicken/egg problem.
+        We simulate the EMS here.
+        """
+        node_name, node = self._get_node_for_xs(ION_ROOT_XS)
+        transport       = self._get_priv_transport(node_name)
 
+        xs = ExchangeSpace(self,
+                           transport,
+                           node,
+                           ION_ROOT_XS,
+                           exchange_type='topic',
+                           durable=False,            # @TODO: configurable?
+                           auto_delete=True)
+
+        # create object if we don't have one
+        rids, _ = self._rr.find_resources(restype=RT.ExchangeSpace, name=ION_ROOT_XS, id_only=True)
+        if not len(rids):
+            xso                         = ResExchangeSpace(name = ION_ROOT_XS)
+
+            # @TODO: we have a bug in the CC, need to skirt around the event publisher capability which shouldn't be there
+            reset = False
+            if self.container.CCAP.EVENT_PUBLISHER in self.container._capabilities:
+                self.container._capabilities.remove(self.container.CCAP.EVENT_PUBLISHER)
+                reset = True
+
+            rid, _                      = self._rr.create(xso)
+
+            # @TODO remove this
+            if reset:
+                self.container._capabilities.append(self.container.CCAP.EVENT_PUBLISHER)
+
+            self._xs_cache[ION_ROOT_XS] = rid
+
+        # ensure_default_declared will take care of any declaration we need to do
+        return xs
 
     @property
     def _rr(self):
