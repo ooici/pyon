@@ -218,9 +218,12 @@ class ExchangeManager(object):
         """
         Lazy-initializing EMS client for internal use.
         """
-        # @TODO specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
         if self._ems_client is None:
-            self._ems_client = ExchangeManagementServiceProcessClient(process=self.container)
+            # specify our own to_name here so we don't get auto-behavior - tricky chicken/egg
+            to_name          = "exchange_management"
+            xn               = self.create_xn_service(to_name, use_ems=False)
+
+            self._ems_client = ExchangeManagementServiceProcessClient(process=self.container, to_name=xn)
 
         return self._ems_client
 
