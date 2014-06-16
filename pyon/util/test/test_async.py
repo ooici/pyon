@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.async import blocking_cb, AsyncDispatcher, get_pythread, AsyncResult, ThreadJob, AsyncQueue, AsyncTask, ThreadExit, ThreadPool
 from pyon.util.int_test import IonIntegrationTestCase

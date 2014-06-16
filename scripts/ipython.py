@@ -3,7 +3,6 @@
 # Entrypoint to start ipython with buildout path
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 def main():
     import sys

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
 
 from gevent import monkey; monkey.patch_all()
 from compass.client import CompassException, Server, ADMIN

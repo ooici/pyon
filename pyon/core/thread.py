@@ -3,7 +3,7 @@
 """Classes to build and manage pyon container worker processes."""
 
 __author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.async import *
 from pyon.util.log import log

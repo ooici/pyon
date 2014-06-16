@@ -3,7 +3,6 @@
 """ION Resource definitions and functions. Life-cycle FSM. Extended resource framework"""
 
 __author__ = 'Michael Meisinger, Stephen Henrie'
-__license__ = 'Apache 2.0'
 
 import inspect
 import types

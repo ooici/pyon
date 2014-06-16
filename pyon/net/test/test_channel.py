@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from mock import Mock, sentinel, patch, MagicMock
 from gevent.event import Event

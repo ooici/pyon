@@ -3,7 +3,6 @@
 """Exchange management classes."""
 
 __author__ = 'Michael Meisinger, Dave Foster'
-__license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.bootstrap import CFG, get_service_registry

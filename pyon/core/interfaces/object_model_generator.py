@@ -3,7 +3,7 @@
 """Functions for generating Python object interfaces from object definitions"""
 
 __author__ = 'Adam R. Smith, Thomas Lennan, Stephen Henrie, Dave Foster, Seman Said'
-__license__ = 'Apache 2.0'
+
 
 from collections import OrderedDict
 import csv

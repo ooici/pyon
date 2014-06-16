@@ -2,7 +2,7 @@
 from pyon.net.endpoint import Publisher
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.int_test import IonIntegrationTestCase
 from interface.services.examples.hello.ihello_service import HelloServiceClient

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
-__license__ = 'Apache 2.0'
+
 
 from nose.plugins.attrib import attr
 from unittest import SkipTest

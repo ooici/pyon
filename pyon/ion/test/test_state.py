@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 from unittest import SkipTest
 from nose.plugins.attrib import attr

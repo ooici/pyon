@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.log import log
 from pyon.util.context import LocalContextMixin
