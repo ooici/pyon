@@ -1,11 +1,12 @@
 ===========================================================
 Ocean Observatories Initiative Cyberinfrastructure (OOI CI)
-Integrated Observatory Network (ION)
+Integrated Observatory Network (ION) - OOINet
 
-pyon - Python COI Capability Container and Core Modules R2
+pyon - Python Capability Container and Core Modules
 https://confluence.oceanobservatories.org/x/ehdTAQ
 
-(C) UC Regents, 2010-2011
+(C) The Regents of the University of California, 2010-2014
+Open source under BSD license. See LICENSE.txt for details.
 ===========================================================
 
 
