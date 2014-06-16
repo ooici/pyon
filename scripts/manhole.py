@@ -3,7 +3,6 @@
 # "manhole" entry point, friendlier ipython startup to remote container
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 def main():
     import sys, os, re, errno, json, socket

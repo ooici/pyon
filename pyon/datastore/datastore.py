@@ -3,7 +3,7 @@
 """Management of datastores in the container"""
 
 __author__ = 'Thomas R. Lennan, Michael Meisinger'
-__license__ = 'Apache 2.0'
+
 
 from pyon.core.bootstrap import get_sys_name, CFG
 from pyon.datastore.datastore_common import DatastoreFactory, DataStore

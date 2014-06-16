@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from pyon.net.messaging import NodeB, ioloop, make_node, PyonSelectConnection
 from pyon.net.channel import BaseChannel, BidirClientChannel, RecvChannel

@@ -2,7 +2,7 @@
 ## coding: utf-8
 
 __author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
+
 
 from pyon.core.registry import IonObjectRegistry
 from pyon.core.bootstrap import IonObject

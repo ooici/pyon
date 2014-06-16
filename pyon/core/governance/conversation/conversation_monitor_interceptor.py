@@ -2,7 +2,7 @@
 from __builtin__ import classmethod
 
 __author__ = 'Stephen P. Henrie'
-__license__ = 'Apache 2.0'
+
 
 import os
 from pyon.core.governance.governance_interceptor import BaseInternalGovernanceInterceptor

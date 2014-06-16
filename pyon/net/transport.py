@@ -8,7 +8,7 @@ TODOS:
 """
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.log import log
 from pyon.util.containers import DotDict

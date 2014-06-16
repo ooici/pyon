@@ -3,7 +3,6 @@
 """Mechanisms for ION services and service management infrastructure"""
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 from zope.interface import implementedBy
 

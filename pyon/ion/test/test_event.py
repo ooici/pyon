@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>, Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 import time
 import sys

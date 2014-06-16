@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 # adapted from http://stackoverflow.com/questions/384076/how-can-i-make-the-python-logging-output-to-be-colored
 
