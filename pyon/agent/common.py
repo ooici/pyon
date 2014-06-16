@@ -9,7 +9,7 @@
 """
 
 __author__ = 'Steve Foley'
-__license__ = 'Apache 2.0'
+
 
 # MI logger
 import logging

@@ -2,7 +2,6 @@
 from pyon.core.governance.governance_dispatcher import GovernanceDispatcher
 
 __author__ = 'Stephen Henrie'
-__license__ = 'Apache 2.0'
 
 
 from pyon.ion.conversation import ConversationRPCClient, ConversationRPCServer, RPCRequesterEndpointUnit, RPCProviderEndpointUnit

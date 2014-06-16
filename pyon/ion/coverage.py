@@ -3,7 +3,6 @@
 """Coverage Postgres Table implementation"""
 
 __author__ = 'Casey Bryant'
-__license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.datastore.datastore import DataStore

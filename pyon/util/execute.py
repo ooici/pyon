@@ -5,7 +5,7 @@ This module handle the dynamic execution of methods
 '''
 
 __author__ = 'Stephen Henrie'
-__license__ = 'Apache 2.0'
+
 
 
 import inspect

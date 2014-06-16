@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
-__license__ = 'Apache 2.0'
+
 
 import collections
 import datetime

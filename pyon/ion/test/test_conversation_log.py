@@ -2,7 +2,6 @@
 from pyon.datastore.datastore import DatastoreManager
 
 __author__ = 'Prashant Kediyal <pkediyal@ucsd.edu>'
-__license__ = 'Apache 2.0'
 
 
 from nose.plugins.attrib import attr

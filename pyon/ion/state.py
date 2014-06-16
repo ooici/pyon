@@ -3,7 +3,6 @@
 """State Repository implementation"""
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 from pyon.core import bootstrap
 from pyon.core.exception import NotFound, BadRequest, Conflict

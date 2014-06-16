@@ -4,7 +4,7 @@
 
 
 __author__ = 'Michael Meisinger'
-__license__ = 'Apache 2.0'
+
 
 import traceback
 
