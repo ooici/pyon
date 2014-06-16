@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 from pyon.util.pool import IDPool
 from pyon.util.unit_test import PyonTestCase

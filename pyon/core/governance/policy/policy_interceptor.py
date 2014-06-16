@@ -2,7 +2,7 @@
 
 
 __author__ = 'Stephen P. Henrie'
-__license__ = 'Apache 2.0'
+
 import pickle
 
 from pyon.core.bootstrap import CFG

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Rumyana Neykova'
-__license__ = 'Apache 2.0'
+
 
 
 class ConversationContext(object):

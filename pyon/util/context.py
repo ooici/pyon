@@ -3,7 +3,7 @@
 """gevent-safe thread-local context as a mixin"""
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
+
 
 # note that this is only gevent-safe if monkey patched prior to importing this module
 import threading

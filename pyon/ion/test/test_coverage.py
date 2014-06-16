@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Casey Bryant'
-__license__ = 'Apache 2.0'
 
 from nose.plugins.attrib import attr
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Dave Foster <dfoster@asascience.com>'
-__license__ = 'Apache 2.0'
 
 from pyon.net import endpoint
 from pyon.ion.endpoint import ProcessEndpointUnitMixin, ProcessRPCRequestEndpointUnit, ProcessRPCClient, ProcessRPCResponseEndpointUnit, ProcessRPCServer, ProcessPublisherEndpointUnit, ProcessPublisher, ProcessSubscriberEndpointUnit, ProcessSubscriber

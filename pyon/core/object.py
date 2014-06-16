@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam R. Smith, Michael Meisinger, Tom Lennan'
-__license__ = 'Apache 2.0'
+
 
 import os
 import re

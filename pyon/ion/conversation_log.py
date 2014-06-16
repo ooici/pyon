@@ -3,7 +3,6 @@
 """Conversation Log"""
 
 __author__ = 'Prashant Kediyal'
-__license__ = 'Apache 2.0'
 
 
 from pyon.core import bootstrap

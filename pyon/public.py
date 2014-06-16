@@ -3,7 +3,6 @@
 """Entry point for importing common Pyon modules. Higher level processes should only need to import from here."""
 
 __author__ = 'Adam R. Smith, Michael Meisinger'
-__license__ = 'Apache 2.0'
 
 __all__ = []
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 __author__ = 'Adam R. Smith'
-__license__ = 'Apache 2.0'
 
 from pyon.public import log
 from pyon.service import service
