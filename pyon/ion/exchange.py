@@ -373,7 +373,7 @@ class ExchangeManager(object):
             if reset:
                 self.container._capabilities.append(self.container.CCAP.EVENT_PUBLISHER)
 
-            self._xs_cache[ION_ROOT_XS] = rid
+            self._xs_cache[ION_ROOT_XS] = self._rr.read(rid)
 
         # ensure_default_declared will take care of any declaration we need to do
         return xs
