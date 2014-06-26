@@ -16,7 +16,7 @@ from pyon.datastore.datastore import DataStore
 from pyon.datastore.datastore_query import QUERY_EXP_KEY, DatastoreQueryBuilder, DQ
 from pyon.ion.identifier import create_unique_event_id, create_simple_unique_id
 from pyon.net.endpoint import Publisher, Subscriber, BaseEndpoint
-from pyon.net.transport import XOTransport
+from pyon.net.transport import XOTransport, NameTrio
 from pyon.util.async import spawn
 from pyon.util.containers import get_ion_ts_millis, is_valid_ts
 from pyon.util.log import log
@@ -60,7 +60,7 @@ class EventPublisher(Publisher):
         # generate an exchange name to publish events to
         container = (hasattr(self, '_process') and hasattr(self._process, 'container') and self._process.container) or BaseEndpoint._get_container_instance()
         if container and container.has_capability(container.CCAP.EXCHANGE_MANAGER):   # might be too early in chain
-            xp = xp or container.create_xp(get_events_exchange_point())
+            xp = xp or container.create_xp(EVENTS_XP)
             to_name = xp
         else:
             xp = xp or get_events_exchange_point()
@@ -99,7 +99,15 @@ class EventPublisher(Publisher):
         if container and container.has_capability(container.CCAP.EXCHANGE_MANAGER):
             # make sure we are an xp, if not, upgrade
             if not isinstance(self._send_name, XOTransport):
-                self._send_name = container.create_xp(self._send_name)
+
+                default_nt = NameTrio(get_events_exchange_point())
+                if isinstance(self._send_name, NameTrio) \
+                   and self._send_name.exchange == default_nt.exchange \
+                   and self._send_name.queue == default_nt.queue \
+                   and self._send_name.binding == default_nt.binding:
+                    self._send_name = container.create_xp(EVENTS_XP)
+                else:
+                    self._send_name = container.create_xp(self._send_name)
 
             xp = self._send_name
             to_name = xp.create_route(topic)
@@ -221,7 +229,7 @@ class BaseEventSubscriberMixin(object):
         self.origin = origin
 
         # establish names for xp, binding/pattern/topic, queue_name
-        xp_name = xp_name or get_events_exchange_point()
+        xp_name = xp_name or EVENTS_XP
         if pattern:
             binding = pattern
         else:
