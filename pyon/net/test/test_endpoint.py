@@ -348,9 +348,6 @@ class TestListeningBaseEndpoint(PyonTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointInt(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}},
-                                                              'datastore':CFG['container']['datastore']},
-                                                 'server':CFG['server']})
         self._start_container()
 
     def test_get_stats(self):
@@ -389,9 +386,6 @@ class TestListeningBaseEndpointInt(IonIntegrationTestCase):
 @attr('INT', group='COI')
 class TestListeningBaseEndpointIntWithLocal(TestListeningBaseEndpointInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}},
-                                                              'datastore':CFG['container']['datastore']},
-                                                 'server':CFG['server']})
         self._start_container()
 
 @attr('UNIT')

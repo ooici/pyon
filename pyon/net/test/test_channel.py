@@ -804,9 +804,6 @@ class TestServerChannel(PyonTestCase):
 @attr('INT')
 class TestChannelInt(IonIntegrationTestCase):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'amqp', 'priviledged':None}},
-                                                              'datastore':CFG['container']['datastore']},
-                                                 'server':CFG['server']})
         self._start_container()
 
     #@skip('Not working consistently on buildbot')
@@ -1041,8 +1038,5 @@ class TestChannelInt(IonIntegrationTestCase):
 @attr('INT')
 class TestChannelIntLocalTransport(TestChannelInt):
     def setUp(self):
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'messaging':{'server':{'primary':'localrouter', 'priviledged':None}},
-                                                              'datastore':CFG['container']['datastore']},
-                                                 'server':CFG['server']})
         self._start_container()
 

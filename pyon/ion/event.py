@@ -14,7 +14,8 @@ from pyon.core.exception import BadRequest, IonException, StreamException
 from pyon.datastore.datastore import DataStore
 from pyon.datastore.datastore_query import QUERY_EXP_KEY, DatastoreQueryBuilder, DQ
 from pyon.ion.identifier import create_unique_event_id, create_simple_unique_id
-from pyon.net.endpoint import Publisher, Subscriber
+from pyon.net.endpoint import Publisher, Subscriber, BaseEndpoint
+from pyon.net.transport import XOTransport, NameTrio
 from pyon.util.async import spawn
 from pyon.util.containers import get_ion_ts_millis, is_valid_ts
 from pyon.util.log import log
@@ -23,15 +24,15 @@ from interface.objects import Event
 
 
 # @TODO: configurable
-EVENTS_XP = "pyon.events"
+EVENTS_XP = "ioncore.events"
 EVENTS_XP_TYPE = "topic"
 
 #The event will be ignored if older than this time period
 VALID_EVENT_TIME_PERIOD = 365 * 24 * 60 * 60 * 1000   # one year
 
 def get_events_exchange_point():
-    return "%s.%s" % (bootstrap.get_sys_name(), EVENTS_XP)
-
+    # match with default output of XOs
+    return ".".join([bootstrap.get_sys_name(), 'ion.xs.ioncore.xp', EVENTS_XP])
 
 class EventError(IonException):
     status_code = 500
@@ -56,10 +57,15 @@ class EventPublisher(Publisher):
             self.event_repo = None
 
         # generate an exchange name to publish events to
-        xp = xp or get_events_exchange_point()
-        name = (xp, None)
+        container = (hasattr(self, '_process') and hasattr(self._process, 'container') and self._process.container) or BaseEndpoint._get_container_instance()
+        if container and container.has_capability(container.CCAP.EXCHANGE_MANAGER):   # might be too early in chain
+            xp = xp or container.create_xp(EVENTS_XP)
+            to_name = xp
+        else:
+            xp = xp or get_events_exchange_point()
+            to_name = (xp, None)
 
-        Publisher.__init__(self, to_name=name, **kwargs)
+        Publisher.__init__(self, to_name=to_name, **kwargs)
 
     def _topic(self, event_object):
         """
@@ -88,7 +94,24 @@ class EventPublisher(Publisher):
         event_object.base_types = event_object._get_extends()
 
         topic = self._topic(event_object)  # Routing key generated using type_, base_types, origin, origin_type, sub_type
-        to_name = (self._send_name.exchange, topic)
+        container = (hasattr(self, '_process') and hasattr(self._process, 'container') and self._process.container) or BaseEndpoint._get_container_instance()
+        if container and container.has_capability(container.CCAP.EXCHANGE_MANAGER):
+            # make sure we are an xp, if not, upgrade
+            if not isinstance(self._send_name, XOTransport):
+
+                default_nt = NameTrio(get_events_exchange_point())
+                if isinstance(self._send_name, NameTrio) \
+                   and self._send_name.exchange == default_nt.exchange \
+                   and self._send_name.queue == default_nt.queue \
+                   and self._send_name.binding == default_nt.binding:
+                    self._send_name = container.create_xp(EVENTS_XP)
+                else:
+                    self._send_name = container.create_xp(self._send_name)
+
+            xp = self._send_name
+            to_name = xp.create_route(topic)
+        else:
+            to_name = (self._send_name.exchange, topic)
 
         current_time = get_ion_ts_millis()
 
@@ -204,28 +227,42 @@ class BaseEventSubscriberMixin(object):
         self.origin_type = origin_type
         self.origin = origin
 
-        xp_name = xp_name or get_events_exchange_point()
+        # establish names for xp, binding/pattern/topic, queue_name
+        xp_name = xp_name or EVENTS_XP
         if pattern:
             binding = pattern
         else:
             binding = self._topic(event_type, origin, sub_type, origin_type)
-        self.binding = binding
 
-        # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
-
-        # prefix the queue_name, if specified, with the sysname
-        if queue_name is not None:
-            if not queue_name.startswith(bootstrap.get_sys_name()):
-                queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
-        else:
+        # create queue_name if none passed in
+        if queue_name is None:
             queue_name = create_simple_unique_id()
-            if hasattr(self, "_process") and self._process:
-                queue_name = "%s_%s" % (self._process._proc_name, queue_name)
+
+        # prepend proc name to queue name if we have one
+        if hasattr(self, "_process") and self._process:
+            queue_name = "%s_%s" % (self._process._proc_name, queue_name)
+
+        # do we have a container/ex_manager?
+        container = (hasattr(self, '_process') and hasattr(self._process, 'container') and self._process.container) or BaseEndpoint._get_container_instance()
+        if container:
+            xp = container.create_xp(xp_name)
+            xne = container.create_xn_event(queue_name,
+                                            pattern=binding,
+                                            xp=xp)
+
+            self._ev_recv_name = xne
+            self.binding = None
+
+        else:
+            self.binding = binding
+
+            # TODO: Provide a case where we can have multiple bindings (e.g. different event_types)
+
+            # prefix the queue_name, if specified, with the sysname
             queue_name = "%s.%s" % (bootstrap.get_sys_name(), queue_name)
 
-        # set this name to be picked up by inherited folks
-        self._ev_recv_name = (xp_name, queue_name)
-
+            # set this name to be picked up by inherited folks
+            self._ev_recv_name = (xp_name, queue_name)
 
 class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
 
@@ -245,12 +282,30 @@ class EventSubscriber(Subscriber, BaseEventSubscriberMixin):
         self._cbthread = None
         self._auto_delete = auto_delete
 
+        # sets self._ev_recv_name, self.binding
         BaseEventSubscriberMixin.__init__(self, xp_name=xp_name, event_type=event_type, origin=origin,
                                           queue_name=queue_name, sub_type=sub_type, origin_type=origin_type, pattern=pattern)
 
         log.debug("EventPublisher events pattern %s", self.binding)
 
-        Subscriber.__init__(self, from_name=self._ev_recv_name, binding=self.binding, callback=callback, **kwargs)
+        from_name = self._get_from_name()
+        binding   = self._get_binding()
+
+        Subscriber.__init__(self, from_name=from_name, binding=binding, callback=callback, **kwargs)
+
+    def _get_from_name(self):
+        """
+        Returns the from_name that the base Subscriber should listen on.
+        This is overridden in the process level.
+        """
+        return self._ev_recv_name
+
+    def _get_binding(self):
+        """
+        Returns the binding that the base Subscriber should use.
+        This is overridden in the process level.
+        """
+        return self.binding
 
     def start(self):
         """

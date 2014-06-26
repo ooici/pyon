@@ -31,11 +31,19 @@ from examples.service.hello_service import HelloService
 
 from interface.services.examples.hello.ihello_service import HelloServiceClient
 
+def _make_exchange_cfg(**kwargs):
+    return DotDict(CFG.exchange, exchange_brokers=kwargs)
 
-def _make_container_cfg(**kwargs):
-    ddkwargs = DotDict(**kwargs)
-    return DotDict(CFG.container, messaging=DotDict(CFG.container.messaging, server=ddkwargs))
+def _make_broker_cfg(**kwargs):
+    default = {'server':'amqp',
+               'description':'',
+               'join_xs':[ION_ROOT_XS],
+               'join_xp':[]}
 
+    default.update(**kwargs)
+
+    ddkwargs = DotDict(default)
+    return ddkwargs
 
 dict_amqp                = DotDict(type='amqp')
 dict_amqp_again          = DotDict(type='amqp')
@@ -54,22 +62,27 @@ class TestExchangeManager(PyonTestCase):
     def test_verify_service(self, mockmessaging):
         PyonTestCase.test_verify_service(self)
 
-    @patch.dict('pyon.ion.exchange.CFG', container=_make_container_cfg())
+    @patch.dict('pyon.ion.exchange.CFG',
+                exchange=_make_exchange_cfg())
     def test_start_with_no_connections(self, mockmessaging):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(system_broker=_make_broker_cfg(server='amqp')))
     def test_start_with_one_connection(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
 
-        mockmessaging.make_node.assert_called_once_with(dict_amqp, 'primary', 0)
-        self.assertIn('primary', self.ex_manager._nodes)
-        self.assertIn('primary', self.ex_manager._ioloops)
-        self.assertEquals(self.ex_manager._nodes['primary'], mockmessaging.make_node.return_value[0])
-        self.assertEquals(self.ex_manager._ioloops['primary'], mockmessaging.make_node.return_value[1])
+        mockmessaging.make_node.assert_called_once_with(dict_amqp, 'system_broker', 0)
+        self.assertIn('system_broker', self.ex_manager._nodes)
+        self.assertIn('system_broker', self.ex_manager._ioloops)
+        self.assertEquals(self.ex_manager._nodes['system_broker'], mockmessaging.make_node.return_value[0])
+        self.assertEquals(self.ex_manager._ioloops['system_broker'], mockmessaging.make_node.return_value[1])
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp'),
+                                            secondary=_make_broker_cfg(server='amqp_again')))
     def test_start_with_multi_connections(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
         self.ex_manager.start()
@@ -86,14 +99,19 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(self.ex_manager._nodes['secondary'], mockmessaging.make_node.return_value[0])
         self.assertEquals(self.ex_manager._ioloops['secondary'], mockmessaging.make_node.return_value[1])
 
-    @patch.dict('pyon.ion.exchange.CFG', server={}, container=_make_container_cfg(primary='idontexist'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='idontexist')))
     def test_start_with_non_existing_connection_in_server(self, mockmessaging):
         mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
 
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         self.assertFalse(mockmessaging.make_node.called)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp'),
+                                            secondary=_make_broker_cfg(server='amqp_fail')))
     def test_start_with_working_and_failing_connection(self, mockmessaging):
 
         # set up return values - first is amqp (Working) second is amqp_fail (not working)
@@ -112,7 +130,9 @@ class TestExchangeManager(PyonTestCase):
         self.assertEquals(len(self.ex_manager._nodes), 1)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp_fail':dict_amqp_fail, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp_fail')))
     def test_start_with_only_failing_connections(self, mockmessaging):
         nodemock = Mock()
         nodemock.running = False
@@ -123,7 +143,9 @@ class TestExchangeManager(PyonTestCase):
         self.assertRaises(ExchangeManagerError, self.ex_manager.start)
         iomock.kill.assert_called_once_with()
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp')))
     def test_start_stop(self, mockmessaging):
         nodemock = Mock()
         iomock = Mock()
@@ -138,7 +160,9 @@ class TestExchangeManager(PyonTestCase):
     def test_default_node_no_connections(self, mockmessaging):
         self.assertIsNone(self.ex_manager.default_node)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp_not_default':dict_amqp_not_default, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(secondary='amqp_not_default'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp_not_default':dict_amqp_not_default, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(secondary=_make_broker_cfg(server='amqp_not_default')))
     def test_default_node_no_default_name(self, mockmessaging):
         nodemock = Mock()
         mockmessaging.make_node.return_value = (nodemock, Mock())     # node, ioloop
@@ -147,7 +171,10 @@ class TestExchangeManager(PyonTestCase):
 
         self.assertEquals(self.ex_manager.default_node, nodemock)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp', secondary='amqp_again'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp'),
+                                            secondary=_make_broker_cfg(server='amqp_again')))
     def test_default_node(self, mockmessaging):
 
         # set up return values - amqp returns this named version, amqp_again does not
@@ -162,6 +189,111 @@ class TestExchangeManager(PyonTestCase):
         self.ex_manager.start()
 
         self.assertEquals(self.ex_manager.default_node, nodemock)
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp')))
+    def test_priv_transports_point_to_default_node(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.get_transport = Mock()
+        self.ex_manager.start()
+
+        self.assertEquals(len(self.ex_manager._priv_transports), 1)
+        self.assertIn('primary', self.ex_manager._priv_transports)
+        self.ex_manager.get_transport.assert_called_once_with(mockmessaging.make_node.return_value[0])
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again')))
+    def test_start_with_privileged_connection(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        mockmessaging.make_node.assert_calls(call(dict_amqp, 'primary', 0), call(dict_amqp_again, 'primary', 0))
+
+        self.assertIn('primary', self.ex_manager._nodes)
+        self.assertIn('primary', self.ex_manager._ioloops)
+        self.assertEquals(self.ex_manager._nodes['primary'], mockmessaging.make_node.return_value[0])
+        self.assertEquals(self.ex_manager._ioloops['primary'], mockmessaging.make_node.return_value[1])
+
+        self.assertIn('primary', self.ex_manager._priv_nodes)
+        self.assertIn('primary', self.ex_manager._priv_ioloops)
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again')))
+    def test_start_with_privileged_connection_transports_point_to_priv_node(self, mockmessaging):
+        non_priv_node = Mock()
+        priv_node = Mock()
+
+        mockmessaging.make_node.side_effect = [(non_priv_node, Mock()), (priv_node, Mock())]
+        self.ex_manager.get_transport = Mock()
+        self.ex_manager.start()
+
+        self.ex_manager.get_transport.assert_called_once_with(priv_node)
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again'),
+                                            secondary=_make_broker_cfg(server='amqp_again')))
+    def test_start_with_some_privileged_connections(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        mockmessaging.make_node.assert_calls(call(dict_amqp, 'primary', 0),
+                                             call(dict_amqp_again, 'primary', 0),
+                                             call(dict_amqp_again, 'secondary', 0))
+
+        self.assertEquals(len(self.ex_manager._nodes), 2)
+        self.assertEquals(len(self.ex_manager._priv_nodes), 1)
+        self.assertNotIn('secondary', self.ex_manager._priv_nodes)
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again'),
+                                            secondary=_make_broker_cfg(server='amqp_again',
+                                                                       join_xs=['blake','keen','dopefish'])))
+    def test__get_node_for_xs(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        one, _ = self.ex_manager._get_node_for_xs('ioncore')
+        self.assertEquals(one, 'primary')
+
+        two, _ = self.ex_manager._get_node_for_xs('keen')
+        self.assertEquals(two, 'secondary')
+
+        three, _ = self.ex_manager._get_node_for_xs('dopefish')
+        self.assertEquals(three, 'secondary')
+
+        four, _ = self.ex_manager._get_node_for_xs('duke')  # not explicitly known
+        self.assertEquals(four, 'primary')
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':dict_amqp, 'amqp_again':dict_amqp_again},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp_again',
+                                                                     join_xp=['events', 'data']),
+                                            secondary=_make_broker_cfg(server='amqp_again',
+                                                                       join_xs=['blake','keen','dopefish'],
+                                                                       join_xp=['try'])))
+    def test__get_node_for_xp(self, mockmessaging):
+        mockmessaging.make_node.return_value = (Mock(), Mock())     # node, ioloop
+        self.ex_manager.start()
+
+        one, _ = self.ex_manager._get_node_for_xp('data', 'ioncore')
+        self.assertEquals(one, 'primary')
+
+        two, _ = self.ex_manager._get_node_for_xp('data', 'keen')    # maybe not intuitive?
+        self.assertEquals(two, 'primary')
+
+        three, _ = self.ex_manager._get_node_for_xp('try', '')
+        self.assertEquals(three, 'secondary')
+
+        four, _ = self.ex_manager._get_node_for_xp('unknown', 'dopefish')  # falls back to xs
+        self.assertEquals(four, 'secondary')
+
+        five, _ = self.ex_manager._get_node_for_xp('unknown', 'unknown')  # falls back to defaults
+        self.assertEquals(five, 'primary')
 
 @attr('INT', group='COI')
 class TestExchangeManagerInt(IonIntegrationTestCase):
@@ -199,14 +331,19 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
     def setUp(self):
         pass
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql}, container=_make_container_cfg(primary='amqp'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp')))
     def test_start_stop(self):
         self._start_container()
 
         self.assertEquals(self.container.node, self.container.ex_manager.default_node)
         self.assertEquals(len(self.container.ex_manager._nodes), 1)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp'),
+                                            secondary=_make_broker_cfg(server='amqp_fail')))
     def test_start_stop_with_one_success_and_one_failure(self):
         self._start_container()
 
@@ -214,7 +351,11 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertIn('primary', self.container.ex_manager._nodes)
         self.assertNotIn('secondary', self.container.ex_manager._nodes)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg, 'amqp_fail2':fail_bad_port_cfg}, container=_make_container_cfg(primary='amqp', secondary='amqp_fail', thirdly='amqp_fail2'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql, 'amqp_fail':fail_bad_user_cfg, 'amqp_fail2':fail_bad_port_cfg},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp'),
+                                            secondary=_make_broker_cfg(server='amqp_fail'),
+                                            thirdly=_make_broker_cfg(server='amqp_fail2')))
     def test_start_stop_with_one_success_and_multiple_failures(self):
         self._start_container()
 
@@ -222,19 +363,25 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertIn('primary', self.container.ex_manager._nodes)
         self.assertNotIn('secondary', self.container.ex_manager._nodes)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp':fail_bad_user_cfg}, container=_make_container_cfg())
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'postgresql':CFG.server.postgresql, 'amqp':fail_bad_user_cfg},
+                exchange=_make_exchange_cfg())
     def test_start_stop_with_no_connections(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_port_cfg}, container=_make_container_cfg(primary='amqp_bad'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_port_cfg},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp_bad')))
     def test_start_stop_with_bad_port_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-    @patch.dict('pyon.ion.exchange.CFG', server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_host_cfg}, container=_make_container_cfg(primary='amqp_bad'))
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'postgresql':CFG.server.postgresql, 'amqp_bad':fail_bad_host_cfg},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp_bad')))
     def test_start_stop_with_bad_host_failure(self):
         self.assertRaises(ExchangeManagerError, self._start_container)
 
-    def test_priviledged_transport_dying_means_fail_fast(self):
+    def test_privileged_transport_dying_means_fail_fast(self):
         self._start_container()
 
         self.container.fail_fast = Mock()
@@ -246,7 +393,17 @@ class TestExchangeManagerInt(IonIntegrationTestCase):
         self.assertRaises(TransportError, xn.unbind, bind)
 
         self.assertEquals(self.container.fail_fast.call_count, 1)
-        self.assertIn("ExManager priviledged transport has failed", self.container.fail_fast.call_args[0][0])
+        self.assertIn("ExManager privileged transport", self.container.fail_fast.call_args[0][0])
+
+    @patch.dict('pyon.ion.exchange.CFG',
+                server={'amqp':CFG.server.amqp, 'postgresql':CFG.server.postgresql},
+                exchange=_make_exchange_cfg(primary=_make_broker_cfg(server='amqp', server_priv='amqp')))
+    def test_privileged_connection(self):
+        self._start_container()
+
+        self.assertEquals(self.container.node, self.container.ex_manager.default_node)
+        self.assertEquals(len(self.container.ex_manager._nodes), 1)
+        self.assertEquals(len(self.container.ex_manager._priv_nodes), 1)
 
 @attr('UNIT', group='exchange')
 class TestExchangeObjects(PyonTestCase):
@@ -256,10 +413,15 @@ class TestExchangeObjects(PyonTestCase):
         self.ex_manager.get_transport = Mock(return_value=self.pt)
 
         # set up some nodes
-        self.ex_manager._nodes = {'primary': Mock(), 'priviledged': Mock()}
+        self.ex_manager._nodes = {'primary': Mock()}
+
+        # skirt some RR/Mock issues
+        self.ex_manager._get_xs_obj = Mock(return_value=None)
 
         # patch for setUp and test
-        self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'exchange':{'auto_register':False}}, 'messaging':{'server':{}}})
+        self.patch_cfg('pyon.ion.exchange.CFG',
+                       {'container':{'exchange':{'auto_register':False}},
+                        'exchange':_make_exchange_cfg()})
 
         # start ex manager
         self.ex_manager.start()
@@ -486,8 +648,9 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
                                                               'datastore':CFG['container']['datastore'],
-                                                              'exchange':{'auto_register': False},
-                                                              'messaging':{'server':{'primary':'amqp', 'priviledged':None}}},
+                                                              'exchange':{'auto_register': False}},
+                                                 'exchange': _make_exchange_cfg(system_broker=_make_broker_cfg(server='amqp'),
+                                                                                other=_make_broker_cfg(server='amqp', join_xs=['other'])),
                                                  'server':CFG['server']})
         self._start_container()
 
@@ -519,6 +682,19 @@ class TestExchangeObjectsInt(IonIntegrationTestCase):
 
         # did we get back what we expected?
         self.assertEquals(ret, 'BACK:hi there')
+
+    def test_create_xn_on_diff_broker(self):
+        xs = self.container.create_xs('other')
+        self.assertEquals(xs.node, self.container.ex_manager._nodes['other'])
+
+        xn = self.container.create_xn_service('hello', xs=xs)
+        self.assertEquals(xn.node, self.container.ex_manager._nodes['other'])
+
+        xn = self.container.create_xn_service('other_hello')
+        self.assertEquals(xn.node, self.container.ex_manager._nodes['system_broker'])
+
+        # @TODO: name collisions in xn_by_name/RR with same name/different XS?
+        # should likely raise error
 
     def test_pubsub_with_xp(self):
         raise unittest.SkipTest("not done yet")
@@ -636,8 +812,8 @@ class TestExchangeObjectsIntWithLocal(TestExchangeObjectsInt):
     def setUp(self):
         self.patch_cfg('pyon.ion.exchange.CFG', {'container':{'profile':"res/profile/development.yml",
                                                               'datastore':CFG['container']['datastore'],
-                                                              'exchange':{'auto_register': False},
-                                                              'messaging':{'server':{'primary':'localrouter', 'priviledged':None}}},
+                                                              'exchange':{'auto_register': False}},
+                                                 'exchange': _make_exchange_cfg(system_broker=_make_broker_cfg(server='amqp')),
                                                  'server':CFG['server']})
         self._start_container()
 
@@ -652,7 +828,7 @@ class TestExchangeObjectsCreateDelete(IonIntegrationTestCase):
         self._start_container()
 
         # skip if we're not an amqp node
-        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+        if not isinstance(self.container.ex_manager.default_node, NodeB):
             raise unittest.SkipTest("Management API only works with AMQP nodes for now")
 
         # test to see if we have access to management URL!
@@ -802,8 +978,8 @@ class TestExchangeObjectsDurableFlag(IonIntegrationTestCase):
 class TestManagementAPI(PyonTestCase):
     def setUp(self):
         self.ex_manager = ExchangeManager(Mock())
-        self.ex_manager._nodes = MagicMock()
-        self.ex_manager._nodes.get.return_value.client.parameters.host = "testhost" # stringifies so don't use sentinel
+        self.ex_manager._priv_nodes = MagicMock()
+        self.ex_manager._priv_nodes.get.return_value.client.parameters.host = "testhost" # stringifies so don't use sentinel
 
         self.ex_manager._ems_client = Mock()
 
@@ -886,10 +1062,10 @@ class TestManagementAPIInt(IonIntegrationTestCase):
         self._start_container()
 
         # skip if we're not an amqp node
-        if not isinstance(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]), NodeB):
+        if not isinstance(self.container.ex_manager.default_node, NodeB):
             raise unittest.SkipTest("Management API only works with AMQP nodes for now")
 
-        self.transport = self.container.ex_manager.get_transport(self.container.ex_manager._nodes.get('priviledged', self.container.ex_manager._nodes.values()[0]))
+        self.transport = self.container.ex_manager.get_transport(self.container.ex_manager.default_node)
 
         # test to see if we have access to management URL!
         url = self.container.ex_manager._get_management_url('overview')

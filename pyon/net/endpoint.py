@@ -21,7 +21,7 @@ from pyon.net.channel import ChannelClosedError, PublisherChannel, ListenChannel
 from pyon.core.interceptor.interceptor import Invocation, process_interceptors
 from pyon.util.containers import get_ion_ts, get_ion_ts_millis
 from pyon.util.log import log
-from pyon.net.transport import NameTrio, BaseTransport
+from pyon.net.transport import NameTrio, BaseTransport, XOTransport
 from pyon.util.sflow import SFlowManager
 
 # create special logging category for RPC message tracking
@@ -325,6 +325,24 @@ class BaseEndpoint(object):
         """
         pass
 
+    def _ensure_name_trio(self, name):
+        """
+        Helper method to ensure a NameTrio on the passed in name.
+
+        This BaseEndpoint method assumes RPC - override where appropriate. @TODO for events
+
+        Returns a NameTrio - if the name parameter is already a NameTrio, returns that.
+        """
+        # ensure NameTrio
+        if not isinstance(name, NameTrio):
+            name = NameTrio(".".join([bootstrap.get_sys_name(),
+                                      'ion.xs',     # @TODO: remove
+                                      CFG.get_safe('exchange.core_xps.ion_rpc', 'ioncore')]),
+                            name)   # if name is a tuple it takes precedence
+            #log.debug("MAKINGNAMETRIO %s\n%s", name, ''.join(traceback.format_list(traceback.extract_stack()[-10:-1])))
+
+        return name
+
 class SendingBaseEndpoint(BaseEndpoint):
     def __init__(self, node=None, to_name=None, name=None, transport=None):
         BaseEndpoint.__init__(self, node=node, transport=transport)
@@ -334,18 +352,28 @@ class SendingBaseEndpoint(BaseEndpoint):
         self._send_name = to_name or name
 
         # ensure NameTrio
-        if not isinstance(self._send_name, NameTrio):
-            self._send_name = NameTrio(bootstrap.get_sys_name(), self._send_name)   # if send_name is a tuple it takes precedence
+        self._send_name = self._ensure_name_trio(self._send_name)
+
+        # set node from XO
+        if isinstance(self._send_name, XOTransport):
+            if self.node is not None and self.node != self._send_name.node:
+                log.warn("SendingBaseEndpoint.__init__: setting new node from XO")
+
+            self.node = self._send_name.node
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
+        if to_name is not None and isinstance(to_name, XOTransport):
+            if self.node is not None and self.node != to_name.node:
+                log.warn("SendingBaseEndpoint.create_endpoint: setting new node from XO when node already set")
+
+            self.node = to_name.node
+
         e = BaseEndpoint.create_endpoint(self, to_name=to_name, existing_channel=existing_channel, **kwargs)
 
         name = to_name or self._send_name
         assert name
 
-        # ensure NameTrio
-        if not isinstance(name, NameTrio):
-            name = NameTrio(bootstrap.get_sys_name(), name)     # if name is a tuple it takes precedence
+        name = self._ensure_name_trio(name)
 
         e.channel.connect(name)
         return e
@@ -453,8 +481,14 @@ class ListeningBaseEndpoint(BaseEndpoint):
         self._recv_name = from_name or name
 
         # ensure NameTrio
-        if not isinstance(self._recv_name, NameTrio):
-            self._recv_name = NameTrio(bootstrap.get_sys_name(), self._recv_name, binding)   # if _recv_name is tuple it takes precedence
+        self._recv_name = self._ensure_name_trio(self._recv_name)
+
+        # set node from XO
+        if isinstance(self._recv_name, XOTransport):
+            if self.node is not None and self.node != self._recv_name.node:
+                log.warn("ListeningBaseEndpoint.__init__: setting new node from XO when node already set")
+
+            self.node = self._recv_name.node
 
         self._ready_event = event.Event()
         self._binding = binding

@@ -4,6 +4,7 @@
 
 __author__ = 'Michael Meisinger, David Stuebe, Dave Foster <dfoster@asascience.com>'
 
+from pyon.net.transport import BaseTransport
 from pyon.net.endpoint import Publisher, Subscriber, EndpointUnit, process_interceptors, RPCRequestEndpointUnit, BaseEndpoint, RPCClient, RPCResponseEndpointUnit, RPCServer, PublisherEndpointUnit, SubscriberEndpointUnit
 from pyon.ion.event import BaseEventSubscriberMixin
 from pyon.util.log import log
@@ -168,11 +169,35 @@ class ProcessRPCClient(RPCClient):
 
     def __init__(self, process=None, **kwargs):
         self._process = process
+
+        if 'to_name' in kwargs and kwargs['to_name'] is not None and not isinstance(kwargs['to_name'], BaseTransport):
+            container = (hasattr(self._process, 'container') and self._process.container) or self._get_container_instance()
+            if container:
+                kwargs['to_name'] = container.create_xn_service(kwargs['to_name'])
+            else:
+                log.info('No container at ProcessRPCClient init time, will wait until message send to upgrade to Exchange Object')
+
         RPCClient.__init__(self, **kwargs)
 
     def create_endpoint(self, to_name=None, existing_channel=None, **kwargs):
         if not self._process:
             raise StandardError("No Process specified")
+
+        # upgrade to exchange object
+        if to_name is None and not isinstance(self._send_name, BaseTransport):
+            container = self._process.container or self._get_container_instance()
+            if not container:
+                raise StandardError("No container found, can not upgrade to ExchangeObject")
+
+            self._send_name = container.create_xn_service(self._send_name)
+
+        # upgrade one timers too
+        if to_name is not None and not isinstance(to_name, BaseTransport):
+            container = self._process.container or self._get_container_instance()
+            if not container:
+                raise StandardError("No container found, can not upgrade to ExchangeObject")
+
+            to_name = container.create_xn_service(to_name)
 
         newkwargs = kwargs.copy()
         newkwargs['process'] = self._process

@@ -405,29 +405,23 @@ class ProcManager(object):
         process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
 
         listen_name = get_safe(config, "process.listen_name") or process_instance.name
+        listen_name_xo = self.container.create_xn_service(listen_name)
+
         log.debug("Service Process (%s) listen_name: %s", name, listen_name)
         process_instance._proc_listen_name = listen_name
 
         # Service RPC endpoint
         rsvc1 = self._create_listening_endpoint(node=self.container.node,
-                                                from_name=listen_name,
+                                                from_name=listen_name_xo,
                                                 process=process_instance)
-        # Named local RPC endpoint
-        rsvc2 = self._create_listening_endpoint(node=self.container.node,
-                                                from_name=process_instance.id,
-                                                process=process_instance)
-
-        # cleanup method to delete process queue
-        cleanup = lambda _: self._cleanup_method(process_instance.id, rsvc2)
 
         # Start an ION process with the right kind of endpoint factory
         proc = self.proc_sup.spawn(name=process_instance.id,
                                    service=process_instance,
-                                   listeners=[rsvc1, rsvc2],
-                                   proc_name=process_instance._proc_name,
-                                   cleanup_method=cleanup)
+                                   listeners=[rsvc1],
+                                   proc_name=process_instance._proc_name)
         proc.proc._glname = "ION Proc %s" % process_instance._proc_name
-        self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((listen_name, process_instance.id)))
+        self.proc_sup.ensure_ready(proc, "_spawn_service_process for %s" % ",".join((str(listen_name), process_instance.id)))
 
         # map gproc to process_instance
         self._spawned_proc_to_process[proc.proc] = process_instance
@@ -466,13 +460,13 @@ class ProcManager(object):
         publish_streams = get_safe(config, "process.publish_streams")
         pub_names = self._set_publisher_endpoints(process_instance, publish_streams)
 
+        pid_listener_xo = self.container.create_xn_process(process_instance.id)
         rsvc = self._create_listening_endpoint(node=self.container.node,
-                                               from_name=process_instance.id,
+                                               from_name=pid_listener_xo,
                                                process=process_instance)
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
         def cleanup(*args):
-            self._cleanup_method(process_instance.id, rsvc)
             for name in pub_names:
                 p = getattr(process_instance, name)
                 p.close()
@@ -520,29 +514,25 @@ class ProcManager(object):
         if resource_id:
             process_instance.resource_id = resource_id
 
+            resource_id_xo = self.container.create_xn_process(resource_id)
+
             alistener = self._create_listening_endpoint(node=self.container.node,
-                                                        from_name=resource_id,
+                                                        from_name=resource_id_xo,
                                                         process=process_instance)
 
             listeners.append(alistener)
 
+        pid_listener_xo = self.container.create_xn_process(process_instance.id)
         rsvc = self._create_listening_endpoint(node=self.container.node,
-                                               from_name=process_instance.id,
+                                               from_name=pid_listener_xo,
                                                process=process_instance)
 
         listeners.append(rsvc)
 
-        # cleanup method to delete process/agent queue (@TODO: leaks a bit here - should use XOs)
-        def agent_cleanup(x):
-            self._cleanup_method(process_instance.id, rsvc)
-            if resource_id:
-                self._cleanup_method(resource_id, alistener)
-
         proc = self.proc_sup.spawn(name=process_instance.id,
                                    service=process_instance,
                                    listeners=listeners,
-                                   proc_name=process_instance._proc_name,
-                                   cleanup_method=agent_cleanup)
+                                   proc_name=process_instance._proc_name)
         proc.proc._glname = "ION Proc %s" % process_instance._proc_name
         self.proc_sup.ensure_ready(proc, "_spawn_agent_process for %s" % process_instance.id)
 
@@ -580,8 +570,9 @@ class ProcManager(object):
         Attach to service pid.
         """
         process_instance = self._create_process_instance(process_id, name, module, cls, config, proc_attr)
+        pid_listener_xo = self.container.create_xn_process(process_instance.id)
         rsvc = self._create_listening_endpoint(node=self.container.node,
-                                               from_name=process_instance.id,
+                                               from_name=pid_listener_xo,
                                                process=process_instance)
 
         # Add publishers if any...
@@ -590,7 +581,6 @@ class ProcManager(object):
 
         # cleanup method to delete process queue (@TODO: leaks a bit here - should use XOs)
         def cleanup(*args):
-            self._cleanup_method(process_instance.id, rsvc)
             for name in pub_names:
                 p = getattr(process_instance, name)
                 p.close()
