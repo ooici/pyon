@@ -83,6 +83,6 @@ setup(  name = 'pyon',
             'python-gevent-profiler',
             'lxml==2.3.4',
             'requests',
-            'psutil==1.0.1'
+            'psutil==5.6.6'
         ],
      )
