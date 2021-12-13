@@ -81,7 +81,7 @@ setup(  name = 'pyon',
             'mock==0.8',
             'ndg-xacml==0.5.1',
             'python-gevent-profiler',
-            'lxml==2.3.4',
+            'lxml==4.6.5',
             'requests',
             'psutil==1.0.1'
         ],
