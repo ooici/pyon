@@ -75,7 +75,7 @@ setup(  name = 'pyon',
             # Don't put == version on coverage.
             'coverage',
             'nose==1.1.2',
-            'ipython==0.13.0',
+            'ipython==7.16.3',
             'antlr_python_runtime==3.1.3',
             'readline',
             'mock==0.8',
